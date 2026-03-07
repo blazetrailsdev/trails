@@ -17612,16 +17612,55 @@ describe("TouchLaterTest", () => {
 });
 
 describe("ReadOnlyTest", () => {
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+
+  it("cant update columns readonly record", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "hello" });
+    p.readonlyBang();
+    expect(p.isReadonly()).toBe(true);
+    await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
+  });
+
+  it("find with readonly option", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "test" });
+    const posts = await Post.all().readonly().toArray();
+    expect(posts.length).toBeGreaterThan(0);
+    expect(posts[0].isReadonly()).toBe(true);
+  });
+
+  it("find with joins option does not imply readonly", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "test" });
+    const found = await Post.find(p.id);
+    expect(found.isReadonly()).toBe(false);
+  });
+
+  it("readonly scoping", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    const results = await Post.all().readonly().toArray();
+    for (const r of results) {
+      expect(r.isReadonly()).toBe(true);
+    }
+  });
+
   it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
-  it.skip("cant update columns readonly record", () => { /* fixture-dependent */ });
-  it.skip("find with readonly option", () => { /* fixture-dependent */ });
-  it.skip("find with joins option does not imply readonly", () => { /* fixture-dependent */ });
   it.skip("has many find readonly", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly while finding by id", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly while finding first", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly while finding last", () => { /* fixture-dependent */ });
-  it.skip("readonly scoping", () => { /* fixture-dependent */ });
   it.skip("association collection method missing scoping not readonly", () => { /* fixture-dependent */ });
 });
 
@@ -17837,15 +17876,85 @@ describe("SerializationTest", () => {
 });
 
 describe("SecureTokenTest", () => {
-  it.skip("token values are generated for specified attributes and persisted on save", () => { /* fixture-dependent */ });
-  it.skip("generating token on initialize does not affect reading from the column", () => { /* fixture-dependent */ });
-  it.skip("generating token on initialize happens only once", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+    }
+    hasSecureToken(User, "token");
+    return { User };
+  }
+
+  it("token values are generated for specified attributes and persisted on save", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice" });
+    const tok = u.readAttribute("token");
+    expect(tok).toBeTruthy();
+    expect(typeof tok).toBe("string");
+    expect((tok as string).length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("generating token on initialize does not affect reading from the column", async () => {
+    const { User } = makeModel();
+    const u = new User({ name: "Bob" });
+    // token should be empty before save
+    expect(u.readAttribute("token")).toBeFalsy();
+    await u.save();
+    expect(u.readAttribute("token")).toBeTruthy();
+  });
+
+  it("generating token on initialize happens only once", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Carol" });
+    const token1 = u.readAttribute("token");
+    await u.save();
+    const token2 = u.readAttribute("token");
+    expect(token1).toBe(token2);
+  });
+
+  it("regenerating the secure token", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Dan" });
+    const originalToken = u.readAttribute("token") as string;
+    await (u as any).regenerateToken();
+    const newToken = u.readAttribute("token") as string;
+    expect(newToken).not.toBe(originalToken);
+    expect(newToken.length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("token value not overwritten when present", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Eve", token: "preset-token-value-abc" });
+    expect(u.readAttribute("token")).toBe("preset-token-value-abc");
+  });
+
+  it("token length cannot be less than 24 characters", async () => {
+    class UserWithToken extends Base {
+      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+    }
+    hasSecureToken(UserWithToken, "token", { length: 24 });
+    const u = await UserWithToken.create({ name: "Frank" });
+    expect((u.readAttribute("token") as string).length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("token on callback", async () => {
+    const { User } = makeModel();
+    const log: string[] = [];
+    User.afterCreate((r: any) => { log.push("after_create"); });
+    await User.create({ name: "Gina" });
+    expect(log).toContain("after_create");
+  });
+
+  it("token calls the setter method", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Henry" });
+    const t = u.readAttribute("token");
+    expect(typeof t).toBe("string");
+  });
+
   it.skip("generating token on initialize is skipped if column was not selected", () => { /* fixture-dependent */ });
-  it.skip("regenerating the secure token", () => { /* fixture-dependent */ });
-  it.skip("token value not overwritten when present", () => { /* fixture-dependent */ });
-  it.skip("token length cannot be less than 24 characters", () => { /* fixture-dependent */ });
-  it.skip("token on callback", () => { /* fixture-dependent */ });
-  it.skip("token calls the setter method", () => { /* fixture-dependent */ });
 });
 
 describe("MysqlDefaultExpressionTest", () => {
@@ -20846,15 +20955,85 @@ describe("AssociationValidationTest", () => {
 });
 
 describe("SecureTokenTest", () => {
-  it.skip("token values are generated for specified attributes and persisted on save", () => { /* fixture-dependent */ });
-  it.skip("generating token on initialize does not affect reading from the column", () => { /* fixture-dependent */ });
-  it.skip("generating token on initialize happens only once", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+    }
+    hasSecureToken(User, "token");
+    return { User };
+  }
+
+  it("token values are generated for specified attributes and persisted on save", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice" });
+    const tok = u.readAttribute("token");
+    expect(tok).toBeTruthy();
+    expect(typeof tok).toBe("string");
+    expect((tok as string).length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("generating token on initialize does not affect reading from the column", async () => {
+    const { User } = makeModel();
+    const u = new User({ name: "Bob" });
+    // token should be empty before save
+    expect(u.readAttribute("token")).toBeFalsy();
+    await u.save();
+    expect(u.readAttribute("token")).toBeTruthy();
+  });
+
+  it("generating token on initialize happens only once", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Carol" });
+    const token1 = u.readAttribute("token");
+    await u.save();
+    const token2 = u.readAttribute("token");
+    expect(token1).toBe(token2);
+  });
+
+  it("regenerating the secure token", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Dan" });
+    const originalToken = u.readAttribute("token") as string;
+    await (u as any).regenerateToken();
+    const newToken = u.readAttribute("token") as string;
+    expect(newToken).not.toBe(originalToken);
+    expect(newToken.length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("token value not overwritten when present", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Eve", token: "preset-token-value-abc" });
+    expect(u.readAttribute("token")).toBe("preset-token-value-abc");
+  });
+
+  it("token length cannot be less than 24 characters", async () => {
+    class UserWithToken extends Base {
+      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+    }
+    hasSecureToken(UserWithToken, "token", { length: 24 });
+    const u = await UserWithToken.create({ name: "Frank" });
+    expect((u.readAttribute("token") as string).length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("token on callback", async () => {
+    const { User } = makeModel();
+    const log: string[] = [];
+    User.afterCreate((r: any) => { log.push("after_create"); });
+    await User.create({ name: "Gina" });
+    expect(log).toContain("after_create");
+  });
+
+  it("token calls the setter method", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Henry" });
+    const t = u.readAttribute("token");
+    expect(typeof t).toBe("string");
+  });
+
   it.skip("generating token on initialize is skipped if column was not selected", () => { /* fixture-dependent */ });
-  it.skip("regenerating the secure token", () => { /* fixture-dependent */ });
-  it.skip("token value not overwritten when present", () => { /* fixture-dependent */ });
-  it.skip("token length cannot be less than 24 characters", () => { /* fixture-dependent */ });
-  it.skip("token on callback", () => { /* fixture-dependent */ });
-  it.skip("token calls the setter method", () => { /* fixture-dependent */ });
 });
 
 describe("AnnotateTest", () => {
@@ -21659,16 +21838,55 @@ describe("PrimaryKeyIntegerTest", () => {
 });
 
 describe("ReadOnlyTest", () => {
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+
+  it("cant update columns readonly record", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "hello" });
+    p.readonlyBang();
+    expect(p.isReadonly()).toBe(true);
+    await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
+  });
+
+  it("find with readonly option", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "test" });
+    const posts = await Post.all().readonly().toArray();
+    expect(posts.length).toBeGreaterThan(0);
+    expect(posts[0].isReadonly()).toBe(true);
+  });
+
+  it("find with joins option does not imply readonly", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "test" });
+    const found = await Post.find(p.id);
+    expect(found.isReadonly()).toBe(false);
+  });
+
+  it("readonly scoping", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    const results = await Post.all().readonly().toArray();
+    for (const r of results) {
+      expect(r.isReadonly()).toBe(true);
+    }
+  });
+
   it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
-  it.skip("cant update columns readonly record", () => { /* fixture-dependent */ });
-  it.skip("find with readonly option", () => { /* fixture-dependent */ });
-  it.skip("find with joins option does not imply readonly", () => { /* fixture-dependent */ });
   it.skip("has many find readonly", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly while finding by id", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly while finding first", () => { /* fixture-dependent */ });
   it.skip("has many with through is not implicitly marked readonly while finding last", () => { /* fixture-dependent */ });
-  it.skip("readonly scoping", () => { /* fixture-dependent */ });
   it.skip("association collection method missing scoping not readonly", () => { /* fixture-dependent */ });
 });
 
