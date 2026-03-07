@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac } from "node:crypto";
 import type { Base } from "./base.js";
 
 /**
@@ -65,6 +65,26 @@ export function generatesTokenFor(
         token: string
       ): Promise<Base | null> {
         return _findByToken(this, purposeName, token);
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  // Add static method: findByTokenForBang(purpose, token)
+  if (!(modelClass as any).findByTokenForBang) {
+    Object.defineProperty(modelClass, "findByTokenForBang", {
+      value: async function (
+        this: typeof Base,
+        purposeName: string,
+        token: string
+      ): Promise<Base> {
+        const record = await _findByToken(this, purposeName, token);
+        if (!record) {
+          const { RecordNotFound } = await import("./errors.js");
+          throw new RecordNotFound(`Couldn't find record for token purpose: ${purposeName}`);
+        }
+        return record;
       },
       writable: true,
       configurable: true,

@@ -17313,9 +17313,35 @@ describe("TokenForTest", () => {
     expect(found.readAttribute("name")).toBe("Frank");
   });
 
-  it.skip("raises on bang when record is not found", () => { /* fixture-dependent */ });
-  it.skip("does not find record when expires_in is different", () => { /* fixture-dependent */ });
-  it.skip("finds record through relation", () => { /* fixture-dependent */ });
+  it("raises on bang when record is not found", async () => {
+    const { User } = makeModel();
+    await expect(
+      (User as any).findByTokenForBang("password_reset", "invalid-token")
+    ).rejects.toThrow();
+  });
+
+  it("does not find record when expires_in is different", async () => {
+    // Token generated with expiresIn=1ms should be expired by the time we look up
+    class UserX extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    generatesTokenFor(UserX, "quick_confirm", { expiresIn: 1, generator: () => "" });
+    const u = await UserX.create({ name: "Alice" });
+    const token = (u as any).generateTokenFor("quick_confirm");
+    await new Promise(r => setTimeout(r, 5));
+    const result = await (UserX as any).findByTokenFor("quick_confirm", token);
+    expect(result).toBeNull();
+  });
+
+  it("finds record through relation", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Grace", password_digest: "abc" });
+    const token = (u as any).generateTokenFor("password_reset");
+    const found = await (User as any).findByTokenFor("password_reset", token);
+    expect(found).not.toBeNull();
+    expect(found.readAttribute("name")).toBe("Grace");
+  });
+
   it.skip("subclasses can redefine tokens", () => { /* fixture-dependent */ });
   it.skip("finds record with a custom primary key", () => { /* fixture-dependent */ });
   it.skip("finds record with a composite primary key", () => { /* fixture-dependent */ });
@@ -18162,12 +18188,49 @@ describe("PresenceValidationTest", () => {
 });
 
 describe("FieldOrderedValuesTest", () => {
-  it.skip("in order of empty", () => { /* fixture-dependent */ });
+  it("in order of empty", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("status", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.all().inOrderOf("status", []).toSql();
+    expect(sql).toContain("CASE");
+  });
+
   it.skip("in order of with enums values", () => { /* fixture-dependent */ });
   it.skip("in order of with enums keys", () => { /* fixture-dependent */ });
-  it.skip("in order of with string column", () => { /* fixture-dependent */ });
-  it.skip("in order of after regular order", () => { /* fixture-dependent */ });
-  it.skip("in order of with nil", () => { /* fixture-dependent */ });
+
+  it("in order of with string column", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("status", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.all().inOrderOf("status", ["draft", "published", "archived"]).toSql();
+    expect(sql).toContain("CASE");
+    expect(sql).toContain("draft");
+    expect(sql).toContain("published");
+    expect(sql).toContain("archived");
+  });
+
+  it("in order of after regular order", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.order("title").inOrderOf("status", ["draft", "published"]).toSql();
+    expect(sql).toContain("CASE");
+  });
+
+  it("in order of with nil", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("status", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.all().inOrderOf("status", [null, "draft", "published"]).toSql();
+    expect(sql).toContain("CASE");
+    expect(sql).toContain("NULL");
+  });
+
   it.skip("in order of with associations", () => { /* fixture-dependent */ });
   it.skip("in order of with filter false", () => { /* fixture-dependent */ });
 });
