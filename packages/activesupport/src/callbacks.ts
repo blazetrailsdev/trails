@@ -3,6 +3,9 @@
  *
  * Provides defineCallbacks, setCallback, skipCallback, resetCallbacks,
  * and runCallbacks for before/after/around lifecycle hooks.
+ *
+ * Also provides a class-based mixin pattern via CallbacksMixin for Rails-style
+ * `include ActiveSupport::Callbacks` usage.
  */
 
 export type CallbackKind = "before" | "after" | "around";
@@ -187,4 +190,95 @@ export function runCallbacks(
   }
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Class-based mixin — Rails-style `include ActiveSupport::Callbacks`
+// ---------------------------------------------------------------------------
+
+/**
+ * CallbacksMixin provides a class-based API mirroring Rails' include of
+ * ActiveSupport::Callbacks. Extend a class with this to get instance methods
+ * `runCallbacks` and class methods `defineCallbacks`, `beforeCallback`, etc.
+ *
+ * Usage:
+ *   class MyModel extends CallbacksMixin() {
+ *     static {
+ *       this.defineCallbacks("save");
+ *       this.beforeCallback("save", (self: MyModel) => self.validate());
+ *     }
+ *
+ *     save() {
+ *       return this.runCallbacks("save", () => { ... });
+ *     }
+ *   }
+ */
+export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
+  const ActualBase = (Base ?? class {}) as TBase;
+
+  class WithCallbacks extends ActualBase {
+    /**
+     * Define a named callback chain on this class.
+     */
+    static defineCallbacks(name: string, options: DefineCallbacksOptions = {}): void {
+      defineCallbacks(this.prototype, name, options);
+    }
+
+    /**
+     * Register a before callback on this class.
+     */
+    static beforeCallback(
+      name: string,
+      callback: BeforeCallback,
+      options: CallbackOptions = {},
+    ): void {
+      setCallback(this.prototype, name, "before", callback, options);
+    }
+
+    /**
+     * Register an after callback on this class.
+     */
+    static afterCallback(
+      name: string,
+      callback: AfterCallback,
+      options: CallbackOptions = {},
+    ): void {
+      setCallback(this.prototype, name, "after", callback, options);
+    }
+
+    /**
+     * Register an around callback on this class.
+     */
+    static aroundCallback(
+      name: string,
+      callback: AroundCallback,
+      options: CallbackOptions = {},
+    ): void {
+      setCallback(this.prototype, name, "around", callback, options);
+    }
+
+    /**
+     * Skip (remove) a callback from this class's chain.
+     */
+    static skipCallback(name: string, kind: CallbackKind, callback: AnyCallback): void {
+      skipCallback(this.prototype, name, kind, callback);
+    }
+
+    /**
+     * Reset all callbacks on a named chain.
+     */
+    static resetCallbacks(name: string): void {
+      resetCallbacks(this.prototype, name);
+    }
+
+    /**
+     * Run the named callback chain, optionally wrapping a block.
+     * Returns false if the chain was halted, true otherwise.
+     */
+    runCallbacks(name: string, block?: () => void): boolean {
+      return runCallbacks(this, name, block);
+    }
+  }
+
+  return WithCallbacks;
 }

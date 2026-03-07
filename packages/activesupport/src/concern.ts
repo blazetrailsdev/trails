@@ -10,6 +10,13 @@ export interface ConcernDefinition {
   included?: (base: any) => void;
   classMethods?: Record<string, Function>;
   instanceMethods?: Record<string, Function>;
+  /**
+   * prepend: true — methods are installed such that they shadow existing
+   * prototype methods while still being able to call the original via the
+   * explicit `_super_<name>` property on the instance. Mirrors Rails'
+   * Module#prepend semantics where prepended methods wrap existing ones.
+   */
+  prepend?: boolean;
 }
 
 export interface ConcernMixin {
@@ -52,6 +59,12 @@ export function includeConcern(klass: any, mixin: ConcernMixin): void {
   // Mix instance methods into prototype
   if (def.instanceMethods) {
     for (const [name, fn] of Object.entries(def.instanceMethods)) {
+      if (def.prepend && klass.prototype[name]) {
+        // Save the original method under _super_<name> so the prepended
+        // method can call it. Mirrors Module#prepend wrap semantics.
+        const original = klass.prototype[name];
+        klass.prototype[`_super_${name}`] = original;
+      }
       klass.prototype[name] = fn;
     }
   }

@@ -5,6 +5,7 @@ import {
   skipCallback,
   resetCallbacks,
   runCallbacks,
+  CallbacksMixin,
 } from "./callbacks.js";
 
 describe("Callbacks", () => {
@@ -525,5 +526,138 @@ describe("Callbacks", () => {
       runCallbacks(target, "save", () => { /* noop */ });
       expect(target.stuff).toBe("ACTION");
     });
+  });
+});
+
+describe("CallbacksMixin", () => {
+  it("provides defineCallbacks and runCallbacks as class/instance methods", () => {
+    class MyModel extends CallbacksMixin() {
+      log: string[] = [];
+
+      static {
+        this.defineCallbacks("save");
+        this.beforeCallback("save", (self: MyModel) => { self.log.push("before"); });
+        this.afterCallback("save", (self: MyModel) => { self.log.push("after"); });
+      }
+
+      save() {
+        this.runCallbacks("save", () => { this.log.push("saved"); });
+      }
+    }
+
+    const m = new MyModel();
+    m.save();
+    expect(m.log).toEqual(["before", "saved", "after"]);
+  });
+
+  it("beforeCallback returning false halts the chain", () => {
+    class MyModel extends CallbacksMixin() {
+      saved = false;
+
+      static {
+        this.defineCallbacks("save");
+        this.beforeCallback("save", () => false);
+      }
+
+      save() {
+        this.runCallbacks("save", () => { this.saved = true; });
+      }
+    }
+
+    const m = new MyModel();
+    m.save();
+    expect(m.saved).toBe(false);
+  });
+
+  it("aroundCallback wraps block", () => {
+    class MyModel extends CallbacksMixin() {
+      log: string[] = [];
+
+      static {
+        this.defineCallbacks("run");
+        this.aroundCallback("run", (self: MyModel, next: () => void) => {
+          self.log.push("before_around");
+          next();
+          self.log.push("after_around");
+        });
+      }
+
+      run() {
+        this.runCallbacks("run", () => { this.log.push("core"); });
+      }
+    }
+
+    const m = new MyModel();
+    m.run();
+    expect(m.log).toEqual(["before_around", "core", "after_around"]);
+  });
+
+  it("skipCallback removes a callback", () => {
+    const cb = (self: any) => { self.log.push("skipped"); };
+
+    class MyModel extends CallbacksMixin() {
+      log: string[] = [];
+
+      static {
+        this.defineCallbacks("save");
+        this.beforeCallback("save", cb);
+      }
+
+      save() { this.runCallbacks("save"); }
+    }
+
+    MyModel.skipCallback("save", "before", cb);
+    const m = new MyModel();
+    m.save();
+    expect(m.log).toEqual([]);
+  });
+
+  it("can extend an existing base class", () => {
+    class Base {
+      type = "base";
+    }
+
+    class Extended extends CallbacksMixin(Base) {
+      log: string[] = [];
+
+      static {
+        this.defineCallbacks("action");
+        this.beforeCallback("action", (self: Extended) => self.log.push("before"));
+      }
+
+      doAction() { this.runCallbacks("action"); }
+    }
+
+    const e = new Extended();
+    expect(e.type).toBe("base");
+    e.doAction();
+    expect(e.log).toEqual(["before"]);
+  });
+
+  it("conditional callbacks work with if option", () => {
+    class MyModel extends CallbacksMixin() {
+      log: string[] = [];
+      active = true;
+
+      static {
+        this.defineCallbacks("save");
+        this.beforeCallback(
+          "save",
+          (self: MyModel) => self.log.push("conditional"),
+          { if: (self: any) => self.active },
+        );
+      }
+
+      save() { this.runCallbacks("save"); }
+    }
+
+    const m = new MyModel();
+    m.save();
+    expect(m.log).toContain("conditional");
+
+    m.log = [];
+    m.active = false;
+    m.save();
+    expect(m.log).not.toContain("conditional");
   });
 });

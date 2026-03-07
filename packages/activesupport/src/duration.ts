@@ -327,7 +327,32 @@ export class Duration {
     }
     return new Duration({ seconds: value });
   }
+
+  /** Sum an array of durations. Mirrors Enumerable#sum for durations. */
+  static sum(durations: Duration[]): Duration {
+    return durations.reduce((acc, d) => acc.plus(d), new Duration());
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Numeric helpers — functional equivalents of Rails' numeric extensions
+// (e.g. `5.minutes` in Ruby → `minutes(5)` in TypeScript)
+// ---------------------------------------------------------------------------
+
+/** @example seconds(30).since(date) */
+export function seconds(n: number): Duration { return Duration.seconds(n); }
+/** @example minutes(5).ago() */
+export function minutes(n: number): Duration { return Duration.minutes(n); }
+/** @example hours(2).fromNow() */
+export function hours(n: number): Duration { return Duration.hours(n); }
+/** @example days(3).since(date) */
+export function days(n: number): Duration { return Duration.days(n); }
+/** @example weeks(1).fromNow() */
+export function weeks(n: number): Duration { return Duration.weeks(n); }
+/** @example months(6).ago() */
+export function months(n: number): Duration { return Duration.months(n); }
+/** @example years(2).fromNow() */
+export function years(n: number): Duration { return Duration.years(n); }
 
 // ---------------------------------------------------------------------------
 // Helpers

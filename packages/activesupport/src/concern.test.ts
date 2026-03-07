@@ -107,4 +107,69 @@ describe("Concern", () => {
 
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it("prepend: true wraps existing prototype method and saves original as _super_<name>", () => {
+    class User {
+      greet() {
+        return "hello";
+      }
+    }
+
+    const Decorated = concern({
+      prepend: true,
+      instanceMethods: {
+        greet(this: any) {
+          return `[decorated] ${this._super_greet()}`;
+        },
+      },
+    });
+
+    includeConcern(User, Decorated);
+    const u = new User() as any;
+    expect(u.greet()).toBe("[decorated] hello");
+    expect(typeof u._super_greet).toBe("function");
+  });
+
+  it("prepend: false does not save _super_ method", () => {
+    class User {
+      greet() { return "hello"; }
+    }
+
+    const Override = concern({
+      instanceMethods: {
+        greet() { return "overridden"; },
+      },
+    });
+
+    includeConcern(User, Override);
+    const u = new User() as any;
+    expect(u.greet()).toBe("overridden");
+    expect(u._super_greet).toBeUndefined();
+  });
+
+  it("can include multiple concerns each providing different methods", () => {
+    const Serializable = concern({
+      instanceMethods: {
+        serialize() { return JSON.stringify({ type: "User" }); },
+      },
+    });
+
+    const Auditable = concern({
+      instanceMethods: {
+        auditLog() { return "audit"; },
+      },
+      classMethods: {
+        auditedFields() { return ["name", "email"]; },
+      },
+    });
+
+    class User {}
+    includeConcern(User, Serializable);
+    includeConcern(User, Auditable);
+
+    const u = new User() as any;
+    expect(u.serialize()).toContain("User");
+    expect(u.auditLog()).toBe("audit");
+    expect((User as any).auditedFields()).toEqual(["name", "email"]);
+  });
 });

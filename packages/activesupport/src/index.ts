@@ -102,6 +102,7 @@ export {
   skipCallback,
   resetCallbacks,
   runCallbacks,
+  CallbacksMixin,
 } from "./callbacks.js";
 export type {
   CallbackKind,
@@ -132,5 +133,8 @@ export * from "./time-ext.js";
 export { MessageEncryptor, InvalidMessage } from "./message-encryptor.js";
 export { MessageVerifier, InvalidSignature } from "./message-verifier.js";
 
-export { Duration } from "./duration.js";
+export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
 export type { DurationParts } from "./duration.js";
+
+export { Notifications, Event as NotificationEvent } from "./notifications.js";
+export type { EventPayload, NotificationSubscriber } from "./notifications.js";
