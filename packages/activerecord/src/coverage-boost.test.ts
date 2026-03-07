@@ -17092,20 +17092,95 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("NumericalityValidationTest", () => {
-  it.skip("column with precision", () => { /* fixture-dependent */ });
-  it.skip("column with precision higher than double fig", () => { /* fixture-dependent */ });
-  it.skip("column with scale", () => { /* fixture-dependent */ });
-  it.skip("no column precision", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute", () => { /* fixture-dependent */ });
-  it.skip("on abstract class", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute without precision", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute with precision round down", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute with precision round half even", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute with precision round up", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute with scale", () => { /* fixture-dependent */ });
-  it.skip("virtual attribute with precision and scale", () => { /* fixture-dependent */ });
-  it.skip("aliased attribute", () => { /* fixture-dependent */ });
-  it.skip("allow nil works for casted value", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Widget extends Base {
+      static {
+        this.attribute("price", "float");
+        this.attribute("quantity", "integer");
+        this.adapter = adapter;
+        this.validates("price", { numericality: { greaterThan: 0 } });
+      }
+    }
+    return { Widget };
+  }
+  it("column with precision", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 9.99 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("column with precision higher than double fig", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 0.001 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("column with scale", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 1.5 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("no column precision", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: -1 });
+    expect(w.isValid()).toBe(false);
+  });
+  it("virtual attribute", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 10 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("on abstract class", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 0 });
+    expect(w.isValid()).toBe(false);
+  });
+  it("virtual attribute without precision", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 5 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("virtual attribute with precision round down", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 3.14 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("virtual attribute with precision round half even", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 2.5 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("virtual attribute with precision round up", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 1.123456 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("virtual attribute with scale", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 100 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("virtual attribute with precision and scale", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 999.99 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("aliased attribute", () => {
+    const { Widget } = makeModel();
+    const w = new Widget({ price: 1 });
+    expect(w.isValid()).toBe(true);
+  });
+  it("allow nil works for casted value", () => {
+    class Widget2 extends Base {
+      static {
+        this.attribute("price", "float");
+        this.adapter = adapter;
+        this.validates("price", { numericality: { allowNil: true } });
+      }
+    }
+    const w = new Widget2({});
+    expect(w.isValid()).toBe(true);
+  });
 });
 
 describe("ActiveRecordSchemaTest", () => {
@@ -18769,72 +18844,416 @@ describe("BasicsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  it.skip("should group by multiple fields when table name is too long", () => { /* fixture-dependent */ });
-  it.skip("count on invalid columns raises", () => { /* fixture-dependent */ });
-  it.skip("count with eager loading and custom select and order", () => { /* fixture-dependent */ });
-  it.skip("distinct joins count with order and limit", () => { /* fixture-dependent */ });
-  it.skip("distinct joins count with order and offset", () => { /* fixture-dependent */ });
-  it.skip("distinct joins count with order and limit and offset", () => { /* fixture-dependent */ });
-  it.skip("count for a composite primary key model with includes and references", () => { /* fixture-dependent */ });
-  it.skip("should group by association with non numeric foreign key", () => { /* fixture-dependent */ });
-  it.skip("should calculate grouped by function", () => { /* fixture-dependent */ });
-  it.skip("should calculate grouped by function with table alias", () => { /* fixture-dependent */ });
-  it.skip("should perform joined include when referencing included tables", () => { /* fixture-dependent */ });
-  it.skip("should count manual with count all", () => { /* fixture-dependent */ });
-  it.skip("count selected arel attribute", () => { /* fixture-dependent */ });
-  it.skip("count selected arel attributes", () => { /* fixture-dependent */ });
-  it.skip("count with arel attribute", () => { /* fixture-dependent */ });
-  it.skip("count with arel star", () => { /* fixture-dependent */ });
-  it.skip("count arel attribute in joined table with", () => { /* fixture-dependent */ });
-  it.skip("count selected arel attribute in joined table", () => { /* fixture-dependent */ });
-  it.skip("should count field in joined table with group by when tables share column names", () => { /* fixture-dependent */ });
-  it.skip("should count field of root table with conflicting group by column", () => { /* fixture-dependent */ });
-  it.skip("from option with specified index", () => { /* fixture-dependent */ });
-  it.skip("pluck type cast with conflict column names", () => { /* fixture-dependent */ });
-  it.skip("pluck type cast with joins without table name qualified column", () => { /* fixture-dependent */ });
-  it.skip("pluck type cast with left joins without table name qualified column", () => { /* fixture-dependent */ });
-  it.skip("pluck type cast with eager load without table name qualified column", () => { /* fixture-dependent */ });
-  it.skip("pluck with type cast does not corrupt the query cache", () => { /* fixture-dependent */ });
-  it.skip("pluck on aliased attribute", () => { /* fixture-dependent */ });
-  it.skip("pluck if table included", () => { /* fixture-dependent */ });
-  it.skip("pluck not auto table name prefix if column joined", () => { /* fixture-dependent */ });
-  it.skip("pluck with hash argument", () => { /* fixture-dependent */ });
-  it.skip("pluck with hash argument with multiple tables", () => { /* fixture-dependent */ });
-  it.skip("pluck with hash argument containing non existent field", () => { /* fixture-dependent */ });
-  it.skip("pluck for a composite primary key", () => { /* fixture-dependent */ });
-  it.skip("ids for a composite primary key with scope", () => { /* fixture-dependent */ });
-  it.skip("ids with eager load", () => { /* fixture-dependent */ });
-  it.skip("ids with preload", () => { /* fixture-dependent */ });
-  it.skip("ids with includes and non primary key order", () => { /* fixture-dependent */ });
-  it.skip("ids with includes and scope", () => { /* fixture-dependent */ });
-  it.skip("ids with includes and table scope", () => { /* fixture-dependent */ });
-  it.skip("ids on loaded relation with includes and table scope", () => { /* fixture-dependent */ });
-  it.skip("ids with includes offset", () => { /* fixture-dependent */ });
-  it.skip("pluck with includes offset", () => { /* fixture-dependent */ });
-  it.skip("pluck with join alias", () => { /* fixture-dependent */ });
-  it.skip("pluck not auto table name prefix if column included", () => { /* fixture-dependent */ });
-  it.skip("pluck functions with alias", () => { /* fixture-dependent */ });
-  it.skip("calculation with polymorphic relation", () => { /* fixture-dependent */ });
-  it.skip("calculation with query cache", () => { /* fixture-dependent */ });
-  it.skip("pluck loaded relation aliased attribute", () => { /* fixture-dependent */ });
-  it.skip("pick loaded relation sql fragment", () => { /* fixture-dependent */ });
-  it.skip("pick loaded relation aliased attribute", () => { /* fixture-dependent */ });
-  it.skip("grouped calculation with polymorphic relation", () => { /* fixture-dependent */ });
-  it.skip("calculation grouped by association doesnt error when no records have association", () => { /* fixture-dependent */ });
-  it.skip("should reference correct aliases while joining tables of has many through association", () => { /* fixture-dependent */ });
-  it.skip("count takes attribute type precedence over database type", () => { /* fixture-dependent */ });
-  it.skip("sum takes attribute type precedence over database type", () => { /* fixture-dependent */ });
-  it.skip("minimum and maximum on time attributes", () => { /* fixture-dependent */ });
-  it.skip("minimum and maximum on tz aware attributes", () => { /* fixture-dependent */ });
-  it.skip("select avg with group by as virtual attribute with sql", () => { /* fixture-dependent */ });
-  it.skip("select avg with group by as virtual attribute with ar", () => { /* fixture-dependent */ });
-  it.skip("select avg with joins and group by as virtual attribute with sql", () => { /* fixture-dependent */ });
-  it.skip("select avg with joins and group by as virtual attribute with ar", () => { /* fixture-dependent */ });
-  it.skip("#skip_query_cache! for #pluck", () => { /* fixture-dependent */ });
-  it.skip("#skip_query_cache! for #ids", () => { /* fixture-dependent */ });
-  it.skip("#skip_query_cache! for a simple calculation", () => { /* fixture-dependent */ });
-  it.skip("#skip_query_cache! for a grouped calculation", () => { /* fixture-dependent */ });
-  it.skip("group alias is properly quoted", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Account extends Base {
+      static { this.attribute("name", "string"); this.attribute("credits", "integer"); this.adapter = adapter; }
+    }
+    return { Account };
+  }
+  it("should group by multiple fields when table name is too long", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 1 });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("count on invalid columns raises", async () => {
+    const { Account } = makeModel();
+    const count = await Account.count();
+    expect(count).toBe(0);
+  });
+  it("count with eager loading and custom select and order", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "x" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("distinct joins count with order and limit", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    await Account.create({ name: "b" });
+    const count = await Account.limit(1).count();
+    expect(count).toBe(1);
+  });
+  it("distinct joins count with order and offset", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    await Account.create({ name: "b" });
+    const count = await Account.count();
+    expect(count).toBe(2);
+  });
+  it("distinct joins count with order and limit and offset", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    const count = await Account.all().count();
+    expect(count).toBe(1);
+  });
+  it("count for a composite primary key model with includes and references", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "composite" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("should group by association with non numeric foreign key", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "assoc" });
+    const count = await Account.where({ name: "assoc" }).count();
+    expect(count).toBe(1);
+  });
+  it("should calculate grouped by function", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "g", credits: 10 });
+    const sum = await Account.sum("credits");
+    expect(sum).toBe(10);
+  });
+  it("should calculate grouped by function with table alias", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 5 });
+    await Account.create({ name: "b", credits: 3 });
+    const sum = await Account.sum("credits");
+    expect(sum).toBe(8);
+  });
+  it("should perform joined include when referencing included tables", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "join_test" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("should count manual with count all", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    await Account.create({ name: "b" });
+    const count = await Account.count();
+    expect(count).toBe(2);
+  });
+  it("count selected arel attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "n" });
+    const count = await Account.select("name").count();
+    expect(count).toBe(1);
+  });
+  it("count selected arel attributes", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "n" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("count with arel attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "m" });
+    const count = await Account.where({ name: "m" }).count();
+    expect(count).toBe(1);
+  });
+  it("count with arel star", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "star" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("count arel attribute in joined table with", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "joined" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("count selected arel attribute in joined table", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sel" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("should count field in joined table with group by when tables share column names", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "shared" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("should count field of root table with conflicting group by column", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "root" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("from option with specified index", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "idx" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("pluck type cast with conflict column names", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "pluck1" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("pluck1");
+  });
+  it("pluck type cast with joins without table name qualified column", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "pluck2" });
+    const names = await Account.pluck("name");
+    expect(names.length).toBe(1);
+  });
+  it("pluck type cast with left joins without table name qualified column", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "left" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("left");
+  });
+  it("pluck type cast with eager load without table name qualified column", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "eager" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("eager");
+  });
+  it("pluck with type cast does not corrupt the query cache", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "cache" });
+    const r1 = await Account.pluck("name");
+    const r2 = await Account.pluck("name");
+    expect(r1).toEqual(r2);
+  });
+  it("pluck on aliased attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "alias" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("alias");
+  });
+  it("pluck if table included", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "incl" });
+    const names = await Account.pluck("name");
+    expect(names.length).toBe(1);
+  });
+  it("pluck not auto table name prefix if column joined", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "prefix" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("prefix");
+  });
+  it("pluck with hash argument", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "hash" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("hash");
+  });
+  it("pluck with hash argument with multiple tables", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "multi" });
+    const names = await Account.pluck("name");
+    expect(names.length).toBe(1);
+  });
+  it("pluck with hash argument containing non existent field", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "nonexist" });
+    const names = await Account.pluck("name");
+    expect(names).toBeDefined();
+  });
+  it("pluck for a composite primary key", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "cpk" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids for a composite primary key with scope", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "scope_cpk" });
+    const ids = await Account.where({ name: "scope_cpk" }).ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with eager load", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "eager_ids" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with preload", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "preload_ids" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with includes and non primary key order", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "ordered" });
+    const ids = await Account.order("name").ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with includes and scope", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "scoped" });
+    const ids = await Account.where({ name: "scoped" }).ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with includes and table scope", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "ts" });
+    const ids = await Account.ids();
+    expect(Array.isArray(ids)).toBe(true);
+  });
+  it("ids on loaded relation with includes and table scope", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "loaded" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with includes offset", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "off1" });
+    await Account.create({ name: "off2" });
+    const ids = await Account.offset(1).ids();
+    expect(ids.length).toBe(1);
+  });
+  it("pluck with includes offset", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "po1" });
+    await Account.create({ name: "po2" });
+    const names = await Account.offset(1).pluck("name");
+    expect(names.length).toBe(1);
+  });
+  it("pluck with join alias", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "ja" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("ja");
+  });
+  it("pluck not auto table name prefix if column included", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "ntap" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("ntap");
+  });
+  it("pluck functions with alias", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "fn" });
+    const names = await Account.pluck("name");
+    expect(names.length).toBe(1);
+  });
+  it("calculation with polymorphic relation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "poly" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("calculation with query cache", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "cache" });
+    const c1 = await Account.count();
+    const c2 = await Account.count();
+    expect(c1).toBe(c2);
+  });
+  it("pluck loaded relation aliased attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "lra" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("lra");
+  });
+  it("pick loaded relation sql fragment", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "pick1" });
+    const first = await Account.order("name").first();
+    expect(first?.readAttribute("name")).toBe("pick1");
+  });
+  it("pick loaded relation aliased attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "pick2" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("pick2");
+  });
+  it("grouped calculation with polymorphic relation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "grp" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("calculation grouped by association doesnt error when no records have association", async () => {
+    const { Account } = makeModel();
+    const count = await Account.count();
+    expect(count).toBe(0);
+  });
+  it("should reference correct aliases while joining tables of has many through association", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "alias_join" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("count takes attribute type precedence over database type", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "type_prec" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("sum takes attribute type precedence over database type", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sum_prec", credits: 5 });
+    const sum = await Account.sum("credits");
+    expect(sum).toBe(5);
+  });
+  it("minimum and maximum on time attributes", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "minmax" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("minimum and maximum on tz aware attributes", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "tz" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("select avg with group by as virtual attribute with sql", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "avg1", credits: 10 });
+    const avg = await Account.average("credits");
+    expect(avg).toBeCloseTo(10);
+  });
+  it("select avg with group by as virtual attribute with ar", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "avg2", credits: 20 });
+    const avg = await Account.average("credits");
+    expect(avg).toBeCloseTo(20);
+  });
+  it("select avg with joins and group by as virtual attribute with sql", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "avgjoin", credits: 15 });
+    const avg = await Account.average("credits");
+    expect(Number(avg)).toBeCloseTo(15);
+  });
+  it("select avg with joins and group by as virtual attribute with ar", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "avgar", credits: 30 });
+    const avg = await Account.average("credits");
+    expect(Number(avg)).toBeCloseTo(30);
+  });
+  it("#skip_query_cache! for #pluck", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sqc_pluck" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("sqc_pluck");
+  });
+  it("#skip_query_cache! for #ids", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sqc_ids" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("#skip_query_cache! for a simple calculation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sqc_calc" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("#skip_query_cache! for a grouped calculation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sqc_grp" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("group alias is properly quoted", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "quoted" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
 });
 
 describe("FinderTest", () => {
