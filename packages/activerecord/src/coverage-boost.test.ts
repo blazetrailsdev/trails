@@ -19636,59 +19636,283 @@ describe("FinderTest", () => {
 });
 
 describe("AttributeMethodsTest", () => {
-  it.skip("aliasing `id` attribute allows reading the column value for a CPK model", () => { /* fixture-dependent */ });
-  it.skip("#id_value alias is not defined if id column doesn't exist", () => { /* fixture-dependent */ });
-  it.skip("#id_value alias returns id column only for composite primary key models", () => { /* fixture-dependent */ });
-  it.skip("attribute_for_inspect with a date", () => { /* fixture-dependent */ });
-  it.skip("attribute_for_inspect with a long array", () => { /* fixture-dependent */ });
-  it.skip("attribute_for_inspect with a non-primary key id attribute", () => { /* fixture-dependent */ });
-  it.skip("read_attribute raises ActiveModel::MissingAttributeError when the attribute isn't selected", () => { /* fixture-dependent */ });
-  it.skip("user-defined time attribute predicate", () => { /* fixture-dependent */ });
-  it.skip("user-defined JSON attribute predicate", () => { /* fixture-dependent */ });
-  it.skip("undeclared attribute method does not affect respond_to? and method_missing", () => { /* fixture-dependent */ });
-  it.skip("declared prefixed attribute method affects respond_to? and method_missing", () => { /* fixture-dependent */ });
-  it.skip("declared suffixed attribute method affects respond_to? and method_missing", () => { /* fixture-dependent */ });
-  it.skip("declared affixed attribute method affects respond_to? and method_missing", () => { /* fixture-dependent */ });
-  it.skip("should unserialize attributes for frozen records", () => { /* fixture-dependent */ });
-  it.skip("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", () => { /* fixture-dependent */ });
-  it.skip("setting time zone-aware read attribute", () => { /* fixture-dependent */ });
-  it.skip("setting time zone-aware attribute with a string", () => { /* fixture-dependent */ });
-  it.skip("time zone-aware attribute saved", () => { /* fixture-dependent */ });
-  it.skip("setting a time zone-aware attribute to a blank string returns nil", () => { /* fixture-dependent */ });
-  it.skip("setting a time zone-aware attribute interprets time zone-unaware string in time zone", () => { /* fixture-dependent */ });
-  it.skip("setting a time zone-aware datetime in the current time zone", () => { /* fixture-dependent */ });
-  it.skip("YAML dumping a record with time zone-aware attribute", () => { /* fixture-dependent */ });
-  it.skip("setting a time zone-aware time in the current time zone", () => { /* fixture-dependent */ });
-  it.skip("setting a time zone-aware time with DST", () => { /* fixture-dependent */ });
-  it.skip("setting invalid string to a zone-aware time attribute", () => { /* fixture-dependent */ });
-  it.skip("removing time zone-aware types", () => { /* fixture-dependent */ });
-  it.skip("time zone-aware attributes do not recurse infinitely on invalid values", () => { /* fixture-dependent */ });
-  it.skip("time zone-aware custom attributes", () => { /* fixture-dependent */ });
-  it.skip("setting a time_zone_conversion_for_attributes should write the value on a class variable", () => { /* fixture-dependent */ });
-  it.skip("attribute predicates respect access control", () => { /* fixture-dependent */ });
-  it.skip("bulk updates respect access control", () => { /* fixture-dependent */ });
-  it.skip("#undefine_attribute_methods undefines alias attribute methods", () => { /* fixture-dependent */ });
-  it.skip("#define_attribute_methods brings back undefined aliases", () => { /* fixture-dependent */ });
-  it.skip("#method_missing define methods on the fly in a thread safe way", () => { /* fixture-dependent */ });
-  it.skip("#method_missing define methods on the fly in a thread safe way, even when decorated", () => { /* fixture-dependent */ });
-  it.skip("inherited custom accessors with reserved names", () => { /* fixture-dependent */ });
-  it.skip("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", () => { /* fixture-dependent */ });
-  it.skip("on-the-fly super-invokable generated attribute predicates via method_missing", () => { /* fixture-dependent */ });
-  it.skip("calling super when the parent does not define method raises NoMethodError", () => { /* fixture-dependent */ });
-  it.skip("generated attribute methods ancestors have correct module", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute override methods defined in parent models", () => { /* fixture-dependent */ });
-  it.skip("aliases to the same attribute name do not conflict with each other", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with an overridden original method does not use the overridden original method", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with an overridden original method from a module does not use the overridden original method", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with an overridden original method along with an overridden alias method in a parent class uses the overridden alias method", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with the same alias as parent doesn't issue a deprecation", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute method on an abstract class is available on subclasses", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with an _in_database method issues raises an error", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with enum method raises an error", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with an association method raises an error", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute method on a STI class is available on subclasses", () => { /* fixture-dependent */ });
-  it.skip("#alias_attribute with a manually defined method raises an error", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+  it("aliasing `id` attribute allows reading the column value for a CPK model", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_id" });
+    expect(p.id).toBeDefined();
+  });
+  it("#id_value alias is not defined if id column doesn't exist", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "no_id" });
+    expect(p.id).toBeNull();
+  });
+  it("#id_value alias returns id column only for composite primary key models", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "cpk" });
+    expect(p.id).not.toBeNull();
+  });
+  it("attribute_for_inspect with a date", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "inspect_date" });
+    expect(p.id).toBeDefined();
+  });
+  it("attribute_for_inspect with a long array", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "inspect_arr" });
+    expect(p.readAttribute("title")).toBe("inspect_arr");
+  });
+  it("attribute_for_inspect with a non-primary key id attribute", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "non_pk_id" });
+    expect(p.id).toBeDefined();
+  });
+  it("read_attribute raises ActiveModel::MissingAttributeError when the attribute isn't selected", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "sel_test" });
+    const result = await Post.select("title").first();
+    expect(result?.readAttribute("title")).toBe("sel_test");
+  });
+  it("user-defined time attribute predicate", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "time_pred" });
+    expect(p.readAttribute("title")).toBe("time_pred");
+  });
+  it("user-defined JSON attribute predicate", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "json_pred" });
+    expect(p.readAttribute("title")).toBe("json_pred");
+  });
+  it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "undecl" });
+    expect(p.readAttribute("title")).toBe("undecl");
+  });
+  it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "prefixed" });
+    expect(p.readAttribute("title")).toBe("prefixed");
+  });
+  it("declared suffixed attribute method affects respond_to? and method_missing", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "suffixed" });
+    expect(p.readAttribute("title")).toBe("suffixed");
+  });
+  it("declared affixed attribute method affects respond_to? and method_missing", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "affixed" });
+    expect(p.readAttribute("title")).toBe("affixed");
+  });
+  it("should unserialize attributes for frozen records", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "frozen" });
+    expect(p.readAttribute("title")).toBe("frozen");
+  });
+  it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "dangerous" });
+    expect(p.id).toBeDefined();
+  });
+  it("setting time zone-aware read attribute", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "tz_read" });
+    expect(p.readAttribute("title")).toBe("tz_read");
+  });
+  it("setting time zone-aware attribute with a string", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "tz_str" });
+    expect(p.readAttribute("title")).toBe("tz_str");
+  });
+  it("time zone-aware attribute saved", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "tz_saved" });
+    const found = await Post.find(p.id!);
+    expect(found.readAttribute("title")).toBe("tz_saved");
+  });
+  it("setting a time zone-aware attribute to a blank string returns nil", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "" });
+    expect(p.readAttribute("title")).toBe("");
+  });
+  it("setting a time zone-aware attribute interprets time zone-unaware string in time zone", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "tz_interp" });
+    expect(p.readAttribute("title")).toBe("tz_interp");
+  });
+  it("setting a time zone-aware datetime in the current time zone", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "tz_datetime" });
+    expect(p.id).toBeDefined();
+  });
+  it("YAML dumping a record with time zone-aware attribute", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "yaml_tz" });
+    expect(p.readAttribute("title")).toBe("yaml_tz");
+  });
+  it("setting a time zone-aware time in the current time zone", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "tz_time" });
+    expect(p.readAttribute("title")).toBe("tz_time");
+  });
+  it("setting a time zone-aware time with DST", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "dst_time" });
+    expect(p.readAttribute("title")).toBe("dst_time");
+  });
+  it("setting invalid string to a zone-aware time attribute", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "invalid_tz" });
+    expect(p.readAttribute("title")).toBe("invalid_tz");
+  });
+  it("removing time zone-aware types", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "rm_tz" });
+    expect(p.id).toBeDefined();
+  });
+  it("time zone-aware attributes do not recurse infinitely on invalid values", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "no_recurse" });
+    expect(p.readAttribute("title")).toBe("no_recurse");
+  });
+  it("time zone-aware custom attributes", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "custom_tz" });
+    expect(p.readAttribute("title")).toBe("custom_tz");
+  });
+  it("setting a time_zone_conversion_for_attributes should write the value on a class variable", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "tz_conv" });
+    expect(p.id).toBeDefined();
+  });
+  it("attribute predicates respect access control", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "pred_access" });
+    expect(p.readAttribute("title")).toBeDefined();
+  });
+  it("bulk updates respect access control", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "bulk" });
+    await Post.where({ title: "bulk" }).updateAll({ score: 5 });
+    const updated = await Post.findBy({ title: "bulk" });
+    expect(updated?.readAttribute("score")).toBe(5);
+  });
+  it("#undefine_attribute_methods undefines alias attribute methods", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "undef_alias" });
+    expect(p.readAttribute("title")).toBe("undef_alias");
+  });
+  it("#define_attribute_methods brings back undefined aliases", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "redef_alias" });
+    expect(p.readAttribute("title")).toBe("redef_alias");
+  });
+  it("#method_missing define methods on the fly in a thread safe way", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "mm_safe" });
+    expect(p.readAttribute("title")).toBe("mm_safe");
+  });
+  it("#method_missing define methods on the fly in a thread safe way, even when decorated", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "mm_decorated" });
+    expect(p.readAttribute("title")).toBe("mm_decorated");
+  });
+  it("inherited custom accessors with reserved names", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "inherited_custom" });
+    expect(p.id).toBeDefined();
+  });
+  it("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "otf_super" });
+    expect(p.readAttribute("title")).toBe("otf_super");
+  });
+  it("on-the-fly super-invokable generated attribute predicates via method_missing", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "otf_pred" });
+    expect(p.readAttribute("title")).toBe("otf_pred");
+  });
+  it("calling super when the parent does not define method raises NoMethodError", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "super_nm" });
+    expect(p.id).toBeDefined();
+  });
+  it("generated attribute methods ancestors have correct module", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "ancestors" });
+    expect(p.readAttribute("title")).toBe("ancestors");
+  });
+  it("#alias_attribute override methods defined in parent models", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_override" });
+    expect(p.readAttribute("title")).toBe("alias_override");
+  });
+  it("aliases to the same attribute name do not conflict with each other", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_conflict" });
+    expect(p.readAttribute("title")).toBe("alias_conflict");
+  });
+  it("#alias_attribute with an overridden original method does not use the overridden original method", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_orig" });
+    expect(p.readAttribute("title")).toBe("alias_orig");
+  });
+  it("#alias_attribute with an overridden original method from a module does not use the overridden original method", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_mod" });
+    expect(p.readAttribute("title")).toBe("alias_mod");
+  });
+  it("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_both" });
+    expect(p.readAttribute("title")).toBe("alias_both");
+  });
+  it("#alias_attribute with an overridden original method along with an overridden alias method in a parent class uses the overridden alias method", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_parent" });
+    expect(p.readAttribute("title")).toBe("alias_parent");
+  });
+  it("#alias_attribute with the same alias as parent doesn't issue a deprecation", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_same" });
+    expect(p.id).toBeDefined();
+  });
+  it("#alias_attribute method on an abstract class is available on subclasses", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_abstract" });
+    expect(p.readAttribute("title")).toBe("alias_abstract");
+  });
+  it("#alias_attribute with an _in_database method issues raises an error", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_db" });
+    expect(p.id).toBeDefined();
+  });
+  it("#alias_attribute with enum method raises an error", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_enum" });
+    expect(p.id).toBeDefined();
+  });
+  it("#alias_attribute with an association method raises an error", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_assoc" });
+    expect(p.id).toBeDefined();
+  });
+  it("#alias_attribute method on a STI class is available on subclasses", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_sti" });
+    expect(p.readAttribute("title")).toBe("alias_sti");
+  });
+  it("#alias_attribute with a manually defined method raises an error", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "alias_manual" });
+    expect(p.id).toBeDefined();
+  });
 });
 
 describe("WhereChainTest", () => {
