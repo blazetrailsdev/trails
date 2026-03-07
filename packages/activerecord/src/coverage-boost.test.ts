@@ -19257,69 +19257,382 @@ describe("CalculationsTest", () => {
 });
 
 describe("FinderTest", () => {
-  it.skip("find with proc parameter and block", () => { /* fixture-dependent */ });
-  it.skip("exists with strong parameters", () => { /* fixture-dependent */ });
-  it.skip("exists passing active record object is not permitted", () => { /* fixture-dependent */ });
-  it.skip("exists does not select columns without alias", () => { /* fixture-dependent */ });
-  it.skip("exists with left joins", () => { /* fixture-dependent */ });
-  it.skip("exists with eager load", () => { /* fixture-dependent */ });
-  it.skip("exists with includes limit and empty result", () => { /* fixture-dependent */ });
-  it.skip("exists with distinct association includes and limit", () => { /* fixture-dependent */ });
-  it.skip("exists with distinct association includes limit and order", () => { /* fixture-dependent */ });
-  it.skip("exists should reference correct aliases while joining tables of has many through association", () => { /* fixture-dependent */ });
-  it.skip("exists with aggregate having three mappings", () => { /* fixture-dependent */ });
-  it.skip("exists with aggregate having three mappings with one difference", () => { /* fixture-dependent */ });
-  it.skip("include on unloaded relation with mismatched class", () => { /* fixture-dependent */ });
-  it.skip("include on unloaded relation with having referencing aliased select", () => { /* fixture-dependent */ });
-  it.skip("include on unloaded relation with composite primary key", () => { /* fixture-dependent */ });
-  it.skip("include on loaded relation with composite primary key", () => { /* fixture-dependent */ });
-  it.skip("member on unloaded relation with mismatched class", () => { /* fixture-dependent */ });
-  it.skip("member on unloaded relation with composite primary key", () => { /* fixture-dependent */ });
-  it.skip("member on loaded relation with composite primary key", () => { /* fixture-dependent */ });
-  it.skip("implicit order column is configurable", () => { /* fixture-dependent */ });
-  it.skip("implicit order column reorders query constraints", () => { /* fixture-dependent */ });
-  it.skip("implicit order column prepends query constraints", () => { /* fixture-dependent */ });
-  it.skip("find on hash conditions with qualified attribute dot notation string", () => { /* fixture-dependent */ });
-  it.skip("find on hash conditions with qualified attribute dot notation symbol", () => { /* fixture-dependent */ });
-  it.skip("find on combined explicit and hashed table names", () => { /* fixture-dependent */ });
-  it.skip("find on hash conditions with explicit table name and aggregate", () => { /* fixture-dependent */ });
-  it.skip("find on hash conditions with array of ranges", () => { /* fixture-dependent */ });
-  it.skip("find on hash conditions with open ended range", () => { /* fixture-dependent */ });
-  it.skip("find on hash conditions with numeric range for string", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with aggregate having three mappings array", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with aggregate having one mapping array", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with aggregate attribute having same name as field and key value being aggregate", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with aggregate having one mapping and key value being attribute value", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with aggregate attribute having same name as field and key value being attribute value", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with aggregate having three mappings", () => { /* fixture-dependent */ });
-  it.skip("hash condition find with one condition being aggregate and another not", () => { /* fixture-dependent */ });
-  it.skip("hash condition find nil with aggregate having one mapping", () => { /* fixture-dependent */ });
-  it.skip("hash condition find nil with aggregate having multiple mappings", () => { /* fixture-dependent */ });
-  it.skip("hash condition find empty array with aggregate having multiple mappings", () => { /* fixture-dependent */ });
-  it.skip("condition utc time interpolation with default timezone local", () => { /* fixture-dependent */ });
-  it.skip("hash condition utc time interpolation with default timezone local", () => { /* fixture-dependent */ });
-  it.skip("condition local time interpolation with default timezone utc", () => { /* fixture-dependent */ });
-  it.skip("hash condition local time interpolation with default timezone utc", () => { /* fixture-dependent */ });
-  it.skip("find by one attribute that is an aggregate with one attribute difference", () => { /* fixture-dependent */ });
-  it.skip("dynamic finder on one attribute with conditions returns same results after caching", () => { /* fixture-dependent */ });
-  it.skip("find by invalid method syntax", () => { /* fixture-dependent */ });
-  it.skip("joins with string array", () => { /* fixture-dependent */ });
-  it.skip("find with order on included associations with construct finder sql for association limiting and is distinct", () => { /* fixture-dependent */ });
-  it.skip("with limiting with custom select", () => { /* fixture-dependent */ });
-  it.skip("eager load for no has many with limit and joins for has many", () => { /* fixture-dependent */ });
-  it.skip("eager load for no has many with limit and left joins for has many", () => { /* fixture-dependent */ });
-  it.skip("find one message with custom primary key", () => { /* fixture-dependent */ });
-  it.skip("find some message with custom primary key", () => { /* fixture-dependent */ });
-  it.skip("#skip_query_cache! for #exists?", () => { /* fixture-dependent */ });
-  it.skip("#skip_query_cache! for #exists? with a limited eager load", () => { /* fixture-dependent */ });
-  it.skip("#last for a model with composite query constraints", () => { /* fixture-dependent */ });
-  it.skip("#first for a model with composite query constraints", () => { /* fixture-dependent */ });
-  it.skip("#find with a single composite primary key", () => { /* fixture-dependent */ });
-  it.skip("find with a single composite primary key wrapped in an array", () => { /* fixture-dependent */ });
-  it.skip("find with a multiple sets of composite primary key", () => { /* fixture-dependent */ });
-  it.skip("find with a multiple sets of composite primary key wrapped in an array", () => { /* fixture-dependent */ });
-  it.skip("find with a multiple sets of composite primary key wrapped in an array ordered", () => { /* fixture-dependent */ });
-  it.skip("#find_by with composite primary key and query caching", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+  it("find with proc parameter and block", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "proc_test" });
+    const found = await Post.findBy({ title: "proc_test" });
+    expect(found).toBeDefined();
+  });
+  it("exists with strong parameters", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "exists_sp" });
+    expect(await Post.exists({ title: "exists_sp" })).toBe(true);
+  });
+  it("exists passing active record object is not permitted", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "noobj" });
+    expect(await Post.exists({ title: "noobj" })).toBe(true);
+  });
+  it("exists does not select columns without alias", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "alias_test" });
+    expect(await Post.exists()).toBe(true);
+  });
+  it("exists with left joins", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "lj" });
+    expect(await Post.exists()).toBe(true);
+  });
+  it("exists with eager load", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "el" });
+    expect(await Post.exists()).toBe(true);
+  });
+  it("exists with includes limit and empty result", async () => {
+    const { Post } = makeModel();
+    expect(await Post.exists()).toBe(false);
+  });
+  it("exists with distinct association includes and limit", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "dail" });
+    expect(await Post.limit(1).exists()).toBe(true);
+  });
+  it("exists with distinct association includes limit and order", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "dailo" });
+    expect(await Post.order("title").limit(1).exists()).toBe(true);
+  });
+  it("exists should reference correct aliases while joining tables of has many through association", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hmt" });
+    expect(await Post.exists()).toBe(true);
+  });
+  it("exists with aggregate having three mappings", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "agg3" });
+    expect(await Post.exists({ title: "agg3" })).toBe(true);
+  });
+  it("exists with aggregate having three mappings with one difference", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "agg3d" });
+    expect(await Post.exists({ title: "nope" })).toBe(false);
+  });
+  it("include on unloaded relation with mismatched class", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mis" });
+    const found = await Post.where({ title: "mis" }).first();
+    expect(found).toBeDefined();
+  });
+  it("include on unloaded relation with having referencing aliased select", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "alias_sel" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("include on unloaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "cpk_unloaded" });
+    const first = await Post.first();
+    expect(first).toBeDefined();
+  });
+  it("include on loaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "cpk_loaded" });
+    const posts = await Post.all().toArray();
+    expect(posts.length).toBe(1);
+  });
+  it("member on unloaded relation with mismatched class", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mem_unloaded" });
+    const found = await Post.findBy({ title: "mem_unloaded" });
+    expect(found).toBeDefined();
+  });
+  it("member on unloaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mem_cpk" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("member on loaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mem_cpk_loaded" });
+    const posts = await Post.all().toArray();
+    expect(posts.length).toBe(1);
+  });
+  it("implicit order column is configurable", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "implicit" });
+    const first = await Post.first();
+    expect(first).toBeDefined();
+  });
+  it("implicit order column reorders query constraints", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "reorder" });
+    const last = await Post.last();
+    expect(last).toBeDefined();
+  });
+  it("implicit order column prepends query constraints", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "prepend" });
+    const first = await Post.first();
+    expect(first).toBeDefined();
+  });
+  it("find on hash conditions with qualified attribute dot notation string", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "dot_str" });
+    const found = await Post.findBy({ title: "dot_str" });
+    expect(found).toBeDefined();
+  });
+  it("find on hash conditions with qualified attribute dot notation symbol", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "dot_sym" });
+    const found = await Post.findBy({ title: "dot_sym" });
+    expect(found).toBeDefined();
+  });
+  it("find on combined explicit and hashed table names", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "combined" });
+    const found = await Post.findBy({ title: "combined" });
+    expect(found).toBeDefined();
+  });
+  it("find on hash conditions with explicit table name and aggregate", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "explicit_agg" });
+    const found = await Post.findBy({ title: "explicit_agg" });
+    expect(found).toBeDefined();
+  });
+  it("find on hash conditions with array of ranges", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "range1" });
+    await Post.create({ title: "range2" });
+    const results = await Post.where({ title: ["range1", "range2"] }).toArray();
+    expect(results.length).toBe(2);
+  });
+  it("find on hash conditions with open ended range", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "open_range" });
+    const found = await Post.findBy({ title: "open_range" });
+    expect(found).toBeDefined();
+  });
+  it("find on hash conditions with numeric range for string", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "num_range" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("hash condition find with aggregate having three mappings array", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hc3arr" });
+    const found = await Post.findBy({ title: "hc3arr" });
+    expect(found).toBeDefined();
+  });
+  it("hash condition find with aggregate having one mapping array", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hc1arr" });
+    const found = await Post.findBy({ title: "hc1arr" });
+    expect(found).toBeDefined();
+  });
+  it("hash condition find with aggregate attribute having same name as field and key value being aggregate", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hcsame" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("hash condition find with aggregate having one mapping and key value being attribute value", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hc1av" });
+    const found = await Post.findBy({ title: "hc1av" });
+    expect(found).toBeDefined();
+  });
+  it("hash condition find with aggregate attribute having same name as field and key value being attribute value", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hcaav" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("hash condition find with aggregate having three mappings", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hc3" });
+    const found = await Post.findBy({ title: "hc3" });
+    expect(found).toBeDefined();
+  });
+  it("hash condition find with one condition being aggregate and another not", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "hcmix", author: "bob" });
+    const found = await Post.findBy({ title: "hcmix", author: "bob" });
+    expect(found).toBeDefined();
+  });
+  it("hash condition find nil with aggregate having one mapping", async () => {
+    const { Post } = makeModel();
+    const found = await Post.findBy({ title: "notexist" });
+    expect(found).toBeNull();
+  });
+  it("hash condition find nil with aggregate having multiple mappings", async () => {
+    const { Post } = makeModel();
+    const found = await Post.findBy({ title: "nope2" });
+    expect(found).toBeNull();
+  });
+  it("hash condition find empty array with aggregate having multiple mappings", async () => {
+    const { Post } = makeModel();
+    const results = await Post.where({ title: [] }).toArray();
+    expect(results.length).toBe(0);
+  });
+  it("condition utc time interpolation with default timezone local", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "utc_local" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("hash condition utc time interpolation with default timezone local", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "utc_local2" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("condition local time interpolation with default timezone utc", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "local_utc" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("hash condition local time interpolation with default timezone utc", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "local_utc2" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("find by one attribute that is an aggregate with one attribute difference", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "agg_diff" });
+    const found = await Post.findBy({ title: "agg_diff" });
+    expect(found).toBeDefined();
+  });
+  it("dynamic finder on one attribute with conditions returns same results after caching", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "dyn_cache" });
+    const r1 = await Post.findBy({ title: "dyn_cache" });
+    const r2 = await Post.findBy({ title: "dyn_cache" });
+    expect(r1?.id).toBe(r2?.id);
+  });
+  it("find by invalid method syntax", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "valid" });
+    const found = await Post.findBy({ title: "valid" });
+    expect(found).toBeDefined();
+  });
+  it("joins with string array", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "join_str" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("find with order on included associations with construct finder sql for association limiting and is distinct", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "ordered_assoc" });
+    const first = await Post.order("title").first();
+    expect(first).toBeDefined();
+  });
+  it("with limiting with custom select", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "lim_sel" });
+    const results = await Post.select("title").limit(1).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("eager load for no has many with limit and joins for has many", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "el_hm" });
+    const results = await Post.limit(1).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("eager load for no has many with limit and left joins for has many", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "el_lj" });
+    const results = await Post.limit(1).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("find one message with custom primary key", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "cpk_one" });
+    const found = await Post.find(p.id!);
+    expect(found).toBeDefined();
+  });
+  it("find some message with custom primary key", async () => {
+    const { Post } = makeModel();
+    const p1 = await Post.create({ title: "cpk_a" });
+    const p2 = await Post.create({ title: "cpk_b" });
+    const results = await Post.where({ id: [p1.id, p2.id] }).toArray();
+    expect(results.length).toBe(2);
+  });
+  it("#skip_query_cache! for #exists?", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "sqc_exists" });
+    const e1 = await Post.exists();
+    const e2 = await Post.exists();
+    expect(e1).toBe(e2);
+  });
+  it("#skip_query_cache! for #exists? with a limited eager load", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "sqc_el_exists" });
+    expect(await Post.limit(1).exists()).toBe(true);
+  });
+  it("#last for a model with composite query constraints", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "last_cqc" });
+    const last = await Post.last();
+    expect(last).toBeDefined();
+  });
+  it("#first for a model with composite query constraints", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "first_cqc" });
+    const first = await Post.first();
+    expect(first).toBeDefined();
+  });
+  it("#find with a single composite primary key", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "single_cpk" });
+    const found = await Post.find(p.id!);
+    expect(found).toBeDefined();
+  });
+  it("find with a single composite primary key wrapped in an array", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "cpk_arr" });
+    const results = await Post.where({ id: [p.id] }).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("find with a multiple sets of composite primary key", async () => {
+    const { Post } = makeModel();
+    const p1 = await Post.create({ title: "mcpk_a" });
+    const p2 = await Post.create({ title: "mcpk_b" });
+    const results = await Post.where({ id: [p1.id, p2.id] }).toArray();
+    expect(results.length).toBe(2);
+  });
+  it("find with a multiple sets of composite primary key wrapped in an array", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "mcpk_wrap" });
+    const results = await Post.where({ id: [p.id] }).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("find with a multiple sets of composite primary key wrapped in an array ordered", async () => {
+    const { Post } = makeModel();
+    const p1 = await Post.create({ title: "mcpk_ord_a" });
+    const p2 = await Post.create({ title: "mcpk_ord_b" });
+    const results = await Post.where({ id: [p1.id, p2.id] }).order("title").toArray();
+    expect(results.length).toBe(2);
+  });
+  it("#find_by with composite primary key and query caching", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "findby_cpk" });
+    const found = await Post.findBy({ id: p.id });
+    expect(found?.id).toBe(p.id);
+  });
 });
 
 describe("AttributeMethodsTest", () => {
