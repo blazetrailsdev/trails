@@ -40,7 +40,7 @@ export function store(
               ? JSON.parse(raw)
               : { ...(raw as Record<string, unknown>) };
         obj[accessor] = value;
-        this.writeAttribute(attribute, obj);
+        this.writeAttribute(attribute, JSON.stringify(obj));
       },
       configurable: true,
     });

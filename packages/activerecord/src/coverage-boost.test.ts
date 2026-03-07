@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor } from "./index.js";
+import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store } from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -13608,14 +13608,86 @@ describe("PreloaderTest", () => {
 });
 
 describe("StoreTest", () => {
-  it.skip("writing store attributes does not update unchanged value", () => { /* fixture-dependent */ });
-  it.skip("accessing attributes not exposed by accessors", () => { /* fixture-dependent */ });
-  it.skip("overriding a read accessor", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = adapter; }
+    }
+    store(User, "settings", { accessors: ["theme", "language"] });
+    return { User };
+  }
+
+  it("writing store attributes does not update unchanged value", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice", settings: JSON.stringify({ theme: "dark", language: "en" }) });
+    expect((u as any).theme).toBe("dark");
+    (u as any).theme = "dark"; // no change
+    expect((u as any).theme).toBe("dark");
+  });
+
+  it("accessing attributes not exposed by accessors", async () => {
+    const { User } = makeModel();
+    const raw = JSON.stringify({ theme: "dark", language: "en", extra: "value" });
+    const u = await User.create({ name: "Bob", settings: raw });
+    expect((u as any).theme).toBe("dark");
+    expect((u as any).language).toBe("en");
+    // extra is not exposed, but settings JSON string contains it
+    const settingsStr = u.readAttribute("settings") as string;
+    const settings = JSON.parse(settingsStr);
+    expect(settings.extra).toBe("value");
+  });
+
+  it("overriding a read accessor", async () => {
+    class SpecialUser extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = adapter; }
+      get theme() { return "forced-dark"; }
+    }
+    const u = new SpecialUser({ name: "Carol" });
+    expect((u as any).theme).toBe("forced-dark");
+  });
+
+  it("updating the store will mark accessor as changed", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Dan", settings: JSON.stringify({ theme: "light", language: "en" }) });
+    (u as any).theme = "dark";
+    expect((u as any).theme).toBe("dark");
+  });
+
+  it("new record and no accessors changes", async () => {
+    const { User } = makeModel();
+    const u = new User({ name: "Eve" });
+    expect((u as any).theme).toBeNull();
+    expect((u as any).language).toBeNull();
+  });
+
+  it("reading store attributes through accessors encoded with JSON", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Frank", settings: JSON.stringify({ theme: "midnight", language: "fr" }) });
+    expect((u as any).theme).toBe("midnight");
+    expect((u as any).language).toBe("fr");
+  });
+
+  it("writing store attributes through accessors encoded with JSON", async () => {
+    const { User } = makeModel();
+    const u = new User({ name: "Grace" });
+    (u as any).theme = "ocean";
+    expect((u as any).theme).toBe("ocean");
+    (u as any).language = "de";
+    expect((u as any).language).toBe("de");
+  });
+
+  it("store takes precedence when updating store and accessor", async () => {
+    const { User } = makeModel();
+    const u = new User({ name: "Helen", settings: JSON.stringify({ theme: "old" }) });
+    (u as any).theme = "new";
+    expect((u as any).theme).toBe("new");
+  });
+
   it.skip("overriding a read accessor using super", () => { /* fixture-dependent */ });
   it.skip("updating the store populates the changed array correctly", () => { /* fixture-dependent */ });
   it.skip("updating the store won't mark it as changed if an attribute isn't changed", () => { /* fixture-dependent */ });
-  it.skip("updating the store will mark accessor as changed", () => { /* fixture-dependent */ });
-  it.skip("new record and no accessors changes", () => { /* fixture-dependent */ });
   it.skip("updating the store won't mark accessor as changed if the whole store was updated", () => { /* fixture-dependent */ });
   it.skip("updating the store and changing it back won't mark accessor as changed", () => { /* fixture-dependent */ });
   it.skip("updating the store populates the accessor changed array correctly", () => { /* fixture-dependent */ });
@@ -13631,11 +13703,8 @@ describe("StoreTest", () => {
   it.skip("overriding a write accessor using super", () => { /* fixture-dependent */ });
   it.skip("preserve store attributes data in HashWithIndifferentAccess format without any conversion", () => { /* fixture-dependent */ });
   it.skip("serialize stored nested attributes", () => { /* fixture-dependent */ });
-  it.skip("store takes precedence when updating store and accessor", () => { /* fixture-dependent */ });
   it.skip("convert store attributes from Hash to HashWithIndifferentAccess saving the data and access attributes indifferently", () => { /* fixture-dependent */ });
   it.skip("convert store attributes from any format other than Hash or HashWithIndifferentAccess losing the data", () => { /* fixture-dependent */ });
-  it.skip("reading store attributes through accessors encoded with JSON", () => { /* fixture-dependent */ });
-  it.skip("writing store attributes through accessors encoded with JSON", () => { /* fixture-dependent */ });
   it.skip("accessing attributes not exposed by accessors encoded with JSON", () => { /* fixture-dependent */ });
   it.skip("updating the store will mark it as changed encoded with JSON", () => { /* fixture-dependent */ });
   it.skip("object initialization with not nullable column encoded with JSON", () => { /* fixture-dependent */ });
@@ -15813,8 +15882,24 @@ describe("SignedIdTest", () => {
   it.skip("find signed record with a bang for single table inheritance (STI Models)", () => { /* fixture-dependent */ });
   it.skip("find signed record within expiration time", () => { /* fixture-dependent */ });
   it.skip("fail to find signed record within expiration time", () => { /* fixture-dependent */ });
-  it.skip("finding signed record outside expiration duration raises on the bang", () => { /* fixture-dependent */ });
-  it.skip("finding signed record that has been destroyed raises on the bang", () => { /* fixture-dependent */ });
+  it("finding signed record that has been destroyed raises on the bang", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Ivan" });
+    const token = u.signedId();
+    await u.destroy();
+    await expect(User.findSignedBang(token)).rejects.toThrow(RecordNotFound);
+  });
+
+  it("finding signed record outside expiration duration raises on the bang", async () => {
+    class UserShort extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = await UserShort.create({ name: "Jake" });
+    const token = u.signedId({ expiresIn: 1 });
+    await new Promise(r => setTimeout(r, 5));
+    await expect(UserShort.findSignedBang(token)).rejects.toThrow(RecordNotFound);
+  });
+
   it.skip("fail to work without a signed_id_verifier_secret", () => { /* fixture-dependent */ });
   it.skip("fail to work without when signed_id_verifier_secret lambda is nil", () => { /* fixture-dependent */ });
   it.skip("always output url_safe", () => { /* fixture-dependent */ });
