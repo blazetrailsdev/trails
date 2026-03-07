@@ -48,6 +48,8 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/activesupport/src/parameter-filter.test.ts",
     "packages/activesupport/src/safe-buffer.test.ts",
     "packages/activesupport/src/key-generator.test.ts",
+    "packages/activesupport/src/ordered-hash.test.ts",
+    "packages/activesupport/src/error-reporter.test.ts",
   ],
   activerecord: [
     "packages/activerecord/src/activerecord.test.ts",

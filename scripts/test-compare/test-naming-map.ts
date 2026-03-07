@@ -766,13 +766,13 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "TestJSONEncoding" },
     ],
     "ordered_hash_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "OrderedHashTest" },
+      { file: "ordered-hash.test.ts", describeBlock: "OrderedHashTest" },
     ],
     "safe_buffer_test.rb": [
       { file: "safe-buffer.test.ts", describeBlock: "SafeBufferTest" },
     ],
     "error_reporter_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ErrorReporterTest" },
+      { file: "error-reporter.test.ts", describeBlock: "ErrorReporterTest" },
     ],
     "cache/stores/mem_cache_store_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "MemCacheStoreTest" },
