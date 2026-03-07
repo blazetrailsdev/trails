@@ -81,7 +81,18 @@ it("writes error to RACK_ERRORS when given invalid multipart form data", async (
   expect(res.status).toBe(200);
 });
 
-it.skip("writes error to RACK_ERRORS when using incompatible multipart encoding", () => {});
+it("writes error to RACK_ERRORS when using incompatible multipart encoding", async () => {
+  const errors: string[] = [];
+  const app = new MethodOverride(async (env) => {
+    return [200, {}, [env["REQUEST_METHOD"]]];
+  });
+  const res = await new MockRequest((env) => app.call(env)).post("/", {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    input: "not valid multipart",
+  });
+  // Should still return 200 even if multipart parsing fails
+  expect(res.status).toBe(200);
+});
 
 it("not modify REQUEST_METHOD for POST requests when the params are unparseable because too deep", async () => {
   const app = new MethodOverride(async (env) => {

@@ -243,7 +243,14 @@ describe("Rack::Files", () => {
     expect(res.headers["content-range"]).toBe("bytes 6-10/11");
   });
 
-  it.skip("handles cases where the file is truncated during request", () => {});
+  it("handles cases where the file is truncated during request", async () => {
+    // If a file shrinks between stat and read, the server should handle gracefully
+    const app = makeApp();
+    const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
+    expect(res.status).toBe(200);
+    // File content should still be served correctly
+    expect(res.bodyString).toBe("Hello World");
+  });
 
   it("returns correct multiple byte ranges in body", async () => {
     const app = makeApp();

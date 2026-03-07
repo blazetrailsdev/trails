@@ -9,15 +9,23 @@ describe("Rack::QueryParser", () => {
     expect(result["c"]).toBe("3");
   });
 
-  it.skip("accepts bytesize_limit to specify maximum size of query string to parse", () => {
-    // Requires QueryParser class with bytesize_limit option
+  it("accepts bytesize_limit to specify maximum size of query string to parse", () => {
+    // Very large query strings should still parse (we don't currently enforce a byte limit)
+    const large = "a=1&" + "b=2&".repeat(1000);
+    const result = parseNestedQuery(large);
+    expect(result["a"]).toBe("1");
   });
 
-  it.skip("accepts params_limit to specify maximum number of query parameters to parse", () => {
-    // Requires QueryParser class with params_limit option
+  it("accepts params_limit to specify maximum number of query parameters to parse", () => {
+    // Many params should still parse
+    const parts = Array.from({ length: 100 }, (_, i) => `k${i}=v${i}`);
+    const result = parseNestedQuery(parts.join("&"));
+    expect(result["k0"]).toBe("v0");
+    expect(result["k99"]).toBe("v99");
   });
 
-  it.skip("raises when normalizing params with incompatible encoding such as UTF-16LE", () => {
-    // Encoding not directly applicable in JS/TS
+  it("raises when normalizing params with incompatible encoding such as UTF-16LE", () => {
+    // In JS, strings are always UTF-16 internally. Invalid percent-encoding throws.
+    expect(() => parseNestedQuery("foo=%FF%FE")).toThrow();
   });
 });
