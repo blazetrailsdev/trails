@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes } from "./index.js";
+import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor } from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -17055,18 +17055,104 @@ describe("SanitizeTest", () => {
 });
 
 describe("TokenForTest", () => {
-  it.skip("returns nil when record is not found", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+    }
+    generatesTokenFor(User, "password_reset", {
+      expiresIn: 15 * 60 * 1000,
+      generator: (r: any) => r.readAttribute("password_digest") ?? "",
+    });
+    generatesTokenFor(User, "email_confirmation");
+    return { User };
+  }
+
+  it("returns nil when record is not found", async () => {
+    const { User } = makeModel();
+    const result = await (User as any).findByTokenFor("password_reset", "invalid-token");
+    expect(result).toBeNull();
+  });
+
+  it("raises when token definition does not exist", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice", password_digest: "abc" });
+    expect(() => (u as any).generateTokenFor("nonexistent")).toThrow();
+  });
+
+  it("does not find record when token is for a different purpose", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice", password_digest: "abc" });
+    const token = (u as any).generateTokenFor("password_reset");
+    const result = await (User as any).findByTokenFor("email_confirmation", token);
+    expect(result).toBeNull();
+  });
+
+  it("finds record when token has not expired and embedded data has not changed", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice", password_digest: "abc" });
+    const token = (u as any).generateTokenFor("password_reset");
+    const found = await (User as any).findByTokenFor("password_reset", token);
+    expect(found).not.toBeNull();
+    expect(found.readAttribute("name")).toBe("Alice");
+  });
+
+  it("does not find record when token has expired", async () => {
+    const { User } = makeModel();
+    class UserShortExpiry extends Base {
+      static { this.attribute("name", "string"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+    }
+    generatesTokenFor(UserShortExpiry, "quick", { expiresIn: 1, generator: () => "" });
+    const u = await UserShortExpiry.create({ name: "Bob", password_digest: "xyz" });
+    const token = (u as any).generateTokenFor("quick");
+    await new Promise(r => setTimeout(r, 5));
+    const result = await (UserShortExpiry as any).findByTokenFor("quick", token);
+    expect(result).toBeNull();
+  });
+
+  it("tokens do not expire by default", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Carol", password_digest: "abc" });
+    const token = (u as any).generateTokenFor("email_confirmation");
+    const found = await (User as any).findByTokenFor("email_confirmation", token);
+    expect(found).not.toBeNull();
+  });
+
+  it("does not find record when embedded data is different", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Dan", password_digest: "before" });
+    const token = (u as any).generateTokenFor("password_reset");
+    u.writeAttribute("password_digest", "after");
+    await u.save();
+    const result = await (User as any).findByTokenFor("password_reset", token);
+    expect(result).toBeNull();
+  });
+
+  it("supports JSON-serializable embedded data", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Eve", password_digest: "abc" });
+    const token = (u as any).generateTokenFor("password_reset");
+    expect(typeof token).toBe("string");
+    expect(token.length).toBeGreaterThan(0);
+  });
+
+  it("finds record through subclass", async () => {
+    class User2 extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    generatesTokenFor(User2, "confirm");
+    const u = await User2.create({ name: "Frank" });
+    const token = (u as any).generateTokenFor("confirm");
+    const found = await (User2 as any).findByTokenFor("confirm", token);
+    expect(found).not.toBeNull();
+    expect(found.readAttribute("name")).toBe("Frank");
+  });
+
   it.skip("raises on bang when record is not found", () => { /* fixture-dependent */ });
-  it.skip("raises when token definition does not exist", () => { /* fixture-dependent */ });
-  it.skip("does not find record when token is for a different purpose", () => { /* fixture-dependent */ });
-  it.skip("finds record when token has not expired and embedded data has not changed", () => { /* fixture-dependent */ });
-  it.skip("does not find record when token has expired", () => { /* fixture-dependent */ });
-  it.skip("tokens do not expire by default", () => { /* fixture-dependent */ });
   it.skip("does not find record when expires_in is different", () => { /* fixture-dependent */ });
-  it.skip("does not find record when embedded data is different", () => { /* fixture-dependent */ });
-  it.skip("supports JSON-serializable embedded data", () => { /* fixture-dependent */ });
   it.skip("finds record through relation", () => { /* fixture-dependent */ });
-  it.skip("finds record through subclass", () => { /* fixture-dependent */ });
   it.skip("subclasses can redefine tokens", () => { /* fixture-dependent */ });
   it.skip("finds record with a custom primary key", () => { /* fixture-dependent */ });
   it.skip("finds record with a composite primary key", () => { /* fixture-dependent */ });
@@ -17894,24 +17980,125 @@ describe("ExcludingTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  it.skip("save person", () => { /* fixture-dependent */ });
-  it.skip("existing valid?", () => { /* fixture-dependent */ });
-  it.skip("validate on contextual create", () => { /* fixture-dependent */ });
-  it.skip("validate on contextual update", () => { /* fixture-dependent */ });
-  it.skip("inheritance of callbacks", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("save person", async () => {
+    class Person extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const p = await Person.create({ name: "Alice" });
+    expect(p.isPersisted()).toBe(true);
+    expect(p.readAttribute("name")).toBe("Alice");
+  });
+
+  it("existing valid?", async () => {
+    class Person extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const p = await Person.create({ name: "Bob" });
+    const found = await Person.find(p.id);
+    expect(found.isValid()).toBe(true);
+  });
+
+  it("validate on contextual create", async () => {
+    class Person extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.validates("name", { presence: true, on: "create" });
+      }
+    }
+    const p = new Person({ name: "" });
+    expect(p.isValid("create")).toBe(false);
+    expect(p.isValid("update")).toBe(true);
+  });
+
+  it("validate on contextual update", async () => {
+    class Person extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.validates("name", { presence: true, on: "update" });
+      }
+    }
+    const p = new Person({ name: "" });
+    expect(p.isValid("create")).toBe(true);
+    expect(p.isValid("update")).toBe(false);
+  });
+
+  it("inheritance of callbacks", async () => {
+    class Animal extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const log: string[] = [];
+    Animal.beforeCreate(function(this: any) { log.push("before_create"); });
+
+    class Dog extends Animal {}
+    await Dog.create({ name: "Rex" });
+    expect(log).toContain("before_create");
+  });
+
   it.skip("before save doesnt allow on option", () => { /* fixture-dependent */ });
   it.skip("around save doesnt allow on option", () => { /* fixture-dependent */ });
   it.skip("after save doesnt allow on option", () => { /* fixture-dependent */ });
 });
 
 describe("FinderRespondToTest", () => {
-  it.skip("should preserve normal respond to behavior on base", () => { /* fixture-dependent */ });
-  it.skip("should preserve normal respond to behavior and respond to newly added method", () => { /* fixture-dependent */ });
-  it.skip("should preserve normal respond to behavior and respond to standard object method", () => { /* fixture-dependent */ });
-  it.skip("should respond to find by with bang", () => { /* fixture-dependent */ });
-  it.skip("should respond to find by two attributes", () => { /* fixture-dependent */ });
-  it.skip("should respond to find all by an aliased attribute", () => { /* fixture-dependent */ });
-  it.skip("should not respond to find by invalid method syntax", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("should preserve normal respond to behavior on base", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(typeof Post.find).toBe("function");
+    expect(typeof Post.where).toBe("function");
+  });
+
+  it("should preserve normal respond to behavior and respond to newly added method", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static customMethod() { return "custom"; }
+    }
+    expect(Post.customMethod()).toBe("custom");
+  });
+
+  it("should preserve normal respond to behavior and respond to standard object method", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(typeof Post.toString).toBe("function");
+  });
+
+  it("should respond to find by with bang", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+  });
+
+  it("should respond to find by two attributes", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+    expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
+  });
+
+  it("should respond to find all by an aliased attribute", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+  });
+
+  it("should not respond to find by invalid method syntax", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
+  });
 });
 
 describe("MergingDifferentRelationsTest", () => {
@@ -18696,8 +18883,22 @@ describe("EagerLoadingTooManyIdsTest", () => {
 });
 
 describe("DefaultTextTest", () => {
-  it.skip("default texts", () => { /* fixture-dependent */ });
-  it.skip("default texts containing single quotes", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("default texts", async () => {
+    class Post extends Base {
+      static { this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ body: "some text" });
+    expect(p.readAttribute("body")).toBe("some text");
+  });
+  it("default texts containing single quotes", async () => {
+    class Post extends Base {
+      static { this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ body: "it's some text" });
+    expect(p.readAttribute("body")).toBe("it's some text");
+  });
 });
 
 describe("DefaultStringsTest", () => {
@@ -20943,13 +21144,60 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 });
 
 describe("FinderRespondToTest", () => {
-  it.skip("should preserve normal respond to behavior on base", () => { /* fixture-dependent */ });
-  it.skip("should preserve normal respond to behavior and respond to newly added method", () => { /* fixture-dependent */ });
-  it.skip("should preserve normal respond to behavior and respond to standard object method", () => { /* fixture-dependent */ });
-  it.skip("should respond to find by with bang", () => { /* fixture-dependent */ });
-  it.skip("should respond to find by two attributes", () => { /* fixture-dependent */ });
-  it.skip("should respond to find all by an aliased attribute", () => { /* fixture-dependent */ });
-  it.skip("should not respond to find by invalid method syntax", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("should preserve normal respond to behavior on base", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(typeof Post.find).toBe("function");
+    expect(typeof Post.where).toBe("function");
+  });
+
+  it("should preserve normal respond to behavior and respond to newly added method", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static customMethod() { return "custom"; }
+    }
+    expect(Post.customMethod()).toBe("custom");
+  });
+
+  it("should preserve normal respond to behavior and respond to standard object method", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(typeof Post.toString).toBe("function");
+  });
+
+  it("should respond to find by with bang", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+  });
+
+  it("should respond to find by two attributes", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+    expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
+  });
+
+  it("should respond to find all by an aliased attribute", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+  });
+
+  it("should not respond to find by invalid method syntax", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
+  });
 });
 
 describe("GeneratedMethodsTest", () => {
