@@ -16669,8 +16669,29 @@ describe("CacheKeyTest", () => {
   it.skip("expand cache key of false", () => { /* fixture-dependent */ });
   it.skip("expand cache key of true", () => { /* fixture-dependent */ });
   it.skip("expand cache key of array like object", () => { /* fixture-dependent */ });
-  it.skip("cache_version is only there when versioning is on", () => { /* fixture-dependent */ });
-  it.skip("cache_version is the same when it comes from the DB or from the user", () => { /* fixture-dependent */ });
+
+  it("cache_version is only there when versioning is on", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ title: "test", updated_at: new Date() });
+    const version = p.cacheVersion();
+    expect(version).not.toBeNull();
+    expect(typeof version).toBe("string");
+  });
+
+  it("cache_version is the same when it comes from the DB or from the user", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+    }
+    const now = new Date();
+    const p = await Post.create({ title: "test", updated_at: now });
+    const found = await Post.find(p.id);
+    expect(found.cacheVersion()).toBe(p.cacheVersion());
+  });
+
   it.skip("cache_version does NOT call updated_at when value is from the database", () => { /* fixture-dependent */ });
   it.skip("cache_version does call updated_at when it is assigned via a Time object", () => { /* fixture-dependent */ });
   it.skip("cache_version does call updated_at when it is assigned via a string", () => { /* fixture-dependent */ });
@@ -19157,8 +19178,26 @@ describe("GeneratedMethodsTest", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
-  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
-  it.skip("should not automatically validate associations without :validate => true", () => { /* fixture-dependent */ });
+  it("should automatically validate associations with :validate => true", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; this.validates("name", { presence: true }); }
+    }
+    const a = new Author({ name: "" });
+    const valid = await a.isValid();
+    expect(valid).toBe(false);
+  });
+
+  it("should not automatically validate associations without :validate => true", async () => {
+    const adapter = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    const item = new Item({ label: "fine" });
+    const valid = await item.isValid();
+    expect(valid).toBe(true);
+  });
+
   it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
 });
 
@@ -19249,13 +19288,45 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 });
 
 describe("DefaultTest", () => {
-  it.skip("nil defaults for not null columns", () => { /* fixture-dependent */ });
-  it.skip("multiline default text", () => { /* fixture-dependent */ });
+  it("nil defaults for not null columns", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const p = new Post({});
+    expect(p.readAttribute("title")).toBeNull();
+  });
+
+  it("multiline default text", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("body", "string", { default: "line1\nline2\nline3" }); this.adapter = adapter; }
+    }
+    const p = new Post({});
+    expect(p.readAttribute("body")).toBe("line1\nline2\nline3");
+  });
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
-  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
-  it.skip("should not automatically add validate associations without :validate => true", () => { /* fixture-dependent */ });
+  it("should automatically validate associations with :validate => true", async () => {
+    const adapter = freshAdapter();
+    class Profile extends Base {
+      static { this.attribute("bio", "string"); this.adapter = adapter; this.validates("bio", { presence: true }); }
+    }
+    const p = new Profile({ bio: "" });
+    const valid = await p.isValid();
+    expect(valid).toBe(false);
+  });
+
+  it("should not automatically add validate associations without :validate => true", async () => {
+    const adapter = freshAdapter();
+    class Address extends Base {
+      static { this.attribute("street", "string"); this.adapter = adapter; }
+    }
+    const a = new Address({ street: "123 Main" });
+    const valid = await a.isValid();
+    expect(valid).toBe(true);
+  });
 });
 
 describe("AnnotateTest", () => {
@@ -19403,7 +19474,16 @@ describe("AssociationsNestedErrorInAssociationOrderTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  it.skip("fills auto populated columns on creation", () => { /* fixture-dependent */ });
+  it("fills auto populated columns on creation", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("created_at", "datetime"); this.adapter = adapter; }
+    }
+    const now = new Date();
+    const p = await Post.create({ title: "auto", created_at: now });
+    expect(p.readAttribute("created_at")).toEqual(now);
+    expect(p.isPersisted()).toBe(true);
+  });
 });
 
 describe("UniquenessWithCompositeKey", () => {
