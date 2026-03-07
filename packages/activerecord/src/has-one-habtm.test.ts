@@ -1740,3 +1740,193 @@ describe("NestedThroughAssociationsTest", () => {
     // Requires source reflection reset after load
   });
 });
+
+// ==========================================================================
+// HasOneThroughAssociationsTest — mirrors has_one_through_associations_test.rb
+// ==========================================================================
+
+describe("HasOneThroughAssociationsTest", () => {
+  it.skip("has one through with has one", () => {
+    // Requires fixtures: member -> membership -> club
+  });
+
+  it.skip("has one through executes limited query", () => {
+    // Requires query count assertions
+  });
+
+  it.skip("creating association creates through record", () => {
+    // Requires through record auto-creation
+  });
+
+  it.skip("association create constructor creates through record", () => {
+    // Requires through record auto-creation
+  });
+
+  it.skip("creating association builds through record", () => {
+    // Requires through record auto-build
+  });
+
+  it.skip("association build constructor builds through record", () => {
+    // Requires through record auto-build
+  });
+
+  it.skip("creating association builds through record for new", () => {
+    // Requires through record auto-build for new records
+  });
+
+  it.skip("building multiple associations builds through record", () => {
+    // Requires multiple through record builds
+  });
+
+  it.skip("building works with has one through belongs to", () => {
+    // Requires belongs_to through
+  });
+
+  it.skip("creating multiple associations creates through record", () => {
+    // Requires multiple through record creates
+  });
+
+  it.skip("creating association sets both parent ids for new", () => {
+    // Requires setting both FK/PK on new through records
+  });
+
+  it.skip("replace target record", () => {
+    // Requires target replacement via through record
+  });
+
+  it.skip("replacing target record deletes old association", () => {
+    // Requires deletion of old through record
+  });
+
+  it.skip("set record to nil should delete association", () => {
+    // Requires deletion of through record when set to nil
+  });
+
+  it.skip("has one through polymorphic", () => {
+    // Requires polymorphic through
+  });
+
+  it.skip("has one through eager loading", () => {
+    // Requires eager loading
+  });
+
+  it.skip("has one through eager loading through polymorphic", () => {
+    // Requires eager loading through polymorphic
+  });
+
+  it.skip("has one through with conditions eager loading", () => {
+    // Requires eager loading with conditions
+  });
+
+  it.skip("has one through polymorphic with source type", () => {
+    // Requires polymorphic with source type
+  });
+
+  it.skip("eager has one through polymorphic with source type", () => {
+    // Requires eager polymorphic with source type
+  });
+
+  it.skip("has one through nonpreload eagerloading", () => {
+    // Requires non-preload eager loading
+  });
+
+  it.skip("has one through nonpreload eager loading through polymorphic", () => {
+    // Requires non-preload eager loading through polymorphic
+  });
+
+  it.skip("has one through nonpreload eager loading through polymorphic with more than one through record", () => {
+    // Requires multi-record non-preload through polymorphic eager loading
+  });
+
+  it.skip("uninitialized has one through should return nil for unsaved record", () => {
+    // Requires nil return for unsaved record
+  });
+
+  it.skip("assigning association correctly assigns target", () => {
+    // Requires correct target assignment
+  });
+
+  it.skip("has one through proxy should not respond to private methods", () => {
+    // Requires proxy method visibility
+  });
+
+  it.skip("has one through proxy should respond to private methods via send", () => {
+    // Requires proxy method visibility via send
+  });
+
+  it.skip("assigning to has one through preserves decorated join record", () => {
+    // Requires decorated join record preservation
+  });
+
+  it.skip("reassigning has one through", () => {
+    // Requires through record replacement
+  });
+
+  it.skip("preloading has one through on belongs to", () => {
+    // Requires preloading through belongs_to
+  });
+
+  it.skip("save of record with loaded has one through", () => {
+    // Requires save with loaded through
+  });
+
+  it.skip("through belongs to after destroy", () => {
+    // Requires through belongs_to after destroy
+  });
+
+  it.skip("value is properly quoted", () => {
+    // Requires SQL quoting
+  });
+
+  it.skip("has one through polymorphic with primary key option", () => {
+    // Requires polymorphic with primary key option
+  });
+
+  it.skip("has one through with primary key option", () => {
+    // Requires primary key option on through
+  });
+
+  it.skip("has one through with default scope on join model", () => {
+    // Requires default scope on join model
+  });
+
+  it.skip("has one through many raises exception", () => {
+    // Requires exception on has-one through has-many
+  });
+
+  it.skip("has one through polymorphic association", () => {
+    // Requires polymorphic through association
+  });
+
+  it.skip("has one through belongs to should update when the through foreign key changes", () => {
+    // Requires FK update tracking
+  });
+
+  it.skip("has one through belongs to setting belongs to foreign key after nil target loaded", () => {
+    // Requires FK setting after nil load
+  });
+
+  it.skip("assigning has one through belongs to with new record owner", () => {
+    // Requires assignment with new record owner
+  });
+
+  it.skip("has one through with custom select on join model default scope", () => {
+    // Requires custom select on join model
+  });
+
+  it.skip("has one through relationship cannot have a counter cache", () => {
+    // Requires counter cache restriction
+  });
+
+  it.skip("has one through do not cache association reader if the though method has default scopes", () => {
+    // Requires cache invalidation with scoped through
+  });
+
+  it.skip("loading cpk association with unpersisted owner", () => {
+    // Requires composite primary key through
+  });
+
+  it.skip("cpk stale target", () => {
+    // Requires composite primary key stale target detection
+  });
+});
