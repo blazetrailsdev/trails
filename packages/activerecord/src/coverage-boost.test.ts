@@ -15717,30 +15717,108 @@ describe("OrTest", () => {
 });
 
 describe("SignedIdTest", () => {
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    return { User };
+  }
+
+  it("fail to find record from broken signed id", async () => {
+    const { User } = makeModel();
+    const result = await User.findSigned("broken-token");
+    expect(result).toBeNull();
+  });
+
+  it("find signed record within expiration duration", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Alice" });
+    const token = u.signedId({ expiresIn: 60_000 });
+    const found = await User.findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("name")).toBe("Alice");
+  });
+
+  it("fail to find signed record within expiration duration", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Bob" });
+    const token = u.signedId({ expiresIn: 1 });
+    await new Promise(r => setTimeout(r, 5));
+    const result = await User.findSigned(token);
+    expect(result).toBeNull();
+  });
+
+  it("fail to find record from that has since been destroyed", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Carol" });
+    const token = u.signedId();
+    await u.destroy();
+    const result = await User.findSigned(token);
+    expect(result).toBeNull();
+  });
+
+  it("fail to find signed record with purpose", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Dan" });
+    const token = u.signedId({ purpose: "login" });
+    const result = await User.findSigned(token, { purpose: "reset" });
+    expect(result).toBeNull();
+  });
+
+  it("finding record from broken signed id raises on the bang", async () => {
+    const { User } = makeModel();
+    await expect(User.findSignedBang("broken")).rejects.toThrow();
+  });
+
+  it("find signed record with bang with purpose", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Eve" });
+    const token = u.signedId({ purpose: "confirm" });
+    const found = await User.findSignedBang(token, { purpose: "confirm" });
+    expect(found.readAttribute("name")).toBe("Eve");
+  });
+
+  it("find signed record with bang with purpose raises", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Frank" });
+    const token = u.signedId({ purpose: "confirm" });
+    await expect(User.findSignedBang(token, { purpose: "reset" })).rejects.toThrow();
+  });
+
+  it("cannot get a signed ID for a new record", () => {
+    const { User } = makeModel();
+    const u = new User({ name: "Gina" });
+    expect(() => u.signedId()).toThrow();
+  });
+
+  it.skip("can get a signed ID in an after_create", async () => {
+    const { User } = makeModel();
+    let capturedToken: string | null = null;
+    User.afterCreate((record: any) => {
+      capturedToken = record.signedId();
+    });
+    await User.create({ name: "Henry" });
+    expect(capturedToken).not.toBeNull();
+    const found = await User.findSigned(capturedToken!);
+    expect(found).not.toBeNull();
+  });
+
   it.skip("find signed record with custom primary key", () => { /* fixture-dependent */ });
   it.skip("find signed record for single table inheritance (STI Models)", () => { /* fixture-dependent */ });
   it.skip("find signed record raises UnknownPrimaryKey when a model has no primary key", () => { /* fixture-dependent */ });
   it.skip("find signed record with a bang with custom primary key", () => { /* fixture-dependent */ });
   it.skip("find signed record with a bang for single table inheritance (STI Models)", () => { /* fixture-dependent */ });
-  it.skip("fail to find record from broken signed id", () => { /* fixture-dependent */ });
-  it.skip("find signed record within expiration duration", () => { /* fixture-dependent */ });
-  it.skip("fail to find signed record within expiration duration", () => { /* fixture-dependent */ });
-  it.skip("fail to find record from that has since been destroyed", () => { /* fixture-dependent */ });
   it.skip("find signed record within expiration time", () => { /* fixture-dependent */ });
   it.skip("fail to find signed record within expiration time", () => { /* fixture-dependent */ });
-  it.skip("fail to find signed record with purpose", () => { /* fixture-dependent */ });
-  it.skip("finding record from broken signed id raises on the bang", () => { /* fixture-dependent */ });
-  it.skip("find signed record with a bang within expiration duration", () => { /* fixture-dependent */ });
   it.skip("finding signed record outside expiration duration raises on the bang", () => { /* fixture-dependent */ });
   it.skip("finding signed record that has been destroyed raises on the bang", () => { /* fixture-dependent */ });
-  it.skip("find signed record with bang with purpose", () => { /* fixture-dependent */ });
-  it.skip("find signed record with bang with purpose raises", () => { /* fixture-dependent */ });
   it.skip("fail to work without a signed_id_verifier_secret", () => { /* fixture-dependent */ });
   it.skip("fail to work without when signed_id_verifier_secret lambda is nil", () => { /* fixture-dependent */ });
   it.skip("always output url_safe", () => { /* fixture-dependent */ });
   it.skip("use a custom verifier", () => { /* fixture-dependent */ });
-  it.skip("cannot get a signed ID for a new record", () => { /* fixture-dependent */ });
-  it.skip("can get a signed ID in an after_create", () => { /* fixture-dependent */ });
 });
 
 describe("SelectTest", () => {
