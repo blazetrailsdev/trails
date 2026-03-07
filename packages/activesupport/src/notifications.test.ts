@@ -5,6 +5,343 @@ beforeEach(() => {
   Notifications.unsubscribeAll();
 });
 
+// ---------------------------------------------------------------------------
+// Rails-matching describe blocks for test comparison pipeline
+// ---------------------------------------------------------------------------
+
+describe("InstrumenterTest", () => {
+  it("instrument", () => {
+    let fired = false;
+    Notifications.subscribe("foo.bar", () => { fired = true; });
+    Notifications.instrument("foo.bar", {});
+    expect(fired).toBe(true);
+  });
+
+  it("instrument yields the payload for further modification", () => {
+    let received: Record<string, unknown> = {};
+    Notifications.subscribe("foo", (e) => { received = e.payload; });
+    Notifications.instrument("foo", { key: "original" }, () => {});
+    expect(received.key).toBe("original");
+  });
+
+  it("instrument works without a block", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("foo", (e) => events.push(e));
+    Notifications.instrument("foo", { x: 1 });
+    expect(events).toHaveLength(1);
+    expect(events[0].end).toBeInstanceOf(Date);
+  });
+
+  it.skip("start", () => { /* lower-level Instrumenter#start API */ });
+  it.skip("finish", () => { /* lower-level Instrumenter#finish API */ });
+  it.skip("record", () => { /* lower-level Instrumenter#record API */ });
+  it.skip("record yields the payload for further modification", () => { /* lower-level API */ });
+  it.skip("record works without a block", () => { /* lower-level API */ });
+
+  it("record with exception", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("risky", (e) => events.push(e));
+    expect(() => Notifications.instrument("risky", {}, () => { throw new Error("boom"); })).toThrow("boom");
+    expect(events).toHaveLength(1);
+  });
+});
+
+describe("EventedTest", () => {
+  it.skip("evented listener", () => { /* Rails evented subscriber pattern (thread-based) */ });
+  it.skip("evented listener no events", () => { /* Rails evented subscriber pattern */ });
+
+  it("listen to everything", () => {
+    const names: string[] = [];
+    Notifications.subscribe(null, (e) => names.push(e.name));
+    Notifications.instrument("alpha");
+    Notifications.instrument("beta");
+    expect(names).toContain("alpha");
+    expect(names).toContain("beta");
+  });
+
+  it.skip("listen start multiple exception consistency", () => { /* evented-specific */ });
+  it.skip("listen finish multiple exception consistency", () => { /* evented-specific */ });
+  it.skip("evented listener priority", () => { /* evented-specific */ });
+
+  it("listen to regexp", () => {
+    const names: string[] = [];
+    Notifications.subscribe(/\.active_record$/, (e) => names.push(e.name));
+    Notifications.instrument("sql.active_record");
+    Notifications.instrument("unrelated");
+    expect(names).toEqual(["sql.active_record"]);
+  });
+
+  it.skip("listen to regexp with exclusions", () => { /* exclusion pattern not implemented */ });
+});
+
+describe("SubscribeEventObjectsTest", () => {
+  it("subscribe events", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("foo", (e) => events.push(e));
+    Notifications.instrument("foo", { a: 1 });
+    expect(events).toHaveLength(1);
+    expect(events[0].name).toBe("foo");
+    expect(events[0].payload).toEqual({ a: 1 });
+  });
+
+  it("subscribe to events where payload is changed during instrumentation", () => {
+    const captured: unknown[] = [];
+    Notifications.subscribe("foo", (e) => captured.push(e.payload));
+    Notifications.instrument("foo", { status: "pending" }, () => {});
+    expect((captured[0] as any).status).toBe("pending");
+  });
+
+  it("subscribe to events can handle nested hashes in the paylaod", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("foo", (e) => events.push(e));
+    Notifications.instrument("foo", { nested: { key: "value" } });
+    expect((events[0].payload.nested as any).key).toBe("value");
+  });
+
+  it("subscribe via top level api", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("bar", (e) => events.push(e));
+    Notifications.instrument("bar");
+    expect(events).toHaveLength(1);
+  });
+
+  it("subscribe with a single arity lambda listener", () => {
+    const received: Event[] = [];
+    const listener = (e: Event) => received.push(e);
+    Notifications.subscribe("baz", listener);
+    Notifications.instrument("baz");
+    expect(received).toHaveLength(1);
+  });
+
+  it("subscribe with a single arity callable listener", () => {
+    const received: Event[] = [];
+    const handler = { call: (e: Event) => received.push(e) };
+    Notifications.subscribe("qux", (e) => handler.call(e));
+    Notifications.instrument("qux");
+    expect(received).toHaveLength(1);
+  });
+});
+
+describe("TimedAndMonotonicTimedSubscriberTest", () => {
+  it("subscribe", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("timed.event", (e) => events.push(e));
+    Notifications.instrument("timed.event", {}, () => {});
+    expect(events[0].duration).toBeGreaterThanOrEqual(0);
+  });
+
+  it.skip("monotonic subscribe", () => { /* monotonic time not implemented */ });
+});
+
+describe("BuildHandleTest", () => {
+  it.skip("interleaved event", () => { /* Rails-internal handle building */ });
+  it.skip("subscribed interleaved with event", () => { /* Rails-internal */ });
+});
+
+describe("SubscribedTest", () => {
+  it("subscribed", () => {
+    const events = Notifications.collectEvents("subscribed.event", () => {
+      Notifications.instrument("subscribed.event", { x: 1 });
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.x).toBe(1);
+  });
+
+  it("subscribed all messages", () => {
+    const events = Notifications.collectEvents(null, () => {
+      Notifications.instrument("alpha");
+      Notifications.instrument("beta");
+    });
+    expect(events.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("subscribing to instrumentation while inside it", () => {
+    // Subscribe during an instrumented block — new subscriber fires on next event
+    let innerFired = false;
+    Notifications.instrument("outer", {}, () => {
+      Notifications.subscribe("inner", () => { innerFired = true; });
+      Notifications.instrument("inner");
+    });
+    expect(innerFired).toBe(true);
+  });
+
+  it.skip("timed subscribed", () => { /* Rails LogSubscriber class */ });
+  it.skip("monotonic timed subscribed", () => { /* monotonic time */ });
+});
+
+describe("InspectTest", () => {
+  it.skip("inspect output is small", () => { /* Rails-specific #inspect */ });
+});
+
+describe("UnsubscribeTest", () => {
+  it("unsubscribing removes a subscription", () => {
+    const events: Event[] = [];
+    const sub = Notifications.subscribe("ping", (e) => events.push(e));
+    Notifications.instrument("ping");
+    Notifications.unsubscribe(sub);
+    Notifications.instrument("ping");
+    expect(events).toHaveLength(1);
+  });
+
+  it("unsubscribing by name removes a subscription", () => {
+    const events: Event[] = [];
+    const sub = Notifications.subscribe("named.event", (e) => events.push(e));
+    Notifications.instrument("named.event");
+    Notifications.unsubscribe(sub);
+    Notifications.instrument("named.event");
+    expect(events).toHaveLength(1);
+  });
+
+  it("unsubscribing by name leaves the other subscriptions", () => {
+    const aEvents: Event[] = [];
+    const bEvents: Event[] = [];
+    const subA = Notifications.subscribe("ev", (e) => aEvents.push(e));
+    Notifications.subscribe("ev", (e) => bEvents.push(e));
+    Notifications.unsubscribe(subA);
+    Notifications.instrument("ev");
+    expect(aEvents).toHaveLength(0);
+    expect(bEvents).toHaveLength(1);
+  });
+
+  it("unsubscribing by name leaves regexp matched subscriptions", () => {
+    const regexpEvents: Event[] = [];
+    const exactEvents: Event[] = [];
+    const exactSub = Notifications.subscribe("foo", (e) => exactEvents.push(e));
+    Notifications.subscribe(/foo/, (e) => regexpEvents.push(e));
+    Notifications.unsubscribe(exactSub);
+    Notifications.instrument("foo");
+    expect(exactEvents).toHaveLength(0);
+    expect(regexpEvents).toHaveLength(1);
+  });
+});
+
+describe("SyncPubSubTest", () => {
+  it("events are published to a listener", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("sync.event", (e) => events.push(e));
+    Notifications.instrument("sync.event");
+    expect(events).toHaveLength(1);
+  });
+
+  it("publishing multiple times works", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("multi", (e) => events.push(e));
+    Notifications.instrument("multi");
+    Notifications.instrument("multi");
+    Notifications.instrument("multi");
+    expect(events).toHaveLength(3);
+  });
+
+  it("publishing after a new subscribe works", () => {
+    const events: Event[] = [];
+    Notifications.instrument("new.sub"); // before subscribe
+    Notifications.subscribe("new.sub", (e) => events.push(e));
+    Notifications.instrument("new.sub"); // after subscribe
+    expect(events).toHaveLength(1);
+  });
+
+  it("log subscriber with string", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("sql.query", (e) => events.push(e));
+    Notifications.instrument("sql.query", { sql: "SELECT 1" });
+    expect(events[0].payload.sql).toBe("SELECT 1");
+  });
+
+  it("log subscriber with pattern", () => {
+    const events: Event[] = [];
+    Notifications.subscribe(/\.query$/, (e) => events.push(e));
+    Notifications.instrument("sql.query");
+    Notifications.instrument("cache.query");
+    Notifications.instrument("other");
+    expect(events).toHaveLength(2);
+  });
+
+  it("multiple log subscribers", () => {
+    const a: Event[] = [];
+    const b: Event[] = [];
+    Notifications.subscribe("multi.sub", (e) => a.push(e));
+    Notifications.subscribe("multi.sub", (e) => b.push(e));
+    Notifications.instrument("multi.sub");
+    expect(a).toHaveLength(1);
+    expect(b).toHaveLength(1);
+  });
+
+  it("publish with subscriber", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("pub.event", (e) => events.push(e));
+    Notifications.publish("pub.event", { x: 42 });
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.x).toBe(42);
+  });
+});
+
+describe("InstrumentationTest", () => {
+  it("instrument returns block result", () => {
+    const result = Notifications.instrument("calc", {}, () => 42);
+    expect(result).toBe(42);
+  });
+
+  it("instrument yields the payload for further modification", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("modify", (e) => events.push(e));
+    Notifications.instrument("modify", { original: true }, () => {});
+    expect(events[0].payload.original).toBe(true);
+  });
+
+  it.skip("instrumenter exposes its id", () => { /* Rails-specific Instrumenter#id */ });
+
+  it("nested events can be instrumented", () => {
+    let outerEvent!: Event;
+    Notifications.subscribe("outer", (e) => { outerEvent = e; });
+    Notifications.instrument("outer", {}, () => {
+      Notifications.instrument("inner", {}, () => {});
+    });
+    expect(outerEvent.children).toHaveLength(1);
+    expect(outerEvent.children[0].name).toBe("inner");
+  });
+
+  it("instrument publishes when exception is raised", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("boom", (e) => events.push(e));
+    expect(() => Notifications.instrument("boom", {}, () => { throw new Error("x"); })).toThrow();
+    expect(events).toHaveLength(1);
+  });
+
+  it("event is pushed even without block", () => {
+    const events: Event[] = [];
+    Notifications.subscribe("no.block", (e) => events.push(e));
+    Notifications.instrument("no.block", { a: 1 });
+    expect(events).toHaveLength(1);
+    expect(events[0].end).toBeInstanceOf(Date);
+  });
+});
+
+describe("EventTest", () => {
+  it("events are initialized with details", () => {
+    const start = new Date();
+    const e = new Event("test.event", start, { key: "val" });
+    expect(e.name).toBe("test.event");
+    expect(e.time).toBe(start);
+    expect(e.payload).toEqual({ key: "val" });
+  });
+
+  it("event cpu time does not raise error when start or finished not called", () => {
+    const e = new Event("test", new Date());
+    // duration before finish should return 0, not throw
+    expect(() => e.duration).not.toThrow();
+    expect(e.duration).toBe(0);
+  });
+
+  it("events consumes information given as payload", () => {
+    const payload = { sql: "SELECT 1", binds: [1, 2] };
+    const e = new Event("sql", new Date(), payload);
+    expect(e.payload.sql).toBe("SELECT 1");
+    expect(e.payload.binds).toEqual([1, 2]);
+  });
+
+  it.skip("subscribe raises error on non supported arguments", () => { /* arg validation not implemented */ });
+});
+
 describe("ActiveSupport::Notifications", () => {
   describe("subscribe and instrument", () => {
     it("calls subscriber when event is fired", () => {

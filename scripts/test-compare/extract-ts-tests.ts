@@ -37,6 +37,7 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/activesupport/src/duration.test.ts",
     "packages/activesupport/src/hwia-module-string.test.ts",
     "packages/activesupport/src/multibyte-assertions.test.ts",
+    "packages/activesupport/src/notifications.test.ts",
   ],
   activerecord: [
     "packages/activerecord/src/activerecord.test.ts",

@@ -1676,18 +1676,6 @@ describe("DeepMergeableTest", () => {
   it.skip("deep_merge? can be overridden to allow deep merging of non-subclass values", () => { /* fixture-dependent */ });
 });
 
-describe("InstrumenterTest", () => {
-  it.skip("instrument", () => { /* fixture-dependent */ });
-  it.skip("instrument yields the payload for further modification", () => { /* fixture-dependent */ });
-  it.skip("instrument works without a block", () => { /* fixture-dependent */ });
-  it.skip("start", () => { /* fixture-dependent */ });
-  it.skip("finish", () => { /* fixture-dependent */ });
-  it.skip("record", () => { /* fixture-dependent */ });
-  it.skip("record yields the payload for further modification", () => { /* fixture-dependent */ });
-  it.skip("record works without a block", () => { /* fixture-dependent */ });
-  it.skip("record with exception", () => { /* fixture-dependent */ });
-});
-
 describe("InTest", () => {
   it.skip("in array", () => { /* fixture-dependent */ });
   it.skip("in hash", () => { /* fixture-dependent */ });
@@ -1759,17 +1747,6 @@ describe("CallbackTypeTest", () => {
   it.skip("skip without raise", () => { /* fixture-dependent */ });
 });
 
-describe("EventedTest", () => {
-  it.skip("evented listener", () => { /* fixture-dependent */ });
-  it.skip("evented listener no events", () => { /* fixture-dependent */ });
-  it.skip("listen to everything", () => { /* fixture-dependent */ });
-  it.skip("listen start multiple exception consistency", () => { /* fixture-dependent */ });
-  it.skip("listen finish multiple exception consistency", () => { /* fixture-dependent */ });
-  it.skip("evented listener priority", () => { /* fixture-dependent */ });
-  it.skip("listen to regexp", () => { /* fixture-dependent */ });
-  it.skip("listen to regexp with exclusions", () => { /* fixture-dependent */ });
-});
-
 describe("TaggedLoggingTest", () => {
   it.skip("sets logger.formatter if missing and extends it with a tagging API", () => { /* fixture-dependent */ });
   it.skip("provides access to the logger instance", () => { /* fixture-dependent */ });
@@ -1820,16 +1797,6 @@ describe("ArrayInquirerTest", () => {
   it.skip("respond to", () => { /* fixture-dependent */ });
   it.skip("inquiry", () => { /* fixture-dependent */ });
   it.skip("respond to fallback to array respond to", () => { /* fixture-dependent */ });
-});
-
-describe("SyncPubSubTest", () => {
-  it.skip("events are published to a listener", () => { /* fixture-dependent */ });
-  it.skip("publishing multiple times works", () => { /* fixture-dependent */ });
-  it.skip("publishing after a new subscribe works", () => { /* fixture-dependent */ });
-  it.skip("log subscriber with string", () => { /* fixture-dependent */ });
-  it.skip("log subscriber with pattern", () => { /* fixture-dependent */ });
-  it.skip("multiple log subscribers", () => { /* fixture-dependent */ });
-  it.skip("publish with subscriber", () => { /* fixture-dependent */ });
 });
 
 describe("StringIndentTest", () => {
@@ -1914,15 +1881,6 @@ describe("TestAutoloadModule", () => {
   it.skip("the location of :eager autoloaded constants defaults to :name.underscore", () => { /* fixture-dependent */ });
   it.skip("a directory for a block of autoloads can be specified", () => { /* fixture-dependent */ });
   it.skip("a path for a block of autoloads can be specified", () => { /* fixture-dependent */ });
-});
-
-describe("SubscribeEventObjectsTest", () => {
-  it.skip("subscribe events", () => { /* fixture-dependent */ });
-  it.skip("subscribe to events where payload is changed during instrumentation", () => { /* fixture-dependent */ });
-  it.skip("subscribe to events can handle nested hashes in the paylaod", () => { /* fixture-dependent */ });
-  it.skip("subscribe via top level api", () => { /* fixture-dependent */ });
-  it.skip("subscribe with a single arity lambda listener", () => { /* fixture-dependent */ });
-  it.skip("subscribe with a single arity callable listener", () => { /* fixture-dependent */ });
 });
 
 describe("IntrospectionTest", () => {
@@ -2054,14 +2012,6 @@ describe("SecureCompareRotatorTest", () => {
   it.skip("#secure_compare! calls the on_rotation proc that given in constructor", () => { /* fixture-dependent */ });
 });
 
-describe("SubscribedTest", () => {
-  it.skip("subscribed", () => { /* fixture-dependent */ });
-  it.skip("subscribed all messages", () => { /* fixture-dependent */ });
-  it.skip("subscribing to instrumentation while inside it", () => { /* fixture-dependent */ });
-  it.skip("timed subscribed", () => { /* fixture-dependent */ });
-  it.skip("monotonic timed subscribed", () => { /* fixture-dependent */ });
-});
-
 describe("AttrInternalTest", () => {
   it.skip("reader", () => { /* fixture-dependent */ });
   it.skip("writer", () => { /* fixture-dependent */ });
@@ -2188,13 +2138,6 @@ describe("UsingObjectTest", () => {
   it.skip("block result is returned", () => { /* fixture-dependent */ });
 });
 
-describe("UnsubscribeTest", () => {
-  it.skip("unsubscribing removes a subscription", () => { /* fixture-dependent */ });
-  it.skip("unsubscribing by name removes a subscription", () => { /* fixture-dependent */ });
-  it.skip("unsubscribing by name leaves the other subscriptions", () => { /* fixture-dependent */ });
-  it.skip("unsubscribing by name leaves regexp matched subscriptions", () => { /* fixture-dependent */ });
-});
-
 describe("CallbackProcTest", () => {
   it.skip("proc arity 0", () => { /* fixture-dependent */ });
   it.skip("proc arity 1", () => { /* fixture-dependent */ });
@@ -2235,13 +2178,6 @@ describe("ActionableErrorTest", () => {
   it.skip("returns no actions for non-actionable errors", () => { /* fixture-dependent */ });
   it.skip("dispatches actions from error and name", () => { /* fixture-dependent */ });
   it.skip("cannot dispatch missing actions", () => { /* fixture-dependent */ });
-});
-
-describe("EventTest", () => {
-  it.skip("events are initialized with details", () => { /* fixture-dependent */ });
-  it.skip("event cpu time does not raise error when start or finished not called", () => { /* fixture-dependent */ });
-  it.skip("events consumes information given as payload", () => { /* fixture-dependent */ });
-  it.skip("subscribe raises error on non supported arguments", () => { /* fixture-dependent */ });
 });
 
 describe("TestLoadError", () => {
@@ -2495,11 +2431,6 @@ describe("CallStackTest", () => {
   it.skip("short call stack", () => { /* fixture-dependent */ });
 });
 
-describe("TimedAndMonotonicTimedSubscriberTest", () => {
-  it.skip("subscribe", () => { /* fixture-dependent */ });
-  it.skip("monotonic subscribe", () => { /* fixture-dependent */ });
-});
-
 describe("BacktraceCleanerMultipleSilencersTest", () => {
   it.skip("backtrace should not contain lines that match the silencers", () => { /* fixture-dependent */ });
   it.skip("backtrace should only contain lines that match the silencers", () => { /* fixture-dependent */ });
@@ -2518,11 +2449,6 @@ describe("ModuleConcerningTest", () => {
 describe("JsonGemEncodingTest", () => {
   it.skip(" ", () => { /* fixture-dependent */ });
   it.skip("custom to_json", () => { /* fixture-dependent */ });
-});
-
-describe("BuildHandleTest", () => {
-  it.skip("interleaved event", () => { /* fixture-dependent */ });
-  it.skip("subscribed interleaved with event", () => { /* fixture-dependent */ });
 });
 
 describe("ThreadSafetyTest", () => {
@@ -2669,10 +2595,6 @@ describe("StringExcludeTest", () => {
 
 describe("WriterCallbacksTest", () => {
   it.skip("skip writer", () => { /* fixture-dependent */ });
-});
-
-describe("InspectTest", () => {
-  it.skip("inspect output is small", () => { /* fixture-dependent */ });
 });
 
 describe("StringBehaviorTest", () => {
@@ -3423,15 +3345,6 @@ describe("HashExtToParamTests", () => {
   it.skip("to param hash", () => { /* fixture-dependent */ });
   it.skip("to param hash escapes its keys and values", () => { /* fixture-dependent */ });
   it.skip("to param orders by key in ascending order", () => { /* fixture-dependent */ });
-});
-
-describe("InstrumentationTest", () => {
-  it.skip("instrument returns block result", () => { /* fixture-dependent */ });
-  it.skip("instrument yields the payload for further modification", () => { /* fixture-dependent */ });
-  it.skip("instrumenter exposes its id", () => { /* fixture-dependent */ });
-  it.skip("nested events can be instrumented", () => { /* fixture-dependent */ });
-  it.skip("instrument publishes when exception is raised", () => { /* fixture-dependent */ });
-  it.skip("event is pushed even without block", () => { /* fixture-dependent */ });
 });
 
 describe("MemoryStorePruningTest", () => {
