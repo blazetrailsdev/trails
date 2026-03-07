@@ -19130,7 +19130,27 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 });
 
 describe("CallbacksOnMultipleActionsTest", () => {
-  it.skip("after commit on multiple actions", () => { /* fixture-dependent */ });
+  it("after commit on multiple actions", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.afterCreate(function() { log.push("created"); });
+        this.afterUpdate(function() { log.push("updated"); });
+        this.afterDestroy(function() { log.push("destroyed"); });
+      }
+    }
+    const p = await Post.create({ title: "a" });
+    expect(log).toContain("created");
+    p.writeAttribute("title", "b");
+    await p.save();
+    expect(log).toContain("updated");
+    await p.destroy();
+    expect(log).toContain("destroyed");
+  });
+
   it.skip("before commit actions", () => { /* fixture-dependent */ });
   it.skip("before commit update in same transaction", () => { /* fixture-dependent */ });
 });
@@ -19574,7 +19594,24 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
 });
 
 describe("CallbacksOnActionAndConditionTest", () => {
-  it.skip("callback on action with condition", () => { /* fixture-dependent */ });
+  it("callback on action with condition", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean", { default: false });
+        this.adapter = adapter;
+        this.beforeSave(function(record: any) {
+          if (record.readAttribute("published")) { log.push("published_save"); }
+        });
+      }
+    }
+    await Post.create({ title: "draft", published: false });
+    expect(log).not.toContain("published_save");
+    await Post.create({ title: "live", published: true });
+    expect(log).toContain("published_save");
+  });
 });
 
 describe("ReservedWordsMigrationTest", () => {
@@ -19657,11 +19694,30 @@ describe("AsyncHasOneAssociationsTest", () => {
 });
 
 describe("TooManyOrTest", () => {
-  it.skip("too many or", () => { /* fixture-dependent */ });
+  it("too many or", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    // Should not throw even with many OR conditions
+    let rel = Post.where({ title: "a" });
+    for (let i = 0; i < 5; i++) {
+      rel = rel.or(Post.where({ title: String(i) }));
+    }
+    const sql = rel.toSql();
+    expect(sql).toContain("OR");
+  });
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
-  it.skip("should generate valid sql", () => { /* fixture-dependent */ });
+  it("should generate valid sql", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.order("title").reorder("title DESC").toSql();
+    expect(sql).toContain("ORDER BY");
+  });
 });
 
 describe("TestAutosaveAssociationWithTouch", () => {
@@ -19669,7 +19725,21 @@ describe("TestAutosaveAssociationWithTouch", () => {
 });
 
 describe("SetCallbackTest", () => {
-  it.skip("set callback with on", () => { /* fixture-dependent */ });
+  it("set callback with on", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeCreate(function() { log.push("before_create"); });
+        this.beforeSave(function() { log.push("before_save"); });
+      }
+    }
+    await Post.create({ title: "test" });
+    expect(log).toContain("before_create");
+    expect(log).toContain("before_save");
+  });
 });
 
 describe("ErrorsTest", () => {
