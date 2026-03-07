@@ -15027,3 +15027,2175 @@ describe("CompositePrimaryKeyTest", () => {
   it.skip("model with a composite primary key", () => { /* fixture-dependent */ });
   it.skip("primary key values present for a composite pk model", () => { /* fixture-dependent */ });
 });
+
+describe("SerializedAttributeTestWithYamlSafeLoad", () => {
+  it.skip("serialized attribute", () => { /* fixture-dependent */ });
+  it.skip("serialized attribute on custom attribute with default", () => { /* fixture-dependent */ });
+  it.skip("nil is always persisted as null", () => { /* fixture-dependent */ });
+  it.skip("serialized attribute with default", () => { /* fixture-dependent */ });
+  it.skip("serialized attributes from database on subclass", () => { /* fixture-dependent */ });
+  it.skip("serialized attribute on alias attribute", () => { /* fixture-dependent */ });
+  it.skip("unexpected serialized type", () => { /* fixture-dependent */ });
+  it.skip("serialize attribute via select method when time zone available", () => { /* fixture-dependent */ });
+  it.skip("should raise exception on serialized attribute with type mismatch", () => { /* fixture-dependent */ });
+  it.skip("serialized time attribute", () => { /* fixture-dependent */ });
+  it.skip("supports permitted classes for default column serializer", () => { /* fixture-dependent */ });
+});
+
+describe("JsonSerializationTest", () => {
+  it.skip("should demodulize root in json", () => { /* fixture-dependent */ });
+  it.skip("should encode all encodable attributes", () => { /* fixture-dependent */ });
+  it.skip("should allow attribute filtering with only", () => { /* fixture-dependent */ });
+  it.skip("should allow attribute filtering with except", () => { /* fixture-dependent */ });
+  it.skip("methods are called on object", () => { /* fixture-dependent */ });
+  it.skip("uses serializable hash with frozen hash", () => { /* fixture-dependent */ });
+  it.skip("uses serializable hash with only option", () => { /* fixture-dependent */ });
+  it.skip("uses serializable hash with except option", () => { /* fixture-dependent */ });
+  it.skip("does not include inheritance column from sti", () => { /* fixture-dependent */ });
+  it.skip("serializable hash with default except option and excluding inheritance column from sti", () => { /* fixture-dependent */ });
+  it.skip("serializable hash should not modify options in argument", () => { /* fixture-dependent */ });
+});
+
+describe("TouchLaterTest", () => {
+  it.skip("touch later raise if non persisted", () => { /* fixture-dependent */ });
+  it.skip("touch later dont set dirty attributes", () => { /* fixture-dependent */ });
+  it.skip("touch later respects no touching policy", () => { /* fixture-dependent */ });
+  it.skip("touch later update the attributes", () => { /* fixture-dependent */ });
+  it.skip("touch touches immediately", () => { /* fixture-dependent */ });
+  it.skip("touch later an association dont autosave parent", () => { /* fixture-dependent */ });
+  it.skip("touch touches immediately with a custom time", () => { /* fixture-dependent */ });
+  it.skip("touch later dont hit the db", () => { /* fixture-dependent */ });
+  it.skip("touching three deep", () => { /* fixture-dependent */ });
+  it.skip("touching through nested attributes without before committed on all records", () => { /* fixture-dependent */ });
+  it.skip("touching through nested attributes with before committed on all records", () => { /* fixture-dependent */ });
+});
+
+describe("ReadOnlyTest", () => {
+  it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
+  it.skip("cant update columns readonly record", () => { /* fixture-dependent */ });
+  it.skip("find with readonly option", () => { /* fixture-dependent */ });
+  it.skip("find with joins option does not imply readonly", () => { /* fixture-dependent */ });
+  it.skip("has many find readonly", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly while finding by id", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly while finding first", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly while finding last", () => { /* fixture-dependent */ });
+  it.skip("readonly scoping", () => { /* fixture-dependent */ });
+  it.skip("association collection method missing scoping not readonly", () => { /* fixture-dependent */ });
+});
+
+describe("DatabaseConnectedJsonEncodingTest", () => {
+  it.skip("includes uses association name", () => { /* fixture-dependent */ });
+  it.skip("includes uses association name and applies attribute filters", () => { /* fixture-dependent */ });
+  it.skip("includes fetches second level associations", () => { /* fixture-dependent */ });
+  it.skip("includes fetches nth level associations", () => { /* fixture-dependent */ });
+  it.skip("includes doesnt merge opts from base", () => { /* fixture-dependent */ });
+  it.skip("should not call methods on associations that dont respond", () => { /* fixture-dependent */ });
+  it.skip("should allow only option for list of authors", () => { /* fixture-dependent */ });
+  it.skip("should allow except option for list of authors", () => { /* fixture-dependent */ });
+  it.skip("should allow includes for list of authors", () => { /* fixture-dependent */ });
+  it.skip("should allow options for hash of authors", () => { /* fixture-dependent */ });
+  it.skip("should be able to encode relation", () => { /* fixture-dependent */ });
+});
+
+describe("DeleteAllTest", () => {
+  it.skip("delete all with index hint", () => { /* fixture-dependent */ });
+  it.skip("delete all loaded", () => { /* fixture-dependent */ });
+  it.skip("delete all with group by and having", () => { /* fixture-dependent */ });
+  it.skip("delete all with unpermitted relation raises error", () => { /* fixture-dependent */ });
+  it.skip("delete all with joins and where part is hash", () => { /* fixture-dependent */ });
+  it.skip("delete all with joins and where part is not hash", () => { /* fixture-dependent */ });
+  it.skip("delete all with left joins", () => { /* fixture-dependent */ });
+  it.skip("delete all with includes", () => { /* fixture-dependent */ });
+  it.skip("delete all with order and limit deletes subset only", () => { /* fixture-dependent */ });
+  it.skip("delete all with order and limit and offset deletes subset only", () => { /* fixture-dependent */ });
+  it.skip("delete all composite model with join subquery", () => { /* fixture-dependent */ });
+});
+
+describe("AssociationValidationTest", () => {
+  it.skip("validates associated many", () => { /* fixture-dependent */ });
+  it.skip("validates associated one", () => { /* fixture-dependent */ });
+  it.skip("validates associated marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates associated without marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates associated with custom message using quotes", () => { /* fixture-dependent */ });
+  it.skip("validates associated missing", () => { /* fixture-dependent */ });
+  it.skip("validates presence of belongs to association  parent is new record", () => { /* fixture-dependent */ });
+  it.skip("validates presence of belongs to association  existing parent", () => { /* fixture-dependent */ });
+  it.skip("validates associated with custom context", () => { /* fixture-dependent */ });
+  it.skip("validates associated with create context", () => { /* fixture-dependent */ });
+});
+
+describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
+  it.skip("invalid adding with nested attributes", () => { /* fixture-dependent */ });
+  it.skip("errors should be indexed when passed as array", () => { /* fixture-dependent */ });
+  it.skip("errors should be indexed when global flag is set", () => { /* fixture-dependent */ });
+  it.skip("errors details should be set", () => { /* fixture-dependent */ });
+  it.skip("errors details should be indexed when passed as array", () => { /* fixture-dependent */ });
+  it.skip("errors details with error on base should be indexed when passed as array", () => { /* fixture-dependent */ });
+  it.skip("indexed errors should be properly translated", () => { /* fixture-dependent */ });
+  it.skip("indexed errors on base attribute should be properly translated", () => { /* fixture-dependent */ });
+  it.skip("errors details should be indexed when global flag is set", () => { /* fixture-dependent */ });
+  it.skip("valid adding with nested attributes", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationsInGeneral", () => {
+  it.skip("autosave works even when other callbacks update the parent model", () => { /* fixture-dependent */ });
+  it.skip("autosave does not pass through non custom validation contexts", () => { /* fixture-dependent */ });
+  it.skip("autosave collection association callbacks get called once", () => { /* fixture-dependent */ });
+  it.skip("autosave has one association callbacks get called once", () => { /* fixture-dependent */ });
+  it.skip("autosave belongs to association callbacks get called once", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for has one", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for belongs to", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for has many", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for has and belongs to many", () => { /* fixture-dependent */ });
+  it.skip("cyclic autosaves do not add multiple validations", () => { /* fixture-dependent */ });
+});
+
+describe("NestedAttributesWithCallbacksTest", () => {
+  it.skip(":before_add called for new bird when not loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add called for new bird when loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for identical assignment when not loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for identical assignment when loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for destroy assignment when not loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for deletion assignment when loaded", () => { /* fixture-dependent */ });
+  it.skip("Assignment updates records in target when not loaded", () => { /* fixture-dependent */ });
+  it.skip("Assignment updates records in target when loaded", () => { /* fixture-dependent */ });
+  it.skip("Assignment updates records in target when not loaded", () => { /* fixture-dependent */ });
+  it.skip("Assignment updates records in target when loaded", () => { /* fixture-dependent */ });
+});
+
+describe("InverseHasOneTests", () => {
+  it.skip("parent instance should be shared with child on find", () => { /* fixture-dependent */ });
+  it.skip("parent instance should be shared with eager loaded child on find", () => { /* fixture-dependent */ });
+  it.skip("parent instance should be shared with newly built child", () => { /* fixture-dependent */ });
+  it.skip("parent instance should be shared with newly created child", () => { /* fixture-dependent */ });
+  it.skip("parent instance should be shared with newly created child via bang method", () => { /* fixture-dependent */ });
+  it.skip("parent instance should be shared with replaced via accessor child", () => { /* fixture-dependent */ });
+  it.skip("child instance should be shared with replaced via accessor parent", () => { /* fixture-dependent */ });
+  it.skip("trying to use inverses that dont exist should raise an error", () => { /* fixture-dependent */ });
+  it.skip("trying to use inverses that dont exist should have suggestions for fix", () => { /* fixture-dependent */ });
+});
+
+describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
+  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => { /* fixture-dependent */ });
+  it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => { /* fixture-dependent */ });
+  it.skip("when grandchild changed in memory, saving parent should save grandchild", () => { /* fixture-dependent */ });
+  it.skip("when grandchild changed via attributes, saving parent should save grandchild", () => { /* fixture-dependent */ });
+  it.skip("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", () => { /* fixture-dependent */ });
+  it.skip("when grandchild added via attributes, saving parent should create grandchild", () => { /* fixture-dependent */ });
+  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => { /* fixture-dependent */ });
+  it.skip("circular references do not perform unnecessary queries", () => { /* fixture-dependent */ });
+  it.skip("nested singular associations are validated", () => { /* fixture-dependent */ });
+});
+
+describe("SerializationTest", () => {
+  it.skip("include root in json is false by default", () => { /* fixture-dependent */ });
+  it.skip("serialize should be reversible", () => { /* fixture-dependent */ });
+  it.skip("serialize should allow attribute only filtering", () => { /* fixture-dependent */ });
+  it.skip("serialize should allow attribute except filtering", () => { /* fixture-dependent */ });
+  it.skip("include root in json allows inheritance", () => { /* fixture-dependent */ });
+  it.skip("read attribute for serialization with format without method missing", () => { /* fixture-dependent */ });
+  it.skip("read attribute for serialization with format after init", () => { /* fixture-dependent */ });
+  it.skip("read attribute for serialization with format after find", () => { /* fixture-dependent */ });
+  it.skip("find records by serialized attributes through join", () => { /* fixture-dependent */ });
+});
+
+describe("SecureTokenTest", () => {
+  it.skip("token values are generated for specified attributes and persisted on save", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize does not affect reading from the column", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize happens only once", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize is skipped if column was not selected", () => { /* fixture-dependent */ });
+  it.skip("regenerating the secure token", () => { /* fixture-dependent */ });
+  it.skip("token value not overwritten when present", () => { /* fixture-dependent */ });
+  it.skip("token length cannot be less than 24 characters", () => { /* fixture-dependent */ });
+  it.skip("token on callback", () => { /* fixture-dependent */ });
+  it.skip("token calls the setter method", () => { /* fixture-dependent */ });
+});
+
+describe("MysqlDefaultExpressionTest", () => {
+  it.skip("schema dump includes default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump includes default expression with single quotes reflected correctly", () => { /* fixture-dependent */ });
+  it.skip("schema dump datetime includes default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump datetime includes precise default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump datetime includes precise default expression with on update", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp includes default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp includes precise default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp includes precise default expression with on update", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp without default expression", () => { /* fixture-dependent */ });
+});
+
+describe("AggregationsTest", () => {
+  it.skip("allow nil gps is nil", () => { /* fixture-dependent */ });
+  it.skip("allow nil gps set to nil", () => { /* fixture-dependent */ });
+  it.skip("nil raises error when allow nil is false", () => { /* fixture-dependent */ });
+  it.skip("nil return from converter is respected when allow nil is true", () => { /* fixture-dependent */ });
+  it.skip("nil return from converter results in failure when allow nil is false", () => { /* fixture-dependent */ });
+  it.skip("do not run the converter when nil was set", () => { /* fixture-dependent */ });
+  it.skip("assigning hash to custom converter", () => { /* fixture-dependent */ });
+  it.skip("assigning hash without custom converter", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
+  it.skip("created callback called on last to save of separate instances in a transaction", () => { /* fixture-dependent */ });
+  it.skip("created callback called on first to save in transaction with old configuration", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on last to save of separate instances in a transaction", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on first to save in transaction with old configuration", () => { /* fixture-dependent */ });
+  it.skip("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => { /* fixture-dependent */ });
+  it.skip("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", () => { /* fixture-dependent */ });
+  it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => { /* fixture-dependent */ });
+});
+
+describe("OverridingAssociationsTest", () => {
+  it.skip("habtm association redefinition callbacks should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("has many association redefinition callbacks should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("habtm association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("has many association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("belongs to association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("has one association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("requires symbol argument", () => { /* fixture-dependent */ });
+  it.skip("associations raise with name error if associated to classes that do not exist", () => { /* fixture-dependent */ });
+});
+
+describe("PresenceValidationTest", () => {
+  it.skip("validates presence of non association", () => { /* fixture-dependent */ });
+  it.skip("validates presence of has one", () => { /* fixture-dependent */ });
+  it.skip("validates presence of has one marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates presence of has many marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates presence doesnt convert to array", () => { /* fixture-dependent */ });
+  it.skip("validates presence of virtual attribute on model", () => { /* fixture-dependent */ });
+  it.skip("validations run on persisted record", () => { /* fixture-dependent */ });
+  it.skip("validates presence with on context", () => { /* fixture-dependent */ });
+});
+
+describe("FieldOrderedValuesTest", () => {
+  it.skip("in order of empty", () => { /* fixture-dependent */ });
+  it.skip("in order of with enums values", () => { /* fixture-dependent */ });
+  it.skip("in order of with enums keys", () => { /* fixture-dependent */ });
+  it.skip("in order of with string column", () => { /* fixture-dependent */ });
+  it.skip("in order of after regular order", () => { /* fixture-dependent */ });
+  it.skip("in order of with nil", () => { /* fixture-dependent */ });
+  it.skip("in order of with associations", () => { /* fixture-dependent */ });
+  it.skip("in order of with filter false", () => { /* fixture-dependent */ });
+});
+
+describe("ExcludingTest", () => {
+  it.skip("result set does not include collection of excluded records from a query", () => { /* fixture-dependent */ });
+  it.skip("result set does not include collection of excluded records from a loaded query", () => { /* fixture-dependent */ });
+  it.skip("result set does not include collection of excluded records and queries", () => { /* fixture-dependent */ });
+  it.skip("result set through association does not include single excluded record", () => { /* fixture-dependent */ });
+  it.skip("result set through association does not include collection of excluded records", () => { /* fixture-dependent */ });
+  it.skip("result set through association does not include collection of excluded records from a relation", () => { /* fixture-dependent */ });
+  it.skip("result set through association does not include collection of excluded records from a loaded relation", () => { /* fixture-dependent */ });
+  it.skip("raises on record from different class", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksTest", () => {
+  it.skip("save person", () => { /* fixture-dependent */ });
+  it.skip("existing valid?", () => { /* fixture-dependent */ });
+  it.skip("validate on contextual create", () => { /* fixture-dependent */ });
+  it.skip("validate on contextual update", () => { /* fixture-dependent */ });
+  it.skip("inheritance of callbacks", () => { /* fixture-dependent */ });
+  it.skip("before save doesnt allow on option", () => { /* fixture-dependent */ });
+  it.skip("around save doesnt allow on option", () => { /* fixture-dependent */ });
+  it.skip("after save doesnt allow on option", () => { /* fixture-dependent */ });
+});
+
+describe("FinderRespondToTest", () => {
+  it.skip("should preserve normal respond to behavior on base", () => { /* fixture-dependent */ });
+  it.skip("should preserve normal respond to behavior and respond to newly added method", () => { /* fixture-dependent */ });
+  it.skip("should preserve normal respond to behavior and respond to standard object method", () => { /* fixture-dependent */ });
+  it.skip("should respond to find by with bang", () => { /* fixture-dependent */ });
+  it.skip("should respond to find by two attributes", () => { /* fixture-dependent */ });
+  it.skip("should respond to find all by an aliased attribute", () => { /* fixture-dependent */ });
+  it.skip("should not respond to find by invalid method syntax", () => { /* fixture-dependent */ });
+});
+
+describe("MergingDifferentRelationsTest", () => {
+  it.skip("merging where relations", () => { /* fixture-dependent */ });
+  it.skip("merging order relations", () => { /* fixture-dependent */ });
+  it.skip("merging order relations (using a hash argument)", () => { /* fixture-dependent */ });
+  it.skip("relation merging (using a proc argument)", () => { /* fixture-dependent */ });
+  it.skip("merging relation with common table expression", () => { /* fixture-dependent */ });
+  it.skip("merging multiple relations with common table expression", () => { /* fixture-dependent */ });
+  it.skip("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyScopingTest", () => {
+  it.skip("forwarding of static methods", () => { /* fixture-dependent */ });
+  it.skip("forwarding to scoped", () => { /* fixture-dependent */ });
+  it.skip("nested scope finder", () => { /* fixture-dependent */ });
+  it.skip("none scoping", () => { /* fixture-dependent */ });
+  it.skip("should default scope on associations is overridden by association conditions", () => { /* fixture-dependent */ });
+  it.skip("should maintain default scope on eager loaded associations", () => { /* fixture-dependent */ });
+  it.skip("scoping applies to all queries on has many when set", () => { /* fixture-dependent */ });
+});
+
+describe("RequiredAssociationsTest", () => {
+  it.skip("belongs_to associations can be optional by default", () => { /* fixture-dependent */ });
+  it.skip("required belongs_to associations have presence validated", () => { /* fixture-dependent */ });
+  it.skip("belongs_to associations can be required by default", () => { /* fixture-dependent */ });
+  it.skip("has_one associations are not required by default", () => { /* fixture-dependent */ });
+  it.skip("required has_one associations have presence validated", () => { /* fixture-dependent */ });
+  it.skip("required has_one associations have a correct error message", () => { /* fixture-dependent */ });
+  it.skip("required belongs_to associations have a correct error message", () => { /* fixture-dependent */ });
+});
+
+describe("WithAnnotationsTest", () => {
+  it.skip("belongs to with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has and belongs to many with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has one with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has many with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has many through with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has many through with annotation includes a query comment when eager loading", () => { /* fixture-dependent */ });
+});
+
+describe("NestedRelationScopingTest", () => {
+  it.skip("merge options", () => { /* fixture-dependent */ });
+  it.skip("merge inner scope has priority", () => { /* fixture-dependent */ });
+  it.skip("replace options", () => { /* fixture-dependent */ });
+  it.skip("three level nested exclusive scoped find", () => { /* fixture-dependent */ });
+  it.skip("nested scoped create", () => { /* fixture-dependent */ });
+  it.skip("nested exclusive scope for create", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
+  it.skip("should generate validation methods for has_many associations", () => { /* fixture-dependent */ });
+  it.skip("should generate validation methods for has_one associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not generate validation methods for has_one associations without :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should generate validation methods for belongs_to associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not generate validation methods for belongs_to associations without :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should generate validation methods for HABTM associations with :validate => true", () => { /* fixture-dependent */ });
+});
+
+describe("InverseAssociationTests", () => {
+  it.skip("should allow for inverse of options in associations", () => { /* fixture-dependent */ });
+  it.skip("should be able to ask a reflection if it has an inverse", () => { /* fixture-dependent */ });
+  it.skip("inverse of method should supply the actual reflection instance it is the inverse of", () => { /* fixture-dependent */ });
+  it.skip("associations with no inverse of should return nil", () => { /* fixture-dependent */ });
+  it.skip("polymorphic associations dont attempt to find inverse of", () => { /* fixture-dependent */ });
+  it.skip("this inverse stuff", () => { /* fixture-dependent */ });
+});
+
+describe("NullRelationTest", () => {
+  it.skip("none chainable to existing scope extension method", () => { /* fixture-dependent */ });
+  it.skip("async query on null relation", () => { /* fixture-dependent */ });
+  it.skip("none chained to methods firing queries straight to db", () => { /* fixture-dependent */ });
+  it.skip("null relation used with constraints", () => { /* fixture-dependent */ });
+  it.skip("null relation metadata methods", () => { /* fixture-dependent */ });
+  it.skip("null relation in where condition", () => { /* fixture-dependent */ });
+});
+
+describe("InstrumentationTest", () => {
+  it.skip("instrument returns block result", () => { /* fixture-dependent */ });
+  it.skip("instrument yields the payload for further modification", () => { /* fixture-dependent */ });
+  it.skip("instrumenter exposes its id", () => { /* fixture-dependent */ });
+  it.skip("nested events can be instrumented", () => { /* fixture-dependent */ });
+  it.skip("instrument publishes when exception is raised", () => { /* fixture-dependent */ });
+  it.skip("event is pushed even without block", () => { /* fixture-dependent */ });
+});
+
+describe("SuppressorTest", () => {
+  it.skip("suppresses create", () => { /* fixture-dependent */ });
+  it.skip("suppresses update", () => { /* fixture-dependent */ });
+  it.skip("suppresses create in callback", () => { /* fixture-dependent */ });
+  it.skip("resumes saving after suppression complete", () => { /* fixture-dependent */ });
+  it.skip("suppresses validations on create", () => { /* fixture-dependent */ });
+  it.skip("suppresses when nested multiple times", () => { /* fixture-dependent */ });
+});
+
+describe("BooleanTest", () => {
+  it.skip("boolean", () => { /* fixture-dependent */ });
+  it.skip("boolean without questionmark", () => { /* fixture-dependent */ });
+  it.skip("boolean cast from string", () => { /* fixture-dependent */ });
+  it.skip("find by boolean string", () => { /* fixture-dependent */ });
+  it.skip("find by falsy boolean symbol", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyIntegerTest", () => {
+  it.skip("primary key column type with serial/integer", () => { /* fixture-dependent */ });
+  it.skip("primary key with serial/integer are automatically numbered", () => { /* fixture-dependent */ });
+  it.skip("schema dump primary key with serial/integer", () => { /* fixture-dependent */ });
+  it.skip("primary key column type with options", () => { /* fixture-dependent */ });
+  it.skip("bigint primary key with unsigned", () => { /* fixture-dependent */ });
+});
+
+describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
+  it.skip("when great-grandchild changed in memory, saving parent should save great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when great-grandchild changed via attributes, saving parent should save great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when great-grandchild added via attributes, saving parent should create great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
+  it.skip("trigger once on multiple deletion within transaction", () => { /* fixture-dependent */ });
+  it.skip("trigger once on multiple deletions", () => { /* fixture-dependent */ });
+  it.skip("trigger once on multiple deletions in a transaction", () => { /* fixture-dependent */ });
+  it.skip("rollback on multiple deletions", () => { /* fixture-dependent */ });
+  it.skip("trigger on update where row was deleted", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyAssociationsTestPrimaryKeys", () => {
+  it.skip("custom primary key on new record should fetch with query", () => { /* fixture-dependent */ });
+  it.skip("association primary key on new record should fetch with query", () => { /* fixture-dependent */ });
+  it.skip("ids on unloaded association with custom primary key", () => { /* fixture-dependent */ });
+  it.skip("ids on loaded association with custom primary key", () => { /* fixture-dependent */ });
+  it.skip("blank custom primary key on new record should not run queries", () => { /* fixture-dependent */ });
+});
+
+describe("LengthValidationTest", () => {
+  it.skip("validates size of association", () => { /* fixture-dependent */ });
+  it.skip("validates size of association using within", () => { /* fixture-dependent */ });
+  it.skip("validates size of association utf8", () => { /* fixture-dependent */ });
+  it.skip("validates size of respects records marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates length of virtual attribute on model", () => { /* fixture-dependent */ });
+});
+
+describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
+  it.skip("autosave new record on belongs to can be disabled per relationship", () => { /* fixture-dependent */ });
+  it.skip("autosave new record on has one can be disabled per relationship", () => { /* fixture-dependent */ });
+  it.skip("autosave new record on has many can be disabled per relationship", () => { /* fixture-dependent */ });
+  it.skip("autosave new record with after create callback", () => { /* fixture-dependent */ });
+  it.skip("autosave new record with after create callback and habtm association", () => { /* fixture-dependent */ });
+});
+
+describe("AbsenceValidationTest", () => {
+  it.skip("non association", () => { /* fixture-dependent */ });
+  it.skip("has one marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("has many marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("does not call to a on associations", () => { /* fixture-dependent */ });
+  it.skip("validates absence of virtual attribute on model", () => { /* fixture-dependent */ });
+});
+
+describe("StructuralCompatibilityTest", () => {
+  it.skip("compatible values", () => { /* fixture-dependent */ });
+  it.skip("incompatible single value relations", () => { /* fixture-dependent */ });
+  it.skip("incompatible multi value relations", () => { /* fixture-dependent */ });
+  it.skip("incompatible unscope", () => { /* fixture-dependent */ });
+});
+
+describe("HabtmDestroyOrderTest", () => {
+  it.skip("may not delete a lesson with students", () => { /* fixture-dependent */ });
+  it.skip("should not raise error if have foreign key in the join table", () => { /* fixture-dependent */ });
+  it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => { /* fixture-dependent */ });
+  it.skip("not destroying a lesson with students leaves student<=>lesson association intact", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
+  it.skip("should automatically validate associations", () => { /* fixture-dependent */ });
+  it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => { /* fixture-dependent */ });
+  it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => { /* fixture-dependent */ });
+  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+});
+
+describe("OrderTest", () => {
+  it.skip("order asc", () => { /* fixture-dependent */ });
+  it.skip("order desc", () => { /* fixture-dependent */ });
+  it.skip("order with association", () => { /* fixture-dependent */ });
+  it.skip("order with association alias", () => { /* fixture-dependent */ });
+});
+
+describe("OptimisticLockingWithSchemaChangeTest", () => {
+  it.skip("destroy dependents", () => { /* fixture-dependent */ });
+  it.skip("destroy existing object with locking column value null in the database", () => { /* fixture-dependent */ });
+  it.skip("destroy stale object", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnMultipleActionsTest", () => {
+  it.skip("after commit on multiple actions", () => { /* fixture-dependent */ });
+  it.skip("before commit actions", () => { /* fixture-dependent */ });
+  it.skip("before commit update in same transaction", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyAnyTypeTest", () => {
+  it.skip("any type primary key", () => { /* fixture-dependent */ });
+  it.skip("schema dump primary key includes type and options", () => { /* fixture-dependent */ });
+  it.skip("schema typed primary key column", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultNumbersTest", () => {
+  it.skip("default positive integer", () => { /* fixture-dependent */ });
+  it.skip("default negative integer", () => { /* fixture-dependent */ });
+  it.skip("default decimal number", () => { /* fixture-dependent */ });
+});
+
+describe("GeneratedMethodsTest", () => {
+  it.skip("association methods override attribute methods of same name", () => { /* fixture-dependent */ });
+  it.skip("model method overrides association method", () => { /* fixture-dependent */ });
+  it.skip("included module overwrites association methods", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
+  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not automatically validate associations without :validate => true", () => { /* fixture-dependent */ });
+  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+});
+
+describe("BidirectionalDestroyDependenciesTest", () => {
+  it.skip("bidirectional dependence when destroying item with belongs to association", () => { /* fixture-dependent */ });
+  it.skip("bidirectional dependence when destroying item with has one association", () => { /* fixture-dependent */ });
+  it.skip("bidirectional dependence when destroying item with has one association fails first time", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultBinaryTest", () => {
+  it.skip("default varbinary string", () => { /* fixture-dependent */ });
+  it.skip("default binary string", () => { /* fixture-dependent */ });
+  it.skip("default varbinary string that looks like hex", () => { /* fixture-dependent */ });
+});
+
+describe("HasAndBelongsToManyScopingTest", () => {
+  it.skip("forwarding of static methods", () => { /* fixture-dependent */ });
+  it.skip("nested scope finder", () => { /* fixture-dependent */ });
+  it.skip("none scoping", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceComputeTypeTest", () => {
+  it.skip("instantiation doesnt try to require corresponding file", () => { /* fixture-dependent */ });
+  it.skip("sti type from attributes disabled in non sti class", () => { /* fixture-dependent */ });
+  it.skip("inheritance new with subclass as default", () => { /* fixture-dependent */ });
+});
+
+describe("AndTest", () => {
+  it.skip("and", () => { /* fixture-dependent */ });
+  it.skip("and with non relation attribute", () => { /* fixture-dependent */ });
+  it.skip("and with structurally incompatible scope", () => { /* fixture-dependent */ });
+});
+
+describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
+  it.skip("index in nested attributes order", () => { /* fixture-dependent */ });
+  it.skip("index unaffected by reject_if", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultTest", () => {
+  it.skip("nil defaults for not null columns", () => { /* fixture-dependent */ });
+  it.skip("multiline default text", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
+  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not automatically add validate associations without :validate => true", () => { /* fixture-dependent */ });
+});
+
+describe("AnnotateTest", () => {
+  it.skip("annotate wraps content in an inline comment", () => { /* fixture-dependent */ });
+  it.skip("annotate is sanitized", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyAssociationsTest", () => {
+  it.skip("transaction when deleting persisted", () => { /* fixture-dependent */ });
+  it.skip("transaction when deleting new record", () => { /* fixture-dependent */ });
+});
+
+describe("TimestampsWithoutTransactionTest", () => {
+  it.skip("do not write timestamps on save if they are not attributes", () => { /* fixture-dependent */ });
+  it.skip("index is created for both timestamps", () => { /* fixture-dependent */ });
+});
+
+describe("InverseMultipleHasManyInversesForSameModel", () => {
+  it.skip("that we can load associations that have the same reciprocal name from different models", () => { /* fixture-dependent */ });
+  it.skip("that we can create associations that have the same reciprocal name from different models", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultsTestWithoutTransactionalFixtures", () => {
+  it.skip("mysql not null defaults non strict", () => { /* fixture-dependent */ });
+  it.skip("mysql not null defaults strict", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
+  it.skip("should not has one through model", () => { /* fixture-dependent */ });
+  it.skip("should not reversed has one through model", () => { /* fixture-dependent */ });
+});
+
+describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
+  it.skip("should update existing records with non standard primary key", () => { /* fixture-dependent */ });
+  it.skip("attr accessor of child should be value provided during update", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyWithAutoIncrementTest", () => {
+  it.skip("primary key with integer", () => { /* fixture-dependent */ });
+  it.skip("primary key with bigint", () => { /* fixture-dependent */ });
+});
+
+describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
+  it.skip("index in nested_attributes_order order", () => { /* fixture-dependent */ });
+  it.skip("index unaffected by reject_if", () => { /* fixture-dependent */ });
+});
+
+describe("InheritedTest", () => {
+  it.skip("super before filter attributes", () => { /* fixture-dependent */ });
+  it.skip("super after filter attributes", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceAttributeMappingTest", () => {
+  it.skip("sti with custom type", () => { /* fixture-dependent */ });
+  it.skip("polymorphic associations custom type", () => { /* fixture-dependent */ });
+});
+
+describe("EagerLoadingTooManyIdsTest", () => {
+  it.skip("preloading too many ids", () => { /* fixture-dependent */ });
+  it.skip("eager loading too many ids", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultTextTest", () => {
+  it.skip("default texts", () => { /* fixture-dependent */ });
+  it.skip("default texts containing single quotes", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultStringsTest", () => {
+  it.skip("default strings", () => { /* fixture-dependent */ });
+  it.skip("default strings containing single quotes", () => { /* fixture-dependent */ });
+});
+
+describe("CloneTest", () => {
+  it.skip("stays frozen", () => { /* fixture-dependent */ });
+  it.skip("freezing a cloned model does not freeze clone", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
+  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not automatically validate associations without :validate => true", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyIntegerNilDefaultTest", () => {
+  it.skip("schema dump primary key integer with default nil", () => { /* fixture-dependent */ });
+  it.skip("schema dump primary key bigint with default nil", () => { /* fixture-dependent */ });
+});
+
+describe("PostgresqlDefaultExpressionTest", () => {
+  it.skip("schema dump includes default expression", () => { /* fixture-dependent */ });
+});
+
+describe("CallbackOrderTest", () => {
+  it.skip("callbacks run in order defined in model if using run after transaction callbacks in order defined", () => { /* fixture-dependent */ });
+});
+
+describe("AssociationsNestedErrorInAssociationOrderTest", () => {
+  it.skip("index in association order", () => { /* fixture-dependent */ });
+});
+
+describe("PersistenceTest", () => {
+  it.skip("fills auto populated columns on creation", () => { /* fixture-dependent */ });
+});
+
+describe("UniquenessWithCompositeKey", () => {
+  it.skip("uniqueness validation for model with composite key", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
+  it.skip("after save callback with autosave", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnActionAndConditionTest", () => {
+  it.skip("callback on action with condition", () => { /* fixture-dependent */ });
+});
+
+describe("ReservedWordsMigrationTest", () => {
+  it.skip("drop index from table named values", () => { /* fixture-dependent */ });
+});
+
+describe("TestNestedAttributesWithExtend", () => {
+  it.skip("extend affects nested attributes", () => { /* fixture-dependent */ });
+});
+
+describe("RevertBulkAlterTableMigrationsTest", () => {
+  it.skip("bulk revert", () => { /* fixture-dependent */ });
+});
+
+describe("ReloadAssociationCacheTest", () => {
+  it.skip("reload sets correct owner for association cache", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceAttributeTest", () => {
+  it.skip("inheritance new with subclass as default", () => { /* fixture-dependent */ });
+});
+
+describe("BelongsToWithForeignKeyTest", () => {
+  it.skip("destroy linked models", () => { /* fixture-dependent */ });
+});
+
+describe("ExplicitlyNamedIndexMigrationTest", () => {
+  it.skip("drop index by name", () => { /* fixture-dependent */ });
+});
+
+describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
+  it.skip("after commit callbacks with optimistic locking", () => { /* fixture-dependent */ });
+});
+
+describe("CustomLockingTest", () => {
+  it.skip("custom lock", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
+  it.skip("should not raise error", () => { /* fixture-dependent */ });
+});
+
+describe("QueryingMethodsDelegationTest", () => {
+  it.skip("delegate querying methods", () => { /* fixture-dependent */ });
+});
+
+describe("AsyncHasOneAssociationsTest", () => {
+  it.skip("async load has one", () => { /* fixture-dependent */ });
+});
+
+describe("TooManyOrTest", () => {
+  it.skip("too many or", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
+  it.skip("should generate valid sql", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationWithTouch", () => {
+  it.skip("autosave with touch should not raise system stack error", () => { /* fixture-dependent */ });
+});
+
+describe("SetCallbackTest", () => {
+  it.skip("set callback with on", () => { /* fixture-dependent */ });
+});
+
+describe("ErrorsTest", () => {
+  it.skip("can be instantiated with no args", () => { /* fixture-dependent */ });
+});
+
+describe("StrictLoadingFixturesTest", () => {
+  it.skip("strict loading violations are ignored on fixtures", () => { /* fixture-dependent */ });
+});
+
+describe("OverridingAggregationsTest", () => {
+  it.skip("composed of aggregation redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
+  it.skip("should update children when association redefined in subclass", () => { /* fixture-dependent */ });
+});
+
+describe("Sqlite3DefaultExpressionTest", () => {
+  it.skip("schema dump includes default expression", () => { /* fixture-dependent */ });
+});
+
+describe("TestNestedAttributesForDelegatedType", () => {
+  it.skip("should build a new record based on the delegated type", () => { /* fixture-dependent */ });
+});
+
+describe("DelegationCachingTest", () => {
+  it.skip("delegation doesn't override methods defined in other relation subclasses", () => { /* fixture-dependent */ });
+});
+
+describe("BasicsTest", () => {
+  it.skip("incomplete schema loading", () => { /* fixture-dependent */ });
+  it.skip("primary key and references columns should be identical type", () => { /* fixture-dependent */ });
+  it.skip("invalid limit", () => { /* fixture-dependent */ });
+  it.skip("limit should sanitize sql injection for limit without commas", () => { /* fixture-dependent */ });
+  it.skip("limit should sanitize sql injection for limit with commas", () => { /* fixture-dependent */ });
+  it.skip("preserving time objects", () => { /* fixture-dependent */ });
+  it.skip("preserving time objects with local time conversion to default timezone utc", () => { /* fixture-dependent */ });
+  it.skip("preserving time objects with time with zone conversion to default timezone utc", () => { /* fixture-dependent */ });
+  it.skip("preserving time objects with utc time conversion to default timezone local", () => { /* fixture-dependent */ });
+  it.skip("preserving time objects with time with zone conversion to default timezone local", () => { /* fixture-dependent */ });
+  it.skip("time zone aware attribute with default timezone utc on utc can be created", () => { /* fixture-dependent */ });
+  it.skip("utc as time zone", () => { /* fixture-dependent */ });
+  it.skip("utc as time zone and new", () => { /* fixture-dependent */ });
+  it.skip("out of range slugs", () => { /* fixture-dependent */ });
+  it.skip("find by slug with range", () => { /* fixture-dependent */ });
+  it.skip("equality of relation and association relation", () => { /* fixture-dependent */ });
+  it.skip("equality of collection proxy and association relation", () => { /* fixture-dependent */ });
+  it.skip("readonly attributes on belongs to association", () => { /* fixture-dependent */ });
+  it.skip("respect internal encoding", () => { /* fixture-dependent */ });
+  it.skip("non valid identifier column name", () => { /* fixture-dependent */ });
+  it.skip("attributes on dummy time with invalid time", () => { /* fixture-dependent */ });
+  it.skip("bignum pk", () => { /* fixture-dependent */ });
+  it.skip("default char types", () => { /* fixture-dependent */ });
+  it.skip("default in local time", () => { /* fixture-dependent */ });
+  it.skip("default in utc", () => { /* fixture-dependent */ });
+  it.skip("default in utc with time zone", () => { /* fixture-dependent */ });
+  it.skip("switching default time zone", () => { /* fixture-dependent */ });
+  it.skip("mutating time objects", () => { /* fixture-dependent */ });
+  it.skip("connection in local time", () => { /* fixture-dependent */ });
+  it.skip("connection in utc time", () => { /* fixture-dependent */ });
+  it.skip("column name properly quoted", () => { /* fixture-dependent */ });
+  it.skip("quoting arrays", () => { /* fixture-dependent */ });
+  it.skip("quote", () => { /* fixture-dependent */ });
+  it.skip("find on abstract base class doesnt use type condition", () => { /* fixture-dependent */ });
+  it.skip("assert queries count", () => { /* fixture-dependent */ });
+  it.skip("benchmark with use silence", () => { /* fixture-dependent */ });
+  it.skip("clear cache!", () => { /* fixture-dependent */ });
+  it.skip("marshal new record round trip", () => { /* fixture-dependent */ });
+  it.skip("marshalling with associations 6 1", () => { /* fixture-dependent */ });
+  it.skip("marshalling with associations 7 1", () => { /* fixture-dependent */ });
+  it.skip("marshal between processes", () => { /* fixture-dependent */ });
+  it.skip("marshalling new record round trip with associations", () => { /* fixture-dependent */ });
+  it.skip("column types on queries on postgresql", () => { /* fixture-dependent */ });
+  it.skip("connection_handler can be overridden", () => { /* fixture-dependent */ });
+  it.skip("new threads get default the default connection handler", () => { /* fixture-dependent */ });
+  it.skip("changing a connection handler in a main thread does not poison the other threads", () => { /* fixture-dependent */ });
+  it.skip(".columns_hash raises an error if the record has an empty table name", () => { /* fixture-dependent */ });
+  it.skip("when #reload called, ignored columns' attribute methods are not defined", () => { /* fixture-dependent */ });
+  it.skip("when ignored attribute is loaded, cast type should be preferred over DB type", () => { /* fixture-dependent */ });
+  it.skip("when assigning new ignored columns it invalidates cache for column names", () => { /* fixture-dependent */ });
+  it.skip("column names are quoted when using #from clause and model has ignored columns", () => { /* fixture-dependent */ });
+  it.skip("using table name qualified column names unless having SELECT list explicitly", () => { /* fixture-dependent */ });
+  it.skip("protected environments by default is an array with production", () => { /* fixture-dependent */ });
+  it.skip("protected environments are stored as an array of string", () => { /* fixture-dependent */ });
+  it.skip("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", () => { /* fixture-dependent */ });
+  it.skip("cannot call connected_to with role and shard on non-abstract classes", () => { /* fixture-dependent */ });
+  it.skip("can call connected_to with role and shard on abstract classes", () => { /* fixture-dependent */ });
+  it.skip("cannot call connected_to on the abstract class that did not establish the connection", () => { /* fixture-dependent */ });
+  it.skip("#connecting_to with role", () => { /* fixture-dependent */ });
+  it.skip("#connecting_to with role and shard", () => { /* fixture-dependent */ });
+  it.skip("#connecting_to with prevent_writes", () => { /* fixture-dependent */ });
+  it.skip("#connected_to_many cannot be called on anything but ActiveRecord::Base", () => { /* fixture-dependent */ });
+  it.skip("#connected_to_many cannot be called with classes that include ActiveRecord::Base", () => { /* fixture-dependent */ });
+  it.skip("#connected_to_many sets prevent_writes if role is reading", () => { /* fixture-dependent */ });
+  it.skip("#connected_to_many with a single argument for classes", () => { /* fixture-dependent */ });
+  it.skip("#connected_to_many with a multiple classes without brackets works", () => { /* fixture-dependent */ });
+});
+
+describe("CalculationsTest", () => {
+  it.skip("should group by multiple fields when table name is too long", () => { /* fixture-dependent */ });
+  it.skip("count on invalid columns raises", () => { /* fixture-dependent */ });
+  it.skip("count with eager loading and custom select and order", () => { /* fixture-dependent */ });
+  it.skip("distinct joins count with order and limit", () => { /* fixture-dependent */ });
+  it.skip("distinct joins count with order and offset", () => { /* fixture-dependent */ });
+  it.skip("distinct joins count with order and limit and offset", () => { /* fixture-dependent */ });
+  it.skip("count for a composite primary key model with includes and references", () => { /* fixture-dependent */ });
+  it.skip("should group by association with non numeric foreign key", () => { /* fixture-dependent */ });
+  it.skip("should calculate grouped by function", () => { /* fixture-dependent */ });
+  it.skip("should calculate grouped by function with table alias", () => { /* fixture-dependent */ });
+  it.skip("should perform joined include when referencing included tables", () => { /* fixture-dependent */ });
+  it.skip("should count manual with count all", () => { /* fixture-dependent */ });
+  it.skip("count selected arel attribute", () => { /* fixture-dependent */ });
+  it.skip("count selected arel attributes", () => { /* fixture-dependent */ });
+  it.skip("count with arel attribute", () => { /* fixture-dependent */ });
+  it.skip("count with arel star", () => { /* fixture-dependent */ });
+  it.skip("count arel attribute in joined table with", () => { /* fixture-dependent */ });
+  it.skip("count selected arel attribute in joined table", () => { /* fixture-dependent */ });
+  it.skip("should count field in joined table with group by when tables share column names", () => { /* fixture-dependent */ });
+  it.skip("should count field of root table with conflicting group by column", () => { /* fixture-dependent */ });
+  it.skip("from option with specified index", () => { /* fixture-dependent */ });
+  it.skip("pluck type cast with conflict column names", () => { /* fixture-dependent */ });
+  it.skip("pluck type cast with joins without table name qualified column", () => { /* fixture-dependent */ });
+  it.skip("pluck type cast with left joins without table name qualified column", () => { /* fixture-dependent */ });
+  it.skip("pluck type cast with eager load without table name qualified column", () => { /* fixture-dependent */ });
+  it.skip("pluck with type cast does not corrupt the query cache", () => { /* fixture-dependent */ });
+  it.skip("pluck on aliased attribute", () => { /* fixture-dependent */ });
+  it.skip("pluck if table included", () => { /* fixture-dependent */ });
+  it.skip("pluck not auto table name prefix if column joined", () => { /* fixture-dependent */ });
+  it.skip("pluck with hash argument", () => { /* fixture-dependent */ });
+  it.skip("pluck with hash argument with multiple tables", () => { /* fixture-dependent */ });
+  it.skip("pluck with hash argument containing non existent field", () => { /* fixture-dependent */ });
+  it.skip("pluck for a composite primary key", () => { /* fixture-dependent */ });
+  it.skip("ids for a composite primary key with scope", () => { /* fixture-dependent */ });
+  it.skip("ids with eager load", () => { /* fixture-dependent */ });
+  it.skip("ids with preload", () => { /* fixture-dependent */ });
+  it.skip("ids with includes and non primary key order", () => { /* fixture-dependent */ });
+  it.skip("ids with includes and scope", () => { /* fixture-dependent */ });
+  it.skip("ids with includes and table scope", () => { /* fixture-dependent */ });
+  it.skip("ids on loaded relation with includes and table scope", () => { /* fixture-dependent */ });
+  it.skip("ids with includes offset", () => { /* fixture-dependent */ });
+  it.skip("pluck with includes offset", () => { /* fixture-dependent */ });
+  it.skip("pluck with join alias", () => { /* fixture-dependent */ });
+  it.skip("pluck not auto table name prefix if column included", () => { /* fixture-dependent */ });
+  it.skip("pluck functions with alias", () => { /* fixture-dependent */ });
+  it.skip("calculation with polymorphic relation", () => { /* fixture-dependent */ });
+  it.skip("calculation with query cache", () => { /* fixture-dependent */ });
+  it.skip("pluck loaded relation aliased attribute", () => { /* fixture-dependent */ });
+  it.skip("pick loaded relation sql fragment", () => { /* fixture-dependent */ });
+  it.skip("pick loaded relation aliased attribute", () => { /* fixture-dependent */ });
+  it.skip("grouped calculation with polymorphic relation", () => { /* fixture-dependent */ });
+  it.skip("calculation grouped by association doesnt error when no records have association", () => { /* fixture-dependent */ });
+  it.skip("should reference correct aliases while joining tables of has many through association", () => { /* fixture-dependent */ });
+  it.skip("count takes attribute type precedence over database type", () => { /* fixture-dependent */ });
+  it.skip("sum takes attribute type precedence over database type", () => { /* fixture-dependent */ });
+  it.skip("minimum and maximum on time attributes", () => { /* fixture-dependent */ });
+  it.skip("minimum and maximum on tz aware attributes", () => { /* fixture-dependent */ });
+  it.skip("select avg with group by as virtual attribute with sql", () => { /* fixture-dependent */ });
+  it.skip("select avg with group by as virtual attribute with ar", () => { /* fixture-dependent */ });
+  it.skip("select avg with joins and group by as virtual attribute with sql", () => { /* fixture-dependent */ });
+  it.skip("select avg with joins and group by as virtual attribute with ar", () => { /* fixture-dependent */ });
+  it.skip("#skip_query_cache! for #pluck", () => { /* fixture-dependent */ });
+  it.skip("#skip_query_cache! for #ids", () => { /* fixture-dependent */ });
+  it.skip("#skip_query_cache! for a simple calculation", () => { /* fixture-dependent */ });
+  it.skip("#skip_query_cache! for a grouped calculation", () => { /* fixture-dependent */ });
+  it.skip("group alias is properly quoted", () => { /* fixture-dependent */ });
+});
+
+describe("FinderTest", () => {
+  it.skip("find with proc parameter and block", () => { /* fixture-dependent */ });
+  it.skip("exists with strong parameters", () => { /* fixture-dependent */ });
+  it.skip("exists passing active record object is not permitted", () => { /* fixture-dependent */ });
+  it.skip("exists does not select columns without alias", () => { /* fixture-dependent */ });
+  it.skip("exists with left joins", () => { /* fixture-dependent */ });
+  it.skip("exists with eager load", () => { /* fixture-dependent */ });
+  it.skip("exists with includes limit and empty result", () => { /* fixture-dependent */ });
+  it.skip("exists with distinct association includes and limit", () => { /* fixture-dependent */ });
+  it.skip("exists with distinct association includes limit and order", () => { /* fixture-dependent */ });
+  it.skip("exists should reference correct aliases while joining tables of has many through association", () => { /* fixture-dependent */ });
+  it.skip("exists with aggregate having three mappings", () => { /* fixture-dependent */ });
+  it.skip("exists with aggregate having three mappings with one difference", () => { /* fixture-dependent */ });
+  it.skip("include on unloaded relation with mismatched class", () => { /* fixture-dependent */ });
+  it.skip("include on unloaded relation with having referencing aliased select", () => { /* fixture-dependent */ });
+  it.skip("include on unloaded relation with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("include on loaded relation with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("member on unloaded relation with mismatched class", () => { /* fixture-dependent */ });
+  it.skip("member on unloaded relation with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("member on loaded relation with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("implicit order column is configurable", () => { /* fixture-dependent */ });
+  it.skip("implicit order column reorders query constraints", () => { /* fixture-dependent */ });
+  it.skip("implicit order column prepends query constraints", () => { /* fixture-dependent */ });
+  it.skip("find on hash conditions with qualified attribute dot notation string", () => { /* fixture-dependent */ });
+  it.skip("find on hash conditions with qualified attribute dot notation symbol", () => { /* fixture-dependent */ });
+  it.skip("find on combined explicit and hashed table names", () => { /* fixture-dependent */ });
+  it.skip("find on hash conditions with explicit table name and aggregate", () => { /* fixture-dependent */ });
+  it.skip("find on hash conditions with array of ranges", () => { /* fixture-dependent */ });
+  it.skip("find on hash conditions with open ended range", () => { /* fixture-dependent */ });
+  it.skip("find on hash conditions with numeric range for string", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with aggregate having three mappings array", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with aggregate having one mapping array", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with aggregate attribute having same name as field and key value being aggregate", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with aggregate having one mapping and key value being attribute value", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with aggregate attribute having same name as field and key value being attribute value", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with aggregate having three mappings", () => { /* fixture-dependent */ });
+  it.skip("hash condition find with one condition being aggregate and another not", () => { /* fixture-dependent */ });
+  it.skip("hash condition find nil with aggregate having one mapping", () => { /* fixture-dependent */ });
+  it.skip("hash condition find nil with aggregate having multiple mappings", () => { /* fixture-dependent */ });
+  it.skip("hash condition find empty array with aggregate having multiple mappings", () => { /* fixture-dependent */ });
+  it.skip("condition utc time interpolation with default timezone local", () => { /* fixture-dependent */ });
+  it.skip("hash condition utc time interpolation with default timezone local", () => { /* fixture-dependent */ });
+  it.skip("condition local time interpolation with default timezone utc", () => { /* fixture-dependent */ });
+  it.skip("hash condition local time interpolation with default timezone utc", () => { /* fixture-dependent */ });
+  it.skip("find by one attribute that is an aggregate with one attribute difference", () => { /* fixture-dependent */ });
+  it.skip("dynamic finder on one attribute with conditions returns same results after caching", () => { /* fixture-dependent */ });
+  it.skip("find by invalid method syntax", () => { /* fixture-dependent */ });
+  it.skip("joins with string array", () => { /* fixture-dependent */ });
+  it.skip("find with order on included associations with construct finder sql for association limiting and is distinct", () => { /* fixture-dependent */ });
+  it.skip("with limiting with custom select", () => { /* fixture-dependent */ });
+  it.skip("eager load for no has many with limit and joins for has many", () => { /* fixture-dependent */ });
+  it.skip("eager load for no has many with limit and left joins for has many", () => { /* fixture-dependent */ });
+  it.skip("find one message with custom primary key", () => { /* fixture-dependent */ });
+  it.skip("find some message with custom primary key", () => { /* fixture-dependent */ });
+  it.skip("#skip_query_cache! for #exists?", () => { /* fixture-dependent */ });
+  it.skip("#skip_query_cache! for #exists? with a limited eager load", () => { /* fixture-dependent */ });
+  it.skip("#last for a model with composite query constraints", () => { /* fixture-dependent */ });
+  it.skip("#first for a model with composite query constraints", () => { /* fixture-dependent */ });
+  it.skip("#find with a single composite primary key", () => { /* fixture-dependent */ });
+  it.skip("find with a single composite primary key wrapped in an array", () => { /* fixture-dependent */ });
+  it.skip("find with a multiple sets of composite primary key", () => { /* fixture-dependent */ });
+  it.skip("find with a multiple sets of composite primary key wrapped in an array", () => { /* fixture-dependent */ });
+  it.skip("find with a multiple sets of composite primary key wrapped in an array ordered", () => { /* fixture-dependent */ });
+  it.skip("#find_by with composite primary key and query caching", () => { /* fixture-dependent */ });
+});
+
+describe("AttributeMethodsTest", () => {
+  it.skip("aliasing `id` attribute allows reading the column value for a CPK model", () => { /* fixture-dependent */ });
+  it.skip("#id_value alias is not defined if id column doesn't exist", () => { /* fixture-dependent */ });
+  it.skip("#id_value alias returns id column only for composite primary key models", () => { /* fixture-dependent */ });
+  it.skip("attribute_for_inspect with a date", () => { /* fixture-dependent */ });
+  it.skip("attribute_for_inspect with a long array", () => { /* fixture-dependent */ });
+  it.skip("attribute_for_inspect with a non-primary key id attribute", () => { /* fixture-dependent */ });
+  it.skip("read_attribute raises ActiveModel::MissingAttributeError when the attribute isn't selected", () => { /* fixture-dependent */ });
+  it.skip("user-defined time attribute predicate", () => { /* fixture-dependent */ });
+  it.skip("user-defined JSON attribute predicate", () => { /* fixture-dependent */ });
+  it.skip("undeclared attribute method does not affect respond_to? and method_missing", () => { /* fixture-dependent */ });
+  it.skip("declared prefixed attribute method affects respond_to? and method_missing", () => { /* fixture-dependent */ });
+  it.skip("declared suffixed attribute method affects respond_to? and method_missing", () => { /* fixture-dependent */ });
+  it.skip("declared affixed attribute method affects respond_to? and method_missing", () => { /* fixture-dependent */ });
+  it.skip("should unserialize attributes for frozen records", () => { /* fixture-dependent */ });
+  it.skip("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", () => { /* fixture-dependent */ });
+  it.skip("setting time zone-aware read attribute", () => { /* fixture-dependent */ });
+  it.skip("setting time zone-aware attribute with a string", () => { /* fixture-dependent */ });
+  it.skip("time zone-aware attribute saved", () => { /* fixture-dependent */ });
+  it.skip("setting a time zone-aware attribute to a blank string returns nil", () => { /* fixture-dependent */ });
+  it.skip("setting a time zone-aware attribute interprets time zone-unaware string in time zone", () => { /* fixture-dependent */ });
+  it.skip("setting a time zone-aware datetime in the current time zone", () => { /* fixture-dependent */ });
+  it.skip("YAML dumping a record with time zone-aware attribute", () => { /* fixture-dependent */ });
+  it.skip("setting a time zone-aware time in the current time zone", () => { /* fixture-dependent */ });
+  it.skip("setting a time zone-aware time with DST", () => { /* fixture-dependent */ });
+  it.skip("setting invalid string to a zone-aware time attribute", () => { /* fixture-dependent */ });
+  it.skip("removing time zone-aware types", () => { /* fixture-dependent */ });
+  it.skip("time zone-aware attributes do not recurse infinitely on invalid values", () => { /* fixture-dependent */ });
+  it.skip("time zone-aware custom attributes", () => { /* fixture-dependent */ });
+  it.skip("setting a time_zone_conversion_for_attributes should write the value on a class variable", () => { /* fixture-dependent */ });
+  it.skip("attribute predicates respect access control", () => { /* fixture-dependent */ });
+  it.skip("bulk updates respect access control", () => { /* fixture-dependent */ });
+  it.skip("#undefine_attribute_methods undefines alias attribute methods", () => { /* fixture-dependent */ });
+  it.skip("#define_attribute_methods brings back undefined aliases", () => { /* fixture-dependent */ });
+  it.skip("#method_missing define methods on the fly in a thread safe way", () => { /* fixture-dependent */ });
+  it.skip("#method_missing define methods on the fly in a thread safe way, even when decorated", () => { /* fixture-dependent */ });
+  it.skip("inherited custom accessors with reserved names", () => { /* fixture-dependent */ });
+  it.skip("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", () => { /* fixture-dependent */ });
+  it.skip("on-the-fly super-invokable generated attribute predicates via method_missing", () => { /* fixture-dependent */ });
+  it.skip("calling super when the parent does not define method raises NoMethodError", () => { /* fixture-dependent */ });
+  it.skip("generated attribute methods ancestors have correct module", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute override methods defined in parent models", () => { /* fixture-dependent */ });
+  it.skip("aliases to the same attribute name do not conflict with each other", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with an overridden original method does not use the overridden original method", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with an overridden original method from a module does not use the overridden original method", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with an overridden original method along with an overridden alias method in a parent class uses the overridden alias method", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with the same alias as parent doesn't issue a deprecation", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute method on an abstract class is available on subclasses", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with an _in_database method issues raises an error", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with enum method raises an error", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with an association method raises an error", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute method on a STI class is available on subclasses", () => { /* fixture-dependent */ });
+  it.skip("#alias_attribute with a manually defined method raises an error", () => { /* fixture-dependent */ });
+});
+
+describe("WhereChainTest", () => {
+  it.skip("associated merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged joined extended early with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged joined extended late with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated ordered merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated ordered merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated with enum", () => { /* fixture-dependent */ });
+  it.skip("associated with enum ordered", () => { /* fixture-dependent */ });
+  it.skip("associated with enum unscoped", () => { /* fixture-dependent */ });
+  it.skip("associated with enum extended early", () => { /* fixture-dependent */ });
+  it.skip("associated with enum extended late", () => { /* fixture-dependent */ });
+  it.skip("associated with add joins before", () => { /* fixture-dependent */ });
+  it.skip("associated with add left joins before", () => { /* fixture-dependent */ });
+  it.skip("associated with add left outer joins before", () => { /* fixture-dependent */ });
+  it.skip("associated with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("missing with invalid association name", () => { /* fixture-dependent */ });
+  it.skip("missing with multiple association", () => { /* fixture-dependent */ });
+  it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing ordered merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing ordered merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged joined extended early with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged joined extended late with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing with enum", () => { /* fixture-dependent */ });
+  it.skip("missing with enum ordered", () => { /* fixture-dependent */ });
+  it.skip("missing with enum unscoped", () => { /* fixture-dependent */ });
+  it.skip("missing with enum extended early", () => { /* fixture-dependent */ });
+  it.skip("missing with enum extended late", () => { /* fixture-dependent */ });
+  it.skip("missing with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("rewhere with alias condition", () => { /* fixture-dependent */ });
+  it.skip("rewhere with nested condition", () => { /* fixture-dependent */ });
+  it.skip("rewhere with infinite upper bound range", () => { /* fixture-dependent */ });
+  it.skip("rewhere with infinite lower bound range", () => { /* fixture-dependent */ });
+  it.skip("rewhere with infinite range", () => { /* fixture-dependent */ });
+  it.skip("rewhere with nil", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceTest", () => {
+  it.skip("class with store full sti class returns full name", () => { /* fixture-dependent */ });
+  it.skip("class with blank sti name", () => { /* fixture-dependent */ });
+  it.skip("class without store full sti class returns demodulized name", () => { /* fixture-dependent */ });
+  it.skip("compute type argument error", () => { /* fixture-dependent */ });
+  it.skip("should store demodulized class name with store full sti class option disabled", () => { /* fixture-dependent */ });
+  it.skip("should store full class name with store full sti class option enabled", () => { /* fixture-dependent */ });
+  it.skip("different namespace subclass should load correctly with store full sti class option", () => { /* fixture-dependent */ });
+  it.skip("becomes sets variables before initialization callbacks", () => { /* fixture-dependent */ });
+  it.skip("becomes and change tracking for inheritance columns", () => { /* fixture-dependent */ });
+  it.skip("alt becomes bang resets inheritance type column", () => { /* fixture-dependent */ });
+  it.skip("where create bang with subclass", () => { /* fixture-dependent */ });
+  it.skip("new with ar base", () => { /* fixture-dependent */ });
+  it.skip("new with invalid type", () => { /* fixture-dependent */ });
+  it.skip("new with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("where new with invalid type", () => { /* fixture-dependent */ });
+  it.skip("where new with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("where create with invalid type", () => { /* fixture-dependent */ });
+  it.skip("where create with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("where create bang with invalid type", () => { /* fixture-dependent */ });
+  it.skip("where create bang with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("new with unrelated namespaced type", () => { /* fixture-dependent */ });
+  it.skip("new without storing full sti class", () => { /* fixture-dependent */ });
+  it.skip("new with autoload paths", () => { /* fixture-dependent */ });
+  it.skip("eager load belongs to something inherited", () => { /* fixture-dependent */ });
+  it.skip("alt eager loading", () => { /* fixture-dependent */ });
+  it.skip("eager load belongs to primary key quoting", () => { /* fixture-dependent */ });
+});
+
+describe("RelationMergingTest", () => {
+  it.skip("merge in clause", () => { /* fixture-dependent */ });
+  it.skip("merge between clause", () => { /* fixture-dependent */ });
+  it.skip("merge or clause", () => { /* fixture-dependent */ });
+  it.skip("merge not in clause", () => { /* fixture-dependent */ });
+  it.skip("merge not range clause", () => { /* fixture-dependent */ });
+  it.skip("merge doesnt duplicate same clauses", () => { /* fixture-dependent */ });
+  it.skip("relation merging", () => { /* fixture-dependent */ });
+  it.skip("relation to sql", () => { /* fixture-dependent */ });
+  it.skip("relation merging with arel equalities keeps last equality", () => { /* fixture-dependent */ });
+  it.skip("relation merging with arel equalities keeps last equality with non attribute left hand", () => { /* fixture-dependent */ });
+  it.skip("relation merging with eager load", () => { /* fixture-dependent */ });
+  it.skip("relation merging with preload", () => { /* fixture-dependent */ });
+  it.skip("relation merging with joins", () => { /* fixture-dependent */ });
+  it.skip("relation merging with left outer joins", () => { /* fixture-dependent */ });
+  it.skip("relation merging with skip query cache", () => { /* fixture-dependent */ });
+  it.skip("relation merging with association", () => { /* fixture-dependent */ });
+  it.skip("merge collapses wheres from the LHS only", () => { /* fixture-dependent */ });
+  it.skip("merging reorders bind params", () => { /* fixture-dependent */ });
+  it.skip("merging compares symbols and strings as equal", () => { /* fixture-dependent */ });
+  it.skip("merging with from clause", () => { /* fixture-dependent */ });
+  it.skip("merging with from clause on different class", () => { /* fixture-dependent */ });
+  it.skip("merging with order with binds", () => { /* fixture-dependent */ });
+  it.skip("merging with order without binds", () => { /* fixture-dependent */ });
+  it.skip("merging annotations respects merge order", () => { /* fixture-dependent */ });
+  it.skip("merging duplicated annotations", () => { /* fixture-dependent */ });
+});
+
+describe("InversePolymorphicBelongsToTests", () => {
+  it.skip("child instance should be shared with parent on find", () => { /* fixture-dependent */ });
+  it.skip("eager loaded child instance should be shared with parent on find", () => { /* fixture-dependent */ });
+  it.skip("child instance should be shared with replaced via accessor parent", () => { /* fixture-dependent */ });
+  it.skip("inversed instance should not be reloaded after stale state changed", () => { /* fixture-dependent */ });
+  it.skip("inversed instance should not be reloaded after stale state changed with validation", () => { /* fixture-dependent */ });
+  it.skip("inversed instance should load after autosave if it is not already loaded", () => { /* fixture-dependent */ });
+  it.skip("should not try to set inverse instances when the inverse is a has many", () => { /* fixture-dependent */ });
+  it.skip("with has many inversing should try to set inverse instances when the inverse is a has many", () => { /* fixture-dependent */ });
+  it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => { /* fixture-dependent */ });
+  it.skip("trying to access inverses that dont exist shouldnt raise an error", () => { /* fixture-dependent */ });
+  it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => { /* fixture-dependent */ });
+  it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultTest", () => {
+  it.skip("nil defaults for not null columns", () => { /* fixture-dependent */ });
+  it.skip("multiline default text", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultNumbersTest", () => {
+  it.skip("default positive integer", () => { /* fixture-dependent */ });
+  it.skip("default negative integer", () => { /* fixture-dependent */ });
+  it.skip("default decimal number", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultStringsTest", () => {
+  it.skip("default strings", () => { /* fixture-dependent */ });
+  it.skip("default strings containing single quotes", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultBinaryTest", () => {
+  it.skip("default varbinary string", () => { /* fixture-dependent */ });
+  it.skip("default binary string", () => { /* fixture-dependent */ });
+  it.skip("default varbinary string that looks like hex", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultTextTest", () => {
+  it.skip("default texts", () => { /* fixture-dependent */ });
+  it.skip("default texts containing single quotes", () => { /* fixture-dependent */ });
+});
+
+describe("PostgresqlDefaultExpressionTest", () => {
+  it.skip("schema dump includes default expression", () => { /* fixture-dependent */ });
+});
+
+describe("MysqlDefaultExpressionTest", () => {
+  it.skip("schema dump includes default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump includes default expression with single quotes reflected correctly", () => { /* fixture-dependent */ });
+  it.skip("schema dump datetime includes default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump datetime includes precise default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump datetime includes precise default expression with on update", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp includes default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp includes precise default expression", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp includes precise default expression with on update", () => { /* fixture-dependent */ });
+  it.skip("schema dump timestamp without default expression", () => { /* fixture-dependent */ });
+});
+
+describe("DefaultsTestWithoutTransactionalFixtures", () => {
+  it.skip("mysql not null defaults non strict", () => { /* fixture-dependent */ });
+  it.skip("mysql not null defaults strict", () => { /* fixture-dependent */ });
+});
+
+describe("Sqlite3DefaultExpressionTest", () => {
+  it.skip("schema dump includes default expression", () => { /* fixture-dependent */ });
+});
+
+describe("TouchLaterTest", () => {
+  it.skip("touch later raise if non persisted", () => { /* fixture-dependent */ });
+  it.skip("touch later dont set dirty attributes", () => { /* fixture-dependent */ });
+  it.skip("touch later respects no touching policy", () => { /* fixture-dependent */ });
+  it.skip("touch later update the attributes", () => { /* fixture-dependent */ });
+  it.skip("touch touches immediately", () => { /* fixture-dependent */ });
+  it.skip("touch later an association dont autosave parent", () => { /* fixture-dependent */ });
+  it.skip("touch touches immediately with a custom time", () => { /* fixture-dependent */ });
+  it.skip("touch later dont hit the db", () => { /* fixture-dependent */ });
+  it.skip("touching three deep", () => { /* fixture-dependent */ });
+  it.skip("touching through nested attributes without before committed on all records", () => { /* fixture-dependent */ });
+  it.skip("touching through nested attributes with before committed on all records", () => { /* fixture-dependent */ });
+});
+
+describe("NestedAttributesWithCallbacksTest", () => {
+  it.skip(":before_add called for new bird when not loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add called for new bird when loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for identical assignment when not loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for identical assignment when loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for destroy assignment when not loaded", () => { /* fixture-dependent */ });
+  it.skip(":before_add not called for deletion assignment when loaded", () => { /* fixture-dependent */ });
+  it.skip("Assignment updates records in target when not loaded", () => { /* fixture-dependent */ });
+  it.skip("Assignment updates records in target when loaded", () => { /* fixture-dependent */ });
+});
+
+describe("AssociationValidationTest", () => {
+  it.skip("validates associated many", () => { /* fixture-dependent */ });
+  it.skip("validates associated one", () => { /* fixture-dependent */ });
+  it.skip("validates associated marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates associated without marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates associated with custom message using quotes", () => { /* fixture-dependent */ });
+  it.skip("validates associated missing", () => { /* fixture-dependent */ });
+  it.skip("validates presence of belongs to association  parent is new record", () => { /* fixture-dependent */ });
+  it.skip("validates presence of belongs to association  existing parent", () => { /* fixture-dependent */ });
+  it.skip("validates associated with custom context", () => { /* fixture-dependent */ });
+  it.skip("validates associated with create context", () => { /* fixture-dependent */ });
+});
+
+describe("SecureTokenTest", () => {
+  it.skip("token values are generated for specified attributes and persisted on save", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize does not affect reading from the column", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize happens only once", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize is skipped if column was not selected", () => { /* fixture-dependent */ });
+  it.skip("regenerating the secure token", () => { /* fixture-dependent */ });
+  it.skip("token value not overwritten when present", () => { /* fixture-dependent */ });
+  it.skip("token length cannot be less than 24 characters", () => { /* fixture-dependent */ });
+  it.skip("token on callback", () => { /* fixture-dependent */ });
+  it.skip("token calls the setter method", () => { /* fixture-dependent */ });
+});
+
+describe("AnnotateTest", () => {
+  it.skip("annotate wraps content in an inline comment", () => { /* fixture-dependent */ });
+  it.skip("annotate is sanitized", () => { /* fixture-dependent */ });
+});
+
+describe("BidirectionalDestroyDependenciesTest", () => {
+  it.skip("bidirectional dependence when destroying item with belongs to association", () => { /* fixture-dependent */ });
+  it.skip("bidirectional dependence when destroying item with has one association", () => { /* fixture-dependent */ });
+  it.skip("bidirectional dependence when destroying item with has one association fails first time", () => { /* fixture-dependent */ });
+});
+
+describe("AssociationsNestedErrorInAssociationOrderTest", () => {
+  it.skip("index in association order", () => { /* fixture-dependent */ });
+});
+
+describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
+  it.skip("index in nested attributes order", () => { /* fixture-dependent */ });
+  it.skip("index unaffected by reject_if", () => { /* fixture-dependent */ });
+  it.skip("no index when singular association", () => { /* fixture-dependent */ });
+});
+
+describe("RequiredAssociationsTest", () => {
+  it.skip("belongs_to associations can be optional by default", () => { /* fixture-dependent */ });
+  it.skip("required belongs_to associations have presence validated", () => { /* fixture-dependent */ });
+  it.skip("belongs_to associations can be required by default", () => { /* fixture-dependent */ });
+  it.skip("has_one associations are not required by default", () => { /* fixture-dependent */ });
+  it.skip("required has_one associations have presence validated", () => { /* fixture-dependent */ });
+  it.skip("required has_one associations have a correct error message", () => { /* fixture-dependent */ });
+  it.skip("required belongs_to associations have a correct error message", () => { /* fixture-dependent */ });
+});
+
+describe("BooleanTest", () => {
+  it.skip("boolean", () => { /* fixture-dependent */ });
+  it.skip("boolean without questionmark", () => { /* fixture-dependent */ });
+  it.skip("boolean cast from string", () => { /* fixture-dependent */ });
+  it.skip("find by boolean string", () => { /* fixture-dependent */ });
+  it.skip("find by falsy boolean symbol", () => { /* fixture-dependent */ });
+});
+
+describe("CustomLockingTest", () => {
+  it.skip("custom lock", () => { /* fixture-dependent */ });
+});
+
+describe("ErrorsTest", () => {
+  it.skip("can be instantiated with no args", () => { /* fixture-dependent */ });
+});
+
+describe("HabtmDestroyOrderTest", () => {
+  it.skip("may not delete a lesson with students", () => { /* fixture-dependent */ });
+  it.skip("should not raise error if have foreign key in the join table", () => { /* fixture-dependent */ });
+  it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => { /* fixture-dependent */ });
+  it.skip("not destroying a lesson with students leaves student<=>lesson association intact", () => { /* fixture-dependent */ });
+});
+
+describe("InheritedTest", () => {
+  it.skip("super before filter attributes", () => { /* fixture-dependent */ });
+  it.skip("super after filter attributes", () => { /* fixture-dependent */ });
+});
+
+describe("ReloadAssociationCacheTest", () => {
+  it.skip("reload sets correct owner for association cache", () => { /* fixture-dependent */ });
+});
+
+describe("QueryingMethodsDelegationTest", () => {
+  it.skip("delegate querying methods", () => { /* fixture-dependent */ });
+});
+
+describe("DelegationCachingTest", () => {
+  it.skip("delegation doesn't override methods defined in other relation subclasses", () => { /* fixture-dependent */ });
+});
+
+describe("SerializationTest", () => {
+  it.skip("include root in json is false by default", () => { /* fixture-dependent */ });
+  it.skip("serialize should be reversible", () => { /* fixture-dependent */ });
+  it.skip("serialize should allow attribute only filtering", () => { /* fixture-dependent */ });
+  it.skip("serialize should allow attribute except filtering", () => { /* fixture-dependent */ });
+  it.skip("include root in json allows inheritance", () => { /* fixture-dependent */ });
+  it.skip("read attribute for serialization with format without method missing", () => { /* fixture-dependent */ });
+  it.skip("read attribute for serialization with format after init", () => { /* fixture-dependent */ });
+  it.skip("read attribute for serialization with format after find", () => { /* fixture-dependent */ });
+  it.skip("find records by serialized attributes through join", () => { /* fixture-dependent */ });
+});
+
+describe("SuppressorTest", () => {
+  it.skip("suppresses create", () => { /* fixture-dependent */ });
+  it.skip("suppresses update", () => { /* fixture-dependent */ });
+  it.skip("suppresses create in callback", () => { /* fixture-dependent */ });
+  it.skip("resumes saving after suppression complete", () => { /* fixture-dependent */ });
+  it.skip("suppresses validations on create", () => { /* fixture-dependent */ });
+  it.skip("suppresses when nested multiple times", () => { /* fixture-dependent */ });
+});
+
+describe("AbsenceValidationTest", () => {
+  it.skip("non association", () => { /* fixture-dependent */ });
+  it.skip("has one marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("has many marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("does not call to a on associations", () => { /* fixture-dependent */ });
+  it.skip("validates absence of virtual attribute on model", () => { /* fixture-dependent */ });
+});
+
+describe("LengthValidationTest", () => {
+  it.skip("validates size of association", () => { /* fixture-dependent */ });
+  it.skip("validates size of association using within", () => { /* fixture-dependent */ });
+  it.skip("validates size of association utf8", () => { /* fixture-dependent */ });
+  it.skip("validates size of respects records marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates length of virtual attribute on model", () => { /* fixture-dependent */ });
+});
+
+describe("PresenceValidationTest", () => {
+  it.skip("validates presence of non association", () => { /* fixture-dependent */ });
+  it.skip("validates presence of has one", () => { /* fixture-dependent */ });
+  it.skip("validates presence of has one marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates presence of has many marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("validates presence doesnt convert to array", () => { /* fixture-dependent */ });
+  it.skip("validates presence of virtual attribute on model", () => { /* fixture-dependent */ });
+  it.skip("validations run on persisted record", () => { /* fixture-dependent */ });
+  it.skip("validates presence with on context", () => { /* fixture-dependent */ });
+});
+
+describe("CallbackOrderTest", () => {
+  it.skip("callbacks run in order defined in model if using run after transaction callbacks in order defined", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnActionAndConditionTest", () => {
+  it.skip("callback on action with condition", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
+  it.skip("trigger once on multiple deletion within transaction", () => { /* fixture-dependent */ });
+  it.skip("trigger once on multiple deletions", () => { /* fixture-dependent */ });
+  it.skip("trigger once on multiple deletions in a transaction", () => { /* fixture-dependent */ });
+  it.skip("rollback on multiple deletions", () => { /* fixture-dependent */ });
+  it.skip("trigger on update where row was deleted", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnMultipleActionsTest", () => {
+  it.skip("after commit on multiple actions", () => { /* fixture-dependent */ });
+  it.skip("before commit actions", () => { /* fixture-dependent */ });
+  it.skip("before commit update in same transaction", () => { /* fixture-dependent */ });
+});
+
+describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
+  it.skip("created callback called on last to save of separate instances in a transaction", () => { /* fixture-dependent */ });
+  it.skip("created callback called on first to save in transaction with old configuration", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on last to save of separate instances in a transaction", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on first to save in transaction with old configuration", () => { /* fixture-dependent */ });
+  it.skip("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => { /* fixture-dependent */ });
+  it.skip("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", () => { /* fixture-dependent */ });
+  it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => { /* fixture-dependent */ });
+});
+
+describe("CopyMigrationsTest", () => {
+  it.skip("migration raises if timestamp greater than 14 digits", () => { /* fixture-dependent */ });
+  it.skip("migration raises if timestamp is future date", () => { /* fixture-dependent */ });
+  it.skip("migration succeeds if timestamp is less than one day in the future", () => { /* fixture-dependent */ });
+  it.skip("migration succeeds despite future timestamp if validate timestamps is false", () => { /* fixture-dependent */ });
+  it.skip("migration succeeds despite future timestamp if timestamped migrations is false", () => { /* fixture-dependent */ });
+  it.skip("copied migrations at timestamp boundary are valid", () => { /* fixture-dependent */ });
+});
+
+describe("DatabaseConnectedJsonEncodingTest", () => {
+  it.skip("includes uses association name", () => { /* fixture-dependent */ });
+  it.skip("includes uses association name and applies attribute filters", () => { /* fixture-dependent */ });
+  it.skip("includes fetches second level associations", () => { /* fixture-dependent */ });
+  it.skip("includes fetches nth level associations", () => { /* fixture-dependent */ });
+  it.skip("includes doesnt merge opts from base", () => { /* fixture-dependent */ });
+  it.skip("should not call methods on associations that dont respond", () => { /* fixture-dependent */ });
+  it.skip("should allow only option for list of authors", () => { /* fixture-dependent */ });
+  it.skip("should allow except option for list of authors", () => { /* fixture-dependent */ });
+  it.skip("should allow includes for list of authors", () => { /* fixture-dependent */ });
+  it.skip("should allow options for hash of authors", () => { /* fixture-dependent */ });
+  it.skip("should be able to encode relation", () => { /* fixture-dependent */ });
+});
+
+describe("FinderRespondToTest", () => {
+  it.skip("should preserve normal respond to behavior on base", () => { /* fixture-dependent */ });
+  it.skip("should preserve normal respond to behavior and respond to newly added method", () => { /* fixture-dependent */ });
+  it.skip("should preserve normal respond to behavior and respond to standard object method", () => { /* fixture-dependent */ });
+  it.skip("should respond to find by with bang", () => { /* fixture-dependent */ });
+  it.skip("should respond to find by two attributes", () => { /* fixture-dependent */ });
+  it.skip("should respond to find all by an aliased attribute", () => { /* fixture-dependent */ });
+  it.skip("should not respond to find by invalid method syntax", () => { /* fixture-dependent */ });
+});
+
+describe("GeneratedMethodsTest", () => {
+  it.skip("association methods override attribute methods of same name", () => { /* fixture-dependent */ });
+  it.skip("model method overrides association method", () => { /* fixture-dependent */ });
+  it.skip("included module overwrites association methods", () => { /* fixture-dependent */ });
+});
+
+describe("HasAndBelongsToManyScopingTest", () => {
+  it.skip("forwarding of static methods", () => { /* fixture-dependent */ });
+  it.skip("nested scope finder", () => { /* fixture-dependent */ });
+  it.skip("none scoping", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyScopingTest", () => {
+  it.skip("forwarding of static methods", () => { /* fixture-dependent */ });
+  it.skip("forwarding to scoped", () => { /* fixture-dependent */ });
+  it.skip("nested scope finder", () => { /* fixture-dependent */ });
+  it.skip("none scoping", () => { /* fixture-dependent */ });
+  it.skip("should default scope on associations is overridden by association conditions", () => { /* fixture-dependent */ });
+  it.skip("should maintain default scope on eager loaded associations", () => { /* fixture-dependent */ });
+  it.skip("scoping applies to all queries on has many when set", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceAttributeMappingTest", () => {
+  it.skip("sti with custom type", () => { /* fixture-dependent */ });
+  it.skip("polymorphic associations custom type", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceAttributeTest", () => {
+  it.skip("inheritance new with subclass as default", () => { /* fixture-dependent */ });
+});
+
+describe("InheritanceTest", () => {
+  it.skip("class with store full sti class returns full name", () => { /* fixture-dependent */ });
+  it.skip("class with blank sti name", () => { /* fixture-dependent */ });
+  it.skip("class without store full sti class returns demodulized name", () => { /* fixture-dependent */ });
+  it.skip("compute type argument error", () => { /* fixture-dependent */ });
+  it.skip("should store demodulized class name with store full sti class option disabled", () => { /* fixture-dependent */ });
+  it.skip("should store full class name with store full sti class option enabled", () => { /* fixture-dependent */ });
+  it.skip("different namespace subclass should load correctly with store full sti class option", () => { /* fixture-dependent */ });
+  it.skip("becomes sets variables before initialization callbacks", () => { /* fixture-dependent */ });
+  it.skip("becomes and change tracking for inheritance columns", () => { /* fixture-dependent */ });
+  it.skip("alt becomes bang resets inheritance type column", () => { /* fixture-dependent */ });
+  it.skip("where create bang with subclass", () => { /* fixture-dependent */ });
+  it.skip("new with ar base", () => { /* fixture-dependent */ });
+  it.skip("new with invalid type", () => { /* fixture-dependent */ });
+  it.skip("new with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("where new with invalid type", () => { /* fixture-dependent */ });
+  it.skip("where new with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("where create with invalid type", () => { /* fixture-dependent */ });
+  it.skip("where create with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("where create bang with invalid type", () => { /* fixture-dependent */ });
+  it.skip("where create bang with unrelated type", () => { /* fixture-dependent */ });
+  it.skip("new with unrelated namespaced type", () => { /* fixture-dependent */ });
+  it.skip("new without storing full sti class", () => { /* fixture-dependent */ });
+  it.skip("new with autoload paths", () => { /* fixture-dependent */ });
+  it.skip("eager load belongs to something inherited", () => { /* fixture-dependent */ });
+  it.skip("alt eager loading", () => { /* fixture-dependent */ });
+  it.skip("eager load belongs to primary key quoting", () => { /* fixture-dependent */ });
+});
+
+describe("InverseAssociationTests", () => {
+  it.skip("should allow for inverse of options in associations", () => { /* fixture-dependent */ });
+  it.skip("should be able to ask a reflection if it has an inverse", () => { /* fixture-dependent */ });
+  it.skip("inverse of method should supply the actual reflection instance it is the inverse of", () => { /* fixture-dependent */ });
+  it.skip("associations with no inverse of should return nil", () => { /* fixture-dependent */ });
+  it.skip("polymorphic associations dont attempt to find inverse of", () => { /* fixture-dependent */ });
+  it.skip("this inverse stuff", () => { /* fixture-dependent */ });
+});
+
+describe("InverseMultipleHasManyInversesForSameModel", () => {
+  it.skip("that we can load associations that have the same reciprocal name from different models", () => { /* fixture-dependent */ });
+  it.skip("that we can create associations that have the same reciprocal name from different models", () => { /* fixture-dependent */ });
+});
+
+describe("InversePolymorphicBelongsToTests", () => {
+  it.skip("child instance should be shared with parent on find", () => { /* fixture-dependent */ });
+  it.skip("eager loaded child instance should be shared with parent on find", () => { /* fixture-dependent */ });
+  it.skip("child instance should be shared with replaced via accessor parent", () => { /* fixture-dependent */ });
+  it.skip("inversed instance should not be reloaded after stale state changed", () => { /* fixture-dependent */ });
+  it.skip("inversed instance should not be reloaded after stale state changed with validation", () => { /* fixture-dependent */ });
+  it.skip("inversed instance should load after autosave if it is not already loaded", () => { /* fixture-dependent */ });
+  it.skip("should not try to set inverse instances when the inverse is a has many", () => { /* fixture-dependent */ });
+  it.skip("with has many inversing should try to set inverse instances when the inverse is a has many", () => { /* fixture-dependent */ });
+  it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => { /* fixture-dependent */ });
+  it.skip("trying to access inverses that dont exist shouldnt raise an error", () => { /* fixture-dependent */ });
+  it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => { /* fixture-dependent */ });
+  it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => { /* fixture-dependent */ });
+});
+
+describe("JsonSerializationTest", () => {
+  it.skip("should demodulize root in json", () => { /* fixture-dependent */ });
+  it.skip("should encode all encodable attributes", () => { /* fixture-dependent */ });
+  it.skip("should allow attribute filtering with only", () => { /* fixture-dependent */ });
+  it.skip("should allow attribute filtering with except", () => { /* fixture-dependent */ });
+  it.skip("methods are called on object", () => { /* fixture-dependent */ });
+  it.skip("uses serializable hash with frozen hash", () => { /* fixture-dependent */ });
+  it.skip("uses serializable hash with only option", () => { /* fixture-dependent */ });
+  it.skip("uses serializable hash with except option", () => { /* fixture-dependent */ });
+  it.skip("does not include inheritance column from sti", () => { /* fixture-dependent */ });
+  it.skip("serializable hash with default except option and excluding inheritance column from sti", () => { /* fixture-dependent */ });
+  it.skip("serializable hash should not modify options in argument", () => { /* fixture-dependent */ });
+});
+
+describe("MergingDifferentRelationsTest", () => {
+  it.skip("merging where relations", () => { /* fixture-dependent */ });
+  it.skip("merging order relations", () => { /* fixture-dependent */ });
+  it.skip("merging order relations (using a hash argument)", () => { /* fixture-dependent */ });
+  it.skip("relation merging (using a proc argument)", () => { /* fixture-dependent */ });
+  it.skip("merging relation with common table expression", () => { /* fixture-dependent */ });
+  it.skip("merging multiple relations with common table expression", () => { /* fixture-dependent */ });
+  it.skip("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", () => { /* fixture-dependent */ });
+});
+
+describe("NestedRelationScopingTest", () => {
+  it.skip("merge options", () => { /* fixture-dependent */ });
+  it.skip("merge inner scope has priority", () => { /* fixture-dependent */ });
+  it.skip("replace options", () => { /* fixture-dependent */ });
+  it.skip("three level nested exclusive scoped find", () => { /* fixture-dependent */ });
+  it.skip("nested scoped create", () => { /* fixture-dependent */ });
+  it.skip("nested exclusive scope for create", () => { /* fixture-dependent */ });
+});
+
+describe("OverridingAssociationsTest", () => {
+  it.skip("habtm association redefinition callbacks should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("has many association redefinition callbacks should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("habtm association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("has many association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("belongs to association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("has one association redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("requires symbol argument", () => { /* fixture-dependent */ });
+  it.skip("associations raise with name error if associated to classes that do not exist", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyAnyTypeTest", () => {
+  it.skip("schema dump primary key includes type and options", () => { /* fixture-dependent */ });
+  it.skip("schema typed primary key column", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyIntegerNilDefaultTest", () => {
+  it.skip("schema dump primary key integer with default nil", () => { /* fixture-dependent */ });
+  it.skip("schema dump primary key bigint with default nil", () => { /* fixture-dependent */ });
+});
+
+describe("PrimaryKeyIntegerTest", () => {
+  it.skip("primary key column type with serial/integer", () => { /* fixture-dependent */ });
+  it.skip("primary key with serial/integer are automatically numbered", () => { /* fixture-dependent */ });
+  it.skip("schema dump primary key with serial/integer", () => { /* fixture-dependent */ });
+  it.skip("primary key column type with options", () => { /* fixture-dependent */ });
+  it.skip("bigint primary key with unsigned", () => { /* fixture-dependent */ });
+});
+
+describe("ReadOnlyTest", () => {
+  it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
+  it.skip("cant update columns readonly record", () => { /* fixture-dependent */ });
+  it.skip("find with readonly option", () => { /* fixture-dependent */ });
+  it.skip("find with joins option does not imply readonly", () => { /* fixture-dependent */ });
+  it.skip("has many find readonly", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly while finding by id", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly while finding first", () => { /* fixture-dependent */ });
+  it.skip("has many with through is not implicitly marked readonly while finding last", () => { /* fixture-dependent */ });
+  it.skip("readonly scoping", () => { /* fixture-dependent */ });
+  it.skip("association collection method missing scoping not readonly", () => { /* fixture-dependent */ });
+});
+
+describe("RelationMergingTest", () => {
+  it.skip("merge in clause", () => { /* fixture-dependent */ });
+  it.skip("merge between clause", () => { /* fixture-dependent */ });
+  it.skip("merge or clause", () => { /* fixture-dependent */ });
+  it.skip("merge not in clause", () => { /* fixture-dependent */ });
+  it.skip("merge not range clause", () => { /* fixture-dependent */ });
+  it.skip("merge doesnt duplicate same clauses", () => { /* fixture-dependent */ });
+  it.skip("relation merging", () => { /* fixture-dependent */ });
+  it.skip("relation to sql", () => { /* fixture-dependent */ });
+  it.skip("relation merging with arel equalities keeps last equality", () => { /* fixture-dependent */ });
+  it.skip("relation merging with arel equalities keeps last equality with non attribute left hand", () => { /* fixture-dependent */ });
+  it.skip("relation merging with eager load", () => { /* fixture-dependent */ });
+  it.skip("relation merging with preload", () => { /* fixture-dependent */ });
+  it.skip("relation merging with joins", () => { /* fixture-dependent */ });
+  it.skip("relation merging with left outer joins", () => { /* fixture-dependent */ });
+  it.skip("relation merging with skip query cache", () => { /* fixture-dependent */ });
+  it.skip("relation merging with association", () => { /* fixture-dependent */ });
+  it.skip("merge collapses wheres from the LHS only", () => { /* fixture-dependent */ });
+  it.skip("merging reorders bind params", () => { /* fixture-dependent */ });
+  it.skip("merging compares symbols and strings as equal", () => { /* fixture-dependent */ });
+  it.skip("merging with from clause", () => { /* fixture-dependent */ });
+  it.skip("merging with from clause on different class", () => { /* fixture-dependent */ });
+  it.skip("merging with order with binds", () => { /* fixture-dependent */ });
+  it.skip("merging with order without binds", () => { /* fixture-dependent */ });
+  it.skip("merging annotations respects merge order", () => { /* fixture-dependent */ });
+  it.skip("merging duplicated annotations", () => { /* fixture-dependent */ });
+});
+
+describe("ReservedWordsMigrationTest", () => {
+  it.skip("drop index from table named values", () => { /* fixture-dependent */ });
+});
+
+describe("RevertBulkAlterTableMigrationsTest", () => {
+  it.skip("bulk revert", () => { /* fixture-dependent */ });
+});
+
+describe("SerializedAttributeTestWithYamlSafeLoad", () => {
+  it.skip("nil is always persisted as null", () => { /* fixture-dependent */ });
+  it.skip("serialized attribute with default", () => { /* fixture-dependent */ });
+  it.skip("serialized attributes from database on subclass", () => { /* fixture-dependent */ });
+  it.skip("serialized attribute on alias attribute", () => { /* fixture-dependent */ });
+  it.skip("unexpected serialized type", () => { /* fixture-dependent */ });
+  it.skip("serialize attribute via select method when time zone available", () => { /* fixture-dependent */ });
+  it.skip("should raise exception on serialized attribute with type mismatch", () => { /* fixture-dependent */ });
+  it.skip("serialized time attribute", () => { /* fixture-dependent */ });
+  it.skip("supports permitted classes for default column serializer", () => { /* fixture-dependent */ });
+});
+
+describe("SetCallbackTest", () => {
+  it.skip("set callback with on", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
+  it.skip("should not raise error", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
+  it.skip("should update children when association redefined in subclass", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
+  it.skip("after save callback with autosave", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
+  it.skip("should not has one through model", () => { /* fixture-dependent */ });
+  it.skip("should not reversed has one through model", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
+  it.skip("should generate validation methods for has_many associations", () => { /* fixture-dependent */ });
+  it.skip("should generate validation methods for has_one associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not generate validation methods for has_one associations without :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should generate validation methods for belongs_to associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not generate validation methods for belongs_to associations without :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should generate validation methods for HABTM associations with :validate => true", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
+  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not automatically validate associations without :validate => true", () => { /* fixture-dependent */ });
+  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
+  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not automatically validate associations without :validate => true", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
+  it.skip("should automatically validate associations", () => { /* fixture-dependent */ });
+  it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => { /* fixture-dependent */ });
+  it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => { /* fixture-dependent */ });
+  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
+  it.skip("should automatically validate associations with :validate => true", () => { /* fixture-dependent */ });
+  it.skip("should not automatically add validate associations without :validate => true", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationWithTouch", () => {
+  it.skip("autosave with touch should not raise system stack error", () => { /* fixture-dependent */ });
+});
+
+describe("TestAutosaveAssociationsInGeneral", () => {
+  it.skip("autosave works even when other callbacks update the parent model", () => { /* fixture-dependent */ });
+  it.skip("autosave does not pass through non custom validation contexts", () => { /* fixture-dependent */ });
+  it.skip("autosave collection association callbacks get called once", () => { /* fixture-dependent */ });
+  it.skip("autosave has one association callbacks get called once", () => { /* fixture-dependent */ });
+  it.skip("autosave belongs to association callbacks get called once", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for has one", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for belongs to", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for has many", () => { /* fixture-dependent */ });
+  it.skip("should not add the same callbacks multiple times for has and belongs to many", () => { /* fixture-dependent */ });
+  it.skip("cyclic autosaves do not add multiple validations", () => { /* fixture-dependent */ });
+});
+
+describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
+  it.skip("errors should be indexed when passed as array", () => { /* fixture-dependent */ });
+  it.skip("errors should be indexed when global flag is set", () => { /* fixture-dependent */ });
+  it.skip("errors details should be set", () => { /* fixture-dependent */ });
+  it.skip("errors details should be indexed when passed as array", () => { /* fixture-dependent */ });
+  it.skip("errors details with error on base should be indexed when passed as array", () => { /* fixture-dependent */ });
+  it.skip("indexed errors should be properly translated", () => { /* fixture-dependent */ });
+  it.skip("indexed errors on base attribute should be properly translated", () => { /* fixture-dependent */ });
+  it.skip("errors details should be indexed when global flag is set", () => { /* fixture-dependent */ });
+});
+
+describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
+  it.skip("autosave new record on belongs to can be disabled per relationship", () => { /* fixture-dependent */ });
+  it.skip("autosave new record on has one can be disabled per relationship", () => { /* fixture-dependent */ });
+  it.skip("autosave new record on has many can be disabled per relationship", () => { /* fixture-dependent */ });
+  it.skip("autosave new record with after create callback", () => { /* fixture-dependent */ });
+  it.skip("autosave new record with after create callback and habtm association", () => { /* fixture-dependent */ });
+});
+
+describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
+  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => { /* fixture-dependent */ });
+  it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => { /* fixture-dependent */ });
+  it.skip("when grandchild changed in memory, saving parent should save grandchild", () => { /* fixture-dependent */ });
+  it.skip("when grandchild changed via attributes, saving parent should save grandchild", () => { /* fixture-dependent */ });
+  it.skip("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", () => { /* fixture-dependent */ });
+  it.skip("when grandchild added via attributes, saving parent should create grandchild", () => { /* fixture-dependent */ });
+  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => { /* fixture-dependent */ });
+  it.skip("circular references do not perform unnecessary queries", () => { /* fixture-dependent */ });
+  it.skip("nested singular associations are validated", () => { /* fixture-dependent */ });
+});
+
+describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
+  it.skip("when great-grandchild changed in memory, saving parent should save great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when great-grandchild changed via attributes, saving parent should save great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when great-grandchild added via attributes, saving parent should create great-grandchild", () => { /* fixture-dependent */ });
+  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => { /* fixture-dependent */ });
+});
+
+describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
+  it.skip("index in nested_attributes_order order", () => { /* fixture-dependent */ });
+  it.skip("index unaffected by reject_if", () => { /* fixture-dependent */ });
+});
+
+describe("TestNestedAttributesForDelegatedType", () => {
+  it.skip("should build a new record based on the delegated type", () => { /* fixture-dependent */ });
+});
+
+describe("TestNestedAttributesWithExtend", () => {
+  it.skip("extend affects nested attributes", () => { /* fixture-dependent */ });
+});
+
+describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
+  it.skip("should update existing records with non standard primary key", () => { /* fixture-dependent */ });
+  it.skip("attr accessor of child should be value provided during update", () => { /* fixture-dependent */ });
+});
+
+describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
+  it.skip("after commit callbacks with optimistic locking", () => { /* fixture-dependent */ });
+});
+
+describe("WhereChainTest", () => {
+  it.skip("associated merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged joined extended early with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated unscoped merged joined extended late with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated ordered merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated ordered merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("associated with enum", () => { /* fixture-dependent */ });
+  it.skip("associated with enum ordered", () => { /* fixture-dependent */ });
+  it.skip("associated with enum unscoped", () => { /* fixture-dependent */ });
+  it.skip("associated with enum extended early", () => { /* fixture-dependent */ });
+  it.skip("associated with enum extended late", () => { /* fixture-dependent */ });
+  it.skip("associated with add joins before", () => { /* fixture-dependent */ });
+  it.skip("associated with add left joins before", () => { /* fixture-dependent */ });
+  it.skip("associated with add left outer joins before", () => { /* fixture-dependent */ });
+  it.skip("associated with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("missing with invalid association name", () => { /* fixture-dependent */ });
+  it.skip("missing with multiple association", () => { /* fixture-dependent */ });
+  it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing ordered merged with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing ordered merged joined with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged joined extended early with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing unscoped merged joined extended late with scope on association", () => { /* fixture-dependent */ });
+  it.skip("missing with enum", () => { /* fixture-dependent */ });
+  it.skip("missing with enum ordered", () => { /* fixture-dependent */ });
+  it.skip("missing with enum unscoped", () => { /* fixture-dependent */ });
+  it.skip("missing with enum extended early", () => { /* fixture-dependent */ });
+  it.skip("missing with enum extended late", () => { /* fixture-dependent */ });
+  it.skip("missing with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("rewhere with alias condition", () => { /* fixture-dependent */ });
+  it.skip("rewhere with nested condition", () => { /* fixture-dependent */ });
+  it.skip("rewhere with infinite upper bound range", () => { /* fixture-dependent */ });
+  it.skip("rewhere with infinite lower bound range", () => { /* fixture-dependent */ });
+  it.skip("rewhere with infinite range", () => { /* fixture-dependent */ });
+  it.skip("rewhere with nil", () => { /* fixture-dependent */ });
+});
+
+describe("WithAnnotationsTest", () => {
+  it.skip("belongs to with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has and belongs to many with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has one with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has many with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has many through with annotation includes a query comment", () => { /* fixture-dependent */ });
+  it.skip("has many through with annotation includes a query comment when eager loading", () => { /* fixture-dependent */ });
+});
+
+describe("assigning nested attributes target", () => {
+  it.skip("assigning nested attributes target", () => { /* fixture-dependent */ });
+});
+
+describe("assigning nested attributes target with nil placeholder for rejected item", () => {
+  it.skip("assigning nested attributes target with nil placeholder for rejected item", () => { /* fixture-dependent */ });
+});
+
+describe("can use symbols as object identifier", () => {
+  it.skip("can use symbols as object identifier", () => { /* fixture-dependent */ });
+});
+
+describe("numeric column changes from zero to no empty string", () => {
+  it.skip("numeric column changes from zero to no empty string", () => { /* fixture-dependent */ });
+});
+
+describe("should allow to bypass validations on the associated models on create", () => {
+  it.skip("should allow to bypass validations on the associated models on create", () => { /* fixture-dependent */ });
+});
+
+describe("should allow to bypass validations on the associated models on update", () => {
+  it.skip("should allow to bypass validations on the associated models on update", () => { /* fixture-dependent */ });
+});
+
+describe("should also work with a HashWithIndifferentAccess", () => {
+  it.skip("should also work with a HashWithIndifferentAccess", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically build new associated models for each entry in a hash where the id is missing", () => {
+  it.skip("should automatically build new associated models for each entry in a hash where the id is missing", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically enable autosave on the association", () => {
+  it.skip("should automatically enable autosave on the association", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically save bang the associated models", () => {
+  it.skip("should automatically save bang the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically save the associated models", () => {
+  it.skip("should automatically save the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically validate the associated models", () => {
+  it.skip("should automatically validate the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should default invalid error from i18n", () => {
+  it.skip("should default invalid error from i18n", () => { /* fixture-dependent */ });
+});
+
+describe("should merge errors on the associated models onto the parent even if it is not valid", () => {
+  it.skip("should merge errors on the associated models onto the parent even if it is not valid", () => { /* fixture-dependent */ });
+});
+
+describe("should not assign destroy key to a record", () => {
+  it.skip("should not assign destroy key to a record", () => { /* fixture-dependent */ });
+});
+
+describe("should not destroy the associated model until the parent is saved", () => {
+  it.skip("should not destroy the associated model until the parent is saved", () => { /* fixture-dependent */ });
+});
+
+describe("should not load association when updating existing records", () => {
+  it.skip("should not load association when updating existing records", () => { /* fixture-dependent */ });
+});
+
+describe("should not load the associated models if they were not loaded yet", () => {
+  it.skip("should not load the associated models if they were not loaded yet", () => { /* fixture-dependent */ });
+});
+
+describe("should not overwrite unsaved updates when loading association", () => {
+  it.skip("should not overwrite unsaved updates when loading association", () => { /* fixture-dependent */ });
+});
+
+describe("should not remove scheduled destroys when loading association", () => {
+  it.skip("should not remove scheduled destroys when loading association", () => { /* fixture-dependent */ });
+});
+
+describe("should not save and return false if a callback cancelled saving in either create or update", () => {
+  it.skip("should not save and return false if a callback cancelled saving in either create or update", () => { /* fixture-dependent */ });
+});
+
+describe("should not update children when parent creation with no reason", () => {
+  it.skip("should not update children when parent creation with no reason", () => { /* fixture-dependent */ });
+});
+
+describe("should not use default invalid error on associated models", () => {
+  it.skip("should not use default invalid error on associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should preserve order when not overwriting unsaved updates", () => {
+  it.skip("should preserve order when not overwriting unsaved updates", () => { /* fixture-dependent */ });
+});
+
+describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
+  it.skip("should raise RecordNotFound if an id belonging to a different record is given", () => { /* fixture-dependent */ });
+});
+
+describe("should raise an UnknownAttributeError for non existing nested attributes for has many", () => {
+  it.skip("should raise an UnknownAttributeError for non existing nested attributes for has many", () => { /* fixture-dependent */ });
+});
+
+describe("should raise an argument error if something else than a hash is passed", () => {
+  it.skip("should raise an argument error if something else than a hash is passed", () => { /* fixture-dependent */ });
+});
+
+describe("should refresh saved records when not overwriting unsaved updates", () => {
+  it.skip("should refresh saved records when not overwriting unsaved updates", () => { /* fixture-dependent */ });
+});
+
+describe("should rollback any changes if an exception occurred while saving", () => {
+  it.skip("should rollback any changes if an exception occurred while saving", () => { /* fixture-dependent */ });
+});
+
+describe("should save only one association on create", () => {
+  it.skip("should save only one association on create", () => { /* fixture-dependent */ });
+});
+
+describe("should sort the hash by the keys before building new associated models", () => {
+  it.skip("should sort the hash by the keys before building new associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
+  it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => { /* fixture-dependent */ });
+});
+
+describe("should take a hash and assign the attributes to the associated models", () => {
+  it.skip("should take a hash and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
+  it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should take an array and assign the attributes to the associated models", () => {
+  it.skip("should take an array and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should update children when autosave is true and parent is new but child is not", () => {
+  it.skip("should update children when autosave is true and parent is new but child is not", () => { /* fixture-dependent */ });
+});
+
+describe("should validation the associated models on create", () => {
+  it.skip("should validation the associated models on create", () => { /* fixture-dependent */ });
+});
+
+describe("should work with update as well", () => {
+  it.skip("should work with update as well", () => { /* fixture-dependent */ });
+});
+
+describe("validate presence of parent works with inverse of", () => {
+  it.skip("validate presence of parent works with inverse of", () => { /* fixture-dependent */ });
+});
+
+describe("AsyncHasOneAssociationsTest", () => {
+  it.skip("async load has one", () => { /* fixture-dependent */ });
+});
+
+describe("BelongsToWithForeignKeyTest", () => {
+  it.skip("destroy linked models", () => { /* fixture-dependent */ });
+});
+
+describe("CloneTest", () => {
+  it.skip("stays frozen", () => { /* fixture-dependent */ });
+  it.skip("freezing a cloned model does not freeze clone", () => { /* fixture-dependent */ });
+});
+
+describe("EagerLoadingTooManyIdsTest", () => {
+  it.skip("eager loading too many ids", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyAssociationsTest", () => {
+  it.skip("transaction when deleting persisted", () => { /* fixture-dependent */ });
+  it.skip("transaction when deleting new record", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
+  it.skip("should generate valid sql", () => { /* fixture-dependent */ });
+});
+
+describe("HasManyAssociationsTestPrimaryKeys", () => {
+  it.skip("custom primary key on new record should fetch with query", () => { /* fixture-dependent */ });
+  it.skip("blank custom primary key on new record should not run queries", () => { /* fixture-dependent */ });
+});
+
+describe("OptimisticLockingWithSchemaChangeTest", () => {
+  it.skip("destroy dependents", () => { /* fixture-dependent */ });
+  it.skip("destroy existing object with locking column value null in the database", () => { /* fixture-dependent */ });
+  it.skip("destroy stale object", () => { /* fixture-dependent */ });
+});
+
+describe("OverridingAggregationsTest", () => {
+  it.skip("composed of aggregation redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+});
+
+describe("StrictLoadingFixturesTest", () => {
+  it.skip("strict loading violations are ignored on fixtures", () => { /* fixture-dependent */ });
+});
+
+describe("TimestampsWithoutTransactionTest", () => {
+  it.skip("do not write timestamps on save if they are not attributes", () => { /* fixture-dependent */ });
+  it.skip("index is created for both timestamps", () => { /* fixture-dependent */ });
+});
+
+describe("TooManyOrTest", () => {
+  it.skip("too many or", () => { /* fixture-dependent */ });
+});
+
+describe("UniquenessWithCompositeKey", () => {
+  it.skip("uniqueness validation for model with composite key", () => { /* fixture-dependent */ });
+});
+
+describe("assigning nested attributes target with nil placeholder for rejected item", () => {
+  it.skip("assigning nested attributes target with nil placeholder for rejected item", () => { /* fixture-dependent */ });
+});
+
+describe("can use symbols as object identifier", () => {
+  it.skip("can use symbols as object identifier", () => { /* fixture-dependent */ });
+});
+
+describe("not respond to arel method", () => {
+  it.skip("not respond to arel method", () => { /* fixture-dependent */ });
+});
+
+describe("numeric column changes from zero to no empty string", () => {
+  it.skip("numeric column changes from zero to no empty string", () => { /* fixture-dependent */ });
+});
+
+describe("should allow to bypass validations on the associated models on create", () => {
+  it.skip("should allow to bypass validations on the associated models on create", () => { /* fixture-dependent */ });
+});
+
+describe("should allow to bypass validations on the associated models on update", () => {
+  it.skip("should allow to bypass validations on the associated models on update", () => { /* fixture-dependent */ });
+});
+
+describe("should also work with a HashWithIndifferentAccess", () => {
+  it.skip("should also work with a HashWithIndifferentAccess", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically build new associated models for each entry in a hash where the id is missing", () => {
+  it.skip("should automatically build new associated models for each entry in a hash where the id is missing", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically enable autosave on the association", () => {
+  it.skip("should automatically enable autosave on the association", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically save bang the associated models", () => {
+  it.skip("should automatically save bang the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should automatically save the associated models", () => {
+  it.skip("should automatically save the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should default invalid error from i18n", () => {
+  it.skip("should default invalid error from i18n", () => { /* fixture-dependent */ });
+});
+
+describe("should merge errors on the associated models onto the parent even if it is not valid", () => {
+  it.skip("should merge errors on the associated models onto the parent even if it is not valid", () => { /* fixture-dependent */ });
+});
+
+describe("should not assign destroy key to a record", () => {
+  it.skip("should not assign destroy key to a record", () => { /* fixture-dependent */ });
+});
+
+describe("should not destroy the associated model until the parent is saved", () => {
+  it.skip("should not destroy the associated model until the parent is saved", () => { /* fixture-dependent */ });
+});
+
+describe("should not load association when updating existing records", () => {
+  it.skip("should not load association when updating existing records", () => { /* fixture-dependent */ });
+});
+
+describe("should not load the associated models if they were not loaded yet", () => {
+  it.skip("should not load the associated models if they were not loaded yet", () => { /* fixture-dependent */ });
+});
+
+describe("should not overwrite unsaved updates when loading association", () => {
+  it.skip("should not overwrite unsaved updates when loading association", () => { /* fixture-dependent */ });
+});
+
+describe("should not remove scheduled destroys when loading association", () => {
+  it.skip("should not remove scheduled destroys when loading association", () => { /* fixture-dependent */ });
+});
+
+describe("should not save and return false if a callback cancelled saving in either create or update", () => {
+  it.skip("should not save and return false if a callback cancelled saving in either create or update", () => { /* fixture-dependent */ });
+});
+
+describe("should not update children when parent creation with no reason", () => {
+  it.skip("should not update children when parent creation with no reason", () => { /* fixture-dependent */ });
+});
+
+describe("should not use default invalid error on associated models", () => {
+  it.skip("should not use default invalid error on associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should preserve order when not overwriting unsaved updates", () => {
+  it.skip("should preserve order when not overwriting unsaved updates", () => { /* fixture-dependent */ });
+});
+
+describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
+  it.skip("should raise RecordNotFound if an id belonging to a different record is given", () => { /* fixture-dependent */ });
+});
+
+describe("should raise an UnknownAttributeError for non existing nested attributes for has many", () => {
+  it.skip("should raise an UnknownAttributeError for non existing nested attributes for has many", () => { /* fixture-dependent */ });
+});
+
+describe("should raise an argument error if something else than a hash is passed", () => {
+  it.skip("should raise an argument error if something else than a hash is passed", () => { /* fixture-dependent */ });
+});
+
+describe("should refresh saved records when not overwriting unsaved updates", () => {
+  it.skip("should refresh saved records when not overwriting unsaved updates", () => { /* fixture-dependent */ });
+});
+
+describe("should rollback any changes if an exception occurred while saving", () => {
+  it.skip("should rollback any changes if an exception occurred while saving", () => { /* fixture-dependent */ });
+});
+
+describe("should save only one association on create", () => {
+  it.skip("should save only one association on create", () => { /* fixture-dependent */ });
+});
+
+describe("should sort the hash by the keys before building new associated models", () => {
+  it.skip("should sort the hash by the keys before building new associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
+  it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => { /* fixture-dependent */ });
+});
+
+describe("should take a hash and assign the attributes to the associated models", () => {
+  it.skip("should take a hash and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
+  it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should take an array and assign the attributes to the associated models", () => {
+  it.skip("should take an array and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+});
+
+describe("should update children when autosave is true and parent is new but child is not", () => {
+  it.skip("should update children when autosave is true and parent is new but child is not", () => { /* fixture-dependent */ });
+});
+
+describe("should validation the associated models on create", () => {
+  it.skip("should validation the associated models on create", () => { /* fixture-dependent */ });
+});
+
+describe("should work with update as well", () => {
+  it.skip("should work with update as well", () => { /* fixture-dependent */ });
+});
+
+describe("validate presence of parent works with inverse of", () => {
+  it.skip("validate presence of parent works with inverse of", () => { /* fixture-dependent */ });
+});

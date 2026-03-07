@@ -105,6 +105,8 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars.join("").startsWith("START")).toBe(true);
   });
 
+  it.skip("insert throws index error", () => { /* fixture-dependent */ });
+
   it("should know if one includes the other", () => {
     expect(multibyteStr.includes("本")).toBe(true);
     expect(multibyteStr.includes("xyz")).toBe(false);

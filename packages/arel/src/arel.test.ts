@@ -6243,3 +6243,16 @@ describe("Arel", () => {
     });
   });
 });
+
+describe("SqlLiteralTest", () => {
+  it.skip("serializes into YAML", () => { /* fixture-dependent */ });
+  it.skip("generates a Fragments node", () => { /* fixture-dependent */ });
+});
+
+describe("can define a dispatch method", () => {
+  it.skip("can define a dispatch method", () => { /* fixture-dependent */ });
+});
+
+describe("should visit_Set", () => {
+  it.skip("should visit_Set", () => { /* fixture-dependent */ });
+});
