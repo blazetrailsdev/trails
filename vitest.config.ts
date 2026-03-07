@@ -15,6 +15,10 @@ export default defineConfig({
         __dirname,
         "packages/activerecord/src/index.ts"
       ),
+      "@rails-ts/rack": path.resolve(
+        __dirname,
+        "packages/rack/src/index.ts"
+      ),
     },
   },
   test: {

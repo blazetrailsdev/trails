@@ -68,7 +68,7 @@ export function parseMultipart(env: Record<string, any>): Record<string, any> | 
     throw new BoundaryTooLongError(`multipart boundary size too large (${boundary.length} characters)`);
   }
 
-  const input = env["rack.input"] || env[Symbol.for("rack.input")];
+  const input = env["rack.input"] || (env as any)[Symbol.for("rack.input")];
   if (!input) {
     throw new MissingInputError();
   }

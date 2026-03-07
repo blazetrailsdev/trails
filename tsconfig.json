@@ -21,7 +21,8 @@
     { "path": "packages/activesupport" },
     { "path": "packages/arel" },
     { "path": "packages/activemodel" },
-    { "path": "packages/activerecord" }
+    { "path": "packages/activerecord" },
+    { "path": "packages/rack" }
   ],
   "exclude": ["node_modules", "dist"]
 }

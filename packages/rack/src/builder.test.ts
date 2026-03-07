@@ -22,7 +22,7 @@ describe("Rack::Builder", () => {
 
   it("raises if #run provided both app and block", () => {
     const builder = new Builder();
-    expect(() => builder.run(async () => [200, {}, []] as any, async () => [200, {}, []] as any)).toThrow();
+    expect(() => (builder as any).run(async () => [200, {}, []], async () => [200, {}, []])).toThrow();
   });
 
   it("supports mapping", async () => {

@@ -249,12 +249,12 @@ describe("Rack::Lint", () => {
   });
 
   it("notices when the response protocol is specified in the response but not in the request", async () => {
-    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": ["h2"] }, ["OK"]]);
+    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": ["h2"] as any }, ["OK"]]);
     await expect(app.call(validEnv())).rejects.toThrow(LintError);
   });
 
   it("pass valid rack.protocol", async () => {
-    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": ["h2"] }, ["OK"]]);
+    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": ["h2"] as any }, ["OK"]]);
     const env = validEnv({ "rack.protocol": ["h2"] });
     const [status] = await app.call(env);
     expect(status).toBe(200);
