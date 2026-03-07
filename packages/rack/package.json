@@ -1,0 +1,13 @@
+{
+  "name": "@rails-ts/rack",
+  "version": "0.1.0",
+  "description": "Modular web server interface, mirroring Ruby's Rack",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": ["dist"],
+  "license": "MIT"
+}
