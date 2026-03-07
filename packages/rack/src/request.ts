@@ -12,6 +12,7 @@ import {
 } from "./constants.js";
 import { parseNestedQuery } from "./utils.js";
 import * as MediaTypeModule from "./media-type.js";
+import { parseMultipart } from "./multipart.js";
 
 const FORM_DATA_MEDIA_TYPES = [
   "application/x-www-form-urlencoded",
@@ -235,11 +236,20 @@ export class Request {
     }
 
     const mt = this.mediaType;
-    if (!mt || !FORM_DATA_MEDIA_TYPES.includes(mt)) {
+    if (!mt || (!FORM_DATA_MEDIA_TYPES.includes(mt) && !mt.startsWith("multipart/"))) {
       this.env[RACK_REQUEST_FORM_HASH] = {};
       return {};
     }
 
+    // Multipart data (form-data, related, mixed, etc.)
+    if (mt.startsWith("multipart/")) {
+      const parsed = parseMultipart(this.env) || {};
+      this.env[RACK_REQUEST_FORM_HASH] = parsed;
+      this.env[RACK_REQUEST_FORM_INPUT] = input;
+      return parsed;
+    }
+
+    // URL-encoded form data
     let body: string;
     if (typeof input.read === "function") {
       body = input.read() || "";
@@ -259,8 +269,30 @@ export class Request {
     return parsed;
   }
 
-  get formPairs(): [string, string][] {
-    // Use cached form vars if available
+  get formData(): boolean {
+    const mt = this.mediaType;
+    return mt !== null && FORM_DATA_MEDIA_TYPES.includes(mt);
+  }
+
+  get formPairs(): [string, any][] {
+    const mt = this.mediaType;
+    if (!mt || !FORM_DATA_MEDIA_TYPES.includes(mt)) return [];
+
+    // Multipart: return pairs from parsed POST
+    if (mt === "multipart/form-data") {
+      if (this.env[RACK_REQUEST_FORM_PAIRS]) {
+        return this.env[RACK_REQUEST_FORM_PAIRS];
+      }
+      const post = this.POST;
+      const pairs: [string, any][] = [];
+      for (const [key, value] of Object.entries(post)) {
+        pairs.push([key, value]);
+      }
+      this.env[RACK_REQUEST_FORM_PAIRS] = pairs;
+      return pairs;
+    }
+
+    // URL-encoded
     if (this.env[RACK_REQUEST_FORM_VARS] !== undefined) {
       const body = this.env[RACK_REQUEST_FORM_VARS];
       if (!body) return [];
@@ -269,9 +301,6 @@ export class Request {
 
     const input = this.env[RACK_INPUT];
     if (!input) return [];
-
-    const mt = this.mediaType;
-    if (!mt || !FORM_DATA_MEDIA_TYPES.includes(mt)) return [];
 
     let body: string;
     if (typeof input.read === "function") {
@@ -382,6 +411,16 @@ export class Request {
 
     return remoteAddr;
   }
+
+  trustedProxy(ip: string): boolean {
+    const trustedProxyFn = this.env["rack.request.trusted_proxy"];
+    if (trustedProxyFn === true) return true;
+    if (trustedProxyFn === false) return false;
+    if (typeof trustedProxyFn === "function") return trustedProxyFn(ip);
+    return isTrustedProxy(ip);
+  }
+
+  static ipFilter: ((ip: string) => boolean) | null = null;
 
   get acceptEncoding(): Array<[string, number]> {
     const header = this.env["HTTP_ACCEPT_ENCODING"] || "";

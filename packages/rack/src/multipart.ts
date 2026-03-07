@@ -117,7 +117,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
   let pos = 0;
 
   // Skip any preamble - find first boundary
-  const firstBoundaryIdx = bufferIndexOf(body, delimiter, pos);
+  const firstBoundaryIdx = findNextBoundary(body, delimiter, pos);
   if (firstBoundaryIdx === -1) {
     throw new BoundaryTooLongError("multipart boundary not found within limit");
   }
@@ -130,7 +130,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
       const afterFirst = body.subarray(firstBoundaryIdx + delimiter.length, firstBoundaryIdx + delimiter.length + 2);
       if (afterFirst.toString() === "--") {
         // End boundary first - look for a real opening boundary after it
-        const nextBoundary = bufferIndexOf(body, delimiter, firstBoundaryIdx + endDelimiter.length);
+        const nextBoundary = findNextBoundary(body, delimiter, firstBoundaryIdx + endDelimiter.length);
         if (nextBoundary === -1) {
           // Only had end boundary
           return params;
@@ -151,7 +151,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
     const afterDelim = body.subarray(pos + delimiter.length, pos + delimiter.length + 2);
     if (afterDelim.toString() === "--") {
       // End boundary first - look for opening boundary after
-      const nextBoundary = bufferIndexOf(body, delimiter, pos + endDelimiter.length);
+      const nextBoundary = findNextBoundary(body, delimiter, pos + endDelimiter.length);
       if (nextBoundary === -1) {
         return params;
       }
@@ -187,7 +187,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
     const bodyStart = headerEndIdx + 4;
 
     // Find next boundary
-    const nextBoundaryIdx = bufferIndexOf(body, delimiter, bodyStart);
+    const nextBoundaryIdx = findNextBoundary(body, delimiter, bodyStart);
     let bodyEnd: number;
     if (nextBoundaryIdx === -1) {
       bodyEnd = body.length;
@@ -452,6 +452,29 @@ function parseContentDisposition(disposition: string): { name?: string; filename
 
 function bufferIndexOf(haystack: Buffer, needle: Buffer, fromIndex: number): number {
   return haystack.indexOf(needle, fromIndex);
+}
+
+/**
+ * Find the next real boundary position. A real boundary is the delimiter
+ * followed by \r\n (part boundary) or -- (end boundary) or end of buffer.
+ */
+function findNextBoundary(body: Buffer, delimiter: Buffer, fromIndex: number): number {
+  let pos = fromIndex;
+  while (pos < body.length) {
+    const idx = body.indexOf(delimiter, pos);
+    if (idx === -1) return -1;
+    const afterIdx = idx + delimiter.length;
+    if (afterIdx >= body.length) return idx; // at end of buffer
+    const b0 = body[afterIdx];
+    const b1 = afterIdx + 1 < body.length ? body[afterIdx + 1] : -1;
+    // Valid: \r\n or --
+    if ((b0 === 0x0d && b1 === 0x0a) || (b0 === 0x2d && b1 === 0x2d)) {
+      return idx;
+    }
+    // Not a real boundary, keep searching
+    pos = idx + 1;
+  }
+  return -1;
 }
 
 // --- Generator / Builder API ---
