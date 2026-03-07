@@ -14,7 +14,7 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-const PACKAGES = ["arel", "activemodel", "activerecord"];
+const PACKAGES = ["arel", "activemodel", "activerecord", "actiondispatch"];
 
 function main() {
   const manifest: ApiManifest = {

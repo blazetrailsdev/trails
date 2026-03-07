@@ -19,6 +19,10 @@ export default defineConfig({
         __dirname,
         "packages/rack/src/index.ts"
       ),
+      "@rails-ts/actiondispatch": path.resolve(
+        __dirname,
+        "packages/actiondispatch/src/index.ts"
+      ),
     },
   },
   test: {

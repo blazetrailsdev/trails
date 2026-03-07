@@ -26,6 +26,7 @@ PACKAGE_TEST_DIRS = {
   "activerecord"  => File.join(RAILS_DIR, "activerecord", "test", "cases"),
   "activesupport" => File.join(RAILS_DIR, "activesupport", "test"),
   "rack"          => File.join(RACK_DIR, "test"),
+  "actiondispatch" => File.join(RAILS_DIR, "actionpack", "test"),
 }
 
 # Files/directories to skip (infrastructure, not actual tests)

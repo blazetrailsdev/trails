@@ -112,6 +112,7 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/rack/src/utils.test.ts",
     "packages/rack/src/version.test.ts",
   ],
+  actiondispatch: [],
 };
 
 function main() {

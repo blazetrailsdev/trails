@@ -1,0 +1,13 @@
+{
+  "name": "@rails-ts/actiondispatch",
+  "version": "0.1.0",
+  "description": "Routing, middleware stack, and request/response — mirroring Rails ActionDispatch",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": ["dist"],
+  "license": "MIT"
+}

@@ -22,7 +22,8 @@
     { "path": "packages/arel" },
     { "path": "packages/activemodel" },
     { "path": "packages/activerecord" },
-    { "path": "packages/rack" }
+    { "path": "packages/rack" },
+    { "path": "packages/actiondispatch" }
   ],
   "exclude": ["node_modules", "dist"]
 }

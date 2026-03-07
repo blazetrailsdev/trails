@@ -2237,6 +2237,10 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "version.test.ts", describeBlock: "Rack" },
     ],
   },
+  // ==========================================================================
+  // ActionDispatch
+  // ==========================================================================
+  actiondispatch: {},
 };
 
 // --- Skip list ---
