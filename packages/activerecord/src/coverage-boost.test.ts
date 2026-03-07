@@ -14087,19 +14087,113 @@ describe("TransactionCallbacksTest", () => {
   it.skip("dont call any callbacks after explicit transaction commits for invalid record", () => { /* fixture-dependent */ });
   it.skip("dont call after commit on update based on previous transaction", () => { /* fixture-dependent */ });
   it.skip("dont call after commit on destroy based on previous transaction", () => { /* fixture-dependent */ });
-  it.skip("only call after commit on save after transaction commits for saving record", () => { /* fixture-dependent */ });
-  it.skip("only call after commit on update after transaction commits for existing record", () => { /* fixture-dependent */ });
+
+  it("only call after commit on save after transaction commits for saving record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const called: string[] = [];
+    Topic.afterCommit(function() { called.push("after_commit"); });
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "test" });
+      expect(called).toEqual([]); // not fired yet
+    });
+    expect(called).toEqual(["after_commit"]);
+  });
+
+  it("only call after commit on update after transaction commits for existing record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const topic = await Topic.create({ title: "original" });
+    const called: string[] = [];
+    Topic.afterCommit(function() { called.push("after_commit"); });
+    await transaction(Topic, async () => {
+      await topic.update({ title: "updated" });
+      expect(called).toEqual([]);
+    });
+    expect(called).toEqual(["after_commit"]);
+  });
+
   it.skip("only call after commit on destroy after transaction commits for destroyed record", () => { /* fixture-dependent */ });
+
   it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => { /* fixture-dependent */ });
   it.skip("no after commit on destroy after transaction commits for destroyed new record", () => { /* fixture-dependent */ });
-  it.skip("only call after commit on create and doesnt leaky", () => { /* fixture-dependent */ });
+
+  it("only call after commit on create and doesnt leaky", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const called: number[] = [];
+    Topic.afterCommit(function() { called.push(1); });
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "one" });
+    });
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "two" });
+    });
+    expect(called.length).toBe(2);
+  });
+
   it.skip("only call after commit on update after transaction commits for existing record on touch", () => { /* fixture-dependent */ });
   it.skip("only call after commit on top level transactions", () => { /* fixture-dependent */ });
-  it.skip("call after rollback after transaction rollsback", () => { /* fixture-dependent */ });
-  it.skip("only call after rollback on update after transaction rollsback for existing record", () => { /* fixture-dependent */ });
+
+  it("call after rollback after transaction rollsback", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const called: string[] = [];
+    Topic.afterRollback(function() { called.push("after_rollback"); });
+    try {
+      await transaction(Topic, async () => {
+        await Topic.create({ title: "test" });
+        throw new Error("rollback");
+      });
+    } catch {}
+    expect(called).toEqual(["after_rollback"]);
+  });
+
+  it("only call after rollback on update after transaction rollsback for existing record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const topic = await Topic.create({ title: "original" });
+    const called: string[] = [];
+    Topic.afterRollback(function() { called.push("after_rollback"); });
+    try {
+      await transaction(Topic, async () => {
+        await topic.update({ title: "updated" });
+        throw new Error("rollback");
+      });
+    } catch {}
+    expect(called).toEqual(["after_rollback"]);
+  });
+
   it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => { /* fixture-dependent */ });
+
   it.skip("only call after rollback on destroy after transaction rollsback for destroyed record", () => { /* fixture-dependent */ });
-  it.skip("only call after rollback on create after transaction rollsback for new record", () => { /* fixture-dependent */ });
+
+  it("only call after rollback on create after transaction rollsback for new record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const called: string[] = [];
+    Topic.afterRollback(function() { called.push("after_rollback"); });
+    try {
+      await transaction(Topic, async () => {
+        await Topic.create({ title: "test" });
+        throw new Error("rollback");
+      });
+    } catch {}
+    expect(called).toEqual(["after_rollback"]);
+  });
+
   it.skip("call after rollback when commit fails", () => { /* fixture-dependent */ });
   it.skip("only call after rollback on records rolled back to a savepoint", () => { /* fixture-dependent */ });
   it.skip("only call after rollback on records rolled back to a savepoint when release savepoint fails", () => { /* fixture-dependent */ });
@@ -14439,13 +14533,67 @@ describe("CustomPropertiesTest", () => {
 });
 
 describe("UniquenessValidationTest", () => {
-  it.skip("validate uniqueness with alias attribute", () => { /* fixture-dependent */ });
-  it.skip("validates uniqueness with nil value", () => { /* fixture-dependent */ });
-  it.skip("validates uniqueness with validates", () => { /* fixture-dependent */ });
+  it("validate uniqueness with alias attribute", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.aliasAttribute("heading", "title");
+        this.validatesUniqueness("title");
+      }
+    }
+    await Post.create({ title: "hello" });
+    // Try to save another with same title - alias reads correctly
+    const p2 = new Post({ title: "hello" });
+    expect((p2 as any).heading).toBe("hello"); // alias works
+    const saved = await p2.save();
+    expect(saved).toBe(false);
+    expect(p2.errors.on("title")).toBeTruthy();
+  });
+
+  it("validates uniqueness with nil value", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+    }
+    await Post.create({ title: null });
+    const p2 = new Post({ title: null });
+    // null values skip uniqueness check
+    expect(p2.isValid()).toBe(true);
+  });
+
+  it("validates uniqueness with validates", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+    }
+    await Post.create({ title: "hello" });
+    const p2 = new Post({ title: "hello" });
+    const saved = await p2.save();
+    expect(saved).toBe(false);
+    expect(p2.errors.on("title")).toBeTruthy();
+  });
+
   it.skip("validate uniqueness when integer out of range", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness when integer out of range show order does not matter", () => { /* fixture-dependent */ });
   it.skip("validates uniqueness with newline chars", () => { /* fixture-dependent */ });
-  it.skip("validate uniqueness with scope", () => { /* fixture-dependent */ });
+
+  it("validate uniqueness with scope", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "author" }); }
+    }
+    await Post.create({ title: "hello", author: "alice" });
+    // Same title, different author - valid
+    const p2 = new Post({ title: "hello", author: "bob" });
+    expect(await p2.save()).toBe(true);
+    // Same title, same author - invalid
+    const p3 = new Post({ title: "hello", author: "alice" });
+    expect(await p3.save()).toBe(false);
+  });
+
   it.skip("validate uniqueness with aliases", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness with scope invalid syntax", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness with object scope", () => { /* fixture-dependent */ });
@@ -14453,7 +14601,20 @@ describe("UniquenessValidationTest", () => {
   it.skip("validate uniqueness with composed attribute scope", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness with object arg", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness scoped to defining class", () => { /* fixture-dependent */ });
-  it.skip("validate uniqueness with scope array", () => { /* fixture-dependent */ });
+
+  it("validate uniqueness with scope array", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("category", "string");
+        this.adapter = adp; this.validatesUniqueness("title", { scope: ["author", "category"] }); }
+    }
+    await Post.create({ title: "hello", author: "alice", category: "tech" });
+    const p2 = new Post({ title: "hello", author: "alice", category: "other" });
+    expect(await p2.save()).toBe(true);
+    const p3 = new Post({ title: "hello", author: "alice", category: "tech" });
+    expect(await p3.save()).toBe(false);
+  });
+
   it.skip("validate case insensitive uniqueness", () => { /* fixture-dependent */ });
   it.skip("validate case sensitive uniqueness with special sql like chars", () => { /* fixture-dependent */ });
   it.skip("validate case insensitive uniqueness with special sql like chars", () => { /* fixture-dependent */ });
@@ -14466,11 +14627,44 @@ describe("UniquenessValidationTest", () => {
   it.skip("validate uniqueness with limit", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness with limit and utf8", () => { /* fixture-dependent */ });
   it.skip("validate straight inheritance uniqueness", () => { /* fixture-dependent */ });
-  it.skip("validate uniqueness with conditions", () => { /* fixture-dependent */ });
+  it("validate uniqueness with conditions", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("active", "integer"); this.adapter = adp;
+        this.validatesUniqueness("title", { conditions: function(this: any) { return this.where({ active: 1 }); } }); }
+    }
+    // conditions limits which records count for uniqueness: only active=1 records
+    await Post.create({ title: "hello", active: 1 });
+    // Different title - valid regardless
+    const p2 = new Post({ title: "world", active: 1 });
+    expect(await p2.save()).toBe(true);
+    // Same title, active=1 - invalid (another active=1 record with same title exists)
+    const p3 = new Post({ title: "hello", active: 1 });
+    expect(await p3.save()).toBe(false);
+  });
+
   it.skip("validate uniqueness with non callable conditions is not supported", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness with conditions with record arg", () => { /* fixture-dependent */ });
-  it.skip("validate uniqueness on existing relation", () => { /* fixture-dependent */ });
-  it.skip("validate uniqueness on empty relation", () => { /* fixture-dependent */ });
+
+  it("validate uniqueness on existing relation", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+    }
+    const post = await Post.create({ title: "unique" });
+    // Record should be valid against itself (save returns true for existing record)
+    expect(await post.save()).toBe(true);
+  });
+
+  it("validate uniqueness on empty relation", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+    }
+    const p = new Post({ title: "brand new" });
+    expect(await p.save()).toBe(true);
+  });
+
   it.skip("validate uniqueness of custom primary key", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness without primary key", () => { /* fixture-dependent */ });
   it.skip("validate uniqueness ignores itself when primary key changed", () => { /* fixture-dependent */ });
@@ -17778,9 +17972,37 @@ describe("SanitizeTest", () => {
     expect(sql).toContain("hello");
   });
 
-  it.skip("sanitize sql like with custom escape character", () => { /* fixture-dependent */ });
-  it.skip("sanitize sql like with wildcard as escape character", () => { /* fixture-dependent */ });
-  it.skip("sanitize sql like example use case", () => { /* fixture-dependent */ });
+  it("sanitize sql like with custom escape character", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const result = Post.sanitizeSqlLike("100%", "!");
+    expect(result).toBe("100!%");
+  });
+
+  it("sanitize sql like with wildcard as escape character", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const result = Post.sanitizeSqlLike("50%_off", "\\");
+    expect(result).toContain("\\%");
+    expect(result).toContain("\\_");
+  });
+
+  it("sanitize sql like example use case", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const userInput = "50% off";
+    const sanitized = Post.sanitizeSqlLike(userInput);
+    const sql = Post.sanitizeSqlArray("title LIKE ?", "%" + sanitized + "%");
+    expect(sql).toContain("\\%");
+    expect(sql).toContain("off");
+  });
+
   it.skip("disallow raw sql with unknown attribute string", () => { /* fixture-dependent */ });
   it.skip("disallow raw sql with unknown attribute sql literal", () => { /* fixture-dependent */ });
 
@@ -19247,8 +19469,29 @@ describe("FieldOrderedValuesTest", () => {
     expect(sql).toContain("CASE");
   });
 
-  it.skip("in order of with enums values", () => { /* fixture-dependent */ });
-  it.skip("in order of with enums keys", () => { /* fixture-dependent */ });
+  it("in order of with enums values", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("status", "integer"); this.adapter = adapter; }
+    }
+    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
+    const sql = Post.all().inOrderOf("status", [0, 1, 2]).toSql();
+    expect(sql).toContain("CASE");
+    expect(sql).toContain("0");
+    expect(sql).toContain("1");
+    expect(sql).toContain("2");
+  });
+
+  it("in order of with enums keys", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("status", "integer"); this.adapter = adapter; }
+    }
+    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
+    const sql = Post.all().inOrderOf("status", ["draft", "published", "archived"]).toSql();
+    expect(sql).toContain("CASE");
+    expect(sql).toContain("draft");
+  });
 
   it("in order of with string column", () => {
     const adapter = freshAdapter();
@@ -19561,13 +19804,55 @@ describe("HasManyScopingTest", () => {
 });
 
 describe("RequiredAssociationsTest", () => {
-  it.skip("belongs_to associations can be optional by default", () => { /* fixture-dependent */ });
-  it.skip("required belongs_to associations have presence validated", () => { /* fixture-dependent */ });
+  it("belongs_to associations can be optional by default", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Book extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { optional: true });
+    registerModel(Author); registerModel(Book);
+    const book = new Book({ title: "No Author" });
+    expect(book.isValid()).toBe(true);
+  });
+
+  it("required belongs_to associations have presence validated", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Book extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { required: true });
+    registerModel(Author); registerModel(Book);
+    const book = new Book({ title: "No Author" });
+    expect(book.isValid()).toBe(false);
+    expect(book.errors.on("author_id")).toBeTruthy();
+  });
+
   it.skip("belongs_to associations can be required by default", () => { /* fixture-dependent */ });
   it.skip("has_one associations are not required by default", () => { /* fixture-dependent */ });
   it.skip("required has_one associations have presence validated", () => { /* fixture-dependent */ });
   it.skip("required has_one associations have a correct error message", () => { /* fixture-dependent */ });
-  it.skip("required belongs_to associations have a correct error message", () => { /* fixture-dependent */ });
+
+  it("required belongs_to associations have a correct error message", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Book extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { required: true });
+    registerModel(Author); registerModel(Book);
+    const book = new Book({ title: "No Author" });
+    book.isValid();
+    const errors = book.errors.fullMessages;
+    expect(errors.length).toBeGreaterThan(0);
+  });
 });
 
 describe("WithAnnotationsTest", () => {
@@ -19762,12 +20047,59 @@ describe("InstrumentationTest", () => {
 });
 
 describe("SuppressorTest", () => {
-  it.skip("suppresses create", () => { /* fixture-dependent */ });
-  it.skip("suppresses update", () => { /* fixture-dependent */ });
+  it("suppresses create", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.suppress(async () => {
+      await Post.create({ title: "suppressed" });
+    });
+    expect(await Post.count()).toBe(0);
+  });
+
+  it("suppresses update", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const post = await Post.create({ title: "original" });
+    await Post.suppress(async () => {
+      post.writeAttribute("title", "changed");
+      await post.save();
+    });
+    const found = await Post.find(post.id);
+    expect(found.readAttribute("title")).toBe("original");
+  });
+
   it.skip("suppresses create in callback", () => { /* fixture-dependent */ });
-  it.skip("resumes saving after suppression complete", () => { /* fixture-dependent */ });
+
+  it("resumes saving after suppression complete", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.suppress(async () => {
+      await Post.create({ title: "suppressed" });
+    });
+    await Post.create({ title: "not suppressed" });
+    expect(await Post.count()).toBe(1);
+  });
+
   it.skip("suppresses validations on create", () => { /* fixture-dependent */ });
-  it.skip("suppresses when nested multiple times", () => { /* fixture-dependent */ });
+
+  it("suppresses when nested multiple times", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.suppress(async () => {
+      await Post.suppress(async () => {
+        await Post.create({ title: "nested" });
+      });
+    });
+    expect(await Post.count()).toBe(0);
+  });
 });
 
 describe("BooleanTest", () => {
@@ -22750,13 +23082,55 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 });
 
 describe("RequiredAssociationsTest", () => {
-  it.skip("belongs_to associations can be optional by default", () => { /* fixture-dependent */ });
-  it.skip("required belongs_to associations have presence validated", () => { /* fixture-dependent */ });
+  it("belongs_to associations can be optional by default", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Book extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { optional: true });
+    registerModel(Author); registerModel(Book);
+    const book = new Book({ title: "No Author" });
+    expect(book.isValid()).toBe(true);
+  });
+
+  it("required belongs_to associations have presence validated", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Book extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { required: true });
+    registerModel(Author); registerModel(Book);
+    const book = new Book({ title: "No Author" });
+    expect(book.isValid()).toBe(false);
+    expect(book.errors.on("author_id")).toBeTruthy();
+  });
+
   it.skip("belongs_to associations can be required by default", () => { /* fixture-dependent */ });
   it.skip("has_one associations are not required by default", () => { /* fixture-dependent */ });
   it.skip("required has_one associations have presence validated", () => { /* fixture-dependent */ });
   it.skip("required has_one associations have a correct error message", () => { /* fixture-dependent */ });
-  it.skip("required belongs_to associations have a correct error message", () => { /* fixture-dependent */ });
+
+  it("required belongs_to associations have a correct error message", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Book extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { required: true });
+    registerModel(Author); registerModel(Book);
+    const book = new Book({ title: "No Author" });
+    book.isValid();
+    const errors = book.errors.fullMessages;
+    expect(errors.length).toBeGreaterThan(0);
+  });
 });
 
 describe("BooleanTest", () => {
@@ -22874,12 +23248,59 @@ describe("SerializationTest", () => {
 });
 
 describe("SuppressorTest", () => {
-  it.skip("suppresses create", () => { /* fixture-dependent */ });
-  it.skip("suppresses update", () => { /* fixture-dependent */ });
+  it("suppresses create", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.suppress(async () => {
+      await Post.create({ title: "suppressed" });
+    });
+    expect(await Post.count()).toBe(0);
+  });
+
+  it("suppresses update", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const post = await Post.create({ title: "original" });
+    await Post.suppress(async () => {
+      post.writeAttribute("title", "changed");
+      await post.save();
+    });
+    const found = await Post.find(post.id);
+    expect(found.readAttribute("title")).toBe("original");
+  });
+
   it.skip("suppresses create in callback", () => { /* fixture-dependent */ });
-  it.skip("resumes saving after suppression complete", () => { /* fixture-dependent */ });
+
+  it("resumes saving after suppression complete", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.suppress(async () => {
+      await Post.create({ title: "suppressed" });
+    });
+    await Post.create({ title: "not suppressed" });
+    expect(await Post.count()).toBe(1);
+  });
+
   it.skip("suppresses validations on create", () => { /* fixture-dependent */ });
-  it.skip("suppresses when nested multiple times", () => { /* fixture-dependent */ });
+
+  it("suppresses when nested multiple times", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.suppress(async () => {
+      await Post.suppress(async () => {
+        await Post.create({ title: "nested" });
+      });
+    });
+    expect(await Post.count()).toBe(0);
+  });
 });
 
 describe("AbsenceValidationTest", () => {

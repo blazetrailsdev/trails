@@ -1727,9 +1727,18 @@ export class Base extends Model {
         }
       }
 
+      // Apply conditions if provided
+      let relation = ctor.where(conditions);
+      if (options.conditions && typeof options.conditions === "function") {
+        relation = options.conditions.call(relation);
+      }
+
       // Exclude self if persisted
-      const existing = await ctor.findBy(conditions);
-      if (existing && (!this.isPersisted() || existing.id !== this.id)) {
+      if (this.isPersisted()) {
+        relation = relation.where(`"${ctor.arelTable.name}"."${ctor.primaryKey}" != ${(this as any).id}`);
+      }
+      const existing = await relation.first();
+      if (existing) {
         this.errors.add(attribute, "taken", { message: options.message });
       }
     }
@@ -1744,7 +1753,7 @@ export class Base extends Model {
    */
   static validatesUniqueness(
     attribute: string,
-    options: { scope?: string | string[]; message?: string } = {}
+    options: { scope?: string | string[]; message?: string; conditions?: (this: any) => any } = {}
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_asyncValidations")) {
       (this as any)._asyncValidations = [...((this as any)._asyncValidations ?? [])];
@@ -2631,6 +2640,19 @@ export class Base extends Model {
     if (typeof input === "string") return input;
     const [template, ...binds] = input;
     return this.sanitizeSqlArray(template, ...binds);
+  }
+
+  /**
+   * Sanitize a string for use in a SQL LIKE clause.
+   * Escapes %, _, and the escape character itself.
+   *
+   * Mirrors: ActiveRecord::Base.sanitize_sql_like
+   */
+  static sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
+    return value
+      .replace(new RegExp(escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), escapeChar + escapeChar)
+      .replace(/%/g, escapeChar + "%")
+      .replace(/_/g, escapeChar + "_");
   }
 
   /**
