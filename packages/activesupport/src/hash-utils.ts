@@ -26,6 +26,23 @@ export function deepMerge<T extends AnyObject>(target: T, source: AnyObject): T 
 }
 
 /**
+ * Deep merge `source` into `target` in place (mutating `target`).
+ * Mirrors Ruby's Hash#deep_merge!.
+ */
+export function deepMergeInPlace<T extends AnyObject>(target: T, source: AnyObject): T {
+  for (const key of Object.keys(source)) {
+    const targetVal = target[key as keyof T];
+    const sourceVal = source[key];
+    if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
+      deepMergeInPlace(targetVal as AnyObject, sourceVal as AnyObject);
+    } else {
+      (target as AnyObject)[key] = sourceVal;
+    }
+  }
+  return target;
+}
+
+/**
  * Deep clone an object.
  */
 export function deepDup<T>(obj: T): T {
@@ -237,15 +254,47 @@ function isPlainObject(value: unknown): value is AnyObject {
  * Keys are sorted ascending. Values are URL-encoded with spaces as +.
  */
 export function toParam(obj: Record<string, unknown>): string {
-  const keys = Object.keys(obj).sort();
-  if (keys.length === 0) return "";
-  return keys
-    .map((k) => {
-      const encoded =
-        encodeURIComponent(k) + "=" + encodeURIComponent(String(obj[k]));
-      return encoded.replace(/%20/g, "+");
-    })
-    .join("&");
+  return toQuery(obj);
+}
+
+function encodeQueryValue(val: unknown): string {
+  return encodeURIComponent(String(val ?? "")).replace(/%20/g, "+");
+}
+
+function encodeQueryKey(key: string): string {
+  return encodeURIComponent(key).replace(/%20/g, "+");
+}
+
+function buildQueryParts(value: unknown, prefix: string): string[] {
+  if (value === null || value === undefined) {
+    return [`${encodeQueryKey(prefix)}=`];
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [];
+    return value.flatMap((v) => buildQueryParts(v, `${prefix}[]`));
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>);
+    if (keys.length === 0) return [];
+    return keys.flatMap((k) =>
+      buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`)
+    );
+  }
+  return [`${encodeQueryKey(prefix)}=${encodeQueryValue(value)}`];
+}
+
+/**
+ * Convert an object to a URL query string with nested key support.
+ * Mirrors Rails' Hash#to_query / Hash#to_param.
+ */
+export function toQuery(obj: Record<string, unknown>, namespace?: string): string {
+  const sortedKeys = Object.keys(obj).sort();
+  const parts: string[] = [];
+  for (const key of sortedKeys) {
+    const fullKey = namespace ? `${namespace}[${key}]` : key;
+    parts.push(...buildQueryParts(obj[key], fullKey));
+  }
+  return parts.join("&");
 }
 
 /**

@@ -76,16 +76,56 @@ export function delegateMissingTo(target: object, property: string): void {
   (target as Record<string, unknown>).__delegateMissingTo__ = property;
 }
 
+export interface MattrOptions {
+  default?: unknown;
+  instanceWriter?: boolean;
+  instanceReader?: boolean;
+  instanceAccessor?: boolean;
+}
+
+const VALID_ATTR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*[!?]?$/;
+
+function assertValidAttrName(name: string): void {
+  if (!VALID_ATTR_NAME.test(name)) {
+    throw new Error(`Invalid attribute name: ${name}`);
+  }
+}
+
 /**
  * mattrAccessor — defines class-level attribute accessors (mattr_accessor).
- * Each name gets a static getter/setter backed by a hidden property.
+ * Also adds instance-level delegates by default (like Rails).
+ * Supports: default, instanceWriter, instanceReader, instanceAccessor options.
  */
 export function mattrAccessor(
-  target: { new(...args: unknown[]): unknown } & Record<string, unknown>,
-  ...names: string[]
+  target: any,
+  ...namesAndOptions: (string | MattrOptions)[]
 ): void {
+  const options: MattrOptions =
+    typeof namesAndOptions[namesAndOptions.length - 1] === "object" &&
+    namesAndOptions[namesAndOptions.length - 1] !== null
+      ? (namesAndOptions.pop() as MattrOptions)
+      : {};
+
+  const names = namesAndOptions as string[];
+  const addInstanceReader =
+    options.instanceAccessor !== false && options.instanceReader !== false;
+  const addInstanceWriter =
+    options.instanceAccessor !== false && options.instanceWriter !== false;
+
   for (const name of names) {
+    assertValidAttrName(name);
     const storageKey = `__mattr_${name}__`;
+
+    // Resolve default value once at definition time
+    const rawDefault = options.default;
+    const resolvedDefault =
+      typeof rawDefault === "function" ? rawDefault() : rawDefault;
+
+    if ("default" in options || typeof rawDefault === "function") {
+      (target as Record<string, unknown>)[storageKey] = resolvedDefault;
+    }
+
+    // Class-level getter/setter
     Object.defineProperty(target, name, {
       configurable: true,
       enumerable: false,
@@ -96,6 +136,31 @@ export function mattrAccessor(
         (target as Record<string, unknown>)[storageKey] = value;
       },
     });
+
+    // Instance-level delegates
+    if (target.prototype && (addInstanceReader || addInstanceWriter)) {
+      if (addInstanceReader && addInstanceWriter) {
+        Object.defineProperty(target.prototype, name, {
+          configurable: true,
+          enumerable: false,
+          get() { return (target as Record<string, unknown>)[name]; },
+          set(value: unknown) { (target as Record<string, unknown>)[name] = value; },
+        });
+      } else if (addInstanceReader) {
+        Object.defineProperty(target.prototype, name, {
+          configurable: true,
+          enumerable: false,
+          get() { return (target as Record<string, unknown>)[name]; },
+        });
+      } else if (addInstanceWriter) {
+        // Only writer — define a method, not a setter-only property (which would be odd)
+        Object.defineProperty(target.prototype, `${name}=`, {
+          configurable: true,
+          enumerable: false,
+          value(value: unknown) { (target as Record<string, unknown>)[name] = value; },
+        });
+      }
+    }
   }
 }
 
@@ -103,6 +168,17 @@ export function mattrAccessor(
  * cattrAccessor — alias for mattrAccessor (cattr_accessor in Rails).
  */
 export const cattrAccessor = mattrAccessor;
+
+/**
+ * configAccessor — defines inheritable configuration accessors (config_accessor in Rails).
+ * Works like mattrAccessor but uses a separate config hash namespace.
+ */
+export function configAccessor(
+  target: any,
+  ...namesAndOptions: (string | MattrOptions)[]
+): void {
+  mattrAccessor(target, ...namesAndOptions);
+}
 
 /**
  * attrInternal — defines instance-level attribute with underscore-prefixed storage.
@@ -149,4 +225,110 @@ export function moduleParentName(klass: Function): string | null {
   const parts = name.split("::");
   if (parts.length <= 1) return null;
   return parts.slice(0, -1).join("::");
+}
+
+/**
+ * suppress — runs fn(), swallowing any error that is an instance of one of the given classes.
+ * Re-raises errors that don't match. Mirrors Ruby's Kernel#suppress.
+ */
+export function suppress<T>(
+  fn: () => T,
+  ...errorClasses: Array<new (...args: any[]) => Error>
+): T | undefined {
+  try {
+    return fn();
+  } catch (e) {
+    if (errorClasses.some((cls) => e instanceof cls)) return undefined;
+    throw e;
+  }
+}
+
+// ── Descendants tracking ──────────────────────────────────────────────────────
+
+const _subclassMap = new WeakMap<Function, Set<Function>>();
+
+/**
+ * registerSubclass — records that `child` is a direct subclass of `parent`.
+ * Call this from child class bodies to participate in descendants tracking.
+ */
+export function registerSubclass(parent: Function, child: Function): void {
+  if (!_subclassMap.has(parent)) _subclassMap.set(parent, new Set());
+  _subclassMap.get(parent)!.add(child);
+}
+
+/**
+ * subclasses — returns the direct subclasses registered for `klass`.
+ * Mirrors Rails Class#subclasses.
+ */
+export function subclasses(klass: Function): Function[] {
+  return [...(_subclassMap.get(klass) ?? [])];
+}
+
+/**
+ * descendants — returns all registered descendants (recursive) of `klass`.
+ * Mirrors Rails Class#descendants.
+ */
+export function descendants(klass: Function): Function[] {
+  const subs = subclasses(klass);
+  return [...subs, ...subs.flatMap((s) => descendants(s))];
+}
+
+// ── Rescuable ────────────────────────────────────────────────────────────────
+
+type ErrorHandler = ((error: Error) => void) | string;
+
+interface RescueEntry {
+  errorClasses: Array<new (...args: any[]) => Error>;
+  handler: ErrorHandler;
+}
+
+const _rescueHandlers = new WeakMap<object, RescueEntry[]>();
+
+function getRescueHandlers(target: object): RescueEntry[] {
+  if (!_rescueHandlers.has(target)) _rescueHandlers.set(target, []);
+  return _rescueHandlers.get(target)!;
+}
+
+/**
+ * rescueFrom — registers an error handler on the class.
+ * Mirrors Rails Rescuable::ClassMethods#rescue_from.
+ *
+ * Usage:
+ *   rescueFrom(MyClass, SomeError, { with: (e) => console.log(e) });
+ *   rescueFrom(MyClass, SomeError, { with: "handleError" });
+ */
+export function rescueFrom(
+  target: any,
+  ...errorClassesAndOptions: any[]
+): void {
+  const lastArg = errorClassesAndOptions[errorClassesAndOptions.length - 1];
+  const hasOptions =
+    typeof lastArg === "object" && lastArg !== null && !lastArg.prototype;
+  const options: { with?: ErrorHandler } = hasOptions
+    ? errorClassesAndOptions.pop()
+    : {};
+  const errorClasses = errorClassesAndOptions as Array<new (...args: any[]) => Error>;
+  const handler = options.with;
+  if (!handler) throw new Error("rescueFrom requires a :with handler");
+  getRescueHandlers(target).push({ errorClasses, handler });
+}
+
+/**
+ * handleRescue — attempts to handle an error using registered rescueFrom handlers.
+ * Returns true if handled. Call from inside a try/catch.
+ */
+export function handleRescue(target: any, error: Error): boolean {
+  const handlers = getRescueHandlers(target);
+  for (const { errorClasses, handler } of [...handlers].reverse()) {
+    if (errorClasses.some((cls) => error instanceof cls)) {
+      if (typeof handler === "function") {
+        handler(error);
+      } else if (typeof handler === "string") {
+        const method = target[handler] ?? target.prototype?.[handler];
+        if (typeof method === "function") method.call(target, error);
+      }
+      return true;
+    }
+  }
+  return false;
 }

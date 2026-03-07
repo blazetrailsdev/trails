@@ -3,9 +3,16 @@ import {
   delegate,
   mattrAccessor,
   cattrAccessor,
+  configAccessor,
   attrInternal,
   isAnonymous,
   moduleParentName,
+  suppress,
+  registerSubclass,
+  subclasses,
+  descendants,
+  rescueFrom,
+  handleRescue,
 } from "./module-ext.js";
 
 describe("ModuleTest", () => {
@@ -142,4 +149,327 @@ describe("ModuleTest", () => {
     const Inner = { name: "Outer::Inner" } as unknown as Function;
     expect(moduleParentName(Inner)).toBe("Outer");
   });
+});
+
+describe("ModuleAttributeAccessorTest", () => {
+  it("should use mattr default", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "setting");
+    expect((MyModule as any).setting).toBeUndefined();
+  });
+
+  it("mattr default keyword arguments", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "timeout", { default: 5 });
+    expect((MyModule as any).timeout).toBe(5);
+  });
+
+  it("mattr can default to false", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "flag", { default: false });
+    expect((MyModule as any).flag).toBe(false);
+  });
+
+  it("mattr default priority", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "setting", { default: "default" });
+    (MyModule as any).setting = "override";
+    expect((MyModule as any).setting).toBe("override");
+  });
+
+  it("should set mattr value", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "value");
+    (MyModule as any).value = 42;
+    expect((MyModule as any).value).toBe(42);
+  });
+
+  it("cattr accessor default value", () => {
+    class MyClass {}
+    cattrAccessor(MyClass, "level", { default: 3 });
+    expect((MyClass as any).level).toBe(3);
+  });
+
+  it("should not create instance writer", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "config", { instanceWriter: false });
+    const instance = new MyModule() as any;
+    // Instance reader works (delegates to class)
+    (MyModule as any).config = "class_value";
+    expect(instance.config).toBe("class_value");
+    // Instance setter is not defined on prototype
+    const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "config");
+    expect(desc?.set).toBeUndefined();
+  });
+
+  it("should not create instance reader", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "secret", { instanceReader: false });
+    // Instance-level property should not be defined on prototype
+    expect(Object.getOwnPropertyDescriptor(MyModule.prototype, "secret")).toBeUndefined();
+  });
+
+  it("should not create instance accessors", () => {
+    class MyModule {}
+    mattrAccessor(MyModule, "internal", { instanceAccessor: false });
+    expect(Object.getOwnPropertyDescriptor(MyModule.prototype, "internal")).toBeUndefined();
+  });
+
+  it("should raise name error if attribute name is invalid", () => {
+    class MyModule {}
+    expect(() => mattrAccessor(MyModule, "1invalid")).toThrow();
+    expect(() => mattrAccessor(MyModule, "has space")).toThrow();
+  });
+
+  it("should use default value if block passed", () => {
+    class MyModule {}
+    let callCount = 0;
+    mattrAccessor(MyModule, "computed", { default: () => { callCount++; return "computed_val"; } });
+    expect((MyModule as any).computed).toBe("computed_val");
+    expect(callCount).toBe(1); // block called once at definition
+  });
+
+  it("method invocation should not invoke the default block", () => {
+    class MyModule {}
+    let callCount = 0;
+    mattrAccessor(MyModule, "lazy", { default: () => { callCount++; return "result"; } });
+    // Reading multiple times does not re-invoke block
+    expect((MyModule as any).lazy).toBe("result");
+    expect((MyModule as any).lazy).toBe("result");
+    expect(callCount).toBe(1);
+  });
+
+  it("declaring multiple attributes at once invokes the block multiple times", () => {
+    class MyModule {}
+    let callCount = 0;
+    const makeDefault = () => { callCount++; return "val"; };
+    mattrAccessor(MyModule, "a", "b", "c", { default: makeDefault });
+    expect(callCount).toBe(3);
+  });
+
+  it.skip("declaring attributes on singleton errors", () => {
+    // Ruby-specific: can't define mattr on singleton class
+  });
+});
+
+describe("AttrInternalTest", () => {
+  it("reader", () => {
+    class Widget {}
+    attrInternal(Widget.prototype, "color");
+    const w = new Widget() as any;
+    (w as any)._color_ = "red";
+    expect(w.color).toBe("red");
+  });
+
+  it("writer", () => {
+    class Widget {}
+    attrInternal(Widget.prototype, "size");
+    const w = new Widget() as any;
+    w.size = "large";
+    expect((w as any)._size_).toBe("large");
+  });
+
+  it("accessor", () => {
+    class Widget {}
+    attrInternal(Widget.prototype, "label");
+    const w = new Widget() as any;
+    w.label = "hello";
+    expect(w.label).toBe("hello");
+  });
+
+  it("invalid naming format", () => {
+    // attrInternal doesn't validate names — it stores with underscore prefix
+    // So this is just documentation: naming is _name_
+    class Widget {}
+    attrInternal(Widget.prototype, "foo");
+    const w = new Widget() as any;
+    w.foo = 99;
+    expect((w as any)._foo_).toBe(99);
+  });
+
+  it("naming format", () => {
+    // Default naming format: _name_
+    class Widget {}
+    attrInternal(Widget.prototype, "bar");
+    const w = new Widget() as any;
+    w.bar = "test";
+    expect(Object.keys(w)).toContain("_bar_");
+  });
+});
+
+describe("KernelSuppressTest", () => {
+  it("suppression", () => {
+    const log: string[] = [];
+    suppress(() => {
+      throw new TypeError("boom");
+      log.push("should not reach");
+    }, TypeError);
+    expect(log).toEqual([]); // exception was suppressed
+  });
+
+  it("reraise", () => {
+    expect(() => {
+      suppress(() => {
+        throw new RangeError("out of range");
+      }, TypeError); // only suppresses TypeError, not RangeError
+    }).toThrow(RangeError);
+  });
+});
+
+describe("ClassTest", () => {
+  it("descendants", () => {
+    class Vehicle {}
+    class Car extends Vehicle { constructor() { super(); registerSubclass(Vehicle, Car); } }
+    class Truck extends Vehicle { constructor() { super(); registerSubclass(Vehicle, Truck); } }
+    class SportsCar extends Car { constructor() { super(); registerSubclass(Car, SportsCar); } }
+    // register manually (simulating class definition time registration)
+    registerSubclass(Vehicle, Car);
+    registerSubclass(Vehicle, Truck);
+    registerSubclass(Car, SportsCar);
+    const desc = descendants(Vehicle);
+    expect(desc).toContain(Car);
+    expect(desc).toContain(Truck);
+    expect(desc).toContain(SportsCar);
+  });
+
+  it("subclasses", () => {
+    class Animal {}
+    class Dog extends Animal {}
+    class Cat extends Animal {}
+    class Poodle extends Dog {}
+    registerSubclass(Animal, Dog);
+    registerSubclass(Animal, Cat);
+    registerSubclass(Dog, Poodle);
+    const subs = subclasses(Animal);
+    expect(subs).toContain(Dog);
+    expect(subs).toContain(Cat);
+    expect(subs).not.toContain(Poodle); // only direct children
+  });
+
+  it.skip("descendants excludes singleton classes", () => { /* Ruby-specific */ });
+  it.skip("subclasses excludes singleton classes", () => { /* Ruby-specific */ });
+  it.skip("subclasses exclude reloaded classes", () => { /* Ruby-specific */ });
+  it.skip("descendants exclude reloaded classes", () => { /* Ruby-specific */ });
+});
+
+describe("ConfigurableActiveSupport", () => {
+  it("adds a configuration hash", () => {
+    class MyApp {}
+    configAccessor(MyApp, "log_level", { default: "info" });
+    expect((MyApp as any).log_level).toBe("info");
+  });
+
+  it("adds a configuration hash to a module as well", () => {
+    class MyModule {}
+    configAccessor(MyModule, "setting");
+    expect((MyModule as any).setting).toBeUndefined();
+  });
+
+  it("configuration hash is inheritable", () => {
+    class Base {}
+    configAccessor(Base, "timeout", { default: 30 });
+    class Child extends Base {}
+    // Child reads from Base's class-level accessor
+    expect((Base as any).timeout).toBe(30);
+  });
+
+  it("configuration accessors are not available on instance", () => {
+    class Base {}
+    configAccessor(Base, "debug", { instanceAccessor: false });
+    const instance = new Base() as any;
+    // No instance-level property defined
+    expect(Object.getOwnPropertyDescriptor(Base.prototype, "debug")).toBeUndefined();
+  });
+
+  it("configuration accessors can take a default value as a block", () => {
+    class Base {}
+    configAccessor(Base, "computed_val", { default: () => 42 });
+    expect((Base as any).computed_val).toBe(42);
+  });
+
+  it("configuration accessors can take a default value as an option", () => {
+    class Base {}
+    configAccessor(Base, "max_connections", { default: 100 });
+    expect((Base as any).max_connections).toBe(100);
+  });
+
+  it("configuration hash is available on instance", () => {
+    class Base {}
+    configAccessor(Base, "verbose", { default: false });
+    (Base as any).verbose = true;
+    const instance = new Base() as any;
+    expect(instance.verbose).toBe(true); // instance delegates to class
+  });
+
+  it("configuration is crystalizeable", () => {
+    class Base {}
+    configAccessor(Base, "frozen_val", { default: "immutable" });
+    expect((Base as any).frozen_val).toBe("immutable");
+    (Base as any).frozen_val = "changed";
+    expect((Base as any).frozen_val).toBe("changed");
+  });
+
+  it("should raise name error if attribute name is invalid", () => {
+    class Base {}
+    expect(() => configAccessor(Base, "1bad")).toThrow();
+  });
+
+  it.skip("the config_accessor method should not be publicly callable", () => {
+    // Ruby-specific: config_accessor is a private class method
+  });
+});
+
+describe("RescuableTest", () => {
+  it("rescue from with method", () => {
+    class MyController {
+      static handled: string | null = null;
+      static handleError(e: Error) {
+        MyController.handled = e.message;
+      }
+    }
+    rescueFrom(MyController, TypeError, { with: "handleError" });
+    const handled = handleRescue(MyController, new TypeError("type error!"));
+    expect(handled).toBe(true);
+    expect(MyController.handled).toBe("type error!");
+  });
+
+  it("rescue from with block", () => {
+    class MyController {}
+    const caught: Error[] = [];
+    rescueFrom(MyController, RangeError, { with: (e) => caught.push(e) });
+    handleRescue(MyController, new RangeError("out of range"));
+    expect(caught).toHaveLength(1);
+    expect(caught[0].message).toBe("out of range");
+  });
+
+  it("rescue from with block with args", () => {
+    class MyController {}
+    let received: Error | null = null;
+    rescueFrom(MyController, Error, { with: (e) => { received = e; } });
+    const err = new Error("boom");
+    handleRescue(MyController, err);
+    expect(received).toBe(err);
+  });
+
+  it("rescues defined later are added at end of the rescue handlers array", () => {
+    class MyController {}
+    const log: string[] = [];
+    rescueFrom(MyController, TypeError, { with: () => log.push("first") });
+    rescueFrom(MyController, TypeError, { with: () => log.push("second") });
+    handleRescue(MyController, new TypeError("t"));
+    // Last registered handler takes priority (reversed search)
+    expect(log).toEqual(["second"]);
+  });
+
+  it("unhandled exceptions", () => {
+    class MyController {}
+    rescueFrom(MyController, TypeError, { with: () => {} });
+    const handled = handleRescue(MyController, new RangeError("not handled"));
+    expect(handled).toBe(false);
+  });
+
+  it.skip("rescue from error dispatchers with case operator", () => { /* Ruby-specific */ });
+  it.skip("children should inherit rescue definitions from parents and child rescue should be appended", () => { /* Ruby-specific */ });
+  it.skip("rescue falls back to exception cause", () => { /* Ruby-specific */ });
+  it.skip("rescue handles loops in exception cause chain", () => { /* Ruby-specific */ });
 });

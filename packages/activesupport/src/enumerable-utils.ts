@@ -220,3 +220,66 @@ export function inOrderOf<T>(
 
   return ordered;
 }
+
+/**
+ * exclude? — true if the element is NOT in the collection.
+ * Mirrors Enumerable#exclude? from Rails.
+ */
+export function exclude<T>(collection: T[], value: T): boolean {
+  return !collection.includes(value);
+}
+
+/**
+ * without — alias for excluding (Rails uses both names).
+ */
+export function without<T>(collection: T[], ...others: T[]): T[] {
+  return excluding(collection, ...others);
+}
+
+/**
+ * pick — returns the value of the first key from each element.
+ * Mirrors Enumerable#pick: `payments.pick(:price)` → first price value.
+ * In TS: pick(collection, key) → collection[0][key]
+ */
+export function pick<T, K extends keyof T>(collection: T[], key: K): T[K] | undefined {
+  return collection[0]?.[key];
+}
+
+/**
+ * sole — returns the only element; raises if count is not exactly one.
+ * Mirrors Enumerable#sole.
+ */
+export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
+  const filtered = fn ? collection.filter(fn) : collection;
+  if (filtered.length === 0) throw new Error("no matching element found");
+  if (filtered.length > 1) throw new Error(`multiple elements found (${filtered.length})`);
+  return filtered[0];
+}
+
+/**
+ * isIn — checks if a value is contained in a collection.
+ * Mirrors Ruby's Object#in?.
+ */
+export function isIn<T>(
+  value: T,
+  collection: T[] | Set<T> | string | Record<string, unknown>
+): boolean {
+  if (Array.isArray(collection)) return collection.includes(value);
+  if (collection instanceof Set) return collection.has(value);
+  if (typeof collection === "string") return collection.includes(value as unknown as string);
+  if (typeof collection === "object" && collection !== null) {
+    return Object.prototype.hasOwnProperty.call(collection, value as string);
+  }
+  return false;
+}
+
+/**
+ * presenceIn — returns the value if it is in the collection, otherwise null.
+ * Mirrors Ruby's Object#presence_in.
+ */
+export function presenceIn<T>(
+  value: T,
+  collection: T[] | Set<T> | string | Record<string, unknown>
+): T | null {
+  return isIn(value, collection) ? value : null;
+}

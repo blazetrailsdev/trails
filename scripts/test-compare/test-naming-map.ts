@@ -595,25 +595,30 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "callbacks_test.rb": [
       { file: "callbacks.test.ts", describeBlock: "Callbacks" },
-      { file: "hwia-extended.test.ts", describeBlock: "AroundCallbackResultTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "CallStackTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "CallbackDefaultTerminatorTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "CallbackProcTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "CallbackTerminatorTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "CallbackTypeTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "ConditionalTests" },
-      { file: "hwia-extended.test.ts", describeBlock: "DoubleYieldTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "ExcludingDuplicatesCallbackTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "ExtendCallbacksTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "HyphenatedKeyTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "NotPermittedStringCallbackTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "NotSupportedStringConditionalTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "OneTimeCompileTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "ResetCallbackTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "RunSpecificCallbackTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "SkipCallbacksTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "UsingObjectTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "WriterCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "AroundCallbackResultTest" },
+      { file: "callbacks.test.ts", describeBlock: "AroundCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallStackTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbackDefaultTerminatorTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbackFalseTerminatorTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbackProcTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbackTerminatorTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbackTerminatorSkippingAfterCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "CallbackTypeTest" },
+      { file: "callbacks.test.ts", describeBlock: "ConditionalCallbackTest" },
+      { file: "callbacks.test.ts", describeBlock: "ConditionalTests" },
+      { file: "callbacks.test.ts", describeBlock: "DoubleYieldTest" },
+      { file: "callbacks.test.ts", describeBlock: "ExcludingDuplicatesCallbackTest" },
+      { file: "callbacks.test.ts", describeBlock: "ExtendCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "HyphenatedKeyTest" },
+      { file: "callbacks.test.ts", describeBlock: "NotPermittedStringCallbackTest" },
+      { file: "callbacks.test.ts", describeBlock: "NotSupportedStringConditionalTest" },
+      { file: "callbacks.test.ts", describeBlock: "OneTimeCompileTest" },
+      { file: "callbacks.test.ts", describeBlock: "ResetCallbackTest" },
+      { file: "callbacks.test.ts", describeBlock: "RunSpecificCallbackTest" },
+      { file: "callbacks.test.ts", describeBlock: "SkipCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "UsingObjectTest" },
+      { file: "callbacks.test.ts", describeBlock: "WriterCallbacksTest" },
     ],
     "concern_test.rb": [
       { file: "concern.test.ts", describeBlock: "Concern" },
@@ -629,8 +634,8 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "activesupport.test.ts", describeBlock: "String access" },
       { file: "activesupport.test.ts", describeBlock: "String transformations" },
       { file: "hwia-module-string.test.ts", describeBlock: "StringInflectionsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "OutputSafetyTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "SafeBufferTest" },
+      { file: "safe-buffer.test.ts", describeBlock: "OutputSafetyTest" },
+      { file: "safe-buffer.test.ts", describeBlock: "SafeBufferTest" },
       { file: "hwia-extended.test.ts", describeBlock: "CoreExtStringMultibyteTest" },
       { file: "hwia-extended.test.ts", describeBlock: "StringAccessTest" },
       { file: "hwia-extended.test.ts", describeBlock: "StringConversionsTest" },
@@ -672,7 +677,6 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "logger_test.rb": [
       { file: "logger.test.ts", describeBlock: "LoggerTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "LoggerTest" },
     ],
     "broadcast_logger_test.rb": [
       { file: "logger.test.ts", describeBlock: "BroadcastLoggerTest" },
@@ -680,8 +684,6 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "tagged_logging_test.rb": [
       { file: "logger.test.ts", describeBlock: "TaggedLoggingTest" },
       { file: "logger.test.ts", describeBlock: "TaggedLoggingWithoutBlockTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "TaggedLoggingTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "TaggedLoggingWithoutBlockTest" },
     ],
     "core_ext/time_ext_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "TimeExtMarshalingTest" },
@@ -716,16 +718,12 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "TimeZoneTest" },
     ],
     "message_encryptor_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "MessageEncryptorTest" },
       { file: "security.test.ts", describeBlock: "MessageEncryptorTest" },
     ],
     "message_verifier_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "MessageVerifierTest" },
       { file: "security.test.ts", describeBlock: "MessageVerifierTest" },
     ],
     "cache/stores/memory_store_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "MemoryStoreTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "MemoryStorePruningTest" },
       { file: "cache.test.ts", describeBlock: "MemoryStoreTest" },
       { file: "cache.test.ts", describeBlock: "MemoryStorePruningTest" },
     ],
@@ -734,30 +732,28 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "NullStoreTest" },
     ],
     "cache/stores/file_store_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "FileStoreTest" },
       { file: "cache.test.ts", describeBlock: "FileStoreTest" },
     ],
     "deprecation_test.rb": [
       { file: "deprecation.test.ts", describeBlock: "DeprecationTest" },
       { file: "hwia-module-string.test.ts", describeBlock: "DeprecationTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "DeprecationTest" },
     ],
     "multibyte_chars_test.rb": [
       { file: "multibyte-assertions.test.ts", describeBlock: "MultibyteCharsUTF8BehaviorTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "MultibyteCharsExtrasTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "MultibyteCharsTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "MultibyteCharsExtrasTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "MultibyteCharsTest" },
     ],
     "multibyte_proxy_test.rb": [
       { file: "multibyte-assertions.test.ts", describeBlock: "AssertionsTest" },
     ],
     "test_case_test.rb": [
       { file: "multibyte-assertions.test.ts", describeBlock: "AssertionsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "ExceptionsInsideAssertionsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "SetupAndTeardownTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "SubclassSetupAndTeardownTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "TestCaseTaggedLoggingTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "TestConstStubbing" },
-      { file: "hwia-extended.test.ts", describeBlock: "TestOrderTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "ExceptionsInsideAssertionsTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "SetupAndTeardownTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "SubclassSetupAndTeardownTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "TestCaseTaggedLoggingTest" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "TestConstStubbing" },
+      { file: "multibyte-assertions.test.ts", describeBlock: "TestOrderTest" },
     ],
     "deprecation/deprecators_test.rb": [
       { file: "deprecation.test.ts", describeBlock: "DeprecationTest" },
@@ -773,7 +769,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "OrderedHashTest" },
     ],
     "safe_buffer_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "SafeBufferTest" },
+      { file: "safe-buffer.test.ts", describeBlock: "SafeBufferTest" },
     ],
     "error_reporter_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ErrorReporterTest" },
@@ -782,13 +778,13 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "MemCacheStoreTest" },
     ],
     "ordered_options_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "OrderedOptionsTest" },
+      { file: "ordered-options.test.ts", describeBlock: "OrderedOptionsTest" },
     ],
     "time_travel_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "TimeTravelTest" },
     ],
     "core_ext/object/try_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ObjectTryTest" },
+      { file: "try.test.ts", describeBlock: "ObjectTryTest" },
     ],
     "core_ext/object/with_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "WithTest" },
@@ -816,7 +812,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "CurrentAttributesTest" },
     ],
     "number_helper_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "NumberHelperTest" },
+      { file: "number-helper.test.ts", describeBlock: "NumberHelperTest" },
     ],
     "share_lock_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ShareLockTest" },
@@ -842,7 +838,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "core_ext/class/attribute_test.rb": [
       { file: "class-attribute.test.ts", describeBlock: "classAttribute" },
-      { file: "hwia-extended.test.ts", describeBlock: "ClassAttributeTest" },
+      { file: "class-attribute.test.ts", describeBlock: "ClassAttributeTest" },
     ],
     "core_ext/module/attribute_accessor_per_thread_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ModuleAttributeAccessorPerThreadTest" },
@@ -851,7 +847,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "duration.test.ts", describeBlock: "NumericExtTimeAndDateTimeTest" },
       { file: "duration.test.ts", describeBlock: "NumericExtDateTest" },
       { file: "duration.test.ts", describeBlock: "NumericExtSizeTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "NumericExtFormattingTest" },
+      { file: "number-helper.test.ts", describeBlock: "NumericExtFormattingTest" },
     ],
     "number_helper_i18n_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "NumberHelperI18nTest" },
@@ -863,20 +859,19 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "EncryptedFileTest" },
     ],
     "lazy_load_hooks_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "LazyLoadHooksTest" },
+      { file: "lazy-load-hooks.test.ts", describeBlock: "LazyLoadHooksTest" },
     ],
     "option_merger_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "OptionMergerTest" },
     ],
     "broadcast_logger_test.rb": [
       { file: "logger.test.ts", describeBlock: "BroadcastLoggerTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "BroadcastLoggerTest" },
     ],
     "core_ext/module/attribute_accessor_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ModuleAttributeAccessorTest" },
+      { file: "module-ext.test.ts", describeBlock: "ModuleAttributeAccessorTest" },
     ],
     "core_ext/object/to_query_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ToQueryTest" },
+      { file: "collections.test.ts", describeBlock: "ToQueryTest" },
     ],
     "encrypted_configuration_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "EncryptedConfigurationTest" },
@@ -886,7 +881,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "core_ext/array/conversions_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ToFsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "ToSentenceTest" },
+      { file: "collections.test.ts", describeBlock: "ToSentenceTest" },
       { file: "hwia-extended.test.ts", describeBlock: "ToXmlTest" },
     ],
     "core_ext/erb_util_test.rb": [
@@ -896,17 +891,17 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "ActionableErrorTest" },
     ],
     "array_inquirer_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ArrayInquirerTest" },
+      { file: "array-inquirer.test.ts", describeBlock: "ArrayInquirerTest" },
     ],
     "autoload_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "TestAutoloadModule" },
     ],
     "backtrace_cleaner_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "BacktraceCleanerDefaultFilterAndSilencerTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "BacktraceCleanerFilterAndSilencerTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "BacktraceCleanerFilterTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "BacktraceCleanerMultipleSilencersTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "BacktraceCleanerSilencerTest" },
+      { file: "key-generator.test.ts", describeBlock: "BacktraceCleanerFilterAndSilencerTest" },
+      { file: "key-generator.test.ts", describeBlock: "BacktraceCleanerFilterTest" },
+      { file: "key-generator.test.ts", describeBlock: "BacktraceCleanerMultipleSilencersTest" },
+      { file: "key-generator.test.ts", describeBlock: "BacktraceCleanerSilencerTest" },
     ],
     "benchmark_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "BenchmarkTest" },
@@ -948,11 +943,11 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "RedisCacheStoreCommonBehaviorTest" },
     ],
     "callback_inheritance_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "BasicCallbacksTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "DynamicDefinedCallbacks" },
-      { file: "hwia-extended.test.ts", describeBlock: "DynamicInheritedCallbacks" },
-      { file: "hwia-extended.test.ts", describeBlock: "InheritedCallbacksTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "InheritedCallbacksTest2" },
+      { file: "callbacks.test.ts", describeBlock: "BasicCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "DynamicDefinedCallbacks" },
+      { file: "callbacks.test.ts", describeBlock: "DynamicInheritedCallbacks" },
+      { file: "callbacks.test.ts", describeBlock: "InheritedCallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "InheritedCallbacksTest2" },
     ],
     "clean_logger_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "CleanLoggerTest" },
@@ -963,26 +958,26 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "entering with blocking" },
     ],
     "configurable_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ConfigurableActiveSupport" },
+      { file: "module-ext.test.ts", describeBlock: "ConfigurableActiveSupport" },
     ],
     "configuration_file_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ConfigurationFileTest" },
     ],
     "core_ext/array/access_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "AccessTest" },
+      { file: "collections.test.ts", describeBlock: "AccessTest" },
     ],
     "core_ext/array/extract_options_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ExtractOptionsTest" },
+      { file: "collections.test.ts", describeBlock: "ExtractOptionsTest" },
     ],
     "core_ext/array/extract_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ExtractTest" },
+      { file: "collections.test.ts", describeBlock: "ExtractTest" },
     ],
     "core_ext/array/grouping_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "GroupingTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "SplitTest" },
+      { file: "collections.test.ts", describeBlock: "GroupingTest" },
+      { file: "collections.test.ts", describeBlock: "SplitTest" },
     ],
     "core_ext/array/wrap_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "WrapTest" },
+      { file: "collections.test.ts", describeBlock: "WrapTest" },
     ],
     "core_ext/benchmark_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "BenchmarkTest" },
@@ -991,7 +986,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "BigDecimalTest" },
     ],
     "core_ext/class_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ClassTest" },
+      { file: "module-ext.test.ts", describeBlock: "ClassTest" },
     ],
     "core_ext/digest/uuid_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "DigestUUIDExt" },
@@ -1009,7 +1004,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "KernelConcernTest" },
     ],
     "core_ext/kernel_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "KernelSuppressTest" },
+      { file: "module-ext.test.ts", describeBlock: "KernelSuppressTest" },
       { file: "hwia-extended.test.ts", describeBlock: "KernelTest" },
     ],
     "core_ext/load_error_test.rb": [
@@ -1019,7 +1014,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "AnonymousTest" },
     ],
     "core_ext/module/attr_internal_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "AttrInternalTest" },
+      { file: "module-ext.test.ts", describeBlock: "AttrInternalTest" },
     ],
     "core_ext/module/attribute_aliasing_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "AttributeAliasingTest" },
@@ -1038,19 +1033,19 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "NameErrorTest" },
     ],
     "core_ext/object/acts_like_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ObjectTests" },
+      { file: "collections.test.ts", describeBlock: "ObjectTests" },
     ],
     "core_ext/object/blank_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "BlankTest" },
+      { file: "collections.test.ts", describeBlock: "BlankTest" },
     ],
     "core_ext/object/deep_dup_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "DeepDupTest" },
+      { file: "collections.test.ts", describeBlock: "DeepDupTest" },
     ],
     "core_ext/object/duplicable_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "DuplicableTest" },
+      { file: "collections.test.ts", describeBlock: "DuplicableTest" },
     ],
     "core_ext/object/inclusion_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "InTest" },
+      { file: "collections.test.ts", describeBlock: "InTest" },
     ],
     "core_ext/object/instance_variables_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ObjectInstanceVariableTest" },
@@ -1062,7 +1057,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "JsonGemEncodingTest" },
     ],
     "core_ext/object/to_param_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ToParamTest" },
+      { file: "collections.test.ts", describeBlock: "ToParamTest" },
     ],
     "core_ext/pathname/blank_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "PathnameBlankTest" },
@@ -1074,13 +1069,13 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "RegexpExtAccessTests" },
     ],
     "core_ext/secure_random_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "SecureRandomTest" },
+      { file: "key-generator.test.ts", describeBlock: "SecureRandomTest" },
     ],
     "core_ext/symbol_ext_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "SymbolStartsEndsWithTest" },
     ],
     "deep_mergeable_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "DeepMergeableTest" },
+      { file: "collections.test.ts", describeBlock: "DeepMergeableTest" },
     ],
     "dependencies_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "RequireDependencyTest" },
@@ -1119,8 +1114,8 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "TestJSONDecoding" },
     ],
     "key_generator_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "CachingKeyGeneratorTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "KeyGeneratorTest" },
+      { file: "key-generator.test.ts", describeBlock: "CachingKeyGeneratorTest" },
+      { file: "key-generator.test.ts", describeBlock: "KeyGeneratorTest" },
     ],
     "message_encryptors_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "MessageEncryptorsTest" },
@@ -1167,13 +1162,13 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "notifications.test.ts", describeBlock: "UnsubscribeTest" },
     ],
     "parameter_filter_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "ParameterFilterTest" },
+      { file: "parameter-filter.test.ts", describeBlock: "ParameterFilterTest" },
     ],
     "reloader_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "ReloaderTest" },
     ],
     "rescuable_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "RescuableTest" },
+      { file: "module-ext.test.ts", describeBlock: "RescuableTest" },
     ],
     "secure_compare_rotator_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "SecureCompareRotatorTest" },
@@ -1185,7 +1180,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "LoggerSilenceTest" },
     ],
     "string_inquirer_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "StringInquirerTest" },
+      { file: "string-inquirer.test.ts", describeBlock: "StringInquirerTest" },
     ],
     "subscriber_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "SubscriberTest" },

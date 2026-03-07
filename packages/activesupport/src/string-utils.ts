@@ -75,10 +75,26 @@ export function upcaseFirst(str: string): string {
  * Returns the character at the given position (supports negative indexing).
  * Returns undefined if out of range.
  */
-export function at(str: string, pos: number): string | undefined {
+export function at(str: string, pos: number | [number, number] | RegExp): string | undefined {
+  if (pos instanceof RegExp) {
+    const m = str.match(pos);
+    return m ? m[0] : undefined;
+  }
+  if (Array.isArray(pos)) {
+    const [start, end] = pos;
+    const s = start < 0 ? str.length + start : start;
+    const e = end < 0 ? str.length + end : end;
+    if (s < 0 || s >= str.length) return undefined;
+    return str.slice(s, e + 1);
+  }
   const idx = pos < 0 ? str.length + pos : pos;
   if (idx < 0 || idx >= str.length) return undefined;
   return str[idx];
+}
+
+/** Rails String#exclude? — returns true if the string does not include the substring */
+export function exclude(str: string, search: string): boolean {
+  return !str.includes(search);
 }
 
 /**

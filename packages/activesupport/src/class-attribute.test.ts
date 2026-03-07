@@ -109,3 +109,112 @@ describe("classAttribute", () => {
     expect(instance.isActive).toBe(true);
   });
 });
+
+describe("ClassAttributeTest", () => {
+  it("defaults to nil", () => {
+    class Klass {}
+    classAttribute(Klass, "x");
+    expect((Klass as any).x).toBeUndefined();
+    expect(new (Klass as any)().x).toBeUndefined();
+  });
+
+  it("custom default", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: "default_value" });
+    expect((Klass as any).x).toBe("default_value");
+  });
+
+  it("inheritable", () => {
+    class Base {}
+    classAttribute(Base, "x", { default: "base_value" });
+    class Child extends Base {}
+    expect((Child as any).x).toBe("base_value");
+  });
+
+  it("overridable", () => {
+    class Base {}
+    classAttribute(Base, "x", { default: "base_value" });
+    class Child extends Base {}
+    (Child as any).x = "child_value";
+    expect((Base as any).x).toBe("base_value");
+    expect((Child as any).x).toBe("child_value");
+  });
+
+  it("predicate method", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: false, instancePredicate: true });
+    const instance = new (Klass as any)();
+    expect(instance.isX).toBe(false);
+    instance.x = true;
+    expect(instance.isX).toBe(true);
+  });
+
+  it("instance reader delegates to class", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: "value" });
+    expect(new (Klass as any)().x).toBe("value");
+  });
+
+  it("instance override", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: "class_value" });
+    const instance = new (Klass as any)();
+    instance.x = "instance_value";
+    expect(instance.x).toBe("instance_value");
+    expect((Klass as any).x).toBe("class_value");
+  });
+
+  it("instance predicate", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: true, instancePredicate: true });
+    const instance = new (Klass as any)();
+    expect(instance.isX).toBe(true);
+    instance.x = false;
+    expect(instance.isX).toBe(false);
+  });
+
+  it("disabling instance writer", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: "value", instanceWriter: false });
+    const instance = new (Klass as any)();
+    expect(instance.x).toBe("value");
+    expect(() => {
+      instance.x = "new_value";
+    }).toThrow();
+  });
+
+  it("disabling instance reader", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: "value", instanceReader: false });
+    const instance = new (Klass as any)();
+    expect(instance.x).toBeUndefined();
+    expect((Klass as any).x).toBe("value");
+  });
+
+  it("disabling both instance writer and reader", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: "value", instanceWriter: false, instanceReader: false });
+    expect((Klass as any).x).toBe("value");
+    expect(new (Klass as any)().x).toBeUndefined();
+  });
+
+  it("disabling instance predicate", () => {
+    class Klass {}
+    classAttribute(Klass, "x", { default: true });
+    expect(new (Klass as any)().isX).toBeUndefined();
+  });
+
+  it("setter returns set value", () => {
+    class Klass {}
+    classAttribute(Klass, "x");
+    const result = ((Klass as any).x = "value");
+    expect(result).toBe("value");
+  });
+
+  it.skip("works well with singleton classes", () => { /* Ruby singleton classes */ });
+  it.skip("when defined in a class's singleton", () => { /* Ruby singleton classes */ });
+  it.skip("works well with module singleton classes", () => { /* Ruby module singleton */ });
+  it.skip("works when overriding private methods from an ancestor", () => { /* private method override semantics */ });
+  it.skip("allow to prepend accessors", () => { /* Ruby module prepend */ });
+  it.skip("can check if value is set on a sub class", () => { /* attribute_set? not implemented */ });
+});

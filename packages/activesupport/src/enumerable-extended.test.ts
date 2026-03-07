@@ -16,6 +16,11 @@ import {
   eachCons,
   eachSlice,
   inOrderOf,
+  exclude,
+  without,
+  pick,
+  sole,
+  pluck,
 } from "./enumerable-utils.js";
 
 // Helpers mirroring Rails test structs
@@ -201,5 +206,156 @@ describe("EnumerableTests", () => {
     const values = [pay(5), pay(3), pay(1)];
     const result = inOrderOf(values, (p) => p.price, [1, 5], { filter: false });
     expect(result.map((p) => p.price)).toEqual([1, 5, 3]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ruby-named describe block — matches Rails core_ext/enumerable_test.rb
+// ---------------------------------------------------------------------------
+
+describe("EnumerableTests", () => {
+  it("minimum with empty enumerable", () => {
+    expect(minimum([], (n: number) => n)).toBeUndefined();
+  });
+
+  it("maximum with empty enumerable", () => {
+    expect(maximum([], (n: number) => n)).toBeUndefined();
+  });
+
+  it("sums", () => {
+    const payments = [pay(5), pay(15), pay(10)];
+    expect(sum(payments, (p) => p.price)).toBe(30);
+  });
+
+  it("nil sums", () => {
+    // null/undefined values are treated as 0
+    const payments = [pay(5), null as any, pay(10)];
+    const total = payments.reduce((acc, p) => acc + (p?.price ?? 0), 0);
+    expect(total).toBe(15);
+  });
+
+  it("empty sums", () => {
+    expect(sum([], (n: number) => n)).toBe(0);
+  });
+
+  it("range sums", () => {
+    // Simulate range [1..5] sum
+    const range = [1, 2, 3, 4, 5];
+    expect(sum(range, (n) => n)).toBe(15);
+  });
+
+  it("array sums", () => {
+    expect(sum([1, 2, 3], (n) => n)).toBe(6);
+  });
+
+  it("index with", () => {
+    const payments = [pay(5), pay(15), pay(10)];
+    const indexed = indexBy(payments, (p) => p.price);
+    expect(indexed[5]).toEqual({ price: 5 });
+    expect(indexed[15]).toEqual({ price: 15 });
+  });
+
+  it("many", () => {
+    expect(many([1, 2])).toBe(true);
+    expect(many([1])).toBe(false);
+    expect(many([])).toBe(false);
+  });
+
+  it("many iterates only on what is needed", () => {
+    let count = 0;
+    many([1, 2, 3], (x) => { count++; return x > 0; });
+    // stops early once 2 matches found
+    expect(count).toBeLessThanOrEqual(3);
+  });
+
+  it("exclude?", () => {
+    expect(exclude([1, 2, 3], 4)).toBe(true);
+    expect(exclude([1, 2, 3], 2)).toBe(false);
+  });
+
+  it("excluding", () => {
+    expect(excluding([1, 2, 3, 4], 2, 4)).toEqual([1, 3]);
+  });
+
+  it("without", () => {
+    expect(without([1, 2, 3, 4], 2, 4)).toEqual([1, 3]);
+  });
+
+  it("pluck", () => {
+    const payments = [pay(5), pay(15), pay(10)];
+    expect(pluck(payments, "price")).toEqual([5, 15, 10]);
+  });
+
+  it("pick", () => {
+    const payments = [pay(5), pay(15), pay(10)];
+    expect(pick(payments, "price")).toBe(5);
+    expect(pick([], "price")).toBeUndefined();
+  });
+
+  it("compact blank", () => {
+    expect(compactBlank([1, null, "", 0, false, "hello", undefined])).toEqual([1, 0, "hello"]);
+  });
+
+  it("array compact blank!", () => {
+    // In-place compact blank — same behavior as compactBlank but tests that blanks are removed
+    const arr = [1, null, "", "hello"];
+    const result = compactBlank(arr as any[]);
+    expect(result).toEqual([1, "hello"]);
+  });
+
+  it("hash compact blank", async () => {
+    const { compactBlankObj } = await import("./hash-utils.js");
+    const result = compactBlankObj({ a: 1, b: "", c: null, d: "hi" } as any);
+    expect(result).toEqual({ a: 1, d: "hi" });
+  });
+
+  it("hash compact blank!", async () => {
+    const { compactBlankObj } = await import("./hash-utils.js");
+    const obj = { x: 0, y: "val", z: null };
+    const result = compactBlankObj(obj as any);
+    expect(result).toEqual({ x: 0, y: "val" });
+  });
+
+  it("in order of", () => {
+    const payments = [pay(10), pay(5), pay(3), pay(15)];
+    const result = inOrderOf(payments, (p) => p.price, [5, 3, 10]);
+    expect(result.map((p) => p.price)).toEqual([5, 3, 10]);
+  });
+
+  it("in order of drops elements not named in series", () => {
+    const payments = [pay(10), pay(5), pay(3), pay(15)];
+    const result = inOrderOf(payments, (p) => p.price, [5, 10]);
+    expect(result.map((p) => p.price)).toEqual([5, 10]);
+    expect(result.find((p) => p.price === 15)).toBeUndefined();
+  });
+
+  it("in order of preserves duplicates", () => {
+    const items = [pay(1), pay(2), pay(1), pay(3)];
+    const result = inOrderOf(items, (p) => p.price, [1, 2, 3]);
+    expect(result.map((p) => p.price)).toEqual([1, 1, 2, 3]);
+  });
+
+  it("in order of preserves nested elements", () => {
+    const items = [{ tag: "b" }, { tag: "a" }, { tag: "c" }];
+    const result = inOrderOf(items, (x) => x.tag, ["a", "b", "c"]);
+    expect(result.map((x) => x.tag)).toEqual(["a", "b", "c"]);
+  });
+
+  it("in order of with filter false", () => {
+    const items = [pay(1), pay(2), pay(3)];
+    const result = inOrderOf(items, (p) => p.price, [3, 1], { filter: false });
+    expect(result.map((p) => p.price)).toEqual([3, 1, 2]);
+  });
+
+  it("sole", () => {
+    expect(sole([42])).toBe(42);
+    expect(() => sole([])).toThrow();
+    expect(() => sole([1, 2])).toThrow();
+  });
+
+  it("doesnt bust constant cache", () => {
+    // Trivial — JS doesn't have Ruby's constant cache concern
+    const arr = [1, 2, 3];
+    expect(excluding(arr, 2)).toEqual([1, 3]);
   });
 });

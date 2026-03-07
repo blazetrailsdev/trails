@@ -184,12 +184,26 @@ export function parameterize(
 ): string {
   const { separator = "-", preserveCase = false } = options;
 
-  // Replace non-alphanumeric characters with separator
-  let result = str;
+  // Transliterate (basic - strip non-ASCII)
+  let result = str.replace(/[^\x00-\x7F]/g, "");
 
-  // Transliterate (basic - replace accented chars)
-  // For now, just strip non-ASCII
-  result = result.replace(/[^\x00-\x7F]/g, "");
+  if (separator === "") {
+    // Split on non-alphanumeric runs, capitalise each word, join
+    const words = result.split(/[^a-z0-9]+/gi).filter((w) => w.length > 0);
+    if (words.length === 0) return "";
+    result = words
+      .map((w, i) => {
+        if (!preserveCase) {
+          // lowercase first word entirely, capitalise first char of rest
+          return i === 0
+            ? w.toLowerCase()
+            : w[0].toUpperCase() + w.slice(1).toLowerCase();
+        }
+        return w;
+      })
+      .join("");
+    return result;
+  }
 
   // Replace non-alphanumeric, non-dash, non-underscore with separator
   result = result.replace(/[^a-z0-9\-_]+/gi, separator);

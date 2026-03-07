@@ -1723,7 +1723,7 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("Donald E. Knuth", { preserveCase: true })).toBe("Donald-E-Knuth");
   });
 
-  it.skip("string parameterized no separator", () => {
+  it("string parameterized no separator", () => {
     expect(parameterize("Donald E. Knuth", { separator: "" })).toBe("donaldEKnuth");
   });
 

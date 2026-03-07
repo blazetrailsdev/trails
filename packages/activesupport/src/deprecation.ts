@@ -7,15 +7,23 @@ export class DeprecationError extends Error {
   }
 }
 
+type AllowMatcher = string | RegExp;
+
+interface AllowContext {
+  matchers: AllowMatcher[];
+  ifFn?: (...args: unknown[]) => boolean;
+}
+
 export class Deprecation {
   behavior: DeprecationBehavior | DeprecationBehavior[] | ((...args: unknown[]) => void) | null = "stderr";
   silenced = false;
   gem?: string;
   horizon?: string;
-  disallowedWarnings: string[] | RegExp[] | ":all"[] | "all" = [];
+  disallowedWarnings: (string | RegExp | "all")[] = [];
   disallowedBehavior: DeprecationBehavior | ((...args: unknown[]) => void) | null = "raise";
 
   private _silencedForThread = false;
+  private _allowContexts: AllowContext[] = [];
 
   constructor(options?: { horizon?: string; gem?: string; silenced?: boolean }) {
     this.horizon = options?.horizon;
@@ -23,18 +31,37 @@ export class Deprecation {
     if (options?.silenced != null) this.silenced = options.silenced;
   }
 
-  warn(message?: string, _callstack?: unknown[]): void {
-    if (this.silenced || this._silencedForThread) return;
+  private _matchesDisallowed(msg: string): boolean {
+    if (this.disallowedWarnings.length === 0) return false;
+    for (const w of this.disallowedWarnings) {
+      if (w === "all") return true;
+      if (w instanceof RegExp && w.test(msg)) return true;
+      if (typeof w === "string" && msg.includes(w)) return true;
+    }
+    return false;
+  }
 
-    const msg = message ?? "DEPRECATION WARNING";
-    const fullMessage = `DEPRECATION WARNING: ${msg}`;
+  private _matchesAllow(msg: string): boolean {
+    for (const ctx of this._allowContexts) {
+      if (ctx.ifFn && !ctx.ifFn()) continue;
+      for (const m of ctx.matchers) {
+        if (m instanceof RegExp && m.test(msg)) return true;
+        if (typeof m === "string" && msg.includes(m)) return true;
+      }
+    }
+    return false;
+  }
 
-    const behaviors = Array.isArray(this.behavior) ? this.behavior : [this.behavior];
-
+  private _runBehaviors(
+    behaviors: (DeprecationBehavior | ((...args: unknown[]) => void) | null)[],
+    msg: string,
+    fullMessage: string,
+    callstack: unknown[]
+  ): void {
     for (const b of behaviors) {
       if (b == null) continue;
       if (typeof b === "function") {
-        b(fullMessage, _callstack ?? [], this);
+        b(fullMessage, callstack, this);
         continue;
       }
       switch (b) {
@@ -45,7 +72,6 @@ export class Deprecation {
           process.stderr.write(fullMessage + "\n");
           break;
         case "log":
-          // Would use Rails.logger in a real implementation
           process.stderr.write(fullMessage + "\n");
           break;
         case "silence":
@@ -58,6 +84,27 @@ export class Deprecation {
     }
   }
 
+  warn(message?: string, callstack?: unknown[]): void {
+    if (this.silenced || this._silencedForThread) return;
+
+    const msg = message ?? "DEPRECATION WARNING";
+    const fullMessage = `DEPRECATION WARNING: ${msg}`;
+    const stack = callstack ?? [];
+
+    if (this._matchesAllow(msg)) return;
+
+    if (this._matchesDisallowed(msg)) {
+      const disallowedBehaviors = Array.isArray(this.disallowedBehavior)
+        ? this.disallowedBehavior
+        : [this.disallowedBehavior];
+      this._runBehaviors(disallowedBehaviors as any[], msg, fullMessage, stack);
+      return;
+    }
+
+    const behaviors = Array.isArray(this.behavior) ? this.behavior : [this.behavior];
+    this._runBehaviors(behaviors as any[], msg, fullMessage, stack);
+  }
+
   silence<T>(fn: () => T): T {
     const prev = this._silencedForThread;
     this._silencedForThread = true;
@@ -65,6 +112,20 @@ export class Deprecation {
       return fn();
     } finally {
       this._silencedForThread = prev;
+    }
+  }
+
+  allow<T>(
+    matchers: AllowMatcher[],
+    options: { if?: (...args: unknown[]) => boolean } = {},
+    fn: () => T
+  ): T {
+    const ctx: AllowContext = { matchers, ifFn: options.if };
+    this._allowContexts.push(ctx);
+    try {
+      return fn();
+    } finally {
+      this._allowContexts.splice(this._allowContexts.indexOf(ctx), 1);
     }
   }
 

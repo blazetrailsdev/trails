@@ -38,6 +38,7 @@ export {
 
 export {
   deepMerge,
+  deepMergeInPlace,
   deepDup,
   slice,
   except,
@@ -54,6 +55,7 @@ export {
   deepTransformValues,
   extractKeys,
   toParam,
+  toQuery,
   compact,
   compactBlankObj,
 } from "./hash-utils.js";
@@ -61,6 +63,11 @@ export {
 export {
   wrap,
   inGroupsOf,
+  inGroups,
+  splitArray,
+  extract,
+  arrayFrom,
+  arrayTo,
   toSentence,
 } from "./array-utils.js";
 
@@ -83,6 +90,12 @@ export {
   eachCons,
   eachSlice,
   inOrderOf,
+  exclude,
+  without,
+  pick,
+  sole,
+  isIn,
+  presenceIn,
 } from "./enumerable-utils.js";
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
@@ -91,10 +104,18 @@ export {
   delegate,
   mattrAccessor,
   cattrAccessor,
+  configAccessor,
   attrInternal,
   isAnonymous,
   moduleParentName,
+  suppress,
+  registerSubclass,
+  subclasses,
+  descendants,
+  rescueFrom,
+  handleRescue,
 } from "./module-ext.js";
+export type { MattrOptions } from "./module-ext.js";
 
 export {
   defineCallbacks,
@@ -118,6 +139,7 @@ export { concern, includeConcern, hasConcern } from "./concern.js";
 export type { ConcernDefinition, ConcernMixin } from "./concern.js";
 
 export { classAttribute } from "./class-attribute.js";
+export { onLoad, runLoadHooks, resetLoadHooks } from "./lazy-load-hooks.js";
 export type { ClassAttributeOptions } from "./class-attribute.js";
 
 export { Logger, BroadcastLogger, taggedLogging } from "./logger.js";
@@ -138,3 +160,12 @@ export type { DurationParts } from "./duration.js";
 
 export { Notifications, Event as NotificationEvent } from "./notifications.js";
 export type { EventPayload, NotificationSubscriber } from "./notifications.js";
+
+export { ParameterFilter } from "./parameter-filter.js";
+export { SafeBuffer, htmlSafe, htmlEscape, htmlEscapeOnce, xmlNameEscape, isHtmlSafe } from "./safe-buffer.js";
+export { KeyGenerator, CachingKeyGenerator, secureRandomBase58, secureRandomBase36, BacktraceCleaner } from "./key-generator.js";
+export type { ParameterFilterOptions } from "./parameter-filter.js";
+export { StringInquirer, inquiry } from "./string-inquirer.js";
+export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
+export { tryCall, tryWith, tryBang } from "./try.js";
+export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
