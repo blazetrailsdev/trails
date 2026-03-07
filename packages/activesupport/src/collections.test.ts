@@ -42,8 +42,6 @@ import {
   presenceIn,
   arrayFrom,
   arrayTo,
-  including,
-  excluding,
   without,
 } from "./index.js";
 
@@ -1037,7 +1035,7 @@ describe("DeepMergeableTest", () => {
     // In TS deepMerge uses standard overwrite; we can test custom behavior using spread
     const a = { x: 1, y: 2 };
     const b = { y: 3, z: 4 };
-    const merged = deepMerge(a, b);
+    const merged = deepMerge(a, b) as any;
     expect(merged.y).toBe(3);
     expect(merged.z).toBe(4);
   });

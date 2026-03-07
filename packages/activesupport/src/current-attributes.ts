@@ -44,7 +44,7 @@ export abstract class CurrentAttributes {
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
   static attribute(name: string, ...rest: unknown[]): void {
-    const ctor = this as unknown as typeof CurrentAttributesClass;
+    const ctor = this as unknown as CurrentAttributesClass;
     if (!Object.prototype.hasOwnProperty.call(ctor, "_definitions")) {
       ctor._definitions = new Map(ctor._definitions);
     }
@@ -65,7 +65,7 @@ export abstract class CurrentAttributes {
 
   /** Returns the singleton instance for this class (creates one if needed). */
   static instance<T extends typeof CurrentAttributes>(this: T): InstanceType<T> {
-    const ctor = this as unknown as typeof CurrentAttributesClass;
+    const ctor = this as unknown as CurrentAttributesClass;
     if (!ctor._instances.has(ctor)) {
       ctor._instances.set(ctor, new (ctor as unknown as new () => CurrentAttributes)());
     }
@@ -74,7 +74,7 @@ export abstract class CurrentAttributes {
 
   /** Resets this class's instance (clears all attributes). */
   static reset(): void {
-    const ctor = this as unknown as typeof CurrentAttributesClass;
+    const ctor = this as unknown as CurrentAttributesClass;
     ctor._instances.delete(ctor);
   }
 
@@ -103,7 +103,7 @@ export abstract class CurrentAttributes {
   // -------------------------------------------------------------------------
 
   protected _get(name: string): AttributeValue {
-    const ctor = this.constructor as typeof CurrentAttributesClass;
+    const ctor = this.constructor as CurrentAttributesClass;
     if (this._attributes.has(name)) return this._attributes.get(name);
     const def = ctor._definitions.get(name);
     if (def && def.default !== undefined) {
@@ -119,7 +119,7 @@ export abstract class CurrentAttributes {
   }
 
   get attributes(): Record<string, AttributeValue> {
-    const ctor = this.constructor as typeof CurrentAttributesClass;
+    const ctor = this.constructor as CurrentAttributesClass;
     const result: Record<string, AttributeValue> = {};
     for (const [name] of ctor._definitions) {
       if (this._attributes.has(name)) {

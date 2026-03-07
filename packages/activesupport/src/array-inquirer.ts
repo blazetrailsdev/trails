@@ -36,7 +36,7 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
   }
 
   /** any?(*values) — true if any of the given values are in the array. */
-  any(...values: (T | ((item: T) => boolean))[]): boolean {
+  any(...values: (string | symbol | ((item: T) => boolean))[]): boolean {
     if (values.length === 0) return this.length > 0;
     return values.some((v) => {
       if (typeof v === "function") return (this as unknown as T[]).some(v as (item: T) => boolean);

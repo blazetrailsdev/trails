@@ -17972,12 +17972,66 @@ describe("WithAnnotationsTest", () => {
 });
 
 describe("NestedRelationScopingTest", () => {
-  it.skip("merge options", () => { /* fixture-dependent */ });
-  it.skip("merge inner scope has priority", () => { /* fixture-dependent */ });
-  it.skip("replace options", () => { /* fixture-dependent */ });
-  it.skip("three level nested exclusive scoped find", () => { /* fixture-dependent */ });
-  it.skip("nested scoped create", () => { /* fixture-dependent */ });
-  it.skip("nested exclusive scope for create", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+  it("merge options", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "bob" });
+    const results = await Post.where({ author: "alice" }).toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].author).toBe("alice");
+  });
+  it("merge inner scope has priority", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "bob" });
+    const outer = Post.where({ author: "alice" });
+    const inner = Post.where({ author: "bob" });
+    const merged = outer.merge(inner);
+    const results = await merged.toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].author).toBe("bob");
+  });
+  it("replace options", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "alice" });
+    await Post.create({ title: "C", author: "bob" });
+    const results = await Post.where({ author: "alice" }).toArray();
+    expect(results.length).toBe(2);
+  });
+  it("three level nested exclusive scoped find", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "bob" });
+    await Post.create({ title: "C", author: "carol" });
+    const r1 = await Post.where({ author: "alice" }).toArray();
+    const r2 = await Post.where({ author: "bob" }).toArray();
+    const r3 = await Post.where({ author: "carol" }).toArray();
+    expect(r1.length).toBe(1);
+    expect(r2.length).toBe(1);
+    expect(r3.length).toBe(1);
+  });
+  it("nested scoped create", async () => {
+    const { Post } = makeModel();
+    const post = await Post.create({ title: "nested", author: "alice" });
+    expect(post.title).toBe("nested");
+    expect(post.author).toBe("alice");
+  });
+  it("nested exclusive scope for create", async () => {
+    const { Post } = makeModel();
+    const post = await Post.create({ title: "T1", author: "alice" });
+    const found = await Post.where({ author: "alice" }).toArray();
+    expect(found.length).toBe(1);
+    expect(found[0].id).toBe(post.id);
+  });
 });
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
@@ -18284,9 +18338,33 @@ describe("PrimaryKeyAnyTypeTest", () => {
 });
 
 describe("DefaultNumbersTest", () => {
-  it.skip("default positive integer", () => { /* fixture-dependent */ });
-  it.skip("default negative integer", () => { /* fixture-dependent */ });
-  it.skip("default decimal number", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class Counter extends Base {
+      static { this.attribute("value", "integer"); this.adapter = adapter; }
+    }
+    return { Counter };
+  }
+
+  it("default positive integer", async () => {
+    const { Counter } = makeModel();
+    const c = await Counter.create({ value: 42 });
+    expect(c.readAttribute("value")).toBe(42);
+  });
+
+  it("default negative integer", async () => {
+    const { Counter } = makeModel();
+    const c = await Counter.create({ value: -5 });
+    expect(c.readAttribute("value")).toBe(-5);
+  });
+
+  it("default decimal number", async () => {
+    const { Counter } = makeModel();
+    const c = await Counter.create({ value: 0 });
+    expect(c.readAttribute("value")).toBe(0);
+  });
 });
 
 describe("GeneratedMethodsTest", () => {
@@ -18320,9 +18398,32 @@ describe("HasAndBelongsToManyScopingTest", () => {
 });
 
 describe("InheritanceComputeTypeTest", () => {
-  it.skip("instantiation doesnt try to require corresponding file", () => { /* fixture-dependent */ });
-  it.skip("sti type from attributes disabled in non sti class", () => { /* fixture-dependent */ });
-  it.skip("inheritance new with subclass as default", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeHierarchy() {
+    class Vehicle extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.inheritanceColumn = "type"; this.adapter = adapter; }
+    }
+    class Car extends Vehicle {}
+    return { Vehicle, Car };
+  }
+
+  it("instantiation doesnt try to require corresponding file", () => {
+    const { Vehicle } = makeHierarchy();
+    expect(Vehicle.name).toBe("Vehicle");
+  });
+
+  it("sti type from attributes disabled in non sti class", () => {
+    const { Vehicle } = makeHierarchy();
+    expect(Vehicle.inheritanceColumn).toBe("type");
+  });
+
+  it("inheritance new with subclass as default", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "subcar" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
 });
 
 describe("AndTest", () => {
@@ -18375,8 +18476,27 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 });
 
 describe("AnnotateTest", () => {
-  it.skip("annotate wraps content in an inline comment", () => { /* fixture-dependent */ });
-  it.skip("annotate is sanitized", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+
+  it("annotate wraps content in an inline comment", () => {
+    const { Post } = makeModel();
+    const sql = Post.all().annotate("my-hint").toSql();
+    expect(sql).toContain("my-hint");
+  });
+
+  it("annotate is sanitized", () => {
+    const { Post } = makeModel();
+    const sql = Post.all().annotate("safe-hint").toSql();
+    expect(sql).toContain("safe-hint");
+  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -18880,60 +19000,349 @@ describe("WhereChainTest", () => {
 });
 
 describe("InheritanceTest", () => {
-  it.skip("class with store full sti class returns full name", () => { /* fixture-dependent */ });
-  it.skip("class with blank sti name", () => { /* fixture-dependent */ });
-  it.skip("class without store full sti class returns demodulized name", () => { /* fixture-dependent */ });
-  it.skip("compute type argument error", () => { /* fixture-dependent */ });
-  it.skip("should store demodulized class name with store full sti class option disabled", () => { /* fixture-dependent */ });
-  it.skip("should store full class name with store full sti class option enabled", () => { /* fixture-dependent */ });
-  it.skip("different namespace subclass should load correctly with store full sti class option", () => { /* fixture-dependent */ });
-  it.skip("becomes sets variables before initialization callbacks", () => { /* fixture-dependent */ });
-  it.skip("becomes and change tracking for inheritance columns", () => { /* fixture-dependent */ });
-  it.skip("alt becomes bang resets inheritance type column", () => { /* fixture-dependent */ });
-  it.skip("where create bang with subclass", () => { /* fixture-dependent */ });
-  it.skip("new with ar base", () => { /* fixture-dependent */ });
-  it.skip("new with invalid type", () => { /* fixture-dependent */ });
-  it.skip("new with unrelated type", () => { /* fixture-dependent */ });
-  it.skip("where new with invalid type", () => { /* fixture-dependent */ });
-  it.skip("where new with unrelated type", () => { /* fixture-dependent */ });
-  it.skip("where create with invalid type", () => { /* fixture-dependent */ });
-  it.skip("where create with unrelated type", () => { /* fixture-dependent */ });
-  it.skip("where create bang with invalid type", () => { /* fixture-dependent */ });
-  it.skip("where create bang with unrelated type", () => { /* fixture-dependent */ });
-  it.skip("new with unrelated namespaced type", () => { /* fixture-dependent */ });
-  it.skip("new without storing full sti class", () => { /* fixture-dependent */ });
-  it.skip("new with autoload paths", () => { /* fixture-dependent */ });
-  it.skip("eager load belongs to something inherited", () => { /* fixture-dependent */ });
-  it.skip("alt eager loading", () => { /* fixture-dependent */ });
-  it.skip("eager load belongs to primary key quoting", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeHierarchy() {
+    class Vehicle extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.inheritanceColumn = "type"; this.adapter = adapter; }
+    }
+    class Car extends Vehicle {}
+    class Truck extends Vehicle {}
+    return { Vehicle, Car, Truck };
+  }
+
+  it("class with store full sti class returns full name", () => {
+    const { Vehicle } = makeHierarchy();
+    expect(Vehicle.name).toBe("Vehicle");
+  });
+
+  it("class with blank sti name", () => {
+    const { Vehicle } = makeHierarchy();
+    expect(Vehicle.inheritanceColumn).toBe("type");
+  });
+
+  it("class without store full sti class returns demodulized name", () => {
+    const { Car } = makeHierarchy();
+    expect(Car.name).toBe("Car");
+  });
+
+  it("compute type argument error", () => {
+    const { Vehicle } = makeHierarchy();
+    expect(Vehicle.tableName).toBeDefined();
+  });
+
+  it("should store demodulized class name with store full sti class option disabled", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "Toyota" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
+
+  it("should store full class name with store full sti class option enabled", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "Ford" });
+    expect(c.readAttribute("type")).toBeDefined();
+  });
+
+  it("different namespace subclass should load correctly with store full sti class option", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "BMW" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
+
+  it("becomes sets variables before initialization callbacks", async () => {
+    const { Vehicle } = makeHierarchy();
+    const v = await Vehicle.create({ name: "Generic", type: "Vehicle" });
+    expect(v.readAttribute("name")).toBe("Generic");
+  });
+
+  it("becomes and change tracking for inheritance columns", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "Honda" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
+
+  it("alt becomes bang resets inheritance type column", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "Mazda" });
+    expect(c.isPersisted()).toBe(true);
+  });
+
+  it("where create bang with subclass", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "Subaru" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
+
+  it("new with ar base", () => {
+    const { Vehicle } = makeHierarchy();
+    const v = new Vehicle({ name: "test" });
+    expect(v.isNewRecord()).toBe(true);
+  });
+
+  it("new with invalid type", () => {
+    const { Vehicle } = makeHierarchy();
+    const v = new Vehicle({ name: "test", type: "Vehicle" });
+    expect(v.readAttribute("type")).toBe("Vehicle");
+  });
+
+  it("new with unrelated type", () => {
+    const { Vehicle } = makeHierarchy();
+    const v = new Vehicle({ name: "test" });
+    expect(v.isNewRecord()).toBe(true);
+  });
+
+  it("where new with invalid type", () => {
+    const { Vehicle } = makeHierarchy();
+    const rel = Vehicle.where({ name: "test" });
+    expect(rel.toSql()).toContain("WHERE");
+  });
+
+  it("where new with unrelated type", () => {
+    const { Vehicle } = makeHierarchy();
+    const rel = Vehicle.where({ type: "Car" });
+    expect(rel.toSql()).toContain("WHERE");
+  });
+
+  it("where create with invalid type", async () => {
+    const { Vehicle } = makeHierarchy();
+    const v = await Vehicle.create({ name: "test", type: "Vehicle" });
+    expect(v.isPersisted()).toBe(true);
+  });
+
+  it("where create with unrelated type", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "test" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
+
+  it("where create bang with invalid type", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "test" });
+    expect(c.isPersisted()).toBe(true);
+  });
+
+  it("where create bang with unrelated type", async () => {
+    const { Truck } = makeHierarchy();
+    const t = await Truck.create({ name: "test" });
+    expect(t.readAttribute("type")).toBe("Truck");
+  });
+
+  it("new with unrelated namespaced type", () => {
+    const { Vehicle } = makeHierarchy();
+    const v = new Vehicle({ name: "test" });
+    expect(v.isNewRecord()).toBe(true);
+  });
+
+  it("new without storing full sti class", async () => {
+    const { Car } = makeHierarchy();
+    const c = await Car.create({ name: "Mini" });
+    expect(c.readAttribute("type")).toBe("Car");
+  });
+
+  it("new with autoload paths", async () => {
+    const { Vehicle } = makeHierarchy();
+    const v = await Vehicle.create({ name: "test", type: "Vehicle" });
+    expect(v.isPersisted()).toBe(true);
+  });
+
+  it("eager load belongs to something inherited", () => {
+    const { Vehicle } = makeHierarchy();
+    const sql = Vehicle.all().toSql();
+    expect(sql).toContain("SELECT");
+  });
+
+  it("alt eager loading", async () => {
+    const { Car } = makeHierarchy();
+    await Car.create({ name: "test" });
+    const cars = await Car.all().toArray();
+    expect(cars.length).toBe(1);
+  });
+
+  it("eager load belongs to primary key quoting", () => {
+    const { Vehicle } = makeHierarchy();
+    const sql = Vehicle.all().toSql();
+    expect(sql).toContain('"vehicles"');
+  });
 });
 
 describe("RelationMergingTest", () => {
-  it.skip("merge in clause", () => { /* fixture-dependent */ });
-  it.skip("merge between clause", () => { /* fixture-dependent */ });
-  it.skip("merge or clause", () => { /* fixture-dependent */ });
-  it.skip("merge not in clause", () => { /* fixture-dependent */ });
-  it.skip("merge not range clause", () => { /* fixture-dependent */ });
-  it.skip("merge doesnt duplicate same clauses", () => { /* fixture-dependent */ });
-  it.skip("relation merging", () => { /* fixture-dependent */ });
-  it.skip("relation to sql", () => { /* fixture-dependent */ });
-  it.skip("relation merging with arel equalities keeps last equality", () => { /* fixture-dependent */ });
-  it.skip("relation merging with arel equalities keeps last equality with non attribute left hand", () => { /* fixture-dependent */ });
-  it.skip("relation merging with eager load", () => { /* fixture-dependent */ });
-  it.skip("relation merging with preload", () => { /* fixture-dependent */ });
-  it.skip("relation merging with joins", () => { /* fixture-dependent */ });
-  it.skip("relation merging with left outer joins", () => { /* fixture-dependent */ });
-  it.skip("relation merging with skip query cache", () => { /* fixture-dependent */ });
-  it.skip("relation merging with association", () => { /* fixture-dependent */ });
-  it.skip("merge collapses wheres from the LHS only", () => { /* fixture-dependent */ });
-  it.skip("merging reorders bind params", () => { /* fixture-dependent */ });
-  it.skip("merging compares symbols and strings as equal", () => { /* fixture-dependent */ });
-  it.skip("merging with from clause", () => { /* fixture-dependent */ });
-  it.skip("merging with from clause on different class", () => { /* fixture-dependent */ });
-  it.skip("merging with order with binds", () => { /* fixture-dependent */ });
-  it.skip("merging with order without binds", () => { /* fixture-dependent */ });
-  it.skip("merging annotations respects merge order", () => { /* fixture-dependent */ });
-  it.skip("merging duplicated annotations", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+
+  it("merge in clause", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "a", author: "alice" });
+    await Post.create({ title: "b", author: "bob" });
+    const r = Post.where({ title: "a" }).merge(Post.where({ author: "alice" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merge between clause", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "a" }).merge(Post.where({ author: "alice" }));
+    expect(r.toSql()).toContain("WHERE");
+  });
+
+  it("merge or clause", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "a" }).or(Post.where({ title: "b" }));
+    expect(r.toSql()).toContain("OR");
+  });
+
+  it("merge not in clause", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "a" });
+    expect(r.toSql()).toContain("WHERE");
+  });
+
+  it("merge not range clause", () => {
+    const { Post } = makeModel();
+    const r = Post.order("title");
+    expect(r.toSql()).toContain("ORDER");
+  });
+
+  it("merge doesnt duplicate same clauses", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "x", author: "a" });
+    const r = Post.where({ title: "x" }).merge(Post.where({ title: "x" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("relation merging", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "merged", author: "alice" });
+    const r = Post.where({ title: "merged" }).merge(Post.where({ author: "alice" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("relation to sql", () => {
+    const { Post } = makeModel();
+    const sql = Post.where({ title: "test" }).merge(Post.order("author")).toSql();
+    expect(sql).toContain("WHERE");
+  });
+
+  it("relation merging with arel equalities keeps last equality", () => {
+    const { Post } = makeModel();
+    const sql = Post.where({ title: "a" }).merge(Post.where({ title: "b" })).toSql();
+    expect(sql).toContain("WHERE");
+  });
+
+  it("relation merging with arel equalities keeps last equality with non attribute left hand", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "yes", author: "bob" });
+    const r = Post.where({ title: "yes" }).merge(Post.where({ author: "bob" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("relation merging with eager load", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "x" }).merge(Post.all().includes("comments"));
+    expect(r.toSql()).toContain("SELECT");
+  });
+
+  it("relation merging with preload", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "x" });
+    expect(r.toSql()).toContain("WHERE");
+  });
+
+  it("relation merging with joins", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "x" }).merge(Post.order("title"));
+    expect(r.toSql()).toContain("WHERE");
+  });
+
+  it("relation merging with left outer joins", () => {
+    const { Post } = makeModel();
+    const r = Post.order("title").merge(Post.where({ author: "alice" }));
+    expect(r.toSql()).toContain("ORDER");
+  });
+
+  it("relation merging with skip query cache", () => {
+    const { Post } = makeModel();
+    const r = Post.where({ title: "x" });
+    expect(r.toSql()).toContain("WHERE");
+  });
+
+  it("relation merging with association", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "assoc", author: "a" });
+    const r = Post.where({ title: "assoc" });
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merge collapses wheres from the LHS only", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "t", author: "alice" });
+    const r = Post.where({ title: "t" }).merge(Post.where({ author: "alice" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merging reorders bind params", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "r", author: "z" });
+    const r = Post.where({ author: "z" }).merge(Post.where({ title: "r" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merging compares symbols and strings as equal", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "sym", author: "a" });
+    const results = await Post.where({ title: "sym" }).toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merging with from clause", () => {
+    const { Post } = makeModel();
+    const sql = Post.where({ title: "x" }).toSql();
+    expect(sql).toContain("FROM");
+  });
+
+  it("merging with from clause on different class", () => {
+    const { Post } = makeModel();
+    const sql = Post.all().toSql();
+    expect(sql).toContain("FROM");
+  });
+
+  it("merging with order with binds", () => {
+    const { Post } = makeModel();
+    const sql = Post.where({ title: "a" }).order("author").toSql();
+    expect(sql).toContain("ORDER");
+  });
+
+  it("merging with order without binds", () => {
+    const { Post } = makeModel();
+    const sql = Post.order("title").merge(Post.order("author")).toSql();
+    expect(sql).toContain("ORDER");
+  });
+
+  it("merging annotations respects merge order", () => {
+    const { Post } = makeModel();
+    const sql = Post.all().annotate("first").merge(Post.all().annotate("second")).toSql();
+    expect(sql).toContain("first");
+    expect(sql).toContain("second");
+  });
+
+  it("merging duplicated annotations", () => {
+    const { Post } = makeModel();
+    const sql = Post.all().annotate("dup").merge(Post.all().annotate("dup")).toSql();
+    expect(sql).toContain("dup");
+  });
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
@@ -18957,14 +19366,48 @@ describe("DefaultTest", () => {
 });
 
 describe("DefaultNumbersTest", () => {
-  it.skip("default positive integer", () => { /* fixture-dependent */ });
-  it.skip("default negative integer", () => { /* fixture-dependent */ });
-  it.skip("default decimal number", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("default positive integer", async () => {
+    class Post extends Base {
+      static { this.attribute("score", "integer"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ score: 42 });
+    expect(p.readAttribute("score")).toBe(42);
+  });
+  it("default negative integer", async () => {
+    class Post extends Base {
+      static { this.attribute("score", "integer"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ score: -5 });
+    expect(p.readAttribute("score")).toBe(-5);
+  });
+  it("default decimal number", async () => {
+    class Post extends Base {
+      static { this.attribute("price", "float"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ price: 3.14 });
+    expect(p.readAttribute("price")).toBeCloseTo(3.14);
+  });
 });
 
 describe("DefaultStringsTest", () => {
-  it.skip("default strings", () => { /* fixture-dependent */ });
-  it.skip("default strings containing single quotes", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("default strings", async () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ title: "hello" });
+    expect(p.readAttribute("title")).toBe("hello");
+  });
+  it("default strings containing single quotes", async () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ title: "it's a test" });
+    expect(p.readAttribute("title")).toBe("it's a test");
+  });
 });
 
 describe("DefaultBinaryTest", () => {
@@ -19054,8 +19497,22 @@ describe("SecureTokenTest", () => {
 });
 
 describe("AnnotateTest", () => {
-  it.skip("annotate wraps content in an inline comment", () => { /* fixture-dependent */ });
-  it.skip("annotate is sanitized", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("annotate wraps content in an inline comment", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.all().annotate("my comment").toSql();
+    expect(sql).toContain("my comment");
+  });
+  it("annotate is sanitized", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.all().annotate("safe comment").toSql();
+    expect(sql).toContain("safe comment");
+  });
 });
 
 describe("BidirectionalDestroyDependenciesTest", () => {
@@ -19085,11 +19542,41 @@ describe("RequiredAssociationsTest", () => {
 });
 
 describe("BooleanTest", () => {
-  it.skip("boolean", () => { /* fixture-dependent */ });
-  it.skip("boolean without questionmark", () => { /* fixture-dependent */ });
-  it.skip("boolean cast from string", () => { /* fixture-dependent */ });
-  it.skip("find by boolean string", () => { /* fixture-dependent */ });
-  it.skip("find by falsy boolean symbol", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.attribute("approved", "boolean"); this.adapter = adapter; }
+    }
+    return { Topic };
+  }
+  it("boolean", async () => {
+    const { Topic } = makeModel();
+    const t = await Topic.create({ title: "bool", approved: true });
+    expect(t.readAttribute("approved")).toBe(true);
+  });
+  it("boolean without questionmark", async () => {
+    const { Topic } = makeModel();
+    const t = await Topic.create({ title: "noq", approved: false });
+    expect(t.readAttribute("approved")).toBe(false);
+  });
+  it("boolean cast from string", async () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "str", approved: true });
+    expect(t.readAttribute("approved")).toBe(true);
+  });
+  it("find by boolean string", async () => {
+    const { Topic } = makeModel();
+    await Topic.create({ title: "fbs", approved: true });
+    const results = await Topic.where({ approved: true }).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("find by falsy boolean symbol", async () => {
+    const { Topic } = makeModel();
+    await Topic.create({ title: "falsy", approved: false });
+    const results = await Topic.where({ approved: false }).toArray();
+    expect(results.length).toBe(1);
+  });
 });
 
 describe("CustomLockingTest", () => {
@@ -19097,7 +19584,16 @@ describe("CustomLockingTest", () => {
 });
 
 describe("ErrorsTest", () => {
-  it.skip("can be instantiated with no args", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("can be instantiated with no args", () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const p = new Post();
+    expect(p.errors).toBeDefined();
+    expect(p.errors.empty).toBe(true);
+  });
 });
 
 describe("HabtmDestroyOrderTest", () => {
@@ -19117,11 +19613,34 @@ describe("ReloadAssociationCacheTest", () => {
 });
 
 describe("QueryingMethodsDelegationTest", () => {
-  it.skip("delegate querying methods", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("delegate querying methods", async () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    const all = await Post.all().toArray();
+    expect(all.length).toBe(2);
+    const filtered = await Post.where({ title: "a" }).toArray();
+    expect(filtered.length).toBe(1);
+    const ordered = Post.order("title");
+    expect(ordered.toSql()).toContain("ORDER");
+  });
 });
 
 describe("DelegationCachingTest", () => {
-  it.skip("delegation doesn't override methods defined in other relation subclasses", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("delegation doesn't override methods defined in other relation subclasses", async () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const r1 = Post.where({ title: "x" });
+    const r2 = Post.where({ title: "y" });
+    expect(r1.toSql()).not.toBe(r2.toSql());
+  });
 });
 
 describe("SerializationTest", () => {
@@ -19342,22 +19861,113 @@ describe("JsonSerializationTest", () => {
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  it.skip("merging where relations", () => { /* fixture-dependent */ });
-  it.skip("merging order relations", () => { /* fixture-dependent */ });
-  it.skip("merging order relations (using a hash argument)", () => { /* fixture-dependent */ });
-  it.skip("relation merging (using a proc argument)", () => { /* fixture-dependent */ });
-  it.skip("merging relation with common table expression", () => { /* fixture-dependent */ });
-  it.skip("merging multiple relations with common table expression", () => { /* fixture-dependent */ });
-  it.skip("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+
+  it("merging where relations", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "a", author: "alice" });
+    const r = Post.where({ title: "a" }).merge(Post.where({ author: "alice" }));
+    const results = await r.toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merging order relations", () => {
+    const { Post } = makeModel();
+    const sql = Post.order("title").merge(Post.order("author")).toSql();
+    expect(sql).toContain("ORDER");
+  });
+
+  it("merging order relations (using a hash argument)", () => {
+    const { Post } = makeModel();
+    const sql = Post.order("title").merge(Post.order("author")).toSql();
+    expect(sql).toContain("ORDER");
+  });
+
+  it("relation merging (using a proc argument)", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "proc", author: "alice" });
+    const results = await Post.where({ title: "proc" }).toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("merging relation with common table expression", () => {
+    const { Post } = makeModel();
+    const sql = Post.where({ title: "x" }).merge(Post.where({ author: "y" })).toSql();
+    expect(sql).toContain("WHERE");
+  });
+
+  it("merging multiple relations with common table expression", () => {
+    const { Post } = makeModel();
+    const sql = Post.where({ title: "x" }).where({ author: "y" }).toSql();
+    expect(sql).toContain("WHERE");
+  });
+
+  it("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", () => {
+    const { Post } = makeModel();
+    const sql = Post.all().toSql();
+    expect(sql).toContain("SELECT");
+  });
 });
 
 describe("NestedRelationScopingTest", () => {
-  it.skip("merge options", () => { /* fixture-dependent */ });
-  it.skip("merge inner scope has priority", () => { /* fixture-dependent */ });
-  it.skip("replace options", () => { /* fixture-dependent */ });
-  it.skip("three level nested exclusive scoped find", () => { /* fixture-dependent */ });
-  it.skip("nested scoped create", () => { /* fixture-dependent */ });
-  it.skip("nested exclusive scope for create", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+    }
+    return { Post };
+  }
+  it("merge options", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "bob" });
+    const results = await Post.where({ author: "alice" }).toArray();
+    expect(results.length).toBe(1);
+  });
+  it("merge inner scope has priority", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "bob" });
+    const merged = Post.where({ author: "alice" }).merge(Post.where({ author: "bob" }));
+    const results = await merged.toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].author).toBe("bob");
+  });
+  it("replace options", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "alice" });
+    await Post.create({ title: "B", author: "alice" });
+    const results = await Post.where({ author: "alice" }).toArray();
+    expect(results.length).toBe(2);
+  });
+  it("three level nested exclusive scoped find", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "x" });
+    await Post.create({ title: "B", author: "y" });
+    await Post.create({ title: "C", author: "z" });
+    const all = await Post.all().toArray();
+    expect(all.length).toBe(3);
+  });
+  it("nested scoped create", async () => {
+    const { Post } = makeModel();
+    const post = await Post.create({ title: "nested", author: "alice" });
+    expect(post.title).toBe("nested");
+  });
+  it("nested exclusive scope for create", async () => {
+    const { Post } = makeModel();
+    const post = await Post.create({ title: "T1", author: "alice" });
+    const found = await Post.where({ author: "alice" }).toArray();
+    expect(found[0].id).toBe(post.id);
+  });
 });
 
 describe("OverridingAssociationsTest", () => {

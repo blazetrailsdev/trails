@@ -25,7 +25,7 @@ export interface DefineCallbacksOptions {
   terminator?: boolean;
 }
 
-export type BeforeCallback = (target: any) => boolean | void;
+export type BeforeCallback = (target: any) => any;
 export type AfterCallback = (target: any) => void;
 export type AroundCallback = (target: any, next: () => void) => void;
 
@@ -100,13 +100,17 @@ export function skipCallback(
   target: any,
   name: string,
   kind: CallbackKind,
-  callback: AnyCallback
+  callback?: AnyCallback
 ): void {
   const chains = getCallbackChains(target);
   const chain = chains.get(name);
   if (!chain) return;
   chain.entries = chain.entries.filter(
-    (e) => !(e.kind === kind && e.callback === callback)
+    (e) => {
+      if (e.kind !== kind) return true;
+      if (callback && e.callback !== callback) return true;
+      return false;
+    }
   );
 }
 
@@ -260,7 +264,7 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
     /**
      * Skip (remove) a callback from this class's chain.
      */
-    static skipCallback(name: string, kind: CallbackKind, callback: AnyCallback): void {
+    static skipCallback(name: string, kind: CallbackKind, callback?: AnyCallback): void {
       skipCallback(this.prototype, name, kind, callback);
     }
 

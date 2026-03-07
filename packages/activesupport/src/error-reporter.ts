@@ -176,20 +176,29 @@ export class ErrorReporter {
     });
   }
 
-  private report(
+  /**
+   * report — reports an error to all subscribers.
+   */
+  public report(
     error: Error,
     opts: {
-      handled: boolean;
-      severity: ErrorSeverity;
-      context: ErrorContext;
-      source: string;
-    }
+      handled?: boolean;
+      severity?: ErrorSeverity;
+      context?: ErrorContext;
+      source?: string;
+    } = {}
   ): void {
     // Don't report the same error twice
     if (this.reportedErrors.has(error)) return;
     this.reportedErrors.add(error);
 
-    const reportedError: ReportedError = { error, ...opts };
+    const reportedError: ReportedError = {
+      error,
+      handled: opts.handled ?? true,
+      severity: opts.severity ?? "warning",
+      context: { ...this.executionContext, ...opts.context },
+      source: opts.source ?? "application",
+    };
 
     for (const subscriber of this.subscribers) {
       try {
