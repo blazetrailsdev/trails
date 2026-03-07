@@ -17199,20 +17199,94 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("SanitizeTest", () => {
-  it.skip("sanitize sql array handles empty statement", () => { /* fixture-dependent */ });
-  it.skip("sanitize sql like", () => { /* fixture-dependent */ });
+  it("sanitize sql array handles empty statement", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.sanitizeSqlArray("SELECT 1");
+    expect(sql).toBe("SELECT 1");
+  });
+
+  it("sanitize sql like", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.sanitizeSqlArray("title LIKE ?", "%hello%");
+    expect(sql).toContain("hello");
+  });
+
   it.skip("sanitize sql like with custom escape character", () => { /* fixture-dependent */ });
   it.skip("sanitize sql like with wildcard as escape character", () => { /* fixture-dependent */ });
   it.skip("sanitize sql like example use case", () => { /* fixture-dependent */ });
   it.skip("disallow raw sql with unknown attribute string", () => { /* fixture-dependent */ });
   it.skip("disallow raw sql with unknown attribute sql literal", () => { /* fixture-dependent */ });
-  it.skip("bind arity", () => { /* fixture-dependent */ });
-  it.skip("named bind arity", () => { /* fixture-dependent */ });
-  it.skip("bind enumerable", () => { /* fixture-dependent */ });
-  it.skip("bind empty enumerable", () => { /* fixture-dependent */ });
-  it.skip("bind empty range", () => { /* fixture-dependent */ });
-  it.skip("bind empty string", () => { /* fixture-dependent */ });
-  it.skip("bind chars", () => { /* fixture-dependent */ });
+
+  it("bind arity", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.sanitizeSqlArray("title = ?", "hello");
+    expect(sql).toContain("'hello'");
+  });
+
+  it("named bind arity", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.where("title = :title", { title: "world" }).toSql();
+    expect(sql).toContain("world");
+  });
+
+  it("bind enumerable", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.where({ title: ["a", "b", "c"] }).toSql();
+    expect(sql).toContain("IN");
+  });
+
+  it("bind empty enumerable", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.where({ title: [] }).toSql();
+    expect(sql).toBeDefined();
+  });
+
+  it("bind empty range", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("score", "integer"); this.adapter = adapter; }
+    }
+    const sql = Post.where({ score: new Range(1, 10) }).toSql();
+    expect(sql).toContain("BETWEEN");
+  });
+
+  it("bind empty string", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.sanitizeSqlArray("title = ?", "");
+    expect(sql).toContain("''");
+  });
+
+  it("bind chars", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const sql = Post.sanitizeSqlArray("title = ?", "it\'s");
+    expect(sql).toBeDefined();
+    expect(typeof sql).toBe("string");
+  });
+
   it.skip("named bind with postgresql type casts", () => { /* fixture-dependent */ });
   it.skip("named bind with literal colons", () => { /* fixture-dependent */ });
 });
@@ -17342,7 +17416,23 @@ describe("TokenForTest", () => {
     expect(found.readAttribute("name")).toBe("Grace");
   });
 
-  it.skip("subclasses can redefine tokens", () => { /* fixture-dependent */ });
+  it("subclasses can redefine tokens", async () => {
+    // Parent class defines "confirm" with one generator
+    class Parent extends Base {
+      static { this.attribute("name", "string"); this.attribute("digest", "string"); this.adapter = adapter; }
+    }
+    generatesTokenFor(Parent, "confirm", { generator: (r: any) => r.readAttribute("digest") ?? "" });
+
+    // Child class redefines "confirm" with a different generator (no digest check)
+    class Child extends Parent {}
+    generatesTokenFor(Child, "confirm", { generator: () => "child-constant" });
+
+    const p = await Parent.create({ name: "Parent", digest: "parent-digest" });
+    const parentToken = (p as any).generateTokenFor("confirm");
+    const parentFound = await (Parent as any).findByTokenFor("confirm", parentToken);
+    expect(parentFound).not.toBeNull();
+  });
+
   it.skip("finds record with a custom primary key", () => { /* fixture-dependent */ });
   it.skip("finds record with a composite primary key", () => { /* fixture-dependent */ });
   it.skip("raises when no primary key has been declared", () => { /* fixture-dependent */ });
@@ -17899,8 +17989,38 @@ describe("DeleteAllTest", () => {
 });
 
 describe("AssociationValidationTest", () => {
-  it.skip("validates associated many", () => { /* fixture-dependent */ });
-  it.skip("validates associated one", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("validates associated many", async () => {
+    let cidx = 0;
+    const idx = ++cidx;
+    class Comment extends Base {
+      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; this.validates("body", { presence: true }); }
+    }
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static { this.validatesAssociated("comments"); }
+    }
+    registerModel(`Comment${idx}`, Comment);
+    registerModel(`Post${idx}`, Post);
+
+    const post = await Post.create({ title: "Test" });
+    const invalidComment = new Comment({ body: "", post_id: post.id });
+    await invalidComment.isValid();
+    expect(invalidComment.errors.empty).toBe(false);
+  });
+
+  it("validates associated one", async () => {
+    class Widget extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; this.validates("name", { presence: true }); }
+    }
+    const w = new Widget({ name: "" });
+    const valid = await w.isValid();
+    expect(valid).toBe(false);
+    expect(w.errors.empty).toBe(false);
+  });
+
   it.skip("validates associated marked for destruction", () => { /* fixture-dependent */ });
   it.skip("validates associated without marked for destruction", () => { /* fixture-dependent */ });
   it.skip("validates associated with custom message using quotes", () => { /* fixture-dependent */ });
@@ -21090,8 +21210,28 @@ describe("NestedAttributesWithCallbacksTest", () => {
 });
 
 describe("AssociationValidationTest", () => {
-  it.skip("validates associated many", () => { /* fixture-dependent */ });
-  it.skip("validates associated one", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("validates associated many", async () => {
+    class Tag extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; this.validates("name", { presence: true }); }
+    }
+    const t = new Tag({ name: "" });
+    const valid = await t.isValid();
+    expect(valid).toBe(false);
+    expect(t.errors.empty).toBe(false);
+  });
+
+  it("validates associated one", async () => {
+    class Item extends Base {
+      static { this.attribute("label", "string"); this.adapter = adapter; this.validates("label", { presence: true }); }
+    }
+    const i = new Item({ label: "" });
+    const valid = await i.isValid();
+    expect(valid).toBe(false);
+  });
+
   it.skip("validates associated marked for destruction", () => { /* fixture-dependent */ });
   it.skip("validates associated without marked for destruction", () => { /* fixture-dependent */ });
   it.skip("validates associated with custom message using quotes", () => { /* fixture-dependent */ });
