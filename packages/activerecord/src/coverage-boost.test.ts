@@ -19981,10 +19981,30 @@ describe("HabtmDestroyOrderTest", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  it.skip("should automatically validate associations", () => { /* fixture-dependent */ });
+  it("should automatically validate associations", async () => {
+    const adapter = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; this.validates("name", { presence: true }); }
+    }
+    const item = new Item({ name: "" });
+    const valid = await item.isValid();
+    expect(valid).toBe(false);
+  });
   it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => { /* fixture-dependent */ });
   it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => { /* fixture-dependent */ });
-  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+  it("validations still fire on unchanged association with custom validation context", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true, on: "create" });
+      }
+    }
+    const p = new Post({});
+    expect(p.isValid("create")).toBe(false);
+    expect(p.isValid("update")).toBe(true);
+  });
 });
 
 describe("OrderTest", () => {
@@ -20127,7 +20147,19 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
     expect(valid).toBe(true);
   });
 
-  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+  it("validations still fire on unchanged association with custom validation context", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true, on: "create" });
+      }
+    }
+    const p = new Post({});
+    expect(p.isValid("create")).toBe(false);
+    expect(p.isValid("update")).toBe(true);
+  });
 });
 
 describe("BidirectionalDestroyDependenciesTest", () => {
@@ -23861,7 +23893,19 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
     expect(valid).toBe(true);
   });
 
-  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+  it("validations still fire on unchanged association with custom validation context", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true, on: "create" });
+      }
+    }
+    const p = new Post({});
+    expect(p.isValid("create")).toBe(false);
+    expect(p.isValid("update")).toBe(true);
+  });
 });
 
 describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
@@ -23886,10 +23930,30 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  it.skip("should automatically validate associations", () => { /* fixture-dependent */ });
+  it("should automatically validate associations", async () => {
+    const adapter = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; this.validates("name", { presence: true }); }
+    }
+    const item = new Item({ name: "" });
+    const valid = await item.isValid();
+    expect(valid).toBe(false);
+  });
   it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => { /* fixture-dependent */ });
   it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => { /* fixture-dependent */ });
-  it.skip("validations still fire on unchanged association with custom validation context", () => { /* fixture-dependent */ });
+  it("validations still fire on unchanged association with custom validation context", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true, on: "create" });
+      }
+    }
+    const p = new Post({});
+    expect(p.isValid("create")).toBe(false);
+    expect(p.isValid("update")).toBe(true);
+  });
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
