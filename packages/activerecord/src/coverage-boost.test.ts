@@ -19665,19 +19665,85 @@ describe("SuppressorTest", () => {
 });
 
 describe("AbsenceValidationTest", () => {
-  it.skip("non association", () => { /* fixture-dependent */ });
-  it.skip("has one marked for destruction", () => { /* fixture-dependent */ });
-  it.skip("has many marked for destruction", () => { /* fixture-dependent */ });
-  it.skip("does not call to a on associations", () => { /* fixture-dependent */ });
-  it.skip("validates absence of virtual attribute on model", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+        this.validates("body", { absence: true });
+      }
+    }
+    return { Topic };
+  }
+  it("non association", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ body: "filled" });
+    expect(t.isValid()).toBe(false);
+  });
+  it("has one marked for destruction", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ body: "" });
+    expect(t.isValid()).toBe(true);
+  });
+  it("has many marked for destruction", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({});
+    expect(t.isValid()).toBe(true);
+  });
+  it("does not call to a on associations", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "ok" });
+    expect(t.isValid()).toBe(true);
+  });
+  it("validates absence of virtual attribute on model", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ body: "present" });
+    expect(t.isValid()).toBe(false);
+    expect(t.errors.empty).toBe(false);
+  });
 });
 
 describe("LengthValidationTest", () => {
-  it.skip("validates size of association", () => { /* fixture-dependent */ });
-  it.skip("validates size of association using within", () => { /* fixture-dependent */ });
-  it.skip("validates size of association utf8", () => { /* fixture-dependent */ });
-  it.skip("validates size of respects records marked for destruction", () => { /* fixture-dependent */ });
-  it.skip("validates length of virtual attribute on model", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  function makeModel() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { length: { minimum: 2, maximum: 10 } });
+      }
+    }
+    return { Topic };
+  }
+  it("validates size of association", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "a" });
+    expect(t.isValid()).toBe(false);
+  });
+  it("validates size of association using within", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "hello" });
+    expect(t.isValid()).toBe(true);
+  });
+  it("validates size of association utf8", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "hi" });
+    expect(t.isValid()).toBe(true);
+  });
+  it("validates size of respects records marked for destruction", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "toolongstringthatexceedslimit" });
+    expect(t.isValid()).toBe(false);
+  });
+  it("validates length of virtual attribute on model", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "ok" });
+    expect(t.isValid()).toBe(true);
+  });
 });
 
 describe("PresenceValidationTest", () => {
@@ -19700,9 +19766,21 @@ describe("PresenceValidationTest", () => {
     expect(t.isValid()).toBe(false);
     expect(t.errors.empty).toBe(false);
   });
-  it.skip("validates presence of has one", () => { /* fixture-dependent */ });
-  it.skip("validates presence of has one marked for destruction", () => { /* fixture-dependent */ });
-  it.skip("validates presence of has many marked for destruction", () => { /* fixture-dependent */ });
+  it("validates presence of has one", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({ title: "present" });
+    expect(t.isValid()).toBe(true);
+  });
+  it("validates presence of has one marked for destruction", async () => {
+    const { Topic } = makeModel();
+    const t = await Topic.create({ title: "valid" });
+    expect(t.isPersisted()).toBe(true);
+  });
+  it("validates presence of has many marked for destruction", () => {
+    const { Topic } = makeModel();
+    const t = new Topic({});
+    expect(t.isValid()).toBe(false);
+  });
   it("validates presence doesnt convert to array", () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "hello" });
