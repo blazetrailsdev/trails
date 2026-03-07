@@ -168,7 +168,35 @@ export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
 export type { ErrorSeverity, ErrorContext, ReportedError, ErrorSubscriber, HandleOptions, RecordOptions } from "./error-reporter.js";
 export type { ParameterFilterOptions } from "./parameter-filter.js";
+export { transliterate } from "./transliterate.js";
+export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
+
+export {
+  travelTo,
+  travelBack,
+  travel,
+  freezeTime,
+  currentTime,
+  assertCalled,
+  assertNotCalled,
+  assertCalledOnInstanceOf,
+  assertNotCalledOnInstanceOf,
+} from "./testing-helpers.js";
+export type { AssertCalledOptions, CallRecord } from "./testing-helpers.js";
+
+export {
+  makeRange,
+  overlap,
+  overlaps,
+  rangeIncludesValue,
+  rangeIncludesRange,
+  cover,
+  rangeToFs,
+  rangeStep,
+  rangeEach,
+} from "./range-ext.js";
+export type { Range as RangeExt } from "./range-ext.js";

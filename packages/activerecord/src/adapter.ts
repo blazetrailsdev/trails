@@ -264,12 +264,13 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // Simple SQL parser for SELECT queries against in-memory store
     const selectMatch = cleanedSql.match(
-      /SELECT\s+(.+?)\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i
+      /SELECT\s+(DISTINCT\s+)?(.+?)\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i
     );
 
     if (selectMatch) {
-      const [, projections, tableName, where, orderBy, limit, offset] =
+      const [, distinctFlag, projections, tableName, where, orderBy, limit, offset] =
         selectMatch;
+      const isDistinct = !!distinctFlag;
       let rows = [...(this.tables.get(tableName) ?? [])];
 
       if (where) {
@@ -300,6 +301,16 @@ export class MemoryAdapter implements DatabaseAdapter {
           }
           return result;
         });
+
+        if (isDistinct) {
+          const seen = new Set<string>();
+          rows = rows.filter((row) => {
+            const key = JSON.stringify(row);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
       }
 
       return rows;

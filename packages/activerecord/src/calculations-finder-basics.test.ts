@@ -223,7 +223,7 @@ describe("CalculationsTest", () => {
     expect(max).toBeNull();
   });
 
-  it.skip("limit should apply before count", async () => {
+  it("limit should apply before count", async () => {
     const Account = makeAccount();
     await Account.create({ credit_limit: 1 });
     await Account.create({ credit_limit: 2 });
@@ -259,7 +259,7 @@ describe("CalculationsTest", () => {
     expect(Object.keys(result as object).length).toBeLessThanOrEqual(2);
   });
 
-  it.skip("pluck and distinct", async () => {
+  it("pluck and distinct", async () => {
     const Account = makeAccount();
     await Account.create({ name: "Alice" });
     await Account.create({ name: "Alice" });
@@ -460,12 +460,12 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it.skip("find by empty ids", async () => {
+  it("find by empty ids", async () => {
     const Topic = makeTopic();
     await expect(Topic.find([])).rejects.toThrow();
   });
 
-  it.skip("find an empty array", async () => {
+  it("find an empty array", async () => {
     const Topic = makeTopic();
     await expect(Topic.find([])).rejects.toThrow();
   });

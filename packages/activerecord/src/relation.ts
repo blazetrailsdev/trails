@@ -1417,6 +1417,12 @@ export class Relation<T extends Base> {
       return this._groupedAggregate("COUNT", column ?? "*");
     }
 
+    // When limit is set, fetch all matching rows then count (simulates COUNT(*) of subquery with LIMIT)
+    if (this._limitValue !== null) {
+      const rows = await this.toArray();
+      return rows.length;
+    }
+
     const table = this._modelClass.arelTable;
     let countExpr: string;
     if (column) {
@@ -1635,6 +1641,7 @@ export class Relation<T extends Base> {
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
 
+    if (this._isDistinct) manager.distinct();
     if (this._limitValue !== null) manager.take(this._limitValue);
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
@@ -2612,6 +2619,12 @@ export class Relation<T extends Base> {
       return records[0];
     }
     const flatIds = ids.flat();
+    if (flatIds.length === 0) {
+      throw new RecordNotFound(
+        `Couldn't find ${this._modelClass.name} with an empty list of ids`,
+        this._modelClass.name, pk, []
+      );
+    }
     const records = await this.where({ [pk]: flatIds }).toArray();
     if (records.length !== flatIds.length) {
       throw new RecordNotFound(

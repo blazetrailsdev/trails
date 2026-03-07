@@ -457,3 +457,91 @@ export function isPast(date: Date): boolean {
 export function isFuture(date: Date): boolean {
   return date.getTime() > Date.now();
 }
+
+/**
+ * floor — rounds time down to nearest multiple of ms.
+ */
+export function floor(date: Date, ms: number): Date {
+  return new Date(Math.floor(date.getTime() / ms) * ms);
+}
+
+/**
+ * ceil — rounds time up to nearest multiple of ms.
+ */
+export function ceil(date: Date, ms: number): Date {
+  return new Date(Math.ceil(date.getTime() / ms) * ms);
+}
+
+/**
+ * secFraction — returns the sub-second fraction of a Date as a float.
+ */
+export function secFraction(date: Date): number {
+  return date.getMilliseconds() / 1000;
+}
+
+/**
+ * toFs — formats a Date as a string using various named formats.
+ */
+export function toFs(date: Date, format: string = "default"): string {
+  switch (format) {
+    case "db":
+      return date.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+    case "long":
+      return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+        " " + date.toTimeString().slice(0, 8);
+    case "short":
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+        " " + date.toTimeString().slice(0, 5);
+    case "rfc822":
+    case "rfc2822":
+      return date.toUTCString();
+    case "iso8601":
+    case "xmlschema":
+      return date.toISOString();
+    case "inspect":
+      return date.toISOString();
+    default:
+      return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+        " " + date.toTimeString().slice(0, 8);
+  }
+}
+
+/**
+ * xmlschema — returns ISO 8601 representation.
+ */
+export function xmlschema(date: Date): string {
+  return date.toISOString();
+}
+
+/**
+ * lastWeek — returns the start of last week.
+ */
+export function lastWeek(date: Date, startDay = "monday"): Date {
+  return prevWeek(date, startDay);
+}
+
+/**
+ * toDate — returns a Date object representing just the date portion.
+ */
+export function toDate(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * toTime — alias, returns same date (in TS, Date represents both date and time).
+ */
+export function toTime(date: Date): Date {
+  return new Date(date.getTime());
+}
+
+/**
+ * formattedOffset — returns the UTC offset formatted as ±HH:MM.
+ */
+export function formattedOffset(date: Date): string {
+  const offsetMin = -date.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const absMin = Math.abs(offsetMin);
+  const h = String(Math.floor(absMin / 60)).padStart(2, "0");
+  const m = String(absMin % 60).padStart(2, "0");
+  return `${sign}${h}:${m}`;
+}

@@ -298,9 +298,8 @@ describe("Finders (Rails-guided)", () => {
     expect(users[1].readAttribute("name")).toBeDefined();
   });
 
-  it("find with empty array returns empty array", async () => {
-    const result = await User.find([]);
-    expect(result).toEqual([]);
+  it("find with empty array raises RecordNotFound", async () => {
+    await expect(User.find([])).rejects.toThrow();
   });
 
   it("find with missing IDs throws", async () => {

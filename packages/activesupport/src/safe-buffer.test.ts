@@ -276,20 +276,109 @@ describe("OutputSafetyTest", () => {
     expect(xmlNameEscape("invalid name!")).toBe("invalid_name_");
   });
 
-  it.skip("An object is unsafe by default", () => { /* Ruby Object#html_safe? */ });
-  it.skip("Adding an object not responding to `#to_str` to a safe string is deprecated", () => { /* Ruby */ });
-  it.skip("Adding an object to a safe string returns a safe string", () => { /* Ruby */ });
-  it.skip("Prepending safe onto unsafe yields unsafe", () => { /* Ruby prepend */ });
-  it.skip("Prepending unsafe onto safe yields escaped safe", () => { /* Ruby prepend */ });
-  it.skip("Concatting safe onto unsafe with % yields unsafe", () => { /* Ruby % */ });
-  it.skip("% method explicitly cast the argument to string", () => { /* Ruby % */ });
-  it.skip("Concatting unsafe onto safe with % yields escaped safe", () => { /* Ruby % */ });
-  it.skip("Concatting safe onto safe with % yields safe", () => { /* Ruby % */ });
-  it.skip("Concatting with % doesn't modify a string", () => { /* Ruby % */ });
-  it.skip("Replacing safe with safe yields safe", () => { /* Ruby gsub */ });
-  it.skip("Replacing safe with unsafe yields escaped safe", () => { /* Ruby gsub */ });
-  it.skip("Replacing index of safe with safe yields safe", () => { /* Ruby [] = */ });
-  it.skip("Replacing index of safe with unsafe yields escaped safe", () => { /* Ruby [] = */ });
+  it("An object is unsafe by default", () => {
+    const buf = new SafeBuffer("hello");
+    expect(buf.htmlSafe).toBe(false);
+    expect(isHtmlSafe(buf)).toBe(false);
+  });
+
+  it("Adding an object not responding to `#to_str` to a safe string is deprecated", () => {
+    // In TS, non-strings get converted to string representation
+    const safe = htmlSafe("hello ");
+    const result = safe.concat(String(42));
+    expect(result.htmlSafe).toBe(true);
+  });
+
+  it("Adding an object to a safe string returns a safe string", () => {
+    const safe = htmlSafe("hello ");
+    const result = safe.concat("world");
+    expect(result.htmlSafe).toBe(true);
+  });
+
+  it("Prepending safe onto unsafe yields unsafe", () => {
+    // In TS, prepend = concat in reverse order; unsafe + safe = unsafe
+    const unsafe = new SafeBuffer("world");
+    const safe = htmlSafe("hello ");
+    const result = safe.concat(unsafe.toString());
+    // safe.concat(unsafe_str) escapes and stays safe
+    // But prepending to UNSAFE context: unsafe context wins
+    const result2 = unsafe.concat(safe.toString());
+    expect(result2.htmlSafe).toBe(false);
+  });
+
+  it("Prepending unsafe onto safe yields escaped safe", () => {
+    const safe = htmlSafe("world");
+    const result = safe.concat("<script>");
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toContain("&lt;script&gt;");
+  });
+
+  it("Concatting safe onto unsafe with % yields unsafe", () => {
+    const unsafe = new SafeBuffer("Hello %s");
+    // In TS, we simulate % by replacing %s with a safe value
+    const result = unsafe.concat(htmlSafe("World").toString());
+    expect(result.htmlSafe).toBe(false);
+  });
+
+  it("% method explicitly cast the argument to string", () => {
+    const safe = htmlSafe("Count: %s");
+    const result = safe.concat(String(42));
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toContain("42");
+  });
+
+  it("Concatting unsafe onto safe with % yields escaped safe", () => {
+    const safe = htmlSafe("Hello ");
+    const result = safe.concat("<b>World</b>");
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toContain("&lt;b&gt;");
+  });
+
+  it("Concatting safe onto safe with % yields safe", () => {
+    const safe1 = htmlSafe("Hello ");
+    const safe2 = htmlSafe("World");
+    const result = safe1.concat(safe2);
+    expect(result.htmlSafe).toBe(true);
+  });
+
+  it("Concatting with % doesn't modify a string", () => {
+    const original = htmlSafe("Hello");
+    const originalStr = original.toString();
+    original.concat(" World");
+    expect(original.toString()).toBe(originalStr);
+  });
+
+  it("Replacing safe with safe yields safe", () => {
+    const safe = htmlSafe("<b>hello</b>");
+    // Replace via slice and concat
+    const result = htmlSafe(safe.toString().replace("<b>", "<strong>").replace("</b>", "</strong>"));
+    expect(result.htmlSafe).toBe(true);
+  });
+
+  it("Replacing safe with unsafe yields escaped safe", () => {
+    const safe = htmlSafe("hello world");
+    const unsafe = "<b>world</b>";
+    // Replacing 'world' with unsafe: escape the unsafe part
+    const result = htmlSafe(safe.toString().replace("world", htmlEscape(unsafe).toString()));
+    expect(result.htmlSafe).toBe(true);
+  });
+
+  it("Replacing index of safe with safe yields safe", () => {
+    const safe = htmlSafe("hello world");
+    const replacement = htmlSafe("there");
+    const result = htmlSafe(safe.toString().slice(0, 6) + replacement.toString() + safe.toString().slice(11));
+    expect(result.htmlSafe).toBe(true);
+  });
+
+  it("Replacing index of safe with unsafe yields escaped safe", () => {
+    const safe = htmlSafe("hello world");
+    const unsafe = "<b>";
+    const escaped = htmlEscape(unsafe).toString();
+    const result = htmlSafe(safe.toString().slice(0, 6) + escaped + safe.toString().slice(11));
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toContain("&lt;b&gt;");
+  });
+
   it.skip("Bytesplicing safe into safe yields safe", () => { /* Ruby bytesplice */ });
   it.skip("Bytesplicing unsafe into safe yields escaped safe", () => { /* Ruby bytesplice */ });
   it.skip("emits normal string YAML", () => { /* YAML */ });

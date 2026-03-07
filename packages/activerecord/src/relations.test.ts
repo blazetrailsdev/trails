@@ -739,9 +739,8 @@ describe("Finders", () => {
       await expect(Post.find([1, 999])).rejects.toThrow(RecordNotFound);
     });
 
-    it("returns empty array for empty id array", async () => {
-      const posts = await Post.find([]);
-      expect(posts).toHaveLength(0);
+    it("raises RecordNotFound for empty id array", async () => {
+      await expect(Post.find([])).rejects.toThrow();
     });
   });
 

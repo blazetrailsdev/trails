@@ -788,34 +788,36 @@ describe("HasManyAssociationsTest", () => {
     expect(assoc.options.counterCache).toBeUndefined();
   });
 
-  it.skip("counter cache updates in memory after create", async () => {
+  it("counter cache updates in memory after create", async () => {
     class Author extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
     class Post extends Base {
       static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
     }
+    Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id", counterCache: "posts_count" });
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
+    // Post.create automatically triggers counter cache increment
     await Post.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(author, "increment");
     const reloaded = await Author.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(1);
   });
 
-  it.skip("pushing association updates counter cache", async () => {
+  it("pushing association updates counter cache", async () => {
     class Author extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
     class Post extends Base {
       static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
     }
+    Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id", counterCache: "posts_count" });
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
+    // Post.create automatically triggers counter cache increment
     await Post.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(author, "increment");
     const reloaded = await Author.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBeGreaterThanOrEqual(1);
   });

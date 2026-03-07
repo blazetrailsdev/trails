@@ -651,7 +651,12 @@ export class Base extends Model {
     const id = ids[0];
     // Multiple IDs — return an array
     if (Array.isArray(id)) {
-      if (id.length === 0) return [];
+      if (id.length === 0) {
+        throw new RecordNotFound(
+          `${this.name}: couldn't find all with an empty list of ids`,
+          this.name, this.primaryKey, []
+        );
+      }
       const records = await this.all()
         .where({ [this.primaryKey]: id })
         .toArray();

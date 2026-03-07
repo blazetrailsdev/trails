@@ -932,13 +932,11 @@ describe("FinderTest", () => {
     expect(await Topic.exists()).toBe(false);
   });
 
-  it("find an empty array", async () => {
+  it("find an empty array raises RecordNotFound", async () => {
     class Topic extends Base {
       static { this.attribute("title", "string"); this.adapter = adapter; }
     }
-    const results = await Topic.find([]);
-    expect(Array.isArray(results)).toBe(true);
-    expect((results as any[]).length).toBe(0);
+    await expect(Topic.find([])).rejects.toThrow();
   });
 
   it("take", async () => {
@@ -1390,13 +1388,11 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it("find by empty ids", async () => {
+  it("find by empty ids raises RecordNotFound", async () => {
     class Topic extends Base {
       static { this.attribute("title", "string"); this.adapter = adapter; }
     }
-    const results = await Topic.find([]);
-    expect(Array.isArray(results)).toBe(true);
-    expect((results as any[]).length).toBe(0);
+    await expect(Topic.find([])).rejects.toThrow();
   });
 
   it("exists returns true with one record and no args", async () => {

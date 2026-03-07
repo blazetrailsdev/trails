@@ -76,8 +76,25 @@ describe("InstrumenterTest", () => {
 });
 
 describe("EventedTest", () => {
-  it.skip("evented listener", () => { /* Rails evented subscriber pattern (thread-based) */ });
-  it.skip("evented listener no events", () => { /* Rails evented subscriber pattern */ });
+  it("evented listener", () => {
+    const events: Event[] = [];
+    const sub = Notifications.subscribe("evented.test", (e) => events.push(e));
+    Notifications.instrument("evented.test", { data: "hello" });
+    Notifications.unsubscribe(sub);
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.data).toBe("hello");
+    // After unsubscribe, no more events
+    Notifications.instrument("evented.test", {});
+    expect(events).toHaveLength(1);
+  });
+
+  it("evented listener no events", () => {
+    const events: Event[] = [];
+    const sub = Notifications.subscribe("no.events.test", (e) => events.push(e));
+    Notifications.unsubscribe(sub);
+    // No instruments after subscribe
+    expect(events).toHaveLength(0);
+  });
 
   it("listen to everything", () => {
     const names: string[] = [];

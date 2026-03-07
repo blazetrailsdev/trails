@@ -649,7 +649,6 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "enumerable-extended.test.ts", describeBlock: "EnumerableTests" },
     ],
     "core_ext/hash_ext_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "HashExtToParamTests" },
       { file: "collections.test.ts", describeBlock: "deepMerge" },
       { file: "collections.test.ts", describeBlock: "deepDup" },
       { file: "collections.test.ts", describeBlock: "deepTransformKeys" },
@@ -665,7 +664,6 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "collections.test.ts", describeBlock: "extractKeys" },
       { file: "hash-ext.test.ts", describeBlock: "HashExtTest" },
       { file: "hash-ext.test.ts", describeBlock: "HashExtToParamTests" },
-      { file: "hwia-extended.test.ts", describeBlock: "HashExtTest" },
       { file: "hwia-extended.test.ts", describeBlock: "HashToXmlTest" },
     ],
     "core_ext/module_test.rb": [
@@ -688,16 +686,13 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "core_ext/time_ext_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "TimeExtMarshalingTest" },
       { file: "time-ext.test.ts", describeBlock: "TimeExtCalculationsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "TimeExtCalculationsTest" },
     ],
     "core_ext/date_ext_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "DateExtBehaviorTest" },
       { file: "time-ext.test.ts", describeBlock: "DateExtCalculationsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "DateExtCalculationsTest" },
     ],
     "core_ext/date_time_ext_test.rb": [
       { file: "time-ext.test.ts", describeBlock: "DateTimeExtCalculationsTest" },
-      { file: "hwia-extended.test.ts", describeBlock: "DateTimeExtCalculationsTest" },
     ],
     "core_ext/duration_test.rb": [
       { file: "duration.test.ts", describeBlock: "DurationTest" },
@@ -760,10 +755,10 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-module-string.test.ts", describeBlock: "DeprecationTest" },
     ],
     "core_ext/range_ext_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "RangeTest" },
+      { file: "range-ext.test.ts", describeBlock: "RangeTest" },
     ],
     "json/encoding_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "TestJSONEncoding" },
+      { file: "json-encoding.test.ts", describeBlock: "TestJSONEncoding" },
     ],
     "ordered_hash_test.rb": [
       { file: "ordered-hash.test.ts", describeBlock: "OrderedHashTest" },
@@ -781,7 +776,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "ordered-options.test.ts", describeBlock: "OrderedOptionsTest" },
     ],
     "time_travel_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "TimeTravelTest" },
+      { file: "testing-helpers.test.ts", describeBlock: "TimeTravelTest" },
     ],
     "core_ext/object/try_test.rb": [
       { file: "try.test.ts", describeBlock: "ObjectTryTest" },
@@ -790,7 +785,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-extended.test.ts", describeBlock: "WithTest" },
     ],
     "testing/method_call_assertions_test.rb": [
-      { file: "hwia-extended.test.ts", describeBlock: "MethodCallAssertionsTest" },
+      { file: "testing-helpers.test.ts", describeBlock: "MethodCallAssertionsTest" },
     ],
     "core_ext/time_with_zone_test.rb": [
       { file: "hwia-extended.test.ts", describeBlock: "TimeWithZoneMethodsForTimeAndDateTimeTest" },
@@ -2124,6 +2119,122 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "coverage-boost.test.ts", describeBlock: "ActiveRecordSchemaTest" },],
     "instrumentation_test.rb": [
       { file: "coverage-boost.test.ts", describeBlock: "InstrumentationTest" },
+    ],
+  },
+  // ==========================================================================
+  // Rack
+  // ==========================================================================
+  rack: {
+    "spec_auth_basic.rb": [
+      { file: "auth_basic.test.ts", describeBlock: "Rack::Auth::Basic" },
+    ],
+    "spec_body_proxy.rb": [
+      { file: "body_proxy.test.ts", describeBlock: "Rack::BodyProxy" },
+    ],
+    "spec_builder.rb": [
+      { file: "builder.test.ts", describeBlock: "Rack::Builder" },
+    ],
+    "spec_cascade.rb": [
+      { file: "cascade.test.ts", describeBlock: "Rack::Cascade" },
+    ],
+    "spec_common_logger.rb": [
+      { file: "common_logger.test.ts", describeBlock: "Rack::CommonLogger" },
+    ],
+    "spec_conditional_get.rb": [
+      { file: "conditional_get.test.ts", describeBlock: "Rack::ConditionalGet" },
+    ],
+    "spec_config.rb": [
+      { file: "config.test.ts", describeBlock: "Rack::Config" },
+    ],
+    "spec_content_length.rb": [
+      { file: "content_length.test.ts", describeBlock: "Rack::ContentLength" },
+    ],
+    "spec_content_type.rb": [
+      { file: "content_type.test.ts", describeBlock: "Rack::ContentType" },
+    ],
+    "spec_deflater.rb": [
+      { file: "deflater.test.ts", describeBlock: "Rack::Deflater" },
+    ],
+    "spec_directory.rb": [
+      { file: "directory.test.ts", describeBlock: "Rack::Directory" },
+    ],
+    "spec_etag.rb": [
+      { file: "etag.test.ts", describeBlock: "Rack::ETag" },
+    ],
+    "spec_files.rb": [
+      { file: "files.test.ts", describeBlock: "Rack::Files" },
+    ],
+    "spec_head.rb": [
+      { file: "head.test.ts", describeBlock: "Rack::Head" },
+    ],
+    "spec_lint.rb": [
+      { file: "lint.test.ts", describeBlock: "Rack::Lint" },
+    ],
+    "spec_lock.rb": [
+      { file: "lock.test.ts", describeBlock: "Rack::Lock" },
+    ],
+    "spec_media_type.rb": [
+      { file: "media_type.test.ts", describeBlock: "Rack::MediaType" },
+    ],
+    "spec_method_override.rb": [
+      { file: "method_override.test.ts", describeBlock: "Rack::MethodOverride" },
+    ],
+    "spec_mime.rb": [
+      { file: "mime.test.ts", describeBlock: "Rack::Mime" },
+    ],
+    "spec_mock_request.rb": [
+      { file: "mock_request.test.ts", describeBlock: "Rack::MockRequest" },
+    ],
+    "spec_mock_response.rb": [
+      { file: "mock_response.test.ts", describeBlock: "Rack::MockResponse" },
+    ],
+    "spec_multipart.rb": [
+      { file: "multipart.test.ts", describeBlock: "Rack::Multipart" },
+    ],
+    "spec_null_logger.rb": [
+      { file: "null_logger.test.ts", describeBlock: "Rack::NullLogger" },
+    ],
+    "spec_query_parser.rb": [
+      { file: "query_parser.test.ts", describeBlock: "Rack::QueryParser" },
+    ],
+    "spec_recursive.rb": [
+      { file: "recursive.test.ts", describeBlock: "Rack::Recursive" },
+    ],
+    "spec_request.rb": [
+      { file: "request.test.ts", describeBlock: "" },
+    ],
+    "spec_response.rb": [
+      { file: "response.test.ts", describeBlock: "Rack::Response" },
+    ],
+    "spec_rewindable_input.rb": [
+      { file: "rewindable_input.test.ts", describeBlock: "Rack::RewindableInput::Middleware" },
+    ],
+    "spec_runtime.rb": [
+      { file: "runtime.test.ts", describeBlock: "Rack::Runtime" },
+    ],
+    "spec_sendfile.rb": [
+      { file: "sendfile.test.ts", describeBlock: "Rack::Sendfile" },
+    ],
+    "spec_show_exceptions.rb": [
+      { file: "show_exceptions.test.ts", describeBlock: "Rack::ShowExceptions" },
+    ],
+    "spec_show_status.rb": [
+      { file: "show_status.test.ts", describeBlock: "Rack::ShowStatus" },
+    ],
+    "spec_static.rb": [
+      { file: "static.test.ts", describeBlock: "Rack::Static" },
+    ],
+    "spec_tempfile_reaper.rb": [
+      { file: "tempfile_reaper.test.ts", describeBlock: "Rack::TempfileReaper" },
+    ],
+    "spec_urlmap.rb": [
+      { file: "urlmap.test.ts", describeBlock: "Rack::URLMap" },
+    ],
+    "spec_utils.rb": [
+      { file: "utils.test.ts", describeBlock: "Rack::Utils" },
+    ],
+    "spec_version.rb": [
+      { file: "version.test.ts", describeBlock: "Rack" },
     ],
   },
 };

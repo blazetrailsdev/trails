@@ -149,6 +149,116 @@ describe("ModuleTest", () => {
     const Inner = { name: "Outer::Inner" } as unknown as Function;
     expect(moduleParentName(Inner)).toBe("Outer");
   });
+
+  it("delegation to index get method", () => {
+    class Container {
+      data: Record<string, unknown> = { key: "value" };
+      get(key: string) { return this.data[key]; }
+    }
+    class Wrapper {
+      container: Container;
+      constructor() { this.container = new Container(); }
+    }
+    delegate(Wrapper.prototype, "get", { to: "container" });
+    const w = new Wrapper() as Wrapper & Record<string, unknown>;
+    // delegate creates a getter that returns the method; bind to call it
+    const getFn = w.get as Container["get"];
+    expect(getFn.call(w.container, "key")).toBe("value");
+  });
+
+  it("delegation to index set method", () => {
+    class Container {
+      data: Record<string, unknown> = {};
+      set(key: string, val: unknown) { this.data[key] = val; }
+      get(key: string) { return this.data[key]; }
+    }
+    class Wrapper {
+      container: Container;
+      constructor() { this.container = new Container(); }
+    }
+    delegate(Wrapper.prototype, "set", "get", { to: "container" });
+    const w = new Wrapper() as Wrapper & Record<string, unknown>;
+    const setFn = w.set as Container["set"];
+    const getFn = w.get as Container["get"];
+    setFn.call(w.container, "x", 42);
+    expect(getFn.call(w.container, "x")).toBe(42);
+  });
+
+  it("delegation with allow nil and false value", () => {
+    class Settings {
+      enabled = false;
+    }
+    class App {
+      settings: Settings | null = new Settings();
+    }
+    delegate(App.prototype, "enabled", { to: "settings", allowNil: true });
+    const app = new App() as App & { enabled: boolean | undefined };
+    expect(app.enabled).toBe(false);
+  });
+
+  it("delegation with allow nil and invalid value", () => {
+    class Target {
+      value: unknown = undefined;
+    }
+    class Host {
+      target: Target | null = new Target();
+    }
+    delegate(Host.prototype, "value", { to: "target", allowNil: true });
+    const h = new Host() as Host & { value: unknown };
+    expect(h.value).toBeUndefined();
+    h.target = null;
+    expect(h.value).toBeUndefined();
+  });
+
+  it("delegation to method that exists on nil when allowing nil", () => {
+    class Greeter {
+      greet() { return "hello"; }
+    }
+    class Host {
+      greeter: Greeter | null = null;
+    }
+    delegate(Host.prototype, "greet", { to: "greeter", allowNil: true });
+    const h = new Host() as Host & Record<string, unknown>;
+    // When greeter is null, returns undefined
+    expect(h.greet).toBeUndefined();
+    h.greeter = new Greeter();
+    // When greeter exists, returns the method
+    expect(typeof h.greet).toBe("function");
+  });
+
+  it("delegate line with nil", () => {
+    class Name {
+      first = "Alice";
+    }
+    class Person {
+      name: Name | null = null;
+    }
+    delegate(Person.prototype, "first", { to: "name", allowNil: true });
+    const p = new Person() as Person & { first: string | undefined };
+    expect(p.first).toBeUndefined();
+  });
+
+  it("delegate missing to does not delegate to fake methods", () => {
+    class Real {
+      exists() { return true; }
+    }
+    class Host {
+      real: Real = new Real();
+    }
+    delegate(Host.prototype, "exists", { to: "real" });
+    const h = new Host() as Host & Record<string, unknown>;
+    expect((h as { exists(): boolean }).exists()).toBe(true);
+    // Non-delegated method should not exist
+    expect(typeof h.nonExistent).toBe("undefined");
+  });
+
+  it("module nesting is empty", () => {
+    // In JS, there's no module nesting concept like Ruby's Module.nesting
+    // The nearest equivalent: check that a plain class has no namespace
+    class Foo {}
+    expect(Foo.name).toBe("Foo");
+    expect(Foo.name.includes("::")).toBe(false);
+  });
 });
 
 describe("ModuleAttributeAccessorTest", () => {

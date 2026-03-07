@@ -16,6 +16,7 @@ require "time"
 
 SCRIPT_DIR = File.dirname(__FILE__)
 RAILS_DIR = File.join(SCRIPT_DIR, "..", "api-compare", ".rails-source")
+RACK_DIR = File.join(SCRIPT_DIR, "..", "api-compare", ".rack-source")
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
 
 # Map packages to their test directories
@@ -24,6 +25,7 @@ PACKAGE_TEST_DIRS = {
   "activemodel"   => File.join(RAILS_DIR, "activemodel", "test", "cases"),
   "activerecord"  => File.join(RAILS_DIR, "activerecord", "test", "cases"),
   "activesupport" => File.join(RAILS_DIR, "activesupport", "test"),
+  "rack"          => File.join(RACK_DIR, "test"),
 }
 
 # Files/directories to skip (infrastructure, not actual tests)
@@ -473,7 +475,8 @@ def run
     # Find test files, excluding arel tests from the activerecord package
     # (they belong to the arel package)
     test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "test_*.rb"))
+                 Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +
+                 Dir.glob(File.join(pkg_dir, "**", "spec_*.rb"))
     test_files.uniq!
 
     # For activerecord, exclude arel test files (handled by arel package)

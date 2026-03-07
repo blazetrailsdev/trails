@@ -31,3 +31,22 @@ for dir in "activerecord/test/cases/arel" "activemodel/test/cases" "activerecord
     echo "  WARNING: $dir not found"
   fi
 done
+
+# --- Rack (separate gem) ---
+RACK_DIR="$SCRIPT_DIR/../api-compare/.rack-source"
+RACK_REPO="https://github.com/rack/rack.git"
+RACK_TAG="v3.1.14"
+
+if [ ! -d "$RACK_DIR/.git" ]; then
+  echo "Cloning Rack $RACK_TAG..."
+  git clone --depth 1 --branch "$RACK_TAG" "$RACK_REPO" "$RACK_DIR"
+else
+  echo "Rack source already present at $RACK_DIR"
+fi
+
+if [ -d "$RACK_DIR/test" ]; then
+  count=$(find "$RACK_DIR/test" -name "spec_*.rb" | wc -l)
+  echo "  rack/test: $count spec files"
+else
+  echo "  WARNING: rack/test not found"
+fi

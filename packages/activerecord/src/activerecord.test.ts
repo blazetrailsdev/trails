@@ -1310,7 +1310,7 @@ describe("ActiveRecord", () => {
       expect(found[1].readAttribute("name")).toBe("Charlie");
     });
 
-    it("find with empty array returns empty", async () => {
+    it("find with empty array raises RecordNotFound", async () => {
       const adapter = freshAdapter();
       class User extends Base {
         static {
@@ -1318,8 +1318,7 @@ describe("ActiveRecord", () => {
           this.adapter = adapter;
         }
       }
-      const found = await User.find([]);
-      expect(found).toEqual([]);
+      await expect(User.find([])).rejects.toThrow();
     });
 
     it("find with missing IDs throws", async () => {
@@ -10276,9 +10275,8 @@ describe("ActiveRecord", () => {
       expect(found[1].readAttribute("name")).toBe("Charlie");
     });
 
-    it("find with empty array returns empty", async () => {
-      const found = await User.find([]);
-      expect(found).toEqual([]);
+    it("find with empty array raises RecordNotFound", async () => {
+      await expect(User.find([])).rejects.toThrow();
     });
 
     it("find raises RecordNotFound for missing ID", async () => {
@@ -10787,10 +10785,9 @@ describe("ActiveRecord", () => {
       expect(await Item.all().count("email")).toBe(1);
     });
 
-    it("count returns total regardless of limit (SQL semantics)", async () => {
-      // In MemoryAdapter, count() returns the total count of matching records,
-      // consistent with Rails' COUNT(*) which operates on the full result set
-      expect(await Order.all().limit(2).count()).toBe(4);
+    it("count respects limit (Rails semantics)", async () => {
+      // Rails: Model.limit(2).count returns 2 (uses subquery with limit)
+      expect(await Order.all().limit(2).count()).toBe(2);
     });
 
     it("sum with where conditions", async () => {

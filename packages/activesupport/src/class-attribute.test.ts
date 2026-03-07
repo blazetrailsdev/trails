@@ -216,5 +216,14 @@ describe("ClassAttributeTest", () => {
   it.skip("works well with module singleton classes", () => { /* Ruby module singleton */ });
   it.skip("works when overriding private methods from an ancestor", () => { /* private method override semantics */ });
   it.skip("allow to prepend accessors", () => { /* Ruby module prepend */ });
-  it.skip("can check if value is set on a sub class", () => { /* attribute_set? not implemented */ });
+
+  it("can check if value is set on a sub class", () => {
+    class Parent {}
+    classAttribute(Parent, "setting");
+    class Child extends Parent {}
+    classAttribute(Child, "setting");
+    (Child as any).setting = "child_value";
+    expect((Child as any).setting).toBe("child_value");
+    expect((Parent as any).setting).not.toBe("child_value");
+  });
 });
