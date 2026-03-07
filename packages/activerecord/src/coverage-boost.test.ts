@@ -18635,8 +18635,22 @@ describe("DefaultTextTest", () => {
 });
 
 describe("DefaultStringsTest", () => {
-  it.skip("default strings", () => { /* fixture-dependent */ });
-  it.skip("default strings containing single quotes", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("default strings", async () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ title: "hello" });
+    expect(p.readAttribute("title")).toBe("hello");
+  });
+  it("default strings containing single quotes", async () => {
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ title: "it's a test" });
+    expect(p.readAttribute("title")).toBe("it's a test");
+  });
 });
 
 describe("CloneTest", () => {
@@ -20405,8 +20419,22 @@ describe("DefaultBinaryTest", () => {
 });
 
 describe("DefaultTextTest", () => {
-  it.skip("default texts", () => { /* fixture-dependent */ });
-  it.skip("default texts containing single quotes", () => { /* fixture-dependent */ });
+  let adapter: MemoryAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+  it("default texts", async () => {
+    class Post extends Base {
+      static { this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ body: "some text" });
+    expect(p.readAttribute("body")).toBe("some text");
+  });
+  it("default texts containing single quotes", async () => {
+    class Post extends Base {
+      static { this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    const p = await Post.create({ body: "it's some text" });
+    expect(p.readAttribute("body")).toBe("it's some text");
+  });
 });
 
 describe("PostgresqlDefaultExpressionTest", () => {
