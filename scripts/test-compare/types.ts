@@ -45,7 +45,8 @@ export interface TestManifest {
 
 // --- Comparison results ---
 
-export type TestStatus = "matched" | "missing" | "skipped" | "extra";
+/** matched = real passing TS test; stub = it.skip placeholder; skipped = null override; missing = no TS test */
+export type TestStatus = "matched" | "stub" | "missing" | "skipped" | "extra";
 
 export interface TestComparison {
   rubyPath: string;
@@ -62,6 +63,7 @@ export interface FileComparison {
   tsFile: string | null;
   tsDescribeBlock: string | null;
   matched: number;
+  stub: number;
   skipped: number;
   missing: number;
   extra: number;
@@ -72,6 +74,7 @@ export interface PackageComparison {
   package: string;
   files: FileComparison[];
   matched: number;
+  stub: number;
   skipped: number;
   missing: number;
   extra: number;
@@ -84,6 +87,7 @@ export interface TestComparisonResult {
   summary: {
     totalRubyTests: number;
     matched: number;
+    stub: number;
     skipped: number;
     missing: number;
     extra: number;
