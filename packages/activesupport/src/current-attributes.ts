@@ -22,11 +22,11 @@ type ResetCallback = () => void;
  */
 export abstract class CurrentAttributes {
   /** @internal per-class attribute definitions */
-  private static _definitions: Map<string, AttributeDefinition> = new Map();
+  public static _definitions: Map<string, AttributeDefinition> = new Map();
   /** @internal per-class instance storage (one per class, reset on each "request") */
-  private static _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes> = new WeakMap();
+  public static _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes> = new WeakMap();
   /** @internal before-reset callbacks */
-  private static _resetCallbacks: ResetCallback[] = [];
+  public static _resetCallbacks: ResetCallback[] = [];
 
   /** @internal per-instance attribute values */
   protected _attributes: Map<string, AttributeValue> = new Map();
@@ -53,7 +53,7 @@ export abstract class CurrentAttributes {
       : {};
     ctor._definitions.set(name, options);
     // Define accessor on the prototype
-    const proto = ctor.prototype as Record<string, unknown>;
+    const proto = ctor.prototype as unknown as Record<string, unknown>;
     if (!(name in proto)) {
       Object.defineProperty(proto, name, {
         get(this: CurrentAttributes) { return this._get(name); },

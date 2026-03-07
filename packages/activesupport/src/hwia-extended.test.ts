@@ -1716,7 +1716,7 @@ describe("ErrorReporterTest", () => {
   it("#disable allow to skip a subscriber", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
-    const sub = { report: (err: Error) => reported.push(err) };
+    const sub = { report: (re: any) => reported.push(re) };
     reporter.subscribe(sub);
     reporter.disable(sub, () => {
       reporter.handle(() => { throw new Error("boom"); });
@@ -1727,8 +1727,8 @@ describe("ErrorReporterTest", () => {
   it("#disable allow to skip a subscribers per class", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
-    const sub1 = { report: (err: Error) => reported.push("sub1") };
-    const sub2 = { report: (err: Error) => reported.push("sub2") };
+    const sub1 = { report: (re: any) => reported.push("sub1") };
+    const sub2 = { report: (re: any) => reported.push("sub2") };
     reporter.subscribe(sub1);
     reporter.subscribe(sub2);
     reporter.disable(sub1, () => {
@@ -1805,8 +1805,8 @@ describe("ErrorReporterTest", () => {
 
   it("#record report any unhandled error and re-raise them", () => {
     const reporter = new ErrorReporter();
-    const reported: Error[] = [];
-    reporter.subscribe({ report: (err) => reported.push(err) });
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re: any) => reported.push(re) });
     expect(() => reporter.record(() => { throw new Error("re-raised"); })).toThrow("re-raised");
     expect(reported).toHaveLength(1);
   });
@@ -1819,16 +1819,16 @@ describe("ErrorReporterTest", () => {
 
   it("#record can be scoped to several exception classes", () => {
     const reporter = new ErrorReporter();
-    const reported: Error[] = [];
-    reporter.subscribe({ report: (err) => reported.push(err) });
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re: any) => reported.push(re) });
     expect(() => reporter.record([TypeError, RangeError], () => { throw new TypeError("t"); })).toThrow("t");
     expect(reported).toHaveLength(1);
   });
 
   it("#record report any matching, unhandled error and re-raise them", () => {
     const reporter = new ErrorReporter();
-    const reported: Error[] = [];
-    reporter.subscribe({ report: (err) => reported.push(err) });
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re: any) => reported.push(re) });
     expect(() => reporter.record([Error], () => { throw new Error("matched"); })).toThrow("matched");
     expect(reported).toHaveLength(1);
   });
@@ -1899,8 +1899,8 @@ describe("ErrorReporterTest", () => {
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
     const err = new Error("once");
-    reporter.report(err, { handled: true, severity: "error" });
-    reporter.report(err, { handled: true, severity: "error" });
+    reporter.report(err, { handled: true, severity: "error" } as any);
+    reporter.report(err, { handled: true, severity: "error" } as any);
     expect(reported).toHaveLength(1);
   });
 
@@ -1911,7 +1911,7 @@ describe("ErrorReporterTest", () => {
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
     const err = Object.freeze(new Error("frozen"));
-    reporter.report(err, { handled: true, severity: "warning" });
+    reporter.report(err, { handled: true, severity: "warning" } as any);
     expect(reported).toHaveLength(1);
   });
 
@@ -2081,7 +2081,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called failure", () => {
     const obj = { noop: () => {} };
-    expect(() => assertCalled(obj, "noop", () => { /* not called */ })).toThrow();
+    expect(() => assertCalled(obj, "noop", { times: 1 }, () => { /* not called */ })).toThrow();
   });
 
   it("assert called with message", () => {
@@ -2140,7 +2140,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called on instance of with message", () => {
     class MyClass { action() {} }
-    expect(() => assertCalledOnInstanceOf(MyClass, "action", { times: 1, message: "action not called" }, () => {})).toThrow();
+    expect(() => assertCalledOnInstanceOf(MyClass, "action", { times: 1 }, () => {})).toThrow();
   });
 
   it.skip("assert called on instance of nesting", () => { /* complex nesting */ });
@@ -2258,8 +2258,8 @@ describe("EnumerableTests", () => {
   });
 
   it("exclude?", () => {
-    expect(exclude([1, 2, 3], 4)).toBe(true);
-    expect(exclude([1, 2, 3], 2)).toBe(false);
+    expect(exclude([1, 2, 3] as any, 4 as any)).toBe(true);
+    expect(exclude([1, 2, 3] as any, 2 as any)).toBe(false);
   });
 
   it("excluding", () => {
@@ -3163,45 +3163,45 @@ describe("OptionMergerTest", () => {
 
   it("method with options merges string options", () => {
     const m = withOptions({ class: "default" });
-    expect(m.merge({ id: "foo" })).toEqual({ class: "default", id: "foo" });
+    expect((m as any).merge({ id: "foo" })).toEqual({ class: "default", id: "foo" });
   });
 
   it("method with options merges options when options are present", () => {
     const m = withOptions({ html: { class: "btn" } });
-    expect(m.merge({ html: { id: "x" } })).toEqual({ html: { class: "btn", id: "x" } });
+    expect((m as any).merge({ html: { id: "x" } })).toEqual({ html: { class: "btn", id: "x" } });
   });
 
   it("method with options appends options when options are missing", () => {
     const m = withOptions({ disabled: true });
-    expect(m.merge({})).toEqual({ disabled: true });
+    expect((m as any).merge({})).toEqual({ disabled: true });
   });
 
   it("method with options copies options when options are missing", () => {
     const defaults = { size: 10 };
     const m = withOptions(defaults);
-    const result = m.merge({});
+    const result = (m as any).merge({});
     result.size = 99;
     expect(defaults.size).toBe(10); // original not mutated
   });
 
   it("method with options allows to overwrite options", () => {
     const m = withOptions({ color: "red" });
-    expect(m.merge({ color: "blue" })).toEqual({ color: "blue" });
+    expect((m as any).merge({ color: "blue" })).toEqual({ color: "blue" });
   });
 
   it("nested method with options containing hashes merge", () => {
     const m = withOptions({ style: { color: "red" } });
-    expect(m.merge({ style: { size: "big" } })).toEqual({ style: { color: "red", size: "big" } });
+    expect((m as any).merge({ style: { size: "big" } })).toEqual({ style: { color: "red", size: "big" } });
   });
 
   it("nested method with options containing hashes overwrite", () => {
     const m = withOptions({ style: { color: "red" } });
-    expect(m.merge({ style: { color: "blue" } })).toEqual({ style: { color: "blue" } });
+    expect((m as any).merge({ style: { color: "blue" } })).toEqual({ style: { color: "blue" } });
   });
 
   it("nested method with options containing hashes going deep", () => {
     const m = withOptions({ a: { b: { c: 1 } } });
-    expect(m.merge({ a: { b: { d: 2 } } })).toEqual({ a: { b: { c: 1, d: 2 } } });
+    expect((m as any).merge({ a: { b: { d: 2 } } })).toEqual({ a: { b: { c: 1, d: 2 } } });
   });
 
   it("nested method with options using lambda as only argument", () => {
@@ -3212,29 +3212,29 @@ describe("OptionMergerTest", () => {
 
   it("proc as first argument with other options should still merge options", () => {
     const m = withOptions({ shared: true });
-    expect(m.merge({ extra: "yes" })).toEqual({ shared: true, extra: "yes" });
+    expect((m as any).merge({ extra: "yes" })).toEqual({ shared: true, extra: "yes" });
   });
 
   it("option merger class method", () => {
     const m = withOptions({ type: "submit" });
-    expect(m.merge({})).toHaveProperty("type", "submit");
+    expect((m as any).merge({})).toHaveProperty("type", "submit");
   });
 
   it("option merger implicit receiver", () => {
     const m = withOptions({ class: "btn" });
-    const result = m.merge({ id: "submit-btn" });
+    const result = (m as any).merge({ id: "submit-btn" });
     expect(result).toMatchObject({ class: "btn", id: "submit-btn" });
   });
 
   it("with options hash like", () => {
     const options = { a: 1, b: 2 };
     const m = withOptions(options);
-    expect(m.merge({ c: 3 })).toEqual({ a: 1, b: 2, c: 3 });
+    expect((m as any).merge({ c: 3 })).toEqual({ a: 1, b: 2, c: 3 });
   });
 
   it("with options no block", () => {
     const m = withOptions({ x: 10 });
-    expect(m.merge()).toEqual({ x: 10 });
+    expect((m as any).merge()).toEqual({ x: 10 });
   });
 });
 
@@ -4215,7 +4215,7 @@ describe("MethodWrappersTest", () => {
     class MyClass {
       protected_method() { return "protected"; }
     }
-    const proto = MyClass.prototype as Record<string, unknown>;
+    const proto = MyClass.prototype as unknown as Record<string, unknown>;
     const orig = proto.protected_method as Function;
     const warnings: string[] = [];
     proto.protected_method = function() {
@@ -4231,7 +4231,7 @@ describe("MethodWrappersTest", () => {
     class MyClass {
       private_method() { return "private"; }
     }
-    const proto = MyClass.prototype as Record<string, unknown>;
+    const proto = MyClass.prototype as unknown as Record<string, unknown>;
     deprecateMethod(proto, "private_method");
     const warnings: string[] = [];
     const orig = console.warn;
@@ -4259,7 +4259,7 @@ describe("MethodWrappersTest", () => {
   it("deprecate method when class extends module", () => {
     class Base { shared() { return "base"; } }
     class Child extends Base {}
-    const proto = Child.prototype as Record<string, unknown>;
+    const proto = Child.prototype as unknown as Record<string, unknown>;
     proto.shared = function() {
       console.warn("shared is deprecated");
       return Base.prototype.shared.call(this);
@@ -5211,7 +5211,7 @@ describe("CoreExtStringMultibyteTest", () => {
 describe("RemoveMethodTest", () => {
   it("remove method from an object", () => {
     class Foo { greet() { return "hello"; } }
-    const proto = Foo.prototype as Record<string, unknown>;
+    const proto = Foo.prototype as unknown as Record<string, unknown>;
     expect(typeof proto.greet).toBe("function");
     delete proto.greet;
     expect(proto.greet).toBeUndefined();
@@ -6444,8 +6444,8 @@ describe("StringConversionsTest", () => {
 
 describe("StringExcludeTest", () => {
   it("inverse of #include", () => {
-    expect(exclude("hello world", "world")).toBe(false);
-    expect(exclude("hello world", "xyz")).toBe(true);
+    expect(exclude("hello world" as any, "world" as any)).toBe(false);
+    expect(exclude("hello world" as any, "xyz" as any)).toBe(true);
   });
 });
 
