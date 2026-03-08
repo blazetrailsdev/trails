@@ -1,6 +1,6 @@
 # ActionController: Road to 100% Test Coverage
 
-Current state: **~33%** (~620 matched / 1,912 total controller+abstract tests). 263 controller tests + 69 routing tests + 76 new parameter tests written, ~1,292 remaining.
+Current state: **~39%** (~754 matched / 1,912 total controller+abstract tests). 1,465 actionpack tests total (285 controller + 1,180 dispatch). Key additions: Parameters 201, Rendering 53, Response 49, TestCase 51, IntegrationTest 39.
 
 In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 
@@ -50,8 +50,8 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 
 | # | Feature Area | Missing | Matched | Status |
 |---|---|---|---|---|
-| 1 | Parameters | ~193 | 118 | Deep coverage added: nested permit, expect (Rails 8), toQuery, equality, unpermitted params |
-| 2 | Rendering | ~238 | ~31 | Simple rendering done, templates/partials/streaming remain |
+| 1 | Parameters | ~100 | 201 | Comprehensive: slice/except/merge/transform/select/compact/fetch/dig/deepDup/toQuery/equality/iteration |
+| 2 | Rendering | ~196 | ~53 | sendData, edge cases, double render. Templates/partials/streaming remain |
 | 3 | Testing harness | ~134 | 90 | TestCase (51) + IntegrationTest (39) done, more edge cases remain |
 | 4 | Routing (controller) | ~150 | 80 | Resource routing, controller routing, namespace/scope/constraints done |
 | 5 | Other (base, assertions, etc) | ~185 | ~44 | Base skeleton done, assertions/logging/helpers remain |
@@ -66,7 +66,7 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 | 14 | Redirects | ~15 | ~39 | Core done, edge cases remain |
 | 15 | File sending | ~26 | ~0 | sendFile/sendData impl exists, needs tests |
 | 16 | Flash (controller) | ~10 | 37 | Mostly done |
-| | **TOTAL** | **~1,292** | **~620** | |
+| | **TOTAL** | **~1,158** | **~754** | |
 
 ## Dependency graph
 
@@ -240,5 +240,5 @@ npm run test:compare
 
 The compare script now has an `actioncontroller` package entry alongside `actiondispatch`.
 
-Current: ~620 / 1,912 controller tests matched (~33%)
+Current: ~754 / 1,912 controller tests matched (~39%)
 Target: 1,912 / 1,912 (100%)
