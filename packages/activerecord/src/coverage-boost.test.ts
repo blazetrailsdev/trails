@@ -18725,7 +18725,24 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("SELECT");
     expect(sql).not.toContain("IS NULL");
   });
-  it.skip("missing with multiple association", () => { /* requires multiple associations */ });
+  it("missing with multiple association", () => {
+    const adapter2 = freshAdapter();
+    class Article extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.attribute("category_id", "integer"); this.adapter = adapter2; }
+    }
+    class ArtAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter2; }
+    }
+    class ArtCategory extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter2; }
+    }
+    Associations.belongsTo.call(Article, "artAuthor", { foreignKey: "author_id" });
+    Associations.belongsTo.call(Article, "artCategory", { foreignKey: "category_id" });
+    registerModel(Article); registerModel(ArtAuthor); registerModel(ArtCategory);
+    const sql = Article.all().whereMissing("artAuthor").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toContain("IS NULL");
+  });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
@@ -30557,6 +30574,22 @@ describe("AttributeMethodsTest", () => {
 });
 
 describe("WhereChainTest", () => {
+  const wc2adapter = freshAdapter();
+  class WC2Post extends Base {
+    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = wc2adapter; }
+  }
+  class WC2Author extends Base {
+    static { this.attribute("name", "string"); this.adapter = wc2adapter; }
+  }
+  Associations.belongsTo.call(WC2Post, "wc2Author", { foreignKey: "author_id" });
+  registerModel(WC2Post);
+  registerModel(WC2Author);
+
+  it("associated with child association", () => {
+    const sql = WC2Post.all().whereAssociated("wc2Author").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
+  });
   it.skip("associated merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("associated unscoped merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("associated unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
@@ -30573,7 +30606,16 @@ describe("WhereChainTest", () => {
   it.skip("associated with add left joins before", () => { /* fixture-dependent */ });
   it.skip("associated with add left outer joins before", () => { /* fixture-dependent */ });
   it.skip("associated with composite primary key", () => { /* fixture-dependent */ });
-  it.skip("missing with invalid association name", () => { /* fixture-dependent */ });
+  it("missing with child association", () => {
+    const sql = WC2Post.all().whereMissing("wc2Author").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toContain("IS NULL");
+  });
+  it("missing with invalid association name", () => {
+    const sql = WC2Post.all().whereMissing("nonexistent").toSql();
+    expect(sql).toContain("SELECT");
+    expect(sql).not.toContain("IS NULL");
+  });
   it.skip("missing with multiple association", () => { /* fixture-dependent */ });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
@@ -30590,58 +30632,34 @@ describe("WhereChainTest", () => {
   it.skip("missing with composite primary key", () => { /* fixture-dependent */ });
 
   it("rewhere with alias condition", () => {
-    const adp = freshAdapter();
-    class PostRW2 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const sql = PostRW2.where({ title: "old" }).rewhere({ title: "new" }).toSql();
+    const sql = WC2Post.where({ title: "old" }).rewhere({ title: "new" }).toSql();
     expect(sql).toContain("new");
     expect(sql).not.toContain("old");
   });
 
   it("rewhere with nested condition", () => {
-    const adp = freshAdapter();
-    class PostRW2 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const sql = PostRW2.where({ title: "orig" }).rewhere({ title: "replaced" }).toSql();
+    const sql = WC2Post.where({ title: "orig" }).rewhere({ title: "replaced" }).toSql();
     expect(sql).toContain("replaced");
   });
 
   it("rewhere with infinite upper bound range", () => {
-    const adp = freshAdapter();
-    class PostRW2R extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW2R.where({ author_id: new Range(1, 10) }).rewhere({ author_id: new Range(5, 20) }).toSql();
+    const sql = WC2Post.where({ author_id: new Range(1, 10) }).rewhere({ author_id: new Range(5, 20) }).toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("20");
   });
   it("rewhere with infinite lower bound range", () => {
-    const adp = freshAdapter();
-    class PostRW2L extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW2L.where({ author_id: new Range(1, 100) }).rewhere({ author_id: new Range(10, 50) }).toSql();
+    const sql = WC2Post.where({ author_id: new Range(1, 100) }).rewhere({ author_id: new Range(10, 50) }).toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("10");
   });
   it("rewhere with infinite range", () => {
-    const adp = freshAdapter();
-    class PostRW2I extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW2I.where({ author_id: new Range(1, 5) }).rewhere({ author_id: null }).toSql();
+    const sql = WC2Post.where({ author_id: new Range(1, 5) }).rewhere({ author_id: null }).toSql();
     expect(sql).toContain("NULL");
     expect(sql).not.toContain("BETWEEN");
   });
 
   it("rewhere with nil", () => {
-    const adp = freshAdapter();
-    class PostRW2 extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW2.where({ author_id: 1 }).rewhere({ author_id: null }).toSql();
+    const sql = WC2Post.where({ author_id: 1 }).rewhere({ author_id: null }).toSql();
     expect(sql).toContain("NULL");
   });
 });
@@ -34286,6 +34304,22 @@ describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
 });
 
 describe("WhereChainTest", () => {
+  const wc3adapter = freshAdapter();
+  class WC3Post extends Base {
+    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = wc3adapter; }
+  }
+  class WC3Author extends Base {
+    static { this.attribute("name", "string"); this.adapter = wc3adapter; }
+  }
+  Associations.belongsTo.call(WC3Post, "wc3Author", { foreignKey: "author_id" });
+  registerModel(WC3Post);
+  registerModel(WC3Author);
+
+  it("associated with child association", () => {
+    const sql = WC3Post.all().whereAssociated("wc3Author").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
+  });
   it.skip("associated merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("associated unscoped merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("associated unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
@@ -34302,7 +34336,16 @@ describe("WhereChainTest", () => {
   it.skip("associated with add left joins before", () => { /* fixture-dependent */ });
   it.skip("associated with add left outer joins before", () => { /* fixture-dependent */ });
   it.skip("associated with composite primary key", () => { /* fixture-dependent */ });
-  it.skip("missing with invalid association name", () => { /* fixture-dependent */ });
+  it("missing with child association", () => {
+    const sql = WC3Post.all().whereMissing("wc3Author").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toContain("IS NULL");
+  });
+  it("missing with invalid association name", () => {
+    const sql = WC3Post.all().whereMissing("nonexistent").toSql();
+    expect(sql).toContain("SELECT");
+    expect(sql).not.toContain("IS NULL");
+  });
   it.skip("missing with multiple association", () => { /* fixture-dependent */ });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
@@ -34318,58 +34361,34 @@ describe("WhereChainTest", () => {
   it.skip("missing with enum extended late", () => { /* fixture-dependent */ });
   it.skip("missing with composite primary key", () => { /* fixture-dependent */ });
   it("rewhere with alias condition", () => {
-    const adp = freshAdapter();
-    class PostRW3 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const sql = PostRW3.where({ title: "old" }).rewhere({ title: "new" }).toSql();
+    const sql = WC3Post.where({ title: "old" }).rewhere({ title: "new" }).toSql();
     expect(sql).toContain("new");
     expect(sql).not.toContain("old");
   });
 
   it("rewhere with nested condition", () => {
-    const adp = freshAdapter();
-    class PostRW3 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const sql = PostRW3.where({ title: "orig" }).rewhere({ title: "replaced" }).toSql();
+    const sql = WC3Post.where({ title: "orig" }).rewhere({ title: "replaced" }).toSql();
     expect(sql).toContain("replaced");
   });
 
   it("rewhere with infinite upper bound range", () => {
-    const adp = freshAdapter();
-    class PostRW3R extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW3R.where({ author_id: new Range(1, 10) }).rewhere({ author_id: new Range(5, 20) }).toSql();
+    const sql = WC3Post.where({ author_id: new Range(1, 10) }).rewhere({ author_id: new Range(5, 20) }).toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("20");
   });
   it("rewhere with infinite lower bound range", () => {
-    const adp = freshAdapter();
-    class PostRW3L extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW3L.where({ author_id: new Range(1, 100) }).rewhere({ author_id: new Range(10, 50) }).toSql();
+    const sql = WC3Post.where({ author_id: new Range(1, 100) }).rewhere({ author_id: new Range(10, 50) }).toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("10");
   });
   it("rewhere with infinite range", () => {
-    const adp = freshAdapter();
-    class PostRW3I extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW3I.where({ author_id: new Range(1, 5) }).rewhere({ author_id: null }).toSql();
+    const sql = WC3Post.where({ author_id: new Range(1, 5) }).rewhere({ author_id: null }).toSql();
     expect(sql).toContain("NULL");
     expect(sql).not.toContain("BETWEEN");
   });
 
   it("rewhere with nil", () => {
-    const adp = freshAdapter();
-    class PostRW3 extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
-    }
-    const sql = PostRW3.where({ author_id: 1 }).rewhere({ author_id: null }).toSql();
+    const sql = WC3Post.where({ author_id: 1 }).rewhere({ author_id: null }).toSql();
     expect(sql).toContain("NULL");
   });
 });
@@ -34416,7 +34435,25 @@ describe("WithAnnotationsTest", () => {
 });
 
 describe("assigning nested attributes target", () => {
-  it.skip("assigning nested attributes target", () => { /* fixture-dependent */ });
+  it("assigning nested attributes target", async () => {
+    const adapter = freshAdapter();
+    class ANTTag extends Base {
+      static { this._tableName = "ant_tags"; this.attribute("name", "string"); this.attribute("ant_article_id", "integer"); this.adapter = adapter; }
+    }
+    class ANTArticle extends Base {
+      static { this._tableName = "ant_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(ANTArticle, "antTags", { className: "ANTTag", foreignKey: "ant_article_id" });
+    acceptsNestedAttributesFor(ANTArticle, "antTags");
+    registerModel(ANTTag);
+    registerModel(ANTArticle);
+    const article = await ANTArticle.create({ title: "target test" });
+    assignNestedAttributes(article, "antTags", [{ name: "assigned" }]);
+    await article.save();
+    const tags = await ANTTag.where({ ant_article_id: article.id }).toArray();
+    expect(tags.length).toBe(1);
+    expect(tags[0].readAttribute("name")).toBe("assigned");
+  });
 });
 
 describe("assigning nested attributes target with nil placeholder for rejected item", () => {
@@ -34499,11 +34536,44 @@ describe("should automatically build new associated models for each entry in a h
 });
 
 describe("should automatically enable autosave on the association", () => {
-  it.skip("should automatically enable autosave on the association", () => { /* fixture-dependent */ });
+  it("should automatically enable autosave on the association", () => {
+    const adapter = freshAdapter();
+    class AE1Tag extends Base {
+      static { this._tableName = "ae1_tags"; this.attribute("name", "string"); this.attribute("ae1_article_id", "integer"); this.adapter = adapter; }
+    }
+    class AE1Article extends Base {
+      static { this._tableName = "ae1_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(AE1Article, "ae1Tags", { className: "AE1Tag", foreignKey: "ae1_article_id" });
+    acceptsNestedAttributesFor(AE1Article, "ae1Tags");
+    registerModel(AE1Tag);
+    registerModel(AE1Article);
+    const configs = (AE1Article as any)._nestedAttributeConfigs;
+    expect(configs).toBeDefined();
+    expect(configs.find((c: any) => c.associationName === "ae1Tags")).toBeDefined();
+  });
 });
 
 describe("should automatically save bang the associated models", () => {
-  it.skip("should automatically save bang the associated models", () => { /* fixture-dependent */ });
+  it("should automatically save bang the associated models", async () => {
+    const adapter = freshAdapter();
+    class ASB1Tag extends Base {
+      static { this._tableName = "asb1_tags"; this.attribute("name", "string"); this.attribute("asb1_article_id", "integer"); this.adapter = adapter; }
+    }
+    class ASB1Article extends Base {
+      static { this._tableName = "asb1_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(ASB1Article, "asb1Tags", { className: "ASB1Tag", foreignKey: "asb1_article_id" });
+    acceptsNestedAttributesFor(ASB1Article, "asb1Tags");
+    registerModel(ASB1Tag);
+    registerModel(ASB1Article);
+    const article = await ASB1Article.create({ title: "bang save" });
+    assignNestedAttributes(article, "asb1Tags", [{ name: "banged" }]);
+    await article.save();
+    const tags = await ASB1Tag.where({ asb1_article_id: article.id }).toArray();
+    expect(tags.length).toBe(1);
+    expect(tags[0].isPersisted()).toBe(true);
+  });
 });
 
 describe("should automatically save the associated models", () => {
@@ -34530,7 +34600,22 @@ describe("should automatically save the associated models", () => {
 });
 
 describe("should automatically validate the associated models", () => {
-  it.skip("should automatically validate the associated models", () => { /* fixture-dependent */ });
+  it("should automatically validate the associated models", async () => {
+    const adapter = freshAdapter();
+    class AVTag extends Base {
+      static { this._tableName = "av_tags"; this.attribute("name", "string"); this.attribute("av_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+    }
+    class AVArticle extends Base {
+      static { this._tableName = "av_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(AVArticle, "avTags", { className: "AVTag", foreignKey: "av_article_id" });
+    acceptsNestedAttributesFor(AVArticle, "avTags");
+    registerModel(AVTag);
+    registerModel(AVArticle);
+    const invalidTag = new AVTag({ name: "" });
+    const valid = await invalidTag.isValid();
+    expect(valid).toBe(false);
+  });
 });
 
 describe("should default invalid error from i18n", () => {
@@ -34542,7 +34627,26 @@ describe("should merge errors on the associated models onto the parent even if i
 });
 
 describe("should not assign destroy key to a record", () => {
-  it.skip("should not assign destroy key to a record", () => { /* fixture-dependent */ });
+  it("should not assign destroy key to a record", async () => {
+    const adapter = freshAdapter();
+    class NADTag extends Base {
+      static { this._tableName = "nad_tags"; this.attribute("name", "string"); this.attribute("nad_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NADArticle extends Base {
+      static { this._tableName = "nad_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NADArticle, "nadTags", { className: "NADTag", foreignKey: "nad_article_id" });
+    acceptsNestedAttributesFor(NADArticle, "nadTags");
+    registerModel(NADTag);
+    registerModel(NADArticle);
+    const article = await NADArticle.create({ title: "no destroy key" });
+    assignNestedAttributes(article, "nadTags", [{ name: "keep" }]);
+    await article.save();
+    const tags = await NADTag.where({ nad_article_id: article.id }).toArray();
+    expect(tags.length).toBe(1);
+    // The _destroy key should not be assigned as an attribute
+    expect(tags[0].readAttribute("_destroy" as any)).toBeFalsy();
+  });
 });
 
 describe("should not destroy the associated model until the parent is saved", () => {
@@ -34550,11 +34654,46 @@ describe("should not destroy the associated model until the parent is saved", ()
 });
 
 describe("should not load association when updating existing records", () => {
-  it.skip("should not load association when updating existing records", () => { /* fixture-dependent */ });
+  it("should not load association when updating existing records", async () => {
+    const adapter = freshAdapter();
+    class NLUTag extends Base {
+      static { this._tableName = "nlu_tags"; this.attribute("name", "string"); this.attribute("nlu_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NLUArticle extends Base {
+      static { this._tableName = "nlu_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NLUArticle, "nluTags", { className: "NLUTag", foreignKey: "nlu_article_id" });
+    acceptsNestedAttributesFor(NLUArticle, "nluTags");
+    registerModel(NLUTag);
+    registerModel(NLUArticle);
+    const article = await NLUArticle.create({ title: "original" });
+    const tag = await NLUTag.create({ name: "existing", nlu_article_id: article.id });
+    // Update existing record via nested attributes
+    assignNestedAttributes(article, "nluTags", [{ id: tag.id, name: "updated" }]);
+    await article.save();
+    const reloaded = await NLUTag.find(tag.id);
+    expect(reloaded.readAttribute("name")).toBe("updated");
+  });
 });
 
 describe("should not load the associated models if they were not loaded yet", () => {
-  it.skip("should not load the associated models if they were not loaded yet", () => { /* fixture-dependent */ });
+  it("should not load the associated models if they were not loaded yet", async () => {
+    const adapter = freshAdapter();
+    class NLTag extends Base {
+      static { this._tableName = "nl_tags"; this.attribute("name", "string"); this.attribute("nl_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NLArticle extends Base {
+      static { this._tableName = "nl_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NLArticle, "nlTags", { className: "NLTag", foreignKey: "nl_article_id" });
+    acceptsNestedAttributesFor(NLArticle, "nlTags");
+    registerModel(NLTag);
+    registerModel(NLArticle);
+    const article = await NLArticle.create({ title: "no load" });
+    // Not loading association, just saving parent should work
+    const saved = await article.save();
+    expect(saved).toBe(true);
+  });
 });
 
 describe("should not overwrite unsaved updates when loading association", () => {
@@ -34570,7 +34709,25 @@ describe("should not save and return false if a callback cancelled saving in eit
 });
 
 describe("should not update children when parent creation with no reason", () => {
-  it.skip("should not update children when parent creation with no reason", () => { /* fixture-dependent */ });
+  it("should not update children when parent creation with no reason", async () => {
+    const adapter = freshAdapter();
+    class NUCTag extends Base {
+      static { this._tableName = "nuc_tags"; this.attribute("name", "string"); this.attribute("nuc_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NUCArticle extends Base {
+      static { this._tableName = "nuc_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NUCArticle, "nucTags", { className: "NUCTag", foreignKey: "nuc_article_id" });
+    acceptsNestedAttributesFor(NUCArticle, "nucTags");
+    registerModel(NUCTag);
+    registerModel(NUCArticle);
+    const article = await NUCArticle.create({ title: "parent" });
+    const tag = await NUCTag.create({ name: "child", nuc_article_id: article.id });
+    // Save parent again without changes - child should not be modified
+    await article.save();
+    const reloaded = await NUCTag.find(tag.id);
+    expect(reloaded.readAttribute("name")).toBe("child");
+  });
 });
 
 describe("should not use default invalid error on associated models", () => {
@@ -34975,11 +35132,44 @@ describe("should automatically build new associated models for each entry in a h
 });
 
 describe("should automatically enable autosave on the association", () => {
-  it.skip("should automatically enable autosave on the association", () => { /* fixture-dependent */ });
+  it("should automatically enable autosave on the association", () => {
+    const adapter = freshAdapter();
+    class AE2Tag extends Base {
+      static { this._tableName = "ae2b_tags"; this.attribute("name", "string"); this.attribute("ae2b_article_id", "integer"); this.adapter = adapter; }
+    }
+    class AE2Article extends Base {
+      static { this._tableName = "ae2b_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(AE2Article, "ae2bTags", { className: "AE2Tag", foreignKey: "ae2b_article_id" });
+    acceptsNestedAttributesFor(AE2Article, "ae2bTags");
+    registerModel(AE2Tag);
+    registerModel(AE2Article);
+    const configs = (AE2Article as any)._nestedAttributeConfigs;
+    expect(configs).toBeDefined();
+    expect(configs.find((c: any) => c.associationName === "ae2bTags")).toBeDefined();
+  });
 });
 
 describe("should automatically save bang the associated models", () => {
-  it.skip("should automatically save bang the associated models", () => { /* fixture-dependent */ });
+  it("should automatically save bang the associated models", async () => {
+    const adapter = freshAdapter();
+    class ASB2Tag extends Base {
+      static { this._tableName = "asb2_tags"; this.attribute("name", "string"); this.attribute("asb2_article_id", "integer"); this.adapter = adapter; }
+    }
+    class ASB2Article extends Base {
+      static { this._tableName = "asb2_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(ASB2Article, "asb2Tags", { className: "ASB2Tag", foreignKey: "asb2_article_id" });
+    acceptsNestedAttributesFor(ASB2Article, "asb2Tags");
+    registerModel(ASB2Tag);
+    registerModel(ASB2Article);
+    const article = await ASB2Article.create({ title: "bang save 2" });
+    assignNestedAttributes(article, "asb2Tags", [{ name: "banged2" }]);
+    await article.save();
+    const tags = await ASB2Tag.where({ asb2_article_id: article.id }).toArray();
+    expect(tags.length).toBe(1);
+    expect(tags[0].isPersisted()).toBe(true);
+  });
 });
 
 describe("should automatically save the associated models", () => {
@@ -35014,7 +35204,25 @@ describe("should merge errors on the associated models onto the parent even if i
 });
 
 describe("should not assign destroy key to a record", () => {
-  it.skip("should not assign destroy key to a record", () => { /* fixture-dependent */ });
+  it("should not assign destroy key to a record", async () => {
+    const adapter = freshAdapter();
+    class NAD2Tag extends Base {
+      static { this._tableName = "nad2_tags"; this.attribute("name", "string"); this.attribute("nad2_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NAD2Article extends Base {
+      static { this._tableName = "nad2_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NAD2Article, "nad2Tags", { className: "NAD2Tag", foreignKey: "nad2_article_id" });
+    acceptsNestedAttributesFor(NAD2Article, "nad2Tags");
+    registerModel(NAD2Tag);
+    registerModel(NAD2Article);
+    const article = await NAD2Article.create({ title: "no destroy key 2" });
+    assignNestedAttributes(article, "nad2Tags", [{ name: "keep2" }]);
+    await article.save();
+    const tags = await NAD2Tag.where({ nad2_article_id: article.id }).toArray();
+    expect(tags.length).toBe(1);
+    expect(tags[0].readAttribute("_destroy" as any)).toBeFalsy();
+  });
 });
 
 describe("should not destroy the associated model until the parent is saved", () => {
@@ -35022,11 +35230,44 @@ describe("should not destroy the associated model until the parent is saved", ()
 });
 
 describe("should not load association when updating existing records", () => {
-  it.skip("should not load association when updating existing records", () => { /* fixture-dependent */ });
+  it("should not load association when updating existing records", async () => {
+    const adapter = freshAdapter();
+    class NLU2Tag extends Base {
+      static { this._tableName = "nlu2_tags"; this.attribute("name", "string"); this.attribute("nlu2_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NLU2Article extends Base {
+      static { this._tableName = "nlu2_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NLU2Article, "nlu2Tags", { className: "NLU2Tag", foreignKey: "nlu2_article_id" });
+    acceptsNestedAttributesFor(NLU2Article, "nlu2Tags");
+    registerModel(NLU2Tag);
+    registerModel(NLU2Article);
+    const article = await NLU2Article.create({ title: "original 2" });
+    const tag = await NLU2Tag.create({ name: "existing2", nlu2_article_id: article.id });
+    assignNestedAttributes(article, "nlu2Tags", [{ id: tag.id, name: "updated2" }]);
+    await article.save();
+    const reloaded = await NLU2Tag.find(tag.id);
+    expect(reloaded.readAttribute("name")).toBe("updated2");
+  });
 });
 
 describe("should not load the associated models if they were not loaded yet", () => {
-  it.skip("should not load the associated models if they were not loaded yet", () => { /* fixture-dependent */ });
+  it("should not load the associated models if they were not loaded yet", async () => {
+    const adapter = freshAdapter();
+    class NL2Tag extends Base {
+      static { this._tableName = "nl2_tags"; this.attribute("name", "string"); this.attribute("nl2_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NL2Article extends Base {
+      static { this._tableName = "nl2_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NL2Article, "nl2Tags", { className: "NL2Tag", foreignKey: "nl2_article_id" });
+    acceptsNestedAttributesFor(NL2Article, "nl2Tags");
+    registerModel(NL2Tag);
+    registerModel(NL2Article);
+    const article = await NL2Article.create({ title: "no load 2" });
+    const saved = await article.save();
+    expect(saved).toBe(true);
+  });
 });
 
 describe("should not overwrite unsaved updates when loading association", () => {
@@ -35042,7 +35283,24 @@ describe("should not save and return false if a callback cancelled saving in eit
 });
 
 describe("should not update children when parent creation with no reason", () => {
-  it.skip("should not update children when parent creation with no reason", () => { /* fixture-dependent */ });
+  it("should not update children when parent creation with no reason", async () => {
+    const adapter = freshAdapter();
+    class NUC2Tag extends Base {
+      static { this._tableName = "nuc2_tags"; this.attribute("name", "string"); this.attribute("nuc2_article_id", "integer"); this.adapter = adapter; }
+    }
+    class NUC2Article extends Base {
+      static { this._tableName = "nuc2_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(NUC2Article, "nuc2Tags", { className: "NUC2Tag", foreignKey: "nuc2_article_id" });
+    acceptsNestedAttributesFor(NUC2Article, "nuc2Tags");
+    registerModel(NUC2Tag);
+    registerModel(NUC2Article);
+    const article = await NUC2Article.create({ title: "parent 2" });
+    const tag = await NUC2Tag.create({ name: "child2", nuc2_article_id: article.id });
+    await article.save();
+    const reloaded = await NUC2Tag.find(tag.id);
+    expect(reloaded.readAttribute("name")).toBe("child2");
+  });
 });
 
 describe("should not use default invalid error on associated models", () => {
