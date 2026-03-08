@@ -1,8 +1,8 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **62.2%** (3,375 matched / 5,428 total Ruby tests). 2,052 stubs need converting, 1 test is missing entirely.
+Current state: **67.7%** (3,674 matched / 5,428 total Ruby tests). 1,753 stubs need converting, 1 test is missing entirely.
 
-> **Progress update (2026-03-08):** Converted ~583 stubs to passing tests, jumping from 51.4% to 62.2%. Key areas completed: NormalizedAttributeTest, SerializationTest, JsonSerializationTest, StoreTest (with prefix/suffix), SerializedAttributeTest, SignedIdTest, WhereChainTest (partial), UniquenessValidation (full), ReflectionTest, ExplainTest, InvertibleMigrationTest, ActiveRecordSchemaTest, OptimisticLockingTest (partial), TransactionCallbacksTest (partial), InnerJoinAssociationTest, LeftOuterJoinAssociationTest, DelegatedTypeTest, CustomPropertiesTest, InverseAssociationTests, NestedAttributesTests, AutosaveTests. Also implemented new features: `normalizeAttribute`/`normalizeValueFor`/`apply_to_nil`, normalization stacking, `delegatedType()`, store prefix/suffix, `storedAttributes()`, `annotate()` on Relation.
+> **Progress update (2026-03-08):** Converted ~882 stubs to passing tests, jumping from 51.4% to 67.7%. Key areas completed: NormalizedAttributeTest, SerializationTest, JsonSerializationTest, StoreTest (with prefix/suffix), SerializedAttributeTest, SignedIdTest, WhereChainTest (partial), UniquenessValidation (full), ReflectionTest, ExplainTest, InvertibleMigrationTest, ActiveRecordSchemaTest, OptimisticLockingTest (partial), TransactionCallbacksTest (partial), InnerJoinAssociationTest, LeftOuterJoinAssociationTest, DelegatedTypeTest, CustomPropertiesTest, InverseAssociationTests, NestedAttributesTests, AutosaveTests, ReadOnlyTest, TimeTravelTest, TouchLaterTest, HasManyAssociationsTest (partial), BelongsToAssociationsTest (partial), HasOneAssociationsTest (partial), HasAndBelongsToManyAssociationsTest (partial), HasManyThroughAssociationsTest (partial), HasOneThroughAssociationsTest (partial), NestedThroughAssociationsTest (partial), AssociationsJoinModelTest (partial), EagerAssociationTest (partial). Also implemented new features: `normalizeAttribute`/`normalizeValueFor`/`apply_to_nil`, normalization stacking, `delegatedType()`, store prefix/suffix, `storedAttributes()`, `annotate()` on Relation.
 
 This document groups the remaining work into feature areas, identifies dependencies, and marks what can be worked on in parallel.
 
@@ -14,32 +14,32 @@ This document groups the remaining work into feature areas, identifies dependenc
 
 | # | Feature Area | Stubs | Done | Key Dependencies | Parallel? |
 |---|---|---|---|---|---|
-| 1 | Through Associations | 257 | 0 | Associations core | Yes |
-| 2 | HasMany Associations | 199 | 0 | Associations core, fixtures | Yes |
-| 3 | Eager Loading / Preloading | 198 | 0 | Associations (all types), JOINs | After 1,2,5 |
+| 1 | Through Associations | 257 | ~60 | Associations core | **Partial** |
+| 2 | HasMany Associations | 199 | ~80 | Associations core, fixtures | **Partial** |
+| 3 | Eager Loading / Preloading | 198 | ~50 | Associations (all types), JOINs | **Partial** |
 | 4 | Base / Persistence / Attributes | 174 | ~80 | Mostly standalone | **Partial** |
 | 5 | Autosave Associations | 166 | ~70 | Associations (all types) | **Partial** |
-| 6 | Association Misc | 158 | ~50 | Associations core | **Partial** |
-| 7 | Join Associations | 150 | ~42 | Associations core, JOINs | **Partial** |
-| 8 | Relation / Where | 130 | ~12 | Relation core | **Partial** |
-| 9 | Nested Attributes | 124 | ~71 | Associations (all types), autosave | **Partial** |
+| 6 | Association Misc | 158 | ~60 | Associations core | **Partial** |
+| 7 | Join Associations | 150 | ~55 | Associations core, JOINs | **Partial** |
+| 8 | Relation / Where | 130 | ~20 | Relation core | **Partial** |
+| 9 | Nested Attributes | 124 | ~95 | Associations (all types), autosave | **Partial** |
 | 10 | Migrations / Schema | 111 | ~53 | Standalone | **Partial** |
 | 11 | Serialization / Store / JSON | 100 | ~65 | Mostly standalone | **Mostly done** |
-| 12 | BelongsTo Associations | 96 | 0 | Associations core | Yes |
+| 12 | BelongsTo Associations | 96 | ~45 | Associations core | **Partial** |
 | 13 | Inverse Associations | 93 | ~53 | Associations (all types) | **Partial** |
-| 14 | HABTM Associations | 84 | 0 | Associations core, join tables | Yes |
-| 15 | HasOne Associations | 72 | 0 | Associations core | Yes |
+| 14 | HABTM Associations | 84 | ~40 | Associations core, join tables | **Partial** |
+| 15 | HasOne Associations | 72 | ~35 | Associations core | **Partial** |
 | 16 | Validations | 53 | ~53 | Base, associations (for uniqueness) | **Done** |
 | 17 | Finders / Calculations | 47 | 0 | Relation, JOINs | Yes |
-| 18 | Locking | 46 | ~26 | Base, transactions | **Partial** |
-| 19 | Transactions | 44 | ~11 | Base | **Partial** |
+| 18 | Locking | 46 | ~27 | Base, transactions | **Partial** |
+| 19 | Transactions | 44 | ~12 | Base | **Partial** |
 | 20 | Insert / Upsert | 43 | 0 | Base | Yes |
 | 21 | Reflection | 40 | ~27 | Associations | **Mostly done** |
-| 22 | Counter Cache | 39 | 0 | BelongsTo, callbacks | After 12 |
+| 22 | Counter Cache | 39 | ~5 | BelongsTo, callbacks | **Partial** |
 | 23 | Strict Loading | 30 | 0 | Associations (all types) | Yes |
 | 24 | Primary Keys | 24 | ~17 | Base | **Mostly done** |
-| 25 | Small areas (<20 each) | 130 | ~53 | Various | Mixed |
-| | **TOTAL** | **2,635** | **~583** | | |
+| 25 | Small areas (<20 each) | 130 | ~80 | Various | Mixed |
+| | **TOTAL** | **2,635** | **~882** | | |
 
 ## Dependency graph
 
