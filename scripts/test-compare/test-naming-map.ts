@@ -2283,6 +2283,15 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "controller/url_for_test.rb": [
       { file: "url-for.test.ts", describeBlock: "ActionController::UrlFor" },
     ],
+    "dispatch/cookies_test.rb": [
+      { file: "cookies.test.ts", describeBlock: "ActionDispatch::Cookies" },
+    ],
+    "dispatch/ssl_test.rb": [
+      { file: "middleware/ssl.test.ts", describeBlock: "ActionDispatch::SSL" },
+    ],
+    "dispatch/host_authorization_test.rb": [
+      { file: "middleware/host-authorization.test.ts", describeBlock: "ActionDispatch::HostAuthorization" },
+    ],
   },
 };
 

@@ -20,3 +20,6 @@ export { Request } from "./request.js";
 export { Response, type CookieOptions } from "./response.js";
 export { Parameters, ParameterMissing } from "./parameters.js";
 export { urlFor, type UrlOptions } from "./url-for.js";
+export { CookieJar, SignedCookieJar, EncryptedCookieJar, PermanentCookieJar, type CookieJarOptions, type SetCookieOptions } from "./cookies.js";
+export { SSL, type SSLOptions, type HSTSOptions } from "./middleware/ssl.js";
+export { HostAuthorization, type HostAuthorizationOptions } from "./middleware/host-authorization.js";

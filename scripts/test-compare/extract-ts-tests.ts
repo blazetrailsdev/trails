@@ -118,6 +118,9 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actiondispatch/src/response.test.ts",
     "packages/actiondispatch/src/parameters.test.ts",
     "packages/actiondispatch/src/url-for.test.ts",
+    "packages/actiondispatch/src/cookies.test.ts",
+    "packages/actiondispatch/src/middleware/ssl.test.ts",
+    "packages/actiondispatch/src/middleware/host-authorization.test.ts",
   ],
 };
 
