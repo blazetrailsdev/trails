@@ -2292,6 +2292,18 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/host_authorization_test.rb": [
       { file: "middleware/host-authorization.test.ts", describeBlock: "ActionDispatch::HostAuthorization" },
     ],
+    "dispatch/middleware_stack_test.rb": [
+      { file: "middleware/stack.test.ts", describeBlock: "ActionDispatch::MiddlewareStack" },
+    ],
+    "dispatch/mime_type_test.rb": [
+      { file: "mime-type.test.ts", describeBlock: "ActionDispatch::Mime::Type" },
+    ],
+    "dispatch/content_security_policy_test.rb": [
+      { file: "content-security-policy.test.ts", describeBlock: "ActionDispatch::ContentSecurityPolicy" },
+    ],
+    "controller/redirect_test.rb": [
+      { file: "redirect.test.ts", describeBlock: "ActionController::Redirect" },
+    ],
   },
 };
 

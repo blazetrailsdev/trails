@@ -121,6 +121,10 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actiondispatch/src/cookies.test.ts",
     "packages/actiondispatch/src/middleware/ssl.test.ts",
     "packages/actiondispatch/src/middleware/host-authorization.test.ts",
+    "packages/actiondispatch/src/middleware/stack.test.ts",
+    "packages/actiondispatch/src/mime-type.test.ts",
+    "packages/actiondispatch/src/content-security-policy.test.ts",
+    "packages/actiondispatch/src/redirect.test.ts",
   ],
 };
 

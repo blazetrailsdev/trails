@@ -1,0 +1,182 @@
+import { describe, it, expect } from "vitest";
+import { redirectTo, redirectBack } from "./redirect.js";
+
+describe("ActionController::Redirect", () => {
+  it("simple redirect", () => {
+    const result = redirectTo("http://example.com/posts");
+    expect(result.status).toBe(302);
+    expect(result.location).toBe("http://example.com/posts");
+    expect(result.body).toContain("redirected");
+  });
+
+  it("redirect with header break", () => {
+    expect(() => redirectTo("http://example.com\r\ninjection")).toThrow(/header break/);
+  });
+
+  it("redirect with null bytes", () => {
+    expect(() => redirectTo("http://example.com\0evil")).toThrow(/null bytes/);
+  });
+
+  it("redirect with no status", () => {
+    const result = redirectTo("/posts");
+    expect(result.status).toBe(302);
+  });
+
+  it("redirect with status", () => {
+    const result = redirectTo("/posts", { status: 301 });
+    expect(result.status).toBe(301);
+  });
+
+  it("redirect with status hash", () => {
+    const result = redirectTo("/posts", { status: 307 });
+    expect(result.status).toBe(307);
+  });
+
+  it("redirect with protocol", () => {
+    const result = redirectTo("https://example.com/posts");
+    expect(result.location).toBe("https://example.com/posts");
+  });
+
+  it("url redirect with status", () => {
+    const result = redirectTo("http://example.com/", { status: 301 });
+    expect(result.status).toBe(301);
+    expect(result.location).toBe("http://example.com/");
+  });
+
+  it("url redirect with status hash", () => {
+    const result = redirectTo("http://example.com/", { status: 303 });
+    expect(result.status).toBe(303);
+  });
+
+  it("relative url redirect with status", () => {
+    const result = redirectTo("/relative/path", { status: 301 });
+    expect(result.status).toBe(301);
+    expect(result.location).toBe("/relative/path");
+  });
+
+  it("relative url redirect with status hash", () => {
+    const result = redirectTo("/foo", { status: 307 });
+    expect(result.status).toBe(307);
+  });
+
+  it("relative url redirect host with port", () => {
+    const result = redirectTo("http://example.com:3000/foo");
+    expect(result.location).toBe("http://example.com:3000/foo");
+  });
+
+  it("simple redirect using options", () => {
+    const result = redirectTo("/dashboard", { status: 302 });
+    expect(result.status).toBe(302);
+    expect(result.location).toBe("/dashboard");
+  });
+
+  it("redirect to url", () => {
+    const result = redirectTo("http://www.example.com");
+    expect(result.location).toBe("http://www.example.com");
+  });
+
+  it("redirect to url with unescaped query string", () => {
+    const result = redirectTo("http://example.com?a=1&b=2");
+    expect(result.location).toBe("http://example.com?a=1&b=2");
+  });
+
+  it("redirect to url with complex scheme", () => {
+    const result = redirectTo("data:text/html,test");
+    expect(result.location).toBe("data:text/html,test");
+  });
+
+  it("redirect to url with network path reference", () => {
+    const result = redirectTo("//cdn.example.com/file.js");
+    expect(result.location).toBe("//cdn.example.com/file.js");
+  });
+
+  it("redirect back", () => {
+    const result = redirectBack({
+      referer: "http://example.com/prev",
+      fallbackLocation: "/",
+    });
+    expect(result.location).toBe("http://example.com/prev");
+  });
+
+  it("redirect back with no referer", () => {
+    const result = redirectBack({
+      fallbackLocation: "/",
+    });
+    expect(result.location).toBe("/");
+  });
+
+  it("redirect back with no referer redirects to another host", () => {
+    const result = redirectBack({
+      fallbackLocation: "http://other.com/",
+    });
+    expect(result.location).toBe("http://other.com/");
+  });
+
+  it("safe redirect back from other host", () => {
+    const result = redirectBack({
+      referer: "http://evil.com/attack",
+      fallbackLocation: "/",
+      allowOtherHost: false,
+      currentHost: "example.com",
+    });
+    expect(result.location).toBe("/");
+  });
+
+  it("safe redirect back from the same host", () => {
+    const result = redirectBack({
+      referer: "http://example.com/prev",
+      fallbackLocation: "/",
+      allowOtherHost: false,
+      currentHost: "example.com",
+    });
+    expect(result.location).toBe("http://example.com/prev");
+  });
+
+  it("safe redirect back with no referer", () => {
+    const result = redirectBack({
+      fallbackLocation: "/fallback",
+      allowOtherHost: false,
+      currentHost: "example.com",
+    });
+    expect(result.location).toBe("/fallback");
+  });
+
+  it("safe redirect back with no referer redirects to another host", () => {
+    const result = redirectBack({
+      fallbackLocation: "http://other.com/",
+      allowOtherHost: false,
+      currentHost: "example.com",
+    });
+    // fallbackLocation is used as-is (only referer is checked)
+    expect(result.location).toBe("http://other.com/");
+  });
+
+  it("safe redirect to root", () => {
+    const result = redirectTo("/");
+    expect(result.location).toBe("/");
+    expect(result.status).toBe(302);
+  });
+
+  it("redirect back with explicit fallback kwarg", () => {
+    const result = redirectBack({
+      fallbackLocation: "/dashboard",
+    });
+    expect(result.location).toBe("/dashboard");
+  });
+
+  it("module redirect", () => {
+    const result = redirectTo("/admin/dashboard");
+    expect(result.location).toBe("/admin/dashboard");
+  });
+
+  it("module redirect using options", () => {
+    const result = redirectTo("/admin/dashboard", { status: 301 });
+    expect(result.status).toBe(301);
+  });
+
+  it("redirect body contains escaped html", () => {
+    const result = redirectTo("/test<script>");
+    expect(result.body).not.toContain("<script>");
+    expect(result.body).toContain("&lt;script&gt;");
+  });
+});
