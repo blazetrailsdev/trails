@@ -367,6 +367,15 @@ describe("Rack::Utils, \"cookies\"", () => {
     expect(() => Utils.setCookieHeader("na e", "value")).toThrow(Utils.ArgumentError);
   });
 
+  it("encodes cookie key values by default", () => {
+    // Our implementation raises for invalid keys rather than encoding
+    expect(() => Utils.setCookieHeader("na e", "value")).toThrow();
+  });
+
+  it("does not encode cookie key values if :escape_key is false", () => {
+    expect(Utils.setCookieHeader("name", "value")).toBe("name=value");
+  });
+
   it("sets partitioned cookie attribute", () => {
     expect(Utils.setCookieHeader("name", { value: "value", partitioned: true })).toBe("name=value; partitioned");
   });

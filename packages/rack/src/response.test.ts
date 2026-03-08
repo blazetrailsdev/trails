@@ -56,6 +56,14 @@ describe("Rack::Response", () => {
     expect(h["content-length"]).toBeUndefined();
   });
 
+  it("#write calls #<< on non-iterable body", () => {
+    const content: string[] = [];
+    const body: any = { push(x: string) { content.push(x); } };
+    const response = new Response(body);
+    response.write("bar");
+    expect(content).toEqual(["bar"]);
+  });
+
   it("can set and read headers", () => {
     const response = new Response();
     expect(response.headers["content-type"]).toBeUndefined();
@@ -526,6 +534,14 @@ describe("Rack::Response", () => {
     res.write("Bar");
     expect(body).toEqual(["Foo"]);
     expect(res.finish()[2]).toEqual(["Foo", "Bar"]);
+  });
+
+  it("handles string reuse in existing body when calling #write", () => {
+    const body = ["Large", " larg", "e fil", "e con", "tent"];
+    const res = new Response(body);
+    res.write(" written");
+    const result = res.finish()[2];
+    expect([...result]).toEqual(["Large", " larg", "e fil", "e con", "tent", " written"]);
   });
 
   it("calls close on #body", () => {

@@ -2163,6 +2163,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "spec_files.rb": [
       { file: "files.test.ts", describeBlock: "Rack::Files" },
+      { file: "files.test.ts", describeBlock: "files" },
     ],
     "spec_head.rb": [
       { file: "head.test.ts", describeBlock: "Rack::Head" },
@@ -2178,6 +2179,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "spec_method_override.rb": [
       { file: "method_override.test.ts", describeBlock: "Rack::MethodOverride" },
+      { file: "method_override.test.ts", describeBlock: "method_override" },
     ],
     "spec_mime.rb": [
       { file: "mime.test.ts", describeBlock: "Rack::Mime" },
@@ -2187,9 +2189,11 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "spec_mock_response.rb": [
       { file: "mock_response.test.ts", describeBlock: "Rack::MockResponse" },
+      { file: "mock_response.test.ts", describeBlock: "Rack::MockResponse, 'headers" },
     ],
     "spec_multipart.rb": [
       { file: "multipart.test.ts", describeBlock: "Rack::Multipart" },
+      { file: "multipart.test.ts", describeBlock: "multipart" },
     ],
     "spec_null_logger.rb": [
       { file: "null_logger.test.ts", describeBlock: "Rack::NullLogger" },
@@ -2205,9 +2209,12 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "spec_response.rb": [
       { file: "response.test.ts", describeBlock: "Rack::Response" },
+      { file: "response.test.ts", describeBlock: "Rack::Response, 'headers" },
+      { file: "response.test.ts", describeBlock: "Rack::Response::Raw" },
     ],
     "spec_rewindable_input.rb": [
       { file: "rewindable_input.test.ts", describeBlock: "Rack::RewindableInput::Middleware" },
+      { file: "rewindable_input.test.ts", describeBlock: "rewindable_input" },
     ],
     "spec_runtime.rb": [
       { file: "runtime.test.ts", describeBlock: "Rack::Runtime" },
@@ -2232,6 +2239,9 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "spec_utils.rb": [
       { file: "utils.test.ts", describeBlock: "Rack::Utils" },
+      { file: "utils.test.ts", describeBlock: "Rack::Utils, \"cookies\"" },
+      { file: "utils.test.ts", describeBlock: "Rack::Utils, \"get_byte_ranges\"" },
+      { file: "utils.test.ts", describeBlock: "Rack::Utils::Context" },
     ],
     "spec_version.rb": [
       { file: "version.test.ts", describeBlock: "Rack" },
@@ -3263,6 +3273,19 @@ export const TEST_OVERRIDES: Record<string, string | null> = {
   "ModelTest > mixin inclusion chain": "ActiveModel > ModelTest > mixin inclusion chain",
   "ModelTest > mixin initializer when args exist": "ActiveModel > ModelTest > mixin initializer when args exist",
   "ModelTest > mixin initializer when args dont exist": "ActiveModel > ModelTest > mixin initializer when args dont exist",
+
+  // ==========================================================================
+  // Rack overrides
+  // ==========================================================================
+  // Ruby .ru file parsing features — not applicable to TypeScript
+  "raises if parses commented options": null,
+  "removes __END__ before evaluating app": null,
+  "supports multi-line comments": null,
+  "requires an_underscore_app not ending in .ru": null,
+  "sets __LINE__ correctly": null,
+  "strips leading unicode byte order mark when present": null,
+  "respects the frozen_string_literal magic comment": null,
+  "builds a rack app from string": null,
 
   // ==========================================================================
   // ActiveRecord overrides

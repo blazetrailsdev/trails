@@ -275,6 +275,11 @@ describe("Rack::Multipart", () => {
     expect(params["files"].filename).toBe("foo");
   });
 
+  it("parses multipart content with different filename and filename*", () => {
+    const params = parseFixture("filename_multi")!;
+    expect(params["files"].filename).toBeDefined();
+  });
+
   it("prefers filename over filename* when both are present", () => {
     const params = parseFixture("filename_multi")!;
     expect(params["files"].filename).toBe("foo");

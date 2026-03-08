@@ -101,6 +101,13 @@ it("does not set the content-type header if the MIME type is not specified", asy
   expect(res.headers["content-type"]).toBeUndefined();
 });
 
+it("serve files", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
+  expect(res.status).toBe(200);
+  expect(res.bodyString).toContain("Hello World");
+});
+
 it("returns 404 and empty body for a HEAD request when the file is not found", async () => {
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).head("/nonexistent.txt");
