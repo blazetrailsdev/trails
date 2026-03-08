@@ -193,4 +193,152 @@ describe("ActionDispatch::Response", () => {
     // Content-length should be byte length, not char length
     expect(res.contentLength).toBe(Buffer.byteLength("テスト", "utf-8"));
   });
+
+  // --- Headers ---
+
+  it("getHeader is case insensitive", () => {
+    const res = new Response();
+    res.setHeader("X-Custom", "value");
+    expect(res.getHeader("X-Custom")).toBe("value");
+  });
+
+  it("deleteHeader removes the header", () => {
+    const res = new Response();
+    res.setHeader("X-Custom", "value");
+    res.deleteHeader("X-Custom");
+    expect(res.getHeader("X-Custom")).toBeUndefined();
+  });
+
+  it("setHeader overwrites existing header", () => {
+    const res = new Response();
+    res.setHeader("X-Custom", "first");
+    res.setHeader("X-Custom", "second");
+    expect(res.getHeader("X-Custom")).toBe("second");
+  });
+
+  // --- ETag ---
+
+  it("weak ETag detection", () => {
+    const res = new Response();
+    res.setHeader("etag", 'W/"abc"');
+    expect(res.weakEtag).toBe(true);
+    expect(res.strongEtag).toBe(false);
+  });
+
+  it("setting etag to undefined removes it", () => {
+    const res = new Response();
+    res.etag = "test";
+    res.etag = undefined;
+    expect(res.etag).toBeUndefined();
+  });
+
+  it("etag auto-quotes unquoted value", () => {
+    const res = new Response();
+    res.etag = "abc";
+    expect(res.etag).toBe('"abc"');
+  });
+
+  it("etag preserves W/ prefix", () => {
+    const res = new Response();
+    res.etag = 'W/"weak"';
+    expect(res.etag).toBe('W/"weak"');
+  });
+
+  // --- Cache-Control ---
+
+  it("setting cacheControl to undefined removes it", () => {
+    const res = new Response();
+    res.cacheControl = "no-cache";
+    res.cacheControl = undefined;
+    expect(res.cacheControl).toBeUndefined();
+  });
+
+  // --- Content type ---
+
+  it("text content type gets charset appended", () => {
+    const res = new Response();
+    res.contentType = "text/plain";
+    expect(res.getHeader("content-type")).toBe("text/plain; charset=utf-8");
+  });
+
+  it("non-text content type has no charset", () => {
+    const res = new Response();
+    res.contentType = "application/json";
+    expect(res.getHeader("content-type")).toBe("application/json");
+  });
+
+  it("setting contentType to undefined clears it", () => {
+    const res = new Response();
+    res.contentType = "text/html";
+    res.contentType = undefined;
+    expect(res.contentType).toBeUndefined();
+  });
+
+  // --- Cookies with options ---
+
+  it("setCookie with options", () => {
+    const res = new Response();
+    res.setCookie("session", { value: "abc", path: "/", httpOnly: true, secure: true });
+    expect(res.cookies.session).toBe("abc");
+  });
+
+  it("deleteCookie sets empty value and past expiry", () => {
+    const res = new Response();
+    res.setCookie("token", "val");
+    res.deleteCookie("token");
+    expect(res.cookies.token).toBe("");
+  });
+
+  // --- Factory ---
+
+  it("Response.create with no body", () => {
+    const res = Response.create(404);
+    expect(res.status).toBe(404);
+    expect(res.body).toBe("");
+  });
+
+  it("Response.create with all args", () => {
+    const res = Response.create(201, { "x-custom": "yes" }, "created");
+    expect(res.status).toBe(201);
+    expect(res.getHeader("x-custom")).toBe("yes");
+    expect(res.body).toBe("created");
+  });
+
+  // --- Default constructor ---
+
+  it("default constructor has status 200", () => {
+    const res = new Response();
+    expect(res.status).toBe(200);
+    expect(res.body).toBe("");
+  });
+
+  // --- Status messages ---
+
+  it("status messages for common codes", () => {
+    expect(new Response(201).message).toBe("Created");
+    expect(new Response(204).message).toBe("No Content");
+    expect(new Response(302).message).toBe("Found");
+    expect(new Response(400).message).toBe("Bad Request");
+    expect(new Response(401).message).toBe("Unauthorized");
+    expect(new Response(403).message).toBe("Forbidden");
+    expect(new Response(422).message).toBe("Unprocessable Entity");
+    expect(new Response(503).message).toBe("Service Unavailable");
+  });
+
+  // --- contentLength ---
+
+  it("contentLength returns undefined when not set", () => {
+    const res = new Response();
+    expect(res.contentLength).toBeUndefined();
+  });
+
+  // --- inspect ---
+
+  it("inspect for error status", () => {
+    expect(new Response(500).inspect()).toBe("#<ActionDispatch::Response 500 Internal Server Error>");
+  });
+
+  it("inspect for redirect", () => {
+    expect(new Response(302).inspect()).toBe("#<ActionDispatch::Response 302 Found>");
+  });
 });
