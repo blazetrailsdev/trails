@@ -1,175 +1,132 @@
 # ActionController: Road to 100% Test Coverage
 
-Current state: **11.5%** (220 matched / 1,912 total controller+abstract tests). 0 stubs, 1,692 missing.
+Current state: **~20%** (~393 matched / 1,912 total controller+abstract tests). 173 new controller tests written, ~1,519 remaining.
 
-In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. Our `test:compare` script counts all controller tests under the `actiondispatch` package. This doc covers the `controller/` and `abstract/` test files specifically.
+In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 
-We do not yet have an ActionController implementation. Building one is the single largest piece of work remaining across the entire project.
+## What's been built
 
-## Current state
+We now have a working ActionController implementation with the full Rails inheritance chain:
 
-We have **no** `ActionController::Base` class. The 220 matched tests come from features that are implemented standalone in the `actiondispatch` package:
+```
+AbstractController::Base → ActionController::Metal → ActionController::Base
+                                                   → ActionController::API
+```
 
-| Area | Matched | Total | Where it lives today |
-|---|---|---|---|
-| Parameters (permit, accessors) | 42 | 311 | `parameters.ts` |
-| Flash | 37 | 47 | `flash.ts` |
-| URL generation | 29 | 60 | `url-for.ts` |
-| CSRF protection | 44 | 100 | `request-forgery-protection.ts` |
-| respond_to | 28 | 66 | `respond-to.ts` |
-| Redirects | 28 | 54 | `redirect.ts` |
-| Routing (controller side) | 11 | 230 | `routing/` |
-| HTTP auth | 1 | 58 | `http-authentication.ts` |
-| **Total** | **220** | **1,912** | |
+### Implementation files
 
-## Summary by feature area
+| File | What it provides |
+|---|---|
+| `actioncontroller/abstract-controller.ts` | Action dispatch, callbacks (before/after/around), skip, only/except/if/unless/prepend, class hierarchy traversal |
+| `actioncontroller/metal.ts` | Request/Response/Params, `dispatch()`, `head()`, status codes (22 symbols), headers, `toRackResponse()` |
+| `actioncontroller/base.ts` | Rendering (json/plain/html/body/text), redirects, flash, CSRF, `rescue_from`, conditional GET (freshWhen/stale/expiresIn), `sendFile`/`sendData`, content negotiation, template resolver |
+| `actioncontroller/index.ts` | Package exports |
 
-| # | Feature Area | Missing | Matched | Depends On |
+### Test files (173 tests, all passing)
+
+| File | Tests | Coverage area |
+|---|---|---|
+| `abstract-controller.test.ts` | 22 | Callbacks, action dispatch, inheritance, skip, conditions |
+| `metal.test.ts` | 25 | Status codes, headers, dispatch, head, params, Rack response |
+| `base.test.ts` | 44 | Rendering, redirects, flash, rescue, caching, sendData, API |
+| `filters.test.ts` | 17 | Controller-level before/after/around with only/except/if/unless/prepend/skip/inherit |
+| `rendering.test.ts` | 31 | All render variants, head, renderToString, double render, implicit render, API rendering |
+| `redirect.test.ts` | 11 | redirect_to, redirect_back, status codes, referer, fallback |
+| `caching.test.ts` | 13 | freshWhen, stale, ETag, Last-Modified, 304, expiresIn, expiresNow |
+| `rescue.test.ts` | 10 | rescue_from, subclass matching, inheritance, async handlers |
+
+### Supporting changes
+
+- `actiondispatch/request.ts` — Added `getHeader()` for Rack env header access
+- `scripts/test-compare/extract-ts-tests.ts` — All 8 test files registered under `actioncontroller` package
+
+## Current state by feature area
+
+| # | Feature Area | Missing | Matched | Status |
 |---|---|---|---|---|
-| 1 | Parameters | 269 | 42 | Standalone |
-| 2 | Rendering | 269 | 0 | Controller base |
-| 3 | Testing harness | 224 | 0 | Controller base, routing |
-| 4 | Routing (controller) | 219 | 11 | Routing engine |
-| 5 | Other (base, assertions, etc) | 229 | 0 | Controller base |
-| 6 | Security/Auth | 113 | 45 | Controller base |
-| 7 | Content negotiation | 67 | 28 | Controller base |
-| 8 | Filters/Callbacks | 54 | 0 | Controller base |
-| 9 | AbstractController | 52 | 0 | Standalone |
-| 10 | Streaming | 40 | 0 | Controller base |
-| 11 | Caching | 32 | 0 | Controller base |
-| 12 | Error handling | 32 | 0 | Controller base |
-| 13 | URL generation | 30 | 29 | Routing |
-| 14 | Redirects | 26 | 28 | Controller base |
-| 15 | File sending | 26 | 0 | Controller base |
-| 16 | Flash (controller) | 10 | 37 | Controller base |
-| | **TOTAL** | **1,692** | **220** | |
-
-## What needs to be built
-
-### 1. AbstractController::Base
-
-The foundation. Rails' `AbstractController::Base` provides:
-- Action dispatching — call a method by name based on the route
-- Callbacks (before_action, after_action, around_action) — 26 tests
-- Response body assignment
-- Format collection — 5 tests
-
-### 2. ActionController::Metal
-
-Minimal controller with Rack interface:
-- `dispatch(action, request, response)` — processes a request
-- `params`, `request`, `response` accessors
-- Status code and header management
-- `head :ok`, `head :not_found`, etc.
-
-### 3. ActionController::Base
-
-Full controller inheriting from Metal with modules mixed in:
-- **Rendering** — `render json:`, `render plain:`, `render html:`, `render body:`, `render status:`
-- **Redirecting** — `redirect_to`, `redirect_back`
-- **Filters** — `before_action`, `after_action`, `around_action`, `skip_before_action`
-- **Strong Parameters** — `params.require().permit()`
-- **Flash** — `flash[:notice]`, `flash.now[:alert]`
-- **Cookies** — `cookies[:key]`, `cookies.signed`, `cookies.encrypted`
-- **Session** — `session[:key]`
-- **CSRF** — `protect_from_forgery`, `verify_authenticity_token`
-- **Content negotiation** — `respond_to { |format| format.html; format.json }`
-- **URL generation** — `url_for`, named route helpers
-- **Rescue** — `rescue_from`, exception handling
-- **Caching** — conditional GET (`stale?`, `fresh_when`)
-
-### 4. ActionController::API
-
-API-only controller (subset of Base, no view rendering):
-- Everything from Base minus HTML rendering, CSRF, cookies, sessions, flash
-
-### 5. Testing infrastructure
-
-- `ActionController::TestCase` — `get :index`, `post :create`, `assert_response`
-- `ActionDispatch::IntegrationTest` — full-stack integration tests
-- Mock request/response pipeline
+| 1 | Parameters | ~269 | 42 | Standalone impl exists, needs deep coverage |
+| 2 | Rendering | ~238 | ~31 | Simple rendering done, templates/partials/streaming remain |
+| 3 | Testing harness | 224 | 0 | Not started |
+| 4 | Routing (controller) | 219 | 11 | Not started |
+| 5 | Other (base, assertions, etc) | ~185 | ~44 | Base skeleton done, assertions/logging/helpers remain |
+| 6 | Security/Auth | ~113 | 45 | CSRF/auth impl exists, controller integration tests needed |
+| 7 | Content negotiation | ~67 | 28 | respond_to impl exists, edge cases remain |
+| 8 | Filters/Callbacks | ~15 | ~39 | Core filters done, edge cases remain |
+| 9 | AbstractController | ~10 | ~42 | Core done, Translation/Collector remain |
+| 10 | Streaming | 40 | 0 | Not started |
+| 11 | Caching | ~19 | ~13 | Conditional GET done, HTTP caching edge cases remain |
+| 12 | Error handling | ~22 | ~10 | rescue_from done, show_exceptions remain |
+| 13 | URL generation | ~30 | 29 | Mostly done |
+| 14 | Redirects | ~15 | ~39 | Core done, edge cases remain |
+| 15 | File sending | ~26 | ~0 | sendFile/sendData impl exists, needs tests |
+| 16 | Flash (controller) | ~10 | 37 | Mostly done |
+| | **TOTAL** | **~1,519** | **~393** | |
 
 ## Dependency graph
 
 ```
-AbstractController::Base (52 tests)  ──── no dependencies
+AbstractController::Base (DONE — 22 tests)
    │
-   ├── Callbacks (26 tests) ── before/after/around_action
+   ├── Callbacks (DONE — 22 + 17 tests)
    ├── Collector (5 tests) ── format collection
    └── Translation (21 tests) ── I18n (may defer)
 
-ActionController::Metal (2 tests)  ──── depends on AbstractController
+ActionController::Metal (DONE — 25 tests)
    │
-   └── dispatch(action, request, response)
+   └── dispatch, head, status codes, params, Rack response
 
-ActionController::Base  ──── depends on Metal + ActionDispatch
+ActionController::Base (DONE — 44 + 31 + 11 + 13 + 10 tests)
    │
-   ├── Parameters deep (269 tests, 42 matched)  ──── mostly standalone
-   │     ├── permit / require (63 tests)
-   │     ├── accessors (77 tests, 39 matched)
-   │     ├── mutators (40 tests, 2 matched)
-   │     ├── expect (25 tests) ── Rails 8
-   │     ├── nested permit (15 tests)
-   │     ├── params wrapper (31 tests)
-   │     ├── logging unpermitted (18 tests)
-   │     └── other small (22 tests)
+   ├── Rendering (PARTIALLY DONE — 31 tests)
+   │     ├── json/plain/html/body/text (DONE)
+   │     ├── head (DONE)
+   │     ├── renderToString (DONE)
+   │     ├── Double render prevention (DONE)
+   │     ├── Template resolver (DONE — pluggable)
+   │     ├── render_action (23) ── NOT STARTED
+   │     ├── render_template (18) ── NOT STARTED
+   │     ├── render_layout (10) ── NOT STARTED
+   │     ├── render_streaming (8) ── NOT STARTED
+   │     ├── render_partial (4) ── NOT STARTED
+   │     └── renderer (25) ── NOT STARTED
    │
-   ├── Rendering (269 tests)  ──── needs controller dispatch
-   │     ├── render_test.rb (88 tests) ── comprehensive
-   │     ├── render_action (23) ── action-based rendering
-   │     ├── render_template (18) ── template rendering
-   │     ├── render_html/plain/body (40) ── simple string rendering
-   │     ├── render_json (10) ── JSON responses
-   │     ├── render_layout (10) ── layout wrapping
-   │     ├── render_streaming (8) ── streaming responses
-   │     ├── render_partial (4) ── partial rendering
-   │     ├── renderer (25) ── standalone rendering
-   │     └── other (43)
+   ├── Filters/Callbacks (DONE — 17 tests)
+   │     └── before/after/around, skip, only/except/if/unless, prepend, inherit
    │
-   ├── Filters/Callbacks (54 tests)  ──── needs controller dispatch
-   │     └── before_action, after_action, around_action, skip_*
+   ├── Redirecting (DONE — 11 tests)
+   │     └── redirect_to, redirect_back, status codes, referer
    │
-   ├── Security/Auth (113 tests, 45 matched)
-   │     ├── CSRF (56 missing, 44 matched) ── controller integration
-   │     ├── HTTP Basic (15 missing)
-   │     ├── HTTP Digest (21 missing) ── may defer
-   │     └── HTTP Token (21 missing, 1 matched)
+   ├── Caching (DONE — 13 tests)
+   │     └── freshWhen, stale, ETag, Last-Modified, 304, expiresIn, expiresNow
    │
-   ├── Content negotiation (67 tests, 28 matched)
-   │     ├── respond_to (38 missing, 28 matched)
-   │     ├── content_type (23 missing)
-   │     └── accept format (6 missing)
+   ├── Rescue (DONE — 10 tests)
+   │     └── rescue_from, subclass matching, inheritance, async
    │
-   ├── Routing from controllers (219 tests, 11 matched)
-   │     ├── controller routing (140 missing)
-   │     ├── resource routing (78 missing)
-   │     └── route helpers (1 missing)
-   │
-   ├── URL generation (30 missing, 29 matched)
-   ├── Redirects (26 missing, 28 matched)
-   ├── Flash (10 missing, 37 matched)
-   ├── File sending (26 missing) ── send_file, send_data
-   ├── Error handling (32 missing) ── rescue_from, show_exceptions
-   ├── Caching (32 missing) ── conditional GET, ETag, stale?
-   ├── Streaming (40 missing) ── SSE, live streaming
+   ├── Flash (DONE via actiondispatch — 37 tests)
+   ├── CSRF (DONE via actiondispatch — 44 tests)
+   ├── Parameters deep (269 tests, 42 matched) ── needs more coverage
+   ├── Security/Auth (113 tests, 45 matched) ── needs controller integration
+   ├── Content negotiation (67 tests, 28 matched) ── needs edge cases
+   ├── Routing (219 tests, 11 matched) ── NOT STARTED
+   ├── File sending (26 missing) ── impl exists, needs tests
+   ├── Streaming (40 missing) ── NOT STARTED
    │
    └── Other (229 missing)
-       ├── ActionPack assertions (44) ── assert_redirected_to, etc.
-       ├── Log subscriber (34) ── request logging
-       ├── Helpers (23) ── helper modules
-       ├── Base tests (34) ── base + new_base
-       ├── Bare metal (22) ── minimal controller
-       ├── ConditionalGet (10) ── stale?/fresh_when
-       └── Misc (62) ── encoding, rate limiting, etc.
+       ├── ActionPack assertions (44)
+       ├── Log subscriber (34)
+       ├── Helpers (23)
+       └── Misc (128)
 
-Testing (224 tests)  ──── depends on everything above
-   ├── TestCase (132) ── controller test DSL
-   └── IntegrationTest (92) ── full-stack tests
+ActionController::API (DONE — included in base.test.ts)
+
+Testing (224 tests) ── NOT STARTED
+   ├── TestCase (132)
+   └── IntegrationTest (92)
 ```
 
-## Workstreams
+## Remaining workstreams
 
-### Stream 1: Parameters deep (269 missing) — STANDALONE, START NOW
+### Stream 1: Parameters deep (269 missing) — STANDALONE
 
 Parameters is the most independently testable area. We already have `parameters.ts` with 42 matched tests. The remaining work is:
 
@@ -184,150 +141,57 @@ Parameters is the most independently testable area. We already have `parameters.
 - **required params** (12 missing) — ActionController::ParameterMissing
 - **other** (50 missing)
 
-### Stream 2: AbstractController (52 missing) — STANDALONE, START NOW
+### Stream 2: Rendering deep (~238 missing)
 
-Build `AbstractController::Base`:
-- Callbacks system (26 tests) — can reuse activesupport's callback infrastructure
-- Collector (5 tests) — format collection for respond_to
-- Translation (21 tests) — I18n lookup from controller context (may defer)
+Simple rendering is done. Remaining:
+- **Action-based rendering** (23) — `render :index`, implicit render
+- **Template rendering** (18) — template lookup pipeline
+- **Layout wrapping** (10) — layout around content
+- **Standalone renderer** (25) — `ApplicationController.renderer.render`
+- **Partial rendering** (4) — `render partial: "form"`
+- **Streaming** (8) — `render stream: true`
+- **Other render tests** (43)
 
-### Stream 3: Controller::Metal + Base skeleton (~100 tests) — AFTER Stream 2
+### Stream 3: Security/Auth controller integration (~113 missing, 45 matched)
 
-Build the minimal controller dispatch pipeline:
+- CSRF controller integration (56 missing) — verify tokens in controller context
+- HTTP Basic (15 missing) — controller integration tests
+- HTTP Token (21 missing) — controller integration tests
+- HTTP Digest (21 missing) — may defer
 
-```typescript
-class Metal {
-  request: Request;
-  response: Response;
-  params: Parameters;
+### Stream 4: Content negotiation deep (~67 missing, 28 matched)
 
-  dispatch(action: string, req: Request, res: Response): Response {
-    this.request = req;
-    this.response = res;
-    this.params = req.parameters;
-    this[action]();
-    return this.response;
-  }
-}
-
-class Base extends Metal {
-  // Mix in: Rendering, Redirecting, Filters, Flash, Cookies, etc.
-}
-```
-
-This unlocks: base_test (21), bare_metal (22), metal_test (2), many other controller tests.
-
-### Stream 4: Filters/Callbacks (54 missing) — AFTER Stream 3
-
-Implement the filter chain on controller base:
-- `before_action :authenticate`, `after_action :log`, `around_action :wrap`
-- `skip_before_action`, `only:`, `except:`, `if:`, `unless:`
-- Halting (rendering/redirecting in a before_action stops the chain)
-
-### Stream 5: Rendering (269 missing) — AFTER Stream 3
-
-**Phase 5a — Simple rendering (~80 tests)**
-
-The easy wins — rendering strings and data without templates:
-- `render plain: "hello"` → set body to string
-- `render html: "<h1>Hi</h1>"` → set body with text/html
-- `render json: { ok: true }` → JSON.stringify + application/json
-- `render body: "raw"` → raw body
-- `render status: 404` / `head :not_found`
-- `render_to_string` — render without sending
-
-**Phase 5b — Action/template rendering (~120 tests)**
-
-This is the hard part. Rails looks up templates by controller name + action:
-- `render :index` → looks for `app/views/posts/index.html.erb`
-- Implicit render — action without explicit render renders its template
-- Layout wrapping — wrap in `application.html.erb`
-
-For TypeScript, we could support a pluggable template resolver without implementing ERB:
-```typescript
-Base.templateResolver = (controller, action, format) => string | null;
-```
-
-**Phase 5c — Partial and streaming (~70 tests)**
-
-- Partial rendering — `render partial: "form"`
-- Streaming — `render stream: true`, ActionController::Live
-- Content negotiation rendering — different templates per format
-
-### Stream 6: Security/Auth (113 missing, 45 matched) — AFTER Stream 3
-
-- CSRF protection controller integration (56 missing) — needs controller to verify tokens
-- HTTP Basic auth (15 missing) — implementation exists, needs controller integration tests
-- HTTP Token auth (21 missing, 1 matched) — similar
-- HTTP Digest auth (21 missing) — complex, may defer
-
-### Stream 7: Content negotiation (67 missing, 28 matched) — AFTER Stream 3
-
-- respond_to edge cases (38 missing) — format blocks, any/all, custom types
-- Content-Type handling (23 missing) — setting response content type
+- respond_to edge cases (38 missing)
+- Content-Type handling (23 missing)
 - Accept header parsing (6 missing)
 
-### Stream 8: Routing from controllers (219 missing) — AFTER Stream 3
+### Stream 5: Routing from controllers (219 missing)
 
-- Controller routing (140 missing) — generating URLs from controller context, polymorphic routing
-- Resource routing (78 missing) — RESTful resource route testing through controllers
+- Controller routing (140 missing) — URL generation from controller context
+- Resource routing (78 missing) — RESTful resource route testing
 - Route helpers (1 missing)
 
-### Stream 9: Remaining features (parallel, ~170 missing) — AFTER Stream 3
+### Stream 6: Remaining features (~170 missing)
 
-- URL generation controller integration (30 missing)
-- Redirects controller integration (26 missing)
-- File sending (26 missing) — `send_file`, `send_data`
-- Error handling (32 missing) — `rescue_from`, exception display
-- Caching (32 missing) — `stale?`, `fresh_when`, conditional GET
-- Flash controller integration (10 missing)
-- Streaming (40 missing) — ActionController::Live, SSE
+- File sending tests (26) — sendFile/sendData (impl exists)
+- Error handling edge cases (22) — show_exceptions
+- Streaming / SSE (40) — ActionController::Live
+- URL generation edge cases (30)
+- Redirect edge cases (15)
+- Flash controller integration (10)
+- AbstractController remainder (10) — Translation, Collector
 
-### Stream 10: Other and cleanup (~229 missing)
+### Stream 7: Other and cleanup (~229 missing)
 
-- ActionPack assertions (44) — `assert_redirected_to`, `assert_response`
-- Log subscriber (34) — request logging
-- Helpers (23) — controller helper modules
+- ActionPack assertions (44) — assert_redirected_to, assert_response
+- Log subscriber (34)
+- Helpers (23)
 - Various small features (128)
 
-### Stream 11: Testing harness (224 missing) — LAST
+### Stream 8: Testing harness (224 missing) — LAST
 
-- `ActionController::TestCase` (132 tests) — functional test DSL
-- `ActionDispatch::IntegrationTest` (92 tests) — full-stack testing
-
-This should be built last because it tests everything else.
-
-## Recommended execution order
-
-```
-Phase 1 — No controller needed (parallel):
-  Stream 1: Parameters deep (269 tests)
-  Stream 2: AbstractController (52 tests)
-  Total: ~321 tests → coverage ~28%
-
-Phase 2 — Controller skeleton:
-  Stream 3: Metal + Base (100 tests)
-  Stream 4: Filters/Callbacks (54 tests)
-  Total: ~154 tests → coverage ~36%
-
-Phase 3 — Core controller features (parallel):
-  Stream 5a: Simple rendering (80 tests)
-  Stream 6: Security/Auth (113 tests)
-  Stream 7: Content negotiation (67 tests)
-  Stream 9: Remaining features (170 tests)
-  Total: ~430 tests → coverage ~58%
-
-Phase 4 — Advanced rendering and routing:
-  Stream 5b: Template rendering (120 tests)
-  Stream 5c: Partial/streaming (70 tests)
-  Stream 8: Routing from controllers (219 tests)
-  Total: ~409 tests → coverage ~80%
-
-Phase 5 — Testing and cleanup:
-  Stream 10: Other (229 tests)
-  Stream 11: Testing harness (224 tests)
-  Total: ~453 tests → 100%
-```
+- `ActionController::TestCase` (132 tests)
+- `ActionDispatch::IntegrationTest` (92 tests)
 
 ## What might be out of scope
 
@@ -341,13 +205,29 @@ Some Rails controller features are deeply tied to Ruby/Rails infrastructure:
 
 If deferred, effective target drops from 1,912 to ~1,762.
 
-## Where to put the code
+## Where the code lives
 
-Options:
-1. **Inside `packages/actiondispatch/`** — Matches how Rails bundles ActionPack. Simplest.
-2. **New `packages/actioncontroller/`** — Cleaner separation. More packages to manage.
+The package has been restructured into `packages/actionpack/` with the following layout:
 
-Recommendation: Start inside `actiondispatch` under `src/controller/`. Extract later if it grows beyond ~1,000 lines. The test:compare script already maps `controller/` tests to actiondispatch.
+```
+packages/actionpack/src/
+  actioncontroller/
+    abstract-controller.ts      # AbstractController::Base
+    abstract-controller.test.ts
+    metal.ts                    # ActionController::Metal
+    metal.test.ts
+    base.ts                     # ActionController::Base + API
+    base.test.ts
+    filters.test.ts
+    rendering.test.ts
+    redirect.test.ts
+    caching.test.ts
+    rescue.test.ts
+    index.ts                    # Exports
+  actiondispatch/
+    ...existing actiondispatch code...
+  index.ts                      # Re-exports both
+```
 
 ## Tracking progress
 
@@ -355,7 +235,7 @@ Recommendation: Start inside `actiondispatch` under `src/controller/`. Extract l
 npm run test:compare
 ```
 
-Controller coverage is embedded in the actiondispatch number. To track controller-specific progress, grep the comparison report for `controller/` files.
+The compare script now has an `actioncontroller` package entry alongside `actiondispatch`.
 
-Current: 220 / 1,912 controller tests matched (11.5%)
+Current: ~393 / 1,912 controller tests matched (~20%)
 Target: 1,912 / 1,912 (100%)
