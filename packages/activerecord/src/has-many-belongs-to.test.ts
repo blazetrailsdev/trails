@@ -4728,8 +4728,45 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect((loaded as any).readAttribute("name")).toBe("Acme");
   });
-  it.skip("eager loading with primary key", () => {});
-  it.skip("eager loading with primary key as symbol", () => {});
+  it("eager loading with primary key", async () => {
+    class EagerPkCompany extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerPkAccount extends Base {
+      static { this.attribute("company_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerPkAccount as any)._associations = [
+      { type: "belongsTo", name: "eagerPkCompany", options: { className: "EagerPkCompany", foreignKey: "company_id" } },
+    ];
+    registerModel(EagerPkCompany);
+    registerModel(EagerPkAccount);
+    const company = await EagerPkCompany.create({ name: "Eager Co" });
+    await EagerPkAccount.create({ company_id: company.id });
+    const accounts = await EagerPkAccount.all().includes("eagerPkCompany").toArray();
+    expect(accounts).toHaveLength(1);
+    const preloaded = (accounts[0] as any)._preloadedAssociations?.get("eagerPkCompany");
+    expect(preloaded).not.toBeNull();
+    expect(preloaded?.readAttribute("name")).toBe("Eager Co");
+  });
+  it("eager loading with primary key as symbol", async () => {
+    class EagerSymCompany extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerSymAccount extends Base {
+      static { this.attribute("company_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerSymAccount as any)._associations = [
+      { type: "belongsTo", name: "eagerSymCompany", options: { className: "EagerSymCompany", foreignKey: "company_id" } },
+    ];
+    registerModel(EagerSymCompany);
+    registerModel(EagerSymAccount);
+    const company = await EagerSymCompany.create({ name: "Sym Co" });
+    await EagerSymAccount.create({ company_id: company.id });
+    const accounts = await EagerSymAccount.all().includes("eagerSymCompany").toArray();
+    expect(accounts).toHaveLength(1);
+    const preloaded = (accounts[0] as any)._preloadedAssociations?.get("eagerSymCompany");
+    expect(preloaded).not.toBeNull();
+  });
   it("creating the belonging object with primary key", async () => {
     class PkBtCompany extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
