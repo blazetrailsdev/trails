@@ -417,7 +417,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(reloaded.readAttribute("cc_comments_count")).toBe(1);
   });
 
-  it.skip("custom named counter cache", async () => {
+  it("custom named counter cache", async () => {
     // Rails: test_custom_named_counter_cache / test_custom_counter_cache
     class CnPost extends Base {
       static {
@@ -442,9 +442,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel("CnComment", CnComment);
 
     const post = await CnPost.create({ title: "Post", my_comment_count: 0 });
-    const comment = await CnComment.create({ body: "Hi", post_id: post.id });
-
-    await updateCounterCaches(comment, "increment");
+    await CnComment.create({ body: "Hi", post_id: post.id });
 
     const reloaded = await CnPost.find(post.id as number);
     expect(reloaded.readAttribute("my_comment_count")).toBe(1);

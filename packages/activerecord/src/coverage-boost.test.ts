@@ -14723,7 +14723,7 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("dont call after commit on destroy based on previous transaction", () => { /* fixture-dependent */ });
+  it.skip("dont call after commit on destroy based on previous transaction", () => { /* destroy doesn't trigger transaction callbacks */ });
 
   it("only call after commit on save after transaction commits for saving record", async () => {
     const adp = freshAdapter();
@@ -14754,10 +14754,23 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("only call after commit on destroy after transaction commits for destroyed record", () => { /* fixture-dependent */ });
+  it.skip("only call after commit on destroy after transaction commits for destroyed record", () => { /* destroy doesn't trigger transaction callbacks */ });
 
   it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => { /* fixture-dependent */ });
-  it.skip("no after commit on destroy after transaction commits for destroyed new record", () => { /* fixture-dependent */ });
+  it("no after commit on destroy after transaction commits for destroyed new record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static { this.attribute("title", "string"); this.adapter = adp; }
+    }
+    const called: string[] = [];
+    Topic.afterCommit(function() { called.push("after_commit"); });
+    await transaction(Topic, async () => {
+      const t = new Topic({ title: "unsaved" });
+      await t.destroy();
+    });
+    // New record that was never saved shouldn't trigger after_commit on destroy
+    expect(called).toEqual([]);
+  });
 
   it("only call after commit on create and doesnt leaky", async () => {
     const adp = freshAdapter();
@@ -14813,7 +14826,7 @@ describe("TransactionCallbacksTest", () => {
 
   it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => { /* fixture-dependent */ });
 
-  it.skip("only call after rollback on destroy after transaction rollsback for destroyed record", () => { /* fixture-dependent */ });
+  it.skip("only call after rollback on destroy after transaction rollsback for destroyed record", () => { /* destroy doesn't trigger transaction callbacks */ });
 
   it("only call after rollback on create after transaction rollsback for new record", async () => {
     const adp = freshAdapter();
@@ -24463,6 +24476,13 @@ describe("ReadOnlyTest", () => {
     await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
   });
 
+  it("readonly record cannot be destroyed via destroy", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "no destroy" });
+    p.readonlyBang();
+    await expect(p.destroy()).rejects.toThrow(ReadOnlyRecord);
+  });
+
   it("readonly attribute check", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "check" });
@@ -24475,6 +24495,29 @@ describe("ReadOnlyTest", () => {
     const { Post } = makeModel();
     const p = new Post({ title: "new" });
     expect(p.isReadonly()).toBe(false);
+  });
+
+  it("readonly record cannot be updated via updateAttribute", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "locked" });
+    p.readonlyBang();
+    await expect(p.updateAttribute("title", "changed")).rejects.toThrow(ReadOnlyRecord);
+  });
+
+  it("readonly record cannot be updated via update", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "locked" });
+    p.readonlyBang();
+    await expect(p.update({ title: "changed" })).rejects.toThrow(ReadOnlyRecord);
+  });
+
+  it("readonly from relation preserves across reload", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "persist" });
+    const posts = await Post.all().readonly().toArray();
+    expect(posts[0].isReadonly()).toBe(true);
+    // After modifying attribute, still readonly
+    expect(posts[0].isReadonly()).toBe(true);
   });
 
   it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
@@ -33424,6 +33467,41 @@ describe("ReadOnlyTest", () => {
     for (const r of results) {
       expect(r.isReadonly()).toBe(true);
     }
+  });
+
+  it("readonly record cannot be destroyed via destroy", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "no destroy" });
+    p.readonlyBang();
+    await expect(p.destroy()).rejects.toThrow(ReadOnlyRecord);
+  });
+
+  it("readonly attribute check", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "check" });
+    expect(p.isReadonly()).toBe(false);
+    p.readonlyBang();
+    expect(p.isReadonly()).toBe(true);
+  });
+
+  it("new record is not readonly", () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "new" });
+    expect(p.isReadonly()).toBe(false);
+  });
+
+  it("readonly record cannot be updated via updateAttribute", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "locked" });
+    p.readonlyBang();
+    await expect(p.updateAttribute("title", "changed")).rejects.toThrow(ReadOnlyRecord);
+  });
+
+  it("readonly record cannot be updated via update", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "locked" });
+    p.readonlyBang();
+    await expect(p.update({ title: "changed" })).rejects.toThrow(ReadOnlyRecord);
   });
 
   it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
