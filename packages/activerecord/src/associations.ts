@@ -502,9 +502,15 @@ export async function processDependentAssociations(record: Base): Promise<void> 
           await child.delete();
         }
       } else if (dep === "nullify") {
-        const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+        const asName = assoc.options.as;
+        const foreignKey = asName
+          ? (assoc.options.foreignKey ?? `${underscore(asName)}_id`)
+          : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+        const typeCol = asName ? `${underscore(asName)}_type` : null;
         for (const child of children) {
-          await child.updateColumn(foreignKey, null);
+          child.writeAttribute(foreignKey, null);
+          if (typeCol) child.writeAttribute(typeCol, null);
+          await child.save();
         }
       } else if (dep === "restrictWithException") {
         if (children.length > 0) {
@@ -524,8 +530,13 @@ export async function processDependentAssociations(record: Base): Promise<void> 
       } else if (dep === "delete") {
         await child.delete();
       } else if (dep === "nullify") {
-        const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-        await child.updateColumn(foreignKey, null);
+        const hasOneAsName = assoc.options.as;
+        const foreignKey = hasOneAsName
+          ? (assoc.options.foreignKey ?? `${underscore(hasOneAsName)}_id`)
+          : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+        child.writeAttribute(foreignKey, null);
+        if (hasOneAsName) child.writeAttribute(`${underscore(hasOneAsName)}_type`, null);
+        await child.save();
       } else if (dep === "restrictWithException") {
         throw new DeleteRestrictionError(record, assoc.name);
       } else if (dep === "restrictWithError") {
@@ -1001,7 +1012,16 @@ export async function updateCounterCaches(
     const fkValue = record.readAttribute(foreignKey);
     if (fkValue === null || fkValue === undefined) continue;
 
-    const className = assoc.options.className ?? camelize(assoc.name);
+    // For polymorphic, resolve model from _type column
+    let className: string;
+    if (assoc.options.polymorphic) {
+      const typeCol = `${underscore(assoc.name)}_type`;
+      const typeName = record.readAttribute(typeCol) as string | null;
+      if (!typeName) continue;
+      className = typeName;
+    } else {
+      className = assoc.options.className ?? camelize(assoc.name);
+    }
     const targetModel = resolveModel(className);
 
     // Counter column name
