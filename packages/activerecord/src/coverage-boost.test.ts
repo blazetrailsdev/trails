@@ -23615,7 +23615,23 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   it.skip("store association in two relations with one save in existing object", () => { /* needs autosave FK sync */ });
   it.skip("store association in two relations with one save in existing object with values", () => { /* needs autosave FK sync */ });
 
-  it.skip("store association with a polymorphic relationship", () => { /* polymorphic not implemented */ });
+  it("store association with a polymorphic relationship", async () => {
+    class PolyMember extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PolySponsor extends Base {
+      static { this.attribute("sponsorable_id", "integer"); this.attribute("sponsorable_type", "string"); this.adapter = adapter; }
+    }
+    registerModel(PolyMember); registerModel(PolySponsor);
+    Associations.belongsTo.call(PolySponsor, "sponsorable", { polymorphic: true });
+    const member = await PolyMember.create({ name: "Alice" });
+    const sponsor = new PolySponsor({});
+    setBelongsTo(sponsor, "sponsorable", member, { polymorphic: true });
+    await sponsor.save();
+    const reloaded = await PolySponsor.find(sponsor.id!);
+    expect(reloaded.readAttribute("sponsorable_id")).toBe(member.id);
+    expect(reloaded.readAttribute("sponsorable_type")).toBe("PolyMember");
+  });
 
   it("build and then save parent should not reload target", async () => {
     const { Author, Post } = makeModels();

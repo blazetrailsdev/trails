@@ -2509,30 +2509,65 @@ export class Relation<T extends Base> {
 
       if (assocDef.type === "belongsTo") {
         const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
-        const className = assocDef.options.className ??
-          assocName.charAt(0).toUpperCase() + assocName.slice(1);
         const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
         const primaryKey = assocDef.options.primaryKey ?? "id";
 
-        const fkValues = [...new Set(records.map(r => r.readAttribute(foreignKey)).filter(v => v != null))];
-        if (fkValues.length === 0) continue;
+        if (assocDef.options.polymorphic) {
+          // Polymorphic belongsTo: group records by type column, query each model
+          const typeCol = `${_underscore(assocName)}_type`;
+          const byType = new Map<string, any[]>();
+          for (const record of records) {
+            const typeName = record.readAttribute(typeCol) as string | null;
+            if (!typeName) continue;
+            if (!byType.has(typeName)) byType.set(typeName, []);
+            byType.get(typeName)!.push(record);
+          }
+          // For each type, batch-load the parents
+          const allParents = new Map<string, Map<unknown, any>>(); // type -> (pk -> record)
+          for (const [typeName, typeRecords] of byType) {
+            const targetModel = _mr.get(typeName);
+            if (!targetModel) continue;
+            const fkValues = [...new Set(typeRecords.map(r => r.readAttribute(foreignKey)).filter(v => v != null))];
+            if (fkValues.length === 0) continue;
+            const related = await (targetModel as any).all().where({ [primaryKey]: fkValues }).toArray();
+            const relatedMap = new Map<unknown, any>();
+            for (const r of related) relatedMap.set(r.readAttribute(primaryKey), r);
+            allParents.set(typeName, relatedMap);
+          }
+          for (const record of records) {
+            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            const typeName = record.readAttribute(typeCol) as string | null;
+            const parent = typeName ? (allParents.get(typeName)?.get(record.readAttribute(foreignKey)) ?? null) : null;
+            (record as any)._preloadedAssociations.set(assocName, parent);
+            if (parent && assocDef.options.inverseOf) {
+              if (!(parent as any)._cachedAssociations) (parent as any)._cachedAssociations = new Map();
+              (parent as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
+            }
+          }
+        } else {
+          const className = assocDef.options.className ??
+            assocName.charAt(0).toUpperCase() + assocName.slice(1);
 
-        const targetModel = _mr.get(className);
-        if (!targetModel) continue;
+          const fkValues = [...new Set(records.map(r => r.readAttribute(foreignKey)).filter(v => v != null))];
+          if (fkValues.length === 0) continue;
 
-        const related = await (targetModel as any).all().where({ [primaryKey]: fkValues }).toArray();
-        const relatedMap = new Map<unknown, any>();
-        for (const r of related) relatedMap.set(r.readAttribute(primaryKey), r);
+          const targetModel = _mr.get(className);
+          if (!targetModel) continue;
 
-        for (const record of records) {
-          if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
-          const parent = relatedMap.get(record.readAttribute(foreignKey)) ?? null;
-          (record as any)._preloadedAssociations.set(assocName, parent);
+          const related = await (targetModel as any).all().where({ [primaryKey]: fkValues }).toArray();
+          const relatedMap = new Map<unknown, any>();
+          for (const r of related) relatedMap.set(r.readAttribute(primaryKey), r);
 
-          // Set inverse association on parent
-          if (parent && assocDef.options.inverseOf) {
-            if (!(parent as any)._cachedAssociations) (parent as any)._cachedAssociations = new Map();
-            (parent as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
+          for (const record of records) {
+            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            const parent = relatedMap.get(record.readAttribute(foreignKey)) ?? null;
+            (record as any)._preloadedAssociations.set(assocName, parent);
+
+            // Set inverse association on parent
+            if (parent && assocDef.options.inverseOf) {
+              if (!(parent as any)._cachedAssociations) (parent as any)._cachedAssociations = new Map();
+              (parent as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
+            }
           }
         }
       } else if (assocDef.type === "hasMany") {
@@ -2546,7 +2581,11 @@ export class Relation<T extends Base> {
         const underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
 
         const className = assocDef.options.className ?? camelize(singularize(assocName));
-        const foreignKey = assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`;
+        const asName = assocDef.options.as;
+        const foreignKey = asName
+          ? (assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+          : (assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
+        const typeCol = asName ? `${underscore(asName)}_type` : null;
         const primaryKey = assocDef.options.primaryKey ?? modelClass.primaryKey;
 
         // Handle through associations
@@ -2591,7 +2630,9 @@ export class Relation<T extends Base> {
         const targetModel = _mr.get(className);
         if (!targetModel) continue;
 
-        const related = await (targetModel as any).all().where({ [foreignKey]: pkValues }).toArray();
+        const whereConditions: Record<string, unknown> = { [foreignKey]: pkValues };
+        if (typeCol) whereConditions[typeCol] = modelClass.name;
+        const related = await (targetModel as any).all().where(whereConditions).toArray();
         const relatedMap = new Map<unknown, any[]>();
         for (const r of related) {
           const fk = r.readAttribute(foreignKey);
@@ -2624,6 +2665,7 @@ export class Relation<T extends Base> {
 
         const className = assocDef.options.className ?? camelize(assocName);
         const primaryKey = assocDef.options.primaryKey ?? modelClass.primaryKey;
+        const hasOneAsName = assocDef.options.as;
 
         // Handle has_one :through
         if (assocDef.options.through) {
@@ -2663,7 +2705,10 @@ export class Relation<T extends Base> {
           continue;
         }
 
-        const foreignKey = assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`;
+        const foreignKey = hasOneAsName
+          ? (assocDef.options.foreignKey ?? `${underscore(hasOneAsName)}_id`)
+          : (assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
+        const hasOneTypeCol = hasOneAsName ? `${underscore(hasOneAsName)}_type` : null;
 
         const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
         if (pkValues.length === 0) continue;
@@ -2671,7 +2716,9 @@ export class Relation<T extends Base> {
         const targetModel = _mr.get(className);
         if (!targetModel) continue;
 
-        const related = await (targetModel as any).all().where({ [foreignKey]: pkValues }).toArray();
+        const hasOneWhere: Record<string, unknown> = { [foreignKey]: pkValues };
+        if (hasOneTypeCol) hasOneWhere[hasOneTypeCol] = modelClass.name;
+        const related = await (targetModel as any).all().where(hasOneWhere).toArray();
         const relatedMap = new Map<unknown, any>();
         for (const r of related) relatedMap.set(r.readAttribute(foreignKey), r);
 

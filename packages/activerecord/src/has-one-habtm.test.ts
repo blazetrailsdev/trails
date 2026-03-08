@@ -12,12 +12,15 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, MemoryAdapter, registerModel, association, DeleteRestrictionError } from "./index.js";
 import {
   Associations,
+  loadBelongsTo,
   loadHasOne,
   loadHasMany,
   loadHabtm,
   processDependentAssociations,
   CollectionProxy,
+  setBelongsTo,
   setHasOne,
+  setHasMany,
 } from "./associations.js";
 
 function freshAdapter(): MemoryAdapter {
@@ -157,8 +160,23 @@ describe("HasOneAssociationsTest", () => {
     expect(loaded2!.readAttribute("credit_limit")).toBe(50);
   });
 
-  it.skip("nullify on polymorphic association", () => {
-    // Requires polymorphic associations
+  it("nullify on polymorphic association", async () => {
+    const adapter = freshAdapter();
+    class PolyTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class PolyPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(PolyTag); registerModel(PolyPost);
+    Associations.hasOne.call(PolyPost, "polyTag", { as: "taggable", className: "PolyTag" });
+    const post = await PolyPost.create({ title: "Hello" });
+    const tag = await PolyTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "PolyPost" });
+    // Nullify the has_one polymorphic
+    await setHasOne(post, "polyTag", null, { as: "taggable", className: "PolyTag" });
+    const reloaded = await PolyTag.find(tag.id!);
+    expect(reloaded.readAttribute("taggable_id")).toBeNull();
+    expect(reloaded.readAttribute("taggable_type")).toBeNull();
   });
 
   it("nullification on destroyed association", async () => {
@@ -1598,8 +1616,23 @@ describe("AssociationsJoinModelTest", () => {
     expect(taggings.length).toBe(1);
   });
 
-  it.skip("count polymorphic has many", () => {
-    // Requires count on polymorphic through
+  it("count polymorphic has many", async () => {
+    const adapter = freshAdapter();
+    class CphmTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class CphmPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(CphmTag); registerModel(CphmPost);
+    Associations.hasMany.call(CphmPost, "cphmTags", { as: "taggable", className: "CphmTag" });
+    const post = await CphmPost.create({ title: "Hello" });
+    await CphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "CphmPost" });
+    await CphmTag.create({ name: "rails", taggable_id: post.id, taggable_type: "CphmPost" });
+    // Create a tag for a different type to ensure polymorphic filtering
+    await CphmTag.create({ name: "other", taggable_id: post.id, taggable_type: "OtherModel" });
+    const tags = await loadHasMany(post, "cphmTags", { as: "taggable", className: "CphmTag" });
+    expect(tags.length).toBe(2);
   });
 
   it.skip("polymorphic has many going through join model with find", () => {
@@ -1642,16 +1675,62 @@ describe("AssociationsJoinModelTest", () => {
     // Requires STI has_one create
   });
 
-  it.skip("set polymorphic has many", () => {
-    // Requires polymorphic= setter
+  it("set polymorphic has many", async () => {
+    const adapter = freshAdapter();
+    class SphmTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class SphmPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(SphmTag); registerModel(SphmPost);
+    Associations.hasMany.call(SphmPost, "sphmTags", { as: "taggable", className: "SphmTag" });
+    const post = await SphmPost.create({ title: "Hello" });
+    const tag1 = await SphmTag.create({ name: "ruby" });
+    const tag2 = await SphmTag.create({ name: "rails" });
+    await setHasMany(post, "sphmTags", [tag1, tag2], { as: "taggable", className: "SphmTag" });
+    const r1 = await SphmTag.find(tag1.id!);
+    const r2 = await SphmTag.find(tag2.id!);
+    expect(r1.readAttribute("taggable_id")).toBe(post.id);
+    expect(r1.readAttribute("taggable_type")).toBe("SphmPost");
+    expect(r2.readAttribute("taggable_id")).toBe(post.id);
+    expect(r2.readAttribute("taggable_type")).toBe("SphmPost");
   });
 
-  it.skip("set polymorphic has one", () => {
-    // Requires polymorphic has_one setter
+  it("set polymorphic has one", async () => {
+    const adapter = freshAdapter();
+    class SphoTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class SphoPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(SphoTag); registerModel(SphoPost);
+    Associations.hasOne.call(SphoPost, "sphoTag", { as: "taggable", className: "SphoTag" });
+    const post = await SphoPost.create({ title: "Hello" });
+    const tag = await SphoTag.create({ name: "ruby" });
+    await setHasOne(post, "sphoTag", tag, { as: "taggable", className: "SphoTag" });
+    const reloaded = await SphoTag.find(tag.id!);
+    expect(reloaded.readAttribute("taggable_id")).toBe(post.id);
+    expect(reloaded.readAttribute("taggable_type")).toBe("SphoPost");
   });
 
-  it.skip("set polymorphic has one on new record", () => {
-    // Requires polymorphic setter on unsaved record
+  it("set polymorphic has one on new record", async () => {
+    const adapter = freshAdapter();
+    class SphnTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class SphnPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(SphnTag); registerModel(SphnPost);
+    Associations.hasOne.call(SphnPost, "sphnTag", { as: "taggable", className: "SphnTag" });
+    const post = new SphnPost({ title: "Hello" });
+    await post.save();
+    const tag = new SphnTag({ name: "ruby" });
+    await setHasOne(post, "sphnTag", tag, { as: "taggable", className: "SphnTag" });
+    expect(tag.readAttribute("taggable_id")).toBe(post.id);
+    expect(tag.readAttribute("taggable_type")).toBe("SphnPost");
   });
 
   it.skip("create polymorphic has many with scope", () => {
@@ -1666,24 +1745,96 @@ describe("AssociationsJoinModelTest", () => {
     // Requires scoped polymorphic has_one create
   });
 
-  it.skip("delete polymorphic has many with delete all", () => {
-    // Requires delete_all on polymorphic
+  it("delete polymorphic has many with delete all", async () => {
+    const adapter = freshAdapter();
+    class DphmTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class DphmPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(DphmTag); registerModel(DphmPost);
+    Associations.hasMany.call(DphmPost, "dphmTags", { as: "taggable", className: "DphmTag" });
+    const post = await DphmPost.create({ title: "Hello" });
+    await DphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphmPost" });
+    await DphmTag.create({ name: "rails", taggable_id: post.id, taggable_type: "DphmPost" });
+    const tags = await loadHasMany(post, "dphmTags", { as: "taggable", className: "DphmTag" });
+    expect(tags.length).toBe(2);
+    // Delete all
+    for (const t of tags) await t.destroy();
+    const remaining = await loadHasMany(post, "dphmTags", { as: "taggable", className: "DphmTag" });
+    expect(remaining.length).toBe(0);
   });
 
-  it.skip("delete polymorphic has many with destroy", () => {
-    // Requires destroy on polymorphic
+  it("delete polymorphic has many with destroy", async () => {
+    const adapter = freshAdapter();
+    class DphmdTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class DphmdPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(DphmdTag); registerModel(DphmdPost);
+    Associations.hasMany.call(DphmdPost, "dphmdTags", { as: "taggable", className: "DphmdTag" });
+    const post = await DphmdPost.create({ title: "Hello" });
+    const tag = await DphmdTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphmdPost" });
+    await tag.destroy();
+    const remaining = await loadHasMany(post, "dphmdTags", { as: "taggable", className: "DphmdTag" });
+    expect(remaining.length).toBe(0);
   });
 
-  it.skip("delete polymorphic has many with nullify", () => {
-    // Requires nullify on polymorphic
+  it("delete polymorphic has many with nullify", async () => {
+    const adapter = freshAdapter();
+    class DphmnTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class DphmnPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(DphmnTag); registerModel(DphmnPost);
+    Associations.hasMany.call(DphmnPost, "dphmnTags", { as: "taggable", className: "DphmnTag" });
+    const post = await DphmnPost.create({ title: "Hello" });
+    const tag = await DphmnTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphmnPost" });
+    // Nullify
+    tag.writeAttribute("taggable_id", null);
+    tag.writeAttribute("taggable_type", null);
+    await tag.save();
+    const remaining = await loadHasMany(post, "dphmnTags", { as: "taggable", className: "DphmnTag" });
+    expect(remaining.length).toBe(0);
   });
 
-  it.skip("delete polymorphic has one with destroy", () => {
-    // Requires has_one polymorphic destroy
+  it("delete polymorphic has one with destroy", async () => {
+    const adapter = freshAdapter();
+    class DphodTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class DphodPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(DphodTag); registerModel(DphodPost);
+    Associations.hasOne.call(DphodPost, "dphodTag", { as: "taggable", className: "DphodTag" });
+    const post = await DphodPost.create({ title: "Hello" });
+    const tag = await DphodTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphodPost" });
+    await tag.destroy();
+    const loaded = await loadHasOne(post, "dphodTag", { as: "taggable", className: "DphodTag" });
+    expect(loaded).toBeNull();
   });
 
-  it.skip("delete polymorphic has one with nullify", () => {
-    // Requires has_one polymorphic nullify
+  it("delete polymorphic has one with nullify", async () => {
+    const adapter = freshAdapter();
+    class DphonTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class DphonPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(DphonTag); registerModel(DphonPost);
+    Associations.hasOne.call(DphonPost, "dphonTag", { as: "taggable", className: "DphonTag" });
+    const post = await DphonPost.create({ title: "Hello" });
+    await DphonTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphonPost" });
+    await setHasOne(post, "dphonTag", null, { as: "taggable", className: "DphonTag" });
+    const loaded = await loadHasOne(post, "dphonTag", { as: "taggable", className: "DphonTag" });
+    expect(loaded).toBeNull();
   });
 
   it.skip("has many with piggyback", () => {
@@ -1698,8 +1849,23 @@ describe("AssociationsJoinModelTest", () => {
     // Requires eager loading through
   });
 
-  it.skip("include polymorphic has one", () => {
-    // Requires eager polymorphic has_one
+  it("include polymorphic has one", async () => {
+    const adapter = freshAdapter();
+    class IphoTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class IphoPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(IphoTag); registerModel(IphoPost);
+    Associations.hasOne.call(IphoPost, "iphoTag", { as: "taggable", className: "IphoTag" });
+    const post = await IphoPost.create({ title: "Hello" });
+    await IphoTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "IphoPost" });
+    const posts = await IphoPost.all().includes("iphoTag").toArray();
+    expect(posts.length).toBe(1);
+    const preloaded = (posts[0] as any)._preloadedAssociations?.get("iphoTag");
+    expect(preloaded).not.toBeNull();
+    expect(preloaded.readAttribute("name")).toBe("ruby");
   });
 
   it.skip("include polymorphic has one defined in abstract parent", () => {
@@ -1710,8 +1876,25 @@ describe("AssociationsJoinModelTest", () => {
     // Requires eager polymorphic through
   });
 
-  it.skip("include polymorphic has many", () => {
-    // Requires eager polymorphic has_many
+  it("include polymorphic has many", async () => {
+    const adapter = freshAdapter();
+    class IphmTag extends Base {
+      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
+    }
+    class IphmPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(IphmTag); registerModel(IphmPost);
+    Associations.hasMany.call(IphmPost, "iphmTags", { as: "taggable", className: "IphmTag" });
+    const post = await IphmPost.create({ title: "Hello" });
+    await IphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "IphmPost" });
+    await IphmTag.create({ name: "rails", taggable_id: post.id, taggable_type: "IphmPost" });
+    // Different type shouldn't be included
+    await IphmTag.create({ name: "other", taggable_id: post.id, taggable_type: "OtherModel" });
+    const posts = await IphmPost.all().includes("iphmTags").toArray();
+    expect(posts.length).toBe(1);
+    const preloaded = (posts[0] as any)._preloadedAssociations?.get("iphmTags");
+    expect(preloaded.length).toBe(2);
   });
 
   it("has many find all", async () => {

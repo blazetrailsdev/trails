@@ -11,6 +11,7 @@ import {
 } from "./index.js";
 import {
   Associations,
+  association,
   loadBelongsTo,
   loadHasMany,
   processDependentAssociations,
@@ -3469,7 +3470,22 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).readAttribute("author_id")).toBe(author.id);
   });
   it.skip("joining through a polymorphic association with a where clause", () => {});
-  it.skip("build with polymorphic has many does not allow to override type and id", () => {});
+  it("build with polymorphic has many does not allow to override type and id", async () => {
+    class BphmComment extends Base {
+      static { this.attribute("body", "string"); this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.adapter = adapter; }
+    }
+    class BphmPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(BphmComment); registerModel(BphmPost);
+    Associations.hasMany.call(BphmPost, "bphmComments", { as: "commentable", className: "BphmComment" });
+    const post = await BphmPost.create({ title: "Hello" });
+    const proxy = association(post, "bphmComments");
+    // Attempt to override type and id — they should be set by the association
+    const comment = proxy.build({ body: "nice", commentable_id: 999, commentable_type: "Evil" });
+    expect(comment.readAttribute("commentable_id")).toBe(post.id);
+    expect(comment.readAttribute("commentable_type")).toBe("BphmPost");
+  });
   it.skip("build from polymorphic association sets inverse instance", () => {});
   it("dont call save callbacks twice on has many", async () => {
     class NoDblAuthor extends Base {
@@ -4853,7 +4869,21 @@ describe("BelongsToAssociationsTest", () => {
     const loaded = await loadBelongsTo(account, "company", { className: "NatNilCompany", foreignKey: "company_id" });
     expect(loaded).toBeNull();
   });
-  it.skip("polymorphic association class", () => {});
+  it("polymorphic association class", async () => {
+    class PacSponsor extends Base {
+      static { this.attribute("sponsorable_id", "integer"); this.attribute("sponsorable_type", "string"); this.adapter = adapter; }
+    }
+    class PacMember extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(PacSponsor); registerModel(PacMember);
+    Associations.belongsTo.call(PacSponsor, "sponsorable", { polymorphic: true });
+    const member = await PacMember.create({ name: "Alice" });
+    const sponsor = await PacSponsor.create({ sponsorable_id: member.id, sponsorable_type: "PacMember" });
+    const loaded = await loadBelongsTo(sponsor, "sponsorable", { polymorphic: true });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("Alice");
+  });
   it.skip("with polymorphic and condition", () => {});
   it("with select", async () => {
     class Company extends Base {

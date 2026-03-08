@@ -488,14 +488,24 @@ export class CollectionProxy {
     const ctor = this._record.constructor as typeof Base;
     const className = this._assocDef.options.className ??
       camelize(singularize(this._assocName));
-    const foreignKey = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
 
-    const targetModel = resolveModel(className);
-    return new targetModel({
+    // Polymorphic "as" option
+    const asName = this._assocDef.options.as;
+    const foreignKey = asName
+      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+
+    const buildAttrs: Record<string, unknown> = {
       ...attrs,
       [foreignKey]: this._record.readAttribute(primaryKey),
-    });
+    };
+    if (asName) {
+      buildAttrs[`${underscore(asName)}_type`] = ctor.name;
+    }
+
+    const targetModel = resolveModel(className);
+    return new targetModel(buildAttrs);
   }
 
   /**
@@ -540,12 +550,17 @@ export class CollectionProxy {
    */
   async push(...records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
-    const foreignKey = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const asName = this._assocDef.options.as;
+    const foreignKey = asName
+      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+    const typeCol = asName ? `${underscore(asName)}_type` : null;
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const pkValue = this._record.readAttribute(primaryKey);
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
       record.writeAttribute(foreignKey, pkValue);
+      if (typeCol) record.writeAttribute(typeCol, ctor.name);
       await record.save();
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     }
@@ -565,10 +580,15 @@ export class CollectionProxy {
    */
   async delete(...records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
-    const foreignKey = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const asName = this._assocDef.options.as;
+    const foreignKey = asName
+      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+    const typeCol = asName ? `${underscore(asName)}_type` : null;
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
       record.writeAttribute(foreignKey, null);
+      if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
@@ -857,8 +877,17 @@ export function setBelongsTo(
 
   if (target) {
     record.writeAttribute(foreignKey, target.readAttribute(primaryKey));
+    // Polymorphic: set the _type column
+    if (options.polymorphic) {
+      const typeCol = `${underscore(assocName)}_type`;
+      record.writeAttribute(typeCol, (target.constructor as typeof Base).name);
+    }
   } else {
     record.writeAttribute(foreignKey, null);
+    if (options.polymorphic) {
+      const typeCol = `${underscore(assocName)}_type`;
+      record.writeAttribute(typeCol, null);
+    }
   }
 
   // Cache the association
@@ -886,20 +915,30 @@ export async function setHasOne(
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const foreignKey = options.foreignKey ?? `${underscore(ctor.name)}_id`;
   const pkValue = record.readAttribute(primaryKey);
+
+  // Polymorphic "as" option
+  const asName = options.as;
+  const foreignKey = asName
+    ? (options.foreignKey ?? `${underscore(asName)}_id`)
+    : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
+  const typeCol = asName ? `${underscore(asName)}_type` : null;
 
   // Nullify old target
   const className = options.className ?? camelize(assocName);
   const targetModel = resolveModel(className);
-  const existing = await targetModel.findBy({ [foreignKey]: pkValue });
+  const findConditions: Record<string, unknown> = { [foreignKey]: pkValue };
+  if (typeCol) findConditions[typeCol] = ctor.name;
+  const existing = await targetModel.findBy(findConditions);
   if (existing && existing !== target) {
     existing.writeAttribute(foreignKey, null);
+    if (typeCol) existing.writeAttribute(typeCol, null);
     await existing.save();
   }
 
   if (target) {
     target.writeAttribute(foreignKey, pkValue);
+    if (typeCol) target.writeAttribute(typeCol, ctor.name);
     if (target.isPersisted()) await target.save();
   }
 
@@ -928,16 +967,25 @@ export async function setHasMany(
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const foreignKey = options.foreignKey ?? `${underscore(ctor.name)}_id`;
   const pkValue = record.readAttribute(primaryKey);
+
+  // Polymorphic "as" option
+  const asName = options.as;
+  const foreignKey = asName
+    ? (options.foreignKey ?? `${underscore(asName)}_id`)
+    : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
+  const typeCol = asName ? `${underscore(asName)}_type` : null;
 
   // Nullify old targets
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveModel(className);
-  const existing = await (targetModel as any).where({ [foreignKey]: pkValue }).toArray();
+  const findConditions: Record<string, unknown> = { [foreignKey]: pkValue };
+  if (typeCol) findConditions[typeCol] = ctor.name;
+  const existing = await (targetModel as any).where(findConditions).toArray();
   for (const old of existing) {
     if (!targets.includes(old)) {
       old.writeAttribute(foreignKey, null);
+      if (typeCol) old.writeAttribute(typeCol, null);
       await old.save();
     }
   }
@@ -945,6 +993,7 @@ export async function setHasMany(
   // Set FK on new targets
   for (const t of targets) {
     t.writeAttribute(foreignKey, pkValue);
+    if (typeCol) t.writeAttribute(typeCol, ctor.name);
     if (t.isPersisted()) await t.save();
 
     // Set inverse
