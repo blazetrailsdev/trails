@@ -1,0 +1,75 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import { MigrationGenerator } from "./migration-generator.js";
+
+let tmpDir: string;
+let lines: string[];
+
+beforeEach(() => {
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  lines = [];
+});
+
+afterEach(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+function makeGen() {
+  return new MigrationGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+}
+
+describe("MigrationGenerator", () => {
+  it("creates a migration file with timestamp", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateUsers", []);
+    expect(files.length).toBe(1);
+    expect(files[0]).toMatch(/^db\/migrations\/\d{14}-create-users\.ts$/);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain("class CreateUsers extends Migration");
+  });
+
+  it("infers createTable from Create* name", () => {
+    const gen = makeGen();
+    const files = gen.run("CreatePosts", ["title:string", "body:text", "published:boolean"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('createTable("posts"');
+    expect(content).toContain('t.string("title")');
+    expect(content).toContain('t.text("body")');
+    expect(content).toContain('t.boolean("published")');
+    expect(content).toContain("t.timestamps()");
+    expect(content).toContain('dropTable("posts")');
+  });
+
+  it("infers addColumn from Add*To* name", () => {
+    const gen = makeGen();
+    const files = gen.run("AddEmailToUsers", ["email:string"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('addColumn("users", "email", "string")');
+    expect(content).toContain('removeColumn("users", "email")');
+  });
+
+  it("infers removeColumn from Remove*From* name", () => {
+    const gen = makeGen();
+    const files = gen.run("RemoveAgeFromUsers", ["age:integer"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('removeColumn("users", "age")');
+    expect(content).toContain('addColumn("users", "age", "integer")');
+  });
+
+  it("generates empty body for unrecognized names", () => {
+    const gen = makeGen();
+    const files = gen.run("DoSomethingComplex", []);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain("TODO: implement migration");
+  });
+
+  it("prints create messages", () => {
+    const gen = makeGen();
+    gen.run("CreateUsers", []);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("create");
+    expect(lines[0]).toContain("db/migrations/");
+  });
+});

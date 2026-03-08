@@ -1,0 +1,18 @@
+{
+  "name": "@rails-ts/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "rails-ts": "./dist/bin.js"
+  },
+  "exports": {
+    ".": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@rails-ts/activerecord": "*",
+    "@rails-ts/activesupport": "*",
+    "@rails-ts/rack": "*",
+    "@rails-ts/actionpack": "*"
+  }
+}

@@ -23,7 +23,8 @@
     { "path": "packages/activemodel" },
     { "path": "packages/activerecord" },
     { "path": "packages/rack" },
-    { "path": "packages/actionpack" }
+    { "path": "packages/actionpack" },
+    { "path": "packages/cli" }
   ],
   "exclude": ["node_modules", "dist"]
 }
