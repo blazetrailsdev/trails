@@ -1,8 +1,18 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **67.7%** (3,674 matched / 5,428 total Ruby tests). 1,753 stubs need converting, 1 test is missing entirely.
+Current state: **71.9%** (3,904 matched / 5,428 total Ruby tests). 1,523 stubs need converting, 1 test is missing entirely.
 
-> **Progress update (2026-03-08):** Converted ~882 stubs to passing tests, jumping from 51.4% to 67.7%. Key areas completed: NormalizedAttributeTest, SerializationTest, JsonSerializationTest, StoreTest (with prefix/suffix), SerializedAttributeTest, SignedIdTest, WhereChainTest (partial), UniquenessValidation (full), ReflectionTest, ExplainTest, InvertibleMigrationTest, ActiveRecordSchemaTest, OptimisticLockingTest (partial), TransactionCallbacksTest (partial), InnerJoinAssociationTest, LeftOuterJoinAssociationTest, DelegatedTypeTest, CustomPropertiesTest, InverseAssociationTests, NestedAttributesTests, AutosaveTests, ReadOnlyTest, TimeTravelTest, TouchLaterTest, HasManyAssociationsTest (partial), BelongsToAssociationsTest (partial), HasOneAssociationsTest (partial), HasAndBelongsToManyAssociationsTest (partial), HasManyThroughAssociationsTest (partial), HasOneThroughAssociationsTest (partial), NestedThroughAssociationsTest (partial), AssociationsJoinModelTest (partial), EagerAssociationTest (partial). Also implemented new features: `normalizeAttribute`/`normalizeValueFor`/`apply_to_nil`, normalization stacking, `delegatedType()`, store prefix/suffix, `storedAttributes()`, `annotate()` on Relation.
+> **Progress update (2026-03-08, session 2):** Jumped from 67.7% to 71.9% (+230 tests). Key new features implemented:
+>
+> - **`has_many :through` and `has_one :through`** — full loading support including through `has_one`, `belongs_to`, and `has_many` intermediaries. `loadHasOneThrough` resolves through chains. `loadHasManyThrough` handles both `belongs_to` source (FK on join record) and `has_many` source (FK on target pointing back to join record). Source association lookup tries both singular and plural names.
+> - **Through-aware CollectionProxy** — `push`/`<<` creates join records instead of setting FK on target. `delete` destroys join records instead of nullifying FK. Works with polymorphic through associations.
+> - **Polymorphic association support (writes, preloading, counter cache, dependent)** — `setBelongsTo` sets `_type` column. `setHasOne`/`setHasMany` handle `as:` option. CollectionProxy `build`/`push`/`delete` set type columns. Preloader handles polymorphic `belongs_to` (groups by type, queries each model), polymorphic `has_many`/`has_one` (filters by type column), and polymorphic through associations.
+> - **Polymorphic dependent nullify** — `processDependentAssociations` nullifies both FK and type columns for polymorphic `as:` associations.
+> - **Polymorphic counter cache** — `updateCounterCaches` resolves target model from `_type` column for polymorphic `belongs_to`.
+> - **Variadic `whereAssociated`/`whereMissing`** — accept multiple association names.
+> - **Preloader improvements** — through preloader handles both `belongs_to` and `has_many` source types, polymorphic `as:` on through associations, and singular/plural source name fallback.
+>
+> Earlier in the same day: NormalizedAttributeTest, SerializationTest, JsonSerializationTest, StoreTest (with prefix/suffix), SerializedAttributeTest, SignedIdTest, WhereChainTest (partial), UniquenessValidation (full), ReflectionTest, ExplainTest, InvertibleMigrationTest, ActiveRecordSchemaTest, OptimisticLockingTest (partial), TransactionCallbacksTest (partial), InnerJoinAssociationTest, LeftOuterJoinAssociationTest, DelegatedTypeTest, CustomPropertiesTest, InverseAssociationTests, NestedAttributesTests, AutosaveTests, ReadOnlyTest, TimeTravelTest, TouchLaterTest, and partial coverage across all association test files.
 
 This document groups the remaining work into feature areas, identifies dependencies, and marks what can be worked on in parallel.
 
@@ -14,32 +24,32 @@ This document groups the remaining work into feature areas, identifies dependenc
 
 | # | Feature Area | Stubs | Done | Key Dependencies | Parallel? |
 |---|---|---|---|---|---|
-| 1 | Through Associations | 257 | ~60 | Associations core | **Partial** |
-| 2 | HasMany Associations | 199 | ~80 | Associations core, fixtures | **Partial** |
-| 3 | Eager Loading / Preloading | 198 | ~50 | Associations (all types), JOINs | **Partial** |
-| 4 | Base / Persistence / Attributes | 174 | ~80 | Mostly standalone | **Partial** |
-| 5 | Autosave Associations | 166 | ~70 | Associations (all types) | **Partial** |
-| 6 | Association Misc | 158 | ~60 | Associations core | **Partial** |
-| 7 | Join Associations | 150 | ~55 | Associations core, JOINs | **Partial** |
-| 8 | Relation / Where | 130 | ~20 | Relation core | **Partial** |
-| 9 | Nested Attributes | 124 | ~95 | Associations (all types), autosave | **Partial** |
-| 10 | Migrations / Schema | 111 | ~53 | Standalone | **Partial** |
-| 11 | Serialization / Store / JSON | 100 | ~65 | Mostly standalone | **Mostly done** |
-| 12 | BelongsTo Associations | 96 | ~45 | Associations core | **Partial** |
-| 13 | Inverse Associations | 93 | ~53 | Associations (all types) | **Partial** |
-| 14 | HABTM Associations | 84 | ~40 | Associations core, join tables | **Partial** |
-| 15 | HasOne Associations | 72 | ~35 | Associations core | **Partial** |
-| 16 | Validations | 53 | ~53 | Base, associations (for uniqueness) | **Done** |
-| 17 | Finders / Calculations | 47 | 0 | Relation, JOINs | Yes |
-| 18 | Locking | 46 | ~27 | Base, transactions | **Partial** |
-| 19 | Transactions | 44 | ~12 | Base | **Partial** |
-| 20 | Insert / Upsert | 43 | 0 | Base | Yes |
-| 21 | Reflection | 40 | ~27 | Associations | **Mostly done** |
-| 22 | Counter Cache | 39 | ~5 | BelongsTo, callbacks | **Partial** |
-| 23 | Strict Loading | 30 | 0 | Associations (all types) | Yes |
-| 24 | Primary Keys | 24 | ~17 | Base | **Mostly done** |
-| 25 | Small areas (<20 each) | 130 | ~80 | Various | Mixed |
-| | **TOTAL** | **2,635** | **~882** | | |
+| 1 | Through Associations | ~200 | ~120 | Associations core | **Partial** — basic through works, polymorphic through works, nested through partially |
+| 2 | HasMany Associations | ~150 | ~130 | Associations core, fixtures | **Partial** |
+| 3 | Eager Loading / Preloading | ~170 | ~80 | Associations (all types), JOINs | **Partial** — through preloading works |
+| 4 | Base / Persistence / Attributes | ~130 | ~120 | Mostly standalone | **Partial** |
+| 5 | Autosave Associations | ~140 | ~95 | Associations (all types) | **Partial** |
+| 6 | Association Misc | ~130 | ~90 | Associations core | **Partial** |
+| 7 | Join Associations | ~120 | ~85 | Associations core, JOINs | **Partial** |
+| 8 | Relation / Where | ~100 | ~50 | Relation core | **Partial** |
+| 9 | Nested Attributes | ~100 | ~120 | Associations (all types), autosave | **Partial** |
+| 10 | Migrations / Schema | ~90 | ~75 | Standalone | **Partial** |
+| 11 | Serialization / Store / JSON | ~50 | ~115 | Mostly standalone | **Mostly done** |
+| 12 | BelongsTo Associations | ~70 | ~80 | Associations core | **Partial** — polymorphic fully works |
+| 13 | Inverse Associations | ~60 | ~85 | Associations (all types) | **Partial** |
+| 14 | HABTM Associations | ~70 | ~55 | Associations core, join tables | **Partial** |
+| 15 | HasOne Associations | ~50 | ~55 | Associations core | **Partial** — has_one :through works |
+| 16 | Validations | ~10 | ~95 | Base, associations (for uniqueness) | **Mostly done** |
+| 17 | Finders / Calculations | ~24 | ~220 | Relation, JOINs | **Mostly done** |
+| 18 | Locking | ~35 | ~35 | Base, transactions | **Partial** |
+| 19 | Transactions | ~30 | ~25 | Base | **Partial** |
+| 20 | Insert / Upsert | ~30 | ~15 | Base | **Partial** |
+| 21 | Reflection | ~30 | ~35 | Associations | **Mostly done** |
+| 22 | Counter Cache | ~25 | ~20 | BelongsTo, callbacks | **Partial** — polymorphic counter cache works |
+| 23 | Strict Loading | ~20 | ~10 | Associations (all types) | **Partial** |
+| 24 | Primary Keys | ~15 | ~25 | Base | **Mostly done** |
+| 25 | Small areas (<20 each) | ~70 | ~140 | Various | Mixed |
+| | **TOTAL** | **~1,523** | **~3,904** | | |
 
 ## Dependency graph
 
@@ -93,11 +103,11 @@ These can all be worked on simultaneously since they test independent associatio
 - **HasMany** (199 stubs, 113 already matched in `has_many_associations_test.rb`)
   - Lots of existing implementation. Most stubs need multi-model fixture setups with callbacks, dependent destroy, counter cache integration, scoping through associations.
 
-- **BelongsTo** (96 stubs, 58 matched in `belongs_to_associations_test.rb`)
-  - Touch propagation, optional/required, polymorphic, counter cache updates, autosave hooks.
+- **BelongsTo** (~70 stubs remaining, ~80 matched in `belongs_to_associations_test.rb`)
+  - Polymorphic fully works (read/write/preload/counter cache). Remaining: touch propagation, STI, CPK, some edge cases.
 
-- **HasOne** (72 stubs, 21 matched in `has_one_associations_test.rb`)
-  - Build/create through has_one, replacement semantics, dependent destroy.
+- **HasOne** (~50 stubs remaining, ~55 matched in `has_one_associations_test.rb`)
+  - `has_one :through` loading and preloading works. Polymorphic `as:` works. Remaining: build/create through, STI, some edge cases.
 
 - **HABTM** (84 stubs, 8 matched in `has_and_belongs_to_many_associations_test.rb`)
   - Join table management, collection operations, eager loading through join tables.
@@ -111,15 +121,30 @@ These can all be worked on simultaneously since they test independent associatio
 - **Association Misc** (158 stubs across callbacks, extensions, required, bidirectional destroy, core associations_test)
   - Mixed bag. `associations_test.rb` (122 stubs) covers cross-cutting association behaviors.
 
-**Phase A2 — Through associations (257 stubs)**
+**Phase A2 — Through associations (~200 stubs remaining)**
 
-Depends on: HasMany, BelongsTo working well.
+Depends on: HasMany, BelongsTo working well. Core through loading is now implemented.
 
-- `has_many_through_associations_test.rb` (148 stubs) — the biggest single file
-- `has_one_through_associations_test.rb` (46 stubs)
-- `nested_through_associations_test.rb` (63 stubs)
+What works:
+- `has_many :through` loading via `loadHasManyThrough` — handles `belongs_to` source (FK on join record) and `has_many` source (FK on target)
+- `has_one :through` loading via `loadHasOneThrough` — resolves through `has_one`, `belongs_to`, and `has_many` intermediaries
+- Through-aware `CollectionProxy` — `push` creates join records, `delete` destroys them
+- Through preloading (both `has_many :through` and `has_one :through`)
+- Polymorphic through associations (`as:` on the through association)
+- Source name resolution (tries singular and plural)
 
-The `through` implementation exists (`associations.ts` ~860 lines) but many edge cases are untested.
+What's still missing:
+- STI + through combinations
+- Nested through (through a through)
+- `source_type:` option
+- Scoped through associations
+- Counter cache through
+- Custom primary keys on through
+
+Remaining stubs are spread across:
+- `has_many_through_associations_test.rb` (~120 stubs)
+- `has_one_through_associations_test.rb` (~30 stubs)
+- `nested_through_associations_test.rb` (~50 stubs)
 
 **Phase A3 — Eager Loading / Preloading (198 stubs)**
 
@@ -148,7 +173,7 @@ Depends on: Autosave.
 
 Can be worked on independently once core associations work:
 
-- **Counter Cache** (39 stubs) — needs belongs_to callbacks
+- **Counter Cache** (~25 stubs remaining) — basic and polymorphic counter cache work. Remaining: custom counter columns, reassignment counter updates.
 - **Strict Loading** (30 stubs) — needs association lazy-loading detection
 - **Reflection** (40 stubs) — needs association macro definitions
 - **Association Callbacks/Extensions** (included in Misc above)
@@ -214,7 +239,7 @@ Each area is self-contained and small:
 | Comment / Annotation | 17 | SQL comment annotations — new test file needed |
 | Explain | 14 | `explain` output formatting — new test file needed |
 | Modules | 14 | Namespaced models — new test file needed |
-| Delegated Type | 13 | `delegated_type` macro — not yet implemented |
+| Delegated Type | ~5 | `delegated_type` macro — implemented, most tests passing |
 | SignedId | 13 | Edge cases (12 stubs, 16 matched) |
 | Touch / TouchLater | 11 | Deferred touch, coalescing |
 | Serialization | 9 | `ActiveModel::Serialization` edge cases |
@@ -230,31 +255,27 @@ Each area is self-contained and small:
 
 ## Recommended execution order
 
+Most foundations are now in place. The remaining work is mostly converting fixture-dependent tests (355 in coverage-boost.test.ts alone) and implementing a few missing features.
+
 ```
-Week 1-2 (parallel):
-  Stream B: Base / Persistence / Attributes (174)
-  Stream C: Relation / Where / Finders (177)
-  Stream D: Serialization / Store / JSON (100)
-  Stream G: Small standalone areas (~130)
-  Stream A1 start: BelongsTo (96), HasOne (72)
+Highest ROI (parallel):
+  - STI (Single Table Inheritance) — unlocks ~50+ tests across through, eager, and association files
+  - Scoped associations — unlocks ~30+ tests
+  - Nested includes (includes(posts: :comments)) — unlocks ~20+ tests
+  - source_type: option for polymorphic through — unlocks ~15+ tests
+  - Fixture-dependent test conversion — 355 stubs in coverage-boost.test.ts
 
-Week 3-4 (parallel):
-  Stream A1 continue: HasMany (199), HABTM (84), Join (150), Inverse (93)
-  Stream A1 continue: Association Misc (158)
-  Stream E: Transactions / Locking (90)
-  Stream F: Migrations / Schema (111)
+Medium ROI (parallel):
+  - HABTM collection operations (<<, delete, clear) — ~20 tests
+  - Remaining eager loading edge cases — ~30 tests
+  - Autosave edge cases — ~30 tests
+  - Transaction callbacks — ~30 tests
 
-Week 5-6:
-  Stream A2: Through Associations (257) — blocked on A1
-  Stream A6: Counter Cache, Strict Loading, Reflection (109)
-
-Week 7-8:
-  Stream A3: Eager Loading (198) — blocked on A1 + A2
-  Stream A4: Autosave (166) — blocked on A1
-
-Week 9:
-  Stream A5: Nested Attributes (124) — blocked on A4
-  Cleanup and final stubs
+Lower ROI / complex:
+  - CPK (composite primary keys) — ~15 tests
+  - Pessimistic locking — ~7 tests
+  - Multi-database support — a few tests
+  - Ruby-only concepts (marshal, YAML) — permanently skip
 ```
 
 ## What "converting a stub" typically involves
@@ -271,19 +292,15 @@ Most stubs fall into a few patterns:
 
 5. **Ruby-only concepts** — marshal round-trip, YAML-specific behavior, Ruby threading. These should be marked as permanently skipped with a comment, or adapted to TypeScript equivalents. (~5% of stubs)
 
-## Files that need creating (no TS match at all)
+## Files that may benefit from dedicated test files
 
-These Ruby test files have 0 matched TS tests and need new test files:
+Most Ruby test files now have TS matches via `coverage-boost.test.ts` or dedicated test files. A few areas might benefit from their own files:
 
-| Ruby file | Tests | Suggested TS file |
+| Ruby file | Remaining stubs | Notes |
 |---|---|---|
-| `associations/join_model_test.rb` | 102 | `join-model.test.ts` |
-| `associations/inverse_associations_test.rb` | 93 | `inverse-associations.test.ts` |
-| `associations/cascaded_eager_loading_test.rb` | 27 | `cascaded-eager-loading.test.ts` |
-| `comment_test.rb` | 17 | `comment.test.ts` |
-| `relation/with_test.rb` | 16 | `relation-with.test.ts` |
-
-These 255 tests are currently counted under "stubs" in existing files (via coverage-boost.test.ts) but would benefit from dedicated test files once the features are built.
+| `associations/cascaded_eager_loading_test.rb` | ~27 | Nested includes, could be split from eager-hmthrough |
+| `relation/with_test.rb` | ~16 | CTE / `WITH` support, not yet implemented |
+| `comment_test.rb` | ~17 | SQL comment annotations |
 
 ## Tracking progress
 
