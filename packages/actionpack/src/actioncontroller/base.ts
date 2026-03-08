@@ -10,6 +10,7 @@ import { FlashHash } from "../actiondispatch/flash.js";
 import { RequestForgeryProtection, InvalidAuthenticityToken } from "../actiondispatch/request-forgery-protection.js";
 import { Collector, UnknownFormat } from "../actiondispatch/respond-to.js";
 import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
+import { LookupContext } from "../actionview/lookup-context.js";
 import { createHash } from "crypto";
 
 // Re-export callback registration
@@ -21,6 +22,16 @@ export type RenderOptions = {
   html?: string;
   body?: string;
   text?: string;
+  /** Render a specific action's template */
+  action?: string;
+  /** Render a partial */
+  partial?: string;
+  /** Locals to pass to template */
+  locals?: Record<string, unknown>;
+  /** Collection to render with a partial */
+  collection?: unknown[];
+  /** Variable name for each collection item */
+  as?: string;
   status?: number | string;
   contentType?: string;
   layout?: boolean | string;
@@ -36,15 +47,21 @@ export class Base extends Metal {
   /** Session store (simple object). */
   session: Record<string, unknown> = {};
 
-  /** Template resolver (pluggable). */
+  /** Template resolver (pluggable, legacy). */
   static templateResolver?: (controller: string, action: string, format: string) => string | null;
+
+  /** Pluggable template lookup context (ActionView integration). */
+  static lookupContext?: LookupContext;
+
+  /** Layout name. Set to false to disable, or a string name. */
+  static layout: string | false = "application";
 
   /** Rescue handlers (class-level, inherited). */
   private static _rescueHandlers: Array<{ errorClass: new (...args: any[]) => Error; handler: RescueHandler }> = [];
 
   // --- Rendering ---
 
-  /** Render a response. Supports json, plain, html, body, text, status. */
+  /** Render a response. Supports json, plain, html, body, text, action, partial, collection. */
   render(options: RenderOptions = {}): void {
     if (this.performed) {
       throw new DoubleRenderError("Render and/or redirect were called multiple times in this action.");
@@ -69,6 +86,14 @@ export class Base extends Metal {
     } else if (options.text !== undefined) {
       this.contentType = options.contentType ?? "text/plain; charset=utf-8";
       this.body = options.text;
+    } else if (options.partial !== undefined) {
+      // Render partial via LookupContext (synchronous wrapper, actual render is async)
+      this._pendingRender = { type: "partial", options };
+      return; // Will be handled by async processAction wrapper
+    } else if (options.action !== undefined || options.collection !== undefined) {
+      // Render action template or collection via LookupContext
+      this._pendingRender = { type: "template", options };
+      return; // Will be handled by async processAction wrapper
     } else {
       // Implicit render — try template resolver
       this._renderTemplate(this.actionName, options);
@@ -80,6 +105,74 @@ export class Base extends Metal {
     }
 
     this.markPerformed();
+  }
+
+  /** Pending async render (for template/partial rendering). */
+  _pendingRender: { type: string; options: RenderOptions } | null = null;
+
+  /** Async render — resolves pending template/partial renders. */
+  async renderAsync(options: RenderOptions): Promise<void> {
+    if (this.performed) {
+      throw new DoubleRenderError("Render and/or redirect were called multiple times in this action.");
+    }
+
+    if (options.status) {
+      this.status = options.status;
+    }
+
+    const ctx = (this.constructor as typeof Base).lookupContext;
+    if (!ctx) {
+      throw new Error(
+        "No lookupContext configured. Set YourController.lookupContext = new LookupContext() " +
+        "and register resolvers/handlers."
+      );
+    }
+
+    const controllerName = this._controllerName();
+    const format = this.request?.format ?? "html";
+    const locals = options.locals ?? {};
+    const layout = options.layout === false ? false
+      : (typeof options.layout === "string" ? options.layout
+        : (this.constructor as typeof Base).layout);
+
+    if (options.partial !== undefined) {
+      if (options.collection !== undefined) {
+        // Render collection with partial
+        this.body = await ctx.renderCollection(
+          options.partial,
+          controllerName,
+          format,
+          options.collection,
+          options.as
+        );
+      } else {
+        this.body = await ctx.renderPartial(
+          options.partial,
+          controllerName,
+          format,
+          locals
+        );
+      }
+    } else {
+      const action = options.action ?? this.actionName;
+      this.body = await ctx.render(
+        controllerName,
+        action,
+        format,
+        locals,
+        { layout: layout === false ? false : (layout || undefined) }
+      );
+    }
+
+    this.contentType = options.contentType ?? "text/html; charset=utf-8";
+    this.markPerformed();
+  }
+
+  /** Derive controller name from class name. */
+  private _controllerName(): string {
+    return this.constructor.name
+      .replace(/Controller$/, "")
+      .toLowerCase();
   }
 
   /** Render to string without committing the response. */
@@ -204,10 +297,16 @@ export class Base extends Metal {
     (this as any)._rescueHandlers.push({ errorClass, handler });
   }
 
-  /** Process action with rescue handling. */
+  /** Process action with rescue handling and async template rendering. */
   async processAction(action: string): Promise<void> {
     try {
       await super.processAction(action);
+
+      // Resolve any pending async renders (template/partial)
+      if (this._pendingRender && !this.performed) {
+        await this.renderAsync(this._pendingRender.options);
+        this._pendingRender = null;
+      }
     } catch (error) {
       if (error instanceof Error) {
         const handler = this._findRescueHandler(error);

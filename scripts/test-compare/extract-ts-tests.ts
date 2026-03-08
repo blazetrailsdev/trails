@@ -149,6 +149,8 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actionpack/src/actioncontroller/test-case.test.ts",
     "packages/actionpack/src/actioncontroller/integration-test.test.ts",
     "packages/actionpack/src/actioncontroller/params-wrapper.test.ts",
+    "packages/actionpack/src/actioncontroller/template-rendering.test.ts",
+    "packages/actionpack/src/actionview/actionview.test.ts",
   ],
 };
 
