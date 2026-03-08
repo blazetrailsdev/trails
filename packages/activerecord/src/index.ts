@@ -31,7 +31,7 @@ export { delegate } from "./delegate.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export { enableSti, getInheritanceColumn, instantiateSti, registerSubclass } from "./sti.js";
 export { hasSecurePassword } from "./secure-password.js";
-export { store, storeAccessor } from "./store.js";
+export { store, storeAccessor, storedAttributes } from "./store.js";
 export { SqliteAdapter } from "./adapters/sqlite-adapter.js";
 export { PostgresAdapter } from "./adapters/postgres-adapter.js";
 export { MysqlAdapter } from "./adapters/mysql-adapter.js";

@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, Migration, Schema, MigrationContext, TableDefinition, delegatedType } from "./index.js";
+import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType } from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -13754,8 +13754,31 @@ describe("StoreTest", () => {
     expect("settings" in u.changes).toBe(true);
   });
 
-  it.skip("dirty methods for suffixed accessors", () => { /* fixture-dependent */ });
-  it.skip("dirty methods for prefixed accessors", () => { /* fixture-dependent */ });
+  it("dirty methods for suffixed accessors", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme"], suffix: true });
+    const item = new Item({ name: "test", settings: JSON.stringify({ theme: "light" }) });
+    (item as any)._dirty.snapshot(item._attributes);
+    (item as any).theme_settings = "dark";
+    expect(item.changed).toBe(true);
+    expect("settings" in item.changes).toBe(true);
+  });
+
+  it("dirty methods for prefixed accessors", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme"], prefix: true });
+    const item = new Item({ name: "test", settings: JSON.stringify({ theme: "light" }) });
+    (item as any)._dirty.snapshot(item._attributes);
+    (item as any).settings_theme = "dark";
+    expect(item.changed).toBe(true);
+    expect("settings" in item.changes).toBe(true);
+  });
 
   it("saved changes tracking for accessors", async () => {
     const { User } = makeModel();
@@ -13876,9 +13899,45 @@ describe("StoreTest", () => {
     expect((item as any).color).toBe("red");
   });
 
-  it.skip("all stored attributes are returned", () => { /* needs storedAttributes tracking */ });
-  it.skip("stored_attributes are tracked per class", () => { /* needs storedAttributes tracking */ });
-  it.skip("stored_attributes are tracked per subclass", () => { /* needs storedAttributes tracking */ });
+  it("all stored attributes are returned", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.attribute("prefs", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme", "language"] });
+    store(Item, "prefs", { accessors: ["notify"] });
+    const attrs = storedAttributes(Item);
+    expect(attrs["settings"]).toEqual(["theme", "language"]);
+    expect(attrs["prefs"]).toEqual(["notify"]);
+  });
+
+  it("stored_attributes are tracked per class", () => {
+    const a2 = freshAdapter();
+    class A extends Base {
+      static { this.attribute("name", "string"); this.attribute("data", "string"); this.adapter = a2; }
+    }
+    class B extends Base {
+      static { this.attribute("name", "string"); this.attribute("config", "string"); this.adapter = a2; }
+    }
+    store(A, "data", { accessors: ["x"] });
+    store(B, "config", { accessors: ["y"] });
+    expect(storedAttributes(A)["data"]).toEqual(["x"]);
+    expect(storedAttributes(B)["config"]).toEqual(["y"]);
+    expect(storedAttributes(A)["config"]).toBeUndefined();
+    expect(storedAttributes(B)["data"]).toBeUndefined();
+  });
+
+  it("stored_attributes are tracked per subclass", () => {
+    const a2 = freshAdapter();
+    class Parent extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    class Child extends Parent {}
+    store(Parent, "settings", { accessors: ["theme"] });
+    store(Child, "settings", { accessors: ["color"] });
+    expect(storedAttributes(Parent)["settings"]).toEqual(["theme"]);
+    expect(storedAttributes(Child)["settings"]).toEqual(["color"]);
+  });
 
   it("YAML coder initializes the store when a Nil value is given", () => {
     const { User } = makeModel();
@@ -13901,13 +13960,84 @@ describe("StoreTest", () => {
     expect((reloaded as any).theme).toBe("light");
   });
 
-  it.skip("read store attributes through accessors with default suffix", () => { /* needs prefix/suffix support */ });
-  it.skip("write store attributes through accessors with default suffix", () => { /* needs prefix/suffix support */ });
-  it.skip("read store attributes through accessors with custom suffix", () => { /* needs prefix/suffix support */ });
-  it.skip("write store attributes through accessors with custom suffix", () => { /* needs prefix/suffix support */ });
-  it.skip("read accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => { /* needs prefix/suffix support */ });
-  it.skip("write accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => { /* needs prefix/suffix support */ });
-  it.skip("prefix/suffix do not affect stored attributes", () => { /* needs prefix/suffix support */ });
+  it("read store attributes through accessors with default suffix", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme"], suffix: true });
+    const item = new Item({ name: "test", settings: JSON.stringify({ theme: "dark" }) });
+    expect((item as any).theme_settings).toBe("dark");
+  });
+
+  it("write store attributes through accessors with default suffix", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme"], suffix: true });
+    const item = new Item({ name: "test" });
+    (item as any).theme_settings = "ocean";
+    expect((item as any).theme_settings).toBe("ocean");
+  });
+
+  it("read store attributes through accessors with custom suffix", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme"], suffix: "config" });
+    const item = new Item({ name: "test", settings: JSON.stringify({ theme: "dark" }) });
+    expect((item as any).theme_config).toBe("dark");
+  });
+
+  it("write store attributes through accessors with custom suffix", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme"], suffix: "config" });
+    const item = new Item({ name: "test" });
+    (item as any).theme_config = "midnight";
+    expect((item as any).theme_config).toBe("midnight");
+  });
+
+  it("read accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["language"] });
+    store(Item, "settings", { accessors: ["theme"], prefix: true });
+    const item = new Item({ name: "test", settings: JSON.stringify({ language: "en", theme: "dark" }) });
+    expect((item as any).language).toBe("en");
+    expect((item as any).settings_theme).toBe("dark");
+  });
+
+  it("write accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["language"] });
+    store(Item, "settings", { accessors: ["theme"], prefix: true });
+    const item = new Item({ name: "test" });
+    (item as any).language = "fr";
+    (item as any).settings_theme = "ocean";
+    expect((item as any).language).toBe("fr");
+    expect((item as any).settings_theme).toBe("ocean");
+  });
+
+  it("prefix/suffix do not affect stored attributes", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static { this.attribute("name", "string"); this.attribute("settings", "string"); this.adapter = a2; }
+    }
+    store(Item, "settings", { accessors: ["theme", "language"], prefix: true });
+    const attrs = storedAttributes(Item);
+    expect(attrs["settings"]).toEqual(["theme", "language"]);
+  });
+
   it.skip("store_accessor raises an exception if the column is not either serializable or a structured type", () => { /* needs type checking */ });
 });
 
