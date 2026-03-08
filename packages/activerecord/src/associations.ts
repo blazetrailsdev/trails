@@ -839,6 +839,126 @@ export async function updateCounterCaches(
  *
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo touch option
  */
+/**
+ * Set a belongs_to association on a record.
+ * Sets the foreign key and caches the associated record.
+ * Also sets inverse_of on the target if configured.
+ *
+ * Mirrors: ActiveRecord::Associations::BelongsToAssociation#writer
+ */
+export function setBelongsTo(
+  record: Base,
+  assocName: string,
+  target: Base | null,
+  options: AssociationOptions = {}
+): void {
+  const foreignKey = options.foreignKey ?? `${underscore(assocName)}_id`;
+  const primaryKey = options.primaryKey ?? "id";
+
+  if (target) {
+    record.writeAttribute(foreignKey, target.readAttribute(primaryKey));
+  } else {
+    record.writeAttribute(foreignKey, null);
+  }
+
+  // Cache the association
+  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+  (record as any)._cachedAssociations.set(assocName, target);
+
+  // Set inverse on target
+  if (target && options.inverseOf) {
+    if (!(target as any)._cachedAssociations) (target as any)._cachedAssociations = new Map();
+    (target as any)._cachedAssociations.set(options.inverseOf, record);
+  }
+}
+
+/**
+ * Set a has_one association on a record.
+ * Sets the foreign key on the target and caches.
+ *
+ * Mirrors: ActiveRecord::Associations::HasOneAssociation#writer
+ */
+export async function setHasOne(
+  record: Base,
+  assocName: string,
+  target: Base | null,
+  options: AssociationOptions = {}
+): Promise<void> {
+  const ctor = record.constructor as typeof Base;
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  const foreignKey = options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const pkValue = record.readAttribute(primaryKey);
+
+  // Nullify old target
+  const className = options.className ?? camelize(assocName);
+  const targetModel = resolveModel(className);
+  const existing = await targetModel.findBy({ [foreignKey]: pkValue });
+  if (existing && existing !== target) {
+    existing.writeAttribute(foreignKey, null);
+    await existing.save();
+  }
+
+  if (target) {
+    target.writeAttribute(foreignKey, pkValue);
+    if (target.isPersisted()) await target.save();
+  }
+
+  // Cache
+  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+  (record as any)._cachedAssociations.set(assocName, target);
+
+  // Set inverse
+  if (target && options.inverseOf) {
+    if (!(target as any)._cachedAssociations) (target as any)._cachedAssociations = new Map();
+    (target as any)._cachedAssociations.set(options.inverseOf, record);
+  }
+}
+
+/**
+ * Set a has_many association (replace entire collection).
+ * Nullifies old targets' FKs, sets new ones.
+ *
+ * Mirrors: ActiveRecord::Associations::HasManyAssociation#writer
+ */
+export async function setHasMany(
+  record: Base,
+  assocName: string,
+  targets: Base[],
+  options: AssociationOptions = {}
+): Promise<void> {
+  const ctor = record.constructor as typeof Base;
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  const foreignKey = options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const pkValue = record.readAttribute(primaryKey);
+
+  // Nullify old targets
+  const className = options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveModel(className);
+  const existing = await (targetModel as any).where({ [foreignKey]: pkValue }).toArray();
+  for (const old of existing) {
+    if (!targets.includes(old)) {
+      old.writeAttribute(foreignKey, null);
+      await old.save();
+    }
+  }
+
+  // Set FK on new targets
+  for (const t of targets) {
+    t.writeAttribute(foreignKey, pkValue);
+    if (t.isPersisted()) await t.save();
+
+    // Set inverse
+    if (options.inverseOf) {
+      if (!(t as any)._cachedAssociations) (t as any)._cachedAssociations = new Map();
+      (t as any)._cachedAssociations.set(options.inverseOf, record);
+    }
+  }
+
+  // Cache the collection
+  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+  (record as any)._cachedAssociations.set(assocName, targets);
+}
+
 export async function touchBelongsToParents(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];

@@ -12,6 +12,9 @@ import {
   loadHasManyThrough,
   processDependentAssociations,
   updateCounterCaches,
+  setBelongsTo,
+  setHasOne,
+  setHasMany,
 } from "./associations.js";
 import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -19656,7 +19659,15 @@ describe("InverseHasManyTests", () => {
     expect(child.readAttribute("man_id")).toBe(m.id);
   });
 
-  it.skip("parent instance should be shared with replaced via accessor children", () => { /* needs association= setter */ });
+  it("parent instance should be shared with replaced via accessor children", async () => {
+    const { Man, Interest } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const i1 = await Interest.create({ topic: "stamps" });
+    const i2 = await Interest.create({ topic: "coins" });
+    await setHasMany(m, "interests", [i1, i2], { inverseOf: "man", foreignKey: "man_id", className: "Interest" });
+    expect((i1 as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((i2 as any)._cachedAssociations?.get("man")).toBe(m);
+  });
 
   it("parent instance should be shared with first and last child", async () => {
     const { Man, Interest } = makeModels();
@@ -22154,7 +22165,15 @@ describe("InverseBelongsToTests", () => {
   it.skip("recursive inverse on recursive model has many inversing", () => { /* needs deep recursive inverse */ });
   it.skip("unscope does not set inverse when incorrect", () => { /* needs unscope support */ });
   it.skip("or does not set inverse when incorrect", () => { /* needs or-query inverse checking */ });
-  it.skip("child instance should be shared with replaced via accessor parent", () => { /* needs association= setter */ });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Face } = makeModels();
+    const m1 = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty", man_id: m1.id });
+    const m2 = await Man.create({ name: "New Guy" });
+    setBelongsTo(f, "man", m2, { inverseOf: "face" });
+    expect((f as any)._cachedAssociations.get("man")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
+  });
   it.skip("trying to use inverses that dont exist should raise an error", () => { /* needs inverse validation */ });
   it.skip("trying to use inverses that dont exist should have suggestions for fix", () => { /* needs inverse validation */ });
 
@@ -24514,7 +24533,15 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it.skip("eager loaded child instance should be shared with parent on find", () => { /* needs eager loading */ });
-  it.skip("child instance should be shared with replaced via accessor parent", () => { /* needs association= setter */ });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Tag } = makeModels();
+    const m1 = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m1.id, taggable_type: "Man" });
+    const m2 = await Man.create({ name: "New" });
+    setBelongsTo(t, "taggable", m2, { polymorphic: true, inverseOf: "tags", foreignKey: "taggable_id" });
+    expect((t as any)._cachedAssociations.get("taggable")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("tags")).toBe(t);
+  });
   it.skip("inversed instance should not be reloaded after stale state changed", () => { /* needs stale state tracking */ });
   it.skip("inversed instance should not be reloaded after stale state changed with validation", () => { /* needs stale state tracking */ });
   it.skip("inversed instance should load after autosave if it is not already loaded", () => { /* needs autosave */ });
@@ -25846,8 +25873,23 @@ describe("InverseHasOneTests", () => {
     expect((face as any)._cachedAssociations?.get("man")).toBe(m);
   });
 
-  it.skip("parent instance should be shared with replaced via accessor child", () => { /* needs association= setter */ });
-  it.skip("child instance should be shared with replaced via accessor parent", () => { /* needs association= setter */ });
+  it("parent instance should be shared with replaced via accessor child", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty" });
+    await setHasOne(m, "face", f, { inverseOf: "man", foreignKey: "man_id", className: "Face" });
+    expect((m as any)._cachedAssociations.get("face")).toBe(f);
+    expect((f as any)._cachedAssociations?.get("man")).toBe(m);
+  });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty", man_id: m.id });
+    const m2 = await Man.create({ name: "New" });
+    setBelongsTo(f, "man", m2, { inverseOf: "face" });
+    expect((f as any)._cachedAssociations.get("man")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
+  });
   it.skip("trying to use inverses that dont exist should raise an error", () => { /* needs inverse validation */ });
   it.skip("trying to use inverses that dont exist should have suggestions for fix", () => { /* needs inverse validation */ });
 });
@@ -31636,7 +31678,15 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it.skip("eager loaded child instance should be shared with parent on find", () => { /* needs eager loading */ });
-  it.skip("child instance should be shared with replaced via accessor parent", () => { /* needs association= setter */ });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Tag } = makeModels();
+    const m1 = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m1.id, taggable_type: "Man" });
+    const m2 = await Man.create({ name: "New" });
+    setBelongsTo(t, "taggable", m2, { polymorphic: true, inverseOf: "tags", foreignKey: "taggable_id" });
+    expect((t as any)._cachedAssociations.get("taggable")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("tags")).toBe(t);
+  });
   it.skip("inversed instance should not be reloaded after stale state changed", () => { /* needs stale state */ });
   it.skip("inversed instance should not be reloaded after stale state changed with validation", () => { /* needs stale state */ });
   it.skip("inversed instance should load after autosave if it is not already loaded", () => { /* needs autosave */ });
@@ -33774,7 +33824,15 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it.skip("eager loaded child instance should be shared with parent on find", () => { /* needs eager loading */ });
-  it.skip("child instance should be shared with replaced via accessor parent", () => { /* needs association= setter */ });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Tag } = makeModels();
+    const m1 = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m1.id, taggable_type: "Man" });
+    const m2 = await Man.create({ name: "New" });
+    setBelongsTo(t, "taggable", m2, { polymorphic: true, inverseOf: "tags", foreignKey: "taggable_id" });
+    expect((t as any)._cachedAssociations.get("taggable")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("tags")).toBe(t);
+  });
   it.skip("inversed instance should not be reloaded after stale state changed", () => { /* needs stale state */ });
   it.skip("inversed instance should not be reloaded after stale state changed with validation", () => { /* needs stale state */ });
   it.skip("inversed instance should load after autosave if it is not already loaded", () => { /* needs autosave */ });
