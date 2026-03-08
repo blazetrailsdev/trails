@@ -125,6 +125,8 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actiondispatch/src/mime-type.test.ts",
     "packages/actiondispatch/src/content-security-policy.test.ts",
     "packages/actiondispatch/src/redirect.test.ts",
+    "packages/actiondispatch/src/flash.test.ts",
+    "packages/actiondispatch/src/middleware/static.test.ts",
   ],
 };
 

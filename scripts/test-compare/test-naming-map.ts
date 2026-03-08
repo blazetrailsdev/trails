@@ -2304,6 +2304,15 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "controller/redirect_test.rb": [
       { file: "redirect.test.ts", describeBlock: "ActionController::Redirect" },
     ],
+    "controller/flash_hash_test.rb": [
+      { file: "flash.test.ts", describeBlock: "ActionDispatch::Flash::FlashHash" },
+    ],
+    "controller/flash_test.rb": [
+      { file: "flash.test.ts", describeBlock: "ActionDispatch::Flash" },
+    ],
+    "dispatch/static_test.rb": [
+      { file: "middleware/static.test.ts", describeBlock: "ActionDispatch::Static" },
+    ],
   },
 };
 

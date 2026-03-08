@@ -27,3 +27,5 @@ export { MiddlewareStack } from "./middleware/stack.js";
 export { MimeType } from "./mime-type.js";
 export { ContentSecurityPolicy, type CSPSource } from "./content-security-policy.js";
 export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
+export { FlashHash } from "./flash.js";
+export { Static, type StaticOptions } from "./middleware/static.js";
