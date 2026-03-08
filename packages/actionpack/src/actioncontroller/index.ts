@@ -20,3 +20,10 @@ export {
 
 export { TestCase, type RequestOptions } from "./test-case.js";
 export { IntegrationTest, type IntegrationRequestOptions } from "./integration-test.js";
+export {
+  wrapParameters,
+  applyParamsWrapper,
+  deriveWrapperKey,
+  type WrapParametersOptions,
+  type ParamsWrapperConfig,
+} from "./params-wrapper.js";
