@@ -1,7 +1,7 @@
 {
-  "name": "@rails-ts/actiondispatch",
+  "name": "@rails-ts/actionpack",
   "version": "0.1.0",
-  "description": "Routing, middleware stack, and request/response — mirroring Rails ActionDispatch",
+  "description": "ActionController and ActionDispatch — mirroring Rails ActionPack",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

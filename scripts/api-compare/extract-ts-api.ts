@@ -16,6 +16,11 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 const PACKAGES = ["arel", "activemodel", "activerecord", "actiondispatch"];
 
+/** Override package → directory mapping when they differ */
+const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
+  actiondispatch: "actionpack",
+};
+
 function main() {
   const manifest: ApiManifest = {
     source: "typescript",
@@ -24,7 +29,8 @@ function main() {
   };
 
   for (const pkg of PACKAGES) {
-    const pkgDir = path.join(ROOT_DIR, "packages", pkg, "src");
+    const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
+    const pkgDir = path.join(ROOT_DIR, "packages", dirName, "src");
     manifest.packages[pkg] = extractPackage(pkg, pkgDir);
   }
 
