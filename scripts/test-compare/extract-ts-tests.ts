@@ -112,7 +112,9 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/rack/src/utils.test.ts",
     "packages/rack/src/version.test.ts",
   ],
-  actiondispatch: [],
+  actiondispatch: [
+    "packages/actiondispatch/src/routing/routing.test.ts",
+  ],
 };
 
 function main() {

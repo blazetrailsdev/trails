@@ -2240,7 +2240,32 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
   // ==========================================================================
   // ActionDispatch
   // ==========================================================================
-  actiondispatch: {},
+  actiondispatch: {
+    "dispatch/routing/route_set_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::RouteSet" },
+    ],
+    "journey/route_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Journey::Route" },
+    ],
+    "journey/router_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Journey::Router" },
+    ],
+    "journey/router/utils_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Journey::Router::Utils" },
+    ],
+    "dispatch/routing_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::Mapper" },
+    ],
+    "dispatch/routing/inspector_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::Inspector" },
+    ],
+    "controller/routing_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionController::Routing" },
+    ],
+    "dispatch/routing_assertions_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::Assertions" },
+    ],
+  },
 };
 
 // --- Skip list ---

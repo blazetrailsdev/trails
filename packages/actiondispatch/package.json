@@ -9,5 +9,8 @@
     "build": "tsc"
   },
   "files": ["dist"],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@rails-ts/rack": "*"
+  }
 }
