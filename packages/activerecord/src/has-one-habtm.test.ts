@@ -1983,8 +1983,12 @@ describe("AssociationsJoinModelTest", () => {
     // Requires conditions on through
   });
 
-  it.skip("has many polymorphic", () => {
-    // Requires polymorphic has_many
+  it("has many polymorphic", async () => {
+    const post = await Post.create({ title: "HmPoly", body: "B" });
+    const tag = await Tag.create({ name: "hm_tag" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+    const taggings = await loadHasMany(post, "taggings", { as: "taggable", className: "Tagging" });
+    expect(taggings.length).toBe(1);
   });
 
   it.skip("has many polymorphic with source type", () => {
@@ -2184,32 +2188,77 @@ describe("AssociationsJoinModelTest", () => {
     // Requires ORDER BY preservation with distinct
   });
 
-  it.skip("polymorphic has many", () => {
-    // Requires polymorphic has_many full implementation
+  it("polymorphic has many", async () => {
+    const post = await Post.create({ title: "Poly", body: "B" });
+    const tag = await Tag.create({ name: "poly_tag" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: 999, taggable_type: "OtherModel" });
+    const taggings = await loadHasMany(post, "taggings", { as: "taggable", className: "Tagging" });
+    expect(taggings.length).toBe(1);
+    expect(taggings[0].readAttribute("tag_id")).toBe(tag.id);
   });
 
-  it.skip("polymorphic has one", () => {
-    // Requires polymorphic has_one full implementation
+  it("polymorphic has one", async () => {
+    const post = await Post.create({ title: "Poly1", body: "B" });
+    await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
+    const tagging = await loadHasOne(post, "tagging", { as: "taggable", className: "Tagging" });
+    expect(tagging).not.toBeNull();
+    expect(tagging!.readAttribute("taggable_type")).toBe("Post");
   });
 
-  it.skip("polymorphic belongs to", () => {
-    // Requires polymorphic belongs_to full implementation
+  it("polymorphic belongs to", async () => {
+    const post = await Post.create({ title: "PolyBt", body: "B" });
+    const tagging = await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
+    Associations.belongsTo.call(Tagging, "taggable", { polymorphic: true });
+    const loaded = await loadBelongsTo(tagging, "taggable", { polymorphic: true });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("title")).toBe("PolyBt");
   });
 
   it.skip("preload polymorphic has many through", () => {
     // Requires preload polymorphic through
   });
 
-  it.skip("preload polymorph many types", () => {
-    // Requires preload multiple types
+  it("preload polymorph many types", async () => {
+    // Preload polymorphic belongsTo with multiple types
+    Associations.belongsTo.call(Tagging, "taggable", { polymorphic: true });
+    const post = await Post.create({ title: "TypeA", body: "B" });
+    const author = await Author.create({ name: "TypeB" });
+    await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: 2, taggable_id: author.id, taggable_type: "Author" });
+    const taggings = await Tagging.all().includes("taggable").toArray();
+    const t1 = taggings.find((r: any) => r.readAttribute("taggable_type") === "Post");
+    const t2 = taggings.find((r: any) => r.readAttribute("taggable_type") === "Author");
+    const p1 = (t1 as any)._preloadedAssociations?.get("taggable");
+    const p2 = (t2 as any)._preloadedAssociations?.get("taggable");
+    expect(p1).not.toBeNull();
+    expect(p1.readAttribute("title")).toBe("TypeA");
+    expect(p2).not.toBeNull();
+    expect(p2.readAttribute("name")).toBe("TypeB");
   });
 
-  it.skip("preload nil polymorphic belongs to", () => {
-    // Requires nil polymorphic preload
+  it("preload nil polymorphic belongs to", async () => {
+    // Tagging with no taggable should preload as null
+    const tagging = await Tagging.create({ tag_id: 1, taggable_id: null as any, taggable_type: null as any });
+    Associations.belongsTo.call(Tagging, "taggable", { polymorphic: true });
+    const taggings = await Tagging.all().includes("taggable").toArray();
+    const t = taggings.find((r: any) => r.id === tagging.id);
+    expect(t).toBeDefined();
+    const preloaded = (t as any)._preloadedAssociations?.get("taggable");
+    expect(preloaded).toBeNull();
   });
 
-  it.skip("preload polymorphic has many", () => {
-    // Requires preload polymorphic has_many
+  it("preload polymorphic has many", async () => {
+    Associations.hasMany.call(Post, "taggings", { as: "taggable", className: "Tagging" });
+    const post = await Post.create({ title: "PrePoly", body: "B" });
+    await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: 2, taggable_id: post.id, taggable_type: "Post" });
+    // Different type shouldn't be preloaded
+    await Tagging.create({ tag_id: 3, taggable_id: post.id, taggable_type: "OtherModel" });
+    const posts = await Post.all().includes("taggings").toArray();
+    const p = posts.find((r: any) => r.id === post.id);
+    const preloaded = (p as any)._preloadedAssociations?.get("taggings");
+    expect(preloaded.length).toBe(2);
   });
 
   it.skip("belongs to shared parent", () => {

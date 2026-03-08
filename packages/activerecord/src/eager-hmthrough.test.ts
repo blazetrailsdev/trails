@@ -363,8 +363,34 @@ describe("EagerAssociationTest", () => {
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerNullParent");
     expect(preloaded == null).toBe(true);
   });
-  it.skip("finding with includes on null belongs to polymorphic association", () => {});
-  it.skip("finding with includes on empty polymorphic type column", () => {});
+  it("finding with includes on null belongs to polymorphic association", async () => {
+    class EagerPolyChild extends Base {
+      static { this.attribute("name", "string"); this.attribute("parent_id", "integer"); this.attribute("parent_type", "string"); this.adapter = adapter; }
+    }
+    registerModel(EagerPolyChild);
+    (EagerPolyChild as any)._associations = [
+      { type: "belongsTo", name: "parent", options: { polymorphic: true } },
+    ];
+    await EagerPolyChild.create({ name: "orphan", parent_id: null as any, parent_type: null as any });
+    const results = await EagerPolyChild.all().includes("parent").toArray();
+    expect(results).toHaveLength(1);
+    const preloaded = (results[0] as any)._preloadedAssociations?.get("parent");
+    expect(preloaded).toBeNull();
+  });
+  it("finding with includes on empty polymorphic type column", async () => {
+    class EagerPolyChild2 extends Base {
+      static { this.attribute("name", "string"); this.attribute("parent_id", "integer"); this.attribute("parent_type", "string"); this.adapter = adapter; }
+    }
+    registerModel(EagerPolyChild2);
+    (EagerPolyChild2 as any)._associations = [
+      { type: "belongsTo", name: "parent", options: { polymorphic: true } },
+    ];
+    await EagerPolyChild2.create({ name: "empty_type", parent_id: 1, parent_type: "" });
+    const results = await EagerPolyChild2.all().includes("parent").toArray();
+    expect(results).toHaveLength(1);
+    const preloaded = (results[0] as any)._preloadedAssociations?.get("parent");
+    expect(preloaded).toBeNull();
+  });
 
   it("loading from an association", async () => {
     class EagerAuthor extends Base {
@@ -1932,7 +1958,20 @@ describe("EagerAssociationTest", () => {
     const preloaded = (children[0] as any)._preloadedAssociations.get("eagerEmptyBtParent");
     expect(preloaded == null).toBe(true);
   });
-  it.skip("preloading empty belongs to polymorphic", () => {});
+  it("preloading empty belongs to polymorphic", async () => {
+    class PrePolyOrphan extends Base {
+      static { this.attribute("name", "string"); this.attribute("owner_id", "integer"); this.attribute("owner_type", "string"); this.adapter = adapter; }
+    }
+    registerModel(PrePolyOrphan);
+    (PrePolyOrphan as any)._associations = [
+      { type: "belongsTo", name: "owner", options: { polymorphic: true } },
+    ];
+    await PrePolyOrphan.create({ name: "orphan" });
+    const results = await PrePolyOrphan.all().includes("owner").toArray();
+    expect(results).toHaveLength(1);
+    const preloaded = (results[0] as any)._preloadedAssociations?.get("owner");
+    expect(preloaded).toBeNull();
+  });
   it("preloading has many through with distinct", async () => {
     class EagerDistOwner extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
