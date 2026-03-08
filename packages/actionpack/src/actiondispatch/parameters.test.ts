@@ -712,3 +712,658 @@ describe("ActionController::Parameters::UnpermittedParametersAction", () => {
     expect(() => params.permit("name")).not.toThrow();
   });
 });
+
+// ==========================================================================
+// controller/parameters/slice_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Slice", () => {
+  it("returns Parameters with only specified keys", () => {
+    const params = new Parameters({ a: "1", b: "2", c: "3" });
+    const sliced = params.slice("a", "c");
+    expect(sliced.get("a")).toBe("1");
+    expect(sliced.get("c")).toBe("3");
+    expect(sliced.has("b")).toBe(false);
+  });
+
+  it("ignores keys that do not exist", () => {
+    const params = new Parameters({ a: "1" });
+    const sliced = params.slice("a", "z");
+    expect(sliced.keys).toEqual(["a"]);
+  });
+
+  it("preserves permitted status", () => {
+    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const sliced = params.slice("a");
+    expect(sliced.permitted).toBe(true);
+  });
+
+  it("returns empty Parameters when no keys match", () => {
+    const params = new Parameters({ a: "1" });
+    const sliced = params.slice("z");
+    expect(sliced.empty).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/except_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Except", () => {
+  it("excludes specified keys", () => {
+    const params = new Parameters({ a: "1", b: "2", c: "3" });
+    const result = params.except("b");
+    expect(result.has("a")).toBe(true);
+    expect(result.has("c")).toBe(true);
+    expect(result.has("b")).toBe(false);
+  });
+
+  it("excludes multiple keys", () => {
+    const params = new Parameters({ a: "1", b: "2", c: "3" });
+    const result = params.except("a", "c");
+    expect(result.keys).toEqual(["b"]);
+  });
+
+  it("without is alias for except", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    const e = params.except("b");
+    const w = params.without("b");
+    expect(e.toHash()).toEqual(w.toHash());
+  });
+
+  it("preserves permitted status", () => {
+    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    expect(params.except("b").permitted).toBe(true);
+  });
+
+  it("does not modify original", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    params.except("b");
+    expect(params.has("b")).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/extract_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Extract", () => {
+  it("extract is alias for slice", () => {
+    const params = new Parameters({ a: "1", b: "2", c: "3" });
+    const extracted = params.extract("a", "c");
+    expect(extracted.toHash()).toEqual({ a: "1", c: "3" });
+  });
+});
+
+// ==========================================================================
+// controller/parameters/merge_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Merge", () => {
+  it("merges another Parameters", () => {
+    const a = new Parameters({ x: "1" });
+    const b = new Parameters({ y: "2" });
+    const merged = a.merge(b);
+    expect(merged.get("x")).toBe("1");
+    expect(merged.get("y")).toBe("2");
+  });
+
+  it("merges a plain object", () => {
+    const params = new Parameters({ x: "1" });
+    const merged = params.merge({ y: "2" });
+    expect(merged.get("y")).toBe("2");
+  });
+
+  it("later values win on conflict", () => {
+    const a = new Parameters({ x: "1" });
+    const b = new Parameters({ x: "2" });
+    expect(a.merge(b).get("x")).toBe("2");
+  });
+
+  it("preserves permitted status of receiver", () => {
+    const a = new Parameters({ x: "1" }).permitAll();
+    const b = new Parameters({ y: "2" });
+    expect(a.merge(b).permitted).toBe(true);
+  });
+
+  it("does not modify original", () => {
+    const a = new Parameters({ x: "1" });
+    a.merge({ y: "2" });
+    expect(a.has("y")).toBe(false);
+  });
+
+  it("reverse_merge gives priority to receiver", () => {
+    const a = new Parameters({ x: "1" });
+    const b = new Parameters({ x: "2", y: "3" });
+    const result = a.reversemerge(b);
+    expect(result.get("x")).toBe("1");
+    expect(result.get("y")).toBe("3");
+  });
+});
+
+// ==========================================================================
+// controller/parameters/transform_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Transform", () => {
+  it("transform applies fn to each value", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    const result = params.transform((_k, v) => Number(v));
+    expect(result.get("a")).toBe(1);
+    expect(result.get("b")).toBe(2);
+  });
+
+  it("transform passes key to fn", () => {
+    const params = new Parameters({ name: "dean" });
+    const result = params.transform((k, v) => `${k}=${v}`);
+    expect(result.get("name")).toBe("name=dean");
+  });
+
+  it("transformKeys applies fn to each key", () => {
+    const params = new Parameters({ first_name: "Dean" });
+    const result = params.transformKeys((k) => k.replace(/_/g, "-"));
+    expect(result.has("first-name")).toBe(true);
+    expect(result.get("first-name")).toBe("Dean");
+  });
+
+  it("transformValues applies fn to each value", () => {
+    const params = new Parameters({ a: "hello", b: "world" });
+    const result = params.transformValues((v) => (v as string).toUpperCase());
+    expect(result.get("a")).toBe("HELLO");
+    expect(result.get("b")).toBe("WORLD");
+  });
+
+  it("transform preserves permitted status", () => {
+    const params = new Parameters({ a: "1" }).permitAll();
+    expect(params.transform((_k, v) => v).permitted).toBe(true);
+    expect(params.transformKeys((k) => k).permitted).toBe(true);
+    expect(params.transformValues((v) => v).permitted).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/select_reject_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::SelectReject", () => {
+  it("select filters by predicate", () => {
+    const params = new Parameters({ a: "1", b: "2", c: "3" });
+    const result = params.select((_k, v) => Number(v) > 1);
+    expect(result.keys).toEqual(["b", "c"]);
+  });
+
+  it("reject removes matching entries", () => {
+    const params = new Parameters({ a: "1", b: "2", c: "3" });
+    const result = params.reject((_k, v) => Number(v) > 1);
+    expect(result.keys).toEqual(["a"]);
+  });
+
+  it("select can filter by key", () => {
+    const params = new Parameters({ name: "x", admin: "y", secret: "z" });
+    const safe = params.select((k) => k === "name");
+    expect(safe.keys).toEqual(["name"]);
+  });
+
+  it("select preserves permitted status", () => {
+    const params = new Parameters({ a: "1" }).permitAll();
+    expect(params.select(() => true).permitted).toBe(true);
+  });
+
+  it("reject preserves permitted status", () => {
+    const params = new Parameters({ a: "1" }).permitAll();
+    expect(params.reject(() => false).permitted).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/compact_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Compact", () => {
+  it("compact removes null and undefined", () => {
+    const params = new Parameters({ a: "1", b: null, c: undefined, d: "4" });
+    const result = params.compact();
+    expect(result.keys).toEqual(["a", "d"]);
+  });
+
+  it("compact keeps empty strings and false", () => {
+    const params = new Parameters({ a: "", b: false, c: 0 });
+    const result = params.compact();
+    expect(result.keys).toEqual(["a", "b", "c"]);
+  });
+
+  it("compactBlank removes null, undefined, empty string, and false", () => {
+    const params = new Parameters({ a: "1", b: null, c: "", d: false, e: 0 });
+    const result = params.compactBlank();
+    expect(result.keys).toEqual(["a", "e"]);
+  });
+
+  it("compact preserves permitted status", () => {
+    const params = new Parameters({ a: "1", b: null }).permitAll();
+    expect(params.compact().permitted).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/fetch_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Fetch", () => {
+  it("fetch returns value for existing key", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.fetch("a")).toBe("1");
+  });
+
+  it("fetch returns default for missing key", () => {
+    const params = new Parameters({});
+    expect(params.fetch("a", "default")).toBe("default");
+  });
+
+  it("fetch throws when key missing and no default", () => {
+    const params = new Parameters({});
+    expect(() => params.fetch("a")).toThrow(/key not found/);
+  });
+
+  it("fetch returns null if value is null (key exists)", () => {
+    const params = new Parameters({ a: null });
+    expect(params.fetch("a")).toBeNull();
+  });
+});
+
+// ==========================================================================
+// controller/parameters/deep_dup_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::DeepDup", () => {
+  it("creates independent copy", () => {
+    const params = new Parameters({ a: "1" });
+    const dup = params.deepDup();
+    dup.set("a", "2");
+    expect(params.get("a")).toBe("1");
+  });
+
+  it("deep copies nested objects", () => {
+    const params = new Parameters({ a: { nested: "value" } });
+    const dup = params.deepDup();
+    (dup.get("a") as any).nested = "changed";
+    expect((params.get("a") as any).nested).toBe("value");
+  });
+
+  it("preserves permitted status", () => {
+    const params = new Parameters({ a: "1" }).permitAll();
+    expect(params.deepDup().permitted).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/to_query_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::ToQuery", () => {
+  it("encodes simple params", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    expect(params.toQuery()).toBe("a=1&b=2");
+  });
+
+  it("encodes with prefix", () => {
+    const params = new Parameters({ name: "Dean" });
+    expect(params.toQuery("user")).toBe("user%5Bname%5D=Dean");
+  });
+
+  it("URL-encodes special characters", () => {
+    const params = new Parameters({ q: "hello world" });
+    expect(params.toQuery()).toBe("q=hello%20world");
+  });
+});
+
+// ==========================================================================
+// controller/parameters/equality_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Equality", () => {
+  it("equals returns true for same content", () => {
+    const a = new Parameters({ x: "1" });
+    const b = new Parameters({ x: "1" });
+    expect(a.equals(b)).toBe(true);
+  });
+
+  it("equals returns false for different content", () => {
+    const a = new Parameters({ x: "1" });
+    const b = new Parameters({ x: "2" });
+    expect(a.equals(b)).toBe(false);
+  });
+
+  it("equals ignores permitted status", () => {
+    const a = new Parameters({ x: "1" });
+    const b = new Parameters({ x: "1" }).permitAll();
+    expect(a.equals(b)).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/conversion_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Conversion", () => {
+  it("toHash returns plain object copy", () => {
+    const params = new Parameters({ a: "1" });
+    const hash = params.toHash();
+    hash.a = "changed";
+    expect(params.get("a")).toBe("1");
+  });
+
+  it("toJSON returns same as toHash", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    expect(params.toJSON()).toEqual(params.toHash());
+  });
+
+  it("toUnsafeHash unwraps nested Parameters", () => {
+    const inner = new Parameters({ city: "NYC" });
+    const params = new Parameters({ address: inner });
+    const hash = params.toUnsafeHash();
+    expect(hash.address).toEqual({ city: "NYC" });
+    expect(hash.address).not.toBeInstanceOf(Parameters);
+  });
+
+  it("toUnsafeHash unwraps arrays of Parameters", () => {
+    const items = [new Parameters({ id: "1" }), new Parameters({ id: "2" })];
+    const params = new Parameters({ items });
+    const hash = params.toUnsafeHash();
+    expect((hash.items as any[])[0]).toEqual({ id: "1" });
+    expect((hash.items as any[])[0]).not.toBeInstanceOf(Parameters);
+  });
+
+  it("toString returns JSON string", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.toString()).toBe('{"a":"1"}');
+  });
+
+  it("inspect includes class name and data", () => {
+    const params = new Parameters({ a: "1" });
+    const s = params.inspect();
+    expect(s).toContain("ActionController::Parameters");
+    expect(s).toContain('"a":"1"');
+  });
+
+  it("inspect shows permitted status", () => {
+    const params = new Parameters({ a: "1" }).permitAll();
+    expect(params.inspect()).toContain("permitted: true");
+  });
+});
+
+// ==========================================================================
+// controller/parameters/hash_methods_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::HashMethods", () => {
+  it("has returns true for existing key", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.has("a")).toBe(true);
+    expect(params.has("b")).toBe(false);
+  });
+
+  it("hasKey is alias for has", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.hasKey("a")).toBe(true);
+  });
+
+  it("hasValue checks values", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.hasValue("1")).toBe(true);
+    expect(params.hasValue("2")).toBe(false);
+  });
+
+  it("include is alias for has", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.include("a")).toBe(true);
+  });
+
+  it("member is alias for has", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.member("a")).toBe(true);
+  });
+
+  it("exclude is inverse of has", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.exclude("a")).toBe(false);
+    expect(params.exclude("b")).toBe(true);
+  });
+
+  it("keys returns all keys", () => {
+    const params = new Parameters({ x: "1", y: "2" });
+    expect(params.keys).toEqual(["x", "y"]);
+  });
+
+  it("values returns all values", () => {
+    const params = new Parameters({ x: "1", y: "2" });
+    expect(params.values).toEqual(["1", "2"]);
+  });
+
+  it("empty returns true for empty params", () => {
+    expect(new Parameters().empty).toBe(true);
+    expect(new Parameters({ a: "1" }).empty).toBe(false);
+  });
+
+  it("length returns count of keys", () => {
+    expect(new Parameters({ a: "1", b: "2" }).length).toBe(2);
+  });
+
+  it("size is alias for length", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    expect(params.size).toBe(params.length);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/iteration_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Iteration", () => {
+  it("each iterates key-value pairs", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    const collected: [string, unknown][] = [];
+    params.each((k, v) => collected.push([k, v]));
+    expect(collected).toEqual([["a", "1"], ["b", "2"]]);
+  });
+
+  it("eachPair is alias for each", () => {
+    const params = new Parameters({ a: "1" });
+    const collected: string[] = [];
+    params.eachPair((k) => collected.push(k));
+    expect(collected).toEqual(["a"]);
+  });
+
+  it("eachValue iterates values only", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    const collected: unknown[] = [];
+    params.eachValue((v) => collected.push(v));
+    expect(collected).toEqual(["1", "2"]);
+  });
+
+  it("eachKey iterates keys only", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    const collected: string[] = [];
+    params.eachKey((k) => collected.push(k));
+    expect(collected).toEqual(["a", "b"]);
+  });
+
+  it("each returns self for chaining", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.each(() => {})).toBe(params);
+  });
+
+  it("eachValue returns self for chaining", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.eachValue(() => {})).toBe(params);
+  });
+
+  it("eachKey returns self for chaining", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.eachKey(() => {})).toBe(params);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/delete_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Delete", () => {
+  it("delete removes key and returns value", () => {
+    const params = new Parameters({ a: "1", b: "2" });
+    expect(params.delete("a")).toBe("1");
+    expect(params.has("a")).toBe(false);
+  });
+
+  it("delete returns default when key missing", () => {
+    const params = new Parameters({});
+    expect(params.delete("a", "default")).toBe("default");
+  });
+
+  it("delete returns undefined when key missing and no default", () => {
+    const params = new Parameters({});
+    expect(params.delete("a")).toBeUndefined();
+  });
+});
+
+// ==========================================================================
+// controller/parameters/set_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Set", () => {
+  it("set adds a new key", () => {
+    const params = new Parameters({});
+    params.set("a", "1");
+    expect(params.get("a")).toBe("1");
+  });
+
+  it("set overwrites existing key", () => {
+    const params = new Parameters({ a: "1" });
+    params.set("a", "2");
+    expect(params.get("a")).toBe("2");
+  });
+});
+
+// ==========================================================================
+// controller/parameters/static_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::Static", () => {
+  it("Parameters.create creates new instance", () => {
+    const params = Parameters.create({ a: "1" });
+    expect(params).toBeInstanceOf(Parameters);
+    expect(params.get("a")).toBe("1");
+  });
+
+  it("Parameters.create with no args creates empty", () => {
+    const params = Parameters.create();
+    expect(params.empty).toBe(true);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/permit_nested_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::PermitDeepNested", () => {
+  it("permit with nested Parameters", () => {
+    const inner = new Parameters({ title: "Hello", admin: true });
+    const params = new Parameters({ post: inner });
+    const permitted = params.permit({ post: ["title"] });
+    const post = permitted.get("post") as Parameters;
+    expect(post.get("title")).toBe("Hello");
+    expect(post.has("admin")).toBe(false);
+  });
+
+  it("permit with array of scalars via empty array", () => {
+    const params = new Parameters({ tags: ["ruby", "js", "ts"] });
+    const permitted = params.permit({ tags: [] });
+    expect(permitted.get("tags")).toEqual(["ruby", "js", "ts"]);
+  });
+
+  it("permit with array of scalars filters non-scalars", () => {
+    const params = new Parameters({ tags: ["ruby", { nested: true }, 42] });
+    const permitted = params.permit({ tags: [] });
+    const tags = permitted.get("tags") as unknown[];
+    expect(tags).toEqual(["ruby", 42]);
+  });
+
+  it("permit with array of Parameters", () => {
+    const items = [
+      new Parameters({ name: "A", secret: "x" }),
+      new Parameters({ name: "B", secret: "y" }),
+    ];
+    const params = new Parameters({ items });
+    const permitted = params.permit({ items: ["name"] });
+    const result = permitted.get("items") as Parameters[];
+    expect(result[0].get("name")).toBe("A");
+    expect(result[0].has("secret")).toBe(false);
+    expect(result[1].get("name")).toBe("B");
+  });
+
+  it("permitted Parameters has permitted flag set", () => {
+    const params = new Parameters({ name: "Dean" });
+    const permitted = params.permit("name");
+    expect(permitted.permitted).toBe(true);
+  });
+
+  it("unpermitted params are excluded", () => {
+    const params = new Parameters({ name: "Dean", admin: true });
+    const permitted = params.permit("name");
+    expect(permitted.has("admin")).toBe(false);
+  });
+});
+
+// ==========================================================================
+// controller/parameters/require_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::RequireDeep", () => {
+  it("require returns nested Parameters", () => {
+    const inner = new Parameters({ title: "Hello" });
+    const params = new Parameters({ post: inner });
+    const result = params.require("post");
+    expect(result).toBeInstanceOf(Parameters);
+    expect((result as Parameters).get("title")).toBe("Hello");
+  });
+
+  it("require throws on missing key", () => {
+    const params = new Parameters({});
+    expect(() => params.require("post")).toThrow(ParameterMissing);
+  });
+
+  it("require throws on null value", () => {
+    const params = new Parameters({ post: null });
+    expect(() => params.require("post")).toThrow(ParameterMissing);
+  });
+
+  it("require throws on empty string", () => {
+    const params = new Parameters({ post: "" });
+    expect(() => params.require("post")).toThrow(ParameterMissing);
+  });
+
+  it("require returns scalar values", () => {
+    const params = new Parameters({ name: "Dean" });
+    expect(params.require("name")).toBe("Dean");
+  });
+
+  it("ParameterMissing has param property", () => {
+    const params = new Parameters({});
+    try {
+      params.require("post");
+    } catch (e) {
+      expect((e as any).param).toBe("post");
+    }
+  });
+});
+
+// ==========================================================================
+// controller/parameters/dig_deep_test.rb
+// ==========================================================================
+describe("ActionController::Parameters::DigDeep", () => {
+  it("dig into nested Parameters", () => {
+    const inner = new Parameters({ city: "NYC" });
+    const params = new Parameters({ address: inner });
+    expect(params.dig("address", "city")).toBe("NYC");
+  });
+
+  it("dig into nested plain objects", () => {
+    const params = new Parameters({ meta: { tags: { primary: "ruby" } } });
+    expect(params.dig("meta", "tags", "primary")).toBe("ruby");
+  });
+
+  it("dig returns undefined for missing path", () => {
+    const params = new Parameters({ a: { b: "c" } });
+    expect(params.dig("a", "z")).toBeUndefined();
+  });
+
+  it("dig returns undefined for null in path", () => {
+    const params = new Parameters({ a: null });
+    expect(params.dig("a", "b")).toBeUndefined();
+  });
+
+  it("dig with single key acts like get", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.dig("a")).toBe("1");
+  });
+});

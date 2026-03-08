@@ -306,3 +306,181 @@ describe("ActionController rendering", () => {
     });
   });
 });
+
+// ==========================================================================
+// action_controller/send_data_test.rb
+// ==========================================================================
+describe("ActionController sendData", () => {
+  it("sends string data with default content type", async () => {
+    class C extends Base { async download() { this.sendData("hello", { filename: "test.txt" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.body).toBe("hello");
+    expect(c.contentType).toBe("application/octet-stream");
+  });
+
+  it("sets content-disposition with filename", async () => {
+    class C extends Base { async download() { this.sendData("data", { filename: "report.csv" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.getHeader("content-disposition")).toBe('attachment; filename="report.csv"');
+  });
+
+  it("sets custom content type", async () => {
+    class C extends Base { async download() { this.sendData("data", { type: "text/csv", filename: "r.csv" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.contentType).toBe("text/csv");
+  });
+
+  it("sets inline disposition", async () => {
+    class C extends Base { async download() { this.sendData("<pdf>", { filename: "doc.pdf", disposition: "inline" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.getHeader("content-disposition")).toBe('inline; filename="doc.pdf"');
+  });
+
+  it("sets content-length", async () => {
+    class C extends Base { async download() { this.sendData("12345", { filename: "test.txt" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.getHeader("content-length")).toBe("5");
+  });
+
+  it("sends Buffer data", async () => {
+    class C extends Base { async download() { this.sendData(Buffer.from("binary"), { filename: "test.bin" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.body).toBe("binary");
+  });
+
+  it("marks action as performed", async () => {
+    class C extends Base { async download() { this.sendData("x", { filename: "f" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.performed).toBe(true);
+  });
+
+  it("disposition only when no filename", async () => {
+    class C extends Base { async download() { this.sendData("x", { disposition: "inline" }); } }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.getHeader("content-disposition")).toBe("inline");
+  });
+});
+
+// ==========================================================================
+// action_controller/render_edge_cases_test.rb
+// ==========================================================================
+describe("ActionController render edge cases", () => {
+  it("render with custom content type", async () => {
+    class C extends Base { async index() { this.render({ json: {}, contentType: "application/vnd.api+json" }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.contentType).toBe("application/vnd.api+json");
+  });
+
+  it("render json null", async () => {
+    class C extends Base { async index() { this.render({ json: null }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.body).toBe("null");
+  });
+
+  it("render json array", async () => {
+    class C extends Base { async index() { this.render({ json: [1, 2, 3] }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(JSON.parse(c.body)).toEqual([1, 2, 3]);
+  });
+
+  it("render json string is used as-is", async () => {
+    class C extends Base { async index() { this.render({ json: '{"raw":true}' }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.body).toBe('{"raw":true}');
+  });
+
+  it("render with status number", async () => {
+    class C extends Base { async index() { this.render({ json: {}, status: 422 }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(422);
+  });
+
+  it("render with status symbol", async () => {
+    class C extends Base { async index() { this.render({ json: {}, status: "not_found" }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(404);
+  });
+
+  it("render text sets plain content type", async () => {
+    class C extends Base { async index() { this.render({ text: "hi" }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.contentType).toContain("text/plain");
+  });
+
+  it("render body sets octet-stream content type", async () => {
+    class C extends Base { async index() { this.render({ body: "raw" }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.contentType).toContain("application/octet-stream");
+  });
+
+  it("head with status symbol", async () => {
+    class C extends Base { async index() { this.head("not_found"); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(404);
+    expect(c.body).toBe("");
+  });
+
+  it("head with status number", async () => {
+    class C extends Base { async index() { this.head(204); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(204);
+  });
+
+  it("render sets performed flag", async () => {
+    class C extends Base { async index() { this.render({ plain: "hi" }); } }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.performed).toBe(true);
+  });
+
+  it("multiple render throws DoubleRenderError", async () => {
+    class C extends Base {
+      async index() {
+        this.render({ plain: "first" });
+        this.render({ plain: "second" });
+      }
+    }
+    const c = new C();
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+  });
+
+  it("render then redirect throws DoubleRenderError", async () => {
+    class C extends Base {
+      async index() {
+        this.render({ plain: "hi" });
+        this.redirectTo("/other");
+      }
+    }
+    const c = new C();
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+  });
+
+  it("redirect then render throws DoubleRenderError", async () => {
+    class C extends Base {
+      async index() {
+        this.redirectTo("/other");
+        this.render({ plain: "hi" });
+      }
+    }
+    const c = new C();
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+  });
+});

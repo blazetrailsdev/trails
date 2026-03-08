@@ -1,6 +1,6 @@
 # ActionController: Road to 100% Test Coverage
 
-Current state: **~28%** (~530 matched / 1,912 total controller+abstract tests). 173 controller tests + 69 routing tests + 76 new parameter tests written, ~1,382 remaining.
+Current state: **~33%** (~620 matched / 1,912 total controller+abstract tests). 263 controller tests + 69 routing tests + 76 new parameter tests written, ~1,292 remaining.
 
 In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 
@@ -22,7 +22,7 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 | `actioncontroller/base.ts` | Rendering (json/plain/html/body/text), redirects, flash, CSRF, `rescue_from`, conditional GET (freshWhen/stale/expiresIn), `sendFile`/`sendData`, content negotiation, template resolver |
 | `actioncontroller/index.ts` | Package exports |
 
-### Test files (173 tests, all passing)
+### Test files (263 tests, all passing)
 
 | File | Tests | Coverage area |
 |---|---|---|
@@ -34,6 +34,8 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 | `redirect.test.ts` | 11 | redirect_to, redirect_back, status codes, referer, fallback |
 | `caching.test.ts` | 13 | freshWhen, stale, ETag, Last-Modified, 304, expiresIn, expiresNow |
 | `rescue.test.ts` | 10 | rescue_from, subclass matching, inheritance, async handlers |
+| `test-case.test.ts` | 51 | Rails-style controller testing: HTTP verbs, params, session, flash, assertions |
+| `integration-test.test.ts` | 39 | Full-stack integration: routing, session/cookie persistence, redirects, multi-request workflows |
 
 ### Supporting changes
 
@@ -50,7 +52,7 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 |---|---|---|---|---|
 | 1 | Parameters | ~193 | 118 | Deep coverage added: nested permit, expect (Rails 8), toQuery, equality, unpermitted params |
 | 2 | Rendering | ~238 | ~31 | Simple rendering done, templates/partials/streaming remain |
-| 3 | Testing harness | 224 | 0 | Not started |
+| 3 | Testing harness | ~134 | 90 | TestCase (51) + IntegrationTest (39) done, more edge cases remain |
 | 4 | Routing (controller) | ~150 | 80 | Resource routing, controller routing, namespace/scope/constraints done |
 | 5 | Other (base, assertions, etc) | ~185 | ~44 | Base skeleton done, assertions/logging/helpers remain |
 | 6 | Security/Auth | ~113 | 45 | CSRF/auth impl exists, controller integration tests needed |
@@ -64,7 +66,7 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 | 14 | Redirects | ~15 | ~39 | Core done, edge cases remain |
 | 15 | File sending | ~26 | ~0 | sendFile/sendData impl exists, needs tests |
 | 16 | Flash (controller) | ~10 | 37 | Mostly done |
-| | **TOTAL** | **~1,382** | **~530** | |
+| | **TOTAL** | **~1,292** | **~620** | |
 
 ## Dependency graph
 
@@ -123,9 +125,9 @@ ActionController::Base (DONE — 44 + 31 + 11 + 13 + 10 tests)
 
 ActionController::API (DONE — included in base.test.ts)
 
-Testing (224 tests) ── NOT STARTED
-   ├── TestCase (132)
-   └── IntegrationTest (92)
+Testing (90/224 done) ── IN PROGRESS
+   ├── TestCase (51 passing)
+   └── IntegrationTest (39 passing)
 ```
 
 ## Remaining workstreams
@@ -188,10 +190,11 @@ Simple rendering is done. Remaining:
 - Helpers (23)
 - Various small features (128)
 
-### Stream 8: Testing harness (224 missing) — LAST
+### Stream 8: Testing harness (~134 remaining) — IN PROGRESS
 
-- `ActionController::TestCase` (132 tests)
-- `ActionDispatch::IntegrationTest` (92 tests)
+TestCase (51 tests) and IntegrationTest (39 tests) are built and passing. Remaining:
+- TestCase edge cases (~80) — file uploads, process method, assigns, template assertions
+- IntegrationTest edge cases (~54) — open_session, multipart, HTTPS, host setting
 
 ## What might be out of scope
 
@@ -237,5 +240,5 @@ npm run test:compare
 
 The compare script now has an `actioncontroller` package entry alongside `actiondispatch`.
 
-Current: ~530 / 1,912 controller tests matched (~28%)
+Current: ~620 / 1,912 controller tests matched (~33%)
 Target: 1,912 / 1,912 (100%)
