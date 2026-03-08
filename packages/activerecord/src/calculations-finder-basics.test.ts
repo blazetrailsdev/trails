@@ -1601,8 +1601,9 @@ describe("WhereChainTest", () => {
     // requires multiple real associations
   });
 
-  it.skip("associated with invalid association name", async () => {
-    // requires whereAssociated with named association
+  it("associated with invalid association name", async () => {
+    const Post = makePost();
+    expect(() => Post.all().whereAssociated("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
   });
 
   it.skip("rewhere with polymorphic association", async () => {

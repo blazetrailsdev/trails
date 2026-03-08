@@ -166,7 +166,11 @@ export class Relation<T extends Base> {
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === assocName);
 
-    if (assocDef && assocDef.type === "belongsTo") {
+    if (!assocDef) {
+      throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
+    }
+
+    if (assocDef.type === "belongsTo") {
       const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
       const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
       return this.whereNot({ [foreignKey]: null });
@@ -184,7 +188,11 @@ export class Relation<T extends Base> {
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === assocName);
 
-    if (assocDef && assocDef.type === "belongsTo") {
+    if (!assocDef) {
+      throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
+    }
+
+    if (assocDef.type === "belongsTo") {
       const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
       const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
       return this.where({ [foreignKey]: null });
@@ -2512,7 +2520,14 @@ export class Relation<T extends Base> {
 
         for (const record of records) {
           if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
-          (record as any)._preloadedAssociations.set(assocName, relatedMap.get(record.readAttribute(foreignKey)) ?? null);
+          const parent = relatedMap.get(record.readAttribute(foreignKey)) ?? null;
+          (record as any)._preloadedAssociations.set(assocName, parent);
+
+          // Set inverse association on parent
+          if (parent && assocDef.options.inverseOf) {
+            if (!(parent as any)._cachedAssociations) (parent as any)._cachedAssociations = new Map();
+            (parent as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
+          }
         }
       } else if (assocDef.type === "hasMany") {
         const singularize = (w: string) => {
@@ -2580,7 +2595,16 @@ export class Relation<T extends Base> {
 
         for (const record of records) {
           if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
-          (record as any)._preloadedAssociations.set(assocName, relatedMap.get(record.readAttribute(primaryKey)) ?? []);
+          const children = relatedMap.get(record.readAttribute(primaryKey)) ?? [];
+          (record as any)._preloadedAssociations.set(assocName, children);
+
+          // Set inverse association on children
+          if (assocDef.options.inverseOf) {
+            for (const child of children) {
+              if (!(child as any)._cachedAssociations) (child as any)._cachedAssociations = new Map();
+              (child as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
+            }
+          }
         }
       } else if (assocDef.type === "hasOne") {
         const underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
@@ -2647,7 +2671,14 @@ export class Relation<T extends Base> {
 
         for (const record of records) {
           if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
-          (record as any)._preloadedAssociations.set(assocName, relatedMap.get(record.readAttribute(primaryKey)) ?? null);
+          const child = relatedMap.get(record.readAttribute(primaryKey)) ?? null;
+          (record as any)._preloadedAssociations.set(assocName, child);
+
+          // Set inverse association on child
+          if (child && assocDef.options.inverseOf) {
+            if (!(child as any)._cachedAssociations) (child as any)._cachedAssociations = new Map();
+            (child as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
+          }
         }
       }
     }

@@ -1870,8 +1870,47 @@ describe("EagerAssociationTest", () => {
   it.skip("eager loading with conditions on string joined table preloads", () => {});
   it.skip("eager loading with select on joined table preloads", () => {});
   it.skip("eager loading with conditions on join model preloads", () => {});
-  it.skip("preload has many using primary key", () => {});
-  it.skip("include has many using primary key", () => {});
+  it("preload has many using primary key", async () => {
+    class EagerPkAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerPkPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("eager_pk_author_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerPkAuthor as any)._associations = [
+      { type: "hasMany", name: "eagerPkPosts", options: { className: "EagerPkPost", foreignKey: "eager_pk_author_id" } },
+    ];
+    registerModel("EagerPkAuthor", EagerPkAuthor);
+    registerModel("EagerPkPost", EagerPkPost);
+    const a = await EagerPkAuthor.create({ name: "Alice" });
+    await EagerPkPost.create({ title: "P1", eager_pk_author_id: a.id });
+    await EagerPkPost.create({ title: "P2", eager_pk_author_id: a.id });
+    const authors = await EagerPkAuthor.all().preload("eagerPkPosts").toArray();
+    expect(authors).toHaveLength(1);
+    const posts = (authors[0] as any)._preloadedAssociations?.get("eagerPkPosts") ?? [];
+    expect(posts).toHaveLength(2);
+  });
+
+  it("include has many using primary key", async () => {
+    class IncPkAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class IncPkPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("inc_pk_author_id", "integer"); this.adapter = adapter; }
+    }
+    (IncPkAuthor as any)._associations = [
+      { type: "hasMany", name: "incPkPosts", options: { className: "IncPkPost", foreignKey: "inc_pk_author_id" } },
+    ];
+    registerModel("IncPkAuthor", IncPkAuthor);
+    registerModel("IncPkPost", IncPkPost);
+    const a = await IncPkAuthor.create({ name: "Bob" });
+    await IncPkPost.create({ title: "Q1", inc_pk_author_id: a.id });
+    const authors = await IncPkAuthor.all().includes("incPkPosts").toArray();
+    expect(authors).toHaveLength(1);
+    const posts = (authors[0] as any)._preloadedAssociations?.get("incPkPosts") ?? [];
+    expect(posts).toHaveLength(1);
+    expect(posts[0].readAttribute("title")).toBe("Q1");
+  });
   it("preloading through empty belongs to", async () => {
     class EagerEmptyBtParent extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }

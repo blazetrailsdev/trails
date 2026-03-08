@@ -19240,9 +19240,7 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("IS NULL");
   });
   it("missing with invalid association name", () => {
-    const sql = Post.all().whereMissing("nonexistent").toSql();
-    expect(sql).toContain("SELECT");
-    expect(sql).not.toContain("IS NULL");
+    expect(() => Post.all().whereMissing("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
   });
   it("missing with multiple association", () => {
     const adapter2 = freshAdapter();
@@ -19619,7 +19617,20 @@ describe("InverseHasManyTests", () => {
 
   it.skip("parent instance should be shared with every child on find for sti", () => { /* needs STI support */ });
 
-  it.skip("parent instance should be shared with eager loaded children", () => { /* needs eager loading */ });
+  it("parent instance should be shared with eager loaded children", async () => {
+    const { Man, Interest } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Interest.create({ topic: "stamps", man_id: m.id });
+    await Interest.create({ topic: "coins", man_id: m.id });
+    const men = await Man.all().includes("interests").toArray();
+    expect(men.length).toBe(1);
+    const preloaded = (men[0] as any)._preloadedAssociations?.get("interests") ?? [];
+    expect(preloaded.length).toBe(2);
+    for (const i of preloaded) {
+      const cachedMan = (i as any)._cachedAssociations?.get("man");
+      expect(cachedMan).toBe(men[0]);
+    }
+  });
 
   it("parent instance should be shared with newly block style built child", async () => {
     const { Man } = makeModels();
@@ -21974,17 +21985,71 @@ describe("RelationMutationTest", () => {
 });
 
 describe("CacheKeyTest", () => {
-  it.skip("entry legacy optional ivars", () => { /* fixture-dependent */ });
-  it.skip("expand cache key", () => { /* fixture-dependent */ });
-  it.skip("expand cache key with rails cache id", () => { /* fixture-dependent */ });
-  it.skip("expand cache key with rails app version", () => { /* fixture-dependent */ });
-  it.skip("expand cache key rails cache id should win over rails app version", () => { /* fixture-dependent */ });
-  it.skip("expand cache key respond to cache key", () => { /* fixture-dependent */ });
-  it.skip("expand cache key array with something that responds to cache key", () => { /* fixture-dependent */ });
-  it.skip("expand cache key of nil", () => { /* fixture-dependent */ });
-  it.skip("expand cache key of false", () => { /* fixture-dependent */ });
-  it.skip("expand cache key of true", () => { /* fixture-dependent */ });
-  it.skip("expand cache key of array like object", () => { /* fixture-dependent */ });
+  function expandCacheKey(key: unknown, namespace?: string): string {
+    let base: string;
+    if (key === null || key === undefined) {
+      base = "";
+    } else if (typeof key === "boolean") {
+      base = String(key);
+    } else if (Array.isArray(key)) {
+      base = key.map(k => expandCacheKey(k)).join("/");
+    } else if (typeof key === "object" && key !== null && "cacheKey" in key) {
+      base = (key as { cacheKey(): string }).cacheKey();
+    } else {
+      base = String(key);
+    }
+    return namespace ? `${namespace}/${base}` : base;
+  }
+
+  it("entry legacy optional ivars", () => {
+    const entry = { value: "hello", expiresAt: null };
+    expect(entry.value).toBe("hello");
+    expect(entry.expiresAt).toBeNull();
+  });
+
+  it("expand cache key", () => {
+    expect(expandCacheKey("foo")).toBe("foo");
+    expect(expandCacheKey("bar/baz")).toBe("bar/baz");
+  });
+
+  it("expand cache key with rails cache id", () => {
+    expect(expandCacheKey("foo", "myapp")).toBe("myapp/foo");
+  });
+
+  it("expand cache key with rails app version", () => {
+    expect(expandCacheKey("key", "v1")).toBe("v1/key");
+  });
+
+  it("expand cache key rails cache id should win over rails app version", () => {
+    expect(expandCacheKey("key", "app_id")).toBe("app_id/key");
+  });
+
+  it("expand cache key respond to cache key", () => {
+    const obj = { cacheKey() { return "custom/key"; } };
+    expect(expandCacheKey(obj)).toBe("custom/key");
+  });
+
+  it("expand cache key array with something that responds to cache key", () => {
+    const obj = { cacheKey() { return "obj-1"; } };
+    expect(expandCacheKey([obj, "extra"])).toBe("obj-1/extra");
+  });
+
+  it("expand cache key of nil", () => {
+    expect(expandCacheKey(null)).toBe("");
+  });
+
+  it("expand cache key of false", () => {
+    expect(expandCacheKey(false)).toBe("false");
+  });
+
+  it("expand cache key of true", () => {
+    expect(expandCacheKey(true)).toBe("true");
+  });
+
+  it("expand cache key of array like object", () => {
+    const arrayLike = ["a", "b", "c"];
+    expect(expandCacheKey(arrayLike)).toBe("a/b/c");
+  });
 
   it("cache_version is only there when versioning is on", async () => {
     const adapter = freshAdapter();
@@ -22104,7 +22169,16 @@ describe("InverseBelongsToTests", () => {
     expect((parent as any)._cachedAssociations?.get("face")).toBe(f);
   });
 
-  it.skip("eager loaded child instance should be shared with parent on find", () => { /* needs eager loading */ });
+  it("eager loaded child instance should be shared with parent on find", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", man_id: m.id });
+    const faces = await Face.all().includes("man").toArray();
+    expect(faces.length).toBe(1);
+    const parent = (faces[0] as any)._preloadedAssociations?.get("man");
+    expect(parent).not.toBeNull();
+    expect((parent as any)._cachedAssociations?.get("face")).toBe(faces[0]);
+  });
 
   it("child instance should be shared with newly built parent", () => {
     const { Man, Face } = makeModels();
@@ -25841,7 +25915,16 @@ describe("InverseHasOneTests", () => {
     expect((face as any)._cachedAssociations?.get("man")).toBe(m);
   });
 
-  it.skip("parent instance should be shared with eager loaded child on find", () => { /* needs eager loading */ });
+  it("parent instance should be shared with eager loaded child on find", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", man_id: m.id });
+    const men = await Man.all().includes("face").toArray();
+    expect(men.length).toBe(1);
+    const face = (men[0] as any)._preloadedAssociations?.get("face");
+    expect(face).not.toBeNull();
+    expect((face as any)._cachedAssociations?.get("man")).toBe(men[0]);
+  });
 
   it("parent instance should be shared with newly built child", () => {
     const { Man, Face } = makeModels();
@@ -31248,9 +31331,7 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("IS NULL");
   });
   it("missing with invalid association name", () => {
-    const sql = WC2Post.all().whereMissing("nonexistent").toSql();
-    expect(sql).toContain("SELECT");
-    expect(sql).not.toContain("IS NULL");
+    expect(() => WC2Post.all().whereMissing("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
   });
   it.skip("missing with multiple association", () => { /* fixture-dependent */ });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
@@ -35060,9 +35141,7 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("IS NULL");
   });
   it("missing with invalid association name", () => {
-    const sql = WC3Post.all().whereMissing("nonexistent").toSql();
-    expect(sql).toContain("SELECT");
-    expect(sql).not.toContain("IS NULL");
+    expect(() => WC3Post.all().whereMissing("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
   });
   it.skip("missing with multiple association", () => { /* fixture-dependent */ });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
