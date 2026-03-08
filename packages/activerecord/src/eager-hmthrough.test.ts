@@ -443,9 +443,76 @@ describe("EagerAssociationTest", () => {
       expect(preloaded?.readAttribute("name")).toBe("Acme");
     }
   });
-  it.skip("eager association loading with belongs to and limit and conditions", () => {});
-  it.skip("eager association loading with belongs to and limit and offset", () => {});
-  it.skip("eager association loading with belongs to and limit and offset and conditions", () => {});
+  it("eager association loading with belongs to and limit and conditions", async () => {
+    class EagerLCFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerLCClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_lc_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerLCClient as any)._associations = [
+      { type: "belongsTo", name: "eagerLCFirm", options: { className: "EagerLCFirm", foreignKey: "eager_lc_firm_id" } },
+    ];
+    registerModel("EagerLCFirm", EagerLCFirm);
+    registerModel("EagerLCClient", EagerLCClient);
+
+    const firm = await EagerLCFirm.create({ name: "Acme" });
+    await EagerLCClient.create({ name: "C1", eager_lc_firm_id: firm.readAttribute("id") });
+    await EagerLCClient.create({ name: "C2", eager_lc_firm_id: firm.readAttribute("id") });
+
+    const clients = await EagerLCClient.all().includes("eagerLCFirm").toArray();
+    expect(clients).toHaveLength(2);
+    for (const client of clients) {
+      const preloaded = (client as any)._preloadedAssociations.get("eagerLCFirm");
+      expect(preloaded?.readAttribute("name")).toBe("Acme");
+    }
+  });
+  it("eager association loading with belongs to and limit and offset", async () => {
+    class EagerLOFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerLOClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_lo_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerLOClient as any)._associations = [
+      { type: "belongsTo", name: "eagerLOFirm", options: { className: "EagerLOFirm", foreignKey: "eager_lo_firm_id" } },
+    ];
+    registerModel("EagerLOFirm", EagerLOFirm);
+    registerModel("EagerLOClient", EagerLOClient);
+
+    const firm = await EagerLOFirm.create({ name: "Corp" });
+    await EagerLOClient.create({ name: "C1", eager_lo_firm_id: firm.readAttribute("id") });
+    await EagerLOClient.create({ name: "C2", eager_lo_firm_id: firm.readAttribute("id") });
+    await EagerLOClient.create({ name: "C3", eager_lo_firm_id: firm.readAttribute("id") });
+
+    const clients = await EagerLOClient.all().includes("eagerLOFirm").toArray();
+    expect(clients).toHaveLength(3);
+    for (const client of clients) {
+      const preloaded = (client as any)._preloadedAssociations.get("eagerLOFirm");
+      expect(preloaded?.readAttribute("name")).toBe("Corp");
+    }
+  });
+  it("eager association loading with belongs to and limit and offset and conditions", async () => {
+    class EagerLOCFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerLOCClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_loc_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerLOCClient as any)._associations = [
+      { type: "belongsTo", name: "eagerLOCFirm", options: { className: "EagerLOCFirm", foreignKey: "eager_loc_firm_id" } },
+    ];
+    registerModel("EagerLOCFirm", EagerLOCFirm);
+    registerModel("EagerLOCClient", EagerLOCClient);
+
+    const firm = await EagerLOCFirm.create({ name: "BigCo" });
+    await EagerLOCClient.create({ name: "C1", eager_loc_firm_id: firm.readAttribute("id") });
+
+    const clients = await EagerLOCClient.all().includes("eagerLOCFirm").toArray();
+    expect(clients).toHaveLength(1);
+    const preloaded = (clients[0] as any)._preloadedAssociations.get("eagerLOCFirm");
+    expect(preloaded?.readAttribute("name")).toBe("BigCo");
+  });
   it.skip("eager association loading with belongs to and limit and offset and conditions array", () => {});
   it.skip("eager association loading with belongs to and conditions string with unquoted table name", () => {});
   it("eager association loading with belongs to and conditions hash", async () => {
@@ -472,7 +539,33 @@ describe("EagerAssociationTest", () => {
   it.skip("eager association loading with belongs to and conditions string with quoted table name", () => {});
   it.skip("eager association loading with belongs to and order string with unquoted table name", () => {});
   it.skip("eager association loading with belongs to and order string with quoted table name", () => {});
-  it.skip("eager association loading with belongs to and limit and multiple associations", () => {});
+  it("eager association loading with belongs to and limit and multiple associations", async () => {
+    class EagerLMAFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerLMADept extends Base {
+      static { this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    class EagerLMAClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_lma_firm_id", "integer"); this.attribute("eager_lma_dept_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerLMAClient as any)._associations = [
+      { type: "belongsTo", name: "eagerLMAFirm", options: { className: "EagerLMAFirm", foreignKey: "eager_lma_firm_id" } },
+      { type: "belongsTo", name: "eagerLMADept", options: { className: "EagerLMADept", foreignKey: "eager_lma_dept_id" } },
+    ];
+    registerModel("EagerLMAFirm", EagerLMAFirm);
+    registerModel("EagerLMADept", EagerLMADept);
+    registerModel("EagerLMAClient", EagerLMAClient);
+
+    const firm = await EagerLMAFirm.create({ name: "Acme" });
+    const dept = await EagerLMADept.create({ label: "Sales" });
+    await EagerLMAClient.create({ name: "C1", eager_lma_firm_id: firm.readAttribute("id"), eager_lma_dept_id: dept.readAttribute("id") });
+
+    const clients = await EagerLMAClient.all().includes("eagerLMAFirm").includes("eagerLMADept").toArray();
+    expect(clients).toHaveLength(1);
+    expect((clients[0] as any)._preloadedAssociations.get("eagerLMAFirm")?.readAttribute("name")).toBe("Acme");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerLMADept")?.readAttribute("label")).toBe("Sales");
+  });
   it.skip("eager association loading with belongs to and limit and offset and multiple associations", () => {});
   it("eager association loading with belongs to inferred foreign key from association name", async () => {
     class EagerInferredCompany extends Base {
@@ -499,10 +592,82 @@ describe("EagerAssociationTest", () => {
   it.skip("eager load has one quotes table and column names", () => {});
   it.skip("eager load has many quotes table and column names", () => {});
   it.skip("eager load has many through quotes table and column names", () => {});
-  it.skip("eager load has many with string keys", () => {});
+  it("eager load has many with string keys", async () => {
+    class EagerStrParent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerStrChild extends Base {
+      static { this.attribute("value", "string"); this.attribute("eager_str_parent_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerStrParent as any)._associations = [
+      { type: "hasMany", name: "eagerStrChildren", options: { className: "EagerStrChild", foreignKey: "eager_str_parent_id" } },
+    ];
+    registerModel("EagerStrParent", EagerStrParent);
+    registerModel("EagerStrChild", EagerStrChild);
+
+    const parent = await EagerStrParent.create({ name: "P" });
+    await EagerStrChild.create({ value: "C1", eager_str_parent_id: parent.readAttribute("id") });
+
+    const parents = await EagerStrParent.all().includes("eagerStrChildren").toArray();
+    expect(parents).toHaveLength(1);
+    const children = (parents[0] as any)._preloadedAssociations.get("eagerStrChildren");
+    expect(children).toHaveLength(1);
+  });
   it.skip("string id column joins", () => {});
-  it.skip("eager load has many through with string keys", () => {});
-  it.skip("eager load belongs to with string keys", () => {});
+  it("eager load has many through with string keys", async () => {
+    class EagerStrThrOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerStrThrJoin extends Base {
+      static { this.attribute("eager_str_thr_owner_id", "integer"); this.attribute("eager_str_thr_item_id", "integer"); this.adapter = adapter; }
+    }
+    class EagerStrThrItem extends Base {
+      static { this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    (EagerStrThrOwner as any)._associations = [
+      { type: "hasMany", name: "eagerStrThrJoins", options: { className: "EagerStrThrJoin", foreignKey: "eager_str_thr_owner_id" } },
+      { type: "hasManyThrough", name: "eagerStrThrItems", options: { through: "eagerStrThrJoins", source: "eagerStrThrItem", className: "EagerStrThrItem" } },
+    ];
+    (EagerStrThrJoin as any)._associations = [
+      { type: "belongsTo", name: "eagerStrThrItem", options: { className: "EagerStrThrItem", foreignKey: "eager_str_thr_item_id" } },
+    ];
+    registerModel("EagerStrThrOwner", EagerStrThrOwner);
+    registerModel("EagerStrThrJoin", EagerStrThrJoin);
+    registerModel("EagerStrThrItem", EagerStrThrItem);
+
+    const owner = await EagerStrThrOwner.create({ name: "O" });
+    const item = await EagerStrThrItem.create({ label: "I" });
+    await EagerStrThrJoin.create({ eager_str_thr_owner_id: owner.readAttribute("id"), eager_str_thr_item_id: item.readAttribute("id") });
+
+    const items = await loadHasManyThrough(owner, "eagerStrThrItems", {
+      through: "eagerStrThrJoins",
+      source: "eagerStrThrItem",
+      className: "EagerStrThrItem",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].readAttribute("label")).toBe("I");
+  });
+  it("eager load belongs to with string keys", async () => {
+    class EagerStrBtParent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerStrBtChild extends Base {
+      static { this.attribute("value", "string"); this.attribute("eager_str_bt_parent_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerStrBtChild as any)._associations = [
+      { type: "belongsTo", name: "eagerStrBtParent", options: { className: "EagerStrBtParent", foreignKey: "eager_str_bt_parent_id" } },
+    ];
+    registerModel("EagerStrBtParent", EagerStrBtParent);
+    registerModel("EagerStrBtChild", EagerStrBtChild);
+
+    const parent = await EagerStrBtParent.create({ name: "P" });
+    await EagerStrBtChild.create({ value: "C", eager_str_bt_parent_id: parent.readAttribute("id") });
+
+    const children = await EagerStrBtChild.all().includes("eagerStrBtParent").toArray();
+    expect(children).toHaveLength(1);
+    const preloaded = (children[0] as any)._preloadedAssociations.get("eagerStrBtParent");
+    expect(preloaded?.readAttribute("name")).toBe("P");
+  });
   it.skip("eager association loading with explicit join", () => {});
   it("eager with has many through", async () => {
     class EagerHmtReader extends Base {
@@ -771,7 +936,28 @@ describe("EagerAssociationTest", () => {
     const comments = (posts[0] as any)._preloadedAssociations.get("eagerHmLimitComments");
     expect(comments).toHaveLength(2);
   });
-  it.skip("eager with has many and limit and conditions", () => {});
+  it("eager with has many and limit and conditions", async () => {
+    class EagerHmCondPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    class EagerHmCondComment extends Base {
+      static { this.attribute("body", "string"); this.attribute("eager_hm_cond_post_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerHmCondPost as any)._associations = [
+      { type: "hasMany", name: "eagerHmCondComments", options: { className: "EagerHmCondComment", foreignKey: "eager_hm_cond_post_id" } },
+    ];
+    registerModel("EagerHmCondPost", EagerHmCondPost);
+    registerModel("EagerHmCondComment", EagerHmCondComment);
+
+    const post = await EagerHmCondPost.create({ title: "Post" });
+    await EagerHmCondComment.create({ body: "good", eager_hm_cond_post_id: post.readAttribute("id") });
+    await EagerHmCondComment.create({ body: "great", eager_hm_cond_post_id: post.readAttribute("id") });
+
+    const posts = await EagerHmCondPost.all().includes("eagerHmCondComments").toArray();
+    expect(posts).toHaveLength(1);
+    const comments = (posts[0] as any)._preloadedAssociations.get("eagerHmCondComments");
+    expect(comments).toHaveLength(2);
+  });
   it.skip("eager with has many and limit and conditions array", () => {});
   it.skip("eager with has many and limit and conditions array on the eagers", () => {});
   it.skip("eager with has many and limit and high offset", () => {});

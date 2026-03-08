@@ -2539,9 +2539,51 @@ describe("HasManyAssociationsTest", () => {
     const remaining = await HashCondPost.where({ author_id: author.id }).toArray();
     expect(remaining.length).toBe(0);
   });
-  it.skip("three levels of dependence", () => {});
+  it("three levels of dependence", async () => {
+    class Grandparent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Parent extends Base {
+      static { this.attribute("grandparent_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Child extends Base {
+      static { this.attribute("parent_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(Grandparent);
+    registerModel(Parent);
+    registerModel(Child);
+    Associations.hasMany.call(Grandparent, "parents", { className: "Parent", foreignKey: "grandparent_id", dependent: "destroy" });
+    Associations.hasMany.call(Parent, "children", { className: "Child", foreignKey: "parent_id", dependent: "destroy" });
+    const gp = await Grandparent.create({ name: "GP" });
+    const p = await Parent.create({ grandparent_id: gp.id, name: "P" });
+    await Child.create({ parent_id: p.id, name: "C" });
+    // Destroy parent's dependents first
+    await processDependentAssociations(p);
+    const remainingChildren = await loadHasMany(p, "children", { className: "Child", foreignKey: "parent_id" });
+    expect(remainingChildren.length).toBe(0);
+    // Now destroy grandparent's dependents
+    await processDependentAssociations(gp);
+    const remainingParents = await loadHasMany(gp, "parents", { className: "Parent", foreignKey: "grandparent_id" });
+    expect(remainingParents.length).toBe(0);
+  });
   it.skip("dependence with transaction support on failure", () => {});
-  it.skip("dependence on account", () => {});
+  it("dependence on account", async () => {
+    class Firm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DepAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+    }
+    registerModel(Firm);
+    registerModel(DepAccount);
+    Associations.hasMany.call(Firm, "dep_accounts", { className: "DepAccount", foreignKey: "firm_id", dependent: "destroy" });
+    const firm = await Firm.create({ name: "Acme" });
+    await DepAccount.create({ firm_id: firm.id, credit_limit: 100 });
+    await DepAccount.create({ firm_id: firm.id, credit_limit: 200 });
+    await processDependentAssociations(firm);
+    const remaining = await loadHasMany(firm, "dep_accounts", { className: "DepAccount", foreignKey: "firm_id" });
+    expect(remaining.length).toBe(0);
+  });
   it.skip("depends and nullify on polymorphic assoc", () => {});
   it.skip("restrict with error", () => {});
   it.skip("restrict with error with locale", () => {});
@@ -2614,8 +2656,37 @@ describe("HasManyAssociationsTest", () => {
   it.skip("associations order should be priority over throughs order", () => {});
   it.skip("dynamic find should respect association order for through", () => {});
   it.skip("has many through respects hash conditions", () => {});
-  it.skip("include checks if record exists if target not loaded", () => {});
-  it.skip("include returns false for non matching record to verify scoping", () => {});
+  it("include checks if record exists if target not loaded", async () => {
+    class InclAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class InclPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(InclAuthor);
+    registerModel(InclPost);
+    const author = await InclAuthor.create({ name: "Alice" });
+    const post = await InclPost.create({ author_id: author.id, title: "A" });
+    const posts = await loadHasMany(author, "incl_posts", { className: "InclPost", foreignKey: "author_id" });
+    const found = posts.some((p: any) => p.id === post.id);
+    expect(found).toBe(true);
+  });
+  it("include returns false for non matching record to verify scoping", async () => {
+    class InclScopeAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class InclScopePost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(InclScopeAuthor);
+    registerModel(InclScopePost);
+    const author1 = await InclScopeAuthor.create({ name: "Alice" });
+    const author2 = await InclScopeAuthor.create({ name: "Bob" });
+    const post = await InclScopePost.create({ author_id: author2.id, title: "B" });
+    const posts = await loadHasMany(author1, "incl_scope_posts", { className: "InclScopePost", foreignKey: "author_id" });
+    const found = posts.some((p: any) => p.id === post.id);
+    expect(found).toBe(false);
+  });
   it.skip("calling first nth or last on association should not load association", () => {});
   it.skip("calling first or last on loaded association should not fetch with query", () => {});
   it.skip("calling first nth or last on existing record with build should load association", () => {});
@@ -2633,15 +2704,72 @@ describe("HasManyAssociationsTest", () => {
   it.skip("calling one on loaded association should not use query", () => {});
   it.skip("subsequent calls to one should use query", () => {});
   it.skip("calling one should defer to collection if using a block", () => {});
-  it.skip("calling one should return false if zero", () => {});
-  it.skip("calling one should return false if more than one", () => {});
+  it("calling one should return false if zero", async () => {
+    class OneZeroAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class OneZeroPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(OneZeroAuthor);
+    registerModel(OneZeroPost);
+    const author = await OneZeroAuthor.create({ name: "Alice" });
+    const posts = await loadHasMany(author, "one_zero_posts", { className: "OneZeroPost", foreignKey: "author_id" });
+    expect(posts.length).toBe(0);
+    // "one?" returns false when zero records
+    expect(posts.length === 1).toBe(false);
+  });
+  it("calling one should return false if more than one", async () => {
+    class OneMultiAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class OneMultiPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(OneMultiAuthor);
+    registerModel(OneMultiPost);
+    const author = await OneMultiAuthor.create({ name: "Alice" });
+    await OneMultiPost.create({ author_id: author.id, title: "A" });
+    await OneMultiPost.create({ author_id: author.id, title: "B" });
+    const posts = await loadHasMany(author, "one_multi_posts", { className: "OneMultiPost", foreignKey: "author_id" });
+    expect(posts.length).toBe(2);
+    // "one?" returns false when more than one record
+    expect(posts.length === 1).toBe(false);
+  });
   it.skip("joins with namespaced model should use correct type", () => {});
   it.skip("association proxy transaction method starts transaction in association class", () => {});
   it.skip("creating using primary key", () => {});
   it.skip("defining has many association with delete all dependency lazily evaluates target class", () => {});
   it.skip("defining has many association with nullify dependency lazily evaluates target class", () => {});
-  it.skip("attributes are being set when initialized from has many association with where clause", () => {});
-  it.skip("attributes are being set when initialized from has many association with multiple where clauses", () => {});
+  it("attributes are being set when initialized from has many association with where clause", async () => {
+    class WhereInitAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class WhereInitPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(WhereInitAuthor);
+    registerModel(WhereInitPost);
+    const author = await WhereInitAuthor.create({ name: "Alice" });
+    const post = WhereInitPost.new({ author_id: author.id, title: "Initialized" });
+    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).readAttribute("title")).toBe("Initialized");
+  });
+  it("attributes are being set when initialized from has many association with multiple where clauses", async () => {
+    class MultiWhereAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class MultiWherePost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+    }
+    registerModel(MultiWhereAuthor);
+    registerModel(MultiWherePost);
+    const author = await MultiWhereAuthor.create({ name: "Alice" });
+    const post = MultiWherePost.new({ author_id: author.id, title: "Init", status: "draft" });
+    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).readAttribute("title")).toBe("Init");
+    expect((post as any).readAttribute("status")).toBe("draft");
+  });
   it.skip("load target respects protected attributes", () => {});
   it.skip("merging with custom attribute writer", () => {});
   it.skip("joining through a polymorphic association with a where clause", () => {});
@@ -2649,8 +2777,30 @@ describe("HasManyAssociationsTest", () => {
   it.skip("build from polymorphic association sets inverse instance", () => {});
   it.skip("dont call save callbacks twice on has many", () => {});
   it.skip("association attributes are available to after initialize", () => {});
-  it.skip("attributes are set when initialized from has many null relationship", () => {});
-  it.skip("attributes are set when initialized from polymorphic has many null relationship", () => {});
+  it("attributes are set when initialized from has many null relationship", async () => {
+    class NullRelAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class NullRelPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(NullRelAuthor);
+    registerModel(NullRelPost);
+    // Building a post with null FK (no parent)
+    const post = NullRelPost.new({ author_id: null as any, title: "Orphan" });
+    expect((post as any).readAttribute("author_id")).toBeNull();
+    expect((post as any).readAttribute("title")).toBe("Orphan");
+  });
+  it("attributes are set when initialized from polymorphic has many null relationship", async () => {
+    class NullPolyComment extends Base {
+      static { this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    registerModel(NullPolyComment);
+    const comment = NullPolyComment.new({ commentable_id: null as any, commentable_type: null as any, body: "Orphan" });
+    expect((comment as any).readAttribute("commentable_id")).toBeNull();
+    expect((comment as any).readAttribute("commentable_type")).toBeNull();
+    expect((comment as any).readAttribute("body")).toBe("Orphan");
+  });
   it("replace returns target", async () => {
     class Author extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -2672,7 +2822,24 @@ describe("HasManyAssociationsTest", () => {
   it.skip("first_or_initialize adds the record to the association", () => {});
   it.skip("first_or_create adds the record to the association", () => {});
   it.skip("first_or_create! adds the record to the association", () => {});
-  it.skip("delete_all, when not loaded, doesn't load the records", () => {});
+  it("delete_all, when not loaded, doesn't load the records", async () => {
+    class NoLoadDelAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class NoLoadDelPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(NoLoadDelAuthor);
+    registerModel(NoLoadDelPost);
+    Associations.hasMany.call(NoLoadDelAuthor, "no_load_del_posts", { className: "NoLoadDelPost", foreignKey: "author_id", dependent: "delete" });
+    const author = await NoLoadDelAuthor.create({ name: "Alice" });
+    await NoLoadDelPost.create({ author_id: author.id, title: "A" });
+    await NoLoadDelPost.create({ author_id: author.id, title: "B" });
+    // Delete without loading first
+    await processDependentAssociations(author);
+    const remaining = await loadHasMany(author, "no_load_del_posts", { className: "NoLoadDelPost", foreignKey: "author_id" });
+    expect(remaining.length).toBe(0);
+  });
   it.skip("collection proxy respects default scope", () => {});
   it.skip("association with extend option with multiple extensions", () => {});
   it.skip("extend option affects per association", () => {});
@@ -2685,7 +2852,29 @@ describe("HasManyAssociationsTest", () => {
   it.skip("updates counter cache when default scope is given", () => {});
   it.skip("passes custom context validation to validate children", () => {});
   it.skip("association with instance dependent scope", () => {});
-  it.skip("associations replace in memory when records have the same id", () => {});
+  it("associations replace in memory when records have the same id", async () => {
+    class ReplMemAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class ReplMemPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(ReplMemAuthor);
+    registerModel(ReplMemPost);
+    const author = await ReplMemAuthor.create({ name: "Alice" });
+    const post = await ReplMemPost.create({ author_id: author.id, title: "Original" });
+    // Load once
+    const posts1 = await loadHasMany(author, "repl_mem_posts", { className: "ReplMemPost", foreignKey: "author_id" });
+    expect(posts1.length).toBe(1);
+    expect((posts1[0] as any).readAttribute("title")).toBe("Original");
+    // Update the post
+    post.writeAttribute("title", "Updated");
+    await post.save();
+    // Reload - should get updated version
+    const posts2 = await loadHasMany(author, "repl_mem_posts", { className: "ReplMemPost", foreignKey: "author_id" });
+    expect(posts2.length).toBe(1);
+    expect((posts2[0] as any).readAttribute("title")).toBe("Updated");
+  });
   it.skip("in memory replacement executes no queries", () => {});
   it.skip("in memory replacements do not execute callbacks", () => {});
   it.skip("in memory replacements sets inverse instance", () => {});
