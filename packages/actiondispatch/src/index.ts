@@ -31,3 +31,6 @@ export { FlashHash } from "./flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
 export { RequestForgeryProtection, InvalidAuthenticityToken, type CsrfOptions, type CsrfStrategy } from "./request-forgery-protection.js";
 export { respondTo, Collector, UnknownFormat } from "./respond-to.js";
+export { PermissionsPolicy, type PermissionSource, type DirectiveName } from "./permissions-policy.js";
+export { UploadedFile, type UploadedFileOptions } from "./uploaded-file.js";
+export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";

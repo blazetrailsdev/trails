@@ -2319,6 +2319,15 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "controller/mime/respond_to_test.rb": [
       { file: "respond-to.test.ts", describeBlock: "RespondToControllerTest" },
     ],
+    "dispatch/permissions_policy_test.rb": [
+      { file: "permissions-policy.test.ts", describeBlock: "ActionDispatch::PermissionsPolicy" },
+    ],
+    "dispatch/uploaded_file_test.rb": [
+      { file: "uploaded-file.test.ts", describeBlock: "ActionDispatch::Http::UploadedFile" },
+    ],
+    "dispatch/request_id_test.rb": [
+      { file: "middleware/request-id.test.ts", describeBlock: "ActionDispatch::RequestId" },
+    ],
   },
 };
 
