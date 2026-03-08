@@ -11,11 +11,12 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 | `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **99.3%** | SQL AST builder and query generation |
 | `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **99%** | Attributes, validations, callbacks, dirty tracking, serialization |
 | `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **67.4%** | Core utilities, inflection, caching, notifications, encryption |
-| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **67.7%** | ORM — persistence, querying, associations, migrations |
-| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **65.8%** | Modular web server interface, request/response, middleware |
-| `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **18%** | Routing, middleware stack, cookies, sessions, security |
+| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **71.6%** | ORM — persistence, querying, associations, migrations |
+| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **99%** | Modular web server interface, request/response, middleware |
+| `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **24%** | Routing, middleware stack, cookies, sessions, security |
+| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **13.3%** | Controller layer, rendering, filters, parameters |
 
-Overall: **58.5%** — 8,041 tests passing against 13,744 Rails tests.
+Overall: **62%** — 8,526 tests passing against 13,744 Rails tests.
 
 ## Quick Example
 
@@ -55,7 +56,7 @@ Attribute definitions with type casting, a full validation framework (presence, 
 
 String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly TimeZone, date/time extensions, and some Ruby-specific features.
 
-### ActiveRecord — ORM (67.7%)
+### ActiveRecord — ORM (71.6%)
 
 **Working:**
 - Base class with attribute definition, persistence (create/save/update/destroy), finders (find, find_by, where, order, limit, offset, pluck, pick)
@@ -80,13 +81,17 @@ String inflection (pluralize, singularize, camelize, underscore, tableize, etc.)
 
 **In progress:** Eager loading/preloading edge cases, polymorphic inverse associations, join model queries, through association edge cases. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full roadmap.
 
-### Rack — Web Server Interface (65.8%)
+### Rack — Web Server Interface (99%)
 
-Request/Response objects, multipart parsing (file uploads), Builder (middleware composition), middleware (ContentType, ContentLength, ETag, ConditionalGet, Deflater, Head, MethodOverride, Runtime, Sendfile, Lock, Static, ShowExceptions, ShowStatus, CommonLogger, Cascade, URLMap), MIME type registry, MockRequest/MockResponse for testing, and HTTP Basic auth. Remaining work is mostly around Rack::Request and Rack::Headers edge cases.
+Request/Response objects, multipart parsing (file uploads), Builder (middleware composition), middleware (ContentType, ContentLength, ETag, ConditionalGet, Deflater, Head, MethodOverride, Runtime, Sendfile, Lock, Static, ShowExceptions, ShowStatus, CommonLogger, Cascade, URLMap), MIME type registry, MockRequest/MockResponse for testing, HTTP Basic auth, Headers, Events, Logger, and RewindableInput. Essentially complete — the only skipped tests are Ruby-specific `.ru` config file parsing features.
 
-### ActionDispatch — Routing and Middleware (18%)
+### ActionDispatch — Routing and Middleware (24%)
 
-Route DSL (resources, resource, namespace, scope, member, collection, concerns, constraints, shallow routes), route matching and URL generation, middleware stack, cookies (signed, encrypted, permanent), flash messages, session handling (CookieStore), CSRF protection, content negotiation (respond_to), Content Security Policy, Permissions Policy, SSL enforcement, Host Authorization, HTTP authentication (Basic, Token, Digest), request ID tracking, and redirect helpers. Early stage — routing core works, but controller integration and many middleware edge cases remain.
+Route DSL (resources, resource, namespace, scope, member, collection, concerns, constraints, shallow routes), route matching and URL generation, route helpers (_path/_url), middleware stack, cookies (signed, encrypted, permanent), flash messages, session handling (CookieStore), CSRF protection, content negotiation (respond_to), Content Security Policy, Permissions Policy, SSL enforcement, Host Authorization, HTTP authentication (Basic, Token, Digest), request ID tracking, and redirect helpers. Early stage — routing core works, but controller integration and many middleware edge cases remain.
+
+### ActionController — Controllers (13.3%)
+
+Base controller with rendering (templates, JSON, plain text, status codes), filters (before/after/around), strong parameters, redirect, head, send_file/send_data, and route helper injection. Early stage — basic request/response cycle works.
 
 ## Ruby to TypeScript Conventions
 
@@ -126,12 +131,12 @@ npm run test:compare
 
 ```
 packages/
-  arel/           — SQL AST and query building
-  activemodel/    — Validations, callbacks, dirty tracking, serialization
-  activerecord/   — ORM layer (persistence, querying, associations)
-  activesupport/  — Core utilities, inflection, caching, encryption
-  rack/           — Web server interface, middleware, request/response
-  actiondispatch/ — Routing, cookies, sessions, security middleware
+  arel/             — SQL AST and query building
+  activemodel/      — Validations, callbacks, dirty tracking, serialization
+  activerecord/     — ORM layer (persistence, querying, associations)
+  activesupport/    — Core utilities, inflection, caching, encryption
+  rack/             — Web server interface, middleware, request/response
+  actionpack/       — ActionDispatch (routing, cookies, sessions) and ActionController
 ```
 
 ## License
