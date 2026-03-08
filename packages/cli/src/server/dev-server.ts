@@ -1,4 +1,7 @@
 import * as http from "node:http";
+import { bodyToString } from "@rails-ts/rack";
+import type { RackEnv } from "@rails-ts/rack";
+import { Application } from "./application.js";
 
 export interface DevServerOptions {
   port: number;
@@ -11,23 +14,30 @@ export class DevServer {
   private host: string;
   private cwd: string;
   private server: http.Server | null = null;
+  private app: Application;
 
   constructor(options: DevServerOptions) {
     this.port = options.port;
     this.host = options.host;
     this.cwd = options.cwd;
+    this.app = new Application({ cwd: this.cwd });
   }
 
   async start(): Promise<void> {
+    await this.app.initialize();
+
     this.server = http.createServer(async (req, res) => {
       const start = Date.now();
       const method = req.method || "GET";
       const url = req.url || "/";
 
       try {
-        // TODO: integrate with Rack middleware stack + ActionDispatch router
-        res.writeHead(200, { "content-type": "text/plain" });
-        res.end("rails-ts development server");
+        const env = await this.buildEnv(req);
+        const [status, headers, body] = await this.app.call(env);
+
+        res.writeHead(status, headers);
+        const bodyStr = await bodyToString(body);
+        res.end(bodyStr);
       } catch (err: any) {
         res.writeHead(500, { "content-type": "text/plain" });
         res.end(`Internal Server Error: ${err.message}`);
@@ -53,5 +63,50 @@ export class DevServer {
       this.server.close();
       this.server = null;
     }
+  }
+
+  /**
+   * Convert a Node.js IncomingMessage into a Rack-compatible env hash.
+   */
+  private async buildEnv(req: http.IncomingMessage): Promise<RackEnv> {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+
+    const env: RackEnv = {
+      REQUEST_METHOD: (req.method || "GET").toUpperCase(),
+      PATH_INFO: url.pathname,
+      QUERY_STRING: url.search?.slice(1) || "",
+      SERVER_NAME: url.hostname,
+      SERVER_PORT: String(url.port || this.port),
+      HTTP_HOST: req.headers.host || `localhost:${this.port}`,
+      REMOTE_ADDR: req.socket.remoteAddress || "127.0.0.1",
+      "rack.url_scheme": "http",
+      "rack.input": await this.readBody(req),
+    };
+
+    // Map HTTP headers to CGI-style env vars
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (key === "content-type") {
+        env["CONTENT_TYPE"] = value;
+      } else if (key === "content-length") {
+        env["CONTENT_LENGTH"] = value;
+      } else {
+        const envKey = "HTTP_" + key.toUpperCase().replace(/-/g, "_");
+        env[envKey] = value;
+      }
+    }
+
+    return env;
+  }
+
+  /**
+   * Read the request body as a string.
+   */
+  private readBody(req: http.IncomingMessage): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+      req.on("error", reject);
+    });
   }
 }

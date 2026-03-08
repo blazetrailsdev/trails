@@ -107,7 +107,9 @@ export function drawRoutes(router: any): void {
     this.createFile("src/config/database.ts", this.dbConfig(name, options.database));
 
     // Application controller
-    this.createFile("src/app/controllers/application-controller.ts", `export class ApplicationController {
+    this.createFile("src/app/controllers/application-controller.ts", `import { ActionController } from "@rails-ts/actionpack";
+
+export class ApplicationController extends ActionController.Base {
   // Base controller — all controllers inherit from this.
 }
 `);

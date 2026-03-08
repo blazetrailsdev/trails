@@ -26,7 +26,7 @@ describe("ControllerGenerator", () => {
     const files = gen.run("Posts", ["index", "show", "create"]);
     expect(files).toContain("src/app/controllers/posts-controller.ts");
     const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/posts-controller.ts"), "utf-8");
-    expect(content).toContain("class PostsController extends BaseController");
+    expect(content).toContain("class PostsController extends ActionController.Base");
     expect(content).toContain("async index()");
     expect(content).toContain("async show()");
     expect(content).toContain("async create()");
@@ -45,14 +45,14 @@ describe("ControllerGenerator", () => {
     const gen = makeGen();
     gen.run("Application", []);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/application-controller.ts"), "utf-8");
-    expect(content).toContain("class ApplicationController extends BaseController");
+    expect(content).toContain("class ApplicationController extends ActionController.Base");
   });
 
   it("handles Controller suffix in name", () => {
     const gen = makeGen();
     gen.run("PostsController", ["index"]);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/posts-controller.ts"), "utf-8");
-    expect(content).toContain("class PostsController extends BaseController");
+    expect(content).toContain("class PostsController extends ActionController.Base");
   });
 
   it("prints create messages", () => {

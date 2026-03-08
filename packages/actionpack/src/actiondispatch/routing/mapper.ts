@@ -26,24 +26,24 @@ export class Mapper {
 
   // --- HTTP verb methods ---
 
-  get(path: string, options: RouteOptions = {}): void {
-    this.addRoute("GET", path, options);
+  get(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.addRoute("GET", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  post(path: string, options: RouteOptions = {}): void {
-    this.addRoute("POST", path, options);
+  post(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.addRoute("POST", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  put(path: string, options: RouteOptions = {}): void {
-    this.addRoute("PUT", path, options);
+  put(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.addRoute("PUT", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  patch(path: string, options: RouteOptions = {}): void {
-    this.addRoute("PATCH", path, options);
+  patch(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.addRoute("PATCH", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  delete(path: string, options: RouteOptions = {}): void {
-    this.addRoute("DELETE", path, options);
+  delete(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.addRoute("DELETE", path, normalizeOptions(optionsOrEndpoint));
   }
 
   // --- root ---
@@ -485,6 +485,14 @@ function allowedActions(options: RouteOptions, all: ResourceAction[]): Set<Resou
     return new Set(all.filter((a) => !except.includes(a)));
   }
   return new Set(all);
+}
+
+/** Normalize a string shorthand ("controller#action") to RouteOptions. */
+function normalizeOptions(optionsOrEndpoint: RouteOptions | string): RouteOptions {
+  if (typeof optionsOrEndpoint === "string") {
+    return { to: optionsOrEndpoint };
+  }
+  return optionsOrEndpoint;
 }
 
 function parseEndpoint(endpoint: string): [string, string] {

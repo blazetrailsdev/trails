@@ -14,9 +14,9 @@ export class ControllerGenerator extends GeneratorBase {
       .map((a) => `  async ${a}(): Promise<void> {\n    // TODO: implement\n  }`)
       .join("\n\n");
 
-    this.createFile(`src/app/controllers/${fileName}.ts`, `import { BaseController } from "@rails-ts/actionpack";
+    this.createFile(`src/app/controllers/${fileName}.ts`, `import { ActionController } from "@rails-ts/actionpack";
 
-export class ${className} extends BaseController {
+export class ${className} extends ActionController.Base {
 ${actionMethods}
 }
 `);
