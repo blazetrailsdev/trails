@@ -2585,10 +2585,55 @@ export class Relation<T extends Base> {
       } else if (assocDef.type === "hasOne") {
         const underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
         const camelize = (n: string) => n.split("_").map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+        const singularize = (w: string) => {
+          if (w.endsWith("ies")) return w.slice(0, -3) + "y";
+          if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
+          if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+          return w;
+        };
 
         const className = assocDef.options.className ?? camelize(assocName);
-        const foreignKey = assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`;
         const primaryKey = assocDef.options.primaryKey ?? modelClass.primaryKey;
+
+        // Handle has_one :through
+        if (assocDef.options.through) {
+          const throughAssocDef = associations.find((a: any) => a.name === assocDef.options.through);
+          if (!throughAssocDef) continue;
+
+          const throughClassName = throughAssocDef.options.className ??
+            (throughAssocDef.type === "hasMany"
+              ? camelize(singularize(throughAssocDef.name))
+              : camelize(throughAssocDef.name));
+          const throughModel = _mr.get(throughClassName);
+          if (!throughModel) continue;
+
+          const throughFk = throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`;
+          const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
+          if (pkValues.length === 0) continue;
+
+          const throughRecords = await (throughModel as any).all().where({ [throughFk]: pkValues }).toArray();
+
+          const sourceName = assocDef.options.source ?? assocName;
+          const targetFk = `${underscore(sourceName)}_id`;
+          const targetModel = _mr.get(className);
+          if (!targetModel) continue;
+
+          const targetIds = [...new Set(throughRecords.map((r: any) => r.readAttribute(targetFk)).filter((v: any) => v != null))];
+          const targetRecords = targetIds.length > 0 ? await (targetModel as any).all().where({ id: targetIds }).toArray() : [];
+          const targetMap = new Map<unknown, any>();
+          for (const r of targetRecords) targetMap.set(r.readAttribute("id"), r);
+
+          for (const record of records) {
+            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            const pkVal = record.readAttribute(primaryKey);
+            const myThroughRecord = throughRecords.find((tr: any) => tr.readAttribute(throughFk) == pkVal);
+            const myTarget = myThroughRecord ? targetMap.get(myThroughRecord.readAttribute(targetFk)) ?? null : null;
+            (record as any)._preloadedAssociations.set(assocName, myTarget);
+          }
+          continue;
+        }
+
+        const foreignKey = assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`;
 
         const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
         if (pkValues.length === 0) continue;
