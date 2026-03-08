@@ -17,6 +17,7 @@ import {
   loadHabtm,
   processDependentAssociations,
   CollectionProxy,
+  setHasOne,
 } from "./associations.js";
 
 function freshAdapter(): MemoryAdapter {
@@ -325,8 +326,16 @@ describe("HasOneAssociationsTest", () => {
     expect(found!.readAttribute("credit_limit")).toBe(300);
   });
 
-  it.skip("clearing an association clears the associations inverse", () => {
-    // Requires inverse_of support
+  it("clearing an association clears the associations inverse", async () => {
+    const firm = await Firm.create({ name: "InvClear" });
+    const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
+    // Set inverse on account
+    if (!(account as any)._cachedAssociations) (account as any)._cachedAssociations = new Map();
+    (account as any)._cachedAssociations.set("firm", firm);
+    // Clear has_one by setting to null
+    await setHasOne(firm, "account", null, { className: "Account", foreignKey: "firm_id" });
+    const loaded = await loadHasOne(firm, "account", { className: "Account", foreignKey: "firm_id" });
+    expect(loaded).toBeNull();
   });
 
   it("create association with bang", async () => {
@@ -2640,8 +2649,25 @@ describe("HasOneThroughAssociationsTest", () => {
     // Requires polymorphic through
   });
 
-  it.skip("has one through eager loading", () => {
-    // Requires eager loading
+  it("has one through eager loading", async () => {
+    // member -> membership (hasOne) -> club (hasOne through)
+    (Member as any)._associations = [
+      ...(Member as any)._associations?.filter((a: any) => a.name !== "membership" && a.name !== "club") ?? [],
+      { type: "hasOne", name: "membership", options: { className: "Membership", foreignKey: "member_id" } },
+      { type: "hasOne", name: "club", options: { className: "Club", through: "membership", source: "club" } },
+    ];
+    (Membership as any)._associations = [
+      ...(Membership as any)._associations?.filter((a: any) => a.name !== "club") ?? [],
+      { type: "belongsTo", name: "club", options: { className: "Club", foreignKey: "club_id" } },
+    ];
+    const club = await Club.create({ name: "Eager Club" });
+    const member = await Member.create({ name: "Eager Member" });
+    await Membership.create({ member_id: member.id, club_id: club.id });
+    const members = await Member.all().includes("club").toArray();
+    expect(members).toHaveLength(1);
+    const preloaded = (members[0] as any)._preloadedAssociations?.get("club");
+    expect(preloaded).not.toBeNull();
+    expect(preloaded?.readAttribute("name")).toBe("Eager Club");
   });
 
   it.skip("has one through eager loading through polymorphic", () => {
@@ -2720,8 +2746,25 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(loadedClub!.readAttribute("name")).toBe("ReassignClub2");
   });
 
-  it.skip("preloading has one through on belongs to", () => {
-    // Requires preloading through belongs_to
+  it("preloading has one through on belongs to", async () => {
+    // member -> membership (hasOne) -> club (hasOne through)
+    (Member as any)._associations = [
+      ...(Member as any)._associations?.filter((a: any) => a.name !== "membership" && a.name !== "club") ?? [],
+      { type: "hasOne", name: "membership", options: { className: "Membership", foreignKey: "member_id" } },
+      { type: "hasOne", name: "club", options: { className: "Club", through: "membership", source: "club" } },
+    ];
+    (Membership as any)._associations = [
+      ...(Membership as any)._associations?.filter((a: any) => a.name !== "club") ?? [],
+      { type: "belongsTo", name: "club", options: { className: "Club", foreignKey: "club_id" } },
+    ];
+    const club = await Club.create({ name: "Preload Club" });
+    const member = await Member.create({ name: "Preload Member" });
+    await Membership.create({ member_id: member.id, club_id: club.id });
+    const members = await Member.all().includes("club").toArray();
+    expect(members).toHaveLength(1);
+    const preloaded = (members[0] as any)._preloadedAssociations?.get("club");
+    expect(preloaded).not.toBeNull();
+    expect(preloaded?.readAttribute("name")).toBe("Preload Club");
   });
 
   it("save of record with loaded has one through", async () => {

@@ -10,6 +10,7 @@ import {
   AssociationReflection,
   reflectOnAssociation,
   reflectOnAllAssociations,
+  composedOf,
 } from "./index.js";
 
 function freshAdapter(): MemoryAdapter {
@@ -271,16 +272,36 @@ describe("ReflectionTest", () => {
     // Requires module/namespace support
   });
 
-  it.skip("aggregation reflection", () => {
-    // Requires composed_of support (composedOf in TS)
+  it("aggregation reflection", () => {
+    class Customer extends Base {
+      static { this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+    }
+    class Address {
+      constructor(public street: string, public city: string) {}
+    }
+    composedOf(Customer, "address", {
+      className: Address,
+      mapping: [["address_street", "street"], ["address_city", "city"]],
+    });
+    const c = new Customer({ address_street: "123 Main", address_city: "Springfield" });
+    const addr = (c as any).address;
+    expect(addr).toBeInstanceOf(Address);
+    expect(addr.street).toBe("123 Main");
+    expect(addr.city).toBe("Springfield");
   });
 
   it.skip("association reflection in modules", () => {
     // Requires module/namespace support
   });
 
-  it.skip("has and belongs to many reflection", () => {
-    // habtm not currently supported
+  it("has and belongs to many reflection", () => {
+    class Developer extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasAndBelongsToMany.call(Developer, "projects", { className: "Project", joinTable: "developer_projects" });
+    const ref = reflectOnAssociation(Developer, "projects");
+    expect(ref).not.toBeNull();
+    expect(ref!.macro).toBe("hasAndBelongsToMany");
   });
 
   it.skip("chain", () => {
@@ -299,8 +320,14 @@ describe("ReflectionTest", () => {
     // Requires includes() support on reflection
   });
 
-  it.skip("association primary key uses explicit primary key option as first priority", () => {
-    // Requires explicit primary_key option on reflection
+  it("association primary key uses explicit primary key option as first priority", () => {
+    class Author extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(Author, "books", { primaryKey: "custom_id" });
+    const ref = reflectOnAssociation(Author, "books");
+    expect(ref).not.toBeNull();
+    expect(ref!.options.primaryKey).toBe("custom_id");
   });
 
   it.skip("belongs to reflection with query constraints infers correct foreign key", () => {
