@@ -247,7 +247,7 @@ describe("ModuleTest", () => {
     }
     delegate(Host.prototype, "exists", { to: "real" });
     const h = new Host() as Host & Record<string, unknown>;
-    expect((h as { exists(): boolean }).exists()).toBe(true);
+    expect((h as any).exists()).toBe(true);
     // Non-delegated method should not exist
     expect(typeof h.nonExistent).toBe("undefined");
   });
@@ -546,7 +546,7 @@ describe("RescuableTest", () => {
   it("rescue from with block", () => {
     class MyController {}
     const caught: Error[] = [];
-    rescueFrom(MyController, RangeError, { with: (e) => caught.push(e) });
+    rescueFrom(MyController, RangeError, { with: (e: any) => caught.push(e) });
     handleRescue(MyController, new RangeError("out of range"));
     expect(caught).toHaveLength(1);
     expect(caught[0].message).toBe("out of range");
@@ -555,7 +555,7 @@ describe("RescuableTest", () => {
   it("rescue from with block with args", () => {
     class MyController {}
     let received: Error | null = null;
-    rescueFrom(MyController, Error, { with: (e) => { received = e; } });
+    rescueFrom(MyController, Error, { with: (e: any) => { received = e; } });
     const err = new Error("boom");
     handleRescue(MyController, err);
     expect(received).toBe(err);

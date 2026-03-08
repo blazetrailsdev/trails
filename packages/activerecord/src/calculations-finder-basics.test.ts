@@ -241,7 +241,7 @@ describe("CalculationsTest", () => {
     expect(count).toBe(2);
   });
 
-  it.skip("group by with limit", async () => {
+  it("group by with limit", async () => {
     const Account = makeAccount();
     await Account.create({ name: "a", credit_limit: 1 });
     await Account.create({ name: "b", credit_limit: 2 });
@@ -250,7 +250,7 @@ describe("CalculationsTest", () => {
     expect(Object.keys(result as object).length).toBeLessThanOrEqual(2);
   });
 
-  it.skip("group by with offset", async () => {
+  it("group by with offset", async () => {
     const Account = makeAccount();
     await Account.create({ name: "a", credit_limit: 1 });
     await Account.create({ name: "b", credit_limit: 2 });
@@ -1063,7 +1063,7 @@ describe("InheritanceTest", () => {
 
   it("abstract inheritance base class", async () => {
     class AbstractBase extends Base {
-      static { this.abstract = true; this.adapter = adapter; }
+      static { this.abstractClass = true; this.adapter = adapter; }
     }
     class ConcreteClass extends AbstractBase {
       static { this.attribute("name", "string"); }
@@ -1099,7 +1099,7 @@ describe("InheritanceTest", () => {
 
   it("new with abstract class", async () => {
     class AbstractCompany extends Base {
-      static { this.abstract = true; this.attribute("name", "string"); this.adapter = adapter; }
+      static { this.abstractClass = true; this.attribute("name", "string"); this.adapter = adapter; }
     }
     class RealCompany extends AbstractCompany {}
     const rc = new (RealCompany as any)({ name: "Real" });
@@ -1628,13 +1628,13 @@ describe("InsertAllTest", () => {
     return Book;
   }
 
-  it.skip("insert", async () => {
+  it("insert", async () => {
     const Book = makeBook();
     const count = await Book.insertAll([{ title: "Single", author: "A" }]);
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
-  it.skip("insert!", async () => {
+  it("insert!", async () => {
     const Book = makeBook();
     const count = await Book.insertAll([{ title: "Bang", author: "B" }]);
     expect(count).toBeGreaterThanOrEqual(1);
@@ -1651,7 +1651,7 @@ describe("InsertAllTest", () => {
     expect(all.length).toBe(2);
   });
 
-  it.skip("insert all raises on duplicate records", async () => {
+  it("insert all raises on duplicate records", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Unique", author: "Author" });
     // insertAll with explicit id that conflicts should raise
@@ -1673,7 +1673,7 @@ describe("InsertAllTest", () => {
     expect(result).toBeDefined();
   });
 
-  it.skip("insert all can skip duplicate records", async () => {
+  it("insert all can skip duplicate records", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Existing", author: "A" });
     // upsertAll with skip behavior
@@ -1770,7 +1770,7 @@ describe("InsertAllTest", () => {
     expect(all.length).toBe(2);
   });
 
-  it.skip("skip duplicates strategy does not secretly upsert", async () => {
+  it("skip duplicates strategy does not secretly upsert", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Original", author: "First" });
     await Book.upsertAll([{ id: b.id, title: "ShouldSkip", author: "Second" }], { onDuplicate: "skip" } as any);

@@ -1,0 +1,2 @@
+# Multipart fixture files contain CRLF line endings that must be preserved exactly.
+packages/rack/test/multipart/* binary

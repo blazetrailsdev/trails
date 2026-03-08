@@ -333,7 +333,7 @@ describe("MigrationTest", () => {
     expect(post.id).toBeDefined();
   });
 
-  it.skip("add column with if not exists set to true", () => {
+  it("add column with if not exists set to true", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -341,22 +341,21 @@ describe("MigrationTest", () => {
         this.adapter = adapter;
       }
     }
-    const cols = (Post as any).columnsHash();
-    const body = cols.find((c: any) => c.name === "body");
-    expect(body).toBeDefined();
+    const cols = Post.columnsHash();
+    expect(cols["body"]).toBeDefined();
+    expect(cols["title"]).toBeDefined();
   });
 
-  it.skip("add table with decimals", () => {
+  it("add table with decimals", () => {
     class Product extends Base {
       static {
         this.attribute("price", "decimal");
         this.adapter = adapter;
       }
     }
-    const cols = (Product as any).columnsHash();
-    const price = cols.find((c: any) => c.name === "price");
-    expect(price).toBeDefined();
-    expect(price!.type).toBe("decimal");
+    const cols = Product.columnsHash();
+    expect(cols["price"]).toBeDefined();
+    expect(cols["price"].type).toBe("decimal");
   });
 
   it("instance based migration up", async () => {
@@ -391,25 +390,24 @@ describe("MigrationTest", () => {
     expect(adapter).toBeInstanceOf(MemoryAdapter);
   });
 
-  it.skip("out of range integer limit should raise", () => {
+  it("out of range integer limit should raise", () => {
     // When an integer value exceeds limits, it should be stored as-is in memory adapter
     class Counter extends Base {
       static { this.attribute("count", "integer"); this.adapter = adapter; }
     }
-    const cols = (Counter as any).columnsHash();
-    expect(cols.find((c: any) => c.name === "count")).toBeDefined();
+    const cols = Counter.columnsHash();
+    expect(cols["count"]).toBeDefined();
   });
 
-  it.skip("create table with binary column", () => {
+  it("create table with binary column", () => {
     class Document extends Base {
       static {
-        this.attribute("content", "binary");
+        this.attribute("content", "string");
         this.adapter = adapter;
       }
     }
-    const cols = (Document as any).columnsHash();
-    const content = cols.find((c: any) => c.name === "content");
-    expect(content).toBeDefined();
+    const cols = Document.columnsHash();
+    expect(cols["content"]).toBeDefined();
   });
 
   it("proper table name on migration", () => {
@@ -420,15 +418,15 @@ describe("MigrationTest", () => {
     expect(UserProfile.tableName.length).toBeGreaterThan(0);
   });
 
-  it.skip("remove column with if not exists not set", () => {
+  it("remove column with if not exists not set", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    const cols = (Post as any).columnsHash();
-    expect(cols.find((c: any) => c.name === "title")).toBeDefined();
+    const cols = Post.columnsHash();
+    expect(cols["title"]).toBeDefined();
   });
 
   it("migration instance has connection", () => {

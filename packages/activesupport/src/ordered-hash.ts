@@ -4,7 +4,7 @@
  * Rails-compatible API on top of Map.
  */
 export class OrderedHash<K, V> extends Map<K, V> {
-  constructor(entries?: readonly (readonly [K, V])[]) {
+  constructor(entries?: Iterable<readonly [K, V]>) {
     super(entries);
   }
 

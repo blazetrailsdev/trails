@@ -1513,7 +1513,9 @@ export class Relation<T extends Base> {
     this._applyWheresToManager(manager, table);
     manager.group(groupCol);
 
-    const sql = manager.toSql();
+    let sql = manager.toSql();
+    if (this._limitValue !== null) sql += ` LIMIT ${this._limitValue}`;
+    if (this._offsetValue !== null) sql += ` OFFSET ${this._offsetValue}`;
     const rows = await this._modelClass.adapter.execute(sql);
 
     const result: Record<string, number> = {};
@@ -1930,20 +1932,27 @@ export class Relation<T extends Base> {
       ? (Array.isArray(options.uniqueBy) ? options.uniqueBy : [options.uniqueBy])
       : [this._modelClass.primaryKey];
 
-    // updateOnly restricts which columns get updated on conflict
-    let updateCols: string[];
-    if (options?.updateOnly) {
-      const only = Array.isArray(options.updateOnly) ? options.updateOnly : [options.updateOnly];
-      updateCols = only;
+    const conflictTarget = `ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")})`;
+
+    let sql: string;
+    if (options?.onDuplicate === "skip") {
+      sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO NOTHING`;
     } else {
-      updateCols = columns.filter((c) => !uniqueCols.includes(c));
+      // updateOnly restricts which columns get updated on conflict
+      let updateCols: string[];
+      if (options?.updateOnly) {
+        const only = Array.isArray(options.updateOnly) ? options.updateOnly : [options.updateOnly];
+        updateCols = only;
+      } else {
+        updateCols = columns.filter((c) => !uniqueCols.includes(c));
+      }
+
+      const updateClause = updateCols.length > 0
+        ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
+        : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
+
+      sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${updateClause}`;
     }
-
-    const updateClause = updateCols.length > 0
-      ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
-      : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
-
-    const sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")}) DO UPDATE SET ${updateClause}`;
 
     return this._modelClass.adapter.executeMutation(sql);
   }

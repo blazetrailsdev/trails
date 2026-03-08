@@ -51,7 +51,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel(Account);
   });
 
-  it.skip("has one", async () => {
+  it("has one", async () => {
     const firm = await Firm.create({ name: "First Firm" });
     await Account.create({ firm_id: firm.id, credit_limit: 50 });
     const assoc = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });

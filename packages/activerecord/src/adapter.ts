@@ -104,12 +104,12 @@ export class MemoryAdapter implements DatabaseAdapter {
     // Strip trailing lock clause (FOR UPDATE, etc.) before parsing
     let cleanedSql = sql.replace(/\s+FOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)(\s+.*)?$/i, "");
 
-    // Grouped aggregate queries: SELECT group_col, AGG(col) FROM ... GROUP BY col
+    // Grouped aggregate queries: SELECT group_col, AGG(col) FROM ... GROUP BY col [LIMIT n] [OFFSET n]
     const groupAggMatch = cleanedSql.match(
-      /SELECT\s+"?\w+"?\."?(\w+)"?\s*AS\s+group_key\s*,\s*(COUNT|SUM|AVG|MIN|MAX)\((\*|"?\w+"?(?:\."?\w+"?)?)\)\s*AS\s+val\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?\s+GROUP\s+BY\s+"?\w+"?$/i
+      /SELECT\s+"?\w+"?\."?(\w+)"?\s*AS\s+group_key\s*,\s*(COUNT|SUM|AVG|MIN|MAX)\((\*|"?\w+"?(?:\."?\w+"?)?)\)\s*AS\s+val\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?\s+GROUP\s+BY\s+"?\w+"?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i
     );
     if (groupAggMatch) {
-      const [, groupCol, fn, colExpr, tableName, where] = groupAggMatch;
+      const [, groupCol, fn, colExpr, tableName, where, limitStr, offsetStr] = groupAggMatch;
       let rows = [...(this.tables.get(tableName) ?? [])];
       if (where) {
         rows = rows.filter((row) => this.evaluateWhere(row, where));
@@ -156,7 +156,10 @@ export class MemoryAdapter implements DatabaseAdapter {
         }
         results.push({ group_key: key, val });
       }
-      return results;
+      let finalResults = results;
+      if (offsetStr) finalResults = finalResults.slice(parseInt(offsetStr));
+      if (limitStr) finalResults = finalResults.slice(0, parseInt(limitStr));
+      return finalResults;
     }
 
     // Aggregate queries: COUNT(*), COUNT(col), COUNT(DISTINCT col), SUM, AVG, MIN, MAX
@@ -388,6 +391,14 @@ export class MemoryAdapter implements DatabaseAdapter {
             affected++;
           }
         } else {
+          // For plain inserts (no ON CONFLICT), check for PK uniqueness
+          if (!uniqueKeys && newRow.id !== undefined) {
+            const tableRows = this.tables.get(tableName)!;
+            const pkConflict = tableRows.find((r) => r.id === newRow.id);
+            if (pkConflict) {
+              throw new Error(`Duplicate key value violates unique constraint: id ${newRow.id} already exists in "${tableName}"`);
+            }
+          }
           // Insert new row
           const id = newRow.id ?? ((this.autoIncrements.get(tableName) ?? 0) + 1);
           this.autoIncrements.set(tableName, Number(id));
