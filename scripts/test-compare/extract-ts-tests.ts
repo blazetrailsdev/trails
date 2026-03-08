@@ -132,6 +132,8 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actiondispatch/src/permissions-policy.test.ts",
     "packages/actiondispatch/src/uploaded-file.test.ts",
     "packages/actiondispatch/src/middleware/request-id.test.ts",
+    "packages/actiondispatch/src/http-authentication.test.ts",
+    "packages/actiondispatch/src/exception-wrapper.test.ts",
   ],
 };
 

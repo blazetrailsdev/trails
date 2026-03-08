@@ -34,3 +34,5 @@ export { respondTo, Collector, UnknownFormat } from "./respond-to.js";
 export { PermissionsPolicy, type PermissionSource, type DirectiveName } from "./permissions-policy.js";
 export { UploadedFile, type UploadedFileOptions } from "./uploaded-file.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
+export { BasicAuth, TokenAuth, DigestAuth, type BasicAuthCredentials, type TokenAuthCredentials, type DigestAuthParams } from "./http-authentication.js";
+export { ExceptionWrapper } from "./exception-wrapper.js";

@@ -2328,6 +2328,18 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/request_id_test.rb": [
       { file: "middleware/request-id.test.ts", describeBlock: "ActionDispatch::RequestId" },
     ],
+    "controller/http_basic_authentication_test.rb": [
+      { file: "http-authentication.test.ts", describeBlock: "ActionController::HttpAuthentication::Basic" },
+    ],
+    "controller/http_token_authentication_test.rb": [
+      { file: "http-authentication.test.ts", describeBlock: "ActionController::HttpAuthentication::Token" },
+    ],
+    "controller/http_digest_authentication_test.rb": [
+      { file: "http-authentication.test.ts", describeBlock: "ActionController::HttpAuthentication::Digest" },
+    ],
+    "dispatch/exception_wrapper_test.rb": [
+      { file: "exception-wrapper.test.ts", describeBlock: "ActionDispatch::ExceptionWrapper" },
+    ],
   },
 };
 
