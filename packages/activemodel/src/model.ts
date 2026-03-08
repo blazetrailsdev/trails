@@ -106,7 +106,7 @@ export class Model {
   }
 
   // -- Normalizations --
-  static _normalizations: Map<string, (value: unknown) => unknown> = new Map();
+  static _normalizations: Map<string, { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }> = new Map();
 
   /**
    * Register a normalization function for one or more attributes.
@@ -118,16 +118,81 @@ export class Model {
    *   User.normalizes("email", (v) => typeof v === "string" ? v.trim().toLowerCase() : v);
    */
   static normalizes(
-    ...args: [...string[], (value: unknown) => unknown]
+    ...args: [...string[], ((value: unknown) => unknown) | Record<string, unknown>]
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_normalizations")) {
-      this._normalizations = new Map(this._normalizations);
+      // Deep copy parent normalizations for stacking
+      this._normalizations = new Map();
+      const parent = Object.getPrototypeOf(this) as typeof Model;
+      if (parent._normalizations) {
+        for (const [k, v] of parent._normalizations) {
+          this._normalizations.set(k, { fns: [...v.fns], applyToNil: v.applyToNil });
+        }
+      }
     }
-    const fn = args[args.length - 1] as (value: unknown) => unknown;
-    const attributes = args.slice(0, -1) as string[];
+
+    // Parse args: attributes..., fn, [options]
+    let options: Record<string, unknown> = {};
+    let fn: (value: unknown) => unknown;
+    const lastArg = args[args.length - 1];
+    if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
+      options = lastArg as Record<string, unknown>;
+      fn = args[args.length - 2] as (value: unknown) => unknown;
+      args = args.slice(0, -2) as any;
+    } else {
+      fn = lastArg as (value: unknown) => unknown;
+      args = args.slice(0, -1) as any;
+    }
+    const attributes = args as unknown as string[];
+    const applyToNil = !!options.applyToNil;
+
     for (const attr of attributes) {
-      this._normalizations.set(attr, fn);
+      const existing = this._normalizations.get(attr);
+      if (existing) {
+        // Stack: add new normalizer after existing ones
+        existing.fns.push(fn);
+        if (applyToNil) existing.applyToNil = true;
+      } else {
+        this._normalizations.set(attr, { fns: [fn], applyToNil });
+      }
     }
+  }
+
+  /**
+   * Apply the normalization for a single attribute (re-normalize in place).
+   * Mirrors: ActiveRecord::Base#normalize_attribute
+   */
+  normalizeAttribute(name: string): void {
+    const ctor = this.constructor as typeof Model;
+    const current = this.readAttribute(name);
+    const normalized = ctor._applyNormalization(name, current);
+    if (normalized !== current) {
+      this._attributes.set(name, normalized);
+    }
+  }
+
+  /**
+   * Normalize a value for a given attribute without a record.
+   * Mirrors: ActiveRecord::Base.normalize_value_for
+   */
+  static normalizeValueFor(name: string, value: unknown): unknown {
+    const def = this._attributeDefinitions.get(name);
+    let result = def ? def.type.cast(value) : value;
+    return this._applyNormalization(name, result);
+  }
+
+  /**
+   * Apply all normalizations for the given attribute.
+   */
+  static _applyNormalization(name: string, value: unknown): unknown {
+    const norm = this._normalizations.get(name);
+    if (!norm) return value;
+    if (value == null && !norm.applyToNil) return value;
+    let result = value;
+    for (const fn of norm.fns) {
+      result = fn(result);
+    }
+    return result;
   }
 
   /**
@@ -662,10 +727,7 @@ export class Model {
         this._attributesBeforeTypeCast.set(name, attrs[name]);
         let castValue = def.type.cast(attrs[name]);
         // Apply normalization if defined
-        const normalizer = ctor._normalizations.get(name);
-        if (normalizer) {
-          castValue = normalizer(castValue);
-        }
+        castValue = ctor._applyNormalization(name, castValue);
         // Nullify blank strings if configured
         if (typeof castValue === "string" && castValue.trim() === "") {
           const nbConfig = ctor._nullifyBlanks;
@@ -723,10 +785,7 @@ export class Model {
     this._attributesBeforeTypeCast.set(name, value);
     let newValue = def ? def.type.cast(value) : value;
     // Apply normalization if defined
-    const normalizer = ctor._normalizations.get(name);
-    if (normalizer) {
-      newValue = normalizer(newValue);
-    }
+    newValue = ctor._applyNormalization(name, newValue);
     // Nullify blank strings if configured
     newValue = this._applyNullifyBlanks(name, newValue);
     this._attributes.set(name, newValue);
