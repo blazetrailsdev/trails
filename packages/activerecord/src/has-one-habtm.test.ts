@@ -3108,8 +3108,30 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(preloaded?.readAttribute("name")).toBe("Eager Club");
   });
 
-  it.skip("has one through eager loading through polymorphic", () => {
-    // Requires eager loading through polymorphic
+  it("has one through eager loading through polymorphic", async () => {
+    // member -> sponsor (has_one, as: sponsorable) -> club (belongs_to)
+    // member has_one :sponsor_club, through: :sponsor, source: :club
+    class HotepClub extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class HotepSponsor extends Base {
+      static { this.attribute("sponsorable_id", "integer"); this.attribute("sponsorable_type", "string"); this.attribute("club_id", "integer"); this.adapter = adapter; }
+    }
+    class HotepMember extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(HotepClub); registerModel(HotepSponsor); registerModel(HotepMember);
+    Associations.hasOne.call(HotepMember, "sponsor", { className: "HotepSponsor", as: "sponsorable" });
+    Associations.hasOne.call(HotepMember, "sponsorClub", { through: "sponsor", source: "club", className: "HotepClub" });
+    Associations.belongsTo.call(HotepSponsor, "club", { className: "HotepClub", foreignKey: "club_id" });
+    const club = await HotepClub.create({ name: "Polymorphic Eager Club" });
+    const member = await HotepMember.create({ name: "Groucho" });
+    await HotepSponsor.create({ sponsorable_id: member.id, sponsorable_type: "HotepMember", club_id: club.id });
+    const members = await HotepMember.all().includes("sponsorClub").toArray();
+    expect(members).toHaveLength(1);
+    const preloaded = (members[0] as any)._preloadedAssociations?.get("sponsorClub");
+    expect(preloaded).not.toBeNull();
+    expect(preloaded?.readAttribute("name")).toBe("Polymorphic Eager Club");
   });
 
   it.skip("has one through with conditions eager loading", () => {

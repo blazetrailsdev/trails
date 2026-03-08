@@ -2721,17 +2721,32 @@ export class Relation<T extends Base> {
           const throughModel = _mr.get(throughClassName);
           if (!throughModel) continue;
 
-          const throughFk = throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`;
+          const throughAsName = throughAssocDef.options.as;
+          const throughFk = throughAsName
+            ? (throughAssocDef.options.foreignKey ?? `${underscore(throughAsName)}_id`)
+            : (throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
           const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
           if (pkValues.length === 0) continue;
 
-          const throughRecords = await (throughModel as any).all().where({ [throughFk]: pkValues }).toArray();
+          const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
+          if (throughAsName) throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
+          const throughRecords = await (throughModel as any).all().where(throughWhereConditions).toArray();
 
           const sourceName = assocDef.options.source ?? assocName;
-          const targetFk = `${underscore(sourceName)}_id`;
           const targetModel = _mr.get(className);
           if (!targetModel) continue;
 
+          // Look up source association on through model
+          const throughModelAssociations: any[] = (throughModel as any)._associations ?? [];
+          const pluralizeHot = (w: string) => {
+            if (w.endsWith("y") && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + "ies";
+            if (w.endsWith("s") || w.endsWith("x") || w.endsWith("z") || w.endsWith("ch") || w.endsWith("sh")) return w + "es";
+            return w + "s";
+          };
+          const sourceAssocDef = throughModelAssociations.find((a: any) => a.name === sourceName)
+            ?? throughModelAssociations.find((a: any) => a.name === pluralizeHot(sourceName));
+
+          const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
           const targetIds = [...new Set(throughRecords.map((r: any) => r.readAttribute(targetFk)).filter((v: any) => v != null))];
           const targetRecords = targetIds.length > 0 ? await (targetModel as any).all().where({ id: targetIds }).toArray() : [];
           const targetMap = new Map<unknown, any>();
