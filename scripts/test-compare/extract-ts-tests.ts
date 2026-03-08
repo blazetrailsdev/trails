@@ -135,6 +135,11 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actionpack/src/actiondispatch/http-authentication.test.ts",
     "packages/actionpack/src/actiondispatch/exception-wrapper.test.ts",
   ],
+  actioncontroller: [
+    "packages/actionpack/src/actioncontroller/abstract-controller.test.ts",
+    "packages/actionpack/src/actioncontroller/metal.test.ts",
+    "packages/actionpack/src/actioncontroller/base.test.ts",
+  ],
 };
 
 function main() {

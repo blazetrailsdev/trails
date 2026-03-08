@@ -291,6 +291,15 @@ export class Request {
     this._variant = value;
   }
 
+  // --- Header access ---
+
+  /** Get an HTTP header value by name (case-insensitive). */
+  getHeader(name: string): string | undefined {
+    // Rack convention: HTTP headers are stored as HTTP_UPPER_SNAKE
+    const key = "HTTP_" + name.toUpperCase().replace(/-/g, "_");
+    return this.env[key] as string | undefined;
+  }
+
   // --- Inspect ---
 
   inspect(): string {
