@@ -17,3 +17,6 @@ export {
   type RenderOptions,
   type RescueHandler,
 } from "./base.js";
+
+export { TestCase, type RequestOptions } from "./test-case.js";
+export { IntegrationTest, type IntegrationRequestOptions } from "./integration-test.js";
