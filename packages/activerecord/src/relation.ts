@@ -161,21 +161,24 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#where.associated
    */
-  whereAssociated(assocName: string): Relation<T> {
-    const modelClass = this._modelClass as any;
-    const associations: any[] = modelClass._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === assocName);
+  whereAssociated(...assocNames: string[]): Relation<T> {
+    let rel: Relation<T> = this;
+    for (const assocName of assocNames) {
+      const modelClass = rel._modelClass as any;
+      const associations: any[] = modelClass._associations ?? [];
+      const assocDef = associations.find((a: any) => a.name === assocName);
 
-    if (!assocDef) {
-      throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
-    }
+      if (!assocDef) {
+        throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
+      }
 
-    if (assocDef.type === "belongsTo") {
-      const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
-      const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
-      return this.whereNot({ [foreignKey]: null });
+      if (assocDef.type === "belongsTo") {
+        const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+        const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
+        rel = rel.whereNot({ [foreignKey]: null });
+      }
     }
-    return this;
+    return rel;
   }
 
   /**
@@ -183,21 +186,24 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#where.missing
    */
-  whereMissing(assocName: string): Relation<T> {
-    const modelClass = this._modelClass as any;
-    const associations: any[] = modelClass._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === assocName);
+  whereMissing(...assocNames: string[]): Relation<T> {
+    let rel: Relation<T> = this;
+    for (const assocName of assocNames) {
+      const modelClass = rel._modelClass as any;
+      const associations: any[] = modelClass._associations ?? [];
+      const assocDef = associations.find((a: any) => a.name === assocName);
 
-    if (!assocDef) {
-      throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
-    }
+      if (!assocDef) {
+        throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
+      }
 
-    if (assocDef.type === "belongsTo") {
-      const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
-      const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
-      return this.where({ [foreignKey]: null });
+      if (assocDef.type === "belongsTo") {
+        const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+        const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
+        rel = rel.where({ [foreignKey]: null });
+      }
     }
-    return this;
+    return rel;
   }
 
   /**

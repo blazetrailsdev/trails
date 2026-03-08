@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, MemoryAdapter, defineEnum } from "./index.js";
+import { Associations, registerModel } from "./associations.js";
 
 function freshAdapter(): MemoryAdapter {
   return new MemoryAdapter();
@@ -1597,8 +1598,27 @@ describe("WhereChainTest", () => {
     expect(found[0].readAttribute("title")).toBe("Match");
   });
 
-  it.skip("associated with multiple associations", async () => {
-    // requires multiple real associations
+  it("associated with multiple associations", async () => {
+    class MaAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class MaCategory extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class MaPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.attribute("category_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(MaPost, "maAuthor", { foreignKey: "author_id" });
+    Associations.belongsTo.call(MaPost, "maCategory", { foreignKey: "category_id" });
+    registerModel(MaAuthor); registerModel(MaCategory); registerModel(MaPost);
+    const author = await MaAuthor.create({ name: "Alice" });
+    const category = await MaCategory.create({ name: "Tech" });
+    await MaPost.create({ title: "Both", author_id: author.id, category_id: category.id });
+    await MaPost.create({ title: "AuthorOnly", author_id: author.id, category_id: null });
+    await MaPost.create({ title: "Neither", author_id: null, category_id: null });
+    const results = await MaPost.all().whereAssociated("maAuthor", "maCategory").toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].readAttribute("title")).toBe("Both");
   });
 
   it("associated with invalid association name", async () => {

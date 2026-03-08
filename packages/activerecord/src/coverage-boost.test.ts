@@ -31510,7 +31510,24 @@ describe("WhereChainTest", () => {
   it("missing with invalid association name", () => {
     expect(() => WC2Post.all().whereMissing("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
   });
-  it.skip("missing with multiple association", () => { /* fixture-dependent */ });
+  it("missing with multiple association", async () => {
+    const a2 = freshAdapter();
+    class WC2MArticle extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.attribute("category_id", "integer"); this.adapter = a2; }
+    }
+    class WC2MArtAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = a2; }
+    }
+    class WC2MArtCategory extends Base {
+      static { this.attribute("name", "string"); this.adapter = a2; }
+    }
+    Associations.belongsTo.call(WC2MArticle, "wc2MArtAuthor", { foreignKey: "author_id" });
+    Associations.belongsTo.call(WC2MArticle, "wc2MArtCategory", { foreignKey: "category_id" });
+    registerModel(WC2MArticle); registerModel(WC2MArtAuthor); registerModel(WC2MArtCategory);
+    const sql = WC2MArticle.all().whereMissing("wc2MArtAuthor").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toContain("IS NULL");
+  });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
@@ -35320,7 +35337,24 @@ describe("WhereChainTest", () => {
   it("missing with invalid association name", () => {
     expect(() => WC3Post.all().whereMissing("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
   });
-  it.skip("missing with multiple association", () => { /* fixture-dependent */ });
+  it("missing with multiple association", async () => {
+    const a3 = freshAdapter();
+    class WC3MArticle extends Base {
+      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.attribute("category_id", "integer"); this.adapter = a3; }
+    }
+    class WC3MArtAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = a3; }
+    }
+    class WC3MArtCategory extends Base {
+      static { this.attribute("name", "string"); this.adapter = a3; }
+    }
+    Associations.belongsTo.call(WC3MArticle, "wc3MArtAuthor", { foreignKey: "author_id" });
+    Associations.belongsTo.call(WC3MArticle, "wc3MArtCategory", { foreignKey: "category_id" });
+    registerModel(WC3MArticle); registerModel(WC3MArtAuthor); registerModel(WC3MArtCategory);
+    const sql = WC3MArticle.all().whereMissing("wc3MArtAuthor").toSql();
+    expect(sql).toContain("author_id");
+    expect(sql).toContain("IS NULL");
+  });
   it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
   it.skip("missing unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
