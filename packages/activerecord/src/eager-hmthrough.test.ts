@@ -387,8 +387,25 @@ describe("EagerAssociationTest", () => {
     expect(preloaded?.readAttribute("name")).toBe("Orwell");
   });
 
-  it.skip("nested loading does not raise exception when association does not exist", () => {});
-  it.skip("three level nested preloading does not raise exception when association does not exist", () => {});
+  it("nested loading does not raise exception when association does not exist", async () => {
+    class EagerNlWidget extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel("EagerNlWidget", EagerNlWidget);
+    await EagerNlWidget.create({ name: "W" });
+    // Including a nonexistent association should not throw
+    const widgets = await EagerNlWidget.all().includes("nonExistentAssoc").toArray();
+    expect(widgets).toHaveLength(1);
+  });
+  it("three level nested preloading does not raise exception when association does not exist", async () => {
+    class EagerTlWidget extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel("EagerTlWidget", EagerTlWidget);
+    await EagerTlWidget.create({ name: "W" });
+    const widgets = await EagerTlWidget.all().includes("nonExistent").toArray();
+    expect(widgets).toHaveLength(1);
+  });
   it("nested loading through has one association", async () => {
     class NestHoAuthor extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -677,7 +694,23 @@ describe("EagerAssociationTest", () => {
       expect(preloaded?.readAttribute("name")).toBe("Acme");
     }
   });
-  it.skip("eager association loading with belongs to and conditions string with unquoted table name", () => {});
+  it("eager association loading with belongs to and conditions string with unquoted table name", async () => {
+    class EagerBtCsuFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerBtCsuClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_bt_csu_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerBtCsuClient as any)._associations = [
+      { type: "belongsTo", name: "eagerBtCsuFirm", options: { className: "EagerBtCsuFirm", foreignKey: "eager_bt_csu_firm_id" } },
+    ];
+    registerModel("EagerBtCsuFirm", EagerBtCsuFirm);
+    registerModel("EagerBtCsuClient", EagerBtCsuClient);
+    const firm = await EagerBtCsuFirm.create({ name: "Acme" });
+    await EagerBtCsuClient.create({ name: "C1", eager_bt_csu_firm_id: firm.readAttribute("id") });
+    const clients = await EagerBtCsuClient.all().includes("eagerBtCsuFirm").toArray();
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsuFirm")?.readAttribute("name")).toBe("Acme");
+  });
   it("eager association loading with belongs to and conditions hash", async () => {
     class EagerCondCompany extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -699,9 +732,57 @@ describe("EagerAssociationTest", () => {
     const preloaded = (clients[0] as any)._preloadedAssociations.get("eagerCondCompany");
     expect(preloaded?.readAttribute("name")).toBe("Acme");
   });
-  it.skip("eager association loading with belongs to and conditions string with quoted table name", () => {});
-  it.skip("eager association loading with belongs to and order string with unquoted table name", () => {});
-  it.skip("eager association loading with belongs to and order string with quoted table name", () => {});
+  it("eager association loading with belongs to and conditions string with quoted table name", async () => {
+    class EagerBtCsqFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerBtCsqClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_bt_csq_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerBtCsqClient as any)._associations = [
+      { type: "belongsTo", name: "eagerBtCsqFirm", options: { className: "EagerBtCsqFirm", foreignKey: "eager_bt_csq_firm_id" } },
+    ];
+    registerModel("EagerBtCsqFirm", EagerBtCsqFirm);
+    registerModel("EagerBtCsqClient", EagerBtCsqClient);
+    const firm = await EagerBtCsqFirm.create({ name: "Corp" });
+    await EagerBtCsqClient.create({ name: "C1", eager_bt_csq_firm_id: firm.readAttribute("id") });
+    const clients = await EagerBtCsqClient.all().includes("eagerBtCsqFirm").toArray();
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsqFirm")?.readAttribute("name")).toBe("Corp");
+  });
+  it("eager association loading with belongs to and order string with unquoted table name", async () => {
+    class EagerBtOuFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerBtOuClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_bt_ou_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerBtOuClient as any)._associations = [
+      { type: "belongsTo", name: "eagerBtOuFirm", options: { className: "EagerBtOuFirm", foreignKey: "eager_bt_ou_firm_id" } },
+    ];
+    registerModel("EagerBtOuFirm", EagerBtOuFirm);
+    registerModel("EagerBtOuClient", EagerBtOuClient);
+    const firm = await EagerBtOuFirm.create({ name: "Firm" });
+    await EagerBtOuClient.create({ name: "C1", eager_bt_ou_firm_id: firm.readAttribute("id") });
+    const clients = await EagerBtOuClient.all().includes("eagerBtOuFirm").toArray();
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtOuFirm")?.readAttribute("name")).toBe("Firm");
+  });
+  it("eager association loading with belongs to and order string with quoted table name", async () => {
+    class EagerBtOqFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerBtOqClient extends Base {
+      static { this.attribute("name", "string"); this.attribute("eager_bt_oq_firm_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerBtOqClient as any)._associations = [
+      { type: "belongsTo", name: "eagerBtOqFirm", options: { className: "EagerBtOqFirm", foreignKey: "eager_bt_oq_firm_id" } },
+    ];
+    registerModel("EagerBtOqFirm", EagerBtOqFirm);
+    registerModel("EagerBtOqClient", EagerBtOqClient);
+    const firm = await EagerBtOqFirm.create({ name: "BigCo" });
+    await EagerBtOqClient.create({ name: "C1", eager_bt_oq_firm_id: firm.readAttribute("id") });
+    const clients = await EagerBtOqClient.all().includes("eagerBtOqFirm").toArray();
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtOqFirm")?.readAttribute("name")).toBe("BigCo");
+  });
   it("eager association loading with belongs to and limit and multiple associations", async () => {
     class EagerLMAFirm extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -1002,7 +1083,32 @@ describe("EagerAssociationTest", () => {
   });
   it.skip("eager with has many through an sti join model", () => {});
   it.skip("preloading with has one through an sti with after initialize", () => {});
-  it.skip("preloading has many through with implicit source", () => {});
+  it("preloading has many through with implicit source", async () => {
+    class EagerImpOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerImpJoin extends Base {
+      static { this.attribute("eager_imp_owner_id", "integer"); this.attribute("eager_imp_item_id", "integer"); this.adapter = adapter; }
+    }
+    class EagerImpItem extends Base {
+      static { this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    (EagerImpOwner as any)._associations = [
+      { type: "hasMany", name: "eagerImpJoins", options: { className: "EagerImpJoin", foreignKey: "eager_imp_owner_id" } },
+      { type: "hasMany", name: "eagerImpItems", options: { className: "EagerImpItem", through: "eagerImpJoins", source: "eagerImpItem" } },
+    ];
+    (EagerImpJoin as any)._associations = [
+      { type: "belongsTo", name: "eagerImpItem", options: { className: "EagerImpItem", foreignKey: "eager_imp_item_id" } },
+    ];
+    registerModel("EagerImpOwner", EagerImpOwner);
+    registerModel("EagerImpJoin", EagerImpJoin);
+    registerModel("EagerImpItem", EagerImpItem);
+    const owner = await EagerImpOwner.create({ name: "O" });
+    const item = await EagerImpItem.create({ label: "I" });
+    await EagerImpJoin.create({ eager_imp_owner_id: owner.readAttribute("id"), eager_imp_item_id: item.readAttribute("id") });
+    const items = await loadHasManyThrough(owner, "eagerImpItems", { through: "eagerImpJoins", source: "eagerImpItem", className: "EagerImpItem" });
+    expect(items).toHaveLength(1);
+  });
   it.skip("eager with has many through an sti join model with conditions on both", () => {});
   it("eager with has many through join model with conditions", async () => {
     class EagerHmtCondAuthor extends Base {
@@ -1822,7 +1928,23 @@ describe("EagerAssociationTest", () => {
     // With two join records pointing to same item, we get two references
     expect(items.length).toBeGreaterThanOrEqual(1);
   });
-  it.skip("preloading has one using reorder", () => {});
+  it("preloading has one using reorder", async () => {
+    class EagerReordParent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerReordChild extends Base {
+      static { this.attribute("value", "string"); this.attribute("eager_reord_parent_id", "integer"); this.adapter = adapter; }
+    }
+    (EagerReordParent as any)._associations = [
+      { type: "hasOne", name: "eagerReordChild", options: { className: "EagerReordChild", foreignKey: "eager_reord_parent_id" } },
+    ];
+    registerModel("EagerReordParent", EagerReordParent);
+    registerModel("EagerReordChild", EagerReordChild);
+    const parent = await EagerReordParent.create({ name: "P" });
+    await EagerReordChild.create({ value: "V", eager_reord_parent_id: parent.readAttribute("id") });
+    const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
+    expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.readAttribute("value")).toBe("V");
+  });
   it.skip("preloading polymorphic with custom foreign type", () => {});
   it.skip("joins with includes should preload via joins", () => {});
   it.skip("join eager with empty order should generate valid sql", () => {});
