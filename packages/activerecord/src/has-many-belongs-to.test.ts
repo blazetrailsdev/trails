@@ -2372,7 +2372,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it.skip("deleting models with composite keys", () => {});
   it.skip("sharded deleting models", () => {});
-  it.skip("counter cache updates in memory after concat", async () => {
+  it("counter cache updates in memory after concat", async () => {
     class CcConcatAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2381,14 +2381,14 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcConcatAuthor);
     registerModel(CcConcatPost);
-    Associations.belongsTo.call(CcConcatPost, "author", { className: "CcConcatAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcConcatPost, "author", { className: "CcConcatAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author = await CcConcatAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcConcatPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
+    await CcConcatPost.create({ author_id: author.id, title: "A" });
+    // create() automatically calls updateCounterCaches
     const reloaded = await CcConcatAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(1);
   });
-  it.skip("counter cache updates in memory after create with array", async () => {
+  it("counter cache updates in memory after create with array", async () => {
     class CcArrAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2397,16 +2397,14 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcArrAuthor);
     registerModel(CcArrPost);
-    Associations.belongsTo.call(CcArrPost, "author", { className: "CcArrAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcArrPost, "author", { className: "CcArrAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author = await CcArrAuthor.create({ name: "Alice", posts_count: 0 });
-    const p1 = await CcArrPost.create({ author_id: author.id, title: "A" });
-    const p2 = await CcArrPost.create({ author_id: author.id, title: "B" });
-    await updateCounterCaches(p1, "increment");
-    await updateCounterCaches(p2, "increment");
+    await CcArrPost.create({ author_id: author.id, title: "A" });
+    await CcArrPost.create({ author_id: author.id, title: "B" });
     const reloaded = await CcArrAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(2);
   });
-  it.skip("counter cache updates in memory after update with inverse of disabled", async () => {
+  it("counter cache updates in memory after update with inverse of disabled", async () => {
     class CcUpdDisAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2415,14 +2413,13 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcUpdDisAuthor);
     registerModel(CcUpdDisPost);
-    Associations.belongsTo.call(CcUpdDisPost, "author", { className: "CcUpdDisAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcUpdDisPost, "author", { className: "CcUpdDisAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author = await CcUpdDisAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcUpdDisPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
+    await CcUpdDisPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcUpdDisAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(1);
   });
-  it.skip("counter cache updates in memory after create with overlapping counter cache columns", async () => {
+  it("counter cache updates in memory after create with overlapping counter cache columns", async () => {
     class CcOverlapAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2433,12 +2430,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(CcOverlapPost);
     Associations.belongsTo.call(CcOverlapPost, "author", { className: "CcOverlapAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author = await CcOverlapAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcOverlapPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
+    await CcOverlapPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcOverlapAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(1);
   });
-  it.skip("counter cache updates in memory after update with inverse of enabled", async () => {
+  it("counter cache updates in memory after update with inverse of enabled", async () => {
     class CcUpdEnAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2447,10 +2443,9 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcUpdEnAuthor);
     registerModel(CcUpdEnPost);
-    Associations.belongsTo.call(CcUpdEnPost, "author", { className: "CcUpdEnAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcUpdEnPost, "author", { className: "CcUpdEnAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author = await CcUpdEnAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcUpdEnPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
+    await CcUpdEnPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcUpdEnAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(1);
   });
@@ -2463,11 +2458,10 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcDelNdAuthor);
     registerModel(CcDelNdPost);
-    Associations.belongsTo.call(CcDelNdPost, "author", { className: "CcDelNdAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcDelNdPost, "author", { className: "CcDelNdAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author = await CcDelNdAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcDelNdPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
-    await updateCounterCaches(post, "decrement");
+    await post.destroy();
     const reloaded = await CcDelNdAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(0);
   });
@@ -2480,12 +2474,11 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcDelDaAuthor);
     registerModel(CcDelDaPost);
-    Associations.belongsTo.call(CcDelDaPost, "author", { className: "CcDelDaAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcDelDaPost, "author", { className: "CcDelDaAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     Associations.hasMany.call(CcDelDaAuthor, "posts", { className: "CcDelDaPost", foreignKey: "author_id", dependent: "delete" });
     const author = await CcDelDaAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcDelDaPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
-    await updateCounterCaches(post, "decrement");
+    await post.destroy();
     const reloaded = await CcDelDaAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(0);
   });
@@ -2498,16 +2491,15 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcDelDsAuthor);
     registerModel(CcDelDsPost);
-    Associations.belongsTo.call(CcDelDsPost, "author", { className: "CcDelDsAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcDelDsPost, "author", { className: "CcDelDsAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     Associations.hasMany.call(CcDelDsAuthor, "posts", { className: "CcDelDsPost", foreignKey: "author_id", dependent: "destroy" });
     const author = await CcDelDsAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcDelDsPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
-    await updateCounterCaches(post, "decrement");
+    await post.destroy();
     const reloaded = await CcDelDsAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(0);
   });
-  it.skip("calling update on id changes the counter cache", async () => {
+  it("calling update on id changes the counter cache", async () => {
     class CcUpdIdAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2516,11 +2508,10 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcUpdIdAuthor);
     registerModel(CcUpdIdPost);
-    Associations.belongsTo.call(CcUpdIdPost, "author", { className: "CcUpdIdAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcUpdIdPost, "author", { className: "CcUpdIdAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author1 = await CcUpdIdAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcUpdIdAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcUpdIdPost.create({ author_id: author1.id, title: "A" });
-    await updateCounterCaches(post, "increment");
     // Move post to author2
     await updateCounterCaches(post, "decrement");
     post.writeAttribute("author_id", author2.id);
@@ -2531,7 +2522,7 @@ describe("HasManyAssociationsTest", () => {
     expect((reloaded1 as any).readAttribute("posts_count")).toBe(0);
     expect((reloaded2 as any).readAttribute("posts_count")).toBe(1);
   });
-  it.skip("calling update changing ids changes the counter cache", async () => {
+  it("calling update changing ids changes the counter cache", async () => {
     class CcChgAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2540,11 +2531,10 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcChgAuthor);
     registerModel(CcChgPost);
-    Associations.belongsTo.call(CcChgPost, "author", { className: "CcChgAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcChgPost, "author", { className: "CcChgAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author1 = await CcChgAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcChgAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcChgPost.create({ author_id: author1.id, title: "A" });
-    await updateCounterCaches(post, "increment");
     await updateCounterCaches(post, "decrement");
     post.writeAttribute("author_id", author2.id);
     await post.save();
@@ -2554,7 +2544,7 @@ describe("HasManyAssociationsTest", () => {
     expect((reloaded1 as any).readAttribute("posts_count")).toBe(0);
     expect((reloaded2 as any).readAttribute("posts_count")).toBe(1);
   });
-  it.skip("calling update changing ids of inversed association changes the counter cache", async () => {
+  it("calling update changing ids of inversed association changes the counter cache", async () => {
     class CcInvAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2563,11 +2553,10 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcInvAuthor);
     registerModel(CcInvPost);
-    Associations.belongsTo.call(CcInvPost, "author", { className: "CcInvAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcInvPost, "author", { className: "CcInvAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     const author1 = await CcInvAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcInvAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcInvPost.create({ author_id: author1.id, title: "A" });
-    await updateCounterCaches(post, "increment");
     await updateCounterCaches(post, "decrement");
     post.writeAttribute("author_id", author2.id);
     await post.save();
@@ -2584,20 +2573,18 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CcClrAuthor);
     registerModel(CcClrPost);
-    Associations.belongsTo.call(CcClrPost, "author", { className: "CcClrAuthor", foreignKey: "author_id", counterCache: true });
+    Associations.belongsTo.call(CcClrPost, "author", { className: "CcClrAuthor", foreignKey: "author_id", counterCache: "posts_count" });
     Associations.hasMany.call(CcClrAuthor, "posts", { className: "CcClrPost", foreignKey: "author_id", dependent: "destroy" });
     const author = await CcClrAuthor.create({ name: "Alice", posts_count: 0 });
     const p1 = await CcClrPost.create({ author_id: author.id, title: "A" });
     const p2 = await CcClrPost.create({ author_id: author.id, title: "B" });
-    await updateCounterCaches(p1, "increment");
-    await updateCounterCaches(p2, "increment");
-    // Now clear
-    await updateCounterCaches(p1, "decrement");
-    await updateCounterCaches(p2, "decrement");
+    // Now clear (destroy auto-decrements)
+    await p1.destroy();
+    await p2.destroy();
     const reloaded = await CcClrAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(0);
   });
-  it.skip("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
+  it("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
     class CcClrSymAuthor extends Base {
       static { this.attribute("name", "string"); this.attribute("posts_count", "integer"); this.adapter = adapter; }
     }
@@ -2610,8 +2597,7 @@ describe("HasManyAssociationsTest", () => {
     Associations.hasMany.call(CcClrSymAuthor, "posts", { className: "CcClrSymPost", foreignKey: "author_id", dependent: "destroy" });
     const author = await CcClrSymAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcClrSymPost.create({ author_id: author.id, title: "A" });
-    await updateCounterCaches(post, "increment");
-    await updateCounterCaches(post, "decrement");
+    await post.destroy();
     const reloaded = await CcClrSymAuthor.find(author.id!);
     expect((reloaded as any).readAttribute("posts_count")).toBe(0);
   });
@@ -4076,7 +4062,6 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(BtcAccount);
     const company = await BtcCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await BtcAccount.create({ company_id: company.id });
-    await updateCounterCaches(account, "increment");
     const reloaded = await BtcCompany.find(company.id!);
     expect((reloaded as any).readAttribute("accounts_count")).toBeGreaterThanOrEqual(1);
   });
@@ -4204,7 +4189,6 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(BtcasAccount);
     const company = await BtcasCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await BtcasAccount.create({ company_id: company.id });
-    await updateCounterCaches(account, "increment");
     const reloaded = await BtcasCompany.find(company.id!);
     expect((reloaded as any).readAttribute("accounts_count")).toBeGreaterThanOrEqual(1);
   });
@@ -4225,9 +4209,7 @@ describe("BelongsToAssociationsTest", () => {
     await CcAccount.create({ company_id: company.id });
     // Manually increment counter cache for each account
     const accounts = await CcAccount.where({ company_id: company.id }).toArray();
-    for (const acct of accounts) {
-      await updateCounterCaches(acct, "increment");
-    }
+    // create() auto-increments counter caches
     const reloaded = await CcCompany.find(company.id!);
     expect((reloaded as any).readAttribute("accounts_count")).toBeGreaterThanOrEqual(2);
   });
@@ -4245,7 +4227,6 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(CustomCcAccount);
     const company = await CustomCcCompany.create({ name: "Acme", custom_count: 0 });
     const account = await CustomCcAccount.create({ company_id: company.id });
-    await updateCounterCaches(account, "increment");
     const reloaded = await CustomCcCompany.find(company.id!);
     expect((reloaded as any).readAttribute("custom_count")).toBeGreaterThanOrEqual(1);
   });
@@ -4902,7 +4883,7 @@ describe("BelongsToAssociationsTest", () => {
     const loaded = await loadBelongsTo(account, "company", { className: "Company", foreignKey: "company_id" });
     expect((loaded as any).readAttribute("rating")).toBe(5);
   });
-  it.skip("belongs to counter with assigning new object", async () => {
+  it("belongs to counter with assigning new object", async () => {
     class CcAsgCompany extends Base {
       static { this.attribute("name", "string"); this.attribute("accounts_count", "integer"); this.adapter = adapter; }
     }
@@ -4915,7 +4896,6 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await CcAsgCompany.create({ name: "Old", accounts_count: 0 });
     const co2 = await CcAsgCompany.create({ name: "New", accounts_count: 0 });
     const account = await CcAsgAccount.create({ company_id: co1.id });
-    await updateCounterCaches(account, "increment");
     // Reassign
     await updateCounterCaches(account, "decrement");
     account.writeAttribute("company_id", co2.id);
@@ -4939,7 +4919,6 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await NsCcCompany.create({ name: "Old", accounts_count: 0 });
     const co2 = await NsCcCompany.create({ name: "New", accounts_count: 0 });
     const account = await NsCcAccount.create({ company_id: co1.id });
-    await updateCounterCaches(account, "increment");
     await updateCounterCaches(account, "decrement");
     account.writeAttribute("company_id", co2.id);
     await account.save();
