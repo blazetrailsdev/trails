@@ -5501,7 +5501,13 @@ describe("BelongsToAssociationsTest", () => {
   });
   it.skip("polymorphic with custom primary key", () => {});
   it.skip("destroying polymorphic child with unloaded parent and touch is possible with has many inversing", () => {});
-  it.skip("polymorphic with false", () => {});
+  it("polymorphic with false", () => {
+    class PfPost extends Base {
+      static { this.attribute("category_id", "integer"); this.adapter = adapter; }
+    }
+    // polymorphic: false should behave as a normal belongs_to (no error)
+    expect(() => Associations.belongsTo.call(PfPost, "category", { polymorphic: false } as any)).not.toThrow();
+  });
   it.skip("multiple counter cache with after create update", () => {});
   it("tracking change from persisted record to new record", async () => {
     class Company extends Base {

@@ -13,6 +13,13 @@ describe("Rack::Head", () => {
     return { promise: head.call(env), body, getClosed: () => closed };
   }
 
+  it("response", async () => {
+    const { promise } = testResponse({ REQUEST_METHOD: "HEAD" });
+    const resp = await promise;
+    expect(resp[0]).toBe(200);
+    expect(resp[1]["content-length"]).toBe("3");
+  });
+
   it("pass GET, POST, PUT, DELETE, OPTIONS, TRACE requests", async () => {
     for (const type of ["GET", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"]) {
       const { promise } = testResponse({ REQUEST_METHOD: type });

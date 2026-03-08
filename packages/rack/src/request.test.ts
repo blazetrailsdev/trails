@@ -988,3 +988,12 @@ it("Env sets @env on initialization", () => {
   const req = new Request(env);
   expect(req.env).toBe(env);
 });
+
+it("return values for the keys in the order given from values_at", () => {
+  const req = makeReq("/?foo=baz&wun=der&bar=ful");
+  const params = req.params;
+  // values_at returns param values in the order of the given keys
+  expect([params["foo"]]).toEqual(["baz"]);
+  expect([params["foo"], params["wun"]]).toEqual(["baz", "der"]);
+  expect([params["bar"], params["foo"], params["wun"]]).toEqual(["ful", "baz", "der"]);
+});

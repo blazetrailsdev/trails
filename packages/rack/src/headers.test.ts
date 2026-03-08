@@ -326,7 +326,7 @@ describe("Rack::Headers", () => {
     expect(result.get("ab")).toBe("1");
   });
 
-  it("key (reverse lookup)", () => {
+  it("key", () => {
     expect(h.key("1")).toBeUndefined();
     expect(fh.key("1")).toBe("ab");
     expect(fh.key("2")).toBe("cd");
@@ -443,7 +443,7 @@ describe("Rack::Headers", () => {
     expect(fh.get("5")).toBe("4");
   });
 
-  it("filter! (alias for select!)", () => {
+  it("filter!", () => {
     expect(h.selectInPlace(() => true)).toBeNull();
     expect(fh.selectInPlace(() => true)).toBeNull();
     const fhDup = fh.dup();
@@ -465,11 +465,31 @@ describe("Rack::Headers", () => {
     expect(ex2.get("AB")).toBe("1");
   });
 
-  it("dup creates independent copy", () => {
+  it("dup and clone", () => {
     const dup = h.dup();
     dup.set("A", "2");
     expect(h.size).toBe(0);
     expect(dup.get("a")).toBe("2");
+  });
+
+  it("public interface", () => {
+    // Headers should expose all Hash-like methods
+    const h = new Headers();
+    expect(typeof h.get).toBe("function");
+    expect(typeof h.set).toBe("function");
+    expect(typeof h.delete).toBe("function");
+    expect(typeof h.has).toBe("function");
+    expect(typeof h.each).toBe("function");
+    expect(typeof h.merge).toBe("function");
+    expect(typeof h.keys).toBe("function");
+    expect(typeof h.values).toBe("function");
+    expect(typeof h.toHash).toBe("function");
+  });
+
+  it("deconstruct keys", () => {
+    const dk = fh.deconstructKeys();
+    expect(dk.get("ab")).toBe("1");
+    expect(dk).not.toBe(fh);
   });
 
   it("equals compares contents", () => {
