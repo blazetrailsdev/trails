@@ -114,6 +114,10 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
   ],
   actiondispatch: [
     "packages/actiondispatch/src/routing/routing.test.ts",
+    "packages/actiondispatch/src/request.test.ts",
+    "packages/actiondispatch/src/response.test.ts",
+    "packages/actiondispatch/src/parameters.test.ts",
+    "packages/actiondispatch/src/url-for.test.ts",
   ],
 };
 

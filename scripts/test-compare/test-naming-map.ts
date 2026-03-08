@@ -2265,6 +2265,24 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/routing_assertions_test.rb": [
       { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::Assertions" },
     ],
+    "dispatch/request_test.rb": [
+      { file: "request.test.ts", describeBlock: "ActionDispatch::Request" },
+    ],
+    "dispatch/response_test.rb": [
+      { file: "response.test.ts", describeBlock: "ActionDispatch::Response" },
+    ],
+    "controller/parameters/accessors_test.rb": [
+      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Accessors" },
+    ],
+    "controller/parameters/parameters_permit_test.rb": [
+      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Permit" },
+    ],
+    "controller/parameters/mutators_test.rb": [
+      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Mutators" },
+    ],
+    "controller/url_for_test.rb": [
+      { file: "url-for.test.ts", describeBlock: "ActionController::UrlFor" },
+    ],
   },
 };
 
