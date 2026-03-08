@@ -5,9 +5,21 @@
  * for mass assignment.
  */
 
+export class UnpermittedParameters extends Error {
+  readonly params: string[];
+
+  constructor(params: string[]) {
+    super(`found unpermitted parameters: ${params.join(", ")}`);
+    this.name = "UnpermittedParameters";
+    this.params = params;
+  }
+}
+
 export class Parameters {
   private _data: Record<string, unknown>;
   private _permitted = false;
+
+  static actionOnUnpermittedParameters: "log" | "raise" | false = false;
 
   constructor(data: Record<string, unknown> = {}) {
     this._data = { ...data };
@@ -20,29 +32,40 @@ export class Parameters {
   }
 
   permit(...keys: (string | Record<string, unknown>)[]): Parameters {
+    const permittedKeyNames = new Set<string>();
     const result: Record<string, unknown> = {};
     for (const key of keys) {
       if (typeof key === "string") {
+        permittedKeyNames.add(key);
         if (key in this._data) {
           result[key] = this._data[key];
         }
       } else {
         // Hash form: { posts: [:title, :body] }
         for (const [k, v] of Object.entries(key)) {
+          permittedKeyNames.add(k);
           if (k in this._data) {
             const val = this._data[k];
             if (val instanceof Parameters) {
               if (Array.isArray(v)) {
-                result[k] = val.permit(...(v as string[]));
+                result[k] = val.permit(...(v as (string | Record<string, unknown>)[]));
               } else {
                 result[k] = val;
               }
             } else if (Array.isArray(val)) {
-              if (Array.isArray(v)) {
+              if (Array.isArray(v) && v.length === 0) {
+                // Empty array spec means permit array of scalars
+                result[k] = val.filter(
+                  (item) =>
+                    typeof item === "string" ||
+                    typeof item === "number" ||
+                    typeof item === "boolean"
+                );
+              } else if (Array.isArray(v)) {
                 // Array of hashes — permit each
                 result[k] = val.map((item) => {
                   if (item instanceof Parameters) {
-                    return item.permit(...(v as string[]));
+                    return item.permit(...(v as (string | Record<string, unknown>)[]));
                   }
                   return item;
                 });
@@ -56,6 +79,23 @@ export class Parameters {
         }
       }
     }
+
+    // Handle unpermitted parameters action
+    if (Parameters.actionOnUnpermittedParameters) {
+      const unpermitted = Object.keys(this._data).filter(
+        (k) => !permittedKeyNames.has(k)
+      );
+      if (unpermitted.length > 0) {
+        if (Parameters.actionOnUnpermittedParameters === "raise") {
+          throw new UnpermittedParameters(unpermitted);
+        } else if (Parameters.actionOnUnpermittedParameters === "log") {
+          console.warn(
+            `found unpermitted parameters: ${unpermitted.join(", ")}`
+          );
+        }
+      }
+    }
+
     const p = new Parameters(result);
     p._permitted = true;
     return p;
@@ -76,6 +116,30 @@ export class Parameters {
       throw new ParameterMissing(key);
     }
     return val;
+  }
+
+  expect(
+    keyOrSpec: string | Record<string, (string | Record<string, unknown>)[]>
+  ): unknown {
+    if (typeof keyOrSpec === "string") {
+      return this.require(keyOrSpec);
+    }
+    const entries = Object.entries(keyOrSpec);
+    if (entries.length === 1) {
+      const [key, allowed] = entries[0];
+      const val = this.require(key);
+      if (val instanceof Parameters) {
+        return val.permit(...allowed);
+      }
+      throw new ParameterMissing(key);
+    }
+    return entries.map(([key, allowed]) => {
+      const val = this.require(key);
+      if (val instanceof Parameters) {
+        return val.permit(...allowed);
+      }
+      throw new ParameterMissing(key);
+    });
   }
 
   // --- Hash-like accessors ---
@@ -289,7 +353,38 @@ export class Parameters {
   }
 
   toUnsafeHash(): Record<string, unknown> {
-    return this.toHash();
+    return this._deepUnwrap(this._data);
+  }
+
+  private _deepUnwrap(obj: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v instanceof Parameters) {
+        result[k] = v.toUnsafeHash();
+      } else if (Array.isArray(v)) {
+        result[k] = v.map((item) =>
+          item instanceof Parameters ? item.toUnsafeHash() : item
+        );
+      } else {
+        result[k] = v;
+      }
+    }
+    return result;
+  }
+
+  toQuery(prefix?: string): string {
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(this._data)) {
+      const key = prefix ? `${prefix}[${k}]` : k;
+      parts.push(
+        `${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`
+      );
+    }
+    return parts.join("&");
+  }
+
+  equals(other: Parameters): boolean {
+    return JSON.stringify(this._data) === JSON.stringify(other.toHash());
   }
 
   toString(): string {
@@ -311,7 +406,10 @@ export class Parameters {
 
   // --- Delete ---
 
-  delete(key: string): unknown {
+  delete(key: string, defaultValue?: unknown): unknown {
+    if (!(key in this._data)) {
+      return defaultValue;
+    }
     const val = this._data[key];
     delete this._data[key];
     return val;

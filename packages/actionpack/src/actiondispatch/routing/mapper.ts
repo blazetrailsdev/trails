@@ -12,7 +12,7 @@
  *   });
  */
 
-import { Route, type RouteOptions, type ResourceAction, type RedirectFunction, type RedirectOptions } from "./route.js";
+import { Route, type RouteOptions, type RouteConstraints, type ResourceAction, type RedirectFunction, type RedirectOptions } from "./route.js";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -71,7 +71,8 @@ export class Mapper {
     }
 
     const shallow = options.shallow || this.isShallow();
-    const controller = name;
+    const controllerPrefix = this.currentControllerPrefix();
+    const controller = controllerPrefix ? `${controllerPrefix}/${name}` : name;
     const prefix = this.currentPrefix();
     const basePath = `${prefix}/${name}`;
     const singular = singularize(name);
@@ -84,11 +85,15 @@ export class Mapper {
     const shallowName = (suffix: string) => shallow ? suffix : routeName(suffix);
 
     const allowed = allowedActions(options, ["index", "show", "new", "create", "edit", "update", "destroy"]);
-    const constraints = options.constraints;
+    const scopeConstraints = this.currentScopeConstraints();
+    const constraints = scopeConstraints
+      ? { ...scopeConstraints, ...options.constraints }
+      : options.constraints;
     const pathNames = options.pathNames ?? {};
     const newPath = pathNames.new ?? "new";
     const editPath = pathNames.edit ?? "edit";
 
+    // Collection-level routes first (no :id param)
     if (allowed.has("index")) {
       this.routes.push(
         new Route("GET", basePath, controller, "index", {
@@ -111,6 +116,27 @@ export class Mapper {
       );
     }
 
+    // Run callback (collection/member/nested routes) before member routes
+    // so collection routes like /posts/search come before /posts/:id
+    if (cb) {
+      // Rename parent constraints from :id to :singular_id for nested routes
+      const nestedConstraints: RouteConstraints = {};
+      if (constraints?.id) {
+        nestedConstraints[`${singular}_id`] = constraints.id;
+      }
+      this.scopeStack.push({
+        path: basePath + `/:${singular}_id`,
+        namePrefix: singular,
+        controller: undefined,
+        shallow,
+        constraints: Object.keys(nestedConstraints).length > 0 ? nestedConstraints : undefined,
+        memberPath: basePath + "/:id",
+      });
+      cb(this);
+      this.scopeStack.pop();
+    }
+
+    // Member routes last (they have :id which would greedily match collection paths)
     if (allowed.has("show")) {
       this.routes.push(
         new Route("GET", `${shallowPath}/:id`, controller, "show", {
@@ -143,17 +169,6 @@ export class Mapper {
         new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints })
       );
     }
-
-    if (cb) {
-      this.scopeStack.push({
-        path: basePath + "/:id",
-        namePrefix: singular,
-        controller: undefined,
-        shallow,
-      });
-      cb(this);
-      this.scopeStack.pop();
-    }
   }
 
   // --- resource (singular) ---
@@ -169,7 +184,9 @@ export class Mapper {
       cb = callback;
     }
 
-    const controller = pluralize(name);
+    const controllerPrefix = this.currentControllerPrefix();
+    const rawController = pluralize(name);
+    const controller = controllerPrefix ? `${controllerPrefix}/${rawController}` : rawController;
     const prefix = this.currentPrefix();
     const basePath = `${prefix}/${name}`;
     const namePrefix = this.currentNamePrefix();
@@ -285,11 +302,21 @@ export class Mapper {
   // --- member / collection ---
 
   member(callback: MapperCallback): void {
-    callback(this);
+    // Use the memberPath (with :id) if we're inside a resources scope
+    const frame = this.scopeStack[this.scopeStack.length - 1];
+    if (frame?.memberPath) {
+      const saved = frame.path;
+      frame.path = frame.memberPath;
+      callback(this);
+      frame.path = saved;
+    } else {
+      callback(this);
+    }
   }
 
   collection(callback: MapperCallback): void {
     const current = this.currentPrefix();
+    // Strip /:id or /:singular_id from end to get collection path
     const collectionPath = current.replace(/\/:[^/]+$/, "");
     this.scopeStack.push({
       path: collectionPath,
@@ -353,6 +380,8 @@ export class Mapper {
   private addRoute(verb: string, path: string, options: RouteOptions): void {
     const fullPath = this.currentPrefix() + "/" + path.replace(/^\/+/, "");
     const endpoint = options.to ?? `${options.controller ?? ""}#${options.action ?? ""}`;
+    // Prepend controller module from scope stack (namespace support)
+    const scopeController = this.currentControllerPrefix();
 
     // Check if endpoint is a redirect
     let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
@@ -370,7 +399,10 @@ export class Mapper {
       redirectTarget = options.redirect;
     }
 
-    const [controller, action] = redirectTarget ? ["", ""] : parseEndpoint(endpoint);
+    let [controller, action] = redirectTarget ? ["", ""] : parseEndpoint(endpoint);
+    if (scopeController && controller && !controller.includes("/")) {
+      controller = scopeController + "/" + controller;
+    }
     const name = options.as ?? options.name;
     const namePrefix = this.currentNamePrefix();
     const fullName = name
@@ -408,6 +440,25 @@ export class Mapper {
       .filter(Boolean) as string[];
     return parts.length > 0 ? parts.join("_") : undefined;
   }
+
+  private currentControllerPrefix(): string | undefined {
+    const parts = this.scopeStack
+      .map((f) => f.controller)
+      .filter(Boolean) as string[];
+    return parts.length > 0 ? parts.join("/") : undefined;
+  }
+
+  private currentScopeConstraints(): RouteConstraints | undefined {
+    const merged: RouteConstraints = {};
+    let any = false;
+    for (const frame of this.scopeStack) {
+      if (frame.constraints) {
+        Object.assign(merged, frame.constraints);
+        any = true;
+      }
+    }
+    return any ? merged : undefined;
+  }
 }
 
 interface ScopeFrame {
@@ -415,6 +466,8 @@ interface ScopeFrame {
   namePrefix?: string;
   controller?: string;
   shallow?: boolean;
+  constraints?: RouteConstraints;
+  memberPath?: string;
 }
 
 interface ScopeOptions {

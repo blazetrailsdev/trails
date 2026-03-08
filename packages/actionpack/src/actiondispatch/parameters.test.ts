@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { Parameters, ParameterMissing } from "./parameters.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { Parameters, ParameterMissing, UnpermittedParameters } from "./parameters.js";
 
 // ==========================================================================
 // controller/parameters/accessors_test.rb
@@ -450,5 +450,265 @@ describe("ActionController::Parameters::Mutators", () => {
     const result = params.transformKeys((k) => k.toUpperCase());
     expect(result.toHash()).toEqual({ A: "1" });
     expect(params.has("a")).toBe(true); // original unchanged
+  });
+});
+
+// ==========================================================================
+// Nested permit tests
+// ==========================================================================
+describe("ActionController::Parameters::NestedPermit", () => {
+  it("permits nested Parameters", () => {
+    const inner = new Parameters({ title: "Hello", admin: true });
+    const params = new Parameters({ post: inner });
+    const permitted = params.permit({ post: ["title"] });
+    const post = permitted.get("post") as Parameters;
+    expect(post).toBeInstanceOf(Parameters);
+    expect(post.get("title")).toBe("Hello");
+    expect(post.has("admin")).toBe(false);
+  });
+
+  it("permits array of Parameters", () => {
+    const items = [
+      new Parameters({ name: "a", secret: "x" }),
+      new Parameters({ name: "b", secret: "y" }),
+    ];
+    const params = new Parameters({ items });
+    const permitted = params.permit({ items: ["name"] });
+    const arr = permitted.get("items") as Parameters[];
+    expect(arr).toHaveLength(2);
+    expect(arr[0].get("name")).toBe("a");
+    expect(arr[0].has("secret")).toBe(false);
+  });
+
+  it("permits empty array spec for scalar arrays", () => {
+    const params = new Parameters({ tags: ["a", "b", 3, true, { bad: true }] });
+    const permitted = params.permit({ tags: [] });
+    const tags = permitted.get("tags") as unknown[];
+    expect(tags).toEqual(["a", "b", 3, true]);
+  });
+
+  it("deeply nested permit", () => {
+    const address = new Parameters({ city: "NYC", secret: "x" });
+    const person = new Parameters({ name: "John", address });
+    const params = new Parameters({ person });
+    const permitted = params.permit({ person: ["name", { address: ["city"] }] });
+    const p = permitted.get("person") as Parameters;
+    expect(p.get("name")).toBe("John");
+    const addr = p.get("address") as Parameters;
+    expect(addr.get("city")).toBe("NYC");
+    expect(addr.has("secret")).toBe(false);
+  });
+});
+
+// ==========================================================================
+// expect() — Rails 8
+// ==========================================================================
+describe("ActionController::Parameters::Expect", () => {
+  it("expect with string key works like require", () => {
+    const params = new Parameters({ name: "John" });
+    expect(params.expect("name")).toBe("John");
+  });
+
+  it("expect with string key raises on missing", () => {
+    const params = new Parameters({});
+    expect(() => params.expect("name")).toThrow(ParameterMissing);
+  });
+
+  it("expect with hash spec requires and permits", () => {
+    const inner = new Parameters({ title: "Hello", admin: true });
+    const params = new Parameters({ post: inner });
+    const result = params.expect({ post: ["title"] }) as Parameters;
+    expect(result).toBeInstanceOf(Parameters);
+    expect(result.get("title")).toBe("Hello");
+    expect(result.has("admin")).toBe(false);
+    expect(result.permitted).toBe(true);
+  });
+
+  it("expect raises if required key missing", () => {
+    const params = new Parameters({});
+    expect(() => params.expect({ post: ["title"] })).toThrow(ParameterMissing);
+  });
+
+  it("expect raises if value is not Parameters", () => {
+    const params = new Parameters({ post: "not a hash" });
+    expect(() => params.expect({ post: ["title"] })).toThrow(ParameterMissing);
+  });
+});
+
+// ==========================================================================
+// toQuery, equals, toUnsafeHash
+// ==========================================================================
+describe("ActionController::Parameters::Serialization", () => {
+  it("toQuery encodes key/value pairs", () => {
+    const params = new Parameters({ a: "1", b: "hello world" });
+    const q = params.toQuery();
+    expect(q).toContain("a=1");
+    expect(q).toContain("b=hello%20world");
+  });
+
+  it("toQuery with prefix", () => {
+    const params = new Parameters({ title: "Hi" });
+    expect(params.toQuery("post")).toBe("post%5Btitle%5D=Hi");
+  });
+
+  it("equals compares by data", () => {
+    const a = new Parameters({ x: "1", y: "2" });
+    const b = new Parameters({ x: "1", y: "2" });
+    const c = new Parameters({ x: "1" });
+    expect(a.equals(b)).toBe(true);
+    expect(a.equals(c)).toBe(false);
+  });
+
+  it("toUnsafeHash deeply unwraps Parameters", () => {
+    const inner = new Parameters({ c: "3" });
+    const params = new Parameters({ a: "1", b: inner });
+    const hash = params.toUnsafeHash();
+    expect(hash).toEqual({ a: "1", b: { c: "3" } });
+  });
+
+  it("toUnsafeHash unwraps arrays of Parameters", () => {
+    const items = [new Parameters({ x: "1" }), new Parameters({ x: "2" })];
+    const params = new Parameters({ items });
+    const hash = params.toUnsafeHash();
+    expect(hash).toEqual({ items: [{ x: "1" }, { x: "2" }] });
+  });
+});
+
+// ==========================================================================
+// Require edge cases
+// ==========================================================================
+describe("ActionController::Parameters::RequireEdgeCases", () => {
+  it("require raises on undefined", () => {
+    const params = new Parameters({ name: undefined });
+    expect(() => params.require("name")).toThrow(ParameterMissing);
+  });
+
+  it("require returns nested Parameters", () => {
+    const inner = new Parameters({ title: "Hi" });
+    const params = new Parameters({ post: inner });
+    expect(params.require("post")).toBe(inner);
+  });
+
+  it("require returns array values", () => {
+    const params = new Parameters({ ids: [1, 2, 3] });
+    expect(params.require("ids")).toEqual([1, 2, 3]);
+  });
+
+  it("require returns numeric zero", () => {
+    const params = new Parameters({ count: 0 });
+    expect(params.require("count")).toBe(0);
+  });
+
+  it("require returns false", () => {
+    const params = new Parameters({ active: false });
+    expect(params.require("active")).toBe(false);
+  });
+});
+
+// ==========================================================================
+// Mutators extended
+// ==========================================================================
+describe("ActionController::Parameters::MutatorsExtended", () => {
+  it("delete returns default for missing key", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.delete("missing", "fallback")).toBe("fallback");
+    expect(params.has("a")).toBe(true);
+  });
+
+  it("delete returns undefined for missing key without default", () => {
+    const params = new Parameters({ a: "1" });
+    expect(params.delete("missing")).toBeUndefined();
+  });
+
+  it("merge with Parameters instance", () => {
+    const p1 = new Parameters({ a: "1" });
+    const p2 = new Parameters({ b: "2" });
+    const merged = p1.merge(p2);
+    expect(merged.toHash()).toEqual({ a: "1", b: "2" });
+  });
+
+  it("reversemerge with Parameters instance", () => {
+    const p1 = new Parameters({ a: "1" });
+    const p2 = new Parameters({ a: "default", b: "2" });
+    const merged = p1.reversemerge(p2);
+    expect(merged.get("a")).toBe("1");
+    expect(merged.get("b")).toBe("2");
+  });
+
+  it("transform transforms both key and value", () => {
+    const params = new Parameters({ count: "5" });
+    const result = params.transform((_k, v) => Number(v) * 10);
+    expect(result.get("count")).toBe(50);
+  });
+});
+
+// ==========================================================================
+// Nested dig
+// ==========================================================================
+describe("ActionController::Parameters::NestedDig", () => {
+  it("dig through nested Parameters", () => {
+    const c = new Parameters({ val: "deep" });
+    const b = new Parameters({ c });
+    const a = new Parameters({ b });
+    expect(a.dig("b", "c", "val")).toBe("deep");
+  });
+
+  it("dig through plain objects", () => {
+    const params = new Parameters({ a: { b: { c: "found" } } });
+    expect(params.dig("a", "b", "c")).toBe("found");
+  });
+
+  it("dig returns undefined for broken chain", () => {
+    const params = new Parameters({ a: "string" });
+    expect(params.dig("a", "b")).toBeUndefined();
+  });
+});
+
+// ==========================================================================
+// Unpermitted parameters action
+// ==========================================================================
+describe("ActionController::Parameters::UnpermittedParametersAction", () => {
+  afterEach(() => {
+    Parameters.actionOnUnpermittedParameters = false;
+  });
+
+  it("raise mode throws UnpermittedParameters", () => {
+    Parameters.actionOnUnpermittedParameters = "raise";
+    const params = new Parameters({ name: "John", admin: true });
+    expect(() => params.permit("name")).toThrow(UnpermittedParameters);
+  });
+
+  it("raise mode includes unpermitted param names", () => {
+    Parameters.actionOnUnpermittedParameters = "raise";
+    const params = new Parameters({ name: "John", admin: true, secret: "x" });
+    try {
+      params.permit("name");
+    } catch (e: unknown) {
+      expect((e as UnpermittedParameters).params).toContain("admin");
+      expect((e as UnpermittedParameters).params).toContain("secret");
+    }
+  });
+
+  it("log mode warns but does not throw", () => {
+    Parameters.actionOnUnpermittedParameters = "log";
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const params = new Parameters({ name: "John", admin: true });
+    const permitted = params.permit("name");
+    expect(permitted.get("name")).toBe("John");
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("admin"));
+    spy.mockRestore();
+  });
+
+  it("false mode does nothing", () => {
+    Parameters.actionOnUnpermittedParameters = false;
+    const params = new Parameters({ name: "John", admin: true });
+    const permitted = params.permit("name");
+    expect(permitted.get("name")).toBe("John");
+  });
+
+  it("no error when all params are permitted", () => {
+    Parameters.actionOnUnpermittedParameters = "raise";
+    const params = new Parameters({ name: "John" });
+    expect(() => params.permit("name")).not.toThrow();
   });
 });

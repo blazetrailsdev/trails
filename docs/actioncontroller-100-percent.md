@@ -1,6 +1,6 @@
 # ActionController: Road to 100% Test Coverage
 
-Current state: **~20%** (~393 matched / 1,912 total controller+abstract tests). 173 new controller tests written, ~1,519 remaining.
+Current state: **~28%** (~530 matched / 1,912 total controller+abstract tests). 173 controller tests + 69 routing tests + 76 new parameter tests written, ~1,382 remaining.
 
 In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 
@@ -38,16 +38,20 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 ### Supporting changes
 
 - `actiondispatch/request.ts` — Added `getHeader()` for Rack env header access
-- `scripts/test-compare/extract-ts-tests.ts` — All 8 test files registered under `actioncontroller` package
+- `actiondispatch/parameters.ts` — Added `expect()` (Rails 8), `toQuery()`, `equals()`, `UnpermittedParameters`, `actionOnUnpermittedParameters`, deep `toUnsafeHash()`, `delete()` with default
+- `actiondispatch/routing/mapper.ts` — Namespace controller prefixing, nested resource parent params (`:post_id`), constraint propagation, route ordering (collection before member), member/collection scope fixes
+- `actiondispatch/routing/resource-routing.test.ts` — 40 tests for RESTful resource routing
+- `actiondispatch/routing/controller-routing.test.ts` — 29 tests for controller routing integration
+- `scripts/test-compare/extract-ts-tests.ts` — All 8 controller test files + 2 new routing test files registered
 
 ## Current state by feature area
 
 | # | Feature Area | Missing | Matched | Status |
 |---|---|---|---|---|
-| 1 | Parameters | ~269 | 42 | Standalone impl exists, needs deep coverage |
+| 1 | Parameters | ~193 | 118 | Deep coverage added: nested permit, expect (Rails 8), toQuery, equality, unpermitted params |
 | 2 | Rendering | ~238 | ~31 | Simple rendering done, templates/partials/streaming remain |
 | 3 | Testing harness | 224 | 0 | Not started |
-| 4 | Routing (controller) | 219 | 11 | Not started |
+| 4 | Routing (controller) | ~150 | 80 | Resource routing, controller routing, namespace/scope/constraints done |
 | 5 | Other (base, assertions, etc) | ~185 | ~44 | Base skeleton done, assertions/logging/helpers remain |
 | 6 | Security/Auth | ~113 | 45 | CSRF/auth impl exists, controller integration tests needed |
 | 7 | Content negotiation | ~67 | 28 | respond_to impl exists, edge cases remain |
@@ -60,7 +64,7 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 | 14 | Redirects | ~15 | ~39 | Core done, edge cases remain |
 | 15 | File sending | ~26 | ~0 | sendFile/sendData impl exists, needs tests |
 | 16 | Flash (controller) | ~10 | 37 | Mostly done |
-| | **TOTAL** | **~1,519** | **~393** | |
+| | **TOTAL** | **~1,382** | **~530** | |
 
 ## Dependency graph
 
@@ -104,10 +108,10 @@ ActionController::Base (DONE — 44 + 31 + 11 + 13 + 10 tests)
    │
    ├── Flash (DONE via actiondispatch — 37 tests)
    ├── CSRF (DONE via actiondispatch — 44 tests)
-   ├── Parameters deep (269 tests, 42 matched) ── needs more coverage
+   ├── Parameters deep (MOSTLY DONE — 118 tests, nested permit/expect/toQuery/equality/unpermitted)
    ├── Security/Auth (113 tests, 45 matched) ── needs controller integration
    ├── Content negotiation (67 tests, 28 matched) ── needs edge cases
-   ├── Routing (219 tests, 11 matched) ── NOT STARTED
+   ├── Routing (PARTIALLY DONE — 269 tests: resource routing, controller routing, namespaces, shallow, concerns)
    ├── File sending (26 missing) ── impl exists, needs tests
    ├── Streaming (40 missing) ── NOT STARTED
    │
@@ -126,20 +130,14 @@ Testing (224 tests) ── NOT STARTED
 
 ## Remaining workstreams
 
-### Stream 1: Parameters deep (269 missing) — STANDALONE
+### Stream 1: Parameters deep (~193 missing) — MOSTLY DONE
 
-Parameters is the most independently testable area. We already have `parameters.ts` with 42 matched tests. The remaining work is:
+Parameters now has 118 tests covering nested permit, expect (Rails 8), toQuery, equality, unpermitted params action, delete with default, deep dup, and more. Remaining work:
 
-- **permit edge cases** (62 missing) — nested hashes, arrays of hashes, scalar filtering
-- **expect** (25 missing) — Rails 8's `params.expect(post: [:title, :body])`
-- **mutators** (38 missing) — `delete`, `extract!`, `merge`, `reverse_merge`, `transform_keys`
-- **nested permit** (15 missing) — deeply nested strong parameters
-- **dup/equality** (14 missing) — `dup`, `==`, `eql?`, `hash`
 - **params wrapper** (31 missing) — auto-wrapping root key
-- **logging** (18 missing) — log unpermitted params
-- **serialization** (4 missing) — to_h, to_query, to_unsafe_h
-- **required params** (12 missing) — ActionController::ParameterMissing
-- **other** (50 missing)
+- **permit edge cases** (~30 missing) — deeply nested hashes, arrays of hashes
+- **logging** (18 missing) — log unpermitted params (integration with logger)
+- **other** (~114 missing) — various edge cases
 
 ### Stream 2: Rendering deep (~238 missing)
 
@@ -165,11 +163,13 @@ Simple rendering is done. Remaining:
 - Content-Type handling (23 missing)
 - Accept header parsing (6 missing)
 
-### Stream 5: Routing from controllers (219 missing)
+### Stream 5: Routing from controllers (~150 missing, 80 matched)
 
-- Controller routing (140 missing) — URL generation from controller context
-- Resource routing (78 missing) — RESTful resource route testing
-- Route helpers (1 missing)
+69 new tests added across two new files. Mapper implementation improved with namespace controller prefixing, nested resource parent params (`:post_id`), constraint propagation, and route ordering (collection before member). Remaining:
+
+- **URL generation from controller context** (~60 missing)
+- **Route helpers** (~30 missing) — `_path`/`_url` helper generation
+- **Advanced routing** (~60 missing) — direct routes, polymorphic URLs, mounted engines
 
 ### Stream 6: Remaining features (~170 missing)
 
@@ -237,5 +237,5 @@ npm run test:compare
 
 The compare script now has an `actioncontroller` package entry alongside `actiondispatch`.
 
-Current: ~393 / 1,912 controller tests matched (~20%)
+Current: ~530 / 1,912 controller tests matched (~28%)
 Target: 1,912 / 1,912 (100%)
