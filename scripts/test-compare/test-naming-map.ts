@@ -2313,6 +2313,12 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/static_test.rb": [
       { file: "middleware/static.test.ts", describeBlock: "ActionDispatch::Static" },
     ],
+    "controller/request_forgery_protection_test.rb": [
+      { file: "request-forgery-protection.test.ts", describeBlock: "ActionController::RequestForgeryProtection" },
+    ],
+    "controller/mime/respond_to_test.rb": [
+      { file: "respond-to.test.ts", describeBlock: "RespondToControllerTest" },
+    ],
   },
 };
 

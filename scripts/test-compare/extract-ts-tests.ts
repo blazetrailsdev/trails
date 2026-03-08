@@ -127,6 +127,8 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
     "packages/actiondispatch/src/redirect.test.ts",
     "packages/actiondispatch/src/flash.test.ts",
     "packages/actiondispatch/src/middleware/static.test.ts",
+    "packages/actiondispatch/src/request-forgery-protection.test.ts",
+    "packages/actiondispatch/src/respond-to.test.ts",
   ],
 };
 
