@@ -1845,8 +1845,30 @@ describe("AssociationsJoinModelTest", () => {
     // Requires through create with extra columns
   });
 
-  it.skip("include has many through", () => {
-    // Requires eager loading through
+  it("include has many through", async () => {
+    const ad = freshAdapter();
+    class IhmtPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = ad; }
+    }
+    class IhmtTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class IhmtTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(IhmtPost); registerModel(IhmtTag); registerModel(IhmtTagging);
+    Associations.hasMany.call(IhmtPost, "taggings", { className: "IhmtTagging", foreignKey: "taggable_id" });
+    Associations.hasMany.call(IhmtPost, "tags", { through: "taggings", className: "IhmtTag", source: "tag" });
+    Associations.belongsTo.call(IhmtTagging, "tag", { className: "IhmtTag", foreignKey: "tag_id" });
+    const post = await IhmtPost.create({ title: "Include", body: "B" });
+    const tag1 = await IhmtTag.create({ name: "ruby" });
+    const tag2 = await IhmtTag.create({ name: "rails" });
+    await IhmtTagging.create({ tag_id: tag1.id, taggable_id: post.id, taggable_type: "IhmtPost" });
+    await IhmtTagging.create({ tag_id: tag2.id, taggable_id: post.id, taggable_type: "IhmtPost" });
+    const posts = await IhmtPost.all().includes("tags").toArray();
+    expect(posts).toHaveLength(1);
+    const preloaded = (posts[0] as any)._preloadedAssociations?.get("tags");
+    expect(preloaded).toHaveLength(2);
   });
 
   it("include polymorphic has one", async () => {
@@ -1971,8 +1993,16 @@ describe("AssociationsJoinModelTest", () => {
     // Requires counter_cache on polymorphic
   });
 
-  it.skip("unavailable through reflection", () => {
-    // Requires error on missing through
+  it("unavailable through reflection", async () => {
+    const ad = freshAdapter();
+    class UtrAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    registerModel(UtrAuthor);
+    Associations.hasMany.call(UtrAuthor, "tags", { through: "nonexistent", className: "Tag" });
+    const author = await UtrAuthor.create({ name: "Bad" });
+    await expect(loadHasMany(author, "tags", { through: "nonexistent", className: "Tag" }))
+      .rejects.toThrow(/Through association "nonexistent" not found/);
   });
 
   it.skip("exceptions have suggestions for fix", () => {
@@ -2064,20 +2094,106 @@ describe("AssociationsJoinModelTest", () => {
     expect(found).toBeDefined();
   });
 
-  it.skip("has many through polymorphic has one", () => {
-    // Requires through polymorphic has_one
+  it("has many through polymorphic has one", async () => {
+    // Author has_one :post; Post has_one :tagging (polymorphic as: taggable)
+    // Author has_many :taggings_2, through: :post (singular), source: :tagging
+    const ad = freshAdapter();
+    class TphoAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class TphoPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = ad; }
+    }
+    class TphoTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(TphoAuthor); registerModel(TphoPost); registerModel(TphoTagging);
+    Associations.hasOne.call(TphoAuthor, "post", { className: "TphoPost", foreignKey: "author_id" });
+    Associations.hasOne.call(TphoPost, "tagging", { className: "TphoTagging", as: "taggable" });
+    Associations.hasMany.call(TphoAuthor, "taggings", { through: "post", className: "TphoTagging", source: "tagging" });
+    const author = await TphoAuthor.create({ name: "David" });
+    const post = await TphoPost.create({ author_id: author.id, title: "P1" });
+    await TphoTagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "TphoPost" });
+    const taggings = await loadHasMany(author, "taggings", { through: "post", className: "TphoTagging", source: "tagging" });
+    expect(taggings).toHaveLength(1);
   });
 
-  it.skip("has many through polymorphic has many", () => {
-    // Requires through polymorphic has_many
+  it("has many through polymorphic has many", async () => {
+    // Author has_many :posts; Post has_many :taggings (as: :taggable)
+    // Author has_many :taggings, through: :posts
+    const ad = freshAdapter();
+    class TphmAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class TphmPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = ad; }
+    }
+    class TphmTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(TphmAuthor); registerModel(TphmPost); registerModel(TphmTagging);
+    Associations.hasMany.call(TphmAuthor, "posts", { className: "TphmPost", foreignKey: "author_id" });
+    Associations.hasMany.call(TphmPost, "taggings", { className: "TphmTagging", as: "taggable" });
+    Associations.hasMany.call(TphmAuthor, "taggings", { through: "posts", className: "TphmTagging", source: "tagging" });
+    const author = await TphmAuthor.create({ name: "David" });
+    const post1 = await TphmPost.create({ author_id: author.id, title: "P1" });
+    const post2 = await TphmPost.create({ author_id: author.id, title: "P2" });
+    await TphmTagging.create({ tag_id: 1, taggable_id: post1.id, taggable_type: "TphmPost" });
+    await TphmTagging.create({ tag_id: 2, taggable_id: post2.id, taggable_type: "TphmPost" });
+    const taggings = await loadHasMany(author, "taggings", { through: "posts", className: "TphmTagging", source: "tagging" });
+    expect(taggings).toHaveLength(2);
   });
 
-  it.skip("include has many through polymorphic has many", () => {
-    // Requires eager through polymorphic
+  it("include has many through polymorphic has many", async () => {
+    const ad = freshAdapter();
+    class IphmtAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class IphmtPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = ad; }
+    }
+    class IphmtTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(IphmtAuthor); registerModel(IphmtPost); registerModel(IphmtTagging);
+    Associations.hasMany.call(IphmtAuthor, "posts", { className: "IphmtPost", foreignKey: "author_id" });
+    Associations.hasMany.call(IphmtPost, "taggings", { className: "IphmtTagging", as: "taggable" });
+    Associations.hasMany.call(IphmtAuthor, "taggings", { through: "posts", className: "IphmtTagging", source: "tagging" });
+    const author = await IphmtAuthor.create({ name: "David" });
+    const post = await IphmtPost.create({ author_id: author.id, title: "P1" });
+    await IphmtTagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "IphmtPost" });
+    const authors = await IphmtAuthor.all().includes("taggings").toArray();
+    expect(authors).toHaveLength(1);
+    const preloaded = (authors[0] as any)._preloadedAssociations?.get("taggings");
+    expect(preloaded).toHaveLength(1);
   });
 
-  it.skip("eager load has many through has many", () => {
-    // Requires eager load through has_many
+  it("eager load has many through has many", async () => {
+    const ad = freshAdapter();
+    class ElAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class ElPost extends Base {
+      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = ad; }
+    }
+    class ElTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class ElTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(ElAuthor); registerModel(ElPost); registerModel(ElTag); registerModel(ElTagging);
+    Associations.hasMany.call(ElAuthor, "posts", { className: "ElPost", foreignKey: "author_id" });
+    Associations.hasMany.call(ElPost, "taggings", { className: "ElTagging", foreignKey: "taggable_id" });
+    Associations.hasMany.call(ElAuthor, "taggings", { through: "posts", className: "ElTagging" });
+    const author = await ElAuthor.create({ name: "EagerThrough" });
+    const post = await ElPost.create({ author_id: author.id, title: "P1", body: "B" });
+    const tag = await ElTag.create({ name: "eager_tag" });
+    await ElTagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "ElPost" });
+    const authors = await ElAuthor.all().includes("taggings").toArray();
+    expect(authors).toHaveLength(1);
+    const preloaded = (authors[0] as any)._preloadedAssociations?.get("taggings");
+    expect(preloaded).toHaveLength(1);
   });
 
   it.skip("eager load has many through has many with conditions", () => {
@@ -2120,8 +2236,30 @@ describe("AssociationsJoinModelTest", () => {
     // Requires unsaved record through association
   });
 
-  it.skip("create associate when adding to has many through", () => {
-    // Requires create via through <<
+  it("create associate when adding to has many through", async () => {
+    const ad = freshAdapter();
+    class CaPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = ad; }
+    }
+    class CaTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class CaTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(CaPost); registerModel(CaTag); registerModel(CaTagging);
+    Associations.hasMany.call(CaPost, "taggings", { className: "CaTagging", foreignKey: "taggable_id" });
+    Associations.hasMany.call(CaPost, "tags", { through: "taggings", className: "CaTag", source: "tag" });
+    const post = await CaPost.create({ title: "Through Push", body: "B" });
+    const tag = await CaTag.create({ name: "pushme" });
+    const proxy = association(post, "tags");
+    await proxy.push(tag);
+    const taggings = await loadHasMany(post, "taggings", { className: "CaTagging", foreignKey: "taggable_id" });
+    expect(taggings).toHaveLength(1);
+    expect(taggings[0].readAttribute("tag_id")).toBe(tag.id);
+    const tags = await proxy.toArray();
+    expect(tags).toHaveLength(1);
+    expect(tags[0].readAttribute("name")).toBe("pushme");
   });
 
   it.skip("add to join table with no id", () => {
@@ -2148,12 +2286,60 @@ describe("AssociationsJoinModelTest", () => {
     // Requires non-standard id delete
   });
 
-  it.skip("delete associate when deleting from has many through", () => {
-    // Requires through delete
+  it("delete associate when deleting from has many through", async () => {
+    const ad = freshAdapter();
+    class DtPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = ad; }
+    }
+    class DtTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class DtTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(DtPost); registerModel(DtTag); registerModel(DtTagging);
+    Associations.hasMany.call(DtPost, "taggings", { className: "DtTagging", foreignKey: "taggable_id" });
+    Associations.hasMany.call(DtPost, "tags", { through: "taggings", className: "DtTag", source: "tag" });
+    const post = await DtPost.create({ title: "Through Del", body: "B" });
+    const tag = await DtTag.create({ name: "doomed" });
+    await DtTagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "DtPost" });
+    const proxy = association(post, "tags");
+    let tags = await proxy.toArray();
+    expect(tags).toHaveLength(1);
+    await proxy.delete(tag);
+    tags = await proxy.toArray();
+    expect(tags).toHaveLength(0);
+    const taggings = await loadHasMany(post, "taggings", { className: "DtTagging", foreignKey: "taggable_id" });
+    expect(taggings).toHaveLength(0);
   });
 
-  it.skip("delete associate when deleting from has many through with multiple tags", () => {
-    // Requires multi-record through delete
+  it("delete associate when deleting from has many through with multiple tags", async () => {
+    const ad = freshAdapter();
+    class MdPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = ad; }
+    }
+    class MdTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class MdTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(MdPost); registerModel(MdTag); registerModel(MdTagging);
+    Associations.hasMany.call(MdPost, "taggings", { className: "MdTagging", foreignKey: "taggable_id" });
+    Associations.hasMany.call(MdPost, "tags", { through: "taggings", className: "MdTag", source: "tag" });
+    const post = await MdPost.create({ title: "Multi Del", body: "B" });
+    const doomed = await MdTag.create({ name: "doomed" });
+    const doomed2 = await MdTag.create({ name: "doomed2" });
+    const keeper = await MdTag.create({ name: "keeper" });
+    await MdTagging.create({ tag_id: doomed.id, taggable_id: post.id, taggable_type: "MdPost" });
+    await MdTagging.create({ tag_id: doomed2.id, taggable_id: post.id, taggable_type: "MdPost" });
+    await MdTagging.create({ tag_id: keeper.id, taggable_id: post.id, taggable_type: "MdPost" });
+    const proxy = association(post, "tags");
+    expect(await proxy.count()).toBe(3);
+    await proxy.delete(doomed, doomed2);
+    expect(await proxy.count()).toBe(1);
+    const remaining = await proxy.toArray();
+    expect(remaining[0].readAttribute("name")).toBe("keeper");
   });
 
   it.skip("deleting junk from has many through should raise type mismatch", () => {
@@ -2877,8 +3063,28 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(loaded).toBeNull();
   });
 
-  it.skip("has one through polymorphic", () => {
-    // Requires polymorphic through
+  it("has one through polymorphic", async () => {
+    // member -> sponsor (has_one, polymorphic as: sponsorable) -> club (belongs_to)
+    // has_one :sponsor_club, through: :sponsor, source: :club (where sponsor.sponsorable is polymorphic)
+    class HotpClub extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class HotpSponsor extends Base {
+      static { this.attribute("sponsorable_id", "integer"); this.attribute("sponsorable_type", "string"); this.attribute("club_id", "integer"); this.adapter = adapter; }
+    }
+    class HotpMember extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(HotpClub); registerModel(HotpSponsor); registerModel(HotpMember);
+    Associations.hasOne.call(HotpMember, "sponsor", { className: "HotpSponsor", as: "sponsorable" });
+    Associations.hasOne.call(HotpMember, "sponsorClub", { through: "sponsor", source: "club", className: "HotpClub" });
+    Associations.belongsTo.call(HotpSponsor, "club", { className: "HotpClub", foreignKey: "club_id" });
+    const club = await HotpClub.create({ name: "Moustache Club" });
+    const member = await HotpMember.create({ name: "Groucho" });
+    await HotpSponsor.create({ sponsorable_id: member.id, sponsorable_type: "HotpMember", club_id: club.id });
+    const sponsorClub = await loadHasOne(member, "sponsorClub", { through: "sponsor", source: "club", className: "HotpClub" });
+    expect(sponsorClub).not.toBeNull();
+    expect(sponsorClub!.readAttribute("name")).toBe("Moustache Club");
   });
 
   it("has one through eager loading", async () => {

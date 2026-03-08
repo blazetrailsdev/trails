@@ -202,6 +202,11 @@ export async function loadHasOne(
     throw new StrictLoadingViolationError(record, assocName);
   }
 
+  // Handle has_one :through
+  if (options.through) {
+    return loadHasOneThrough(record, assocName, options);
+  }
+
   const ctor = record.constructor as typeof Base;
   const className = options.className ?? camelize(assocName);
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
@@ -320,7 +325,20 @@ export async function loadHasManyThrough(
   }
 
   // Load through records
-  const throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+  let throughRecords: Base[];
+  if (throughAssoc.type === "hasMany") {
+    throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+  } else if (throughAssoc.type === "hasOne") {
+    const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
+    throughRecords = one ? [one] : [];
+  } else if (throughAssoc.type === "belongsTo") {
+    const one = await loadBelongsTo(record, throughAssoc.name, throughAssoc.options);
+    throughRecords = one ? [one] : [];
+  } else {
+    throughRecords = [];
+  }
+
+  if (throughRecords.length === 0) return [];
 
   // Resolve the target model
   const className = options.className ?? camelize(singularize(assocName));
@@ -328,17 +346,90 @@ export async function loadHasManyThrough(
 
   // The source defaults to the singularized association name
   const sourceName = options.source ?? singularize(assocName);
+
+  // Look up the source association on the through model (try singular and plural)
+  const throughCtor = throughRecords[0].constructor as typeof Base;
+  const throughModelAssocs: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
+  const sourceAssoc = throughModelAssocs.find((a) => a.name === sourceName)
+    ?? throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+  const sourceType = sourceAssoc?.type ?? "belongsTo";
+
+  if (sourceType === "belongsTo") {
+    // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
+    const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+    const targetIds = throughRecords
+      .map((r) => r.readAttribute(targetFk))
+      .filter((v) => v !== null && v !== undefined);
+    if (targetIds.length === 0) return [];
+    return (targetModel as any).all().where({ [targetModel.primaryKey]: targetIds }).toArray();
+  } else {
+    // Source is has_many/has_one: target has FK pointing back to through record
+    const sourceAsName = sourceAssoc?.options?.as;
+    const throughClassName = throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    const sourceFk = sourceAsName
+      ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+      : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+    const throughIds = throughRecords
+      .map((r) => r.readAttribute((r.constructor as typeof Base).primaryKey))
+      .filter((v) => v !== null && v !== undefined);
+    if (throughIds.length === 0) return [];
+    const whereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
+    if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
+    return (targetModel as any).all().where(whereConditions).toArray();
+  }
+}
+
+/**
+ * Load a has_one :through association.
+ */
+export async function loadHasOneThrough(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions
+): Promise<Base | null> {
+  const ctor = record.constructor as typeof Base;
+  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const throughAssoc = associations.find((a) => a.name === options.through);
+  if (!throughAssoc) {
+    throw new Error(`Through association "${options.through}" not found on ${ctor.name}`);
+  }
+
+  // Load the through record (could be has_one or belongs_to)
+  let throughRecord: Base | null;
+  if (throughAssoc.type === "hasOne") {
+    throughRecord = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
+  } else if (throughAssoc.type === "belongsTo") {
+    throughRecord = await loadBelongsTo(record, throughAssoc.name, throughAssoc.options);
+  } else if (throughAssoc.type === "hasMany") {
+    const throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+    throughRecord = throughRecords[0] ?? null;
+  } else {
+    throughRecord = null;
+  }
+
+  if (!throughRecord) return null;
+
+  // Now load the source from the through record
+  const sourceName = options.source ?? assocName;
+  const throughCtor = throughRecord.constructor as typeof Base;
+  const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
+  const sourceAssoc = throughAssociations.find((a) => a.name === sourceName);
+
+  if (sourceAssoc) {
+    if (sourceAssoc.type === "belongsTo") {
+      return loadBelongsTo(throughRecord, sourceName, sourceAssoc.options);
+    } else if (sourceAssoc.type === "hasOne") {
+      return loadHasOne(throughRecord, sourceName, sourceAssoc.options);
+    }
+  }
+
+  // Fallback: try as belongs_to by convention
+  const className = options.className ?? camelize(sourceName);
   const targetFk = `${underscore(sourceName)}_id`;
-
-  // Collect target IDs from through records
-  const targetIds = throughRecords
-    .map((r) => r.readAttribute(targetFk))
-    .filter((v) => v !== null && v !== undefined);
-
-  if (targetIds.length === 0) return [];
-
-  const rel = (targetModel as any).all().where({ [targetModel.primaryKey]: targetIds });
-  return rel.toArray();
+  const fkValue = throughRecord.readAttribute(targetFk);
+  if (fkValue === null || fkValue === undefined) return null;
+  const targetModel = resolveModel(className);
+  return targetModel.findBy({ [targetModel.primaryKey]: fkValue });
 }
 
 /**
@@ -549,6 +640,12 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
    */
   async push(...records: Base[]): Promise<void> {
+    // Through association: create join records instead of setting FK on target
+    if (this._assocDef.options.through) {
+      await this._pushThrough(records);
+      return;
+    }
+
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
     const foreignKey = asName
@@ -566,6 +663,43 @@ export class CollectionProxy {
     }
   }
 
+  private async _pushThrough(records: Base[]): Promise<void> {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) {
+      throw new Error(`Through association "${this._assocDef.options.through}" not found on ${ctor.name}`);
+    }
+
+    const throughClassName = throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    const throughModel = resolveModel(throughClassName);
+    const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    const pkValue = this._record.readAttribute(primaryKey);
+    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+    const sourceFk = `${underscore(sourceName)}_id`;
+
+    for (const record of records) {
+      fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      // Save the target record if it's new
+      if (record.isNewRecord()) await record.save();
+      // Create the join record
+      const joinAttrs: Record<string, unknown> = {
+        [ownerFk]: pkValue,
+        [sourceFk]: record.readAttribute((record.constructor as typeof Base).primaryKey),
+      };
+      // Handle polymorphic through (as option on through association)
+      if (throughAssoc.options.as) {
+        const typeCol = `${underscore(throughAssoc.options.as)}_type`;
+        joinAttrs[`${underscore(throughAssoc.options.as)}_id`] = pkValue;
+        joinAttrs[typeCol] = ctor.name;
+        delete joinAttrs[ownerFk];
+      }
+      await throughModel.create(joinAttrs);
+      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    }
+  }
+
   /**
    * Alias for push.
    */
@@ -574,11 +708,17 @@ export class CollectionProxy {
   }
 
   /**
-   * Delete associated records by nullifying the FK.
+   * Delete associated records by nullifying the FK (or removing join record for through).
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
    */
   async delete(...records: Base[]): Promise<void> {
+    // Through association: delete the join records
+    if (this._assocDef.options.through) {
+      await this._deleteThrough(records);
+      return;
+    }
+
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
     const foreignKey = asName
@@ -590,6 +730,33 @@ export class CollectionProxy {
       record.writeAttribute(foreignKey, null);
       if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
+      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+    }
+  }
+
+  private async _deleteThrough(records: Base[]): Promise<void> {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) return;
+
+    const throughClassName = throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    const throughModel = resolveModel(throughClassName);
+    const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    const pkValue = this._record.readAttribute(primaryKey);
+    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+    const sourceFk = `${underscore(sourceName)}_id`;
+
+    for (const record of records) {
+      fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
+      const targetPk = record.readAttribute((record.constructor as typeof Base).primaryKey);
+      // Find and destroy the join record
+      const joinRecord = await throughModel.findBy({
+        [ownerFk]: pkValue,
+        [sourceFk]: targetPk,
+      });
+      if (joinRecord) await joinRecord.destroy();
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
   }
