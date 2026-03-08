@@ -13,6 +13,7 @@ import {
   loadHasMany,
   loadHasManyThrough,
   loadBelongsTo,
+  processDependentAssociations,
 } from "./associations.js";
 
 function freshAdapter(): MemoryAdapter {
@@ -2734,12 +2735,124 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
   });
-  it.skip("delete through belongs to with dependent nullify", () => {});
-  it.skip("delete through belongs to with dependent delete all", () => {});
-  it.skip("delete through belongs to with dependent destroy", () => {});
-  it.skip("belongs to with dependent destroy", () => {});
-  it.skip("belongs to with dependent delete all", () => {});
-  it.skip("belongs to with dependent nullify", () => {});
+  it("delete through belongs to with dependent nullify", async () => {
+    class DepNullOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DepNullJoin extends Base {
+      static { this.attribute("dep_null_owner_id", "integer"); this.attribute("dep_null_item_id", "integer"); this.adapter = adapter; }
+    }
+    class DepNullItem extends Base {
+      static { this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    (DepNullOwner as any)._associations = [
+      { type: "hasMany", name: "depNullJoins", options: { className: "DepNullJoin", foreignKey: "dep_null_owner_id", dependent: "nullify" } },
+    ];
+    registerModel("DepNullOwner", DepNullOwner);
+    registerModel("DepNullJoin", DepNullJoin);
+    registerModel("DepNullItem", DepNullItem);
+    const owner = await DepNullOwner.create({ name: "O" });
+    const item = await DepNullItem.create({ label: "I" });
+    await DepNullJoin.create({ dep_null_owner_id: owner.readAttribute("id"), dep_null_item_id: item.readAttribute("id") });
+    await processDependentAssociations(owner);
+    const joins = await DepNullJoin.all().toArray();
+    expect(joins.length).toBe(1);
+    expect(joins[0].readAttribute("dep_null_owner_id")).toBeNull();
+  });
+  it("delete through belongs to with dependent delete all", async () => {
+    class DepDelOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DepDelJoin extends Base {
+      static { this.attribute("dep_del_owner_id", "integer"); this.attribute("dep_del_item_id", "integer"); this.adapter = adapter; }
+    }
+    (DepDelOwner as any)._associations = [
+      { type: "hasMany", name: "depDelJoins", options: { className: "DepDelJoin", foreignKey: "dep_del_owner_id", dependent: "delete" } },
+    ];
+    registerModel("DepDelOwner", DepDelOwner);
+    registerModel("DepDelJoin", DepDelJoin);
+    const owner = await DepDelOwner.create({ name: "O" });
+    await DepDelJoin.create({ dep_del_owner_id: owner.readAttribute("id"), dep_del_item_id: 1 });
+    await processDependentAssociations(owner);
+    const joins = await DepDelJoin.all().toArray();
+    expect(joins.length).toBe(0);
+  });
+  it("delete through belongs to with dependent destroy", async () => {
+    class DepDesOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DepDesJoin extends Base {
+      static { this.attribute("dep_des_owner_id", "integer"); this.attribute("dep_des_item_id", "integer"); this.adapter = adapter; }
+    }
+    (DepDesOwner as any)._associations = [
+      { type: "hasMany", name: "depDesJoins", options: { className: "DepDesJoin", foreignKey: "dep_des_owner_id", dependent: "destroy" } },
+    ];
+    registerModel("DepDesOwner", DepDesOwner);
+    registerModel("DepDesJoin", DepDesJoin);
+    const owner = await DepDesOwner.create({ name: "O" });
+    await DepDesJoin.create({ dep_des_owner_id: owner.readAttribute("id"), dep_des_item_id: 1 });
+    await processDependentAssociations(owner);
+    const joins = await DepDesJoin.all().toArray();
+    expect(joins.length).toBe(0);
+  });
+  it("belongs to with dependent destroy", async () => {
+    class BtDesParent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class BtDesChild extends Base {
+      static { this.attribute("bt_des_parent_id", "integer"); this.adapter = adapter; }
+    }
+    (BtDesChild as any)._associations = [
+      { type: "belongsTo", name: "btDesParent", options: { className: "BtDesParent", foreignKey: "bt_des_parent_id" } },
+    ];
+    (BtDesParent as any)._associations = [
+      { type: "hasMany", name: "btDesChildren", options: { className: "BtDesChild", foreignKey: "bt_des_parent_id", dependent: "destroy" } },
+    ];
+    registerModel("BtDesParent", BtDesParent);
+    registerModel("BtDesChild", BtDesChild);
+    const parent = await BtDesParent.create({ name: "P" });
+    await BtDesChild.create({ bt_des_parent_id: parent.readAttribute("id") });
+    await processDependentAssociations(parent);
+    const children = await BtDesChild.all().toArray();
+    expect(children.length).toBe(0);
+  });
+  it("belongs to with dependent delete all", async () => {
+    class BtDelParent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class BtDelChild extends Base {
+      static { this.attribute("bt_del_parent_id", "integer"); this.adapter = adapter; }
+    }
+    (BtDelParent as any)._associations = [
+      { type: "hasMany", name: "btDelChildren", options: { className: "BtDelChild", foreignKey: "bt_del_parent_id", dependent: "delete" } },
+    ];
+    registerModel("BtDelParent", BtDelParent);
+    registerModel("BtDelChild", BtDelChild);
+    const parent = await BtDelParent.create({ name: "P" });
+    await BtDelChild.create({ bt_del_parent_id: parent.readAttribute("id") });
+    await processDependentAssociations(parent);
+    const children = await BtDelChild.all().toArray();
+    expect(children.length).toBe(0);
+  });
+  it("belongs to with dependent nullify", async () => {
+    class BtNullParent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class BtNullChild extends Base {
+      static { this.attribute("bt_null_parent_id", "integer"); this.adapter = adapter; }
+    }
+    (BtNullParent as any)._associations = [
+      { type: "hasMany", name: "btNullChildren", options: { className: "BtNullChild", foreignKey: "bt_null_parent_id", dependent: "nullify" } },
+    ];
+    registerModel("BtNullParent", BtNullParent);
+    registerModel("BtNullChild", BtNullChild);
+    const parent = await BtNullParent.create({ name: "P" });
+    await BtNullChild.create({ bt_null_parent_id: parent.readAttribute("id") });
+    await processDependentAssociations(parent);
+    const children = await BtNullChild.all().toArray();
+    expect(children.length).toBe(1);
+    expect(children[0].readAttribute("bt_null_parent_id")).toBeNull();
+  });
   it.skip("update counter caches on delete", () => {});
   it.skip("update counter caches on delete with dependent destroy", () => {});
   it.skip("update counter caches on delete with dependent nullify", () => {});
