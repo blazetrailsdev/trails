@@ -14705,7 +14705,28 @@ describe("SerializedAttributeTest", () => {
 });
 
 describe("AssociationsTest", () => {
-  it.skip("eager loading should not change count of children", () => { /* fixture-dependent */ });
+  it("eager loading should not change count of children", async () => {
+    const adapter = freshAdapter();
+    class ELParent extends Base {
+      static { this._tableName = "el_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class ELChild extends Base {
+      static { this._tableName = "el_children"; this.attribute("value", "string"); this.attribute("el_parent_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(ELParent, "elChildren", { foreignKey: "el_parent_id", className: "ELChild" });
+    registerModel("ELParent", ELParent);
+    registerModel("ELChild", ELChild);
+    const parent = await ELParent.create({ name: "p1" });
+    await ELChild.create({ value: "c1", el_parent_id: parent.id });
+    await ELChild.create({ value: "c2", el_parent_id: parent.id });
+    // Count before eager loading
+    const countBefore = (await ELChild.all().toArray()).length;
+    // Eager load
+    await ELParent.all().includes("elChildren").toArray();
+    // Count after eager loading should be the same
+    const countAfter = (await ELChild.all().toArray()).length;
+    expect(countAfter).toBe(countBefore);
+  });
   it.skip("subselect", () => { /* fixture-dependent */ });
   it("loading the association target should keep child records marked for destruction", async () => {
     const adapter = freshAdapter();
@@ -14731,7 +14752,24 @@ describe("AssociationsTest", () => {
   });
   it.skip("loading the association target should load most recent attributes for child records marked for destruction", () => { /* fixture-dependent */ });
   it.skip("loading cpk association when persisted and in memory differ", () => { /* fixture-dependent */ });
-  it.skip("include with order works", () => { /* fixture-dependent */ });
+  it("include with order works", async () => {
+    const adapter = freshAdapter();
+    class IOPost extends Base {
+      static { this._tableName = "io_posts"; this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+    }
+    class IOComment extends Base {
+      static { this._tableName = "io_comments"; this.attribute("body", "string"); this.attribute("io_post_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(IOPost, "ioComments", { foreignKey: "io_post_id", className: "IOComment" });
+    registerModel("IOPost", IOPost);
+    registerModel("IOComment", IOComment);
+    await IOPost.create({ title: "B", score: 2 });
+    await IOPost.create({ title: "A", score: 1 });
+    const posts = await IOPost.all().includes("ioComments").order("score").toArray();
+    expect(posts.length).toBe(2);
+    expect(posts[0].readAttribute("title")).toBe("A");
+    expect(posts[1].readAttribute("title")).toBe("B");
+  });
   it("bad collection keys", async () => {
     const adapter = freshAdapter();
     class APost extends Base {
@@ -18322,7 +18360,24 @@ describe("CascadedEagerLoadingTest", () => {
   it.skip("cascaded eager association loading with duplicated includes", () => { /* fixture-dependent */ });
   it.skip("cascaded eager association loading with twice includes edge cases", () => { /* fixture-dependent */ });
   it.skip("eager association loading with join for count", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with nil associations", () => { /* fixture-dependent */ });
+  it("eager association loading with nil associations", async () => {
+    const adapter = freshAdapter();
+    class ENParent extends Base {
+      static { this._tableName = "en_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class ENChild extends Base {
+      static { this._tableName = "en_children"; this.attribute("value", "string"); this.attribute("en_parent_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(ENParent, "enChildren", { foreignKey: "en_parent_id", className: "ENChild" });
+    registerModel("ENParent", ENParent);
+    registerModel("ENChild", ENChild);
+    // Parent with no children
+    await ENParent.create({ name: "lonely" });
+    const parents = await ENParent.all().includes("enChildren").toArray();
+    expect(parents.length).toBe(1);
+    const children = (parents[0] as any)._preloadedAssociations?.get("enChildren") ?? [];
+    expect(children.length).toBe(0);
+  });
   it.skip("eager association loading with cascaded two levels with two has many associations", () => { /* fixture-dependent */ });
   it.skip("eager association loading with cascaded two levels and self table reference", () => { /* fixture-dependent */ });
   it.skip("eager association loading with cascaded two levels with condition", () => { /* fixture-dependent */ });
@@ -18332,13 +18387,89 @@ describe("CascadedEagerLoadingTest", () => {
   it.skip("eager association loading with belongs to sti", () => { /* fixture-dependent */ });
   it.skip("eager association loading with multiple stis and order", () => { /* fixture-dependent */ });
   it.skip("eager association loading of stis with multiple references", () => { /* fixture-dependent */ });
-  it.skip("eager association loading where first level returns nil", () => { /* fixture-dependent */ });
-  it.skip("preload through missing records", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with missing first record", () => { /* fixture-dependent */ });
+  it("eager association loading where first level returns nil", async () => {
+    const adapter = freshAdapter();
+    class EFParent extends Base {
+      static { this._tableName = "ef_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EFChild extends Base {
+      static { this._tableName = "ef_children"; this.attribute("value", "string"); this.attribute("ef_parent_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasOne.call(EFParent, "efChild", { foreignKey: "ef_parent_id", className: "EFChild" });
+    registerModel("EFParent", EFParent);
+    registerModel("EFChild", EFChild);
+    await EFParent.create({ name: "no-child" });
+    const parents = await EFParent.all().includes("efChild").toArray();
+    expect(parents.length).toBe(1);
+    const child = (parents[0] as any)._preloadedAssociations?.get("efChild");
+    expect(child).toBeNull();
+  });
+
+  it("preload through missing records", async () => {
+    const adapter = freshAdapter();
+    class PMAuthor extends Base {
+      static { this._tableName = "pm_authors"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PMPost extends Base {
+      static { this._tableName = "pm_posts"; this.attribute("title", "string"); this.attribute("pm_author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(PMPost, "pmAuthor", { foreignKey: "pm_author_id", className: "PMAuthor" });
+    registerModel("PMAuthor", PMAuthor);
+    registerModel("PMPost", PMPost);
+    // Post with non-existent author id
+    await PMPost.create({ title: "orphan", pm_author_id: 9999 });
+    const posts = await PMPost.all().includes("pmAuthor").toArray();
+    expect(posts.length).toBe(1);
+    const author = (posts[0] as any)._preloadedAssociations?.get("pmAuthor");
+    expect(author).toBeNull();
+  });
+
+  it("eager association loading with missing first record", async () => {
+    const adapter = freshAdapter();
+    class EMAuthor extends Base {
+      static { this._tableName = "em_authors"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EMPost extends Base {
+      static { this._tableName = "em_posts"; this.attribute("title", "string"); this.attribute("em_author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(EMPost, "emAuthor", { foreignKey: "em_author_id", className: "EMAuthor" });
+    registerModel("EMAuthor", EMAuthor);
+    registerModel("EMPost", EMPost);
+    await EMPost.create({ title: "missing-author", em_author_id: null });
+    const a = await EMAuthor.create({ name: "real" });
+    await EMPost.create({ title: "has-author", em_author_id: a.id });
+    const posts = await EMPost.all().includes("emAuthor").toArray();
+    expect(posts.length).toBe(2);
+    // One should have author, one should not
+    const authors = posts.map((p: any) => (p as any)._preloadedAssociations?.get("emAuthor"));
+    expect(authors.filter((a: any) => a != null).length).toBe(1);
+    expect(authors.filter((a: any) => a == null).length).toBe(1);
+  });
   it.skip("eager association loading with recursive cascading four levels has many through", () => { /* fixture-dependent */ });
   it.skip("eager association loading with recursive cascading four levels has and belongs to many", () => { /* fixture-dependent */ });
   it.skip("eager association loading with cascaded interdependent one level and two levels", () => { /* fixture-dependent */ });
-  it.skip("preloaded records are not duplicated", () => { /* fixture-dependent */ });
+  it("preloaded records are not duplicated", async () => {
+    const adapter = freshAdapter();
+    class PDAuthor extends Base {
+      static { this._tableName = "pd_authors"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PDPost extends Base {
+      static { this._tableName = "pd_posts"; this.attribute("title", "string"); this.attribute("pd_author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(PDAuthor, "pdPosts", { foreignKey: "pd_author_id", className: "PDPost" });
+    registerModel("PDAuthor", PDAuthor);
+    registerModel("PDPost", PDPost);
+    const a = await PDAuthor.create({ name: "Alice" });
+    await PDPost.create({ title: "P1", pd_author_id: a.id });
+    await PDPost.create({ title: "P2", pd_author_id: a.id });
+    const authors = await PDAuthor.all().includes("pdPosts").toArray();
+    expect(authors.length).toBe(1);
+    const posts = (authors[0] as any)._preloadedAssociations?.get("pdPosts") ?? [];
+    expect(posts.length).toBe(2);
+    // Check no duplicates - all unique ids
+    const ids = posts.map((p: any) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
   it.skip("preloading across has one constrains loaded records", () => { /* fixture-dependent */ });
   it.skip("preloading across has one through constrains loaded records", () => { /* fixture-dependent */ });
 });
@@ -23362,9 +23493,39 @@ describe("TokenForTest", () => {
     expect(parentFound).not.toBeNull();
   });
 
-  it.skip("finds record with a custom primary key", () => { /* fixture-dependent */ });
+  it("finds record with a custom primary key", async () => {
+    const adapter = freshAdapter();
+    class CustomPkItem extends Base {
+      static {
+        this._primaryKey = "uuid";
+        this.attribute("uuid", "string");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (CustomPkItem as any).generatesTokenFor = (purpose: string) => ({
+      purpose, expiresIn: 60_000,
+    });
+    const item = await CustomPkItem.create({ uuid: "abc-123", name: "test" });
+    expect(item.readAttribute("uuid")).toBe("abc-123");
+    const token = item.signedId();
+    const found = await CustomPkItem.findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("name")).toBe("test");
+  });
   it.skip("finds record with a composite primary key", () => { /* fixture-dependent */ });
-  it.skip("raises when no primary key has been declared", () => { /* fixture-dependent */ });
+  it("raises when no primary key has been declared", () => {
+    const adapter = freshAdapter();
+    class NoPkItem extends Base {
+      static {
+        this._primaryKey = "";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const item = new NoPkItem({ name: "test" });
+    expect(() => item.signedId()).toThrow();
+  });
 });
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
@@ -29864,7 +30025,23 @@ describe("QueryingMethodsDelegationTest", () => {
 });
 
 describe("AsyncHasOneAssociationsTest", () => {
-  it.skip("async load has one", () => { /* fixture-dependent */ });
+  it("async load has one", async () => {
+    const adapter = freshAdapter();
+    class AHFirm extends Base {
+      static { this._tableName = "ah_firms"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class AHAccount extends Base {
+      static { this._tableName = "ah_accounts"; this.attribute("credit_limit", "integer"); this.attribute("ah_firm_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasOne.call(AHFirm, "ahAccount", { foreignKey: "ah_firm_id", className: "AHAccount" });
+    registerModel("AHFirm", AHFirm);
+    registerModel("AHAccount", AHAccount);
+    const firm = await AHFirm.create({ name: "Test Corp" });
+    await AHAccount.create({ credit_limit: 100, ah_firm_id: firm.id });
+    const account = await loadHasOne(firm, "ahAccount", { className: "AHAccount", foreignKey: "ah_firm_id" });
+    expect(account).not.toBeNull();
+    expect(account!.readAttribute("credit_limit")).toBe(100);
+  });
 });
 
 describe("TooManyOrTest", () => {
@@ -35668,7 +35845,23 @@ describe("validate presence of parent works with inverse of", () => {
 });
 
 describe("AsyncHasOneAssociationsTest", () => {
-  it.skip("async load has one", () => { /* fixture-dependent */ });
+  it("async load has one", async () => {
+    const adapter = freshAdapter();
+    class AHFirm extends Base {
+      static { this._tableName = "ah_firms"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class AHAccount extends Base {
+      static { this._tableName = "ah_accounts"; this.attribute("credit_limit", "integer"); this.attribute("ah_firm_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasOne.call(AHFirm, "ahAccount", { foreignKey: "ah_firm_id", className: "AHAccount" });
+    registerModel("AHFirm", AHFirm);
+    registerModel("AHAccount", AHAccount);
+    const firm = await AHFirm.create({ name: "Test Corp" });
+    await AHAccount.create({ credit_limit: 100, ah_firm_id: firm.id });
+    const account = await loadHasOne(firm, "ahAccount", { className: "AHAccount", foreignKey: "ah_firm_id" });
+    expect(account).not.toBeNull();
+    expect(account!.readAttribute("credit_limit")).toBe(100);
+  });
 });
 
 describe("BelongsToWithForeignKeyTest", () => {
