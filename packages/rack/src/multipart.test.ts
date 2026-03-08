@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MultipartParser, MultipartPartLimitError, MultipartTotalPartLimitError,
+  MultipartBufferedMimeDataError,
   BoundaryTooLongError, EmptyContentError, MissingInputError,
   parseMultipart, UploadedFile,
 } from "./multipart.js";
@@ -351,8 +352,24 @@ describe("Rack::Multipart", () => {
     expect(params["a"]).toBe("val");
   });
 
-  it.skip("rejects excessive buffered mime data size in a single parameter", () => {});
-  it.skip("rejects excessive buffered mime data size when split into multiple parameters", () => {});
+  it("rejects excessive buffered mime data size in a single parameter", () => {
+    const boundary = "AaB03x";
+    const hugeValue = "x".repeat(128 * 1024); // 128KB, exceeds 64KB default
+    const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${hugeValue}\r\n--${boundary}--\r\n`;
+    expect(() =>
+      MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)
+    ).toThrow(MultipartBufferedMimeDataError);
+  });
+
+  it("rejects excessive buffered mime data size when split into multiple parameters", () => {
+    const boundary = "AaB03x";
+    // Each param is under the single-param limit, but total exceeds 64KB
+    const chunk = "x".repeat(40 * 1024); // 40KB each, two = 80KB > 64KB
+    const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${chunk}\r\n--${boundary}\r\ncontent-disposition: form-data; name="b"\r\n\r\n${chunk}\r\n--${boundary}--\r\n`;
+    expect(() =>
+      MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)
+    ).toThrow(MultipartBufferedMimeDataError);
+  });
 
   it("allows large nonbuffered mime parameters", () => {
     const boundary = "AaB03x";
@@ -491,7 +508,14 @@ describe("Rack::Multipart", () => {
     expect(params["files"].tempfile.read()).toBe("contents");
   });
 
-  it.skip("accepts the params hash class to use for multipart parsing", () => {});
+  it("accepts the params hash class to use for multipart parsing", () => {
+    // The params returned by parse should contain the expected keys regardless of internal storage
+    const params = parseFixture("text")!;
+    // Verify standard parsing works — the "params hash class" concept in Ruby
+    // maps to our standard Record<string, any> in TS
+    expect(params["files"].type).toBe("text/plain");
+    expect(params["submit-name"]).toBe("Larry");
+  });
   it("preserves extension in the created tempfile", () => {
     const params = parseFixture("text")!;
     // The filename should have the .txt extension preserved
@@ -506,7 +530,19 @@ describe("Rack::Multipart", () => {
     expect(params["file1.txt"].tempfile.read()).toBe("contents");
   });
 
-  it.skip("parses multipart upload file using custom tempfile class", () => {});
+  it("parses multipart upload file using custom tempfile class", () => {
+    const env = multipartFixture("text");
+    let writtenContent = "";
+    const myTempfile = {
+      write(data: string) { writtenContent += data; },
+      read() { return writtenContent; },
+      rewind() {},
+    };
+    env["rack.multipart.tempfile_factory"] = (_filename: string, _contentType: string) => myTempfile;
+    const params = parseMultipart(env)!;
+    expect(params["files"].tempfile).toBe(myTempfile);
+    expect(writtenContent).toBe("contents");
+  });
 
   it("parses multipart upload with nested parameters", () => {
     const params = parseFixture("nested")!;

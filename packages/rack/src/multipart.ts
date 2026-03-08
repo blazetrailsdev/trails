@@ -28,6 +28,16 @@ export class EmptyContentError extends Error {
   }
 }
 
+export class MultipartBufferedMimeDataError extends Error {
+  constructor(message = "exceeded buffered MIME data size limit") {
+    super(message);
+    this.name = "MultipartBufferedMimeDataError";
+  }
+}
+
+/** Default limit for buffered (non-file) MIME data: 64 KB */
+const MULTIPART_TEXT_LIMIT = 64 * 1024;
+
 export class MissingInputError extends Error {
   constructor(message = "bad request: no body") {
     super(message);
@@ -110,8 +120,12 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
   const params: Record<string, any> = {};
   const fileLimit = env._multipart_file_limit || 0;
   const totalLimit = env._multipart_total_limit || 0;
+  const textLimit = env._multipart_text_limit ?? MULTIPART_TEXT_LIMIT;
+  const tempfileFactory = env["rack.multipart.tempfile_factory"] as
+    ((filename: string, contentType: string) => { read(): string; rewind(): void; toString(): string } & Record<string, any>) | undefined;
   let fileCount = 0;
   let totalCount = 0;
+  let totalTextSize = 0;
 
   // Find all boundary positions
   let pos = 0;
@@ -247,13 +261,24 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
         }
 
         const normalizedFilename = normalizeFilename(filename);
-        const tempContent = contentBuf.toString("binary");
+        const ctype = contentTypeHeader || "application/octet-stream";
+
+        let tempfile: any;
+        if (tempfileFactory) {
+          tempfile = tempfileFactory(normalizedFilename, ctype);
+          const content = contentBuf.toString("binary");
+          if (typeof tempfile.write === "function") {
+            tempfile.write(content);
+          }
+        } else {
+          tempfile = makeTempfile(contentBuf);
+        }
 
         const fileInfo: UploadedFileInfo = {
           filename: normalizedFilename,
-          type: contentTypeHeader || "application/octet-stream",
+          type: ctype,
           name,
-          tempfile: makeTempfile(contentBuf),
+          tempfile,
           head: headerStr + "\r\n",
         };
 
@@ -270,6 +295,15 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
       }
 
       const textValue = contentBuf.toString("utf-8");
+
+      // Check buffered text size limit
+      if (textLimit > 0) {
+        totalTextSize += contentBuf.length;
+        if (contentBuf.length > textLimit || totalTextSize > textLimit) {
+          throw new MultipartBufferedMimeDataError();
+        }
+      }
+
       normalizeAndSet(params, name, textValue);
     }
 
@@ -618,4 +652,5 @@ export const Multipart = {
   MissingInputError,
   MultipartPartLimitError,
   MultipartTotalPartLimitError,
+  MultipartBufferedMimeDataError,
 };

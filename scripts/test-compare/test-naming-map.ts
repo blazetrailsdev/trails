@@ -2201,7 +2201,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "recursive.test.ts", describeBlock: "Rack::Recursive" },
     ],
     "spec_request.rb": [
-      { file: "request.test.ts", describeBlock: "" },
+      { file: "request.test.ts", describeBlock: "request" },
     ],
     "spec_response.rb": [
       { file: "response.test.ts", describeBlock: "Rack::Response" },
@@ -2236,6 +2236,15 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "spec_version.rb": [
       { file: "version.test.ts", describeBlock: "Rack" },
     ],
+    "spec_headers.rb": [
+      { file: "headers.test.ts", describeBlock: "Rack::Headers" },
+    ],
+    "spec_events.rb": [
+      { file: "events.test.ts", describeBlock: "Rack::Events" },
+    ],
+    "spec_logger.rb": [
+      { file: "logger.test.ts", describeBlock: "Rack::Logger" },
+    ],
   },
   // ==========================================================================
   // ActionDispatch
@@ -2259,9 +2268,6 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/routing/inspector_test.rb": [
       { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::Inspector" },
     ],
-    "controller/routing_test.rb": [
-      { file: "routing.test.ts", describeBlock: "ActionController::Routing" },
-    ],
     "dispatch/routing_assertions_test.rb": [
       { file: "routing.test.ts", describeBlock: "ActionDispatch::Routing::Assertions" },
     ],
@@ -2270,18 +2276,6 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     ],
     "dispatch/response_test.rb": [
       { file: "response.test.ts", describeBlock: "ActionDispatch::Response" },
-    ],
-    "controller/parameters/accessors_test.rb": [
-      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Accessors" },
-    ],
-    "controller/parameters/parameters_permit_test.rb": [
-      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Permit" },
-    ],
-    "controller/parameters/mutators_test.rb": [
-      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Mutators" },
-    ],
-    "controller/url_for_test.rb": [
-      { file: "url-for.test.ts", describeBlock: "ActionController::UrlFor" },
     ],
     "dispatch/cookies_test.rb": [
       { file: "cookies.test.ts", describeBlock: "ActionDispatch::Cookies" },
@@ -2301,23 +2295,8 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/content_security_policy_test.rb": [
       { file: "content-security-policy.test.ts", describeBlock: "ActionDispatch::ContentSecurityPolicy" },
     ],
-    "controller/redirect_test.rb": [
-      { file: "redirect.test.ts", describeBlock: "ActionController::Redirect" },
-    ],
-    "controller/flash_hash_test.rb": [
-      { file: "flash.test.ts", describeBlock: "ActionDispatch::Flash::FlashHash" },
-    ],
-    "controller/flash_test.rb": [
-      { file: "flash.test.ts", describeBlock: "ActionDispatch::Flash" },
-    ],
     "dispatch/static_test.rb": [
       { file: "middleware/static.test.ts", describeBlock: "ActionDispatch::Static" },
-    ],
-    "controller/request_forgery_protection_test.rb": [
-      { file: "request-forgery-protection.test.ts", describeBlock: "ActionController::RequestForgeryProtection" },
-    ],
-    "controller/mime/respond_to_test.rb": [
-      { file: "respond-to.test.ts", describeBlock: "RespondToControllerTest" },
     ],
     "dispatch/permissions_policy_test.rb": [
       { file: "permissions-policy.test.ts", describeBlock: "ActionDispatch::PermissionsPolicy" },
@@ -2328,6 +2307,45 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "dispatch/request_id_test.rb": [
       { file: "middleware/request-id.test.ts", describeBlock: "ActionDispatch::RequestId" },
     ],
+    "dispatch/exception_wrapper_test.rb": [
+      { file: "exception-wrapper.test.ts", describeBlock: "ActionDispatch::ExceptionWrapper" },
+    ],
+  },
+
+  // ==========================================================================
+  // ActionController (controller/ tests from actionpack)
+  // ==========================================================================
+  actioncontroller: {
+    "controller/routing_test.rb": [
+      { file: "routing.test.ts", describeBlock: "ActionController::Routing" },
+    ],
+    "controller/parameters/accessors_test.rb": [
+      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Accessors" },
+    ],
+    "controller/parameters/parameters_permit_test.rb": [
+      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Permit" },
+    ],
+    "controller/parameters/mutators_test.rb": [
+      { file: "parameters.test.ts", describeBlock: "ActionController::Parameters::Mutators" },
+    ],
+    "controller/url_for_test.rb": [
+      { file: "url-for.test.ts", describeBlock: "ActionController::UrlFor" },
+    ],
+    "controller/redirect_test.rb": [
+      { file: "redirect.test.ts", describeBlock: "ActionController::Redirect" },
+    ],
+    "controller/flash_hash_test.rb": [
+      { file: "flash.test.ts", describeBlock: "ActionDispatch::Flash::FlashHash" },
+    ],
+    "controller/flash_test.rb": [
+      { file: "flash.test.ts", describeBlock: "ActionDispatch::Flash" },
+    ],
+    "controller/request_forgery_protection_test.rb": [
+      { file: "request-forgery-protection.test.ts", describeBlock: "ActionController::RequestForgeryProtection" },
+    ],
+    "controller/mime/respond_to_test.rb": [
+      { file: "respond-to.test.ts", describeBlock: "RespondToControllerTest" },
+    ],
     "controller/http_basic_authentication_test.rb": [
       { file: "http-authentication.test.ts", describeBlock: "ActionController::HttpAuthentication::Basic" },
     ],
@@ -2337,8 +2355,49 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
     "controller/http_digest_authentication_test.rb": [
       { file: "http-authentication.test.ts", describeBlock: "ActionController::HttpAuthentication::Digest" },
     ],
-    "dispatch/exception_wrapper_test.rb": [
-      { file: "exception-wrapper.test.ts", describeBlock: "ActionDispatch::ExceptionWrapper" },
+    "controller/test_case_test.rb": [
+      { file: "test-case.test.ts", describeBlock: "ActionController::TestCase" },
+    ],
+    "controller/render_test.rb": [
+      { file: "rendering.test.ts", describeBlock: "ActionController::Rendering" },
+      { file: "template-rendering.test.ts", describeBlock: "ActionController template rendering" },
+    ],
+    "controller/filters_test.rb": [
+      { file: "filters.test.ts", describeBlock: "ActionController::Filters" },
+    ],
+    "controller/resources_test.rb": [
+      { file: "resource-routing.test.ts", describeBlock: "ActionDispatch::Routing::Resources" },
+      { file: "controller-routing.test.ts", describeBlock: "ActionController::Routing" },
+    ],
+    "controller/rescue_test.rb": [
+      { file: "rescue.test.ts", describeBlock: "ActionController::Rescue" },
+    ],
+    "controller/caching_test.rb": [
+      { file: "caching.test.ts", describeBlock: "ActionController::ConditionalGet" },
+    ],
+    "controller/metal_test.rb": [
+      { file: "metal.test.ts", describeBlock: "ActionController::Metal" },
+    ],
+    "controller/base_test.rb": [
+      { file: "base.test.ts", describeBlock: "ActionController::Base" },
+    ],
+    "controller/integration_test.rb": [
+      { file: "integration-test.test.ts", describeBlock: "ActionController::IntegrationTest" },
+    ],
+    "controller/params_wrapper_test.rb": [
+      { file: "params-wrapper.test.ts", describeBlock: "ActionController::ParamsWrapper" },
+    ],
+    "controller/send_file_test.rb": [
+      { file: "base.test.ts", describeBlock: "ActionController::Base" },
+    ],
+    "controller/route_helpers_test.rb": [
+      { file: "route-helpers.test.ts", describeBlock: "RouteHelpers" },
+    ],
+    "controller/renderers_test.rb": [
+      { file: "rendering.test.ts", describeBlock: "ActionController::Rendering" },
+    ],
+    "controller/renderer_test.rb": [
+      { file: "actionview.test.ts", describeBlock: "Renderer" },
     ],
   },
 };

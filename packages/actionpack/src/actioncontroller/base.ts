@@ -11,6 +11,7 @@ import { RequestForgeryProtection, InvalidAuthenticityToken } from "../actiondis
 import { Collector, UnknownFormat } from "../actiondispatch/respond-to.js";
 import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
 import { LookupContext } from "../actionview/lookup-context.js";
+import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
 import { createHash } from "crypto";
 
 // Re-export callback registration
@@ -55,6 +56,9 @@ export class Base extends Metal {
 
   /** Layout name. Set to false to disable, or a string name. */
   static layout: string | false = "application";
+
+  /** Route helpers (_path/_url functions) available to controller and templates. */
+  static routeHelpers?: RouteHelpersMap;
 
   /** Rescue handlers (class-level, inherited). */
   private static _rescueHandlers: Array<{ errorClass: new (...args: any[]) => Error; handler: RescueHandler }> = [];
@@ -130,7 +134,8 @@ export class Base extends Metal {
 
     const controllerName = this._controllerName();
     const format = this.request?.format ?? "html";
-    const locals = options.locals ?? {};
+    const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
+    const locals = { ...routeHelpers, ...options.locals };
     const layout = options.layout === false ? false
       : (typeof options.layout === "string" ? options.layout
         : (this.constructor as typeof Base).layout);
