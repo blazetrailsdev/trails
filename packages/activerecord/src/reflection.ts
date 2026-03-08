@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { modelRegistry } from "./associations.js";
 
 /**
  * Represents metadata about an association.
@@ -65,6 +66,19 @@ export class AssociationReflection {
 
   isCollection(): boolean {
     return this.macro === "hasMany" || this.macro === "hasAndBelongsToMany";
+  }
+
+  /**
+   * Returns the target class of the association, resolved via the model registry.
+   *
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#klass
+   */
+  get klass(): typeof Base {
+    const resolved = modelRegistry.get(this.className);
+    if (!resolved) {
+      throw new Error(`Could not find model '${this.className}' in model registry (for association '${this.name}')`);
+    }
+    return resolved;
   }
 }
 

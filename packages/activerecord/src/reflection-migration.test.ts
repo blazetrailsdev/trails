@@ -11,6 +11,7 @@ import {
   reflectOnAssociation,
   reflectOnAllAssociations,
   composedOf,
+  registerModel,
 } from "./index.js";
 
 function freshAdapter(): MemoryAdapter {
@@ -256,16 +257,40 @@ describe("ReflectionTest", () => {
     expect(Post.primaryKey).toBe("id");
   });
 
-  it.skip("reflection klass not found with no class name option", () => {
-    // Requires dynamic class resolution
+  it("reflection klass not found with no class name option", () => {
+    class Orphan extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(Orphan, "ghosts", {});
+    const ref = reflectOnAssociation(Orphan, "ghosts");
+    expect(ref).not.toBeNull();
+    // "Ghost" is not registered, so accessing klass should throw
+    expect(() => ref!.klass).toThrow(/Could not find model 'Ghost'/);
   });
 
-  it.skip("reflection klass not found with pointer to non existent class name", () => {
-    // Requires dynamic class resolution
+  it("reflection klass not found with pointer to non existent class name", () => {
+    class Orphan2 extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(Orphan2, "items", { className: "NonExistentModel" });
+    const ref = reflectOnAssociation(Orphan2, "items");
+    expect(ref).not.toBeNull();
+    expect(() => ref!.klass).toThrow(/Could not find model 'NonExistentModel'/);
   });
 
-  it.skip("reflection klass requires ar subclass", () => {
-    // Requires dynamic class resolution
+  it("reflection klass requires ar subclass", () => {
+    class Parent extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Child extends Base {
+      static { this.attribute("parent_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(Parent, "children", { className: "Child" });
+    registerModel(Child);
+    const ref = reflectOnAssociation(Parent, "children");
+    expect(ref).not.toBeNull();
+    // klass should return a class that extends Base
+    expect(ref!.klass).toBe(Child);
   });
 
   it.skip("reflection klass with same demodularized name", () => {

@@ -2072,7 +2072,26 @@ describe("HasManyAssociationsTest", () => {
     const posts = await loadHasMany(author, "posts", { className: "Post", foreignKey: "author_id" });
     expect(posts.length).toBe(1);
   });
-  it.skip("find all with include and conditions", () => {});
+  it("find all with include and conditions", async () => {
+    class FICAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class FICPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("fic_author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(FICAuthor, "ficPosts", { foreignKey: "fic_author_id", className: "FICPost" });
+    registerModel("FICAuthor", FICAuthor);
+    registerModel("FICPost", FICPost);
+    const a1 = await FICAuthor.create({ name: "Alice" });
+    const a2 = await FICAuthor.create({ name: "Bob" });
+    await FICPost.create({ title: "P1", fic_author_id: a1.id });
+    await FICPost.create({ title: "P2", fic_author_id: a2.id });
+    const authors = await FICAuthor.all().includes("ficPosts").where({ name: "Alice" }).toArray();
+    expect(authors.length).toBe(1);
+    expect(authors[0].readAttribute("name")).toBe("Alice");
+    const posts = (authors[0] as any)._preloadedAssociations?.get("ficPosts") ?? [];
+    expect(posts.length).toBe(1);
+  });
   it("find grouped", async () => {
     class Author extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
