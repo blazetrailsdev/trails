@@ -19810,7 +19810,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("can get a signed ID in an after_create", async () => {
-    // afterCreate callback is not implemented yet
+    // _newRecord is still true when afterCreate fires, so signedId() throws
     const { User } = makeModel();
     let capturedToken: string | null = null;
     User.afterCreate((record: any) => {

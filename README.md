@@ -11,11 +11,11 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 | `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **99.3%** | SQL AST builder and query generation |
 | `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **99%** | Attributes, validations, callbacks, dirty tracking, serialization |
 | `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **67.4%** | Core utilities, inflection, caching, notifications, encryption |
-| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **51.4%** | ORM — persistence, querying, associations, migrations |
+| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **62.2%** | ORM — persistence, querying, associations, migrations |
 | `@rails-ts/rack` | [Rack](https://rack.github.io/) | **65.8%** | Modular web server interface, request/response, middleware |
 | `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **18%** | Routing, middleware stack, cookies, sessions, security |
 
-Overall: **52.1%** — 7,159 tests passing against 13,744 Rails tests.
+Overall: **56.3%** — 7,742 tests passing against 13,744 Rails tests.
 
 ## Quick Example
 
@@ -55,25 +55,30 @@ Attribute definitions with type casting, a full validation framework (presence, 
 
 String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly TimeZone, date/time extensions, and some Ruby-specific features.
 
-### ActiveRecord — ORM (51.4%)
+### ActiveRecord — ORM (62.2%)
 
 **Working:**
 - Base class with attribute definition, persistence (create/save/update/destroy), finders (find, find_by, where, order, limit, offset, pluck, pick)
 - Relation chaining (where, not, or, order, limit, offset, group, having, distinct, select, joins, left_outer_joins, reorder, rewhere, reselect)
 - Calculations (count, sum, average, minimum, maximum) with grouped aggregates
-- Associations (has_many, belongs_to, has_one, has_and_belongs_to_many, has_many :through, has_one :through) with eager loading, collection proxy, dependent destroy
+- Associations (has_many, belongs_to, has_one, has_and_belongs_to_many, has_many :through, has_one :through) with eager loading, collection proxy, dependent destroy, inverse_of
 - Scopes (default_scope, named scopes), Enum, STI (Single Table Inheritance)
-- Callbacks (before/after/around for create, update, save, destroy, find, initialize, touch)
+- Callbacks (before/after/around for create, update, save, destroy, find, initialize, touch), transaction callbacks (after_commit, after_rollback)
 - Transactions, optimistic locking (lock_version), counter cache
 - Batching (find_each, find_in_batches, in_batches)
 - insertAll / upsertAll (bulk operations)
-- Serialized attributes (JSON, Array, Hash coders), Store accessors
+- Serialized attributes (JSON, Array, Hash coders), Store accessors (with prefix/suffix support)
 - Secure tokens, signed IDs, generates_token_for
 - Nested attributes, autosave associations
-- Migrations and migration runner
+- Normalized attributes (normalizes, normalize_attribute, normalize_value_for)
+- Delegated types (delegated_type)
+- Uniqueness validation (including scoped and composite key)
+- Migrations (reversible, revert, bulk alter, schema define) and migration runner
+- Reflection (reflect_on_association, reflect_on_all_associations)
+- SQL annotations (annotate), explain
 - Database adapters: MemoryAdapter (for tests), SQLite, PostgreSQL, MySQL/MariaDB
 
-**In progress:** Eager loading edge cases, inverse associations, join model queries, through association edge cases, nested attributes lifecycle. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full roadmap.
+**In progress:** Eager loading/preloading edge cases, polymorphic inverse associations, join model queries, through association edge cases. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full roadmap.
 
 ### Rack — Web Server Interface (65.8%)
 
