@@ -61,5 +61,7 @@ export { serialize } from "./serialize.js";
 export { encrypts, defaultEncryptor, getEncryptor, isEncryptedAttribute } from "./encryption.js";
 export type { Encryptor } from "./encryption.js";
 export { generatesTokenFor } from "./generates-token-for.js";
+export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
+export type { DelegatedTypeOptions } from "./delegated-type.js";
 
 export { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
