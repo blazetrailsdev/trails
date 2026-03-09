@@ -117,8 +117,33 @@ export class ApplicationController extends ActionController.Base {
     // Models directory placeholder
     this.createFile("src/app/models/.gitkeep", "");
 
-    // Views directory placeholder
-    this.createFile("src/app/views/.gitkeep", "");
+    // Layout
+    this.createFile("src/app/views/layouts/application.html.ejs", `<!DOCTYPE html>
+<html>
+<head>
+  <title>${name}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      color: #333;
+    }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+    a { color: #0366d6; }
+    h1 { border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+  <%- yield %>
+</body>
+</html>
+`);
 
     // Migrations directory
     this.createFile("db/migrations/.gitkeep", "");

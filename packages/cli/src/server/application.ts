@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url";
 
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString } from "@rails-ts/rack";
-import { RouteSet, Mapper, Request, Response, ActionController } from "@rails-ts/actionpack";
+import { RouteSet, Mapper, Request, Response, ActionController, ActionView } from "@rails-ts/actionpack";
 
 export interface ApplicationOptions {
   cwd: string;
@@ -21,17 +21,40 @@ export class Application {
   private cwd: string;
   private routeSet: RouteSet = new RouteSet();
   private controllerCache: Map<string, typeof ActionController.Base> = new Map();
+  private lookupContext: ActionView.LookupContext;
 
   constructor(options: ApplicationOptions) {
     this.cwd = options.cwd;
+    this.lookupContext = new ActionView.LookupContext();
   }
 
   /**
-   * Initialize the application: load routes and set up the dispatcher.
+   * Initialize the application: load routes, set up views, and wire the dispatcher.
    */
   async initialize(): Promise<void> {
+    this.setupViews();
     await this.loadRoutes();
     this.routeSet.setDispatcher(this.dispatch.bind(this));
+  }
+
+  /**
+   * Set up the ActionView pipeline: register EJS handler and file system resolver.
+   */
+  private setupViews(): void {
+    // Register EJS handler
+    ActionView.TemplateHandlerRegistry.register(new ActionView.EjsHandler());
+
+    // Add file system resolver pointing to the app's views directory
+    const viewsPath = path.join(this.cwd, "src", "app", "views");
+    if (fs.existsSync(viewsPath)) {
+      this.lookupContext.addResolver(new ActionView.FileSystemResolver(viewsPath));
+    }
+
+    // Also check dist/ for compiled apps
+    const distViewsPath = path.join(this.cwd, "dist", "app", "views");
+    if (fs.existsSync(distViewsPath)) {
+      this.lookupContext.addResolver(new ActionView.FileSystemResolver(distViewsPath));
+    }
   }
 
   /**
@@ -88,6 +111,9 @@ export class Application {
   ): Promise<RackResponse> {
     try {
       const ControllerClass = await this.resolveController(controllerName);
+
+      // Wire up the view layer on the controller class
+      ControllerClass.lookupContext = this.lookupContext;
 
       const request = new Request(env);
       const response = new Response();
