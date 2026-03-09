@@ -40,6 +40,9 @@ const _createdColumns = new Map<string, Set<string>>();
 // Populated when Base.adapter is set. Consumed before first DB operation.
 const _pendingModels = new Map<string, Map<string, string>>();
 
+// Model classes registered via the hook — used to lazily extract attributes.
+const _registeredModelClasses = new Set<any>();
+
 // Set true when createTestAdapter() is called; cleared after data cleanup.
 let _needsCleanup = false;
 let _cleanupInProgress = false;
@@ -73,27 +76,40 @@ function sqlType(typeName: string): string {
 
 /**
  * Register a model class for table creation. Called from Base.adapter setter.
+ * We store the model class reference and extract attributes lazily in
+ * processPendingModels(), because some tests call this.adapter = x
+ * before this.attribute() in their static {} blocks.
  */
 function registerModel(modelClass: any): void {
-  const tableName: string = modelClass.tableName;
-  if (!tableName) return;
+  _registeredModelClasses.add(modelClass);
+}
 
-  const attrs: Map<string, { name: string; type: { name?: string } }> =
-    modelClass._attributeDefinitions;
-  if (!attrs || attrs.size === 0) return;
+/**
+ * Extract columns from all registered model classes and add to _pendingModels.
+ */
+function extractColumnsFromModels(): void {
+  for (const modelClass of _registeredModelClasses) {
+    const tableName: string = modelClass.tableName;
+    if (!tableName) continue;
 
-  const columns = new Map<string, string>();
-  for (const [name, def] of attrs) {
-    if (name === "id") continue;
-    columns.set(name, sqlType(def.type?.name || "string"));
+    const attrs: Map<string, { name: string; type: { name?: string } }> =
+      modelClass._attributeDefinitions;
+    if (!attrs || attrs.size === 0) continue;
+
+    const columns = new Map<string, string>();
+    for (const [name, def] of attrs) {
+      if (name === "id") continue;
+      columns.set(name, sqlType(def.type?.name || "string"));
+    }
+
+    const existing = _pendingModels.get(tableName);
+    if (existing) {
+      for (const [col, type] of columns) existing.set(col, type);
+    } else {
+      _pendingModels.set(tableName, columns);
+    }
   }
-
-  const existing = _pendingModels.get(tableName);
-  if (existing) {
-    for (const [col, type] of columns) existing.set(col, type);
-  } else {
-    _pendingModels.set(tableName, columns);
-  }
+  _registeredModelClasses.clear();
 }
 
 /**
@@ -240,6 +256,10 @@ class SchemaAdapter implements DatabaseAdapter {
     if (_needsCleanup && !_cleanupInProgress) {
       _needsCleanup = false;
       await deleteAllData(this.inner);
+    }
+    // Extract columns from any newly registered model classes
+    if (_registeredModelClasses.size > 0) {
+      extractColumnsFromModels();
     }
     if (_pendingModels.size > 0) {
       await processPendingModels(this.inner);

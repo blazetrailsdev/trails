@@ -49,9 +49,11 @@ export class TableDefinition {
   readonly columns: ColumnDefinition[] = [];
   readonly indexes: IndexDefinition[] = [];
   private _id: boolean;
+  private _adapterName: "sqlite" | "postgres" | "mysql" | "memory";
 
-  constructor(tableName: string, options: { id?: boolean } = {}) {
+  constructor(tableName: string, options: { id?: boolean; adapterName?: "sqlite" | "postgres" | "mysql" | "memory" } = {}) {
     this.tableName = tableName;
+    this._adapterName = options.adapterName ?? "sqlite";
     this._id = options.id !== false;
 
     if (this._id) {
@@ -157,7 +159,13 @@ export class TableDefinition {
 
       switch (col.type) {
         case "primary_key":
-          parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
+          if (this._adapterName === "postgres") {
+            parts.push("SERIAL PRIMARY KEY");
+          } else if (this._adapterName === "mysql") {
+            parts.push("INT AUTO_INCREMENT PRIMARY KEY");
+          } else {
+            parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
+          }
           break;
         case "string":
           parts.push(`VARCHAR(${col.options.limit ?? 255})`);
@@ -169,7 +177,7 @@ export class TableDefinition {
           parts.push("INTEGER");
           break;
         case "float":
-          parts.push("REAL");
+          parts.push(this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL");
           break;
         case "decimal":
           parts.push(
@@ -177,17 +185,17 @@ export class TableDefinition {
           );
           break;
         case "boolean":
-          parts.push("BOOLEAN");
+          parts.push(this._adapterName === "postgres" ? "BOOLEAN" : "BOOLEAN");
           break;
         case "date":
           parts.push("DATE");
           break;
         case "datetime":
         case "timestamp":
-          parts.push("DATETIME");
+          parts.push(this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME");
           break;
         case "binary":
-          parts.push("BLOB");
+          parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
           break;
       }
 
@@ -231,6 +239,20 @@ export abstract class Migration {
   private _recordedOps: RecordedOperation[] = [];
   private _name?: string;
   private _version?: string;
+
+  /** Determine adapter type from the adapter class name. */
+  protected get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
+    const name = this.adapter?.constructor?.name ?? "";
+    if (name.includes("Postgres") || name === "SchemaAdapter") {
+      // SchemaAdapter wraps the real adapter; check env
+      if (process.env.PG_TEST_URL) return "postgres";
+      if (process.env.MYSQL_TEST_URL) return "mysql";
+      return "memory";
+    }
+    if (name.includes("Mysql") || name.includes("Maria")) return "mysql";
+    if (name.includes("Memory")) return "memory";
+    return "sqlite";
+  }
 
   /**
    * Mirrors: ActiveRecord::Migration#initialize
@@ -362,7 +384,7 @@ export abstract class Migration {
       definer = fn;
     }
 
-    const td = new TableDefinition(name, options);
+    const td = new TableDefinition(name, { ...options, adapterName: this._adapterName });
     if (definer) definer(td);
 
     await this.adapter.executeMutation(td.toSql());
@@ -1101,6 +1123,8 @@ export abstract class Migration {
       case "binary":
         return "BLOB";
       case "primary_key":
+        if (this._adapterName === "postgres") return "SERIAL PRIMARY KEY";
+        if (this._adapterName === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
         return "INTEGER PRIMARY KEY AUTOINCREMENT";
     }
   }
@@ -1187,11 +1211,23 @@ export class Schema {
     this.adapter = adapter;
   }
 
+  private get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
+    const name = this.adapter?.constructor?.name ?? "";
+    if (name.includes("Postgres") || name === "SchemaAdapter") {
+      if (process.env.PG_TEST_URL) return "postgres";
+      if (process.env.MYSQL_TEST_URL) return "mysql";
+      return "memory";
+    }
+    if (name.includes("Mysql") || name.includes("Maria")) return "mysql";
+    if (name.includes("Memory")) return "memory";
+    return "sqlite";
+  }
+
   async createTable(
     name: string,
     fn?: (t: TableDefinition) => void
   ): Promise<void> {
-    const td = new TableDefinition(name);
+    const td = new TableDefinition(name, { adapterName: this._adapterName });
     if (fn) fn(td);
     await this.adapter.executeMutation(td.toSql());
   }

@@ -163,7 +163,12 @@ export class Base extends Model {
     const pk = this.primaryKey;
     await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${table}"`);
 
-    const colDefs: string[] = [`"${pk}" INTEGER PRIMARY KEY AUTOINCREMENT`];
+    const isPg = !!process.env.PG_TEST_URL;
+    const isMysql = !!process.env.MYSQL_TEST_URL;
+    const pkDef = isPg ? `"${pk}" SERIAL PRIMARY KEY`
+      : isMysql ? `\`${pk}\` INT AUTO_INCREMENT PRIMARY KEY`
+      : `"${pk}" INTEGER PRIMARY KEY AUTOINCREMENT`;
+    const colDefs: string[] = [pkDef];
     for (const [name, def] of this._attributeDefinitions) {
       if (name === pk) continue;
       const sqlType = this.sqlTypeFor(def.type?.name || "string");
