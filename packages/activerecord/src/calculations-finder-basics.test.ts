@@ -14,8 +14,8 @@
  * Use it.skip for DB-specific or unimplemented features.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, defineEnum } from "./index.js";
-import { Associations, registerModel } from "./associations.js";
+import { Base, MemoryAdapter, defineEnum, registerModel, registerSubclass } from "./index.js";
+import { Associations } from "./associations.js";
 
 function freshAdapter(): MemoryAdapter {
   return new MemoryAdapter();
@@ -1045,8 +1045,30 @@ describe("InheritanceTest", () => {
     expect(p.readAttribute("name")).toBe("NoSTI");
   });
 
-  it.skip("alt inheritance find", async () => {
-    // requires alt fixture models
+  it("alt inheritance find", async () => {
+    class Vegetable extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("custom_type", "string");
+        this.inheritanceColumn = "custom_type";
+        this.adapter = adapter;
+      }
+    }
+    class Cucumber extends Vegetable {
+      static { registerModel(Cucumber); registerSubclass(Cucumber); this.adapter = adapter; }
+    }
+    class Cabbage extends Vegetable {
+      static { registerModel(Cabbage); registerSubclass(Cabbage); this.adapter = adapter; }
+    }
+    registerModel(Vegetable);
+
+    const cuc = await Cucumber.create({ name: "my cucumber" });
+    const cab = await Cabbage.create({ name: "his cabbage" });
+
+    expect(await Vegetable.find(cuc.id as number)).toBeInstanceOf(Cucumber);
+    expect(await Cucumber.find(cuc.id as number)).toBeInstanceOf(Cucumber);
+    expect(await Vegetable.find(cab.id as number)).toBeInstanceOf(Cabbage);
+    expect(await Cabbage.find(cab.id as number)).toBeInstanceOf(Cabbage);
   });
 
   it.skip("scope inherited properly", async () => {
