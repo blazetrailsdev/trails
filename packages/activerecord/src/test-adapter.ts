@@ -204,15 +204,37 @@ async function ensureTable(
  * targets a table that doesn't exist yet. Uses DELETE-based cleanup
  * for test isolation: schema persists, data is cleaned between tests.
  */
+// Track the latest adapter ID. When an adapter does its first operation
+// and its ID matches _latestAdapterId, it triggers cleanup. This ensures
+// only the most-recently-created adapter cleans, avoiding problems when
+// multiple adapters are created in the same test.
+let _latestAdapterId = 0;
+let _cleanedForAdapter = 0;
+
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
-  private hasInserted = false;
+  private id: number;
 
   constructor(inner: any) {
     this.inner = inner;
+    this.id = ++_latestAdapterId;
+  }
+
+  /**
+   * Auto-clean on first operation if this is the latest adapter.
+   * Only the most-recently-created adapter triggers cleanup to avoid
+   * wiping data that sibling adapters in the same test just inserted.
+   */
+  private async autoClean(): Promise<void> {
+    if (_cleanedForAdapter >= this.id) return;
+    if (this.id === _latestAdapterId) {
+      _cleanedForAdapter = this.id;
+      await _deleteAllData(this.inner);
+    }
   }
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
+    await this.autoClean();
     try {
       return await this.inner.execute(sql, binds);
     } catch (e: any) {
@@ -239,16 +261,11 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
+    await this.autoClean();
     // Auto-create table on INSERT
     const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]*)\)/i);
     if (insertMatch) {
       const [, tableName, colStr] = insertMatch;
-      // Clean all data before the first INSERT of this adapter instance.
-      // This ensures test isolation: each test gets a clean database.
-      if (!this.hasInserted) {
-        this.hasInserted = true;
-        await _deleteAllData(this.inner);
-      }
       await ensureTable(this.inner, tableName, colStr, sql);
     }
 
