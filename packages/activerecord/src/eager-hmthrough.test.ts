@@ -8,7 +8,7 @@
  * Tests that can be meaningfully exercised with MemoryAdapter are implemented.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, registerModel } from "./index.js";
+import { Base, MemoryAdapter, registerModel, enableSti, registerSubclass } from "./index.js";
 import {
   Associations,
   loadHasMany,
@@ -1109,7 +1109,49 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].readAttribute("body")).toBe("Great");
   });
-  it.skip("eager with has many through an sti join model", () => {});
+  it("eager with has many through an sti join model", async () => {
+    // Author -> SpecialPost (STI) -> Comments (through)
+    class EagerStiAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class EagerStiPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("eager_sti_author_id", "integer");
+        this._tableName = "eager_sti_posts";
+        this.adapter = adapter;
+        enableSti(EagerStiPost);
+      }
+    }
+    class EagerSpecialPost extends EagerStiPost {
+      static { this.adapter = adapter; registerModel(EagerSpecialPost); registerSubclass(EagerSpecialPost); }
+    }
+    class EagerStiComment extends Base {
+      static { this.attribute("body", "string"); this.attribute("eager_sti_post_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(EagerStiAuthor); registerModel(EagerStiPost); registerModel(EagerStiComment);
+    (EagerStiAuthor as any)._associations = [
+      { type: "hasMany", name: "eagerSpecialPosts", options: { className: "EagerSpecialPost", foreignKey: "eager_sti_author_id" } },
+      { type: "hasMany", name: "specialPostComments", options: {
+        className: "EagerStiComment", through: "eagerSpecialPosts", source: "eagerStiComment",
+      }},
+    ];
+    (EagerSpecialPost as any)._associations = [
+      { type: "hasMany", name: "eagerStiComment", options: { className: "EagerStiComment", foreignKey: "eager_sti_post_id" } },
+    ];
+
+    const author = await EagerStiAuthor.create({ name: "David" });
+    const normalPost = await EagerStiPost.create({ title: "Normal", eager_sti_author_id: author.id });
+    const specialPost = await EagerSpecialPost.create({ title: "Special", eager_sti_author_id: author.id });
+    await EagerStiComment.create({ body: "on normal", eager_sti_post_id: normalPost.id });
+    await EagerStiComment.create({ body: "does it hurt", eager_sti_post_id: specialPost.id });
+
+    const authors = await EagerStiAuthor.all().includes("specialPostComments").toArray();
+    const comments = (authors[0] as any)._preloadedAssociations.get("specialPostComments");
+    expect(comments).toHaveLength(1);
+    expect(comments[0].readAttribute("body")).toBe("does it hurt");
+  });
   it.skip("preloading with has one through an sti with after initialize", () => {});
   it("preloading has many through with implicit source", async () => {
     class EagerImpOwner extends Base {
@@ -2151,8 +2193,55 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("through association with left joins", () => {});
   it.skip("through association with through scope and nested where", () => {});
   it.skip("preload with nested association", () => {});
-  it.skip("preload sti rhs class", () => {});
-  it.skip("preload sti middle relation", () => {});
+  it.skip("preload sti rhs class", () => { /* needs Developer/Firm fixture models */ });
+  it("preload sti middle relation", async () => {
+    // Club -> Members through Memberships (STI: SuperMembership, CurrentMembership)
+    class PsClub extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PsMember extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PsMembership extends Base {
+      static {
+        this.attribute("ps_club_id", "integer");
+        this.attribute("ps_member_id", "integer");
+        this.attribute("type", "string");
+        this._tableName = "ps_memberships";
+        this.adapter = adapter;
+        enableSti(PsMembership);
+      }
+    }
+    class PsSuperMembership extends PsMembership {
+      static { this.adapter = adapter; registerModel(PsSuperMembership); registerSubclass(PsSuperMembership); }
+    }
+    class PsCurrentMembership extends PsMembership {
+      static { this.adapter = adapter; registerModel(PsCurrentMembership); registerSubclass(PsCurrentMembership); }
+    }
+    registerModel(PsClub); registerModel(PsMember); registerModel(PsMembership);
+
+    (PsClub as any)._associations = [
+      { type: "hasMany", name: "psMemberships", options: { className: "PsMembership", foreignKey: "ps_club_id" } },
+      { type: "hasMany", name: "members", options: {
+        className: "PsMember", through: "psMemberships", source: "psMember",
+      }},
+    ];
+    (PsMembership as any)._associations = [
+      { type: "belongsTo", name: "psMember", options: { className: "PsMember", foreignKey: "ps_member_id" } },
+    ];
+
+    const club = await PsClub.create({ name: "Aaron cool banana club" });
+    const member1 = await PsMember.create({ name: "Aaron" });
+    const member2 = await PsMember.create({ name: "Cat" });
+    await PsSuperMembership.create({ ps_club_id: club.id, ps_member_id: member1.id });
+    await PsCurrentMembership.create({ ps_club_id: club.id, ps_member_id: member2.id });
+
+    const clubs = await PsClub.all().includes("members").toArray();
+    const members = (clubs[0] as any)._preloadedAssociations.get("members");
+    expect(members).toHaveLength(2);
+    const names = members.map((m: any) => m.readAttribute("name")).sort();
+    expect(names).toEqual(["Aaron", "Cat"]);
+  });
   it("preload multiple instances of the same record", async () => {
     class PreloadMultiParent extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
