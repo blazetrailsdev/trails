@@ -2235,3 +2235,67 @@ describe("previouslyNewRecord", () => {
     expect(user.isPreviouslyNewRecord()).toBe(false);
   });
 });
+
+describe("Rails-guided: increment/decrement/toggle", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("increment attribute", () => {
+    class Counter extends Base {
+      static { this.attribute("hits", "integer", { default: 0 }); this.adapter = adapter; }
+    }
+    const c = new Counter();
+    c.increment("hits");
+    expect(c.readAttribute("hits")).toBe(1);
+    c.increment("hits", 5);
+    expect(c.readAttribute("hits")).toBe(6);
+  });
+
+  it("decrement attribute", () => {
+    class Counter extends Base {
+      static { this.attribute("stock", "integer", { default: 10 }); this.adapter = adapter; }
+    }
+    const c = new Counter();
+    c.decrement("stock");
+    expect(c.readAttribute("stock")).toBe(9);
+  });
+
+  it("toggle flips boolean in memory", () => {
+    class Feature extends Base {
+      static { this.attribute("enabled", "boolean", { default: false }); this.adapter = adapter; }
+    }
+    const f = new Feature();
+    f.toggle("enabled");
+    expect(f.readAttribute("enabled")).toBe(true);
+  });
+
+  it("incrementBang persists change", async () => {
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 0 }); this.adapter = adapter; }
+    }
+    const c = await Counter.create({ count: 10 });
+    await c.incrementBang("count", 2);
+    const reloaded = await Counter.find(c.id);
+    expect(reloaded.readAttribute("count")).toBe(12);
+  });
+
+  it("decrementBang persists change", async () => {
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 0 }); this.adapter = adapter; }
+    }
+    const c = await Counter.create({ count: 10 });
+    await c.decrementBang("count", 3);
+    const reloaded = await Counter.find(c.id);
+    expect(reloaded.readAttribute("count")).toBe(7);
+  });
+
+  it("toggleBang persists change", async () => {
+    class Feature extends Base {
+      static { this.attribute("active", "boolean", { default: true }); this.adapter = adapter; }
+    }
+    const f = await Feature.create({ active: true });
+    await f.toggleBang("active");
+    const reloaded = await Feature.find(f.id);
+    expect(reloaded.readAttribute("active")).toBe(false);
+  });
+});

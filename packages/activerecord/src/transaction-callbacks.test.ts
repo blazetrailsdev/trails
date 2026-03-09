@@ -375,4 +375,34 @@ describe("afterCommit / afterRollback", () => {
     });
     expect(log).toContain("committed");
   });
+
+  it("afterCommit fires immediately outside transaction (Rails-guided)", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Order extends Base {
+      static {
+        this.attribute("amount", "integer");
+        this.adapter = adp;
+        this.afterCommit(() => { log.push("committed"); });
+      }
+    }
+    await Order.create({ amount: 100 });
+    expect(log).toContain("committed");
+  });
+
+  it("afterCommit fires on transaction commit (Rails-guided)", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Invoice extends Base {
+      static {
+        this.attribute("total", "integer");
+        this.adapter = adp;
+        this.afterCommit(() => { log.push("invoice committed"); });
+      }
+    }
+    await transaction(Invoice, async () => {
+      await Invoice.create({ total: 200 });
+    });
+    expect(log).toContain("invoice committed");
+  });
 });

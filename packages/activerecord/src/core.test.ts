@@ -357,3 +357,71 @@ describe("toKey()", () => {
     expect(user.toKey()).toBeNull();
   });
 });
+
+describe("Base features (Rails-guided) - core", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("toParam returns id as string", async () => {
+    class User extends Base { static { this.attribute("name", "string"); this.adapter = adapter; } }
+    const u = await User.create({ name: "Dean" });
+    expect(u.toParam()).toBe("1");
+  });
+
+  it("toParam returns null for new record", () => {
+    class User extends Base { static { this.attribute("name", "string"); } }
+    const u = new User({ name: "Dean" });
+    expect(u.toParam()).toBeNull();
+  });
+
+  it("inspect returns human-readable string", async () => {
+    class User extends Base { static { this.attribute("name", "string"); this.adapter = adapter; } }
+    const u = await User.create({ name: "Alice" });
+    const str = u.inspect();
+    expect(str).toContain("#<User");
+    expect(str).toContain('name: "Alice"');
+  });
+
+  it("slice returns subset of attributes", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "Alice", email: "a@b.com" });
+    const sliced = u.slice("name", "email");
+    expect(sliced).toEqual({ name: "Alice", email: "a@b.com" });
+    expect(sliced).not.toHaveProperty("id");
+  });
+
+  it("valuesAt returns attribute values as array", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "Alice", email: "a@b.com" });
+    expect(u.valuesAt("name", "email")).toEqual(["Alice", "a@b.com"]);
+  });
+
+  it("adapter throws when not configured", () => {
+    class NoAdapter extends Base { static { this.attribute("name", "string"); } }
+    expect(() => NoAdapter.adapter).toThrow("No adapter configured");
+  });
+
+  it("arelTable returns Table with correct name", () => {
+    class User extends Base {}
+    expect(User.arelTable.name).toBe("users");
+  });
+
+  it("table name guesses", () => {
+    class User extends Base {}
+    expect(User.tableName).toBe("users");
+  });
+
+  it("handles CamelCase class names", () => {
+    class BlogPost extends Base {}
+    expect(BlogPost.tableName).toBe("blog_posts");
+  });
+
+  it("custom table name", () => {
+    class User extends Base { static { this.tableName = "people"; } }
+    expect(User.tableName).toBe("people");
+  });
+});

@@ -576,3 +576,62 @@ describe("MigrationRunner", () => {
     await runner.migrate();
   });
 });
+
+describe("Rails-guided: migrations", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("reversible migration change method auto-reverses", async () => {
+    class CreateWidgets extends Migration {
+      async change() {
+        await this.createTable("widgets", (t) => {
+          t.string("name");
+          t.integer("quantity");
+        });
+      }
+    }
+    const m = new CreateWidgets();
+    await m.run(adapter, "up");
+    await adapter.executeMutation(`INSERT INTO "widgets" ("name", "quantity") VALUES ('Sprocket', 10)`);
+    expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(1);
+
+    await m.run(adapter, "down");
+    expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
+  });
+
+  it("MigrationRunner runs and rolls back", async () => {
+    class CreateUsers extends Migration {
+      static version = "20240101";
+      async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+      async down() { await this.dropTable("users"); }
+    }
+    class CreatePosts extends Migration {
+      static version = "20240102";
+      async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
+      async down() { await this.dropTable("posts"); }
+    }
+
+    const runner = new MigrationRunner(adapter, [new CreateUsers(), new CreatePosts()]);
+    await runner.migrate();
+
+    const status = await runner.status();
+    expect(status.every((s) => s.status === "up")).toBe(true);
+
+    await runner.rollback(1);
+    const afterRollback = await runner.status();
+    expect(afterRollback[0].status).toBe("up");
+    expect(afterRollback[1].status).toBe("down");
+  });
+
+  it("MigrationRunner.migrate is idempotent", async () => {
+    class CreateItems extends Migration {
+      static version = "20240201";
+      async up() { await this.createTable("items", (t) => { t.string("name"); }); }
+      async down() { await this.dropTable("items"); }
+    }
+    const runner = new MigrationRunner(adapter, [new CreateItems()]);
+    await runner.migrate();
+    await runner.migrate();
+    expect((await runner.status())[0].status).toBe("up");
+  });
+});

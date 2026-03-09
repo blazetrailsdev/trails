@@ -2734,3 +2734,32 @@ describe("Base.respondToMissingFinder", () => {
     expect(User.respondToMissingFinder("something")).toBe(false);
   });
 });
+
+describe("Rails-guided: first/last with count", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("first(n) returns array of n records", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "A" });
+    await User.create({ name: "B" });
+    await User.create({ name: "C" });
+    const result = await User.all().first(2) as Base[];
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
+  });
+
+  it("last(n) returns last n records in original order", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "A" });
+    await User.create({ name: "B" });
+    await User.create({ name: "C" });
+    const result = await User.all().last(2) as Base[];
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
+  });
+});

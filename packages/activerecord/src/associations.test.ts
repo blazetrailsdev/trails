@@ -1396,3 +1396,143 @@ describe("TouchBelongsToParents", () => {
     await expect(touchBelongsToParents(pet)).resolves.toBeUndefined();
   });
 });
+
+describe("Rails-guided: association features", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("dependent: destroy on has_many destroys all children", async () => {
+    class Comment extends Base {
+      static { this.attribute("body", "string"); this.attribute("article_id", "integer"); this.adapter = adapter; }
+    }
+    class Article extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    (Article as any)._associations = [
+      { type: "hasMany", name: "comments", options: { dependent: "destroy", className: "Comment", foreignKey: "article_id" } },
+    ];
+    registerModel(Article);
+    registerModel(Comment);
+
+    const article = await Article.create({ title: "Test" });
+    await Comment.create({ body: "Great!", article_id: article.id });
+    await Comment.create({ body: "Nice!", article_id: article.id });
+
+    await article.destroy();
+    expect(await Comment.all().count()).toBe(0);
+  });
+
+  it("dependent: delete on has_many deletes all children without callbacks", async () => {
+    class Tag extends Base {
+      static { this.attribute("name", "string"); this.attribute("category_id", "integer"); this.adapter = adapter; }
+    }
+    class Category extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    (Category as any)._associations = [
+      { type: "hasMany", name: "tags", options: { dependent: "delete", className: "Tag", foreignKey: "category_id" } },
+    ];
+    registerModel(Category);
+    registerModel(Tag);
+
+    const cat = await Category.create({ name: "Tech" });
+    await Tag.create({ name: "JS", category_id: cat.id });
+    await cat.destroy();
+    expect(await Tag.all().count()).toBe(0);
+  });
+
+  it("has_many :through loads records via join model", async () => {
+    class Skill extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Enrollment extends Base {
+      static { this.attribute("student_id", "integer"); this.attribute("skill_id", "integer"); this.adapter = adapter; }
+    }
+    class Student extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    (Student as any)._associations = [
+      { type: "hasMany", name: "enrollments", options: { className: "Enrollment" } },
+      { type: "hasMany", name: "skills", options: { through: "enrollments", className: "Skill", source: "skill" } },
+    ];
+    registerModel(Student);
+    registerModel(Enrollment);
+    registerModel(Skill);
+
+    const student = await Student.create({ name: "Alice" });
+    const js = await Skill.create({ name: "JavaScript" });
+    const ts = await Skill.create({ name: "TypeScript" });
+    await Enrollment.create({ student_id: student.id, skill_id: js.id });
+    await Enrollment.create({ student_id: student.id, skill_id: ts.id });
+
+    const skills = await loadHasManyThrough(student, "skills", {
+      through: "enrollments", className: "Skill", source: "skill",
+    });
+    expect(skills).toHaveLength(2);
+  });
+
+  it("CollectionProxy build sets FK on new record", async () => {
+    class Part extends Base {
+      static { this.attribute("name", "string"); this.attribute("machine_id", "integer"); this.adapter = adapter; }
+    }
+    class Machine extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    (Machine as any)._associations = [
+      { type: "hasMany", name: "parts", options: { className: "Part", foreignKey: "machine_id" } },
+    ];
+    registerModel(Machine);
+    registerModel(Part);
+
+    const machine = await Machine.create({ name: "Lathe" });
+    const proxy = association(machine, "parts");
+    const part = proxy.build({ name: "Gear" });
+    expect(part.readAttribute("machine_id")).toBe(machine.id);
+    expect(part.isNewRecord()).toBe(true);
+  });
+
+  it("CollectionProxy create saves record with FK", async () => {
+    class Entry extends Base {
+      static { this.attribute("content", "string"); this.attribute("journal_id", "integer"); this.adapter = adapter; }
+    }
+    class Journal extends Base {
+      static { this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    (Journal as any)._associations = [
+      { type: "hasMany", name: "entries", options: { className: "Entry", foreignKey: "journal_id" } },
+    ];
+    registerModel(Journal);
+    registerModel(Entry);
+
+    const journal = await Journal.create({ title: "Daily" });
+    const proxy = association(journal, "entries");
+    const entry = await proxy.create({ content: "Day 1" });
+    expect(entry.isPersisted()).toBe(true);
+    expect(await proxy.count()).toBe(1);
+  });
+
+  it("includes preloads hasMany and uses cache", async () => {
+    class Song extends Base {
+      static { this.attribute("title", "string"); this.attribute("album_id", "integer"); this.adapter = adapter; }
+    }
+    class Album extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    (Album as any)._associations = [
+      { type: "hasMany", name: "songs", options: { className: "Song", foreignKey: "album_id" } },
+    ];
+    registerModel(Album);
+    registerModel(Song);
+
+    const album = await Album.create({ name: "Best Of" });
+    await Song.create({ title: "Track 1", album_id: album.id });
+    await Song.create({ title: "Track 2", album_id: album.id });
+
+    const albums = await Album.all().includes("songs").toArray();
+    const cached = (albums[0] as any)._preloadedAssociations.get("songs");
+    expect(cached).toHaveLength(2);
+
+    const songs = await loadHasMany(albums[0], "songs", { className: "Song", foreignKey: "album_id" });
+    expect(songs).toHaveLength(2);
+  });
+});

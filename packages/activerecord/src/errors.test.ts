@@ -106,3 +106,96 @@ describe("error classes", () => {
     }
   });
 });
+
+describe("Error Classes (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  // Rails: test "RecordNotFound"
+  it("find raises RecordNotFound with model, primary_key, and id", async () => {
+    class Person extends Base {
+      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+
+    try {
+      await Person.find(42);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.model).toBe("Person");
+      expect(e.primaryKey).toBe("id");
+      expect(e.id).toBe(42);
+      expect(e.message).toContain("42");
+    }
+  });
+
+  // Rails: test "RecordNotFound with multiple IDs"
+  it("find with multiple IDs raises RecordNotFound listing missing IDs", async () => {
+    class Person extends Base {
+      static { this._tableName = "people"; this.attribute("id", "integer"); this.adapter = adapter; }
+    }
+    await Person.create({ id: 1 });
+
+    try {
+      await Person.find([1, 2, 3]);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.message).toContain("2");
+      expect(e.message).toContain("3");
+    }
+  });
+
+  // Rails: test "RecordInvalid"
+  it("save! raises RecordInvalid with error messages", async () => {
+    class Person extends Base {
+      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static { this.validates("name", { presence: true }); }
+    }
+
+    const p = new Person({});
+    try {
+      await p.saveBang();
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordInvalid);
+      expect(e.record).toBe(p);
+      expect(e.message).toContain("Validation failed");
+    }
+  });
+
+  // Rails: test "create! raises RecordInvalid"
+  it("create! raises RecordInvalid on validation failure", async () => {
+    class Person extends Base {
+      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static { this.validates("name", { presence: true }); }
+    }
+
+    await expect(Person.createBang({})).rejects.toThrow(RecordInvalid);
+  });
+
+  // Rails: test "find_by! raises RecordNotFound"
+  it("findByBang raises RecordNotFound when no record matches", async () => {
+    class Person extends Base {
+      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+
+    await expect(Person.findByBang({ name: "Nobody" })).rejects.toThrow(RecordNotFound);
+  });
+
+  // Rails: test "ReadOnlyRecord"
+  it("save on readonly record raises ReadOnlyRecord", async () => {
+    class Person extends Base {
+      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+
+    const p = await Person.create({ name: "Alice" });
+    p.readonlyBang();
+
+    await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
+    await expect(p.destroy()).rejects.toThrow(ReadOnlyRecord);
+  });
+});

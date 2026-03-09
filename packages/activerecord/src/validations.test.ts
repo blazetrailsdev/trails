@@ -324,3 +324,38 @@ describe("Validations (Rails-guided)", () => {
     expect(u.errors.size).toBe(0);
   });
 });
+
+describe("Rails-guided: uniqueness validations", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("validate uniqueness", async () => {
+    class Email extends Base {
+      static {
+        this.attribute("address", "string");
+        this.adapter = adapter;
+        this.validatesUniqueness("address");
+      }
+    }
+    await Email.create({ address: "a@b.com" });
+    const dup = new Email({ address: "a@b.com" });
+    expect(await dup.save()).toBe(false);
+    expect(dup.errors.get("address")).toContain("has already been taken");
+  });
+
+  it("validate uniqueness with scope", async () => {
+    class Permission extends Base {
+      static {
+        this.attribute("user_id", "integer");
+        this.attribute("resource_id", "integer");
+        this.adapter = adapter;
+        this.validatesUniqueness("user_id", { scope: "resource_id" });
+      }
+    }
+    await Permission.create({ user_id: 1, resource_id: 1 });
+    const p2 = await Permission.create({ user_id: 1, resource_id: 2 });
+    expect(p2.isPersisted()).toBe(true);
+    const p3 = new Permission({ user_id: 1, resource_id: 1 });
+    expect(await p3.save()).toBe(false);
+  });
+});

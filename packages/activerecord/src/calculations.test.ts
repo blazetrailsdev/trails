@@ -4893,3 +4893,24 @@ describe("Grouped Calculations (Rails-guided)", () => {
     expect((u as any)["get_name"]()).toBe("Alice");
   });
 });
+
+describe("Rails-guided: pick", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("pick returns single column value from first record", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+    }
+    await User.create({ name: "Alice", age: 25 });
+    await User.create({ name: "Bob", age: 30 });
+    expect(await User.all().order("name").pick("name")).toBe("Alice");
+  });
+
+  it("pick returns null when no records exist", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    expect(await User.all().pick("name")).toBe(null);
+  });
+});

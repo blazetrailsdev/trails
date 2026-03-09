@@ -415,3 +415,15 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(item.id).toBeGreaterThan(0);
   });
 });
+
+describe("Base features (Rails-guided) - primary keys", () => {
+  it("primary key defaults to id", () => {
+    class User extends Base {}
+    expect(User.primaryKey).toBe("id");
+  });
+
+  it("custom primary key", () => {
+    class User extends Base { static { this.primaryKey = "uuid"; } }
+    expect(User.primaryKey).toBe("uuid");
+  });
+});

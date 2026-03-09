@@ -3469,3 +3469,101 @@ describe("Relation query edge cases (Rails-guided)", () => {
     expect(ids).toContain(b.readAttribute("id"));
   });
 });
+
+describe("Rails-guided: set operations and joins", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("union combines two relations without duplicates", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "Alice", role: "admin" });
+    await User.create({ name: "Bob", role: "user" });
+    await User.create({ name: "Charlie", role: "admin" });
+
+    const admins = User.where({ role: "admin" });
+    const users = User.where({ role: "user" });
+    const result = await admins.union(users).toArray();
+    expect(result).toHaveLength(3);
+  });
+
+  it("intersect finds overlap between relations", async () => {
+    class Product extends Base {
+      static { this.attribute("name", "string"); this.attribute("category", "string"); this.attribute("featured", "boolean"); this.adapter = adapter; }
+    }
+    await Product.create({ name: "A", category: "electronics", featured: true });
+    await Product.create({ name: "B", category: "electronics", featured: false });
+    await Product.create({ name: "C", category: "books", featured: true });
+
+    const result = await Product.where({ category: "electronics" })
+      .intersect(Product.where({ featured: true }))
+      .toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].readAttribute("name")).toBe("A");
+  });
+
+  it("except removes records from left relation", async () => {
+    class Product extends Base {
+      static { this.attribute("name", "string"); this.attribute("discontinued", "boolean"); this.adapter = adapter; }
+    }
+    await Product.create({ name: "A", discontinued: false });
+    await Product.create({ name: "B", discontinued: true });
+
+    const result = await Product.all()
+      .except(Product.where({ discontinued: true }))
+      .toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].readAttribute("name")).toBe("A");
+  });
+
+  it("lock generates FOR UPDATE in SQL", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    expect(User.all().lock().toSql()).toContain("FOR UPDATE");
+  });
+
+  it("lock with custom clause", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    expect(User.all().lock("FOR SHARE").toSql()).toContain("FOR SHARE");
+  });
+
+  it("locked query still executes against MemoryAdapter", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "Alice" });
+    const result = await User.all().lock().toArray();
+    expect(result).toHaveLength(1);
+  });
+
+  it("joins generates proper JOIN SQL", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const sql = User.all().joins("posts", '"users"."id" = "posts"."user_id"').toSql();
+    expect(sql).toMatch(/INNER JOIN/);
+    expect(sql).toContain('"posts"');
+    expect(sql).toContain('user_id');
+  });
+
+  it("leftJoins generates LEFT OUTER JOIN SQL", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const sql = User.all().leftJoins("posts", '"users"."id" = "posts"."user_id"').toSql();
+    expect(sql).toMatch(/LEFT OUTER JOIN/);
+  });
+
+  it("unionAll includes all records including duplicates", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "Alice" });
+    const result = await User.all().unionAll(User.all()).toArray();
+    expect(result).toHaveLength(2);
+  });
+});

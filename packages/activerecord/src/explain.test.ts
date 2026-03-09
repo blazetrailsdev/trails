@@ -160,4 +160,11 @@ describe("ExplainTest", () => {
     expect(typeof plan).toBe("string");
     expect(plan.length).toBeGreaterThan(0);
   });
+
+  it("explain returns query plan string (Rails-guided)", async () => {
+    const { Post } = makeModel();
+    const plan = await Post.all().explain();
+    expect(typeof plan).toBe("string");
+    expect(plan.length).toBeGreaterThan(0);
+  });
 });
