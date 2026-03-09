@@ -2002,7 +2002,9 @@ export class Base extends Model {
       })
       .join(", ");
 
-    const sql = `INSERT INTO "${table.name}" (${colList}) VALUES (${valList})`;
+    const sql = columns.length === 0
+      ? `INSERT INTO "${table.name}" DEFAULT VALUES`
+      : `INSERT INTO "${table.name}" (${colList}) VALUES (${valList})`;
     this._pendingOperation = ctor.adapter
       .executeMutation(sql)
       .then((insertedId) => {

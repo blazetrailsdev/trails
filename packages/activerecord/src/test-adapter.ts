@@ -94,12 +94,13 @@ function extractColumnsFromModels(): void {
 
     const attrs: Map<string, { name: string; type: { name?: string } }> =
       modelClass._attributeDefinitions;
-    if (!attrs || attrs.size === 0) continue;
 
     const columns = new Map<string, string>();
-    for (const [name, def] of attrs) {
-      if (name === "id") continue;
-      columns.set(name, sqlType(def.type?.name || "string"));
+    if (attrs) {
+      for (const [name, def] of attrs) {
+        if (name === "id") continue;
+        columns.set(name, sqlType(def.type?.name || "string"));
+      }
     }
 
     const existing = _pendingModels.get(tableName);
@@ -276,7 +277,12 @@ class SchemaAdapter implements DatabaseAdapter {
 
     // Track DDL so we know what tables exist
     const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
-    if (createMatch) _createdTables.add(createMatch[1]);
+    if (createMatch) {
+      _createdTables.add(createMatch[1]);
+      if (!_createdColumns.has(createMatch[1])) {
+        _createdColumns.set(createMatch[1], new Set(["id"]));
+      }
+    }
 
     const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
     if (dropMatch) {

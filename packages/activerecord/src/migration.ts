@@ -1,5 +1,18 @@
 import type { DatabaseAdapter } from "./adapter.js";
 
+/** Detect adapter type from an adapter instance. */
+function detectAdapterName(adapter: DatabaseAdapter | null | undefined): "sqlite" | "postgres" | "mysql" | "memory" {
+  const name = adapter?.constructor?.name ?? "";
+  if (name.includes("Postgres") || name === "SchemaAdapter") {
+    if (process.env.PG_TEST_URL) return "postgres";
+    if (process.env.MYSQL_TEST_URL) return "mysql";
+    return "memory";
+  }
+  if (name.includes("Mysql") || name.includes("Maria")) return "mysql";
+  if (name.includes("Memory")) return "memory";
+  return "sqlite";
+}
+
 /**
  * Column type mapping.
  */
@@ -242,16 +255,7 @@ export abstract class Migration {
 
   /** Determine adapter type from the adapter class name. */
   protected get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
-    const name = this.adapter?.constructor?.name ?? "";
-    if (name.includes("Postgres") || name === "SchemaAdapter") {
-      // SchemaAdapter wraps the real adapter; check env
-      if (process.env.PG_TEST_URL) return "postgres";
-      if (process.env.MYSQL_TEST_URL) return "mysql";
-      return "memory";
-    }
-    if (name.includes("Mysql") || name.includes("Maria")) return "mysql";
-    if (name.includes("Memory")) return "memory";
-    return "sqlite";
+    return detectAdapterName(this.adapter);
   }
 
   /**
@@ -1110,7 +1114,7 @@ export abstract class Migration {
       case "integer":
         return "INTEGER";
       case "float":
-        return "REAL";
+        return this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
       case "decimal":
         return `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
       case "boolean":
@@ -1119,9 +1123,9 @@ export abstract class Migration {
         return "DATE";
       case "datetime":
       case "timestamp":
-        return "DATETIME";
+        return this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
       case "binary":
-        return "BLOB";
+        return this._adapterName === "postgres" ? "BYTEA" : "BLOB";
       case "primary_key":
         if (this._adapterName === "postgres") return "SERIAL PRIMARY KEY";
         if (this._adapterName === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
@@ -1212,15 +1216,7 @@ export class Schema {
   }
 
   private get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
-    const name = this.adapter?.constructor?.name ?? "";
-    if (name.includes("Postgres") || name === "SchemaAdapter") {
-      if (process.env.PG_TEST_URL) return "postgres";
-      if (process.env.MYSQL_TEST_URL) return "mysql";
-      return "memory";
-    }
-    if (name.includes("Mysql") || name.includes("Maria")) return "mysql";
-    if (name.includes("Memory")) return "memory";
-    return "sqlite";
+    return detectAdapterName(this.adapter);
   }
 
   async createTable(
@@ -1247,6 +1243,10 @@ export class MigrationContext {
 
   constructor(private adapter: DatabaseAdapter) {}
 
+  private get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
+    return detectAdapterName(this.adapter);
+  }
+
   async createTable(
     name: string,
     options?: { primaryKey?: string | false; force?: boolean; id?: boolean },
@@ -1255,7 +1255,7 @@ export class MigrationContext {
     if (options?.force) {
       await this.dropTable(name).catch(() => {});
     }
-    const td = new TableDefinition(name, { id: options?.id });
+    const td = new TableDefinition(name, { id: options?.id, adapterName: this._adapterName });
     if (fn) fn(td);
     await this.adapter.executeMutation(td.toSql());
     this._tables.add(name);
