@@ -51,7 +51,14 @@ export class MysqlAdapter implements DatabaseAdapter {
     for (let i = 0; i < parts.length; i += 2) {
       parts[i] = parts[i].replace(/"/g, "`");
     }
-    return parts.join("");
+    let result = parts.join("");
+
+    // MySQL requires LIMIT when using OFFSET; add a large LIMIT if missing
+    if (/\bOFFSET\b/i.test(result) && !/\bLIMIT\b/i.test(result)) {
+      result = result.replace(/\bOFFSET\b/i, "LIMIT 18446744073709551615 OFFSET");
+    }
+
+    return result;
   }
 
   /**
