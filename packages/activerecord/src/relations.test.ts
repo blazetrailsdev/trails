@@ -2415,16 +2415,19 @@ describe("Relation#invertWhere", () => {
       static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
     }
     const alice = await InvertWhereUser.create({ name: "Alice", role: "admin" });
+    console.log(`[invertWhere] alice.id=${alice.id}, alice.name=${alice.readAttribute("name")}`);
     const afterAlice = await InvertWhereUser.all().toArray();
-    console.log(`[invertWhere] after alice: count=${afterAlice.length}, ids=${afterAlice.map((r: any) => r.id)}`);
+    console.log(`[invertWhere] after alice SELECT: count=${afterAlice.length}, ids=${afterAlice.map((r: any) => r.id)}`);
 
     const bob = await InvertWhereUser.create({ name: "Bob", role: "user" });
+    console.log(`[invertWhere] bob.id=${bob.id}, bob.name=${bob.readAttribute("name")}`);
     const afterBob = await InvertWhereUser.all().toArray();
-    console.log(`[invertWhere] after bob: count=${afterBob.length}, ids=${afterBob.map((r: any) => r.id)}`);
+    console.log(`[invertWhere] after bob SELECT: count=${afterBob.length}, ids=${afterBob.map((r: any) => r.id)}`);
 
     const charlie = await InvertWhereUser.create({ name: "Charlie", role: "admin" });
+    console.log(`[invertWhere] charlie.id=${charlie.id}`);
     const afterCharlie = await InvertWhereUser.all().toArray();
-    console.log(`[invertWhere] after charlie: count=${afterCharlie.length}, ids=${afterCharlie.map((r: any) => r.id)}`);
+    console.log(`[invertWhere] after charlie SELECT: count=${afterCharlie.length}, ids=${afterCharlie.map((r: any) => r.id)}`);
 
     expect(afterCharlie.length).toBe(3);
 

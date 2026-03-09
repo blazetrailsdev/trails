@@ -225,6 +225,9 @@ if (_sharedAdapter) {
  */
 export function createTestAdapter(): DatabaseAdapter {
   _needsCleanup = true;
+  if (_sharedAdapter) {
+    console.log(`[test-adapter] createTestAdapter() called, _needsCleanup=true, stack=${new Error().stack?.split("\n").slice(1, 4).join(" | ")}`);
+  }
   return _factory();
 }
 
