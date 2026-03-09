@@ -6,8 +6,10 @@
  *   - MYSQL_TEST_URL → MysqlAdapter (wrapped in AutoMigrateAdapter)
  *   - (default)      → MemoryAdapter
  *
- * Uses top-level await to eagerly load the adapter module so that
- * createTestAdapter() can be called synchronously from tests.
+ * For real database adapters, a single shared connection pool is reused
+ * across all test adapters to avoid exhausting database connections.
+ * Each AutoMigrateAdapter tracks its own tables and cleans them up,
+ * but the underlying connection stays open for the lifetime of the process.
  */
 
 import { MemoryAdapter } from "./adapter.js";
@@ -20,22 +22,27 @@ const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 export const adapterType: "memory" | "postgres" | "mysql" =
   PG_TEST_URL ? "postgres" : MYSQL_TEST_URL ? "mysql" : "memory";
 
-// Eagerly resolve the adapter constructor via top-level await
+// Shared adapter instance for real databases (single connection pool)
+let _sharedAdapter: any = null;
+
 let _factory: () => DatabaseAdapter;
 
 if (PG_TEST_URL) {
   const { PostgresAdapter } = await import("./adapters/postgres-adapter.js");
-  _factory = () => new AutoMigrateAdapter(new PostgresAdapter(PG_TEST_URL));
+  _sharedAdapter = new PostgresAdapter(PG_TEST_URL);
+  _factory = () => new AutoMigrateAdapter(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
   const { MysqlAdapter } = await import("./adapters/mysql-adapter.js");
-  _factory = () => new AutoMigrateAdapter(new MysqlAdapter(MYSQL_TEST_URL));
+  _sharedAdapter = new MysqlAdapter(MYSQL_TEST_URL);
+  _factory = () => new AutoMigrateAdapter(_sharedAdapter);
 } else {
   _factory = () => new MemoryAdapter();
 }
 
 /**
  * Create a fresh adapter for testing. Each call returns a new adapter
- * instance with a clean state. Synchronous thanks to top-level await.
+ * instance with a clean state. For real databases, the underlying
+ * connection pool is shared to avoid connection exhaustion.
  */
 export function createTestAdapter(): DatabaseAdapter {
   return _factory();
@@ -43,7 +50,7 @@ export function createTestAdapter(): DatabaseAdapter {
 
 /**
  * Clean up test tables. Call this in afterEach/afterAll to drop tables
- * created during tests.
+ * created during tests. Does NOT close the shared connection.
  */
 export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void> {
   if (adapter instanceof AutoMigrateAdapter) {
@@ -56,6 +63,9 @@ export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void
  * targets a table that doesn't exist yet. This lets the existing test
  * suite run against real databases without adding explicit CREATE TABLE
  * statements to every test.
+ *
+ * The underlying adapter is shared across instances — cleanup() drops
+ * tables and clears data but does NOT close the connection.
  */
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
@@ -107,13 +117,35 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     return `EXPLAIN not supported`;
   }
 
+  // Track known columns per table to add missing ones
+  private tableColumns = new Map<string, Set<string>>();
+
   /**
    * Ensure a table exists, creating it with TEXT columns if needed.
+   * If the table already exists but is missing columns, adds them via ALTER TABLE.
    */
   private async ensureTable(tableName: string, colStr: string): Promise<void> {
-    if (this.knownTables.has(tableName)) return;
+    const columns = colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""));
 
-    const columns = colStr.split(",").map((c) => c.trim().replace(/"/g, ""));
+    if (this.knownTables.has(tableName)) {
+      // Table exists — check for missing columns and add them
+      const known = this.tableColumns.get(tableName);
+      if (known) {
+        for (const col of columns) {
+          if (col === "id" || known.has(col)) continue;
+          try {
+            const alterSql = this.isMysql()
+              ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` TEXT`
+              : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`;
+            await this.inner.exec(alterSql);
+          } catch {
+            // Column might already exist
+          }
+          known.add(col);
+        }
+      }
+      return;
+    }
 
     const colDefs = columns
       .filter((c) => c !== "id")
@@ -137,9 +169,11 @@ class AutoMigrateAdapter implements DatabaseAdapter {
       await this.inner.exec(createSql);
       this.knownTables.add(tableName);
       this.createdTables.add(tableName);
+      this.tableColumns.set(tableName, new Set(columns));
     } catch {
       // Table might already exist (race condition or previously created)
       this.knownTables.add(tableName);
+      this.tableColumns.set(tableName, new Set(columns));
     }
   }
 
@@ -152,7 +186,7 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Drop all auto-created tables and close the connection.
+   * Drop all auto-created tables. Does NOT close the shared connection.
    */
   async cleanup(): Promise<void> {
     for (const table of this.createdTables) {
@@ -167,9 +201,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     }
     this.createdTables.clear();
     this.knownTables.clear();
-
-    if (this.inner.close) {
-      await this.inner.close();
-    }
+    this.tableColumns.clear();
   }
 }
