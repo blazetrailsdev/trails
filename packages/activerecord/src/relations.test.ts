@@ -2418,6 +2418,13 @@ describe("Relation#invertWhere", () => {
     await InvertWhereUser.create({ name: "Bob", role: "user" });
     await InvertWhereUser.create({ name: "Charlie", role: "admin" });
 
+    // Verify all 3 records exist with correct data
+    const all = await InvertWhereUser.all().toArray();
+    const roles = all.map((u: any) => u.readAttribute("role"));
+    expect(all.length).toBe(3);
+    // If role is null, the column wasn't created properly
+    expect(roles.filter((r: unknown) => r === "admin").length).toBe(2);
+
     // where({ role: "admin" }) returns Alice, Charlie
     const admins = await InvertWhereUser.where({ role: "admin" }).toArray();
     expect(admins.length).toBe(2);
