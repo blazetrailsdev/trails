@@ -9,10 +9,13 @@
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
  *
- * Test isolation strategy: tables are auto-created on first INSERT and
- * persist for the lifetime of the test file. Between tests, cleanup()
- * DELETEs all rows (instead of DROP/CREATE) so schema is preserved but
- * data doesn't leak between tests.
+ * Test isolation strategy:
+ *   - Tables are auto-created on first INSERT and persist for the file.
+ *   - Each createTestAdapter() call sets a "needs cleanup" flag.
+ *   - The first DB operation after the flag is set deletes all rows
+ *     and resets auto-increment counters.
+ *   - This ensures each test starts with empty tables without requiring
+ *     explicit afterEach cleanup.
  */
 
 import { MemoryAdapter } from "./adapter.js";
@@ -25,41 +28,55 @@ const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 export const adapterType: "memory" | "postgres" | "mysql" =
   PG_TEST_URL ? "postgres" : MYSQL_TEST_URL ? "mysql" : "memory";
 
+const isPg = (): boolean => !!PG_TEST_URL;
+const isMysql = (): boolean => !!MYSQL_TEST_URL;
+
 // Shared adapter instance for real databases (single connection pool)
 let _sharedAdapter: any = null;
 
 // Module-level schema tracking — shared across all AutoMigrateAdapter
-// instances within a single test file (vitest worker). This lets tables
-// accumulate columns across tests without being dropped/recreated.
+// instances within a single test file (vitest worker).
 const _knownTables = new Set<string>();
 const _tableColumns = new Map<string, Set<string>>();
 
+// Set to true whenever createTestAdapter() is called. Cleared after
+// the first DB operation deletes all data. This ensures exactly one
+// cleanup per test boundary regardless of how many adapters are created.
+let _needsCleanup = false;
+// Guard against re-entrant cleanup (e.g. _deleteAllData triggers execute)
+let _cleaningInProgress = false;
+
 /**
  * Delete all rows from all known tables and reset auto-increment.
- * Called automatically when a new AutoMigrateAdapter is created.
  */
 async function _deleteAllData(inner: any): Promise<void> {
-  for (const table of _knownTables) {
-    try {
-      const deleteSql = isMysql()
-        ? `DELETE FROM \`${table}\``
-        : `DELETE FROM "${table}"`;
-      await inner.exec(deleteSql);
-      if (isPg()) {
-        try {
-          const seqs = await inner.execute(
-            `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname LIKE '${table}_%_seq'`
-          );
-          for (const seq of seqs) {
-            await inner.exec(`ALTER SEQUENCE "${(seq as any).relname}" RESTART WITH 1`);
-          }
-        } catch {}
-      } else if (isMysql()) {
-        try { await inner.exec(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`); } catch {}
+  if (_cleaningInProgress) return;
+  _cleaningInProgress = true;
+  try {
+    for (const table of _knownTables) {
+      try {
+        const deleteSql = isMysql()
+          ? `DELETE FROM \`${table}\``
+          : `DELETE FROM "${table}"`;
+        await inner.exec(deleteSql);
+        if (isPg()) {
+          try {
+            const seqs = await inner.execute(
+              `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname LIKE '${table}_%_seq'`
+            );
+            for (const seq of seqs) {
+              await inner.exec(`ALTER SEQUENCE "${(seq as any).relname}" RESTART WITH 1`);
+            }
+          } catch {}
+        } else if (isMysql()) {
+          try { await inner.exec(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`); } catch {}
+        }
+      } catch {
+        // Table may not exist yet
       }
-    } catch {
-      // Table may not exist yet
     }
+  } finally {
+    _cleaningInProgress = false;
   }
 }
 
@@ -68,8 +85,6 @@ let _factory: () => DatabaseAdapter;
 if (PG_TEST_URL) {
   const { PostgresAdapter } = await import("./adapters/postgres-adapter.js");
   _sharedAdapter = new PostgresAdapter(PG_TEST_URL);
-  // Drop all existing tables from previous test files (vitest worker isolation
-  // means module state resets per file, but DB state persists)
   const rows = await _sharedAdapter.execute(
     `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
   );
@@ -80,7 +95,6 @@ if (PG_TEST_URL) {
 } else if (MYSQL_TEST_URL) {
   const { MysqlAdapter } = await import("./adapters/mysql-adapter.js");
   _sharedAdapter = new MysqlAdapter(MYSQL_TEST_URL);
-  // Drop all existing tables from previous test files
   const rows = await _sharedAdapter.execute(`SHOW TABLES`);
   for (const r of rows) {
     const table = Object.values(r)[0] as string;
@@ -92,27 +106,23 @@ if (PG_TEST_URL) {
 }
 
 /**
- * Create a fresh adapter for testing. Each call returns a new adapter
- * instance with a clean state. For real databases, data from previous
- * tests is automatically deleted on first use.
+ * Create a fresh adapter for testing. Synchronous — cleanup happens
+ * lazily on the first DB operation.
  */
 export function createTestAdapter(): DatabaseAdapter {
+  _needsCleanup = true;
   return _factory();
 }
 
 /**
- * Clean up test data. Call this in afterEach/afterAll to delete rows
- * created during tests. Schema (tables/columns) is preserved.
- * Does NOT close the shared connection.
+ * Clean up test data explicitly. Usually not needed since cleanup
+ * happens automatically on next createTestAdapter() + first operation.
  */
 export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void> {
   if (adapter instanceof AutoMigrateAdapter) {
     await adapter.cleanup();
   }
 }
-
-const isPg = (): boolean => !!PG_TEST_URL;
-const isMysql = (): boolean => !!MYSQL_TEST_URL;
 
 /**
  * Infer a SQL column type from the INSERT values.
@@ -200,37 +210,20 @@ async function ensureTable(
 }
 
 /**
- * Wraps a real database adapter and auto-creates tables when an INSERT
- * targets a table that doesn't exist yet. Uses DELETE-based cleanup
- * for test isolation: schema persists, data is cleaned between tests.
+ * Wraps a real database adapter and auto-creates tables on INSERT.
+ * Uses a shared "needs cleanup" flag for lazy test isolation.
  */
-// Track the latest adapter ID. When an adapter does its first operation
-// and its ID matches _latestAdapterId, it triggers cleanup. This ensures
-// only the most-recently-created adapter cleans, avoiding problems when
-// multiple adapters are created in the same test.
-let _latestAdapterId = 0;
-let _cleanedForAdapter = 0;
-
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
-  private id: number;
 
   constructor(inner: any) {
     this.inner = inner;
-    this.id = ++_latestAdapterId;
   }
 
-  /**
-   * Auto-clean on first operation if this is the latest adapter.
-   * Only the most-recently-created adapter triggers cleanup to avoid
-   * wiping data that sibling adapters in the same test just inserted.
-   */
   private async autoClean(): Promise<void> {
-    if (_cleanedForAdapter >= this.id) return;
-    if (this.id === _latestAdapterId) {
-      _cleanedForAdapter = this.id;
-      await _deleteAllData(this.inner);
-    }
+    if (!_needsCleanup || _cleaningInProgress) return;
+    _needsCleanup = false;
+    await _deleteAllData(this.inner);
   }
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
@@ -243,7 +236,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
         || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
       if (tableMatch) {
         const tableName = tableMatch[1];
-        // Extract column names from SQL to create minimal table
         const colMatches = sql.match(/["`](\w+)["`]\.\s*["`](\w+)["`]/g) || [];
         const cols = new Set<string>();
         for (const m of colMatches) {
@@ -290,7 +282,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
         || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
       if (tableMatch) {
         const tableName = tableMatch[1];
-        // Create minimal table and retry
         const insertCols = sql.match(/\(([^)]*)\)\s*VALUES/i);
         const colStr = insertCols?.[1] || "";
         await ensureTable(this.inner, tableName, colStr, sql);
@@ -312,10 +303,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     return `EXPLAIN not supported`;
   }
 
-  /**
-   * Delete all rows from known tables. Also called automatically
-   * via autoClean() on next adapter's first operation.
-   */
   async cleanup(): Promise<void> {
     await _deleteAllData(this.inner);
   }
