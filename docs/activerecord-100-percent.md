@@ -1,20 +1,21 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **72.1%** (3,914 matched / 5,428 total Ruby tests). 1,513 stubs need converting, 1 test is missing entirely. Raw test stats: 6,523 passed, 1,335 skipped.
+Current state: **77.9%** name match (4,229 matched / 5,428 total Ruby tests), **13.4%** real (730 non-skip). 3,499 stubs need converting, ~1,199 tests have no TS match at all. Raw test stats: 6,744 passed, 3,669 skipped.
 
-> **Progress update (2026-03-08, session 3):** Added scoped preloading support — the preloader now applies association `scope` lambdas when loading hasMany, hasOne, and through associations. Converted 10 more tests (scoped dependent delete, scoped through preloading, scoped through loading). Coverage: 6,523 passed / 1,335 skipped.
+> **Progress update (2026-03-09):** Converted 129 `it.skip` stubs to real passing tests across the 6 highest-impact files:
 >
-> **Progress update (2026-03-08, session 2):** Jumped from 67.7% to 71.9% (+230 tests). Key new features implemented:
+> - **base.test.ts** — 85 tests implemented: table name guessing, abstract class checks, find/first/last, firstBang/lastBang with RecordNotFound, exists?, findBy, findOrCreateBy, findOrInitializeBy, toParam, where conditions, count, pluck, pick, ids, min/max/sum/avg, order, group, having, offset, limit, distinct, readonly, lock, joins, update/updateBang, destroyBang, becomes, dup, findBySql, scoping/currentScope, default scope with unscoped, named scopes, column names, ignored columns, readonly attributes, inherited attributes, prefixes/suffixes, and more.
+> - **counter-cache.test.ts** — 19 tests: incrementCounter, decrementCounter, updateCounters (single/multiple/multi-record), counter cache with belongsTo association create/destroy lifecycle.
+> - **relation/where.test.ts** — 9 tests: string conditions, empty hash, nil hash value, array hash value, range conditions, numeric comparisons, not nil conditions.
+> - **insert-all.test.ts** — 5 tests: empty array handling, upsert updates, no callback bypass, array immutability.
+> - **strict-loading.test.ts** — 5 tests: per-model default, raises on lazy load, enabled on record, toggle, StrictLoadingViolationError.
+> - **reflection.test.ts** — 6 tests: hasMany/hasOne/belongsTo reflection, reflection type, all associations, inferred foreign key.
 >
-> - **`has_many :through` and `has_one :through`** — full loading support including through `has_one`, `belongs_to`, and `has_many` intermediaries. `loadHasOneThrough` resolves through chains. `loadHasManyThrough` handles both `belongs_to` source (FK on join record) and `has_many` source (FK on target pointing back to join record). Source association lookup tries both singular and plural names.
-> - **Through-aware CollectionProxy** — `push`/`<<` creates join records instead of setting FK on target. `delete` destroys join records instead of nullifying FK. Works with polymorphic through associations.
-> - **Polymorphic association support (writes, preloading, counter cache, dependent)** — `setBelongsTo` sets `_type` column. `setHasOne`/`setHasMany` handle `as:` option. CollectionProxy `build`/`push`/`delete` set type columns. Preloader handles polymorphic `belongs_to` (groups by type, queries each model), polymorphic `has_many`/`has_one` (filters by type column), and polymorphic through associations.
-> - **Polymorphic dependent nullify** — `processDependentAssociations` nullifies both FK and type columns for polymorphic `as:` associations.
-> - **Polymorphic counter cache** — `updateCounterCaches` resolves target model from `_type` column for polymorphic `belongs_to`.
-> - **Variadic `whereAssociated`/`whereMissing`** — accept multiple association names.
-> - **Preloader improvements** — through preloader handles both `belongs_to` and `has_many` source types, polymorphic `as:` on through associations, and singular/plural source name fallback.
+> Also added 100% name-matched test stubs for all 3 database adapter test files (SQLite: 181 tests, PostgreSQL: 1,052 tests, MySQL: 216 tests).
 >
-> Earlier in the same day: NormalizedAttributeTest, SerializationTest, JsonSerializationTest, StoreTest (with prefix/suffix), SerializedAttributeTest, SignedIdTest, WhereChainTest (partial), UniquenessValidation (full), ReflectionTest, ExplainTest, InvertibleMigrationTest, ActiveRecordSchemaTest, OptimisticLockingTest (partial), TransactionCallbacksTest (partial), InnerJoinAssociationTest, LeftOuterJoinAssociationTest, DelegatedTypeTest, CustomPropertiesTest, InverseAssociationTests, NestedAttributesTests, AutosaveTests, ReadOnlyTest, TimeTravelTest, TouchLaterTest, and partial coverage across all association test files.
+> **Progress update (2026-03-08, session 3):** Added scoped preloading support — the preloader now applies association `scope` lambdas when loading hasMany, hasOne, and through associations. Converted 10 more tests.
+>
+> **Progress update (2026-03-08, session 2):** Jumped from 67.7% to 71.9% (+230 tests). Key features: `has_many :through` / `has_one :through`, through-aware CollectionProxy, polymorphic association support (writes, preloading, counter cache, dependent), variadic `whereAssociated`/`whereMissing`, preloader improvements.
 
 This document groups the remaining work into feature areas, identifies dependencies, and marks what can be worked on in parallel.
 
@@ -24,16 +25,16 @@ This document groups the remaining work into feature areas, identifies dependenc
 
 ## Summary by feature area
 
-| # | Feature Area | Stubs | Done | Key Dependencies | Parallel? |
+| # | Feature Area | Stubs | Real | Key Dependencies | Parallel? |
 |---|---|---|---|---|---|
 | 1 | Through Associations | ~195 | ~125 | Associations core | **Partial** — basic through works, polymorphic through works, scoped through works, nested through partially |
 | 2 | HasMany Associations | ~148 | ~132 | Associations core, fixtures | **Partial** |
 | 3 | Eager Loading / Preloading | ~168 | ~82 | Associations (all types), JOINs | **Partial** — through preloading works, scoped preloading works |
-| 4 | Base / Persistence / Attributes | ~130 | ~120 | Mostly standalone | **Partial** |
+| 4 | Base / Persistence / Attributes | ~45 | ~205 | Mostly standalone | **Good** — 85 tests converted this session |
 | 5 | Autosave Associations | ~140 | ~95 | Associations (all types) | **Partial** |
 | 6 | Association Misc | ~130 | ~90 | Associations core | **Partial** |
 | 7 | Join Associations | ~120 | ~85 | Associations core, JOINs | **Partial** |
-| 8 | Relation / Where | ~100 | ~50 | Relation core | **Partial** |
+| 8 | Relation / Where | ~91 | ~59 | Relation core | **Partial** — 9 tests converted this session |
 | 9 | Nested Attributes | ~100 | ~120 | Associations (all types), autosave | **Partial** |
 | 10 | Migrations / Schema | ~90 | ~75 | Standalone | **Partial** |
 | 11 | Serialization / Store / JSON | ~50 | ~115 | Mostly standalone | **Mostly done** |
@@ -45,13 +46,14 @@ This document groups the remaining work into feature areas, identifies dependenc
 | 17 | Finders / Calculations | ~24 | ~220 | Relation, JOINs | **Mostly done** |
 | 18 | Locking | ~35 | ~35 | Base, transactions | **Partial** |
 | 19 | Transactions | ~30 | ~25 | Base | **Partial** |
-| 20 | Insert / Upsert | ~30 | ~15 | Base | **Partial** |
-| 21 | Reflection | ~30 | ~35 | Associations | **Mostly done** |
-| 22 | Counter Cache | ~25 | ~20 | BelongsTo, callbacks | **Partial** — polymorphic counter cache works |
-| 23 | Strict Loading | ~20 | ~10 | Associations (all types) | **Partial** |
+| 20 | Insert / Upsert | ~25 | ~20 | Base | **Partial** — 5 tests converted this session |
+| 21 | Reflection | ~24 | ~41 | Associations | **Mostly done** — 6 tests converted this session |
+| 22 | Counter Cache | ~6 | ~39 | BelongsTo, callbacks | **Good** — 19 tests converted this session |
+| 23 | Strict Loading | ~15 | ~15 | Associations (all types) | **Partial** — 5 tests converted this session |
 | 24 | Primary Keys | ~15 | ~25 | Base | **Mostly done** |
-| 25 | Small areas (<20 each) | ~70 | ~140 | Various | Mixed |
-| | **TOTAL** | **~1,513** | **~3,914** | | |
+| 25 | DB Adapters (SQLite/PG/MySQL) | ~1,284 | ~165 | Real DB connections | **Stubs complete** — 100% name match |
+| 26 | Small areas (<20 each) | ~70 | ~140 | Various | Mixed |
+| | **TOTAL** | **~3,499** | **~730** | | |
 
 ## Dependency graph
 

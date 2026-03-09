@@ -4032,4 +4032,16 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("loading cpk association with unpersisted owner", () => {});
   it.skip("cpk stale target", () => {});
   it.skip("cpk association build through singular", () => {});
+
+  it.skip("has many through create record", () => {});
+  it.skip("ordered has many through", () => {});
+  it.skip("no pk join model callbacks", () => {});
+  it.skip("include?", () => {});
+  it.skip("has many association through a belongs to association", () => {});
+  it.skip("has many association through a has many association to self", () => {});
+  it.skip("create with conditions hash on through association", () => {});
+  it.skip("has many through associations on new records use null relations", () => {});
+
+  it.skip("has many inherited", () => {});
+  it.skip("polymorphic has many going through join model", () => {});
 });

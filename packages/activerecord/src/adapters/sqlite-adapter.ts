@@ -10,13 +10,18 @@ export class SqliteAdapter implements DatabaseAdapter {
   private db: Database.Database;
   private _inTransaction = false;
   private _savepointCounter = 0;
+  private _readonly: boolean;
+  private _preventWrites = false;
 
-  constructor(filename: string | ":memory:" = ":memory:") {
-    this.db = new Database(filename);
-    // Enable WAL mode for better concurrent read performance
-    this.db.pragma("journal_mode = WAL");
-    // Enable foreign keys
-    this.db.pragma("foreign_keys = ON");
+  constructor(filename: string | ":memory:" = ":memory:", options?: { readonly?: boolean }) {
+    this._readonly = options?.readonly ?? false;
+    this.db = new Database(filename, { readonly: this._readonly });
+    if (!this._readonly) {
+      // Enable WAL mode for better concurrent read performance
+      this.db.pragma("journal_mode = WAL");
+      // Enable foreign keys
+      this.db.pragma("foreign_keys = ON");
+    }
   }
 
   /**
@@ -31,12 +36,45 @@ export class SqliteAdapter implements DatabaseAdapter {
   }
 
   /**
+   * Get or set a PRAGMA value.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#pragma
+   */
+  pragma(name: string): unknown {
+    return this.db.pragma(name);
+  }
+
+  /**
+   * Prevent or allow write operations.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#preventing_writes?
+   */
+  get preventingWrites(): boolean {
+    return this._preventWrites;
+  }
+
+  /**
+   * Execute a block with writes prevented.
+   */
+  async withPreventedWrites<R>(fn: () => R | Promise<R>): Promise<R> {
+    this._preventWrites = true;
+    try {
+      return await fn();
+    } finally {
+      this._preventWrites = false;
+    }
+  }
+
+  /**
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    */
   async executeMutation(
     sql: string,
     binds: unknown[] = []
   ): Promise<number> {
+    if (this._preventWrites) {
+      throw new Error("Write query attempted while preventing writes");
+    }
     const stmt = this.db.prepare(sql);
     const result = stmt.run(...binds);
 
