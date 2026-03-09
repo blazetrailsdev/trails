@@ -1226,3 +1226,106 @@ describe("ignoredColumns", () => {
     expect(User.ignoredColumns).toEqual(["legacy_field"]);
   });
 });
+describe("Attributes (extended)", () => {
+  let adapter: DatabaseAdapter;
+
+  class Person extends Base {
+    static {
+      this.attribute("name", "string");
+      this.attribute("age", "integer");
+      this.attribute("email", "string");
+      this.attribute("active", "boolean");
+    }
+  }
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+    Person.adapter = adapter;
+  });
+
+  describe("readAttribute / writeAttribute", () => {
+    it("reads and writes attributes", () => {
+      const p = new Person({ name: "Alice" });
+      expect(p.readAttribute("name")).toBe("Alice");
+      p.writeAttribute("name", "Bob");
+      expect(p.readAttribute("name")).toBe("Bob");
+    });
+
+    it("returns null for unset attributes", () => {
+      const p = new Person({});
+      expect(p.readAttribute("name")).toBeNull();
+    });
+  });
+
+  describe("attributes", () => {
+    it("returns all attributes as a plain object", () => {
+      const p = new Person({ name: "Alice", age: 30 });
+      const attrs = p.attributes;
+      expect(attrs.name).toBe("Alice");
+      expect(attrs.age).toBe(30);
+    });
+  });
+
+  describe("id", () => {
+    it("reads the primary key value", async () => {
+      const p = await Person.create({ name: "Alice" });
+      expect(p.id).toBeTruthy();
+    });
+
+    it("can set id", () => {
+      const p = new Person({});
+      p.id = 42;
+      expect(p.id).toBe(42);
+    });
+  });
+
+  describe("dirty tracking", () => {
+    it("new record starts without changes tracked", () => {
+      const p = new Person({ name: "Alice" });
+      // In this implementation, new records don't track initial assignment as "changed"
+      expect(p.changed).toBe(false);
+    });
+
+    it("clears changes after save", async () => {
+      const p = await Person.create({ name: "Alice" });
+      expect(p.changed).toBe(false);
+    });
+
+    it("detects changes after writeAttribute", async () => {
+      const p = await Person.create({ name: "Alice" });
+      p.writeAttribute("name", "Bob");
+      expect(p.changed).toBe(true);
+    });
+  });
+
+  describe("hasAttribute", () => {
+    it("returns true for defined attributes", () => {
+      expect(Person.hasAttributeDefinition("name")).toBe(true);
+    });
+
+    it("returns false for undefined attributes", () => {
+      expect(Person.hasAttributeDefinition("foo")).toBe(false);
+    });
+  });
+
+  describe("readonly attributes", () => {
+    it("readonly attributes are not updated after create", async () => {
+      class Item extends Base {
+        static {
+          this.attribute("code", "string");
+          this.attribute("name", "string");
+          this.attrReadonly("code");
+          this.adapter = adapter;
+        }
+      }
+      const item = await Item.create({ code: "ABC", name: "Widget" });
+      item.writeAttribute("code", "XYZ");
+      item.writeAttribute("name", "Updated");
+      await item.save();
+      const found = await Item.find(item.id);
+      // code should remain unchanged because it's readonly
+      expect(found.readAttribute("code")).toBe("ABC");
+      expect(found.readAttribute("name")).toBe("Updated");
+    });
+  });
+});

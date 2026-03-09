@@ -4914,3 +4914,173 @@ describe("Rails-guided: pick", () => {
     expect(await User.all().pick("name")).toBe(null);
   });
 });
+describe("Calculations (extended)", () => {
+  let adapter: DatabaseAdapter;
+
+  class Product extends Base {
+    static {
+      this.attribute("name", "string");
+      this.attribute("price", "integer");
+      this.attribute("quantity", "integer");
+      this.attribute("category", "string");
+    }
+  }
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    Product.adapter = adapter;
+    await Product.create({ name: "Apple", price: 1, quantity: 10, category: "fruit" });
+    await Product.create({ name: "Banana", price: 2, quantity: 20, category: "fruit" });
+    await Product.create({ name: "Carrot", price: 3, quantity: 30, category: "vegetable" });
+    await Product.create({ name: "Donut", price: 5, quantity: 5, category: "pastry" });
+  });
+
+  describe("count", () => {
+    it("counts all records", async () => {
+      expect(await Product.count()).toBe(4);
+    });
+
+    it("counts with where clause", async () => {
+      const count = await Product.all().where({ category: "fruit" }).count();
+      expect(count).toBe(2);
+    });
+
+    it("returns 0 when no records match", async () => {
+      const count = await Product.all().where({ category: "meat" }).count();
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("sum", () => {
+    it("sums a column", async () => {
+      const total = await Product.all().sum("price");
+      expect(total).toBe(11);
+    });
+
+    it("sums with where clause", async () => {
+      const total = await Product.all().where({ category: "fruit" }).sum("price");
+      expect(total).toBe(3);
+    });
+
+    it("returns 0 for no records", async () => {
+      const total = await Product.all().where({ category: "meat" }).sum("price");
+      expect(total).toBe(0);
+    });
+  });
+
+  describe("minimum", () => {
+    it("returns minimum value", async () => {
+      const min = await Product.all().minimum("price");
+      expect(min).toBe(1);
+    });
+
+    it("returns minimum with where clause", async () => {
+      const min = await Product.all().where({ category: "fruit" }).minimum("price");
+      expect(min).toBe(1);
+    });
+  });
+
+  describe("maximum", () => {
+    it("returns maximum value", async () => {
+      const max = await Product.all().maximum("price");
+      expect(max).toBe(5);
+    });
+
+    it("returns maximum with where clause", async () => {
+      const max = await Product.all().where({ category: "fruit" }).maximum("price");
+      expect(max).toBe(2);
+    });
+  });
+
+  describe("average", () => {
+    it("returns average value", async () => {
+      const avg = await Product.all().average("price");
+      expect(avg).toBeCloseTo(2.75, 1);
+    });
+
+    it("returns average with where clause", async () => {
+      const avg = await Product.all().where({ category: "fruit" }).average("price");
+      expect(avg).toBeCloseTo(1.5, 1);
+    });
+  });
+
+  describe("pluck", () => {
+    it("returns values for a single column", async () => {
+      const names = await Product.all().pluck("name");
+      expect(names).toContain("Apple");
+      expect(names).toContain("Banana");
+      expect(names).toHaveLength(4);
+    });
+
+    it("returns values with where clause", async () => {
+      const names = await Product.all().where({ category: "fruit" }).pluck("name");
+      expect(names).toHaveLength(2);
+    });
+  });
+
+  describe("ids", () => {
+    it("returns all primary key values", async () => {
+      const ids = await Product.all().ids();
+      expect(ids).toHaveLength(4);
+    });
+  });
+
+  describe("exists", () => {
+    it("returns true when records exist", async () => {
+      expect(await Product.all().exists()).toBe(true);
+    });
+
+    it("returns false for empty result set", async () => {
+      expect(await Product.all().where({ category: "meat" }).exists()).toBe(false);
+    });
+  });
+
+  describe("count via class method", async () => {
+    it("delegates to relation", async () => {
+      expect(await Product.count()).toBe(4);
+    });
+  });
+
+  describe("sum via class method", () => {
+    it("delegates to relation", async () => {
+      expect(await Product.sum("price")).toBe(11);
+    });
+  });
+
+  describe("minimum via class method", () => {
+    it("delegates to relation", async () => {
+      expect(await Product.minimum("price")).toBe(1);
+    });
+  });
+
+  describe("maximum via class method", () => {
+    it("delegates to relation", async () => {
+      expect(await Product.maximum("price")).toBe(5);
+    });
+  });
+
+  describe("average via class method", () => {
+    it("delegates to relation", async () => {
+      const avg = await Product.average("price");
+      expect(avg).toBeCloseTo(2.75, 1);
+    });
+  });
+
+  describe("pick", () => {
+    it("returns a single value from first record", async () => {
+      const val = await Product.all().order("name").pick("name");
+      expect(val).toBe("Apple");
+    });
+  });
+
+  describe("none", () => {
+    it("returns empty results", async () => {
+      const items = await Product.all().none().toArray();
+      expect(items).toHaveLength(0);
+    });
+
+    it("count returns 0", async () => {
+      expect(await Product.all().none().count()).toBe(0);
+    });
+  });
+});

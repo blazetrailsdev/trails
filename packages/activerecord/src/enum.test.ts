@@ -1015,3 +1015,210 @@ describe("Enum (Rails-guided)", () => {
     expect(readEnumValue(conv, "priority")).toBe("high");
   });
 });
+describe("Enum (extended)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  describe("defineEnum with array form", () => {
+    it("creates mapping from array", () => {
+      class Post extends Base {
+        static {
+          this.attribute("status", "integer");
+          this.adapter = adapter;
+        }
+      }
+      defineEnum(Post, "status", ["draft", "published", "archived"]);
+
+      const p = new Post({});
+      p.writeAttribute("status", 0);
+      expect(readEnumValue(p, "status")).toBe("draft");
+
+      p.writeAttribute("status", 1);
+      expect(readEnumValue(p, "status")).toBe("published");
+    });
+  });
+
+  describe("defineEnum with object form", () => {
+    it("creates mapping from object", () => {
+      class Post extends Base {
+        static {
+          this.attribute("status", "integer");
+          this.adapter = adapter;
+        }
+      }
+      defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
+
+      const p = new Post({});
+      p.writeAttribute("status", 2);
+      expect(readEnumValue(p, "status")).toBe("archived");
+    });
+  });
+
+  describe("predicate methods", () => {
+    it("generates is* predicate methods", () => {
+      class Post extends Base {
+        static {
+          this.attribute("status", "integer");
+          this.adapter = adapter;
+        }
+      }
+      defineEnum(Post, "status", ["draft", "published"]);
+
+      const p = new Post({});
+      p.writeAttribute("status", 0);
+      expect((p as any).isDraft()).toBe(true);
+      expect((p as any).isPublished()).toBe(false);
+    });
+  });
+
+  describe("setter methods", () => {
+    it("generates setter methods that update value", () => {
+      class Post extends Base {
+        static {
+          this.attribute("status", "integer");
+          this.adapter = adapter;
+        }
+      }
+      defineEnum(Post, "status", ["draft", "published"]);
+
+      const p = new Post({});
+      (p as any).published();
+      expect(p.readAttribute("status")).toBe(1);
+      expect((p as any).isPublished()).toBe(true);
+    });
+  });
+
+  describe("readEnumValue", () => {
+    it("returns null for undefined enum", () => {
+      class Post extends Base {
+        static {
+          this.attribute("status", "integer");
+        }
+      }
+      const p = new Post({});
+      expect(readEnumValue(p, "status")).toBeNull();
+    });
+
+    it("returns null for null value", () => {
+      class Post extends Base {
+        static {
+          this.attribute("status", "integer");
+          this.adapter = adapter;
+        }
+      }
+      defineEnum(Post, "status", ["draft", "published"]);
+      const p = new Post({});
+      expect(readEnumValue(p, "status")).toBeNull();
+    });
+  });
+
+  describe("Base.enum", () => {
+    it("defines enum with getter returning symbol name", () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.adapter = adapter;
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      const t = new Task({});
+      t.writeAttribute("priority", 1);
+      expect((t as any).priority).toBe("medium");
+    });
+
+    it("setter accepts string name", () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.adapter = adapter;
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      const t = new Task({});
+      (t as any).priority = "high";
+      expect(t.readAttribute("priority")).toBe(2);
+    });
+
+    it("generates predicate methods", () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.adapter = adapter;
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      const t = new Task({});
+      t.writeAttribute("priority", 0);
+      expect((t as any).isLow()).toBe(true);
+      expect((t as any).isMedium()).toBe(false);
+    });
+
+    it("generates bang setter methods", () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.adapter = adapter;
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      const t = new Task({});
+      (t as any).highBang();
+      expect(t.readAttribute("priority")).toBe(2);
+    });
+
+    it("provides static mapping accessor", () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.adapter = adapter;
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      expect((Task as any).prioritys).toEqual({ low: 0, medium: 1, high: 2 });
+    });
+
+    it("supports prefix option", () => {
+      class Task extends Base {
+        static {
+          this.attribute("status", "integer");
+          this.adapter = adapter;
+          this.enum("status", { active: 0, archived: 1 }, { prefix: true });
+        }
+      }
+
+      const t = new Task({});
+      t.writeAttribute("status", 0);
+      expect((t as any).isStatus_active()).toBe(true);
+    });
+  });
+
+  describe("scopes from enum", () => {
+    it("defines scopes for each enum value", async () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.adapter = adapter;
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      await Task.create({ priority: 0 });
+      await Task.create({ priority: 0 });
+      await Task.create({ priority: 2 });
+
+      const lowTasks = await Task.all().low().toArray();
+      expect(lowTasks).toHaveLength(2);
+
+      const highTasks = await Task.all().high().toArray();
+      expect(highTasks).toHaveLength(1);
+    });
+  });
+});

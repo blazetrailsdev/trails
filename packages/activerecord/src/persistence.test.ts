@@ -2470,3 +2470,493 @@ describe("Base (extended) - persistence", () => {
     expect(result.isDestroyed()).toBe(true);
   });
 });
+describe("Persistence (extended)", () => {
+  let adapter: DatabaseAdapter;
+
+  class Article extends Base {
+    static {
+      this.attribute("title", "string");
+      this.attribute("body", "string");
+      this.attribute("views", "integer");
+    }
+  }
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+    Article.adapter = adapter;
+  });
+
+  describe("save", () => {
+    it("inserts a new record and assigns an id", async () => {
+      const a = new Article({ title: "Hello", body: "World" });
+      expect(a.isNewRecord()).toBe(true);
+      await a.save();
+      expect(a.isNewRecord()).toBe(false);
+      expect(a.id).toBeTruthy();
+    });
+
+    it("updates an existing record", async () => {
+      const a = await Article.create({ title: "Old" });
+      a.writeAttribute("title", "New");
+      await a.save();
+      const found = await Article.find(a.id);
+      expect(found.readAttribute("title")).toBe("New");
+    });
+
+    it("returns false for invalid record", async () => {
+      class Validated extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.adapter = adapter;
+        }
+      }
+      const v = new Validated();
+      expect(await v.save()).toBe(false);
+    });
+
+    it("can skip validation with validate: false", async () => {
+      class Validated extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.adapter = adapter;
+        }
+      }
+      const v = new Validated();
+      const result = await v.save({ validate: false });
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("saveBang", () => {
+    it("throws RecordInvalid on validation failure", async () => {
+      class Required extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.adapter = adapter;
+        }
+      }
+      const r = new Required();
+      await expect(r.saveBang()).rejects.toThrow();
+    });
+
+    it("saves valid record successfully", async () => {
+      const a = new Article({ title: "Test" });
+      await a.saveBang();
+      expect(a.isPersisted()).toBe(true);
+    });
+  });
+
+  describe("create", () => {
+    it("creates and persists a record", async () => {
+      const a = await Article.create({ title: "New", body: "Content" });
+      expect(a.isPersisted()).toBe(true);
+      expect(a.id).toBeTruthy();
+    });
+
+    it("creates with empty attributes", async () => {
+      const a = await Article.create({});
+      expect(a.isPersisted()).toBe(true);
+    });
+  });
+
+  describe("createBang", () => {
+    it("throws on validation failure", async () => {
+      class Required extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.adapter = adapter;
+        }
+      }
+      await expect(Required.createBang({})).rejects.toThrow();
+    });
+
+    it("creates valid record", async () => {
+      const a = await Article.createBang({ title: "Valid" });
+      expect(a.isPersisted()).toBe(true);
+    });
+  });
+
+  describe("update (instance)", () => {
+    it("updates attributes and saves", async () => {
+      const a = await Article.create({ title: "Old", body: "Content" });
+      await a.update({ title: "New" });
+      expect(a.readAttribute("title")).toBe("New");
+      const found = await Article.find(a.id);
+      expect(found.readAttribute("title")).toBe("New");
+    });
+
+    it("returns false on validation failure", async () => {
+      class Validated extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.adapter = adapter;
+        }
+      }
+      const v = await Validated.create({ name: "ok" });
+      const result = await v.update({ name: "" });
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("updateBang (instance)", () => {
+    it("throws on validation failure", async () => {
+      class Validated extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.adapter = adapter;
+        }
+      }
+      const v = await Validated.create({ name: "ok" });
+      await expect(v.updateBang({ name: "" })).rejects.toThrow();
+    });
+  });
+
+  describe("update (class method)", () => {
+    it("finds and updates a record by id", async () => {
+      const a = await Article.create({ title: "Old" });
+      await Article.update(a.id, { title: "New" });
+      const found = await Article.find(a.id);
+      expect(found.readAttribute("title")).toBe("New");
+    });
+  });
+
+  describe("destroy (instance)", () => {
+    it("marks the record as destroyed", async () => {
+      const a = await Article.create({ title: "Bye" });
+      await a.destroy();
+      expect(a.isDestroyed()).toBe(true);
+      expect(a.isPersisted()).toBe(false);
+    });
+
+    it("freezes the record after destroy", async () => {
+      const a = await Article.create({ title: "Bye" });
+      await a.destroy();
+      expect(a.isFrozen()).toBe(true);
+    });
+
+    it("removes the record from database", async () => {
+      const a = await Article.create({ title: "Bye" });
+      const id = a.id;
+      await a.destroy();
+      await expect(Article.find(id)).rejects.toThrow();
+    });
+  });
+
+  describe("destroy (class method)", () => {
+    it("destroys by id", async () => {
+      const a = await Article.create({ title: "Bye" });
+      const id = a.id;
+      await Article.destroy(id);
+      await expect(Article.find(id)).rejects.toThrow();
+    });
+
+    it("destroys multiple ids", async () => {
+      const a1 = await Article.create({ title: "One" });
+      const a2 = await Article.create({ title: "Two" });
+      await Article.destroy([a1.id, a2.id]);
+      await expect(Article.find(a1.id)).rejects.toThrow();
+      await expect(Article.find(a2.id)).rejects.toThrow();
+    });
+  });
+
+  describe("delete (instance)", () => {
+    it("deletes without callbacks", async () => {
+      const log: string[] = [];
+      class Tracked extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          this.beforeDestroy(() => { log.push("before_destroy"); });
+        }
+      }
+      const t = await Tracked.create({ name: "test" });
+      await t.delete();
+      expect(t.isDestroyed()).toBe(true);
+      expect(log).toEqual([]); // no callbacks fired
+    });
+  });
+
+  describe("delete (class method)", () => {
+    it("deletes by id without callbacks", async () => {
+      const a = await Article.create({ title: "Gone" });
+      const id = a.id;
+      await Article.delete(id);
+      await expect(Article.find(id)).rejects.toThrow();
+    });
+  });
+
+  describe("reload", () => {
+    it("refreshes attributes from database", async () => {
+      const a = await Article.create({ title: "Original" });
+      const a2 = await Article.find(a.id);
+      await a2.update({ title: "Modified" });
+      expect(a.readAttribute("title")).toBe("Original");
+      await a.reload();
+      expect(a.readAttribute("title")).toBe("Modified");
+    });
+
+    it("throws if record no longer exists", async () => {
+      const a = await Article.create({ title: "Temp" });
+      await Article.delete(a.id);
+      await expect(a.reload()).rejects.toThrow();
+    });
+  });
+
+  describe("record state", () => {
+    it("new record is not persisted", () => {
+      const a = new Article({ title: "test" });
+      expect(a.isNewRecord()).toBe(true);
+      expect(a.isPersisted()).toBe(false);
+      expect(a.isDestroyed()).toBe(false);
+    });
+
+    it("saved record is persisted", async () => {
+      const a = await Article.create({ title: "test" });
+      expect(a.isNewRecord()).toBe(false);
+      expect(a.isPersisted()).toBe(true);
+    });
+
+    it("destroyed record is not persisted", async () => {
+      const a = await Article.create({ title: "test" });
+      await a.destroy();
+      expect(a.isPersisted()).toBe(false);
+      expect(a.isDestroyed()).toBe(true);
+    });
+
+    it("previouslyNewRecord is true after first save", async () => {
+      const a = new Article({ title: "test" });
+      await a.save();
+      expect(a.isPreviouslyNewRecord()).toBe(true);
+    });
+  });
+
+  describe("readonly", () => {
+    it("isReadonly defaults to false", () => {
+      const a = new Article({ title: "test" });
+      expect(a.isReadonly()).toBe(false);
+    });
+
+    it("readonlyBang marks record as readonly", () => {
+      const a = new Article({ title: "test" });
+      a.readonlyBang();
+      expect(a.isReadonly()).toBe(true);
+    });
+
+    it("readonly record throws on save", async () => {
+      const a = await Article.create({ title: "test" });
+      a.readonlyBang();
+      await expect(a.save()).rejects.toThrow();
+    });
+
+    it("readonly record throws on destroy", async () => {
+      const a = await Article.create({ title: "test" });
+      a.readonlyBang();
+      await expect(a.destroy()).rejects.toThrow();
+    });
+  });
+
+  describe("freeze", () => {
+    it("prevents attribute modification", async () => {
+      const a = await Article.create({ title: "test" });
+      a.freeze();
+      expect(() => a.writeAttribute("title", "new")).toThrow("frozen");
+    });
+  });
+
+  describe("increment / decrement / toggle", () => {
+    it("increment increases attribute value", () => {
+      const a = new Article({ views: 5 });
+      a.increment("views");
+      expect(a.readAttribute("views")).toBe(6);
+    });
+
+    it("increment with custom amount", () => {
+      const a = new Article({ views: 5 });
+      a.increment("views", 10);
+      expect(a.readAttribute("views")).toBe(15);
+    });
+
+    it("decrement decreases attribute value", () => {
+      const a = new Article({ views: 5 });
+      a.decrement("views");
+      expect(a.readAttribute("views")).toBe(4);
+    });
+
+    it("toggle flips boolean", () => {
+      class Post extends Base {
+        static {
+          this.attribute("published", "boolean");
+        }
+      }
+      const p = new Post({ published: false });
+      p.toggle("published");
+      expect(p.readAttribute("published")).toBe(true);
+    });
+
+    it("incrementBang persists the change", async () => {
+      const a = await Article.create({ title: "test", views: 0 });
+      await a.incrementBang("views", 3);
+      const found = await Article.find(a.id);
+      expect(found.readAttribute("views")).toBe(3);
+    });
+
+    it("decrementBang persists the change", async () => {
+      const a = await Article.create({ title: "test", views: 10 });
+      await a.decrementBang("views", 2);
+      const found = await Article.find(a.id);
+      expect(found.readAttribute("views")).toBe(8);
+    });
+  });
+
+  describe("toParam", () => {
+    it("returns id as string for persisted record", async () => {
+      const a = await Article.create({ title: "test" });
+      expect(a.toParam()).toBe(String(a.id));
+    });
+
+    it("returns null for new record", () => {
+      const a = new Article({ title: "test" });
+      expect(a.toParam()).toBeNull();
+    });
+  });
+
+  describe("inspect", () => {
+    it("returns a readable string", async () => {
+      const a = await Article.create({ title: "Hello" });
+      const str = a.inspect();
+      expect(str).toContain("Article");
+      expect(str).toContain("title");
+    });
+  });
+
+  describe("attributeForInspect", () => {
+    it("returns nil for null attribute", () => {
+      const a = new Article({});
+      expect(a.attributeForInspect("title")).toBe("nil");
+    });
+
+    it("quotes strings", () => {
+      const a = new Article({ title: "Hello" });
+      expect(a.attributeForInspect("title")).toBe('"Hello"');
+    });
+
+    it("truncates long strings", () => {
+      const long = "a".repeat(100);
+      const a = new Article({ title: long });
+      const result = a.attributeForInspect("title");
+      expect(result).toContain("...");
+      expect(result.length).toBeLessThan(60);
+    });
+  });
+
+  describe("cacheKey", () => {
+    it("returns table/new for new record", () => {
+      const a = new Article({});
+      expect(a.cacheKey()).toBe("articles/new");
+    });
+
+    it("returns table/id for persisted record", async () => {
+      const a = await Article.create({ title: "test" });
+      expect(a.cacheKey()).toBe(`articles/${a.id}`);
+    });
+  });
+
+  describe("slice", () => {
+    it("returns a subset of attributes", () => {
+      const a = new Article({ title: "Hello", body: "World", views: 5 });
+      const sliced = a.slice("title", "views");
+      expect(sliced).toEqual({ title: "Hello", views: 5 });
+    });
+  });
+
+  describe("assignAttributes", () => {
+    it("sets attributes without saving", async () => {
+      const a = await Article.create({ title: "Old" });
+      a.assignAttributes({ title: "New" });
+      expect(a.readAttribute("title")).toBe("New");
+      const found = await Article.find(a.id);
+      expect(found.readAttribute("title")).toBe("Old");
+    });
+  });
+
+  describe("findOrCreateBy", () => {
+    it("finds existing record", async () => {
+      const a = await Article.create({ title: "Exists" });
+      const found = await Article.findOrCreateBy({ title: "Exists" });
+      expect(found.id).toBe(a.id);
+    });
+
+    it("creates when not found", async () => {
+      const found = await Article.findOrCreateBy({ title: "New" });
+      expect(found.isPersisted()).toBe(true);
+      expect(found.readAttribute("title")).toBe("New");
+    });
+  });
+
+  describe("findOrInitializeBy", () => {
+    it("finds existing record", async () => {
+      const a = await Article.create({ title: "Exists" });
+      const found = await Article.findOrInitializeBy({ title: "Exists" });
+      expect(found.id).toBe(a.id);
+    });
+
+    it("initializes unsaved record when not found", async () => {
+      const found = await Article.findOrInitializeBy({ title: "New" });
+      expect(found.isNewRecord()).toBe(true);
+      expect(found.readAttribute("title")).toBe("New");
+    });
+  });
+
+  describe("exists (class method)", () => {
+    it("returns true when records exist", async () => {
+      await Article.create({ title: "test" });
+      expect(await Article.exists()).toBe(true);
+    });
+
+    it("returns false when no records", async () => {
+      expect(await Article.exists()).toBe(false);
+    });
+
+    it("accepts conditions", async () => {
+      await Article.create({ title: "test" });
+      expect(await Article.exists({ title: "test" })).toBe(true);
+      expect(await Article.exists({ title: "nope" })).toBe(false);
+    });
+
+    it("accepts primary key", async () => {
+      const a = await Article.create({ title: "test" });
+      expect(await Article.exists(a.id)).toBe(true);
+      expect(await Article.exists(9999)).toBe(false);
+    });
+  });
+
+  describe("suppress", () => {
+    it("prevents persistence during block", async () => {
+      await Article.suppress(async () => {
+        const a = await Article.create({ title: "Ghost" });
+        // Record appears saved in memory
+        expect(a.isPersisted()).toBe(true);
+      });
+      // But nothing in the database
+      const count = await Article.count();
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("noTouching", () => {
+    it("suppresses touching during block", async () => {
+      let suppressed = false;
+      await Article.noTouching(async () => {
+        suppressed = Article.isTouchingSuppressed;
+      });
+      expect(suppressed).toBe(true);
+      expect(Article.isTouchingSuppressed).toBe(false);
+    });
+  });
+});

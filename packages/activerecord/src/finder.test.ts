@@ -2806,3 +2806,153 @@ describe("Base (extended) - finders", () => {
     await expect(User.find([1, 999])).rejects.toThrow("not found");
   });
 });
+describe("Finders (extended)", () => {
+  let adapter: DatabaseAdapter;
+
+  class User extends Base {
+    static {
+      this.attribute("name", "string");
+      this.attribute("email", "string");
+      this.attribute("age", "integer");
+    }
+  }
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    User.adapter = adapter;
+    await User.create({ name: "Alice", email: "alice@test.com", age: 30 });
+    await User.create({ name: "Bob", email: "bob@test.com", age: 25 });
+    await User.create({ name: "Charlie", email: "charlie@test.com", age: 35 });
+  });
+
+  describe("find", () => {
+    it("finds by single id", async () => {
+      const u = await User.find(1);
+      expect(u.readAttribute("name")).toBe("Alice");
+    });
+
+    it("raises RecordNotFound for missing id", async () => {
+      await expect(User.find(999)).rejects.toThrow();
+    });
+
+    it("finds multiple by array of ids", async () => {
+      const users = await User.find([1, 2]);
+      expect(users).toHaveLength(2);
+    });
+
+    it("raises RecordNotFound for partially missing ids", async () => {
+      await expect(User.find([1, 999])).rejects.toThrow();
+    });
+  });
+
+  describe("findBy", () => {
+    it("finds first matching record", async () => {
+      const u = await User.findBy({ name: "Bob" });
+      expect(u).not.toBeNull();
+      expect(u!.readAttribute("email")).toBe("bob@test.com");
+    });
+
+    it("returns null when not found", async () => {
+      const u = await User.findBy({ name: "Nobody" });
+      expect(u).toBeNull();
+    });
+  });
+
+  describe("findByBang", () => {
+    it("raises when not found", async () => {
+      await expect(User.findByBang({ name: "Nobody" })).rejects.toThrow();
+    });
+  });
+
+  describe("first / last", () => {
+    it("first returns the first record", async () => {
+      const u = await User.first();
+      expect(u).not.toBeNull();
+    });
+
+    it("last returns the last record", async () => {
+      const u = await User.last();
+      expect(u).not.toBeNull();
+    });
+  });
+
+  describe("count", () => {
+    it("returns total count", async () => {
+      expect(await User.count()).toBe(3);
+    });
+  });
+
+  describe("where (class method)", () => {
+    it("returns filtered relation", async () => {
+      const users = await User.where({ age: 30 }).toArray();
+      expect(users).toHaveLength(1);
+      expect(users[0].readAttribute("name")).toBe("Alice");
+    });
+  });
+
+  describe("order / limit / offset (class methods)", () => {
+    it("order delegates to relation", async () => {
+      const users = await User.order({ age: "asc" }).toArray();
+      expect(users[0].readAttribute("name")).toBe("Bob");
+    });
+
+    it("limit delegates to relation", async () => {
+      const users = await User.limit(1).toArray();
+      expect(users).toHaveLength(1);
+    });
+
+    it("offset delegates to relation", async () => {
+      const users = await User.offset(1).toArray();
+      expect(users).toHaveLength(2);
+    });
+  });
+
+  describe("scope", () => {
+    it("defines named scopes", async () => {
+      class Item extends Base {
+        static {
+          this.attribute("active", "boolean");
+          this.adapter = adapter;
+          this.scope("active", (rel) => rel.where({ active: true }));
+        }
+      }
+      await Item.create({ active: true });
+      await Item.create({ active: false });
+      await Item.create({ active: true });
+
+      const items = await Item.all().active().toArray();
+      expect(items).toHaveLength(2);
+    });
+  });
+
+  describe("defaultScope", () => {
+    it("applies default scope to all queries", async () => {
+      class Item extends Base {
+        static {
+          this.attribute("active", "boolean");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          this.defaultScope((rel) => rel.where({ active: true }));
+        }
+      }
+      await Item.create({ name: "A", active: true });
+      await Item.create({ name: "B", active: false });
+
+      const items = await Item.all().toArray();
+      expect(items).toHaveLength(1);
+      expect(items[0].readAttribute("name")).toBe("A");
+    });
+  });
+
+  describe("destroyBy / deleteBy", () => {
+    it("destroyBy removes matching records with callbacks", async () => {
+      await User.destroyBy({ name: "Alice" });
+      expect(await User.count()).toBe(2);
+    });
+
+    it("deleteBy removes matching records without callbacks", async () => {
+      await User.deleteBy({ name: "Alice" });
+      expect(await User.count()).toBe(2);
+    });
+  });
+});

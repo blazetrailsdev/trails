@@ -461,3 +461,279 @@ describe("table_name_prefix and table_name_suffix", () => {
     expect(User.tableName).toBe("custom_users");
   });
 });
+describe("Base (extended)", () => {
+  describe("tableName", () => {
+    it("infers table name from class name", () => {
+      class User extends Base {}
+      expect(User.tableName).toBe("users");
+    });
+
+    it("pluralizes CamelCase names with underscores", () => {
+      class LineItem extends Base {}
+      expect(LineItem.tableName).toBe("line_items");
+    });
+
+    it("allows explicit table name override", () => {
+      class User extends Base {
+        static { this.tableName = "legacy_users"; }
+      }
+      expect(User.tableName).toBe("legacy_users");
+    });
+
+    it("supports tableNamePrefix", () => {
+      class Widget extends Base {
+        static { this._tableNamePrefix = "app_"; }
+      }
+      expect(Widget.tableName).toBe("app_widgets");
+    });
+
+    it("supports tableNameSuffix", () => {
+      class Widget extends Base {
+        static { this._tableNameSuffix = "_v2"; }
+      }
+      expect(Widget.tableName).toBe("widgets_v2");
+    });
+
+    it("supports both prefix and suffix", () => {
+      class Widget extends Base {
+        static {
+          this._tableNamePrefix = "pre_";
+          this._tableNameSuffix = "_suf";
+        }
+      }
+      expect(Widget.tableName).toBe("pre_widgets_suf");
+    });
+
+    it("explicit table name ignores prefix/suffix", () => {
+      class Widget extends Base {
+        static {
+          this._tableNamePrefix = "pre_";
+          this.tableName = "my_widgets";
+        }
+      }
+      expect(Widget.tableName).toBe("my_widgets");
+    });
+
+    it("different subclasses have independent table names", () => {
+      class Dog extends Base {}
+      class Cat extends Base {}
+      expect(Dog.tableName).toBe("dogs");
+      expect(Cat.tableName).toBe("cats");
+    });
+  });
+
+  describe("primaryKey", () => {
+    it("defaults to id", () => {
+      class Post extends Base {}
+      expect(Post.primaryKey).toBe("id");
+    });
+
+    it("can be overridden to a custom key", () => {
+      class Post extends Base {
+        static { this.primaryKey = "post_id"; }
+      }
+      expect(Post.primaryKey).toBe("post_id");
+    });
+
+    it("subclass inherits parent primary key", () => {
+      class Animal extends Base {
+        static { this.primaryKey = "uuid"; }
+      }
+      class Dog extends Animal {}
+      expect(Dog.primaryKey).toBe("uuid");
+    });
+  });
+
+  describe("abstractClass", () => {
+    it("defaults to false", () => {
+      class Foo extends Base {}
+      expect(Foo.abstractClass).toBe(false);
+    });
+
+    it("can be set to true", () => {
+      class ApplicationRecord extends Base {
+        static { this.abstractClass = true; }
+      }
+      expect(ApplicationRecord.abstractClass).toBe(true);
+    });
+
+    it("does not inherit to subclass", () => {
+      class ApplicationRecord extends Base {
+        static { this.abstractClass = true; }
+      }
+      class User extends ApplicationRecord {}
+      expect(User.abstractClass).toBe(false);
+    });
+  });
+
+  describe("columnNames", () => {
+    it("returns defined attribute names", () => {
+      class Post extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("body", "string");
+        }
+      }
+      const names = Post.columnNames();
+      expect(names).toContain("title");
+      expect(names).toContain("body");
+    });
+
+    it("returns empty array for model with no attributes", () => {
+      class Empty extends Base {}
+      expect(Empty.columnNames()).toEqual([]);
+    });
+  });
+
+  describe("columnsHash", () => {
+    it("returns column definitions keyed by name", () => {
+      class Post extends Base {
+        static { this.attribute("title", "string"); }
+      }
+      const hash = Post.columnsHash();
+      expect(hash.title).toBeDefined();
+      expect(hash.title.name).toBe("title");
+    });
+  });
+
+  describe("contentColumns", () => {
+    it("excludes primary key, foreign keys, and timestamps", () => {
+      class Post extends Base {
+        static {
+          this.attribute("id", "integer");
+          this.attribute("title", "string");
+          this.attribute("author_id", "integer");
+          this.attribute("created_at", "datetime");
+          this.attribute("updated_at", "datetime");
+          this.attribute("body", "string");
+        }
+      }
+      const content = Post.contentColumns();
+      expect(content).toContain("title");
+      expect(content).toContain("body");
+      expect(content).not.toContain("id");
+      expect(content).not.toContain("author_id");
+      expect(content).not.toContain("created_at");
+      expect(content).not.toContain("updated_at");
+    });
+  });
+
+  describe("humanAttributeName", () => {
+    it("converts underscored name to human-readable", () => {
+      expect(Base.humanAttributeName("first_name")).toBe("First name");
+    });
+
+    it("handles single word", () => {
+      expect(Base.humanAttributeName("name")).toBe("Name");
+    });
+  });
+
+  describe("hasAttributeDefinition", () => {
+    it("returns true for defined attributes", () => {
+      class Post extends Base {
+        static { this.attribute("title", "string"); }
+      }
+      expect(Post.hasAttributeDefinition("title")).toBe(true);
+    });
+
+    it("returns false for undefined attributes", () => {
+      class Post extends Base {}
+      expect(Post.hasAttributeDefinition("missing")).toBe(false);
+    });
+  });
+
+  describe("arelTable", () => {
+    it("returns a Table with correct name", () => {
+      class Order extends Base {}
+      expect(Order.arelTable.name).toBe("orders");
+    });
+  });
+
+  describe("inheritance", () => {
+    it("subclass inherits attributes from parent", () => {
+      class Animal extends Base {
+        static { this.attribute("name", "string"); }
+      }
+      class Dog extends Animal {}
+      expect(Dog.columnNames()).toContain("name");
+    });
+  });
+
+  describe("logger", () => {
+    it("defaults to null", () => {
+      class Post extends Base {}
+      expect(Post.logger).toBeNull();
+    });
+
+    it("can be set", () => {
+      class Post extends Base {}
+      const logger = { debug: () => {} };
+      Post.logger = logger;
+      expect(Post.logger).toBe(logger);
+      Post.logger = null;
+    });
+  });
+
+  describe("recordTimestamps", () => {
+    it("defaults to true", () => {
+      class Post extends Base {}
+      expect(Post.recordTimestamps).toBe(true);
+    });
+
+    it("can be disabled", () => {
+      class Post extends Base {
+        static { this.recordTimestamps = false; }
+      }
+      expect(Post.recordTimestamps).toBe(false);
+    });
+  });
+
+  describe("ignoredColumns", () => {
+    it("defaults to empty array", () => {
+      class Post extends Base {}
+      expect(Post.ignoredColumns).toEqual([]);
+    });
+
+    it("can be set", () => {
+      class Post extends Base {
+        static { this.ignoredColumns = ["legacy_col"]; }
+      }
+      expect(Post.ignoredColumns).toEqual(["legacy_col"]);
+    });
+  });
+
+  describe("readonlyAttributes", () => {
+    it("defaults to empty", () => {
+      class Post extends Base {}
+      expect(Post.readonlyAttributes).toEqual([]);
+    });
+
+    it("can mark attributes as readonly", () => {
+      class Post extends Base {
+        static {
+          this.attribute("category", "string");
+          this.attrReadonly("category");
+        }
+      }
+      expect(Post.readonlyAttributes).toContain("category");
+    });
+  });
+
+  describe("new (static)", () => {
+    it("instantiates a new unsaved record", () => {
+      class User extends Base {
+        static { this.attribute("name", "string"); }
+      }
+      const u = User.new({ name: "Alice" });
+      expect(u.isNewRecord()).toBe(true);
+      expect(u.readAttribute("name")).toBe("Alice");
+    });
+  });
+
+  describe("adapter", () => {
+    it("throws when no adapter is set", () => {
+      class Orphan extends Base {}
+      expect(() => Orphan.adapter).toThrow("No adapter configured");
+    });
+  });
+});
