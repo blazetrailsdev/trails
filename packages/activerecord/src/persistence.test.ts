@@ -2299,3 +2299,174 @@ describe("Rails-guided: increment/decrement/toggle", () => {
     expect(reloaded.readAttribute("active")).toBe(false);
   });
 });
+
+describe("Base: increment/decrement/toggle", () => {
+  it("increment attribute", () => {
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 0 }); this.adapter = freshAdapter(); }
+    }
+    const c = new Counter();
+    c.increment("count");
+    expect(c.readAttribute("count")).toBe(1);
+  });
+
+  it("increment attribute by", () => {
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 5 }); this.adapter = freshAdapter(); }
+    }
+    const c = new Counter();
+    c.increment("count", 3);
+    expect(c.readAttribute("count")).toBe(8);
+  });
+
+  it("decrement attribute", () => {
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 10 }); this.adapter = freshAdapter(); }
+    }
+    const c = new Counter();
+    c.decrement("count");
+    expect(c.readAttribute("count")).toBe(9);
+  });
+
+  it("decrement attribute by", () => {
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 10 }); this.adapter = freshAdapter(); }
+    }
+    const c = new Counter();
+    c.decrement("count", 3);
+    expect(c.readAttribute("count")).toBe(7);
+  });
+
+  it("toggle flips boolean", () => {
+    class Feature extends Base {
+      static { this.attribute("active", "boolean", { default: false }); this.adapter = freshAdapter(); }
+    }
+    const f = new Feature();
+    f.toggle("active");
+    expect(f.readAttribute("active")).toBe(true);
+    f.toggle("active");
+    expect(f.readAttribute("active")).toBe(false);
+  });
+
+  it("incrementBang persists to DB", async () => {
+    const adapter = freshAdapter();
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 0 }); this.adapter = adapter; }
+    }
+    const c = await Counter.create({ count: 5 });
+    await c.incrementBang("count");
+    const reloaded = await Counter.find(c.id);
+    expect(reloaded.readAttribute("count")).toBe(6);
+  });
+
+  it("decrementBang persists to DB", async () => {
+    const adapter = freshAdapter();
+    class Counter extends Base {
+      static { this.attribute("count", "integer", { default: 0 }); this.adapter = adapter; }
+    }
+    const c = await Counter.create({ count: 5 });
+    await c.decrementBang("count");
+    const reloaded = await Counter.find(c.id);
+    expect(reloaded.readAttribute("count")).toBe(4);
+  });
+
+  it("toggleBang persists to DB", async () => {
+    const adapter = freshAdapter();
+    class Feature extends Base {
+      static { this.attribute("active", "boolean", { default: false }); this.adapter = adapter; }
+    }
+    const f = await Feature.create({ active: false });
+    await f.toggleBang("active");
+    const reloaded = await Feature.find(f.id);
+    expect(reloaded.readAttribute("active")).toBe(true);
+  });
+
+  it("increment returns this for chaining", () => {
+    class Counter extends Base {
+      static { this.attribute("a", "integer", { default: 0 }); this.attribute("b", "integer", { default: 0 }); this.adapter = freshAdapter(); }
+    }
+    const c = new Counter();
+    c.increment("a").increment("b");
+    expect(c.readAttribute("a")).toBe(1);
+    expect(c.readAttribute("b")).toBe(1);
+  });
+});
+
+describe("Base (extended) - persistence", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("createBang throws on validation failure", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.adapter = adapter;
+      }
+    }
+    await expect(User.createBang({})).rejects.toThrow("Validation failed");
+  });
+
+  it("updateBang throws on validation failure", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    await expect(u.updateBang({ name: "" })).rejects.toThrow("Validation failed");
+  });
+
+  it("save destroyed object", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    await u.destroy();
+    await expect(u.save()).rejects.toThrow("destroyed");
+  });
+
+  it("delete doesnt run callbacks", async () => {
+    const log: string[] = [];
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.beforeDestroy(() => { log.push("before_destroy"); });
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    await u.delete();
+    expect(u.isDestroyed()).toBe(true);
+    expect(log).not.toContain("before_destroy");
+  });
+
+  it("class level delete", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await User.create({ name: "Alice" });
+    await User.delete(1);
+    await expect(User.find(1)).rejects.toThrow("not found");
+  });
+
+  it("destroyBang delegates to destroy", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const result = await u.destroyBang();
+    expect(result.isDestroyed()).toBe(true);
+  });
+});

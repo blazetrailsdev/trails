@@ -2763,3 +2763,46 @@ describe("Rails-guided: first/last with count", () => {
     expect(result).toHaveLength(2);
   });
 });
+
+describe("Base (extended) - finders", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("find with multiple IDs", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await User.create({ name: "Alice" });
+    await User.create({ name: "Bob" });
+    await User.create({ name: "Charlie" });
+
+    const found = await User.find([1, 3]);
+    expect(found).toHaveLength(2);
+    expect(found[0].readAttribute("name")).toBe("Alice");
+    expect(found[1].readAttribute("name")).toBe("Charlie");
+  });
+
+  it("find with empty array raises RecordNotFound", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await expect(User.find([])).rejects.toThrow();
+  });
+
+  it("find with missing IDs throws", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await User.create({ name: "Alice" });
+    await expect(User.find([1, 999])).rejects.toThrow("not found");
+  });
+});
