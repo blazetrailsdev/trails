@@ -2495,67 +2495,7 @@ describe("Base: increment/decrement/toggle", () => {
   });
 });
 
-describe("delegate", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  it("delegates methods to an association", async () => {
-    class Author extends Base {
-      static _tableName = "authors";
-    }
-    Author.attribute("id", "integer");
-    Author.attribute("name", "string");
-    Author.attribute("email", "string");
-    Author.adapter = adapter;
-    registerModel(Author);
-
-    class Book extends Base {
-      static _tableName = "books";
-    }
-    Book.attribute("id", "integer");
-    Book.attribute("title", "string");
-    Book.attribute("author_id", "integer");
-    Book.adapter = adapter;
-    Associations.belongsTo.call(Book, "author");
-    delegate(Book, ["name", "email"], { to: "author" });
-    registerModel(Book);
-
-    const author = await Author.create({ name: "Tolkien", email: "jrr@shire.com" });
-    const book = await Book.create({ title: "The Hobbit", author_id: author.id });
-
-    expect(await (book as any).name()).toBe("Tolkien");
-    expect(await (book as any).email()).toBe("jrr@shire.com");
-  });
-
-  it("supports prefix option", async () => {
-    class Author extends Base {
-      static _tableName = "authors";
-    }
-    Author.attribute("id", "integer");
-    Author.attribute("name", "string");
-    Author.adapter = adapter;
-    registerModel(Author);
-
-    class Book extends Base {
-      static _tableName = "books";
-    }
-    Book.attribute("id", "integer");
-    Book.attribute("title", "string");
-    Book.attribute("author_id", "integer");
-    Book.adapter = adapter;
-    Associations.belongsTo.call(Book, "author");
-    delegate(Book, ["name"], { to: "author", prefix: true });
-    registerModel(Book);
-
-    const author = await Author.create({ name: "Tolkien" });
-    const book = await Book.create({ title: "The Hobbit", author_id: author.id });
-
-    expect(await (book as any).authorName()).toBe("Tolkien");
-  });
-});
+// delegate tests moved to delegate.test.ts
 
 describe("error classes", () => {
   let adapter: DatabaseAdapter;
@@ -2625,30 +2565,7 @@ describe("error classes", () => {
   });
 });
 
-describe("hasAttribute()", () => {
-  it("returns true for defined attributes", () => {
-    class Item extends Base { static _tableName = "items"; }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    Item.adapter = freshAdapter();
-
-    const item = new Item({ name: "Test" });
-    expect(item.hasAttribute("name")).toBe(true);
-    expect(item.hasAttribute("nonexistent")).toBe(false);
-  });
-});
-
-describe("attributeNames()", () => {
-  it("returns list of defined attribute names", () => {
-    class Item extends Base { static _tableName = "items"; }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    Item.attribute("status", "string");
-    Item.adapter = freshAdapter();
-
-    expect(Item.attributeNames()).toEqual(["id", "name", "status"]);
-  });
-});
+// hasAttribute() and attributeNames() tests moved to attribute-methods.test.ts
 
 describe("previouslyNewRecord", () => {
   it("returns false before first save", () => {
@@ -2751,18 +2668,7 @@ describe("frozen / isFrozen", () => {
   });
 });
 
-describe("columnNames", () => {
-  it("returns the list of defined attribute names", () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("email", "string");
-    User.adapter = adapter;
-
-    expect(User.columnNames()).toEqual(["id", "name", "email"]);
-  });
-});
+// columnNames tests moved to attribute-methods.test.ts
 
 describe("humanAttributeName", () => {
   it("converts snake_case to human-readable form", () => {
@@ -2772,16 +2678,7 @@ describe("humanAttributeName", () => {
   });
 });
 
-describe("hasAttributeDefinition", () => {
-  it("returns true for defined attributes", () => {
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    expect(User.hasAttributeDefinition("name")).toBe(true);
-    expect(User.hasAttributeDefinition("age")).toBe(false);
-  });
-});
+// hasAttributeDefinition tests moved to attribute-methods.test.ts
 
 describe("isBlank / isPresent", () => {
   it("isBlank returns true when no records exist", async () => {
@@ -2800,92 +2697,9 @@ describe("isBlank / isPresent", () => {
   });
 });
 
-describe("Base.exists", () => {
-  it("returns true when records exist (no args)", async () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
+// Base.exists tests covered in finder.test.ts
 
-    expect(await User.exists()).toBe(false);
-    await User.create({ name: "Alice" });
-    expect(await User.exists()).toBe(true);
-  });
-
-  it("checks by primary key", async () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
-
-    const user = await User.create({ name: "Alice" });
-    expect(await User.exists(user.id)).toBe(true);
-    expect(await User.exists(999)).toBe(false);
-  });
-
-  it("checks by conditions hash", async () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
-
-    await User.create({ name: "Alice" });
-    expect(await User.exists({ name: "Alice" })).toBe(true);
-    expect(await User.exists({ name: "Unknown" })).toBe(false);
-  });
-});
-
-describe("Base class aggregate delegates", () => {
-  it("count returns total records", async () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("age", "integer");
-    User.adapter = adapter;
-
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-
-    expect(await User.count()).toBe(2);
-  });
-
-  it("minimum/maximum/average/sum work as class methods", async () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("age", "integer");
-    User.adapter = adapter;
-
-    await User.create({ age: 20 });
-    await User.create({ age: 30 });
-
-    expect(await User.minimum("age")).toBe(20);
-    expect(await User.maximum("age")).toBe(30);
-    expect(await User.sum("age")).toBe(50);
-    expect(await User.average("age")).toBe(25);
-  });
-
-  it("pluck and ids work as class methods", async () => {
-    const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
-
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-
-    const names = (await User.pluck("name")).sort();
-    expect(names).toEqual(["Alice", "Bob"]);
-
-    const ids = await User.ids();
-    expect(ids.length).toBe(2);
-  });
-});
+// Base class aggregate delegates tests covered in calculations.test.ts
 
 describe("ignoredColumns", () => {
   it("can be set and retrieved on a model class", () => {
@@ -3165,25 +2979,7 @@ describe("Base.attributeTypes", () => {
   });
 });
 
-describe("isPersisted on Base", () => {
-  it("returns false for new records", () => {
-    const adapter = freshAdapter();
-    class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    const u = new User({ name: "Alice" });
-    expect(u.isPersisted()).toBe(false);
-  });
-
-  it("returns true for saved records", async () => {
-    const adapter = freshAdapter();
-    class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    const u = await User.create({ name: "Alice" });
-    expect(u.isPersisted()).toBe(true);
-  });
-});
+// isPersisted tests covered in persistence.test.ts
 
 describe("Base#isEqual", () => {
   it("returns true for same class and same id", async () => {
@@ -3241,25 +3037,7 @@ describe("Base#isEqual", () => {
   });
 });
 
-describe("Base.pick (static)", () => {
-  it("picks a column value from the first record", async () => {
-    const adapter = freshAdapter();
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.adapter = adapter;
-      }
-    }
-
-    await User.create({ name: "Alice", age: 30 });
-    await User.create({ name: "Bob", age: 25 });
-
-    const name = await User.pick("name");
-    expect(name).toBe("Alice");
-  });
-});
+// Base.pick tests covered in calculations.test.ts
 
 describe("Base static query delegations", () => {
   it("Base.first() returns the first record", async () => {
