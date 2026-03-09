@@ -2411,19 +2411,19 @@ describe("Relation#loadAsync", () => {
 describe("Relation#invertWhere", () => {
   it("swaps where and whereNot clauses", async () => {
     const adapter = freshAdapter();
-    class User extends Base {
+    class InvertWhereUser extends Base {
       static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
     }
-    await User.create({ name: "Alice", role: "admin" });
-    await User.create({ name: "Bob", role: "user" });
-    await User.create({ name: "Charlie", role: "admin" });
+    await InvertWhereUser.create({ name: "Alice", role: "admin" });
+    await InvertWhereUser.create({ name: "Bob", role: "user" });
+    await InvertWhereUser.create({ name: "Charlie", role: "admin" });
 
     // where({ role: "admin" }) returns Alice, Charlie
-    const admins = await User.where({ role: "admin" }).toArray();
+    const admins = await InvertWhereUser.where({ role: "admin" }).toArray();
     expect(admins.length).toBe(2);
 
     // invertWhere() should return Bob (non-admins)
-    const nonAdmins = await User.where({ role: "admin" }).invertWhere().toArray();
+    const nonAdmins = await InvertWhereUser.where({ role: "admin" }).invertWhere().toArray();
     expect(nonAdmins.length).toBe(1);
     expect(nonAdmins[0].readAttribute("name")).toBe("Bob");
   });

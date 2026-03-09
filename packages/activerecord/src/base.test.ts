@@ -17,7 +17,7 @@ import {
   setHasMany,
 } from "./associations.js";
 import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
 
@@ -4041,7 +4041,11 @@ describe("Rails-guided: New Features", () => {
     expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(1);
 
     await m.run(adapter, "down");
-    expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
+    if (adapterType === "memory") {
+      expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
+    } else {
+      await expect(adapter.execute(`SELECT * FROM "widgets"`)).rejects.toThrow();
+    }
   });
 
   // Rails: test_migration_runner_migrate_and_rollback
