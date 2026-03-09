@@ -13565,7 +13565,27 @@ describe("RelationScopingTest", () => {
 });
 
 describe("PreloaderTest", () => {
-  it.skip("preload with scope", () => { /* needs scoped preloading */ });
+  it("preload with scope", async () => {
+    const adapter = freshAdapter();
+    class PwsPost extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class PwsComment extends Base {
+      static { this.attribute("pws_post_id", "integer"); this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    registerModel("PwsPost", PwsPost); registerModel("PwsComment", PwsComment);
+    (PwsPost as any)._associations = [
+      { type: "hasMany", name: "scopedComments", options: {
+        className: "PwsComment", foreignKey: "pws_post_id",
+        scope: (rel: any) => rel.where({ body: "Thank you" }),
+      }},
+    ];
+    const post = await PwsPost.create({ title: "Welcome" });
+    await PwsComment.create({ pws_post_id: post.id, body: "Thank you" });
+    await PwsComment.create({ pws_post_id: post.id, body: "Other" });
+    const posts = await PwsPost.all().includes("scopedComments").toArray();
+    const comments = (posts[0] as any)._preloadedAssociations.get("scopedComments");
+    expect(comments.length).toBe(1);
+    expect(comments[0].readAttribute("body")).toBe("Thank you");
+  });
 
   it("preload makes correct number of queries on array", async () => {
     const adapter = freshAdapter();
@@ -13628,7 +13648,35 @@ describe("PreloaderTest", () => {
     expect(preloaded).toHaveLength(2);
   });
 
-  it.skip("preload for hmt with conditions", () => { /* needs scoped through */ });
+  it("preload for hmt with conditions", async () => {
+    const adapter = freshAdapter();
+    class HmtcPost extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class HmtcCategory extends Base { static { this.attribute("name", "string"); this.attribute("special", "boolean"); this.adapter = adapter; } }
+    class HmtcCategorization extends Base {
+      static { this.attribute("hmtc_post_id", "integer"); this.attribute("hmtc_category_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("HmtcPost", HmtcPost); registerModel("HmtcCategory", HmtcCategory); registerModel("HmtcCategorization", HmtcCategorization);
+    (HmtcPost as any)._associations = [
+      { type: "hasMany", name: "hmtcCategorizations", options: { className: "HmtcCategorization", foreignKey: "hmtc_post_id" } },
+      { type: "hasMany", name: "hmtSpecialCategories", options: {
+        className: "HmtcCategory", through: "hmtcCategorizations", source: "hmtcCategory",
+        scope: (rel: any) => rel.where({ special: true }),
+      }},
+    ];
+    (HmtcCategorization as any)._associations = [
+      { type: "belongsTo", name: "hmtcCategory", options: { className: "HmtcCategory", foreignKey: "hmtc_category_id" } },
+    ];
+    const post = await HmtcPost.create({ title: "Welcome" });
+    const normalCat = await HmtcCategory.create({ name: "Normal", special: false });
+    const specialCat = await HmtcCategory.create({ name: "Special", special: true });
+    await HmtcCategorization.create({ hmtc_post_id: post.id, hmtc_category_id: normalCat.id });
+    await HmtcCategorization.create({ hmtc_post_id: post.id, hmtc_category_id: specialCat.id });
+
+    const posts = await HmtcPost.all().includes("hmtSpecialCategories").toArray();
+    const cats = (posts[0] as any)._preloadedAssociations.get("hmtSpecialCategories");
+    expect(cats.length).toBe(1);
+    expect(cats[0].readAttribute("name")).toBe("Special");
+  });
   it.skip("preload groups queries with same scope", () => { /* needs scope tracking */ });
   it.skip("preload grouped queries with already loaded records", () => { /* needs loaded-record merging */ });
   it.skip("preload grouped queries of middle records", () => { /* needs middle-record grouping */ });
