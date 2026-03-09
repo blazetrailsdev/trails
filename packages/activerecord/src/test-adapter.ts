@@ -135,59 +135,60 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Ensure a table exists, creating it with TEXT columns if needed.
-   * If the table already exists but is missing columns, adds them via ALTER TABLE.
+   * Ensure a table exists with the needed columns.
+   * Creates the table if missing, adds columns via ALTER TABLE if the table
+   * exists but is missing columns.
    */
   private async ensureTable(tableName: string, colStr: string): Promise<void> {
     const columns = colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""));
 
-    if (this.knownTables.has(tableName)) {
-      // Table exists — check for missing columns and add them
-      const known = this.tableColumns.get(tableName);
-      if (known) {
-        for (const col of columns) {
-          if (col === "id" || known.has(col)) continue;
-          try {
-            const alterSql = this.isMysql()
-              ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` TEXT`
-              : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`;
-            await this.inner.exec(alterSql);
-          } catch {
-            // Column might already exist
-          }
-          known.add(col);
-        }
+    if (!this.knownTables.has(tableName)) {
+      // Try to create the table
+      const colDefs = columns
+        .filter((c) => c !== "id")
+        .map((c) => `"${c}" TEXT`);
+
+      const idCol = this.isPg()
+        ? '"id" SERIAL PRIMARY KEY'
+        : this.isMysql()
+          ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
+          : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
+
+      const colDefsQuoted = this.isMysql()
+        ? columns.filter((c) => c !== "id").map((c) => `\`${c}\` TEXT`)
+        : colDefs;
+
+      const createSql = this.isMysql()
+        ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefsQuoted].join(", ")}) ENGINE=InnoDB`
+        : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
+
+      try {
+        await this.inner.exec(createSql);
+      } catch {
+        // Table might already exist
       }
-      return;
-    }
-
-    const colDefs = columns
-      .filter((c) => c !== "id")
-      .map((c) => `"${c}" TEXT`);
-
-    const idCol = this.isPg()
-      ? '"id" SERIAL PRIMARY KEY'
-      : this.isMysql()
-        ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
-        : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
-
-    const colDefsQuoted = this.isMysql()
-      ? columns.filter((c) => c !== "id").map((c) => `\`${c}\` TEXT`)
-      : colDefs;
-
-    const createSql = this.isMysql()
-      ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefsQuoted].join(", ")}) ENGINE=InnoDB`
-      : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
-
-    try {
-      await this.inner.exec(createSql);
       this.knownTables.add(tableName);
       this.createdTables.add(tableName);
-      this.tableColumns.set(tableName, new Set(columns));
-    } catch {
-      // Table might already exist (race condition or previously created)
-      this.knownTables.add(tableName);
-      this.tableColumns.set(tableName, new Set(columns));
+      if (!this.tableColumns.has(tableName)) {
+        this.tableColumns.set(tableName, new Set());
+      }
+    }
+
+    // Always ensure all needed columns exist (handles both newly created
+    // tables where CREATE TABLE IF NOT EXISTS was a no-op, and tables
+    // that were created earlier with different columns)
+    const known = this.tableColumns.get(tableName)!;
+    for (const col of columns) {
+      if (col === "id" || known.has(col)) continue;
+      try {
+        const alterSql = this.isMysql()
+          ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` TEXT`
+          : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`;
+        await this.inner.exec(alterSql);
+      } catch {
+        // Column might already exist
+      }
+      known.add(col);
     }
   }
 
