@@ -30,6 +30,13 @@ export function acceptsNestedAttributesFor(
   associationName: string,
   options: NestedAttributeOptions = {}
 ): void {
+  // Validate that the association exists
+  const associations: any[] = (modelClass as any)._associations ?? [];
+  const assocExists = associations.find((a: any) => a.name === associationName);
+  if (!assocExists) {
+    throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
+  }
+
   // Store config on the class
   if (!(modelClass as any)._nestedAttributeConfigs) {
     (modelClass as any)._nestedAttributeConfigs = [];
@@ -68,12 +75,19 @@ export function assignNestedAttributes(
   associationName: string,
   attributesArray: Record<string, unknown>[] | Record<string, Record<string, unknown>>
 ): void {
+  // Validate input type
+  if (typeof attributesArray !== "object" || attributesArray === null) {
+    throw new Error("Hash or Array expected for nested attributes, got: " + typeof attributesArray);
+  }
+
   // Normalize hash-keyed format to array
   let attrs: Record<string, unknown>[];
   if (Array.isArray(attributesArray)) {
     attrs = attributesArray;
   } else {
-    attrs = Object.values(attributesArray);
+    // Sort by keys before converting to array (Rails sorts hash keys)
+    const sortedKeys = Object.keys(attributesArray).sort();
+    attrs = sortedKeys.map((k) => (attributesArray as Record<string, Record<string, unknown>>)[k]);
   }
 
   // Store on instance for later processing
@@ -135,15 +149,20 @@ async function processNestedAttributes(record: Base): Promise<void> {
       continue;
     }
 
+    const childPk = (targetModel as any).primaryKey || "id";
+
     for (const attrs of attrsList) {
-      const { _destroy, id, ...childAttrs } = attrs as any;
+      const { _destroy, ...restAttrs } = attrs as any;
+      const pkValue = restAttrs[childPk];
+      // Remove PK from child attrs so it's not set as a regular attribute during update
+      const { [childPk]: _pkIgnored, ...childAttrs } = restAttrs;
 
       // Check _destroy before rejectIf — destroy should work regardless of rejectIf
       if (_destroy && config.options.allowDestroy) {
         // Destroy existing record
-        if (id) {
-          const existing = await (targetModel as any).find(id);
-          if (existing) await existing.destroy();
+        if (pkValue) {
+          const existing = await (targetModel as any).find(pkValue);
+          await existing.destroy();
         }
         continue;
       }
@@ -153,12 +172,10 @@ async function processNestedAttributes(record: Base): Promise<void> {
         continue;
       }
 
-      if (id) {
+      if (pkValue) {
         // Update existing record
-        const existing = await (targetModel as any).find(id);
-        if (existing) {
-          await existing.update(childAttrs);
-        }
+        const existing = await (targetModel as any).find(pkValue);
+        await existing.update(childAttrs);
       } else if (assocDef.type === "belongsTo") {
         // For belongs_to, create the target and set FK on *this* record
         const created = await (targetModel as any).create(childAttrs);
