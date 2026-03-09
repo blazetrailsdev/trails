@@ -121,9 +121,11 @@ class AutoMigrateAdapter implements DatabaseAdapter {
             ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
             : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
 
-        const colDefs = [...cols].filter(c => c !== "id").map(c =>
-          this.isMysql() ? `\`${c}\` TEXT` : `"${c}" TEXT`
-        );
+        const colDefs = [...cols].filter(c => c !== "id").map(c => {
+          // FK columns should be INTEGER to avoid type mismatch errors
+          const type = c.endsWith("_id") ? "INTEGER" : "TEXT";
+          return this.isMysql() ? `\`${c}\` ${type}` : `"${c}" ${type}`;
+        });
 
         const createSql = this.isMysql()
           ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
@@ -149,7 +151,7 @@ class AutoMigrateAdapter implements DatabaseAdapter {
 
     // Auto-create table on INSERT if it doesn't exist
     // Handle both double-quoted (PG/SQLite) and backtick-quoted (MySQL) identifiers
-    const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]+)\)/i);
+    const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]*)\)/i);
     if (insertMatch) {
       const [, tableName, colStr] = insertMatch;
       await this.ensureTable(tableName, colStr, sql);
@@ -172,7 +174,44 @@ class AutoMigrateAdapter implements DatabaseAdapter {
       this.tableColumns.delete(dropMatch[1]);
     }
 
-    return this.inner.executeMutation(sql, binds);
+    try {
+      return await this.inner.executeMutation(sql, binds);
+    } catch (e: any) {
+      // If table doesn't exist, create it and retry
+      const msg = e?.message || e?.sqlMessage || "";
+      const tableMatch = msg.match(/relation "(\w+)" does not exist/i)
+        || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
+      if (tableMatch) {
+        const tableName = tableMatch[1];
+        const createSql = this.isMysql()
+          ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (\`id\` INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB`
+          : `CREATE TABLE IF NOT EXISTS "${tableName}" ("id" ${this.isPg() ? 'SERIAL' : 'INTEGER'} PRIMARY KEY)`;
+        try {
+          await this.inner.exec(createSql);
+          this.knownTables.add(tableName);
+          this.createdTables.add(tableName);
+          _allCreatedTables.add(tableName);
+          this.tableColumns.set(tableName, new Set(["id"]));
+        } catch {}
+
+        // Also handle empty INSERT (no columns) — add columns from SQL
+        const insertCols = sql.match(/\(([^)]*)\)\s*VALUES/i);
+        if (insertCols && insertCols[1].trim()) {
+          const cols = insertCols[1].split(",").map(c => c.trim().replace(/"/g, "").replace(/`/g, ""));
+          for (const col of cols) {
+            if (col === "id") continue;
+            try {
+              const alterSql = this.isMysql()
+                ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` TEXT`
+                : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`;
+              await this.inner.exec(alterSql);
+            } catch {}
+          }
+        }
+        return this.inner.executeMutation(sql, binds);
+      }
+      throw e;
+    }
   }
 
   async beginTransaction(): Promise<void> { return this.inner.beginTransaction(); }
@@ -191,6 +230,9 @@ class AutoMigrateAdapter implements DatabaseAdapter {
    * Infer a SQL column type from the INSERT values.
    */
   private inferType(colName: string, insertSql: string): string {
+    // FK columns should always be INTEGER
+    if (colName.endsWith("_id")) return "INTEGER";
+
     // Look at the VALUES clause to infer types
     const valMatch = insertSql.match(/VALUES\s*\(([^)]+)\)/i);
     if (!valMatch) return "TEXT";
@@ -218,7 +260,9 @@ class AutoMigrateAdapter implements DatabaseAdapter {
    * previous adapter, DROP it and recreate with correct columns/types.
    */
   private async ensureTable(tableName: string, colStr: string, insertSql: string): Promise<void> {
-    const columns = colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""));
+    const columns = colStr.trim()
+      ? colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""))
+      : [];
 
     if (!this.knownTables.has(tableName)) {
       // Always DROP first — the table may exist from a previous test file
