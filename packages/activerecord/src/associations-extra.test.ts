@@ -1103,6 +1103,11 @@ describe("HABTM (Rails-guided)", () => {
     }
     registerModel(Project);
 
+    // Create the join table
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+    );
+
     const dev = await Developer.create({ name: "David" });
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });

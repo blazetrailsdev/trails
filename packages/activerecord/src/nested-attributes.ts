@@ -159,8 +159,14 @@ async function processNestedAttributes(record: Base): Promise<void> {
         if (existing) {
           await existing.update(childAttrs);
         }
+      } else if (assocDef.type === "belongsTo") {
+        // For belongs_to, create the target and set FK on *this* record
+        const created = await (targetModel as any).create(childAttrs);
+        if (created && created.id != null) {
+          await record.update({ [foreignKey]: created.id });
+        }
       } else {
-        // Create new record
+        // For hasMany/hasOne, set FK on the child record
         await (targetModel as any).create({
           ...childAttrs,
           [foreignKey]: record.id,

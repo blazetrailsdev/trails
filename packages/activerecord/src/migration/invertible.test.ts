@@ -17,7 +17,7 @@ import {
   setHasMany,
 } from "../associations.js";
 import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, adapterType } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
 
@@ -348,7 +348,12 @@ describe("Reversible Migrations", () => {
 
     // Down — drops the table
     await migration.run(adapter, "down");
-    const afterDrop = await adapter.execute(`SELECT * FROM "posts"`);
-    expect(afterDrop).toHaveLength(0);
+    if (adapterType === "memory") {
+      const afterDrop = await adapter.execute(`SELECT * FROM "posts"`);
+      expect(afterDrop).toHaveLength(0);
+    } else {
+      // Real DBs raise when querying a dropped table
+      await expect(adapter.execute(`SELECT * FROM "posts"`)).rejects.toThrow();
+    }
   });
 });

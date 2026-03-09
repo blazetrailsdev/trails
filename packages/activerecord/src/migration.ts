@@ -335,10 +335,14 @@ export abstract class Migration {
         break;
       case "removeColumn":
         throw new Error("Cannot reverse removeColumn without type info");
-      case "addIndex":
-        await this.removeIndex(op.args[0] as string, {
+      case "addIndex": {
+        const idxOpts: { column: string | string[]; name?: string } = {
           column: op.args[1] as string | string[],
-        });
+        };
+        const origOpts = op.args[2] as { name?: string } | undefined;
+        if (origOpts?.name) idxOpts.name = origOpts.name;
+        await this.removeIndex(op.args[0] as string, idxOpts);
+      }
         break;
       case "removeIndex":
         throw new Error("Cannot reverse removeIndex without column info");

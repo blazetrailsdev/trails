@@ -325,7 +325,7 @@ class SchemaAdapter implements DatabaseAdapter {
   private async handleMissingTable(e: any, sql: string): Promise<boolean> {
     const msg = e?.message || e?.sqlMessage || "";
     const tableMatch = msg.match(/relation "(\w+)" does not exist/i)
-      || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
+      || msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i);
     if (!tableMatch) return false;
 
     const tableName = tableMatch[1];
@@ -353,7 +353,12 @@ class SchemaAdapter implements DatabaseAdapter {
     return true;
   }
 
-  async beginTransaction(): Promise<void> { return this.inner.beginTransaction(); }
+  async beginTransaction(): Promise<void> {
+    // Run pending DDL before starting a transaction, because DDL in MySQL
+    // causes implicit commits which destroy savepoints and break nesting.
+    await this.setup();
+    return this.inner.beginTransaction();
+  }
   async commit(): Promise<void> { return this.inner.commit(); }
   async rollback(): Promise<void> { return this.inner.rollback(); }
   async createSavepoint(name: string): Promise<void> { return this.inner.createSavepoint(name); }

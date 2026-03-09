@@ -577,7 +577,7 @@ describe("BasicsTest2", () => {
 
   it("bignum", async () => {
     class Counter extends Base {
-      static { this.attribute("count", "integer"); this.adapter = createTestAdapter(); }
+      static { this.attribute("count", "big_integer"); this.adapter = createTestAdapter(); }
     }
     const c = await Counter.create({ count: 9007199254740991 });
     expect(c.readAttribute("count")).toBe(9007199254740991);

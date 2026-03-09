@@ -1180,6 +1180,11 @@ describe("HasAndBelongsToManyAssociations", () => {
     registerModel(Developer);
     registerModel(Project);
 
+    // Create the join table
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+    );
+
     const dev = await Developer.create({ name: "David" });
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });
@@ -1201,6 +1206,11 @@ describe("HasAndBelongsToManyAssociations", () => {
       static { this.attribute("name", "string"); this.adapter = adapter; }
     }
     registerModel(Developer);
+
+    // Create the join table
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+    );
 
     const dev = await Developer.create({ name: "Solo" });
     const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });

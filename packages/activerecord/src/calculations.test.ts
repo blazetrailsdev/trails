@@ -308,7 +308,10 @@ describe("CalculationsTest", () => {
 // More CalculationsTest
 // ==========================================================================
 describe("CalculationsTest", () => {
-  const adapter = freshAdapter();
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("should sum arel attribute", async () => {
     class Account extends Base {

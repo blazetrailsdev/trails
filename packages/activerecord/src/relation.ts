@@ -1811,7 +1811,7 @@ export class Relation<T extends Base> {
       .map(([key, val]) => {
         if (val === null) return `"${key}" = NULL`;
         if (typeof val === "number") return `"${key}" = ${val}`;
-        if (typeof val === "boolean") return `"${key}" = ${val ? 1 : 0}`;
+        if (typeof val === "boolean") return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
         return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
       })
       .join(", ");

@@ -84,16 +84,14 @@ export async function transaction<T>(
     await adapter.beginTransaction();
   }
 
+  let result: T;
   try {
-    const result = await fn(tx);
+    result = await fn(tx);
     if (nested && spName) {
       await adapter.releaseSavepoint(spName);
     } else {
       await adapter.commit();
     }
-    _currentTransaction = previousTx;
-    await tx.runAfterCommitCallbacks();
-    return result;
   } catch (error) {
     if (nested && spName) {
       await adapter.rollbackToSavepoint(spName);
@@ -104,6 +102,9 @@ export async function transaction<T>(
     await tx.runAfterRollbackCallbacks();
     throw error;
   }
+  _currentTransaction = previousTx;
+  await tx.runAfterCommitCallbacks();
+  return result;
 }
 
 /**

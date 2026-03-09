@@ -769,6 +769,8 @@ export class MemoryAdapter implements DatabaseAdapter {
 
   private parseSingleValue(raw: string): unknown {
     if (raw === "NULL") return null;
+    if (raw === "TRUE" || raw === "true") return 1;
+    if (raw === "FALSE" || raw === "false") return 0;
     if (raw.startsWith("'") && raw.endsWith("'")) {
       return raw.slice(1, -1).replace(/''/g, "'");
     }

@@ -66,6 +66,11 @@ describe("has_and_belongs_to_many", () => {
     registerModel(Tag);
     registerModel(Post);
 
+    // Create the join table
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "posts_tags" ("post_id" INTEGER, "tag_id" INTEGER)`
+    );
+
     const post = await Post.create({ title: "Hello" });
     const t1 = await Tag.create({ name: "ruby" });
     const t2 = await Tag.create({ name: "rails" });
@@ -102,6 +107,11 @@ describe("has_and_belongs_to_many", () => {
     Project.attribute("name", "string");
     Project.adapter = adapter;
     registerModel(Project);
+
+    // Create the join table
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+    );
 
     const dev = await Developer.create({ name: "Alice" });
     const proj = await Project.create({ name: "Rails" });
