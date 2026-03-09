@@ -23,7 +23,22 @@ This document groups the remaining work into feature areas, identifies dependenc
 
 ## How coverage is measured
 
-`npm run test:compare` extracts test names from Rails Ruby source and matches them by description against our TypeScript `it()` / `it.skip()` tests. A "stub" is an `it.skip()` that matched a Ruby test name. "Missing" means no TS test exists at all. The goal is 0 stubs and 0 missing.
+Two compare scripts measure progress against Rails:
+
+- **`npm run test:compare`** — Extracts test names from the Rails Ruby source (`scripts/test-compare/fetch-rails-tests.sh` fetches the Rails repo, `extract-ruby-tests.rb` pulls out test descriptions, `extract-ts-tests.ts` does the same for our TypeScript tests, and `compare.ts` matches them). A "stub" is an `it.skip()` that matched a Ruby test name. "Missing" means no TS test exists at all. The goal is 0 stubs and 0 missing.
+- **`npm run api:compare`** — Same approach but for public API methods. Compares our exported class/method signatures against Rails' public API surface.
+- **`npm run test:generate-stubs`** — Generates `it.skip()` stubs for any Rails tests that don't have a TypeScript match yet.
+
+Both compare scripts run in CI on every push (see the "Rails API/Test Comparison" job in `.github/workflows/ci.yml`).
+
+## Database adapters
+
+Tests run against three backends in CI: in-memory (default), PostgreSQL 17, and MariaDB 11. Set `PG_TEST_URL` or `MYSQL_TEST_URL` to run against a real database locally. The `SchemaAdapter` in `test-adapter.ts` auto-creates tables from model attribute definitions so tests don't need manual DDL.
+
+Adapter source lives in `packages/activerecord/src/adapters/`:
+- `postgres-adapter.ts` — PostgreSQL via `pg`
+- `mysql-adapter.ts` — MySQL/MariaDB via `mysql2`
+- SQLite is handled by `better-sqlite3` in the base adapter
 
 ## Summary by feature area
 

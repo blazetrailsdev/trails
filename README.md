@@ -117,15 +117,43 @@ Base controller with rendering (templates, JSON, plain text, status codes), filt
 # Install dependencies
 npm install
 
-# Run tests
+# Run tests (uses in-memory SQLite adapter by default)
 npx vitest run
 
 # Build all packages
 npm run build
-
-# Compare test coverage against Rails
-npm run test:compare
 ```
+
+### Measuring Progress Against Rails
+
+Two compare scripts measure how closely we track the real Rails codebase:
+
+```bash
+# Compare public API surface against Rails
+# Extracts Ruby method signatures from Rails source and diffs against our TS exports
+npm run api:compare
+
+# Compare test coverage against the Rails test suite
+# Matches our it()/it.skip() descriptions against Ruby test names
+npm run test:compare
+
+# Generate stub tests for any unmatched Rails tests
+npm run test:generate-stubs
+```
+
+Both scripts fetch the Rails source, extract Ruby definitions, extract our TypeScript equivalents, and produce a comparison report. CI runs both on every push to ensure we don't regress.
+
+### Database Adapters
+
+Tests run against all three database backends in CI:
+
+| Backend | How to run locally | Env variable |
+|---------|-------------------|--------------|
+| In-memory (default) | `npx vitest run` | (none) |
+| PostgreSQL | `PG_TEST_URL=postgres://... npx vitest run` | `PG_TEST_URL` |
+| MySQL/MariaDB | `MYSQL_TEST_URL=mysql://... npx vitest run` | `MYSQL_TEST_URL` |
+
+The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 
 ## Project Structure
 
