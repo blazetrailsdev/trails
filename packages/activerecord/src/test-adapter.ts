@@ -169,6 +169,29 @@ async function processPendingModels(inner: any): Promise<void> {
 }
 
 /**
+ * Delete all data from known tables without dropping them.
+ * Using DELETE FROM (not DROP TABLE) preserves table structure, PG SERIAL
+ * sequences, and MySQL AUTO_INCREMENT counters, avoiding ID reuse issues
+ * when multiple createTestAdapter() calls happen within a test file.
+ */
+async function cleanAllTables(inner: any): Promise<void> {
+  if (_cleanupInProgress) return;
+  _cleanupInProgress = true;
+  try {
+    for (const table of _createdTables) {
+      try {
+        const sql = isMysql()
+          ? `DELETE FROM \`${table}\``
+          : `DELETE FROM "${table}"`;
+        await inner.exec(sql);
+      } catch {}
+    }
+  } finally {
+    _cleanupInProgress = false;
+  }
+}
+
+/**
  * Drop all known tables and reset tracking state.
  */
 async function dropAllTables(inner: any): Promise<void> {
@@ -258,7 +281,7 @@ class SchemaAdapter implements DatabaseAdapter {
   private async setup(): Promise<void> {
     if (_needsCleanup && !_cleanupInProgress) {
       _needsCleanup = false;
-      await dropAllTables(this.inner);
+      await cleanAllTables(this.inner);
     }
     // Extract columns from any newly registered model classes
     if (_registeredModelClasses.size > 0) {
