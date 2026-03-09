@@ -1,7 +1,9 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **77.9%** name match (4,229 matched / 5,428 total Ruby tests), **13.4%** real (730 non-skip). 3,499 stubs need converting, ~1,199 tests have no TS match at all. Raw test stats: 6,744 passed, 3,669 skipped.
+Current state: **77.9%** name match (4,229 matched / 5,428 total Ruby tests), **13.4%** real (730 non-skip). 3,499 stubs need converting, ~1,199 tests have no TS match at all. Raw test stats: 6,825 passed, 3,588 skipped.
 
+> **Progress update (2026-03-09, session 2):** Reorganized activerecord tests from 4 monolithic files into ~100 focused per-feature test files matching Rails test structure. Converted 16 more SQLite adapter tests (157 passing / 24 skipped). Extended SqliteAdapter with `pragma()`, `readonly` option, and `withPreventedWrites()`. Overall: 14,160 passed / 4,926 skipped across all packages.
+>
 > **Progress update (2026-03-09):** Converted 129 `it.skip` stubs to real passing tests across the 6 highest-impact files:
 >
 > - **base.test.ts** — 85 tests implemented: table name guessing, abstract class checks, find/first/last, firstBang/lastBang with RecordNotFound, exists?, findBy, findOrCreateBy, findOrInitializeBy, toParam, where conditions, count, pluck, pick, ids, min/max/sum/avg, order, group, having, offset, limit, distinct, readonly, lock, joins, update/updateBang, destroyBang, becomes, dup, findBySql, scoping/currentScope, default scope with unscoped, named scopes, column names, ignored columns, readonly attributes, inherited attributes, prefixes/suffixes, and more.
