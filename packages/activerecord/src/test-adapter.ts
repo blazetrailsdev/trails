@@ -144,7 +144,11 @@ async function processPendingModels(inner: any): Promise<void> {
       }
     } else {
       // Table exists — add missing columns
-      const known = _createdColumns.get(tableName)!;
+      let known = _createdColumns.get(tableName);
+      if (!known) {
+        known = new Set(["id"]);
+        _createdColumns.set(tableName, known);
+      }
       for (const [col, type] of columns) {
         if (known.has(col)) continue;
         try {
@@ -269,7 +273,14 @@ class SchemaAdapter implements DatabaseAdapter {
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     await this.setup();
-    return this.inner.execute(sql, binds);
+    try {
+      return await this.inner.execute(sql, binds);
+    } catch (e: any) {
+      if (await this.handleMissingTable(e, sql)) {
+        return this.inner.execute(sql, binds);
+      }
+      throw e;
+    }
   }
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
@@ -290,7 +301,58 @@ class SchemaAdapter implements DatabaseAdapter {
       _createdColumns.delete(dropMatch[1]);
     }
 
-    return this.inner.executeMutation(sql, binds);
+    // Auto-add IF NOT EXISTS to CREATE TABLE to prevent "already exists" errors
+    if (/CREATE\s+TABLE\s+(?!IF)/i.test(sql)) {
+      sql = sql.replace(/CREATE\s+TABLE\s+/i, "CREATE TABLE IF NOT EXISTS ");
+    }
+    // Auto-add IF EXISTS to DROP TABLE
+    if (/DROP\s+TABLE\s+(?!IF)/i.test(sql)) {
+      sql = sql.replace(/DROP\s+TABLE\s+/i, "DROP TABLE IF EXISTS ");
+    }
+
+    try {
+      return await this.inner.executeMutation(sql, binds);
+    } catch (e: any) {
+      if (await this.handleMissingTable(e, sql)) {
+        return this.inner.executeMutation(sql, binds);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * If the error is about a missing table, create the table with columns
+   * extracted from the SQL statement. Returns true if recovery succeeded.
+   */
+  private async handleMissingTable(e: any, sql: string): Promise<boolean> {
+    const msg = e?.message || e?.sqlMessage || "";
+    const tableMatch = msg.match(/relation "(\w+)" does not exist/i)
+      || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
+    if (!tableMatch) return false;
+
+    const tableName = tableMatch[1];
+    if (_createdTables.has(tableName)) return false;
+
+    // Extract columns from SQL
+    const cols = new Map<string, string>();
+    // INSERT columns
+    const insertMatch = sql.match(/INSERT\s+INTO\s+["`]\w+["`]\s+\(([^)]*)\)/i);
+    if (insertMatch && insertMatch[1].trim()) {
+      for (const c of insertMatch[1].split(",")) {
+        const col = c.trim().replace(/"/g, "").replace(/`/g, "");
+        if (col !== "id") cols.set(col, col.endsWith("_id") ? "INTEGER" : "TEXT");
+      }
+    }
+    // table.column references
+    const colMatches = sql.matchAll(/["`](\w+)["`]\.\s*["`](\w+)["`]/g);
+    for (const m of colMatches) {
+      if (m[2] === "id" || m[2] === "*") continue;
+      cols.set(m[2], m[2].endsWith("_id") ? "INTEGER" : "TEXT");
+    }
+
+    _pendingModels.set(tableName, cols);
+    await processPendingModels(this.inner);
+    return true;
   }
 
   async beginTransaction(): Promise<void> { return this.inner.beginTransaction(); }
