@@ -8,8 +8,6 @@
  *
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
- * Each AutoMigrateAdapter tracks its own tables and cleans them up,
- * but the underlying connection stays open for the lifetime of the process.
  */
 
 import { MemoryAdapter } from "./adapter.js";
@@ -25,23 +23,19 @@ export const adapterType: "memory" | "postgres" | "mysql" =
 // Shared adapter instance for real databases (single connection pool)
 let _sharedAdapter: any = null;
 
-// Shared table tracking across all AutoMigrateAdapter instances for real DBs.
-// This prevents column-not-found errors when different test files reuse the
-// same table name with different columns.
-const _sharedKnownTables = new Set<string>();
-const _sharedCreatedTables = new Set<string>();
-const _sharedTableColumns = new Map<string, Set<string>>();
+// Track ALL tables ever created so we can drop them when a new adapter starts
+const _allCreatedTables = new Set<string>();
 
 let _factory: () => DatabaseAdapter;
 
 if (PG_TEST_URL) {
   const { PostgresAdapter } = await import("./adapters/postgres-adapter.js");
   _sharedAdapter = new PostgresAdapter(PG_TEST_URL);
-  _factory = () => new AutoMigrateAdapter(_sharedAdapter, _sharedKnownTables, _sharedCreatedTables, _sharedTableColumns);
+  _factory = () => new AutoMigrateAdapter(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
   const { MysqlAdapter } = await import("./adapters/mysql-adapter.js");
   _sharedAdapter = new MysqlAdapter(MYSQL_TEST_URL);
-  _factory = () => new AutoMigrateAdapter(_sharedAdapter, _sharedKnownTables, _sharedCreatedTables, _sharedTableColumns);
+  _factory = () => new AutoMigrateAdapter(_sharedAdapter);
 } else {
   _factory = () => new MemoryAdapter();
 }
@@ -71,25 +65,18 @@ export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void
  * suite run against real databases without adding explicit CREATE TABLE
  * statements to every test.
  *
- * The underlying adapter is shared across instances — cleanup() drops
- * tables and clears data but does NOT close the connection.
+ * Each instance gets its own table/column tracking. When a table is first
+ * seen in an INSERT, it is DROP-ed (if it existed from a previous adapter)
+ * and recreated fresh with the correct columns. This ensures test isolation.
  */
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
-  private knownTables: Set<string>;
-  private createdTables: Set<string>;
-  private tableColumns: Map<string, Set<string>>;
+  private knownTables = new Set<string>();
+  private createdTables = new Set<string>();
+  private tableColumns = new Map<string, Set<string>>();
 
-  constructor(
-    inner: any,
-    knownTables?: Set<string>,
-    createdTables?: Set<string>,
-    tableColumns?: Map<string, Set<string>>,
-  ) {
+  constructor(inner: any) {
     this.inner = inner;
-    this.knownTables = knownTables ?? new Set();
-    this.createdTables = createdTables ?? new Set();
-    this.tableColumns = tableColumns ?? new Map();
   }
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
@@ -102,7 +89,7 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]+)\)/i);
     if (insertMatch) {
       const [, tableName, colStr] = insertMatch;
-      await this.ensureTable(tableName, colStr);
+      await this.ensureTable(tableName, colStr, sql);
     }
 
     // Auto-handle CREATE TABLE
@@ -110,6 +97,7 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     if (createMatch) {
       this.knownTables.add(createMatch[1]);
       this.createdTables.add(createMatch[1]);
+      _allCreatedTables.add(createMatch[1]);
     }
 
     // Auto-handle DROP TABLE
@@ -117,6 +105,8 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     if (dropMatch) {
       this.knownTables.delete(dropMatch[1]);
       this.createdTables.delete(dropMatch[1]);
+      _allCreatedTables.delete(dropMatch[1]);
+      this.tableColumns.delete(dropMatch[1]);
     }
 
     return this.inner.executeMutation(sql, binds);
@@ -135,18 +125,59 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Ensure a table exists with the needed columns.
-   * Creates the table if missing, adds columns via ALTER TABLE if the table
-   * exists but is missing columns.
+   * Infer a SQL column type from the INSERT values.
    */
-  private async ensureTable(tableName: string, colStr: string): Promise<void> {
+  private inferType(colName: string, insertSql: string): string {
+    // Look at the VALUES clause to infer types
+    const valMatch = insertSql.match(/VALUES\s*\(([^)]+)\)/i);
+    if (!valMatch) return "TEXT";
+
+    const columns = insertSql.match(/\(([^)]+)\)\s*VALUES/i);
+    if (!columns) return "TEXT";
+
+    const colNames = columns[1].split(",").map(c => c.trim().replace(/"/g, "").replace(/`/g, ""));
+    const values = valMatch[1].split(",").map(v => v.trim());
+
+    const idx = colNames.indexOf(colName);
+    if (idx < 0 || idx >= values.length) return "TEXT";
+
+    const val = values[idx];
+    if (val === "NULL") return "TEXT";
+    if (val === "TRUE" || val === "FALSE") return this.isPg() ? "BOOLEAN" : "INTEGER";
+    if (/^-?\d+$/.test(val)) return "INTEGER";
+    if (/^-?\d+\.\d+$/.test(val)) return this.isPg() ? "DOUBLE PRECISION" : "DOUBLE";
+    return "TEXT";
+  }
+
+  /**
+   * Ensure a table exists with the needed columns.
+   * If this adapter hasn't seen the table before but it was created by a
+   * previous adapter, DROP it and recreate with correct columns/types.
+   */
+  private async ensureTable(tableName: string, colStr: string, insertSql: string): Promise<void> {
     const columns = colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""));
 
     if (!this.knownTables.has(tableName)) {
-      // Try to create the table
+      // Drop stale table from previous adapter if it exists
+      if (_allCreatedTables.has(tableName)) {
+        try {
+          const dropSql = this.isMysql()
+            ? `DROP TABLE IF EXISTS \`${tableName}\``
+            : `DROP TABLE IF EXISTS "${tableName}" CASCADE`;
+          await this.inner.exec(dropSql);
+        } catch {
+          // ignore
+        }
+        _allCreatedTables.delete(tableName);
+      }
+
+      // Create the table with inferred column types
       const colDefs = columns
         .filter((c) => c !== "id")
-        .map((c) => `"${c}" TEXT`);
+        .map((c) => {
+          const type = this.inferType(c, insertSql);
+          return `"${c}" ${type}`;
+        });
 
       const idCol = this.isPg()
         ? '"id" SERIAL PRIMARY KEY'
@@ -155,7 +186,10 @@ class AutoMigrateAdapter implements DatabaseAdapter {
           : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
 
       const colDefsQuoted = this.isMysql()
-        ? columns.filter((c) => c !== "id").map((c) => `\`${c}\` TEXT`)
+        ? columns.filter((c) => c !== "id").map((c) => {
+            const type = this.inferType(c, insertSql);
+            return `\`${c}\` ${type}`;
+          })
         : colDefs;
 
       const createSql = this.isMysql()
@@ -169,21 +203,20 @@ class AutoMigrateAdapter implements DatabaseAdapter {
       }
       this.knownTables.add(tableName);
       this.createdTables.add(tableName);
-      if (!this.tableColumns.has(tableName)) {
-        this.tableColumns.set(tableName, new Set());
-      }
+      _allCreatedTables.add(tableName);
+      this.tableColumns.set(tableName, new Set(columns));
+      return;
     }
 
-    // Always ensure all needed columns exist (handles both newly created
-    // tables where CREATE TABLE IF NOT EXISTS was a no-op, and tables
-    // that were created earlier with different columns)
+    // Table already known to this adapter — add missing columns
     const known = this.tableColumns.get(tableName)!;
     for (const col of columns) {
       if (col === "id" || known.has(col)) continue;
       try {
+        const type = this.inferType(col, insertSql);
         const alterSql = this.isMysql()
-          ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` TEXT`
-          : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`;
+          ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` ${type}`
+          : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" ${type}`;
         await this.inner.exec(alterSql);
       } catch {
         // Column might already exist
@@ -201,7 +234,7 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Drop all auto-created tables. Does NOT close the shared connection.
+   * Drop all tables created by this adapter. Does NOT close the shared connection.
    */
   async cleanup(): Promise<void> {
     for (const table of this.createdTables) {
@@ -213,6 +246,7 @@ class AutoMigrateAdapter implements DatabaseAdapter {
       } catch {
         // ignore cleanup errors
       }
+      _allCreatedTables.delete(table);
     }
     this.createdTables.clear();
     this.knownTables.clear();
