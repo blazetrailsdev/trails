@@ -548,9 +548,15 @@ export abstract class Migration {
     const nullable = options.null === false ? " NOT NULL" : "";
     const defaultClause = this._defaultClause(options.default);
 
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" TYPE ${sqlType}${nullable}${defaultClause}`
-    );
+    if (this._adapterName === "mysql") {
+      await this.adapter.executeMutation(
+        `ALTER TABLE "${tableName}" MODIFY COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`
+      );
+    } else {
+      await this.adapter.executeMutation(
+        `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" TYPE ${sqlType}${nullable}${defaultClause}`
+      );
+    }
   }
 
   /**
@@ -1332,9 +1338,15 @@ export class MigrationContext {
     type: string,
     _options?: ColumnOptions
   ): Promise<void> {
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`
-    );
+    if (this._adapterName === "mysql") {
+      await this.adapter.executeMutation(
+        `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type)}`
+      );
+    } else {
+      await this.adapter.executeMutation(
+        `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`
+      );
+    }
   }
 
   async addIndex(
