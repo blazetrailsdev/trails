@@ -82,21 +82,22 @@ class AutoMigrateAdapter implements DatabaseAdapter {
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
     // Auto-create table on INSERT if it doesn't exist
-    const insertMatch = sql.match(/INSERT\s+INTO\s+"(\w+)"\s+\(([^)]+)\)/i);
+    // Handle both double-quoted (PG/SQLite) and backtick-quoted (MySQL) identifiers
+    const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]+)\)/i);
     if (insertMatch) {
       const [, tableName, colStr] = insertMatch;
       await this.ensureTable(tableName, colStr);
     }
 
     // Auto-handle CREATE TABLE
-    const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"(\w+)"/i);
+    const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
     if (createMatch) {
       this.knownTables.add(createMatch[1]);
       this.createdTables.add(createMatch[1]);
     }
 
     // Auto-handle DROP TABLE
-    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+"(\w+)"/i);
+    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
     if (dropMatch) {
       this.knownTables.delete(dropMatch[1]);
       this.createdTables.delete(dropMatch[1]);
