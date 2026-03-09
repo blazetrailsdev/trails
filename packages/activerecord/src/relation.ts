@@ -3250,7 +3250,7 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
     const table = this._modelClass.arelTable;
     const setClauses = Object.entries(counters)
-      .map(([key, val]) => `"${key}" = "${key}" + ${val}`)
+      .map(([key, val]) => `"${key}" = COALESCE("${key}", 0) + ${val}`)
       .join(", ");
     let sql = `UPDATE "${table.name}" SET ${setClauses}`;
     const whereConditions = this._buildWhereStrings(table);

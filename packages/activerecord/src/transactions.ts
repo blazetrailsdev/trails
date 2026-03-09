@@ -63,6 +63,8 @@ export class Transaction {
  *
  * Mirrors: ActiveRecord::Base.transaction
  */
+let _savepointCounter = 0;
+
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: Transaction) => Promise<T>
@@ -72,16 +74,32 @@ export async function transaction<T>(
   const previousTx = _currentTransaction;
   _currentTransaction = tx;
 
-  await adapter.beginTransaction();
+  // If already in a transaction, use a savepoint for nesting
+  const nested = previousTx !== null;
+  const spName = nested ? `sp_${++_savepointCounter}` : null;
+
+  if (nested && spName) {
+    await adapter.createSavepoint(spName);
+  } else {
+    await adapter.beginTransaction();
+  }
 
   try {
     const result = await fn(tx);
-    await adapter.commit();
+    if (nested && spName) {
+      await adapter.releaseSavepoint(spName);
+    } else {
+      await adapter.commit();
+    }
     _currentTransaction = previousTx;
     await tx.runAfterCommitCallbacks();
     return result;
   } catch (error) {
-    await adapter.rollback();
+    if (nested && spName) {
+      await adapter.rollbackToSavepoint(spName);
+    } else {
+      await adapter.rollback();
+    }
     _currentTransaction = previousTx;
     await tx.runAfterRollbackCallbacks();
     throw error;
