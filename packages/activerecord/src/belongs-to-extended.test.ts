@@ -9,11 +9,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   registerModel,
   touchBelongsToParents,
   updateCounterCaches,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import { Associations, loadBelongsTo } from "./associations.js";
 
 // ---------------------------------------------------------------------------
@@ -21,10 +22,10 @@ import { Associations, loadBelongsTo } from "./associations.js";
 // ---------------------------------------------------------------------------
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
-    adapter = new MemoryAdapter();
+    adapter = createTestAdapter();
   });
 
   // -------------------------------------------------------------------------

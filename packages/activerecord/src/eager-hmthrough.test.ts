@@ -8,7 +8,9 @@
  * Tests that can be meaningfully exercised with MemoryAdapter are implemented.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, registerModel, enableSti, registerSubclass } from "./index.js";
+import { Base, registerModel, enableSti, registerSubclass } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import {
   Associations,
   loadHasMany,
@@ -17,15 +19,15 @@ import {
   processDependentAssociations,
 } from "./associations.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2182,7 +2184,7 @@ describe("EagerAssociationTest", () => {
 // HasManyThroughAssociationsTest — targets associations/has_many_through_associations_test.rb
 // ==========================================================================
 describe("HasManyThroughAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();

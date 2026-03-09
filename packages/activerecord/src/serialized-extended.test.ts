@@ -3,10 +3,12 @@
  * Mirrors: activerecord/test/cases/serialized_attribute_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, serialize } from "./index.js";
+import { Base, serialize } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
@@ -14,7 +16,7 @@ function freshAdapter(): MemoryAdapter {
 // ==========================================================================
 
 describe("SerializedAttributeTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();

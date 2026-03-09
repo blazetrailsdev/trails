@@ -4,10 +4,12 @@
  *          activerecord/test/cases/invertible_migration_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { MemoryAdapter, MigrationContext } from "./index.js";
+import { MigrationContext } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshContext(): { adapter: MemoryAdapter; ctx: MigrationContext } {
-  const adapter = new MemoryAdapter();
+function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
+  const adapter = createTestAdapter();
   const ctx = new MigrationContext(adapter);
   return { adapter, ctx };
 }

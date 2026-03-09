@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, enableSti, registerSubclass, registerModel, SubclassNotFound, findStiClass } from "./index.js";
+import { Base, enableSti, registerSubclass, registerModel, SubclassNotFound, findStiClass } from "./index.js";
 import { getStiBase, isStiSubclass } from "./sti.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
 /**
  * Single Table Inheritance tests.
@@ -8,10 +10,10 @@ import { getStiBase, isStiSubclass } from "./sti.js";
  * Mirrors: activerecord/test/cases/inheritance_test.rb (InheritanceTest)
  */
 describe("InheritanceTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
-    adapter = new MemoryAdapter();
+    adapter = createTestAdapter();
   });
 
   // -------------------------------------------------------------------------
@@ -756,7 +758,7 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = new MemoryAdapter();
+        this.adapter = createTestAdapter();
         enableSti(Company);
       }
     }
@@ -771,7 +773,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("inheritance new with subclass", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -797,7 +799,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("new with invalid type", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -818,7 +820,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("new with unrelated type", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -843,7 +845,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("new with complex inheritance", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -871,7 +873,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("a bad type column", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -896,7 +898,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("becomes bang resets inheritance type column", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -930,7 +932,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("becomes and change tracking for inheritance columns", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -961,7 +963,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("update all within inheritance", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -999,7 +1001,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt update all within inheritance", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -1035,7 +1037,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt destroy all within inheritance", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -1069,7 +1071,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("descends from active record", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
@@ -1099,7 +1101,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("base class predicate", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
@@ -1130,7 +1132,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt complex inheritance", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -1180,7 +1182,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("class with blank sti name", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -1207,7 +1209,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("inheritance without mapping", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Subscriber extends Base {
       static {
         this.attribute("nick", "string");

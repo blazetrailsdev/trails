@@ -5,10 +5,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   registerModel,
   CollectionProxy,
+  enableSti,
+  registerSubclass,
+  SubclassNotFound,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import {
   Associations,
   association,
@@ -17,10 +21,11 @@ import {
   processDependentAssociations,
   updateCounterCaches,
   touchBelongsToParents,
+  buildBelongsTo,
 } from "./associations.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
@@ -28,7 +33,7 @@ function freshAdapter(): MemoryAdapter {
 // ==========================================================================
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1473,11 +1478,124 @@ describe("HasManyAssociationsTest", () => {
     const remaining = await loadHasMany(author, "clear_scope_posts", { className: "ClearScopePost", foreignKey: "author_id" });
     expect(remaining.length).toBe(0);
   });
-  it.skip("building the associated object with implicit sti base class", () => {});
-  it.skip("building the associated object with explicit sti base class", () => {});
-  it.skip("building the associated object with sti subclass", () => {});
-  it.skip("building the associated object with an invalid type", () => {});
-  it.skip("building the associated object with an unrelated type", () => {});
+  it("building the associated object with implicit sti base class", () => {
+    // DependentFirm has_many :companies; Company has STI with type column
+    const a = freshAdapter();
+    class StiCompany extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(StiCompany);
+    class StiFirm extends StiCompany {}
+    registerSubclass(StiFirm);
+    class StiClient extends StiCompany {}
+    registerSubclass(StiClient);
+    class StiAccount extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(StiCompany);
+    registerModel(StiFirm);
+    registerModel(StiClient);
+    registerModel(StiAccount);
+
+    class DepFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(DepFirm);
+    Associations.hasMany.call(DepFirm, "stiCompanies", { className: "StiCompany", foreignKey: "firm_id" });
+
+    const firm = new DepFirm({ name: "Test" });
+    const proxy = new CollectionProxy(firm, "stiCompanies", (DepFirm as any)._associations[0]);
+    const company = proxy.build();
+    expect(company).toBeInstanceOf(StiCompany);
+  });
+
+  it("building the associated object with explicit sti base class", () => {
+    const a = freshAdapter();
+    class StiCompany2 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(StiCompany2);
+    class StiClient2 extends StiCompany2 {}
+    registerSubclass(StiClient2);
+    registerModel(StiCompany2);
+    registerModel(StiClient2);
+
+    class DepFirm2 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(DepFirm2);
+    Associations.hasMany.call(DepFirm2, "stiCompany2s", { className: "StiCompany2", foreignKey: "firm_id" });
+
+    const firm = new DepFirm2({ name: "Test" });
+    const proxy = new CollectionProxy(firm, "stiCompany2s", (DepFirm2 as any)._associations[0]);
+    const company = proxy.build({ type: "StiCompany2" });
+    expect(company).toBeInstanceOf(StiCompany2);
+  });
+
+  it("building the associated object with sti subclass", () => {
+    const a = freshAdapter();
+    class StiCompany3 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(StiCompany3);
+    class StiClient3 extends StiCompany3 {}
+    registerSubclass(StiClient3);
+    registerModel(StiCompany3);
+    registerModel(StiClient3);
+
+    class DepFirm3 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(DepFirm3);
+    Associations.hasMany.call(DepFirm3, "stiCompany3s", { className: "StiCompany3", foreignKey: "firm_id" });
+
+    const firm = new DepFirm3({ name: "Test" });
+    const proxy = new CollectionProxy(firm, "stiCompany3s", (DepFirm3 as any)._associations[0]);
+    const company = proxy.build({ type: "StiClient3" });
+    expect(company).toBeInstanceOf(StiClient3);
+  });
+
+  it("building the associated object with an invalid type", () => {
+    const a = freshAdapter();
+    class StiCompany4 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(StiCompany4);
+    registerModel(StiCompany4);
+
+    class DepFirm4 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(DepFirm4);
+    Associations.hasMany.call(DepFirm4, "stiCompany4s", { className: "StiCompany4", foreignKey: "firm_id" });
+
+    const firm = new DepFirm4({ name: "Test" });
+    const proxy = new CollectionProxy(firm, "stiCompany4s", (DepFirm4 as any)._associations[0]);
+    expect(() => proxy.build({ type: "Invalid" })).toThrow(SubclassNotFound);
+  });
+
+  it("building the associated object with an unrelated type", () => {
+    const a = freshAdapter();
+    class StiCompany5 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(StiCompany5);
+    class UnrelatedModel extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(StiCompany5);
+    registerModel(UnrelatedModel);
+
+    class DepFirm5 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(DepFirm5);
+    Associations.hasMany.call(DepFirm5, "stiCompany5s", { className: "StiCompany5", foreignKey: "firm_id" });
+
+    const firm = new DepFirm5({ name: "Test" });
+    const proxy = new CollectionProxy(firm, "stiCompany5s", (DepFirm5 as any)._associations[0]);
+    expect(() => proxy.build({ type: "UnrelatedModel" })).toThrow(SubclassNotFound);
+  });
   it("build the association with an array", async () => {
     class Author extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -3959,7 +4077,7 @@ describe("HasManyAssociationsTest", () => {
 // ==========================================================================
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4907,11 +5025,104 @@ describe("BelongsToAssociationsTest", () => {
   it.skip("belongs to with explicit composite primary key", () => {});
   it.skip("belongs to with inverse association for composite primary key", () => {});
   it.skip("should set composite foreign key on association when key changes on associated record", () => {});
-  it.skip("building the belonging object with implicit sti base class", () => {});
-  it.skip("building the belonging object with explicit sti base class", () => {});
-  it.skip("building the belonging object with sti subclass", () => {});
-  it.skip("building the belonging object with an invalid type", () => {});
-  it.skip("building the belonging object with an unrelated type", () => {});
+  it("building the belonging object with implicit sti base class", () => {
+    const a = freshAdapter();
+    class BtCompany extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = a; }
+    }
+    enableSti(BtCompany);
+    class BtFirm extends BtCompany {}
+    registerSubclass(BtFirm);
+    registerModel(BtCompany);
+    registerModel(BtFirm);
+
+    class BtAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    registerModel(BtAccount);
+    Associations.belongsTo.call(BtAccount, "btFirm", { className: "BtCompany", foreignKey: "firm_id" });
+
+    const account = new BtAccount({});
+    const company = buildBelongsTo(account, "btFirm", { className: "BtCompany", foreignKey: "firm_id" });
+    expect(company).toBeInstanceOf(BtCompany);
+  });
+
+  it("building the belonging object with explicit sti base class", () => {
+    const a = freshAdapter();
+    class BtCompany2 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = a; }
+    }
+    enableSti(BtCompany2);
+    registerModel(BtCompany2);
+
+    class BtAccount2 extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    registerModel(BtAccount2);
+
+    const account = new BtAccount2({});
+    const company = buildBelongsTo(account, "btFirm", { className: "BtCompany2", foreignKey: "firm_id" }, { type: "BtCompany2" });
+    expect(company).toBeInstanceOf(BtCompany2);
+  });
+
+  it("building the belonging object with sti subclass", () => {
+    const a = freshAdapter();
+    class BtCompany3 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = a; }
+    }
+    enableSti(BtCompany3);
+    class BtFirm3 extends BtCompany3 {}
+    registerSubclass(BtFirm3);
+    registerModel(BtCompany3);
+    registerModel(BtFirm3);
+
+    class BtAccount3 extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    registerModel(BtAccount3);
+
+    const account = new BtAccount3({});
+    const company = buildBelongsTo(account, "btFirm", { className: "BtCompany3", foreignKey: "firm_id" }, { type: "BtFirm3" });
+    expect(company).toBeInstanceOf(BtFirm3);
+  });
+
+  it("building the belonging object with an invalid type", () => {
+    const a = freshAdapter();
+    class BtCompany4 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = a; }
+    }
+    enableSti(BtCompany4);
+    registerModel(BtCompany4);
+
+    class BtAccount4 extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    registerModel(BtAccount4);
+
+    const account = new BtAccount4({});
+    expect(() => buildBelongsTo(account, "btFirm", { className: "BtCompany4", foreignKey: "firm_id" }, { type: "InvalidType" })).toThrow(SubclassNotFound);
+  });
+
+  it("building the belonging object with an unrelated type", () => {
+    const a = freshAdapter();
+    class BtCompany5 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = a; }
+    }
+    enableSti(BtCompany5);
+    class BtUnrelated extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(BtCompany5);
+    registerModel(BtUnrelated);
+
+    class BtAccount5 extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    registerModel(BtAccount5);
+
+    const account = new BtAccount5({});
+    expect(() => buildBelongsTo(account, "btFirm", { className: "BtCompany5", foreignKey: "firm_id" }, { type: "BtUnrelated" })).toThrow(SubclassNotFound);
+  });
   it("building the belonging object with primary key", async () => {
     class BuildPkCompany extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }

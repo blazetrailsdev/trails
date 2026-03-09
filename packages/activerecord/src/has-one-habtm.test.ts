@@ -9,7 +9,9 @@
  * A small subset of structural/in-memory tests run fully.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, registerModel, association, DeleteRestrictionError, enableSti, registerSubclass } from "./index.js";
+import { Base, registerModel, association, DeleteRestrictionError, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import {
   Associations,
   loadBelongsTo,
@@ -22,10 +24,11 @@ import {
   setBelongsTo,
   setHasOne,
   setHasMany,
+  buildHasOne,
 } from "./associations.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
@@ -33,7 +36,7 @@ function freshAdapter(): MemoryAdapter {
 // ==========================================================================
 
 describe("HasOneAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Firm extends Base {
     static {
@@ -202,7 +205,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("association change calls delete", async () => {
     // When a has_one dependent: delete is set and FK changes, the old record gets deleted
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class DelFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class DelAcct extends Base { static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(DelFirm, "delAcct", { className: "DelAcct", foreignKey: "firm_id", dependent: "delete" });
@@ -216,7 +219,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("association change calls destroy", async () => {
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class DestFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class DestAcct extends Base { static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(DestFirm, "destAcct", { className: "DestAcct", foreignKey: "firm_id", dependent: "destroy" });
@@ -252,7 +255,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("exclusive dependence", async () => {
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class ExclFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class ExclAccount extends Base { static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(ExclFirm, "exclAccount", { className: "ExclAccount", foreignKey: "firm_id", dependent: "nullify" });
@@ -266,7 +269,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with nil associate", async () => {
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class NilFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class NilAcct extends Base { static { this.attribute("firm_id", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(NilFirm, "nilAcct", { className: "NilAcct", foreignKey: "firm_id", dependent: "destroy" });
@@ -277,7 +280,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("restrict with error", async () => {
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class RsFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class RsAcct extends Base { static { this.attribute("firm_id", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(RsFirm, "rsAcct", { className: "RsAcct", foreignKey: "firm_id", dependent: "restrictWithError" });
@@ -312,24 +315,103 @@ describe("HasOneAssociationsTest", () => {
     expect(loaded).toBeNull();
   });
 
-  it.skip("building the associated object with implicit sti base class", () => {
-    // Requires STI
+  it("building the associated object with implicit sti base class", () => {
+    const a = freshAdapter();
+    class HoCompany extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(HoCompany);
+    class HoClient extends HoCompany {}
+    registerSubclass(HoClient);
+    registerModel(HoCompany);
+    registerModel(HoClient);
+
+    class HoFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(HoFirm);
+    Associations.hasOne.call(HoFirm, "hoCompany", { className: "HoCompany", foreignKey: "firm_id" });
+
+    const firm = new HoFirm({ name: "Test" });
+    const company = buildHasOne(firm, "hoCompany", { className: "HoCompany", foreignKey: "firm_id" });
+    expect(company).toBeInstanceOf(HoCompany);
   });
 
-  it.skip("building the associated object with explicit sti base class", () => {
-    // Requires STI
+  it("building the associated object with explicit sti base class", () => {
+    const a = freshAdapter();
+    class HoCompany2 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(HoCompany2);
+    registerModel(HoCompany2);
+
+    class HoFirm2 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(HoFirm2);
+
+    const firm = new HoFirm2({ name: "Test" });
+    const company = buildHasOne(firm, "hoCompany2", { className: "HoCompany2", foreignKey: "firm_id" }, { type: "HoCompany2" });
+    expect(company).toBeInstanceOf(HoCompany2);
   });
 
-  it.skip("building the associated object with sti subclass", () => {
-    // Requires STI
+  it("building the associated object with sti subclass", () => {
+    const a = freshAdapter();
+    class HoCompany3 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(HoCompany3);
+    class HoClient3 extends HoCompany3 {}
+    registerSubclass(HoClient3);
+    registerModel(HoCompany3);
+    registerModel(HoClient3);
+
+    class HoFirm3 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(HoFirm3);
+
+    const firm = new HoFirm3({ name: "Test" });
+    const company = buildHasOne(firm, "hoCompany3", { className: "HoCompany3", foreignKey: "firm_id" }, { type: "HoClient3" });
+    expect(company).toBeInstanceOf(HoClient3);
   });
 
-  it.skip("building the associated object with an invalid type", () => {
-    // Requires STI type validation
+  it("building the associated object with an invalid type", () => {
+    const a = freshAdapter();
+    class HoCompany4 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(HoCompany4);
+    registerModel(HoCompany4);
+
+    class HoFirm4 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(HoFirm4);
+
+    const firm = new HoFirm4({ name: "Test" });
+    expect(() => buildHasOne(firm, "hoCompany4", { className: "HoCompany4", foreignKey: "firm_id" }, { type: "Invalid" })).toThrow(SubclassNotFound);
   });
 
-  it.skip("building the associated object with an unrelated type", () => {
-    // Requires STI type validation
+  it("building the associated object with an unrelated type", () => {
+    const a = freshAdapter();
+    class HoCompany5 extends Base {
+      static { this.attribute("name", "string"); this.attribute("type", "string"); this.attribute("firm_id", "integer"); this.adapter = a; }
+    }
+    enableSti(HoCompany5);
+    class HoUnrelated extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(HoCompany5);
+    registerModel(HoUnrelated);
+
+    class HoFirm5 extends Base {
+      static { this.attribute("name", "string"); this.adapter = a; }
+    }
+    registerModel(HoFirm5);
+
+    const firm = new HoFirm5({ name: "Test" });
+    expect(() => buildHasOne(firm, "hoCompany5", { className: "HoCompany5", foreignKey: "firm_id" }, { type: "HoUnrelated" })).toThrow(SubclassNotFound);
   });
 
   it.skip("build and create should not happen within scope", () => {
@@ -441,7 +523,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("dependence with missing association", async () => {
     // When dependent association record doesn't exist, processDependentAssociations should not error
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class MissFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class MissAcct extends Base { static { this.attribute("firm_id", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(MissFirm, "missAcct", { className: "MissAcct", foreignKey: "firm_id", dependent: "destroy" });
@@ -453,7 +535,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with missing association and nullify", async () => {
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class MissNFirm extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class MissNAcct extends Base { static { this.attribute("firm_id", "integer"); this.adapter = a2; } }
     Associations.hasOne.call(MissNFirm, "missNAcct", { className: "MissNAcct", foreignKey: "firm_id", dependent: "nullify" });
@@ -740,7 +822,7 @@ describe("HasOneAssociationsTest", () => {
 // ==========================================================================
 
 describe("HasAndBelongsToManyAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Developer extends Base {
     static {
@@ -1416,7 +1498,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("custom join table", async () => {
     // Use a differently-named join table model but with conventional FK columns
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class CjDeveloper extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class CjProject extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class CustomJoin extends Base { static { this.attribute("cj_developer_id", "integer"); this.attribute("cj_project_id", "integer"); this.adapter = a2; } }
@@ -1471,7 +1553,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("association name is the same as join table name", async () => {
     // Use a join table model whose name matches the association name
-    const a2 = new MemoryAdapter();
+    const a2 = createTestAdapter();
     class SameDev extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class SameProj extends Base { static { this.attribute("name", "string"); this.adapter = a2; } }
     class SameJoin extends Base { static { this.attribute("same_dev_id", "integer"); this.attribute("same_proj_id", "integer"); this.adapter = a2; } }
@@ -1509,7 +1591,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 // ==========================================================================
 
 describe("AssociationsJoinModelTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Author extends Base {
     static {
@@ -2637,7 +2719,7 @@ describe("AssociationsJoinModelTest", () => {
 // ==========================================================================
 
 describe("NestedThroughAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Author extends Base {
     static {
@@ -3071,7 +3153,7 @@ describe("NestedThroughAssociationsTest", () => {
 // ==========================================================================
 
 describe("HasOneThroughAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Club extends Base {
     static {

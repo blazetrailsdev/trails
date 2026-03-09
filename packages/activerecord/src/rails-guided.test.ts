@@ -15,7 +15,6 @@ import {
   Base,
   Relation,
   Range,
-  MemoryAdapter,
   transaction,
   savepoint,
   registerModel,
@@ -51,9 +50,11 @@ import {
 } from "./index.js";
 import { Migration } from "./migration.js";
 import { Associations, loadBelongsTo } from "./associations.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
@@ -61,7 +62,7 @@ function freshAdapter(): MemoryAdapter {
 // ==========================================================================
 
 describe("Persistence (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Post extends Base {
     static {
@@ -274,7 +275,7 @@ describe("Persistence (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Finders (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -339,7 +340,7 @@ describe("Finders (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Relation (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Product extends Base {
     static {
@@ -620,7 +621,7 @@ describe("Relation (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Callbacks (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -961,7 +962,7 @@ describe("Callbacks (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Associations (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Author extends Base {
     static {
@@ -1097,7 +1098,7 @@ describe("Associations (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Transactions (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Account extends Base {
     static {
@@ -1226,7 +1227,7 @@ describe("Transactions (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Timestamps (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Article extends Base {
     static {
@@ -1292,7 +1293,7 @@ describe("Timestamps (Rails-guided)", () => {
 // ==========================================================================
 
 describe("update_column / update_columns (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Topic extends Base {
     static {
@@ -1396,7 +1397,7 @@ describe("update_column / update_columns (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Relation#or (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Post extends Base {
     static {
@@ -1478,7 +1479,7 @@ describe("Relation#or (Rails-guided)", () => {
 // ==========================================================================
 
 describe("find_each / find_in_batches (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Record extends Base {
     static {
@@ -1563,7 +1564,7 @@ describe("find_each / find_in_batches (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Scopes (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Post extends Base {
     static {
@@ -1664,7 +1665,7 @@ describe("Scopes (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Calculations (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Account extends Base {
     static {
@@ -1745,7 +1746,7 @@ describe("Calculations (Rails-guided)", () => {
 // ==========================================================================
 
 describe("find_or_create_by (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Bird extends Base {
     static {
@@ -1806,7 +1807,7 @@ describe("find_or_create_by (Rails-guided)", () => {
 // ==========================================================================
 
 describe("touch (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Topic extends Base {
     static {
@@ -1864,7 +1865,7 @@ describe("touch (Rails-guided)", () => {
 // ==========================================================================
 
 describe("where with Range (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Person extends Base {
     static {
@@ -1916,7 +1917,7 @@ describe("where with Range (Rails-guided)", () => {
 // ==========================================================================
 
 describe("default_scope / unscoped (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2017,7 +2018,7 @@ describe("default_scope / unscoped (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Persistence edge cases (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -2126,7 +2127,7 @@ describe("Persistence edge cases (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Finders edge cases (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -2198,7 +2199,7 @@ describe("Finders edge cases (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Relation query edge cases (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Post extends Base {
     static {
@@ -2382,7 +2383,7 @@ describe("Relation query edge cases (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Bulk operations (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2481,7 +2482,7 @@ describe("Bulk operations (Rails-guided)", () => {
 // ==========================================================================
 
 describe("OR queries (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -2561,7 +2562,7 @@ describe("OR queries (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Calculations edge cases (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Product extends Base {
     static {
@@ -2649,7 +2650,7 @@ describe("Calculations edge cases (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Batches (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Record extends Base {
     static {
@@ -2722,7 +2723,7 @@ describe("Batches (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Range / BETWEEN (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Product extends Base {
     static {
@@ -2774,7 +2775,7 @@ describe("Range / BETWEEN (Rails-guided)", () => {
 // ==========================================================================
 
 describe("update_column / touch edge cases (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2877,7 +2878,7 @@ describe("update_column / touch edge cases (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Scopes edge cases (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2971,7 +2972,7 @@ describe("Scopes edge cases (Rails-guided)", () => {
 // New features — Rails-guided tests
 // =============================================================================
 describe("Rails-guided: New Features", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   // Rails: test_pick
@@ -3464,7 +3465,7 @@ describe("Rails-guided: New Features", () => {
 // ==========================================================================
 
 describe("Enum (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3557,7 +3558,7 @@ describe("Enum (Rails-guided)", () => {
 // ==========================================================================
 
 describe("STI (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3645,7 +3646,7 @@ describe("STI (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Polymorphic Associations (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3709,7 +3710,7 @@ describe("Polymorphic Associations (Rails-guided)", () => {
 // ==========================================================================
 
 describe("HABTM (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3746,7 +3747,7 @@ describe("HABTM (Rails-guided)", () => {
 // ==========================================================================
 
 describe("SecurePassword (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3812,7 +3813,7 @@ describe("SecurePassword (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Store (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3868,7 +3869,7 @@ describe("Store (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Counter Cache (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3943,7 +3944,7 @@ describe("Counter Cache (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Optimistic Locking (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3982,7 +3983,7 @@ describe("Optimistic Locking (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Readonly (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4025,7 +4026,7 @@ describe("Readonly (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Validation Contexts (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4089,7 +4090,7 @@ describe("Validation Contexts (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Delegate (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4157,7 +4158,7 @@ describe("Delegate (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Touch on belongs_to (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4192,7 +4193,7 @@ describe("Touch on belongs_to (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Error Classes (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4289,7 +4290,7 @@ describe("Error Classes (Rails-guided)", () => {
 // ==========================================================================
 
 describe("insertAll / upsertAll (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4343,7 +4344,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
 // ==========================================================================
 
 describe("after_initialize / after_find (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4449,7 +4450,7 @@ describe("after_initialize / after_find (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Conditional Callbacks (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4534,7 +4535,7 @@ describe("Conditional Callbacks (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Reflection (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4632,7 +4633,7 @@ describe("Reflection (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Nested Attributes (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4752,7 +4753,7 @@ describe("Nested Attributes (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Raw SQL Where (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4823,7 +4824,7 @@ describe("Raw SQL Where (Rails-guided)", () => {
 // ==========================================================================
 
 describe("has_secure_token (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4886,7 +4887,7 @@ describe("has_secure_token (Rails-guided)", () => {
 // ==========================================================================
 
 describe("composed_of (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -4958,7 +4959,7 @@ describe("composed_of (Rails-guided)", () => {
 // ==========================================================================
 
 describe("serialize (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -5050,7 +5051,7 @@ describe("alias_attribute (Rails-guided)", () => {
 // ==========================================================================
 
 describe("inverse_of (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -5106,7 +5107,7 @@ describe("inverse_of (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Association Scopes (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -5165,7 +5166,7 @@ describe("Association Scopes (Rails-guided)", () => {
 // ==========================================================================
 
 describe("Grouped Calculations (Rails-guided)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -7321,7 +7322,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: attributeChanged?(from:, to:) — Active Model Dirty
   it("attributeChanged? supports from: and to: options (Active Model Dirty)", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
 
     class Person extends Base {
       static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
@@ -7348,7 +7349,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: optimizer_hints — add database query hints
   it("optimizerHints() adds hints to generated SQL", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7358,7 +7359,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: errors.full_messages_for — error messages for specific attribute
   it("errors.fullMessagesFor() returns messages for specific attribute", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7378,7 +7379,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: errors.of_kind? — check for specific error type
   it("errors.ofKind() checks for error type on attribute", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7396,7 +7397,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: column_for_attribute — attribute metadata
   it("columnForAttribute() returns type info for attribute", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
     }
@@ -7409,7 +7410,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: attributes_before_type_cast — raw attribute values
   it("attributesBeforeTypeCast returns raw values", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("age", "integer"); this.adapter = adapter; }
     }
@@ -7420,7 +7421,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: encrypts — encrypted attributes
   it("encrypts() transparently encrypts and decrypts attributes", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("ssn", "string"); this.adapter = adapter; this.encrypts("ssn"); }
     }
@@ -7441,7 +7442,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: scope with extension block
   it("scope with extension block adds methods to the relation", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter;
@@ -7477,7 +7478,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails guide: record_timestamps — control timestamp behavior
   it("recordTimestamps controls timestamp auto-updates", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = new MemoryAdapter(); }
+      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = createTestAdapter(); }
     }
     expect(User.recordTimestamps).toBe(true);
     User.recordTimestamps = false;
@@ -7486,7 +7487,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: no_touching — suppress touch callbacks
   it("noTouching() suppresses touching during block", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
     }
@@ -7501,7 +7502,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails guide: generates_token_for — purpose-specific tokens
   it("generatesTokenFor creates and resolves purpose tokens", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7515,7 +7516,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: Relation#readonly? — check readonly status
   it("Relation.isReadonly reflects readonly state", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
     }
@@ -7529,7 +7530,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
       static {
         this._tableName = "orders";
         this.attribute("id", "integer");
-        this.adapter = new MemoryAdapter();
+        this.adapter = createTestAdapter();
         this.defineModelCallbacks("ship", "deliver");
       }
     }
@@ -7544,7 +7545,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: nullify_blanks — auto-nullify blank strings
   it("nullifyBlanks converts empty strings to null", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7562,7 +7563,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: prepend callbacks
   it("before_destroy with prepend: true runs first", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7580,7 +7581,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: suppress — skip persistence during block
   it("suppress() prevents database writes", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7595,7 +7596,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("withOptions applies shared options to multiple validates calls", () => {
     class User extends Base {
       static {
-        this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = new MemoryAdapter();
+        this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = createTestAdapter();
       }
     }
     User.withOptions({ on: "update" }, (m: any) => {
@@ -7608,7 +7609,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: to_xml — XML serialization
   it("toXml() serializes model to XML", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
     }
@@ -7622,7 +7623,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: from_json — JSON deserialization
   it("fromJson() sets attributes from JSON", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7633,7 +7634,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: from_json with root
   it("fromJson() supports include_root", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7644,7 +7645,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: persisted? — checks if record is saved
   it("isPersisted() returns false for new records, true after save", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7656,7 +7657,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: attribute_types — returns map of column types
   it("attributeTypes returns type objects per column", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7667,7 +7668,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: logger — set/get logger
   it("logger defaults to null and can be set", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
     }
@@ -7680,7 +7681,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: Relation#build — creates unsaved record with scope
   it("Relation#build creates unsaved record with scoped attributes", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
     }
@@ -7692,7 +7693,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: Relation#create — persists record with scope
   it("Relation#create persists record with scoped attributes", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
     }
@@ -7703,7 +7704,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: Relation#spawn — independent copy
   it("Relation#spawn returns an independent copy", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7714,7 +7715,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: invert_where — inverts where conditions
   it("invertWhere swaps where and whereNot", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
     }
@@ -7729,7 +7730,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: Relation#inspect — debug representation
   it("inspect() returns human-readable relation info", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7741,7 +7742,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: toModel returns self (ActiveModel::Conversion)
   it("toModel() returns self", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
     }
@@ -7752,7 +7753,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails guide: i18nScope
   it("i18nScope returns 'activemodel' on Model", () => {
     // Base extends Model, so should inherit
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
     }
@@ -7761,7 +7762,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: attribute_previously_changed?
   it("attributePreviouslyChanged checks last save changes", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7774,7 +7775,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: CollectionProxy#push
   it("CollectionProxy push adds records", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Author extends Base {
       static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7793,7 +7794,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: CollectionProxy#isEmpty
   it("CollectionProxy isEmpty returns true when empty", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class Author extends Base {
       static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7809,7 +7810,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: load_async schedules background load
   it("loadAsync returns the relation for chaining", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
     }
@@ -7819,7 +7820,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: clone — shallow clone preserving id
   it("clone preserves id and persisted state", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7831,7 +7832,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: find_each with order: :desc (Rails 7.1)
   it("findEach supports order option", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7847,7 +7848,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: to_gid — GlobalID
   it("toGid returns a GlobalID-like URI", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7857,7 +7858,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: to_sgid — signed GlobalID
   it("toSgid returns a base64-encoded GID", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7869,7 +7870,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: column_defaults
   it("columnDefaults returns default values", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7883,7 +7884,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: find_by_attribute dynamic finder
   it("findByAttribute finds record by single column", async () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7895,7 +7896,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: confirmation validator with caseSensitive: false
   it("confirmation validator supports case_sensitive: false", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7912,7 +7913,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: extending with function
   it("extending accepts a function argument", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
@@ -7924,7 +7925,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
   // Rails guide: attribute_method_prefix
   it("attributeMethodPrefix defines prefixed methods", () => {
-    const adapter = new MemoryAdapter();
+    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";

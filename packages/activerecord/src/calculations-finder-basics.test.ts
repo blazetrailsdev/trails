@@ -14,18 +14,20 @@
  * Use it.skip for DB-specific or unimplemented features.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, defineEnum, registerModel, registerSubclass } from "./index.js";
+import { Base, defineEnum, registerModel, registerSubclass } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { Associations } from "./associations.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
 // CalculationsTest — targets calculations_test.rb
 // ==========================================================================
 describe("CalculationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeAccount() {
@@ -322,7 +324,7 @@ describe("CalculationsTest", () => {
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeTopic() {
@@ -626,7 +628,7 @@ describe("FinderTest", () => {
 // BasicsTest — targets base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeTopic() {
@@ -903,7 +905,7 @@ describe("BasicsTest", () => {
 // InheritanceTest — targets inheritance_test.rb
 // ==========================================================================
 describe("InheritanceTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeCompanyHierarchy() {
@@ -1161,7 +1163,7 @@ describe("InheritanceTest", () => {
 // AttributeMethodsTest — targets attribute_methods_test.rb
 // ==========================================================================
 describe("AttributeMethodsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeTopic() {
@@ -1365,7 +1367,7 @@ describe("AttributeMethodsTest", () => {
 // WhereTest — targets relation/where_test.rb
 // ==========================================================================
 describe("WhereTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeAuthor() {
@@ -1509,7 +1511,7 @@ describe("WhereTest", () => {
 // WhereChainTest — targets relation/where_chain_test.rb
 // ==========================================================================
 describe("WhereChainTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makePost() {
@@ -1661,7 +1663,7 @@ describe("WhereChainTest", () => {
 // InsertAllTest — targets insert_all_test.rb
 // ==========================================================================
 describe("InsertAllTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeBook() {

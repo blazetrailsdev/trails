@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Relation, Range, MemoryAdapter, transaction, savepoint, CollectionProxy, association, MigrationRunner, defineEnum, readEnumValue, enableSti, hasSecurePassword, store, loadHabtm, delegate, RecordNotFound, RecordInvalid, StaleObjectError, ReadOnlyRecord, SoleRecordExceeded, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, acceptsNestedAttributesFor, assignNestedAttributes, hasSecureToken, composedOf, serialize, registerModel } from "./index.js";
+import { Base, Relation, Range, transaction, savepoint, CollectionProxy, association, MigrationRunner, defineEnum, readEnumValue, enableSti, hasSecurePassword, store, loadHabtm, delegate, RecordNotFound, RecordInvalid, StaleObjectError, ReadOnlyRecord, SoleRecordExceeded, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, acceptsNestedAttributesFor, assignNestedAttributes, hasSecureToken, composedOf, serialize, registerModel } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import { Migration, TableDefinition, Schema } from "./migration.js";
 import {
   Associations,
@@ -12,8 +14,8 @@ import {
 
 // -- Helpers --
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // -- Phase 2000: Core --
@@ -118,7 +120,7 @@ describe("ActiveRecord", () => {
 
     // -- CRUD --
     describe("persistence", () => {
-      let adapter: MemoryAdapter;
+      let adapter: DatabaseAdapter;
 
       class Post extends Base {
         static {
@@ -207,7 +209,7 @@ describe("ActiveRecord", () => {
 
     // -- Finders --
     describe("finders", () => {
-      let adapter: MemoryAdapter;
+      let adapter: DatabaseAdapter;
 
       class User extends Base {
         static {
@@ -399,7 +401,7 @@ describe("ActiveRecord", () => {
 
   // -- Phase 2100: Relation --
   describe("Relation", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Item extends Base {
       static {
@@ -540,7 +542,7 @@ describe("ActiveRecord", () => {
 
   // -- Phase 2200: Associations --
   describe("Associations", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Author extends Base {
       static {
@@ -749,7 +751,7 @@ describe("ActiveRecord", () => {
 
   // -- Phase 2500: Transactions --
   describe("Transactions", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Account extends Base {
       static {
@@ -842,7 +844,7 @@ describe("ActiveRecord", () => {
   // Untested surface area — Relation advanced
   // =========================================================================
   describe("Relation (extended)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Widget extends Base {
       static {
@@ -1053,7 +1055,7 @@ describe("ActiveRecord", () => {
   // Untested surface area — Scopes
   // =========================================================================
   describe("Scopes", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Product extends Base {
       static {
@@ -4108,7 +4110,7 @@ describe("ActiveRecord", () => {
 
   // -- Enum --
   describe("Enum", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4198,7 +4200,7 @@ describe("ActiveRecord", () => {
 
   // -- Single Table Inheritance --
   describe("STI", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4297,7 +4299,7 @@ describe("ActiveRecord", () => {
 
   // -- Polymorphic Associations --
   describe("Polymorphic Associations", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4377,7 +4379,7 @@ describe("ActiveRecord", () => {
 
   // -- HABTM --
   describe("has_and_belongs_to_many", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4455,7 +4457,7 @@ describe("ActiveRecord", () => {
 
   // -- secure_password --
   describe("secure_password", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4525,7 +4527,7 @@ describe("ActiveRecord", () => {
 
   // -- Store --
   describe("Store", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4593,7 +4595,7 @@ describe("ActiveRecord", () => {
 
   // -- Counter Cache --
   describe("counter_cache", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4664,7 +4666,7 @@ describe("ActiveRecord", () => {
 
   // -- Touch on belongs_to --
   describe("touch on belongs_to", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4706,7 +4708,7 @@ describe("ActiveRecord", () => {
 
   // -- Optimistic Locking --
   describe("optimistic locking", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4755,7 +4757,7 @@ describe("ActiveRecord", () => {
 
   // -- Readonly --
   describe("readonly", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4848,7 +4850,7 @@ describe("ActiveRecord", () => {
 
   // -- Delegate --
   describe("delegate", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     beforeEach(() => {
       adapter = freshAdapter();
@@ -4911,7 +4913,7 @@ describe("ActiveRecord", () => {
 
   // -- Error Classes --
   describe("error classes", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("find throws RecordNotFound with metadata", async () => {
@@ -4980,7 +4982,7 @@ describe("ActiveRecord", () => {
 
   // -- insertAll / upsertAll --
   describe("insertAll / upsertAll", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("insert all", async () => {
@@ -5012,7 +5014,7 @@ describe("ActiveRecord", () => {
 
   // -- after_initialize / after_find --
   describe("after_initialize / after_find callbacks", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("fires after_initialize on new records", () => {
@@ -5050,7 +5052,7 @@ describe("ActiveRecord", () => {
 
   // -- Conditional callbacks --
   describe("conditional callbacks", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("supports if: condition on callbacks", async () => {
@@ -5149,7 +5151,7 @@ describe("ActiveRecord", () => {
 
   // -- Nested Attributes --
   describe("acceptsNestedAttributesFor", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("creates child records through parent", async () => {
@@ -5211,7 +5213,7 @@ describe("ActiveRecord", () => {
 
   // -- Halt callback chain --
   describe("halt callback chain", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("halts save when before_save returns false", async () => {
@@ -5230,7 +5232,7 @@ describe("ActiveRecord", () => {
 
   // -- Raw SQL where --
   describe("where with raw SQL", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("supports raw SQL string with bind params", async () => {
@@ -5268,7 +5270,7 @@ describe("ActiveRecord", () => {
 
   // -- has_secure_token --
   describe("has_secure_token", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("auto-generates a token on create", async () => {
@@ -5313,7 +5315,7 @@ describe("ActiveRecord", () => {
 
   // -- composed_of --
   describe("composed_of", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("composes value objects from multiple attributes", async () => {
@@ -5363,7 +5365,7 @@ describe("ActiveRecord", () => {
 
   // -- serialize --
   describe("serialize", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("serializes and deserializes JSON data", async () => {
@@ -5411,7 +5413,7 @@ describe("ActiveRecord", () => {
 
   // -- inverse_of --
   describe("inverse_of", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("sets inverse reference on loaded belongs_to", async () => {
@@ -5467,7 +5469,7 @@ describe("ActiveRecord", () => {
 
   // -- Association scopes --
   describe("association scopes", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("applies scope to has_many association", async () => {
@@ -5504,7 +5506,7 @@ describe("ActiveRecord", () => {
 
   // -- Grouped calculations --
   describe("grouped calculations", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("group().count() returns hash of counts", async () => {
@@ -5542,7 +5544,7 @@ describe("ActiveRecord", () => {
 
   // -- readonly() --
   describe("readonly()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("marks loaded records as readonly", async () => {
@@ -5560,7 +5562,7 @@ describe("ActiveRecord", () => {
 
   // -- sole() and take() --
   describe("sole() and take()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("sole() returns the only matching record", async () => {
@@ -5652,7 +5654,7 @@ describe("ActiveRecord", () => {
 
   // -- merge() --
   describe("merge()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("combines conditions from two relations", async () => {
@@ -5702,7 +5704,7 @@ describe("ActiveRecord", () => {
 
   // -- strict_loading --
   describe("strict_loading", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("raises StrictLoadingViolationError on lazy association load", async () => {
@@ -5751,7 +5753,7 @@ describe("ActiveRecord", () => {
 
   // -- findSoleBy --
   describe("findSoleBy()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("returns the sole matching record", async () => {
@@ -5779,7 +5781,7 @@ describe("ActiveRecord", () => {
 
   // -- createWith --
   describe("createWith()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("applies default attrs when creating via findOrCreateBy", async () => {
@@ -5796,7 +5798,7 @@ describe("ActiveRecord", () => {
 
   // -- unscope --
   describe("unscope()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("removes where conditions", async () => {
@@ -5838,7 +5840,7 @@ describe("ActiveRecord", () => {
 
   // -- dup --
   describe("dup()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("creates an unsaved copy without primary key", async () => {
@@ -5857,7 +5859,7 @@ describe("ActiveRecord", () => {
 
   // -- becomes --
   describe("becomes()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("transforms a record to another class", async () => {
@@ -5908,7 +5910,7 @@ describe("ActiveRecord", () => {
 
   // -- exists?(conditions) --
   describe("exists?(conditions)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("accepts conditions hash", async () => {
@@ -5936,7 +5938,7 @@ describe("ActiveRecord", () => {
 
   // -- calculate --
   describe("calculate()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("delegates to the appropriate aggregate method", async () => {
@@ -5959,7 +5961,7 @@ describe("ActiveRecord", () => {
 
   // -- extending --
   describe("extending()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("adds custom methods to a relation", async () => {
@@ -5983,7 +5985,7 @@ describe("ActiveRecord", () => {
 
   // -- enum bang setters and not-scopes --
   describe("enum enhancements", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("generates bang setter that persists", async () => {
@@ -6019,7 +6021,7 @@ describe("ActiveRecord", () => {
 
   // -- savedChanges --
   describe("savedChanges", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("tracks changes from the last save", async () => {
@@ -6051,7 +6053,7 @@ describe("ActiveRecord", () => {
 
   // -- destroyBy and deleteBy --
   describe("destroyBy and deleteBy", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("destroyBy destroys matching records with callbacks", async () => {
@@ -6086,7 +6088,7 @@ describe("ActiveRecord", () => {
 
   // -- static updateAll --
   describe("static updateAll", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("updates all records", async () => {
@@ -6120,7 +6122,7 @@ describe("ActiveRecord", () => {
 
   // -- touchAll --
   describe("touchAll()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("updates timestamps on all matching records", async () => {
@@ -6139,7 +6141,7 @@ describe("ActiveRecord", () => {
 
   // -- static update --
   describe("static update()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("finds and updates a record by id", async () => {
@@ -6156,7 +6158,7 @@ describe("ActiveRecord", () => {
 
   // -- static destroyAll --
   describe("static destroyAll()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("destroys all records", async () => {
@@ -6175,7 +6177,7 @@ describe("ActiveRecord", () => {
 
   // -- whereAssociated / whereMissing --
   describe("whereAssociated / whereMissing", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("whereAssociated filters records WITH non-null FK", async () => {
@@ -6221,7 +6223,7 @@ describe("ActiveRecord", () => {
 
   // -- positional finders --
   describe("positional finders", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("second() returns the second record", async () => {
@@ -6319,7 +6321,7 @@ describe("ActiveRecord", () => {
 
   // -- select block form --
   describe("select block form", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("filters loaded records with a function", async () => {
@@ -6341,7 +6343,7 @@ describe("ActiveRecord", () => {
 
   // -- findEach / findInBatches --
   describe("findEach / findInBatches", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("findEach yields each record", async () => {
@@ -6393,7 +6395,7 @@ describe("ActiveRecord", () => {
 
   // -- excluding/without --
   describe("excluding() / without()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("excludes specific records by PK", async () => {
@@ -6427,7 +6429,7 @@ describe("ActiveRecord", () => {
 
   // -- relation state methods --
   describe("Relation state: isLoaded, reset, size, isEmpty, isAny, isMany", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("isLoaded returns false before loading", () => {
@@ -6526,7 +6528,7 @@ describe("ActiveRecord", () => {
 
   // -- scoping --
   describe("scoping()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("sets currentScope within the block", async () => {
@@ -6545,7 +6547,7 @@ describe("ActiveRecord", () => {
 
   // -- load() --
   describe("load()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("eagerly loads records and returns the relation", async () => {
@@ -6568,7 +6570,7 @@ describe("ActiveRecord", () => {
 
   // -- length() --
   describe("length()", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("returns the number of records after loading", async () => {
@@ -6618,7 +6620,7 @@ describe("ActiveRecord", () => {
 
   // -- distinct count --
   describe("distinct count", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("count with distinct uses COUNT(DISTINCT ...)", async () => {
@@ -6641,7 +6643,7 @@ describe("ActiveRecord", () => {
 
   // -- where with subquery --
   describe("where with subquery", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("supports Relation as value for IN subquery", async () => {
@@ -6689,7 +6691,7 @@ describe("ActiveRecord", () => {
 
   // -- enum prefix/suffix --
   describe("enum prefix/suffix", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("prefix: true uses attribute name as prefix", async () => {
@@ -9918,7 +9920,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Persistence (from persistence_test.rb)
   // =========================================================================
   describe("Persistence (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("save valid record returns true", async () => {
@@ -10245,7 +10247,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Finders (from finder_test.rb)
   // =========================================================================
   describe("Finders (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class User extends Base {
       static {
@@ -10440,7 +10442,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Dirty tracking (from dirty_test.rb)
   // =========================================================================
   describe("Dirty (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("attribute changes", async () => {
@@ -10559,7 +10561,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Callbacks (from callbacks_test.rb)
   // =========================================================================
   describe("Callbacks (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("create callback order", async () => {
@@ -10733,7 +10735,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Calculations (from calculations_test.rb)
   // =========================================================================
   describe("Calculations (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Order extends Base {
       static {
@@ -10830,7 +10832,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Null Relation (from null_relation_test.rb)
   // =========================================================================
   describe("Null Relation (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("none returns empty for all terminal methods", async () => {
@@ -10881,7 +10883,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation Where (from relation/where_test.rb)
   // =========================================================================
   describe("Relation Where (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class User extends Base {
       static {
@@ -10982,7 +10984,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation Or (from relation/or_test.rb)
   // =========================================================================
   describe("Relation Or (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class User extends Base {
       static {
@@ -11030,7 +11032,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation And (from relation/and_test.rb)
   // =========================================================================
   describe("Relation And (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("and merges where conditions", async () => {
@@ -11051,7 +11053,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation Order (from relation/order_test.rb)
   // =========================================================================
   describe("Relation Order (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Item extends Base {
       static {
@@ -11106,7 +11108,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation Select (from relation/select_test.rb)
   // =========================================================================
   describe("Relation Select (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("select specific columns in SQL", () => {
@@ -11153,7 +11155,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation Delete All / Update All (from relation/delete_all_test.rb, update_all_test.rb)
   // =========================================================================
   describe("Relation Delete All / Update All (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("delete all removes all matching records", async () => {
@@ -11270,7 +11272,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Batches (from batches_test.rb)
   // =========================================================================
   describe("Batches (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("find_in_batches returns batches", async () => {
@@ -11333,7 +11335,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Scopes (from scoping/named_test.rb, scoping/default_test.rb)
   // =========================================================================
   describe("Scopes (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("named scope filters records", async () => {
@@ -11467,7 +11469,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Timestamps (from timestamp_test.rb)
   // =========================================================================
   describe("Timestamps (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("sets created_at and updated_at on create", async () => {
@@ -11604,7 +11606,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Associations (from associations tests)
   // =========================================================================
   describe("Associations (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
 
     class Author extends Base {
       static { this.attribute("name", "string"); }
@@ -11679,7 +11681,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Validations on ActiveRecord (from validations_test.rb)
   // =========================================================================
   describe("Validations (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("validates before save", async () => {
@@ -11777,7 +11779,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Excluding / Without (from excluding_test.rb)
   // =========================================================================
   describe("Excluding (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("excluding removes specific records", async () => {
@@ -11822,7 +11824,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation state methods (from relation_test.rb)
   // =========================================================================
   describe("Relation State (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("isLoaded is false before loading", () => {
@@ -11928,7 +11930,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Base class features (from base_test.rb)
   // =========================================================================
   describe("Base features (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("table name guesses", () => {
@@ -12117,7 +12119,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation Merging (from relation/merging_test.rb)
   // =========================================================================
   describe("Relation Merging (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("merge combines two relations", async () => {
@@ -12139,7 +12141,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Unscope (from relation/where_chain_test.rb)
   // =========================================================================
   describe("Unscope (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("removes where conditions", async () => {
@@ -12175,7 +12177,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Pluck (from calculations_test.rb pluck tests)
   // =========================================================================
   describe("Pluck (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("pluck single column", async () => {
@@ -12226,7 +12228,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Readonly (from readonly_test.rb)
   // =========================================================================
   describe("Readonly (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("readonly records cannot be saved", async () => {
@@ -12287,7 +12289,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Touch All (from persistence tests)
   // =========================================================================
   describe("Touch All (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("touchAll updates timestamps on all records", async () => {
@@ -12305,7 +12307,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Enum (from enum_test.rb)
   // =========================================================================
   describe("Enum (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("creates query predicates for each value", async () => {
@@ -12373,7 +12375,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Relation immutability
   // =========================================================================
   describe("Relation immutability (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("where returns a new relation", async () => {
@@ -12422,7 +12424,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Scoping block
   // =========================================================================
   describe("Scoping block (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("scoping sets currentScope within the block", async () => {
@@ -12441,7 +12443,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Static shorthands delegating to Relation
   // =========================================================================
   describe("Static shorthands (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("Base.where is shorthand for Base.all().where()", async () => {
@@ -12524,7 +12526,7 @@ describe("ActiveRecord", () => {
   // Rails-guided: Transactions (from transaction_test.rb)
   // =========================================================================
   describe("Transactions (Rails-guided)", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     it("successful transaction commits", async () => {

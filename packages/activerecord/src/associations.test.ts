@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   registerModel,
   association,
   reflectOnAssociation,
@@ -16,6 +15,8 @@ import {
   StrictLoadingViolationError,
   DeleteRestrictionError,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import {
   Associations,
   loadBelongsTo,
@@ -29,8 +30,8 @@ import {
   CollectionProxy,
 } from "./associations.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
@@ -38,7 +39,7 @@ function freshAdapter(): MemoryAdapter {
 // ==========================================================================
 
 describe("BelongsToAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Company extends Base {
     static { this.attribute("name", "string"); }
@@ -223,7 +224,7 @@ describe("BelongsToAssociations", () => {
 // ==========================================================================
 
 describe("HasOneAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Firm extends Base {
     static { this.attribute("name", "string"); }
@@ -319,7 +320,7 @@ describe("HasOneAssociations", () => {
 // ==========================================================================
 
 describe("HasManyAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Author extends Base {
     static { this.attribute("name", "string"); }
@@ -442,7 +443,7 @@ describe("HasManyAssociations", () => {
 // ==========================================================================
 
 describe("HasManyThroughAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Doctor extends Base {
     static { this.attribute("name", "string"); }
@@ -530,7 +531,7 @@ describe("HasManyThroughAssociations", () => {
 // ==========================================================================
 
 describe("CollectionProxy", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Team extends Base {
     static { this.attribute("name", "string"); }
@@ -713,7 +714,7 @@ describe("CollectionProxy", () => {
 // ==========================================================================
 
 describe("DependentAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -900,7 +901,7 @@ describe("DependentAssociations", () => {
 // ==========================================================================
 
 describe("StrictLoading", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Author extends Base {
     static { this.attribute("name", "string"); }
@@ -1034,7 +1035,7 @@ describe("AssociationDefinitions", () => {
 // ==========================================================================
 
 describe("AssociationReflection", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1162,7 +1163,7 @@ describe("AssociationReflection", () => {
 // ==========================================================================
 
 describe("HasAndBelongsToManyAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1238,7 +1239,7 @@ describe("HasAndBelongsToManyAssociations", () => {
 // ==========================================================================
 
 describe("CounterCache", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1328,7 +1329,7 @@ describe("CounterCache", () => {
 // ==========================================================================
 
 describe("TouchBelongsToParents", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();

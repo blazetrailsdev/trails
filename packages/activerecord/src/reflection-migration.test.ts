@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   Associations,
   AssociationReflection,
   reflectOnAssociation,
@@ -13,16 +12,18 @@ import {
   composedOf,
   registerModel,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
 // ReflectionTest — targets reflection_test.rb
 // ==========================================================================
 describe("ReflectionTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -364,7 +365,7 @@ describe("ReflectionTest", () => {
 // MigrationTest — targets migration_test.rb
 // ==========================================================================
 describe("MigrationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -438,8 +439,9 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment", () => {
-    // Structural: MemoryAdapter maintains internal state
-    expect(adapter).toBeInstanceOf(MemoryAdapter);
+    // Structural: adapter maintains internal state
+    expect(adapter).toBeDefined();
+    expect(typeof adapter.execute).toBe("function");
   });
 
   it("out of range integer limit should raise", () => {

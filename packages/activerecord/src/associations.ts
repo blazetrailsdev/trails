@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { StrictLoadingViolationError, DeleteRestrictionError } from "./errors.js";
 import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
+import { getInheritanceColumn, findStiClass } from "./sti.js";
 
 /**
  * Association options.
@@ -242,6 +243,65 @@ export async function loadHasOne(
   }
 
   return result;
+}
+
+/**
+ * Build (but don't save) a has_one associated record.
+ *
+ * Mirrors: ActiveRecord::Associations::HasOneAssociation#build_record
+ */
+export function buildHasOne(
+  record: Base,
+  _assocName: string,
+  options: AssociationOptions,
+  attrs: Record<string, unknown> = {}
+): Base {
+  const ctor = record.constructor as typeof Base;
+  const className = options.className ?? camelize(_assocName);
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  const foreignKey = options.as
+    ? (options.foreignKey ?? `${underscore(options.as)}_id`)
+    : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
+
+  const buildAttrs: Record<string, unknown> = {
+    ...attrs,
+    [foreignKey]: record.readAttribute(primaryKey),
+  };
+  if (options.as) {
+    buildAttrs[`${underscore(options.as)}_type`] = ctor.name;
+  }
+
+  let targetModel = resolveModel(className);
+  const inheritanceCol = getInheritanceColumn(targetModel);
+  if (inheritanceCol && buildAttrs[inheritanceCol]) {
+    const typeName = buildAttrs[inheritanceCol] as string;
+    targetModel = findStiClass(targetModel, typeName);
+  }
+
+  return new targetModel(buildAttrs);
+}
+
+/**
+ * Build (but don't save) a belongs_to associated record.
+ *
+ * Mirrors: ActiveRecord::Associations::BelongsToAssociation#build_record
+ */
+export function buildBelongsTo(
+  _record: Base,
+  _assocName: string,
+  options: AssociationOptions,
+  attrs: Record<string, unknown> = {}
+): Base {
+  const className = options.className ?? camelize(_assocName);
+
+  let targetModel = resolveModel(className);
+  const inheritanceCol = getInheritanceColumn(targetModel);
+  if (inheritanceCol && attrs[inheritanceCol]) {
+    const typeName = attrs[inheritanceCol] as string;
+    targetModel = findStiClass(targetModel, typeName);
+  }
+
+  return new targetModel(attrs);
 }
 
 /**
@@ -610,7 +670,15 @@ export class CollectionProxy {
       buildAttrs[`${underscore(asName)}_type`] = ctor.name;
     }
 
-    const targetModel = resolveModel(className);
+    let targetModel = resolveModel(className);
+
+    // STI: if a type attribute is provided, resolve to the correct subclass
+    const inheritanceCol = getInheritanceColumn(targetModel);
+    if (inheritanceCol && buildAttrs[inheritanceCol]) {
+      const typeName = buildAttrs[inheritanceCol] as string;
+      targetModel = findStiClass(targetModel, typeName);
+    }
+
     return new targetModel(buildAttrs);
   }
 

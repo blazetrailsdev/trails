@@ -3,18 +3,19 @@ import {
   Base,
   Relation,
   Range,
-  MemoryAdapter,
   RecordNotFound,
   SoleRecordExceeded,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ─── Shared model setup ───
 
-let adapter: MemoryAdapter;
+let adapter: DatabaseAdapter;
 
 class Post extends Base {
   static {
@@ -985,7 +986,7 @@ describe("Finders", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("Scoping", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Article extends Base {
     static {

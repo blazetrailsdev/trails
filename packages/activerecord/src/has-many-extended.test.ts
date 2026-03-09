@@ -2,18 +2,19 @@
  * HasMany extended tests — mirrors Rails:
  * activerecord/test/cases/associations/has_many_associations_test.rb
  *
- * Covers testable behaviors using MemoryAdapter. Tests requiring raw SQL,
+ * Covers testable behaviors using DatabaseAdapter. Tests requiring raw SQL,
  * DB-specific features (RETURNING, locking, query cache), fixtures, or
  * cross-adapter behavior are kept as null in the naming map.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   registerModel,
   association,
   DeleteRestrictionError,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./index.js";
 import {
   Associations,
   loadHasMany,
@@ -24,7 +25,7 @@ import {
 // Shared setup helpers
 // ---------------------------------------------------------------------------
 
-function makePostComments(adapter: MemoryAdapter) {
+function makePostComments(adapter: DatabaseAdapter) {
   class Comment extends Base {
     static {
       this.attribute("body", "string");
@@ -44,7 +45,7 @@ function makePostComments(adapter: MemoryAdapter) {
   return { Post, Comment };
 }
 
-function makeFirmClients(adapter: MemoryAdapter) {
+function makeFirmClients(adapter: DatabaseAdapter) {
   class Client extends Base {
     static {
       this.attribute("name", "string");
@@ -69,10 +70,10 @@ function makeFirmClients(adapter: MemoryAdapter) {
 // ---------------------------------------------------------------------------
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
-    adapter = new MemoryAdapter();
+    adapter = createTestAdapter();
   });
 
   // -------------------------------------------------------------------------
@@ -367,7 +368,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("dependence", async () => {
     // Rails: test_dependence
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Tag extends Base {
       static {
         this.attribute("name", "string");
@@ -409,7 +410,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("depends and nullify", async () => {
     // Rails: test_depends_and_nullify
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Child extends Base {
       static {
         this.attribute("name", "string");
@@ -450,7 +451,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with exception", async () => {
     // Rails: test_restrict_with_exception
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
@@ -482,7 +483,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with exception when empty allows destroy", async () => {
     // Rails: test_restrict_with_exception (empty case)
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -515,7 +516,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with error", async () => {
     // Rails: test_restrict_with_error
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Entry extends Base {
       static {
         this.attribute("name", "string");
@@ -667,7 +668,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("association with scope applies conditions", async () => {
     // Rails: scoped association variant
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class ScopedComment extends Base {
       static {
         this.attribute("body", "string");
@@ -722,7 +723,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("has many with different foreign keys", async () => {
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Product extends Base {
       static {
         this.attribute("name", "string");
@@ -1332,7 +1333,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("three levels of dependence", async () => {
     // Rails: test_three_levels_of_dependence
-    const adapter2 = new MemoryAdapter();
+    const adapter2 = createTestAdapter();
     class Grandchild extends Base {
       static {
         this.attribute("name", "string");

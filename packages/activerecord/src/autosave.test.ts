@@ -5,9 +5,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   registerModel,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import {
   markForDestruction,
   isMarkedForDestruction,
@@ -15,8 +16,8 @@ import {
 } from "./autosave.js";
 import { Associations } from "./associations.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
@@ -24,7 +25,7 @@ function freshAdapter(): MemoryAdapter {
 // ==========================================================================
 
 describe("TestAutosaveAssociationsInGeneral", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -131,7 +132,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 // ==========================================================================
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Company extends Base {
     static {
@@ -225,7 +226,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 // ==========================================================================
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Post extends Base {
     static {
@@ -299,7 +300,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 // ==========================================================================
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Company extends Base {
     static {
@@ -385,7 +386,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 // ==========================================================================
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Ship extends Base {
     static {

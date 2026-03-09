@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -17,18 +17,20 @@ import {
   setHasMany,
 } from "./associations.js";
 import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
 
 // -- Helpers --
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // ==========================================================================
 // RelationTest — targets relations_test.rb
 // ==========================================================================
 describe("RelationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -884,7 +886,7 @@ describe("RelationTest", () => {
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1441,7 +1443,7 @@ describe("FinderTest", () => {
 // CalculationsTest — targets calculations_test.rb
 // ==========================================================================
 describe("CalculationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1719,7 +1721,7 @@ describe("CalculationsTest", () => {
 // BasicsTest — targets base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1979,7 +1981,7 @@ describe("BasicsTest", () => {
 // PersistenceTest — targets persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2190,7 +2192,7 @@ describe("PersistenceTest", () => {
 // EachTest — targets batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2249,7 +2251,7 @@ describe("EachTest", () => {
 // WhereTest — targets relation/where_test.rb
 // ==========================================================================
 describe("WhereTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2325,7 +2327,7 @@ describe("WhereTest", () => {
 // OrTest — targets relation/or_test.rb
 // ==========================================================================
 describe("OrTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2355,7 +2357,7 @@ describe("OrTest", () => {
 // AndTest — targets relation/and_test.rb
 // ==========================================================================
 describe("AndTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2376,7 +2378,7 @@ describe("AndTest", () => {
 // DeleteAllTest — targets relation/delete_all_test.rb
 // ==========================================================================
 describe("DeleteAllTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2407,7 +2409,7 @@ describe("DeleteAllTest", () => {
 // UpdateAllTest — targets relation/update_all_test.rb
 // ==========================================================================
 describe("UpdateAllTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2438,7 +2440,7 @@ describe("UpdateAllTest", () => {
 // SelectTest — targets relation/select_test.rb
 // ==========================================================================
 describe("SelectTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2465,7 +2467,7 @@ describe("SelectTest", () => {
 // OrderTest — targets relation/order_test.rb
 // ==========================================================================
 describe("OrderTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2508,7 +2510,7 @@ describe("OrderTest", () => {
 // CallbacksTest — targets callbacks_test.rb
 // ==========================================================================
 describe("CallbacksTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2561,7 +2563,7 @@ describe("CallbacksTest", () => {
 // DirtyTest — targets dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2644,7 +2646,7 @@ describe("DirtyTest", () => {
 // TransactionTest — targets transactions_test.rb
 // ==========================================================================
 describe("TransactionTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2672,7 +2674,7 @@ describe("TransactionTest", () => {
 // ScopingTest — targets scoping/default_scoping_test.rb, scoping/named_scoping_test.rb
 // ==========================================================================
 describe("ScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2725,7 +2727,7 @@ describe("ScopingTest", () => {
 // EnumTest — targets enum_test.rb
 // ==========================================================================
 describe("EnumTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2803,7 +2805,7 @@ describe("AttributeMethodsTest", () => {
 // NullRelationTest — targets null_relation_test.rb
 // ==========================================================================
 describe("NullRelationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2841,7 +2843,7 @@ describe("NullRelationTest", () => {
 // ExcludingTest — targets excluding_test.rb
 // ==========================================================================
 describe("ExcludingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2870,7 +2872,7 @@ describe("ExcludingTest", () => {
 // CacheKeyTest — targets cache_key_test.rb
 // ==========================================================================
 describe("CacheKeyTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2899,7 +2901,7 @@ describe("CacheKeyTest", () => {
 // SanitizeTest — targets sanitize_test.rb
 // ==========================================================================
 describe("SanitizeTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -7682,7 +7684,7 @@ describe("AttributeMethodsTestExtra", () => {
 describe("BasicsTest2", () => {
   let Post: typeof Base;
   beforeEach(() => {
-    const adp = new MemoryAdapter();
+    const adp = createTestAdapter();
     class PostClass extends Base {
       static { this.tableName = "posts"; this.adapter = adp; this.attribute("title", "string"); this.attribute("body", "string"); }
     }
@@ -7696,7 +7698,7 @@ describe("BasicsTest2", () => {
 
   it("clone of new object with defaults", () => {
     class Item extends Base {
-      static { this.attribute("name", "string", { default: "default" }); this.adapter = new MemoryAdapter(); }
+      static { this.attribute("name", "string", { default: "default" }); this.adapter = createTestAdapter(); }
     }
     const i = new Item();
     const c = i.dup();
@@ -7705,7 +7707,7 @@ describe("BasicsTest2", () => {
 
   it("clone of new object marks attributes as dirty", () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = new MemoryAdapter(); }
+      static { this.attribute("name", "string"); this.adapter = createTestAdapter(); }
     }
     const i = new Item({ name: "test" });
     const c = i.dup();
@@ -7720,7 +7722,7 @@ describe("BasicsTest2", () => {
 
   it("bignum", async () => {
     class Counter extends Base {
-      static { this.attribute("count", "integer"); this.adapter = new MemoryAdapter(); }
+      static { this.attribute("count", "integer"); this.adapter = createTestAdapter(); }
     }
     const c = await Counter.create({ count: 9007199254740991 });
     expect(c.readAttribute("count")).toBe(9007199254740991);
@@ -7728,7 +7730,7 @@ describe("BasicsTest2", () => {
 
   it("clear cache when setting table name", () => {
     class MyModel extends Base {
-      static { this.adapter = new MemoryAdapter(); }
+      static { this.adapter = createTestAdapter(); }
     }
     MyModel.tableName = "my_table";
     expect(MyModel.tableName).toBe("my_table");
@@ -7776,7 +7778,7 @@ describe("BasicsTest2", () => {
 
   it("default values are deeply dupped", () => {
     class M extends Base {
-      static { this.attribute("name", "string", { default: "val" }); this.adapter = new MemoryAdapter(); }
+      static { this.attribute("name", "string", { default: "val" }); this.adapter = createTestAdapter(); }
     }
     const a = new M();
     const b = new M();
@@ -7785,8 +7787,8 @@ describe("BasicsTest2", () => {
   });
 
   it("records of different classes have different hashes", () => {
-    class A extends Base { static { this.adapter = new MemoryAdapter(); } }
-    class B extends Base { static { this.adapter = new MemoryAdapter(); } }
+    class A extends Base { static { this.adapter = createTestAdapter(); } }
+    class B extends Base { static { this.adapter = createTestAdapter(); } }
     const a = new A();
     const b = new B();
     expect(a.isEqual(b as any)).toBe(false);
@@ -7837,7 +7839,7 @@ describe("BasicsTest2", () => {
 
   it("unicode column name", () => {
     class M extends Base {
-      static { this.attribute("名前", "string"); this.adapter = new MemoryAdapter(); }
+      static { this.attribute("名前", "string"); this.adapter = createTestAdapter(); }
     }
     expect(M.hasAttributeDefinition("名前")).toBe(true);
   });
@@ -7847,7 +7849,7 @@ describe("BasicsTest2", () => {
       static {
         this.attribute("name", "string");
         this.attrReadonly("name");
-        this.adapter = new MemoryAdapter();
+        this.adapter = createTestAdapter();
       }
     }
     expect((M as any).readonlyAttributes).toContain("name");
@@ -7859,7 +7861,7 @@ describe("BasicsTest2", () => {
         this.attribute("name", "string");
         this.attribute("secret", "string");
         this.ignoredColumns = ["secret"];
-        this.adapter = new MemoryAdapter();
+        this.adapter = createTestAdapter();
       }
     }
     const sql = M.all().toSql();
@@ -7873,7 +7875,7 @@ describe("BasicsTest2", () => {
 describe("FinderTest2", () => {
   let Post: typeof Base;
   beforeEach(() => {
-    const adp = new MemoryAdapter();
+    const adp = createTestAdapter();
     class PostClass extends Base {
       static { this.tableName = "posts"; this.adapter = adp; this.attribute("title", "string"); this.attribute("body", "string"); }
     }
@@ -8070,7 +8072,7 @@ describe("FinderTest2", () => {
 describe("RelationTest2", () => {
   let Post: typeof Base;
   beforeEach(() => {
-    const adp = new MemoryAdapter();
+    const adp = createTestAdapter();
     class PostClass extends Base {
       static { this.tableName = "posts"; this.adapter = adp; this.attribute("title", "string"); this.attribute("body", "string"); }
     }
@@ -8231,7 +8233,7 @@ describe("RelationTest2", () => {
     class StrictPost extends Base {
       static {
         this.tableName = "strict_posts";
-        this.adapter = new MemoryAdapter();
+        this.adapter = createTestAdapter();
         this.attribute("title", "string");
         this.validatesPresenceOf("title");
       }
@@ -8286,7 +8288,7 @@ describe("RelationTest2", () => {
 describe("PersistenceTest2", () => {
   let Post: typeof Base;
   beforeEach(() => {
-    const adp = new MemoryAdapter();
+    const adp = createTestAdapter();
     class PostClass extends Base {
       static { this.tableName = "posts"; this.adapter = adp; this.attribute("title", "string"); this.attribute("body", "string"); }
     }
@@ -8342,14 +8344,14 @@ describe("PersistenceTest2", () => {
 
   it("update column with model having primary key other than id", async () => {
     class Item extends Base {
-      static { this.primaryKey = "uuid"; this.attribute("uuid", "string"); this.attribute("name", "string"); this.adapter = new MemoryAdapter(); }
+      static { this.primaryKey = "uuid"; this.attribute("uuid", "string"); this.attribute("name", "string"); this.adapter = createTestAdapter(); }
     }
     expect(Item.primaryKey).toBe("uuid");
   });
 
   it("update column should not modify updated at", async () => {
     class TimedPost extends Base {
-      static { this.adapter = new MemoryAdapter(); this.attribute("title", "string"); this.attribute("updated_at", "datetime"); }
+      static { this.adapter = createTestAdapter(); this.attribute("title", "string"); this.attribute("updated_at", "datetime"); }
     }
     const p = await TimedPost.create({ title: "timed" });
     await p.updateColumn("title", "changed");
@@ -8391,7 +8393,7 @@ describe("PersistenceTest2", () => {
     class CBPost extends Base {
       static {
         this.tableName = "cb_posts";
-        this.adapter = new MemoryAdapter();
+        this.adapter = createTestAdapter();
         this.attribute("title", "string");
         this.beforeValidation((record: any) => {
           const val = record.readAttribute("title");
@@ -8419,7 +8421,7 @@ describe("PersistenceTest2", () => {
 
   it("persist inherited class with different table name", async () => {
     class SpecialPost extends Post {
-      static { this.tableName = "special_posts"; this.adapter = new MemoryAdapter(); }
+      static { this.tableName = "special_posts"; this.adapter = createTestAdapter(); }
     }
     const sp = await SpecialPost.create({ title: "special" });
     expect(sp.isPersisted()).toBe(true);
@@ -8438,7 +8440,7 @@ describe("PersistenceTest2", () => {
 
   it("increment with touch an attribute updates timestamps", async () => {
     class CountPost extends Base {
-      static { this.tableName = "count_posts"; this.adapter = new MemoryAdapter(); this.attribute("count", "integer", { default: 0 }); }
+      static { this.tableName = "count_posts"; this.adapter = createTestAdapter(); this.attribute("count", "integer", { default: 0 }); }
     }
     const p = await CountPost.create({});
     p.increment("count");
@@ -8447,7 +8449,7 @@ describe("PersistenceTest2", () => {
 
   it("decrement with touch updates timestamps", async () => {
     class CountPost2 extends Base {
-      static { this.tableName = "count_posts2"; this.adapter = new MemoryAdapter(); this.attribute("count", "integer", { default: 5 }); }
+      static { this.tableName = "count_posts2"; this.adapter = createTestAdapter(); this.attribute("count", "integer", { default: 5 }); }
     }
     const p = await CountPost2.create({});
     p.decrement("count");
@@ -8462,7 +8464,7 @@ describe("PersistenceTest2", () => {
 
   it("create with custom timestamps", async () => {
     class TSPost extends Base {
-      static { this.tableName = "ts_posts"; this.adapter = new MemoryAdapter(); this.attribute("title", "string"); this.attribute("created_at", "datetime"); }
+      static { this.tableName = "ts_posts"; this.adapter = createTestAdapter(); this.attribute("title", "string"); this.attribute("created_at", "datetime"); }
     }
     const p = await TSPost.create({ title: "ts" });
     expect(p.isPersisted()).toBe(true);
@@ -8726,7 +8728,7 @@ describe("EachTest2", () => {
 // EnumTest2 — more targets for enum_test.rb
 // ==========================================================================
 describe("EnumTest2", () => {
-  function makeEnum(adp: MemoryAdapter) {
+  function makeEnum(adp: DatabaseAdapter) {
     class P extends Base {
       static {
         this.tableName = "posts";
@@ -9982,7 +9984,7 @@ describe("NamedScopingTest2", () => {
 // RelationTest3 — additional missing tests from relations_test.rb
 // ==========================================================================
 describe("RelationTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("finding with subquery without select does not change the select", () => {
@@ -10199,7 +10201,7 @@ describe("CreateOrFindByWithinTransactions", () => {
 // EachTest3 — additional missing tests from batches_test.rb
 // ==========================================================================
 describe("EachTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("warn if order scope is set", () => {
@@ -10393,7 +10395,7 @@ describe("EachTest3", () => {
 // EnumTest3 — additional missing tests from enum_test.rb
 // ==========================================================================
 describe("EnumTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("type.cast", () => { expect(true).toBe(true); });
@@ -10478,7 +10480,7 @@ describe("EnumTest3", () => {
 // PersistenceTest3 — additional missing tests from persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("populates non primary key autoincremented column", () => { expect(true).toBe(true); });
@@ -10557,7 +10559,7 @@ describe("QueryConstraintsTest", () => {
 // DirtyTest3 — additional missing tests from dirty_test.rb
 // ==========================================================================
 describe("DirtyTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("time attributes changes with time zone", () => { expect(true).toBe(true); });
@@ -10616,7 +10618,7 @@ describe("DirtyTest3", () => {
 // DefaultScopingTest3 — additional missing tests from scoping/default_scoping_test.rb
 // ==========================================================================
 describe("DefaultScopingTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("default scope as class method referencing scope", () => { expect(true).toBe(true); });
@@ -10709,7 +10711,7 @@ describe("DefaultScopingWithThreadTest", () => {
 // NamedScopingTest3 — additional missing tests from scoping/named_scoping_test.rb
 // ==========================================================================
 describe("NamedScopingTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("has many associations have access to scopes", () => { expect(true).toBe(true); });
@@ -10740,7 +10742,7 @@ describe("NamedScopingTest3", () => {
 // TransactionTest3 — additional missing tests from transactions_test.rb
 // ==========================================================================
 describe("TransactionTest3", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("rollback dirty changes even with raise during rollback removes from pool", () => { expect(true).toBe(true); });
@@ -11308,7 +11310,7 @@ describe("AttributeMethodsTest", () => {
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -11612,7 +11614,7 @@ describe("EagerAssociationTest", () => {
 // NestedAttributesTest — targets nested_attributes_test.rb
 // ==========================================================================
 describe("NestedAttributesTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -12093,7 +12095,7 @@ describe("NestedAttributesTest", () => {
 // CounterCacheTest — targets counter_cache_test.rb
 // ==========================================================================
 describe("CounterCacheTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -12299,7 +12301,7 @@ describe("CounterCacheTest", () => {
 // StrictLoadingTest — targets strict_loading_test.rb
 // ==========================================================================
 describe("StrictLoadingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -12577,7 +12579,7 @@ describe("StrictLoadingTest", () => {
 // AggregationsTest — targets aggregations_test.rb
 // ==========================================================================
 describe("AggregationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -12947,7 +12949,7 @@ describe("HasManyThroughTest", () => {
 // InsertAllTest — targets insert_all_test.rb
 // ==========================================================================
 describe("InsertAllTest", () => {
-  function makeBook(adapter: MemoryAdapter) {
+  function makeBook(adapter: DatabaseAdapter) {
     class Book extends Base {
       static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("status", "integer"); this.adapter = adapter; }
     }
@@ -13107,7 +13109,7 @@ describe("InsertAllTest", () => {
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
   let cbIdx = 0;
-  function makePostWithCallbacks(adapter: MemoryAdapter, callbacks: any) {
+  function makePostWithCallbacks(adapter: DatabaseAdapter, callbacks: any) {
     const idx = ++cbIdx;
     const commentName = `CBComment${idx}`;
     const postName = `CBPost${idx}`;
@@ -13209,7 +13211,7 @@ describe("AssociationCallbacksTest", () => {
 });
 
 describe("RelationScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeDeveloper() {
@@ -13973,7 +13975,7 @@ describe("PreloaderTest", () => {
 });
 
 describe("StoreTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -14912,7 +14914,7 @@ describe("AssociationsTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makePost() {
@@ -15488,7 +15490,7 @@ describe("TransactionCallbacksTest", () => {
 });
 
 describe("PrimaryKeysTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeTopic() {
@@ -15702,7 +15704,7 @@ describe("PrimaryKeysTest", () => {
 });
 
 describe("InnerJoinAssociationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -16983,7 +16985,7 @@ describe("UniquenessValidationTest", () => {
 });
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -17218,7 +17220,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 });
 
 describe("StrictLoadingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -17718,7 +17720,7 @@ describe("OrderedOptionsTest", () => {
 });
 
 describe("AssociationProxyTest", () => {
-  let apAdapter: MemoryAdapter;
+  let apAdapter: DatabaseAdapter;
 
   beforeEach(() => {
     apAdapter = freshAdapter();
@@ -17872,7 +17874,7 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("TimeTravelTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -18106,7 +18108,7 @@ describe("TimeTravelTest", () => {
 });
 
 describe("InvertibleMigrationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -18614,7 +18616,7 @@ describe("CascadedEagerLoadingTest", () => {
 });
 
 describe("ReflectionTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -18845,7 +18847,7 @@ describe("ReflectionTest", () => {
 });
 
 describe("CounterCacheTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -19316,7 +19318,7 @@ describe("RelationTest", () => {
 });
 
 describe("InsertAllTest", () => {
-  function makeBook(adapter: MemoryAdapter) {
+  function makeBook(adapter: DatabaseAdapter) {
     class Book extends Base {
       static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("status", "integer"); this.adapter = adapter; }
     }
@@ -19578,7 +19580,7 @@ describe("WhereChainTest", () => {
 });
 
 describe("WhereTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -19651,7 +19653,7 @@ describe("WhereTest", () => {
 });
 
 describe("InheritanceTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeHierarchy() {
@@ -19849,7 +19851,7 @@ describe("InheritanceTest", () => {
 });
 
 describe("InverseHasManyTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -20070,7 +20072,7 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels(opts: { allowDestroy?: boolean; rejectIf?: (attrs: Record<string, unknown>) => boolean; updateOnly?: boolean } = {}) {
@@ -20307,7 +20309,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 });
 
 describe("RelationMergingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -20489,7 +20491,7 @@ describe("RelationMergingTest", () => {
 });
 
 describe("OrTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -20680,7 +20682,7 @@ describe("OrTest", () => {
 });
 
 describe("SignedIdTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -20876,7 +20878,7 @@ describe("SignedIdTest", () => {
 });
 
 describe("SelectTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -21030,7 +21032,7 @@ describe("SelectTest", () => {
 });
 
 describe("UpdateAllTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -21239,7 +21241,7 @@ describe("WithTest", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -21438,7 +21440,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 });
 
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels(opts: { allowDestroy?: boolean; rejectIf?: (attrs: Record<string, unknown>) => boolean; updateOnly?: boolean } = {}) {
@@ -21649,7 +21651,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 });
 
 describe("CoreTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -21802,7 +21804,7 @@ describe("CoreTest", () => {
 });
 
 describe("TestNestedAttributesInGeneral", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("base should have an empty nested attributes options", () => {
@@ -21999,7 +22001,7 @@ describe("TestNestedAttributesInGeneral", () => {
 });
 
 describe("AutomaticInverseFindingTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
@@ -22128,7 +22130,7 @@ describe("AutomaticInverseFindingTests", () => {
 });
 
 describe("RelationMutationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -22407,7 +22409,7 @@ describe("CacheKeyTest", () => {
 });
 
 describe("InverseBelongsToTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -22539,7 +22541,7 @@ describe("InverseBelongsToTests", () => {
 });
 
 describe("LeftOuterJoinAssociationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -22681,7 +22683,7 @@ describe("LeftOuterJoinAssociationTest", () => {
 });
 
 describe("ValidationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -22821,7 +22823,7 @@ describe("ValidationsTest", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -22940,7 +22942,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("DupTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -23098,7 +23100,7 @@ describe("CommentTest", () => {
 
 describe("ActiveRecord::Relation", () => {
   describe("WhereClauseTest", () => {
-    let adapter: MemoryAdapter;
+    let adapter: DatabaseAdapter;
     beforeEach(() => { adapter = freshAdapter(); });
 
     function makeModel() {
@@ -23239,7 +23241,7 @@ describe("ActiveRecord::Relation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -23491,7 +23493,7 @@ describe("SanitizeTest", () => {
 });
 
 describe("TokenForTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -23668,7 +23670,7 @@ describe("TokenForTest", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -23810,7 +23812,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("NumericalityValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Widget extends Base {
@@ -23902,7 +23904,7 @@ describe("NumericalityValidationTest", () => {
 });
 
 describe("ActiveRecordSchemaTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -24053,7 +24055,7 @@ describe("ActiveRecordSchemaTest", () => {
 });
 
 describe("ExplainTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -24189,7 +24191,7 @@ describe("ExplainTest", () => {
 });
 
 describe("ModulesTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it.skip("module spanning associations", () => { /* needs cross-module association loading */ });
@@ -24278,7 +24280,7 @@ describe("NormalizedAttributeTest", () => {
     return s.replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w/g, c => c.toLowerCase());
   }
 
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   let NormalizedAircraft: typeof Base;
   let Aircraft: typeof Base;
 
@@ -24583,7 +24585,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
 describe("AssociationCallbacksTest", () => {
   let cbIdx = 0;
-  function makePostWithCallbacks(adapter: MemoryAdapter, callbacks: any) {
+  function makePostWithCallbacks(adapter: DatabaseAdapter, callbacks: any) {
     const idx = ++cbIdx;
     const commentName = `CBComment${idx}`;
     const postName = `CBPost${idx}`;
@@ -24685,7 +24687,7 @@ describe("AssociationCallbacksTest", () => {
 });
 
 describe("DelegatedTypeTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -24806,7 +24808,7 @@ describe("DelegatedTypeTest", () => {
 });
 
 describe("AssociationsExtensionsTest", () => {
-  let extAdapter: MemoryAdapter;
+  let extAdapter: DatabaseAdapter;
 
   beforeEach(() => {
     extAdapter = freshAdapter();
@@ -24884,7 +24886,7 @@ describe("AssociationsExtensionsTest", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -24967,7 +24969,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -25129,7 +25131,7 @@ describe("PessimisticLockingTest", () => {
 });
 
 describe("BulkAlterTableMigrationsTest", () => {
-  let bulkAdapter: MemoryAdapter;
+  let bulkAdapter: DatabaseAdapter;
   beforeEach(() => { bulkAdapter = freshAdapter(); });
   function makeBulkMig(m: Migration): Migration { (m as any).adapter = bulkAdapter; return m; }
 
@@ -25263,7 +25265,7 @@ describe("CopyMigrationsTest", () => {
 });
 
 describe("CompositePrimaryKeyTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("composite primary key", () => {
@@ -25370,7 +25372,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 });
 
 describe("JsonSerializationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   let Contact: typeof Base;
 
   beforeEach(() => {
@@ -25472,7 +25474,7 @@ describe("JsonSerializationTest", () => {
 });
 
 describe("TouchLaterTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -25564,7 +25566,7 @@ describe("TouchLaterTest", () => {
 });
 
 describe("ReadOnlyTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -25668,7 +25670,7 @@ describe("ReadOnlyTest", () => {
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("includes uses association name", async () => {
@@ -25839,7 +25841,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 });
 
 describe("DeleteAllTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -25948,7 +25950,7 @@ describe("DeleteAllTest", () => {
 });
 
 describe("AssociationValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("validates associated many", async () => {
@@ -26029,7 +26031,7 @@ describe("AssociationValidationTest", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -26107,7 +26109,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 });
 
 describe("NestedAttributesWithCallbacksTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -26206,7 +26208,7 @@ describe("NestedAttributesWithCallbacksTest", () => {
 });
 
 describe("InverseHasOneTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -26294,7 +26296,7 @@ describe("InverseHasOneTests", () => {
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -26404,7 +26406,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 });
 
 describe("SerializationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   let Contact: typeof Base;
 
   beforeEach(() => {
@@ -26479,7 +26481,7 @@ describe("SerializationTest", () => {
 });
 
 describe("SecureTokenTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -26575,7 +26577,7 @@ describe("MysqlDefaultExpressionTest", () => {
 });
 
 describe("AggregationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -27116,7 +27118,7 @@ describe("OverridingAssociationsTest", () => {
 });
 
 describe("PresenceValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -27259,7 +27261,7 @@ describe("FieldOrderedValuesTest", () => {
 });
 
 describe("ExcludingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -27338,7 +27340,7 @@ describe("ExcludingTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("save person", async () => {
@@ -27403,7 +27405,7 @@ describe("CallbacksTest", () => {
 });
 
 describe("FinderRespondToTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("should preserve normal respond to behavior on base", () => {
@@ -27460,7 +27462,7 @@ describe("FinderRespondToTest", () => {
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -27524,7 +27526,7 @@ describe("MergingDifferentRelationsTest", () => {
 });
 
 describe("HasManyScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -27679,7 +27681,7 @@ describe("RequiredAssociationsTest", () => {
 });
 
 describe("WithAnnotationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -27947,7 +27949,7 @@ describe("WithAnnotationsTest", () => {
 });
 
 describe("NestedRelationScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Post extends Base {
@@ -28019,7 +28021,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 });
 
 describe("InverseAssociationTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("should allow for inverse of options in associations", () => {
@@ -28099,7 +28101,7 @@ describe("InverseAssociationTests", () => {
 });
 
 describe("NullRelationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -28299,7 +28301,7 @@ describe("SuppressorTest", () => {
 });
 
 describe("BooleanTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -28388,7 +28390,7 @@ describe("PrimaryKeyIntegerTest", () => {
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -28559,7 +28561,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 });
 
 describe("LengthValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Topic extends Base {
@@ -28607,7 +28609,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("AbsenceValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Topic extends Base {
@@ -28649,7 +28651,7 @@ describe("AbsenceValidationTest", () => {
 });
 
 describe("StructuralCompatibilityTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -28720,7 +28722,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 });
 
 describe("OrderTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -28909,7 +28911,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
 });
 
 describe("DefaultNumbersTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -28939,7 +28941,7 @@ describe("DefaultNumbersTest", () => {
 });
 
 describe("GeneratedMethodsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("association methods override attribute methods of same name", () => {
@@ -29009,7 +29011,7 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
 });
 
 describe("BidirectionalDestroyDependenciesTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("bidirectional dependence when destroying item with belongs to association", async () => {
@@ -29092,7 +29094,7 @@ describe("DefaultBinaryTest", () => {
 });
 
 describe("HasAndBelongsToManyScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("forwarding of static methods", async () => {
@@ -29130,7 +29132,7 @@ describe("HasAndBelongsToManyScopingTest", () => {
 });
 
 describe("InheritanceComputeTypeTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeHierarchy() {
@@ -29159,7 +29161,7 @@ describe("InheritanceComputeTypeTest", () => {
 });
 
 describe("AndTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -29240,7 +29242,7 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 });
 
 describe("AnnotateTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -29427,7 +29429,7 @@ describe("EagerLoadingTooManyIdsTest", () => {
 });
 
 describe("DefaultTextTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("default texts", async () => {
     class Post extends Base {
@@ -29446,7 +29448,7 @@ describe("DefaultTextTest", () => {
 });
 
 describe("DefaultStringsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("default strings", async () => {
     class Post extends Base {
@@ -30162,7 +30164,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
 });
 
 describe("QueryingMethodsDelegationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("delegate querying methods", async () => {
     class Post extends Base {
@@ -30249,7 +30251,7 @@ describe("SetCallbackTest", () => {
 });
 
 describe("ErrorsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("can be instantiated with no args", () => {
     class Post extends Base {
@@ -30283,7 +30285,7 @@ describe("TestNestedAttributesForDelegatedType", () => {
 });
 
 describe("DelegationCachingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("delegation doesn't override methods defined in other relation subclasses", () => {
     class Post extends Base {
@@ -30296,7 +30298,7 @@ describe("DelegationCachingTest", () => {
 });
 
 describe("BasicsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -30553,7 +30555,7 @@ describe("BasicsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Account extends Base {
@@ -30966,7 +30968,7 @@ describe("CalculationsTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Post extends Base {
@@ -31345,7 +31347,7 @@ describe("FinderTest", () => {
 });
 
 describe("AttributeMethodsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Post extends Base {
@@ -31731,7 +31733,7 @@ describe("WhereChainTest", () => {
 });
 
 describe("InheritanceTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeHierarchy() {
@@ -31898,7 +31900,7 @@ describe("InheritanceTest", () => {
 });
 
 describe("RelationMergingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -32077,7 +32079,7 @@ describe("RelationMergingTest", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -32166,7 +32168,7 @@ describe("DefaultTest", () => {
 });
 
 describe("DefaultNumbersTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("default positive integer", async () => {
     class Post extends Base {
@@ -32192,7 +32194,7 @@ describe("DefaultNumbersTest", () => {
 });
 
 describe("DefaultStringsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("default strings", async () => {
     class Post extends Base {
@@ -32238,7 +32240,7 @@ describe("DefaultBinaryTest", () => {
 });
 
 describe("DefaultTextTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("default texts", async () => {
     class Post extends Base {
@@ -32286,7 +32288,7 @@ describe("Sqlite3DefaultExpressionTest", () => {
 });
 
 describe("TouchLaterTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -32366,7 +32368,7 @@ describe("TouchLaterTest", () => {
 });
 
 describe("NestedAttributesWithCallbacksTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -32464,7 +32466,7 @@ describe("NestedAttributesWithCallbacksTest", () => {
 });
 
 describe("AssociationValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("validates associated many", async () => {
@@ -32535,7 +32537,7 @@ describe("AssociationValidationTest", () => {
 });
 
 describe("SecureTokenTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -32617,7 +32619,7 @@ describe("SecureTokenTest", () => {
 });
 
 describe("AnnotateTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("annotate wraps content in an inline comment", () => {
     class Post extends Base {
@@ -32636,7 +32638,7 @@ describe("AnnotateTest", () => {
 });
 
 describe("BidirectionalDestroyDependenciesTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("bidirectional dependence when destroying item with belongs to association", async () => {
@@ -32769,7 +32771,7 @@ describe("RequiredAssociationsTest", () => {
 });
 
 describe("BooleanTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Topic extends Base {
@@ -32824,7 +32826,7 @@ describe("CustomLockingTest", () => {
 });
 
 describe("ErrorsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("can be instantiated with no args", () => {
     class Post extends Base {
@@ -32891,7 +32893,7 @@ describe("ReloadAssociationCacheTest", () => {
 });
 
 describe("QueryingMethodsDelegationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("delegate querying methods", async () => {
     class Post extends Base {
@@ -32909,7 +32911,7 @@ describe("QueryingMethodsDelegationTest", () => {
 });
 
 describe("DelegationCachingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   it("delegation doesn't override methods defined in other relation subclasses", async () => {
     class Post extends Base {
@@ -32922,7 +32924,7 @@ describe("DelegationCachingTest", () => {
 });
 
 describe("SerializationTest", () => {
-  let adapter2: MemoryAdapter;
+  let adapter2: DatabaseAdapter;
   let Contact2: typeof Base;
 
   beforeEach(() => {
@@ -33082,7 +33084,7 @@ describe("SuppressorTest", () => {
 });
 
 describe("AbsenceValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Topic extends Base {
@@ -33124,7 +33126,7 @@ describe("AbsenceValidationTest", () => {
 });
 
 describe("LengthValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Topic extends Base {
@@ -33164,7 +33166,7 @@ describe("LengthValidationTest", () => {
 });
 
 describe("PresenceValidationTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Topic extends Base {
@@ -33519,7 +33521,7 @@ describe("CopyMigrationsTest", () => {
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("includes uses association name", async () => {
@@ -33690,7 +33692,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 });
 
 describe("FinderRespondToTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("should preserve normal respond to behavior on base", () => {
@@ -33747,7 +33749,7 @@ describe("FinderRespondToTest", () => {
 });
 
 describe("GeneratedMethodsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("association methods override attribute methods of same name", () => {
@@ -33780,7 +33782,7 @@ describe("GeneratedMethodsTest", () => {
 });
 
 describe("HasAndBelongsToManyScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("forwarding of static methods", async () => {
@@ -33818,7 +33820,7 @@ describe("HasAndBelongsToManyScopingTest", () => {
 });
 
 describe("HasManyScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -33947,7 +33949,7 @@ describe("InheritanceAttributeTest", () => {
 });
 
 describe("InheritanceTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeHierarchy() {
@@ -34114,7 +34116,7 @@ describe("InheritanceTest", () => {
 });
 
 describe("InverseAssociationTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("should allow for inverse of options in associations", () => {
@@ -34181,7 +34183,7 @@ describe("InverseAssociationTests", () => {
 });
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
@@ -34223,7 +34225,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -34292,7 +34294,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 });
 
 describe("JsonSerializationTest", () => {
-  let adapterJ: MemoryAdapter;
+  let adapterJ: DatabaseAdapter;
   let ContactJ: typeof Base;
 
   beforeEach(() => {
@@ -34387,7 +34389,7 @@ describe("JsonSerializationTest", () => {
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -34444,7 +34446,7 @@ describe("MergingDifferentRelationsTest", () => {
 });
 
 describe("NestedRelationScopingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Post extends Base {
@@ -34702,7 +34704,7 @@ describe("PrimaryKeyIntegerTest", () => {
 });
 
 describe("ReadOnlyTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -34790,7 +34792,7 @@ describe("ReadOnlyTest", () => {
 });
 
 describe("RelationMergingTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModel() {
@@ -35184,7 +35186,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 
   function makeModels() {
@@ -35236,7 +35238,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -35346,7 +35348,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -35557,7 +35559,7 @@ describe("WhereChainTest", () => {
 });
 
 describe("WithAnnotationsTest", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
   function makeModel() {
     class Post extends Base {

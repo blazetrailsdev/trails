@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
-  MemoryAdapter,
   defineEnum,
   readEnumValue,
   RecordNotFound,
   RecordInvalid,
   ReadOnlyRecord,
 } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): MemoryAdapter {
-  return new MemoryAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
 }
 
 // =============================================================================
@@ -299,7 +300,7 @@ describe("Base (extended)", () => {
 // =============================================================================
 
 describe("Persistence (extended)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Article extends Base {
     static {
@@ -794,7 +795,7 @@ describe("Persistence (extended)", () => {
 // =============================================================================
 
 describe("Attributes (extended)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Person extends Base {
     static {
@@ -902,7 +903,7 @@ describe("Attributes (extended)", () => {
 // =============================================================================
 
 describe("Calculations (extended)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class Product extends Base {
     static {
@@ -1077,7 +1078,7 @@ describe("Calculations (extended)", () => {
 // =============================================================================
 
 describe("Enum (extended)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1289,7 +1290,7 @@ describe("Enum (extended)", () => {
 // =============================================================================
 
 describe("Finders (extended)", () => {
-  let adapter: MemoryAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
