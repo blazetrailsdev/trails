@@ -117,9 +117,14 @@ async function processPendingModels(inner: any): Promise<void> {
         ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
         : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
 
-      try { await inner.exec(createSql); } catch {}
-      _createdTables.add(tableName);
-      _createdColumns.set(tableName, new Set(["id", ...columns.keys()]));
+      try {
+        await inner.exec(createSql);
+        _createdTables.add(tableName);
+        _createdColumns.set(tableName, new Set(["id", ...columns.keys()]));
+      } catch (e: any) {
+        // Log but don't add to _createdTables so we retry next time
+        console.error(`[test-adapter] Failed to create table "${tableName}": ${e?.message}`);
+      }
     } else {
       // Table exists — add missing columns
       const known = _createdColumns.get(tableName)!;
@@ -130,8 +135,11 @@ async function processPendingModels(inner: any): Promise<void> {
             ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` ${type}`
             : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" ${type}`;
           await inner.exec(alterSql);
-        } catch {}
-        known.add(col);
+          known.add(col);
+        } catch {
+          // Column might already exist in the real DB
+          known.add(col);
+        }
       }
     }
   }
