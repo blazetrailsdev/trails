@@ -62,6 +62,13 @@ export class MysqlAdapter implements DatabaseAdapter {
   }
 
   /**
+   * Convert boolean values in binds to integers for MySQL compatibility.
+   */
+  private mysqlBinds(binds: unknown[]): unknown[] {
+    return binds.map(v => (v === true ? 1 : v === false ? 0 : v));
+  }
+
+  /**
    * Execute a SELECT query and return rows.
    */
   async execute(
@@ -70,7 +77,7 @@ export class MysqlAdapter implements DatabaseAdapter {
   ): Promise<Record<string, unknown>[]> {
     const conn = await this.getConn();
     try {
-      const [rows] = await conn.query(this.mysqlQuote(sql), binds);
+      const [rows] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
       return rows as Record<string, unknown>[];
     } finally {
       this.releaseConn(conn);
@@ -86,7 +93,7 @@ export class MysqlAdapter implements DatabaseAdapter {
   ): Promise<number> {
     const conn = await this.getConn();
     try {
-      const [result] = await conn.query(this.mysqlQuote(sql), binds);
+      const [result] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
       const info = result as mysql.ResultSetHeader;
 
       // For INSERT, return the last inserted ID

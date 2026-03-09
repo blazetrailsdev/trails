@@ -359,7 +359,20 @@ class SchemaAdapter implements DatabaseAdapter {
   async releaseSavepoint(name: string): Promise<void> { return this.inner.releaseSavepoint(name); }
   async rollbackToSavepoint(name: string): Promise<void> { return this.inner.rollbackToSavepoint(name); }
 
+  async exec(sql: string): Promise<void> {
+    await this.setup();
+    // Auto-add IF NOT EXISTS / IF EXISTS
+    if (/CREATE\s+TABLE\s+(?!IF)/i.test(sql)) {
+      sql = sql.replace(/CREATE\s+TABLE\s+/i, "CREATE TABLE IF NOT EXISTS ");
+    }
+    if (/DROP\s+TABLE\s+(?!IF)/i.test(sql)) {
+      sql = sql.replace(/DROP\s+TABLE\s+/i, "DROP TABLE IF EXISTS ");
+    }
+    return this.inner.exec(sql);
+  }
+
   async explain(sql: string): Promise<string> {
+    await this.setup();
     if (this.inner.explain) return this.inner.explain(sql);
     return `EXPLAIN not supported`;
   }

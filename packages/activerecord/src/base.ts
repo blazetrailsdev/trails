@@ -1047,6 +1047,10 @@ export class Base extends Model {
     if (idOrConditions === undefined) {
       return this.all().isAny();
     }
+    // Rails: exists(false) and exists(nil) always return false
+    if (idOrConditions === false || idOrConditions === null) {
+      return false;
+    }
     if (typeof idOrConditions === "object" && idOrConditions !== null && !Array.isArray(idOrConditions)) {
       return this.all().where(idOrConditions as Record<string, unknown>).isAny();
     }

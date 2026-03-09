@@ -151,7 +151,8 @@ describe("ActiveRecordSchemaTest", () => {
     await adapter.executeMutation(`INSERT INTO "ts_change" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`);
     const rows = await adapter.execute(`SELECT * FROM "ts_change"`);
     expect(rows.length).toBe(1);
-    expect(rows[0].created_at).toBe("2023-01-01");
+    const createdAt = rows[0].created_at;
+    expect(createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt)).toBe("2023-01-01");
   });
 
   it.skip("timestamps with implicit default on change table with bulk", () => { /* bulk mode not supported */ });
@@ -173,6 +174,7 @@ describe("ActiveRecordSchemaTest", () => {
     await adapter.executeMutation(`INSERT INTO "ts_add" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`);
     const rows = await adapter.execute(`SELECT * FROM "ts_add"`);
     expect(rows.length).toBe(1);
-    expect(rows[0].created_at).toBe("2023-01-01");
+    const createdAt = rows[0].created_at;
+    expect(createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt)).toBe("2023-01-01");
   });
 });

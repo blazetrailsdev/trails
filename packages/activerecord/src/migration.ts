@@ -526,7 +526,12 @@ export abstract class Migration {
       throw new Error("Must specify either name or column for remove_index");
     }
 
-    await this.adapter.executeMutation(`DROP INDEX IF EXISTS "${indexName}"`);
+    const adp = detectAdapterName(this.adapter);
+    if (adp === "mysql") {
+      await this.adapter.executeMutation(`DROP INDEX \`${indexName}\` ON \`${tableName}\``);
+    } else {
+      await this.adapter.executeMutation(`DROP INDEX IF EXISTS "${indexName}"`);
+    }
   }
 
   /**
@@ -1377,7 +1382,12 @@ export class MigrationContext {
       indexName = `index_${table}_on_${cols.join("_and_")}`;
     }
     if (indexName) {
-      await this.adapter.executeMutation(`DROP INDEX "${indexName}"`);
+      const adp = detectAdapterName(this.adapter);
+      if (adp === "mysql") {
+        await this.adapter.executeMutation(`DROP INDEX \`${indexName}\` ON \`${table}\``);
+      } else {
+        await this.adapter.executeMutation(`DROP INDEX "${indexName}"`);
+      }
       const tableIndexes = this._indexes.get(table);
       if (tableIndexes) {
         this._indexes.set(

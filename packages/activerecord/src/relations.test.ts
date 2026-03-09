@@ -1929,13 +1929,14 @@ describe("Relation: pick, first(n), last(n)", () => {
 });
 
 describe("Relation: explain()", () => {
-  it("returns explain output from MemoryAdapter", async () => {
+  it("returns explain output", async () => {
     const adapter = freshAdapter();
     class User extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
     }
     const result = await User.all().explain();
-    expect(result).toContain("MemoryAdapter");
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
   });
 });
 

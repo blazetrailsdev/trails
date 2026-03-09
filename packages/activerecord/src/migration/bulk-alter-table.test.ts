@@ -68,7 +68,8 @@ describe("BulkAlterTableMigrationsTest", () => {
     await bulkAdapter.executeMutation(`INSERT INTO "bk4" ("x", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`);
     const rows = await bulkAdapter.execute(`SELECT * FROM "bk4"`);
     expect(rows.length).toBe(1);
-    expect(rows[0].created_at).toBe("2023-01-01");
+    const createdAt = rows[0].created_at;
+    expect(createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt)).toBe("2023-01-01");
   });
 
   it("removing timestamps", async () => {
