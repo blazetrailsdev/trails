@@ -85,6 +85,10 @@ export class PostgresAdapter implements DatabaseAdapter {
         const withReturning = `${pgSql} RETURNING id`;
         try {
           const result = await client.query(withReturning, binds);
+          if (result.rows.length > 1) {
+            // Multi-row INSERT: return count of inserted rows
+            return result.rowCount ?? result.rows.length;
+          }
           if (result.rows.length > 0) {
             const firstCol = Object.keys(result.rows[0])[0];
             return Number(result.rows[0][firstCol]);

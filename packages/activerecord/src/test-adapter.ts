@@ -51,8 +51,9 @@ let _cleanupInProgress = false;
 function sqlType(typeName: string): string {
   switch (typeName) {
     case "integer":
-    case "big_integer":
       return "INTEGER";
+    case "big_integer":
+      return "BIGINT";
     case "float":
     case "decimal":
       return isPg() ? "DOUBLE PRECISION" : "REAL";
