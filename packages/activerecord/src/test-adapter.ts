@@ -225,9 +225,6 @@ if (_sharedAdapter) {
  */
 export function createTestAdapter(): DatabaseAdapter {
   _needsCleanup = true;
-  if (_sharedAdapter) {
-    console.log(`[test-adapter] createTestAdapter() called, _needsCleanup=true, stack=${new Error().stack?.split("\n").slice(1, 4).join(" | ")}`);
-  }
   return _factory();
 }
 
@@ -261,7 +258,6 @@ class SchemaAdapter implements DatabaseAdapter {
   private async setup(): Promise<void> {
     if (_needsCleanup && !_cleanupInProgress) {
       _needsCleanup = false;
-      console.log(`[test-adapter] setup() dropping tables: ${[..._createdTables].join(", ")}`);
       await dropAllTables(this.inner);
     }
     // Extract columns from any newly registered model classes
