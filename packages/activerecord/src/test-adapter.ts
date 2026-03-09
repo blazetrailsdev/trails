@@ -25,16 +25,23 @@ export const adapterType: "memory" | "postgres" | "mysql" =
 // Shared adapter instance for real databases (single connection pool)
 let _sharedAdapter: any = null;
 
+// Shared table tracking across all AutoMigrateAdapter instances for real DBs.
+// This prevents column-not-found errors when different test files reuse the
+// same table name with different columns.
+const _sharedKnownTables = new Set<string>();
+const _sharedCreatedTables = new Set<string>();
+const _sharedTableColumns = new Map<string, Set<string>>();
+
 let _factory: () => DatabaseAdapter;
 
 if (PG_TEST_URL) {
   const { PostgresAdapter } = await import("./adapters/postgres-adapter.js");
   _sharedAdapter = new PostgresAdapter(PG_TEST_URL);
-  _factory = () => new AutoMigrateAdapter(_sharedAdapter);
+  _factory = () => new AutoMigrateAdapter(_sharedAdapter, _sharedKnownTables, _sharedCreatedTables, _sharedTableColumns);
 } else if (MYSQL_TEST_URL) {
   const { MysqlAdapter } = await import("./adapters/mysql-adapter.js");
   _sharedAdapter = new MysqlAdapter(MYSQL_TEST_URL);
-  _factory = () => new AutoMigrateAdapter(_sharedAdapter);
+  _factory = () => new AutoMigrateAdapter(_sharedAdapter, _sharedKnownTables, _sharedCreatedTables, _sharedTableColumns);
 } else {
   _factory = () => new MemoryAdapter();
 }
@@ -69,11 +76,20 @@ export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void
  */
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
-  private knownTables = new Set<string>();
-  private createdTables = new Set<string>();
+  private knownTables: Set<string>;
+  private createdTables: Set<string>;
+  private tableColumns: Map<string, Set<string>>;
 
-  constructor(inner: any) {
+  constructor(
+    inner: any,
+    knownTables?: Set<string>,
+    createdTables?: Set<string>,
+    tableColumns?: Map<string, Set<string>>,
+  ) {
     this.inner = inner;
+    this.knownTables = knownTables ?? new Set();
+    this.createdTables = createdTables ?? new Set();
+    this.tableColumns = tableColumns ?? new Map();
   }
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
@@ -117,9 +133,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     if (this.inner.explain) return this.inner.explain(sql);
     return `EXPLAIN not supported`;
   }
-
-  // Track known columns per table to add missing ones
-  private tableColumns = new Map<string, Set<string>>();
 
   /**
    * Ensure a table exists, creating it with TEXT columns if needed.
