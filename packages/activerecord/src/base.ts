@@ -777,11 +777,12 @@ export class Base extends Model {
     if (this._defaultScope) {
       rel = this._defaultScope(rel);
     }
-    // STI subclasses auto-filter by type column
+    // STI subclasses auto-filter by type column (includes descendants)
     if (isStiSubclass(this)) {
       const col = getInheritanceColumn(getStiBase(this));
       if (col) {
-        rel = rel.where({ [col]: this.name });
+        const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
+        rel = rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
       }
     }
     return rel;
@@ -1390,9 +1391,10 @@ export class Base extends Model {
    */
   static _instantiate(row: Record<string, unknown>): Base {
     // If STI is enabled, delegate to the correct subclass
-    const inheritanceCol = getInheritanceColumn(this);
+    const stiBase = getStiBase(this);
+    const inheritanceCol = getInheritanceColumn(stiBase);
     if (inheritanceCol && row[inheritanceCol] && row[inheritanceCol] !== this.name) {
-      return instantiateSti(this, row);
+      return instantiateSti(stiBase, row);
     }
 
     this._skipEncryption = true;
@@ -2433,7 +2435,9 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#becomes
    */
   becomes(klass: typeof Base): Base {
-    const instance = new klass(this.attributes);
+    const instance = new klass({});
+    // Share the same attributes map (Rails behavior)
+    instance._attributes = this._attributes;
     instance._newRecord = this._newRecord;
     if (!this._newRecord) {
        (instance as any)._dirty.snapshot(instance._attributes);
@@ -2671,10 +2675,13 @@ export class Base extends Model {
    */
   becomesBang(klass: typeof Base): Base {
     const instance = this.becomes(klass);
-    // Set the STI type column if it exists
-    const inheritanceCol = getInheritanceColumn(klass);
+    // Set the STI type column — find it from the base class
+    const base = getStiBase(klass);
+    const inheritanceCol = getInheritanceColumn(base);
     if (inheritanceCol) {
-      instance._attributes.set(inheritanceCol, klass.name);
+      // For the base class itself, set to null; for subclasses, set to class name
+      const value = isStiSubclass(klass) ? klass.name : null;
+      instance._attributes.set(inheritanceCol, value);
     }
     return instance;
   }

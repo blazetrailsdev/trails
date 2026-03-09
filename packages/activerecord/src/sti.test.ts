@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, enableSti, registerSubclass, registerModel } from "./index.js";
+import { Base, MemoryAdapter, enableSti, registerSubclass, registerModel, SubclassNotFound, findStiClass } from "./index.js";
+import { getStiBase, isStiSubclass } from "./sti.js";
 
 /**
  * Single Table Inheritance tests.
@@ -742,5 +743,492 @@ describe("InheritanceTest", () => {
     }
 
     expect(SpecialSubscriber.primaryKey).toBe("nick");
+  });
+
+  // -------------------------------------------------------------------------
+  // inheritance new with base class
+  // -------------------------------------------------------------------------
+
+  it("inheritance new with base class", () => {
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = new MemoryAdapter();
+        enableSti(Company);
+      }
+    }
+    registerModel(Company);
+
+    const company = new Company({ type: "Company" });
+    expect(company).toBeInstanceOf(Company);
+  });
+
+  // -------------------------------------------------------------------------
+  // inheritance new with subclass
+  // -------------------------------------------------------------------------
+
+  it("inheritance new with subclass", () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    class Firm extends Company {
+      static { this.adapter = adapter; registerModel(Firm); registerSubclass(Firm); }
+    }
+
+    const firm = new Company({ type: "Firm" });
+    // In Rails, Company.new(type: "Firm") returns a Firm instance
+    // We validate by checking the type attribute is set
+    expect(firm.readAttribute("type")).toBe("Firm");
+  });
+
+  // -------------------------------------------------------------------------
+  // new with invalid type
+  // -------------------------------------------------------------------------
+
+  it("new with invalid type", () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    registerModel(Company);
+
+    expect(() => findStiClass(Company, "InvalidType")).toThrow(SubclassNotFound);
+  });
+
+  // -------------------------------------------------------------------------
+  // new with unrelated type
+  // -------------------------------------------------------------------------
+
+  it("new with unrelated type", () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    class Account extends Base {
+      static { this.adapter = adapter; }
+    }
+    registerModel(Company);
+    registerModel(Account);
+
+    expect(() => findStiClass(Company, "Account")).toThrow(SubclassNotFound);
+  });
+
+  // -------------------------------------------------------------------------
+  // new with complex inheritance
+  // -------------------------------------------------------------------------
+
+  it("new with complex inheritance", () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    class Client extends Company {
+      static { this.adapter = adapter; registerModel(Client); registerSubclass(Client); }
+    }
+    class VerySpecialClient extends Client {
+      static { this.adapter = adapter; registerModel(VerySpecialClient); registerSubclass(VerySpecialClient); }
+    }
+    registerModel(Company);
+
+    // Should not throw — VerySpecialClient is a subclass of Company
+    expect(() => findStiClass(Company, "VerySpecialClient")).not.toThrow();
+  });
+
+  // -------------------------------------------------------------------------
+  // a bad type column
+  // -------------------------------------------------------------------------
+
+  it("a bad type column", async () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    registerModel(Company);
+
+    // Create a record and then corrupt its type via updateAll
+    const company = await Company.create({ name: "Not happening" });
+    await Company.all().where({ id: company.id }).updateAll({ type: "bad_class!" });
+
+    await expect(Company.find(company.id as number)).rejects.toThrow(SubclassNotFound);
+  });
+
+  // -------------------------------------------------------------------------
+  // becomes! resets inheritance type column
+  // -------------------------------------------------------------------------
+
+  it("becomes bang resets inheritance type column", async () => {
+    const adapter = new MemoryAdapter();
+    class Vegetable extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("custom_type", "string");
+        this._tableName = "vegetables";
+        this.adapter = adapter;
+        enableSti(Vegetable, { column: "custom_type" });
+      }
+    }
+    class Cabbage extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+    }
+    registerModel(Vegetable);
+
+    const vegetable = await Vegetable.create({ name: "Red Pepper" });
+    expect(vegetable.readAttribute("custom_type")).toBeNull();
+
+    const cabbage = vegetable.becomesBang(Cabbage);
+    expect(cabbage).toBeInstanceOf(Cabbage);
+    expect(cabbage.readAttribute("custom_type")).toBe("Cabbage");
+
+    // becomes! back to Vegetable should clear the type
+    cabbage.becomesBang(Vegetable);
+    // Since becomes! shares attributes, cabbage's custom_type is also cleared
+    expect(cabbage.readAttribute("custom_type")).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // becomes and change tracking for inheritance columns
+  // -------------------------------------------------------------------------
+
+  it("becomes and change tracking for inheritance columns", async () => {
+    const adapter = new MemoryAdapter();
+    class Vegetable extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("custom_type", "string");
+        this._tableName = "vegetables";
+        this.adapter = adapter;
+        enableSti(Vegetable, { column: "custom_type" });
+      }
+    }
+    class Cucumber extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cucumber); registerSubclass(Cucumber); }
+    }
+    class Cabbage extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+    }
+    registerModel(Vegetable);
+
+    const cucumber = await Cucumber.create({ name: "my cucumber" });
+    const cabbage = cucumber.becomesBang(Cabbage);
+    // After becomes!, the type changed from "Cucumber" to "Cabbage"
+    expect(cabbage.readAttribute("custom_type")).toBe("Cabbage");
+    expect(cabbage).toBeInstanceOf(Cabbage);
+  });
+
+  // -------------------------------------------------------------------------
+  // update all within inheritance
+  // -------------------------------------------------------------------------
+
+  it("update all within inheritance", async () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    class Firm extends Company {
+      static { this.adapter = adapter; registerModel(Firm); registerSubclass(Firm); }
+    }
+    class Client extends Company {
+      static { this.adapter = adapter; registerModel(Client); registerSubclass(Client); }
+    }
+    registerModel(Company);
+
+    await Firm.create({ name: "37signals" });
+    await Client.create({ name: "Summit" });
+    await Client.create({ name: "RailsCore" });
+
+    await Client.updateAll({ name: "I am a client" });
+
+    const client = await Client.all().first();
+    expect(client!.readAttribute("name")).toBe("I am a client");
+
+    // Firm should be unchanged
+    const firm = await Firm.all().first();
+    expect(firm!.readAttribute("name")).toBe("37signals");
+  });
+
+  // -------------------------------------------------------------------------
+  // alt update all within inheritance
+  // -------------------------------------------------------------------------
+
+  it("alt update all within inheritance", async () => {
+    const adapter = new MemoryAdapter();
+    class Vegetable extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "vegetables";
+        this.adapter = adapter;
+        enableSti(Vegetable);
+      }
+    }
+    class Cucumber extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cucumber); registerSubclass(Cucumber); }
+    }
+    class Cabbage extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+    }
+    registerModel(Vegetable);
+
+    await Cucumber.create({ name: "my cucumber" });
+    await Cabbage.create({ name: "his cabbage" });
+
+    await Cabbage.updateAll({ name: "the cabbage" });
+
+    const cabbage = await Cabbage.all().first();
+    expect(cabbage!.readAttribute("name")).toBe("the cabbage");
+
+    const cucumber = await Cucumber.all().first();
+    expect(cucumber!.readAttribute("name")).toBe("my cucumber");
+  });
+
+  // -------------------------------------------------------------------------
+  // alt destroy all within inheritance
+  // -------------------------------------------------------------------------
+
+  it("alt destroy all within inheritance", async () => {
+    const adapter = new MemoryAdapter();
+    class Vegetable extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "vegetables";
+        this.adapter = adapter;
+        enableSti(Vegetable);
+      }
+    }
+    class Cucumber extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cucumber); registerSubclass(Cucumber); }
+    }
+    class Cabbage extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+    }
+    registerModel(Vegetable);
+
+    await Cucumber.create({ name: "my cucumber" });
+    await Cabbage.create({ name: "his cabbage" });
+    await Cabbage.create({ name: "her cabbage" });
+    await Cabbage.create({ name: "red cabbage" });
+
+    await Cabbage.destroyAll();
+    expect(await Cabbage.all().count()).toBe(0);
+    expect(await Cucumber.all().count()).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // descends from active record
+  // -------------------------------------------------------------------------
+
+  it("descends from active record", () => {
+    const adapter = new MemoryAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this._tableName = "posts";
+        this.adapter = adapter;
+        enableSti(Post);
+      }
+    }
+    class StiPost extends Post {
+      static { registerSubclass(StiPost); }
+    }
+    class SubStiPost extends StiPost {
+      static { registerSubclass(SubStiPost); }
+    }
+
+    // Post is the STI base — it descends from Base directly
+    expect(isStiSubclass(Post)).toBe(false);
+    // StiPost is an STI subclass
+    expect(isStiSubclass(StiPost)).toBe(true);
+    // SubStiPost is also an STI subclass
+    expect(isStiSubclass(SubStiPost)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // base_class?
+  // -------------------------------------------------------------------------
+
+  it("base class predicate", () => {
+    const adapter = new MemoryAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this._tableName = "posts";
+        this.adapter = adapter;
+        enableSti(Post);
+      }
+    }
+    class SpecialPost extends Post {
+      static { registerSubclass(SpecialPost); }
+    }
+    class StiPost extends Post {
+      static { registerSubclass(StiPost); }
+    }
+    class SubStiPost extends StiPost {
+      static { registerSubclass(SubStiPost); }
+    }
+
+    expect(getStiBase(Post)).toBe(Post);
+    expect(getStiBase(SpecialPost)).toBe(Post);
+    expect(getStiBase(StiPost)).toBe(Post);
+    expect(getStiBase(SubStiPost)).toBe(Post);
+  });
+
+  // -------------------------------------------------------------------------
+  // complex inheritance — multi-level query finds subclass instances
+  // -------------------------------------------------------------------------
+
+  it("alt complex inheritance", async () => {
+    const adapter = new MemoryAdapter();
+    class Vegetable extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "vegetables";
+        this.adapter = adapter;
+        enableSti(Vegetable);
+      }
+    }
+    class Cabbage extends Vegetable {
+      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+    }
+    class GreenCabbage extends Cabbage {
+      static { this.adapter = adapter; registerModel(GreenCabbage); registerSubclass(GreenCabbage); }
+    }
+    class KingCole extends GreenCabbage {
+      static { this.adapter = adapter; registerModel(KingCole); registerSubclass(KingCole); }
+    }
+    registerModel(Vegetable);
+
+    const kingCole = await KingCole.create({ name: "uniform heads" });
+
+    // KingCole.where should find it
+    const found1 = await KingCole.where({ name: "uniform heads" }).first();
+    expect(found1).toBeInstanceOf(KingCole);
+
+    // GreenCabbage.where should find it (KingCole is a GreenCabbage descendant)
+    const found2 = await GreenCabbage.where({ name: "uniform heads" }).first();
+    expect(found2).toBeInstanceOf(KingCole);
+
+    // Cabbage.where should find it
+    const found3 = await Cabbage.where({ name: "uniform heads" }).first();
+    expect(found3).toBeInstanceOf(KingCole);
+
+    // Vegetable.where should find it
+    const found4 = await Vegetable.where({ name: "uniform heads" }).first();
+    expect(found4).toBeInstanceOf(KingCole);
+
+    // Cabbage.find should return KingCole
+    const found5 = await Cabbage.find(kingCole.id as number);
+    expect(found5).toBeInstanceOf(KingCole);
+  });
+
+  // -------------------------------------------------------------------------
+  // class with blank sti name
+  // -------------------------------------------------------------------------
+
+  it("class with blank sti name", async () => {
+    const adapter = new MemoryAdapter();
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    registerModel(Company);
+
+    const company = await Company.create({ name: "Test" });
+    // Update type to blank
+    company.writeAttribute("type", "  ");
+    await company.save();
+
+    const found = await Company.find(company.id as number);
+    expect(found.readAttribute("type")).toBe("  ");
+  });
+
+  // -------------------------------------------------------------------------
+  // inheritance without mapping (custom primary key)
+  // -------------------------------------------------------------------------
+
+  it("inheritance without mapping", async () => {
+    const adapter = new MemoryAdapter();
+    class Subscriber extends Base {
+      static {
+        this.attribute("nick", "string");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.primaryKey = "nick";
+        this._tableName = "subscribers";
+        this.adapter = adapter;
+        enableSti(Subscriber);
+      }
+    }
+    class SpecialSubscriber extends Subscriber {
+      static { this.adapter = adapter; registerModel(SpecialSubscriber); registerSubclass(SpecialSubscriber); }
+    }
+    registerModel(Subscriber);
+
+    const ss = new SpecialSubscriber({ name: "And breaaaaathe!" });
+    ss.writeAttribute("nick", "roger");
+    await ss.save();
+
+    const found = await SpecialSubscriber.find("roger");
+    expect(found).toBeInstanceOf(SpecialSubscriber);
   });
 });

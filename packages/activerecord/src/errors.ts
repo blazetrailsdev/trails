@@ -135,6 +135,18 @@ export class StrictLoadingViolationError extends Error {
 }
 
 /**
+ * Raised when a type column value does not correspond to a valid subclass.
+ *
+ * Mirrors: ActiveRecord::SubclassNotFound
+ */
+export class SubclassNotFound extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SubclassNotFound";
+  }
+}
+
+/**
  * Raised when a dependent: :restrict_with_exception association prevents deletion.
  *
  * Mirrors: ActiveRecord::DeleteRestrictionError

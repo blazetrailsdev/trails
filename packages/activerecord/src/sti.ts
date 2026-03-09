@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
+import { SubclassNotFound } from "./errors.js";
 
 /**
  * Register a class as a subclass of its parent.
@@ -77,6 +78,48 @@ export function getStiBase(modelClass: typeof Base): typeof Base {
 }
 
 /**
+ * Resolve a type name to a subclass of the given base class.
+ * Throws SubclassNotFound if the type is invalid or not a subclass.
+ *
+ * Mirrors: ActiveRecord::Inheritance.find_sti_class
+ */
+export function findStiClass(
+  baseClass: typeof Base,
+  typeName: string
+): typeof Base {
+  const klass = modelRegistry.get(typeName);
+  if (!klass) {
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`
+    );
+  }
+  // Verify it's actually a subclass (or the base itself)
+  if (klass !== baseClass && !(klass.prototype instanceof baseClass)) {
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`
+    );
+  }
+  return klass;
+}
+
+/**
+ * Directly instantiate a record without STI delegation (avoids recursion).
+ */
+function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Base {
+  (klass as any)._skipEncryption = true;
+  const record = new klass(row);
+  (klass as any)._skipEncryption = false;
+  record._newRecord = false;
+  (record as any)._dirty.snapshot(record._attributes);
+  record.changesApplied();
+  if ((klass as any)._strictLoadingByDefault) {
+    (record as any)._strictLoading = true;
+  }
+  (klass as any)._callbackChain?.runAfter?.("find", record);
+  return record;
+}
+
+/**
  * Instantiate the correct STI subclass from a database row.
  */
 export function instantiateSti(
@@ -84,13 +127,11 @@ export function instantiateSti(
   row: Record<string, unknown>
 ): Base {
   const column = getInheritanceColumn(baseClass);
-  if (!column) return baseClass._instantiate(row);
+  if (!column) return directInstantiate(baseClass, row);
 
   const typeName = row[column] as string | null | undefined;
-  if (!typeName) return baseClass._instantiate(row);
+  if (!typeName || !typeName.trim()) return directInstantiate(baseClass, row);
 
-  const subclass = modelRegistry.get(typeName);
-  if (!subclass) return baseClass._instantiate(row);
-
-  return subclass._instantiate(row);
+  const subclass = findStiClass(baseClass, typeName);
+  return directInstantiate(subclass, row);
 }
