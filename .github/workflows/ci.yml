@@ -68,6 +68,7 @@ jobs:
         env:
           MARIADB_DATABASE: rails_js_test
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+          MARIADB_CHARACTER_SET: utf8mb4
           MARIADB_COLLATION: utf8mb4_bin
         ports:
           - 3306:3306

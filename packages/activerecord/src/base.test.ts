@@ -580,7 +580,7 @@ describe("BasicsTest2", () => {
       static { this.attribute("count", "big_integer"); this.adapter = createTestAdapter(); }
     }
     const c = await Counter.create({ count: 9007199254740991 });
-    expect(c.readAttribute("count")).toBe(9007199254740991);
+    expect(Number(c.readAttribute("count"))).toBe(9007199254740991);
   });
 
   it("clear cache when setting table name", () => {

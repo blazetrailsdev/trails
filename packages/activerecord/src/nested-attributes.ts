@@ -163,7 +163,14 @@ async function processNestedAttributes(record: Base): Promise<void> {
         // For belongs_to, create the target and set FK on *this* record
         const created = await (targetModel as any).create(childAttrs);
         if (created && created.id != null) {
-          await record.update({ [foreignKey]: created.id });
+          // Use writeAttribute + direct save to avoid re-triggering nested attributes
+          record.writeAttribute(foreignKey, created.id);
+          const tableName = (ctor as any).tableName;
+          const pk = (ctor as any).primaryKey || "id";
+          const pkVal = record.readAttribute(pk);
+          await (ctor as any).adapter.executeMutation(
+            `UPDATE "${tableName}" SET "${foreignKey}" = ${created.id} WHERE "${pk}" = ${pkVal}`
+          );
         }
       } else {
         // For hasMany/hasOne, set FK on the child record

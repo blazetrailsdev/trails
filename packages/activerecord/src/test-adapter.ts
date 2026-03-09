@@ -271,14 +271,7 @@ class SchemaAdapter implements DatabaseAdapter {
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     await this.setup();
-    try {
-      return await this.inner.execute(sql, binds);
-    } catch (e: any) {
-      if (await this.handleMissingTable(e, sql)) {
-        return this.inner.execute(sql, binds);
-      }
-      throw e;
-    }
+    return this.inner.execute(sql, binds);
   }
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {

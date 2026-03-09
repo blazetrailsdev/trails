@@ -96,8 +96,11 @@ export class MysqlAdapter implements DatabaseAdapter {
       const [result] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
       const info = result as mysql.ResultSetHeader;
 
-      // For INSERT, return the last inserted ID
+      // For INSERT, return the last inserted ID (or affected rows for multi-row)
       if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+        if (info.affectedRows > 1) {
+          return info.affectedRows;
+        }
         return info.insertId;
       }
 
