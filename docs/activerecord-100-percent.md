@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **~72.2%** (~3,914 matched / 5,428 total Ruby tests). ~1,513 stubs need converting, 1 test is missing entirely. Raw test stats: 6,523 passed, 1,335 skipped.
+Current state: **72.1%** (3,914 matched / 5,428 total Ruby tests). 1,513 stubs need converting, 1 test is missing entirely. Raw test stats: 6,523 passed, 1,335 skipped.
 
 > **Progress update (2026-03-08, session 3):** Added scoped preloading support — the preloader now applies association `scope` lambdas when loading hasMany, hasOne, and through associations. Converted 10 more tests (scoped dependent delete, scoped through preloading, scoped through loading). Coverage: 6,523 passed / 1,335 skipped.
 >
@@ -51,7 +51,7 @@ This document groups the remaining work into feature areas, identifies dependenc
 | 23 | Strict Loading | ~20 | ~10 | Associations (all types) | **Partial** |
 | 24 | Primary Keys | ~15 | ~25 | Base | **Mostly done** |
 | 25 | Small areas (<20 each) | ~70 | ~140 | Various | Mixed |
-| | **TOTAL** | **~1,523** | **~3,904** | | |
+| | **TOTAL** | **~1,513** | **~3,914** | | |
 
 ## Dependency graph
 
@@ -138,8 +138,9 @@ What works:
 What's still missing:
 - STI + through combinations
 - Nested through (through a through)
-- `source_type:` option
-- Scoped through associations
+- `source_type:` option for polymorphic through
+- Default scopes on through models
+- Instance-dependent scopes
 - Counter cache through
 - Custom primary keys on through
 
@@ -262,7 +263,7 @@ Most foundations are now in place. The remaining work is mostly converting fixtu
 ```
 Highest ROI (parallel):
   - STI (Single Table Inheritance) — unlocks ~50+ tests across through, eager, and association files
-  - Scoped associations — unlocks ~30+ tests
+  - Scoped associations — basic scoped loading/preloading done, ~20 remaining (default scopes, unscope, instance-dependent scopes)
   - Nested includes (includes(posts: :comments)) — unlocks ~20+ tests
   - source_type: option for polymorphic through — unlocks ~15+ tests
   - Fixture-dependent test conversion — 355 stubs in coverage-boost.test.ts
