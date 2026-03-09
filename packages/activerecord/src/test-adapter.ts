@@ -168,30 +168,22 @@ async function processPendingModels(inner: any): Promise<void> {
 }
 
 /**
- * Delete all rows from all known tables and reset auto-increment.
+ * Drop all known tables and reset tracking state.
  */
-async function deleteAllData(inner: any): Promise<void> {
+async function dropAllTables(inner: any): Promise<void> {
   if (_cleanupInProgress) return;
   _cleanupInProgress = true;
   try {
     for (const table of _createdTables) {
       try {
-        const sql = isMysql() ? `DELETE FROM \`${table}\`` : `DELETE FROM "${table}"`;
+        const sql = isMysql()
+          ? `DROP TABLE IF EXISTS \`${table}\``
+          : `DROP TABLE IF EXISTS "${table}" CASCADE`;
         await inner.exec(sql);
-        if (isPg()) {
-          try {
-            const seqs = await inner.execute(
-              `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname LIKE '${table}_%_seq'`
-            );
-            for (const s of seqs) {
-              await inner.exec(`ALTER SEQUENCE "${(s as any).relname}" RESTART WITH 1`);
-            }
-          } catch {}
-        } else if (isMysql()) {
-          try { await inner.exec(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`); } catch {}
-        }
       } catch {}
     }
+    _createdTables.clear();
+    _createdColumns.clear();
   } finally {
     _cleanupInProgress = false;
   }
@@ -265,7 +257,7 @@ class SchemaAdapter implements DatabaseAdapter {
   private async setup(): Promise<void> {
     if (_needsCleanup && !_cleanupInProgress) {
       _needsCleanup = false;
-      await deleteAllData(this.inner);
+      await dropAllTables(this.inner);
     }
     // Extract columns from any newly registered model classes
     if (_registeredModelClasses.size > 0) {
@@ -373,6 +365,6 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   async cleanup(): Promise<void> {
-    await deleteAllData(this.inner);
+    await dropAllTables(this.inner);
   }
 }
