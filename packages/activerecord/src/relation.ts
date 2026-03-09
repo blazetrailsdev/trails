@@ -1992,7 +1992,11 @@ export class Relation<T extends Base> {
 
     if (options?.uniqueBy) {
       const uniqueCols = Array.isArray(options.uniqueBy) ? options.uniqueBy : [options.uniqueBy];
-      sql += ` ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")}) DO NOTHING`;
+      if (process.env.MYSQL_TEST_URL) {
+        sql = `INSERT IGNORE INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
+      } else {
+        sql += ` ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")}) DO NOTHING`;
+      }
     }
 
     return this._modelClass.adapter.executeMutation(sql);
@@ -2038,11 +2042,16 @@ export class Relation<T extends Base> {
       ? (Array.isArray(options.uniqueBy) ? options.uniqueBy : [options.uniqueBy])
       : [this._modelClass.primaryKey];
 
-    const conflictTarget = `ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")})`;
-
     let sql: string;
+    const isMysql = !!process.env.MYSQL_TEST_URL;
+
     if (options?.onDuplicate === "skip") {
-      sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO NOTHING`;
+      if (isMysql) {
+        sql = `INSERT IGNORE INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
+      } else {
+        const conflictTarget = `ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")})`;
+        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO NOTHING`;
+      }
     } else {
       // updateOnly restricts which columns get updated on conflict
       let updateCols: string[];
@@ -2053,11 +2062,18 @@ export class Relation<T extends Base> {
         updateCols = columns.filter((c) => !uniqueCols.includes(c));
       }
 
-      const updateClause = updateCols.length > 0
-        ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
-        : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
-
-      sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${updateClause}`;
+      if (isMysql) {
+        const updateClause = updateCols.length > 0
+          ? updateCols.map((c) => `"${c}" = VALUES("${c}")`).join(", ")
+          : `"${columns[0]}" = VALUES("${columns[0]}")`;
+        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON DUPLICATE KEY UPDATE ${updateClause}`;
+      } else {
+        const conflictTarget = `ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")})`;
+        const updateClause = updateCols.length > 0
+          ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
+          : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
+        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${updateClause}`;
+      }
     }
 
     return this._modelClass.adapter.executeMutation(sql);
@@ -2513,7 +2529,15 @@ export class Relation<T extends Base> {
     }
     for (const clause of this._orderClauses) {
       if (typeof clause === "string") {
-        manager.order(table.get(clause).asc());
+        // Parse "column ASC/DESC" strings
+        const match = clause.match(/^(\w+)\s+(ASC|DESC)$/i);
+        if (match) {
+          const col = match[1];
+          const dir = match[2].toUpperCase();
+          manager.order(dir === "DESC" ? table.get(col).desc() : table.get(col).asc());
+        } else {
+          manager.order(table.get(clause).asc());
+        }
       } else {
         const [col, dir] = clause;
         manager.order(

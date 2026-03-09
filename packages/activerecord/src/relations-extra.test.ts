@@ -1240,7 +1240,7 @@ describe("RelationTest", () => {
     }
     const sql = Post.order("title ASC").toSql();
     expect(sql).toContain("ORDER BY");
-    expect(sql).toContain("title ASC");
+    expect(sql).toContain('"title" ASC');
   });
 
   it("find all with join", () => {

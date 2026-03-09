@@ -2002,9 +2002,15 @@ export class Base extends Model {
       })
       .join(", ");
 
-    const sql = columns.length === 0
-      ? `INSERT INTO "${table.name}" DEFAULT VALUES`
-      : `INSERT INTO "${table.name}" (${colList}) VALUES (${valList})`;
+    let sql: string;
+    if (columns.length === 0) {
+      // PG supports DEFAULT VALUES, MySQL/SQLite need () VALUES ()
+      sql = process.env.MYSQL_TEST_URL
+        ? `INSERT INTO "${table.name}" () VALUES ()`
+        : `INSERT INTO "${table.name}" DEFAULT VALUES`;
+    } else {
+      sql = `INSERT INTO "${table.name}" (${colList}) VALUES (${valList})`;
+    }
     this._pendingOperation = ctor.adapter
       .executeMutation(sql)
       .then((insertedId) => {
@@ -2120,6 +2126,10 @@ export class Base extends Model {
     ctor._callbackChain.run("destroy", this, () => {
       const table = ctor.arelTable;
       const pk = this.id;
+      if (pk == null) {
+        // New (unpersisted) record — nothing to delete from DB
+        return;
+      }
       const pkQuoted =
         typeof pk === "number"
           ? String(pk)
@@ -2162,6 +2172,13 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     const table = ctor.arelTable;
     const pk = this.id;
+
+    if (pk == null) {
+      // New (unpersisted) record — nothing to delete
+      this._destroyed = true;
+      return this;
+    }
+
     const pkQuoted =
       typeof pk === "number"
         ? String(pk)
