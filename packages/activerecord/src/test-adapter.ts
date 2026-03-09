@@ -255,9 +255,7 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   private async setup(): Promise<void> {
-    // Skip DDL operations during transactions — DDL on MySQL causes implicit commits
-    const inTx = this.inner.inTransaction === true;
-    if (_needsCleanup && !_cleanupInProgress && !inTx) {
+    if (_needsCleanup && !_cleanupInProgress) {
       _needsCleanup = false;
       await dropAllTables(this.inner);
     }
@@ -265,7 +263,7 @@ class SchemaAdapter implements DatabaseAdapter {
     if (_registeredModelClasses.size > 0) {
       extractColumnsFromModels();
     }
-    if (_pendingModels.size > 0 && !inTx) {
+    if (_pendingModels.size > 0) {
       await processPendingModels(this.inner);
     }
   }
