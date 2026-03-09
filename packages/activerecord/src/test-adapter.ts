@@ -8,6 +8,11 @@
  *
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
+ *
+ * Test isolation strategy: tables are auto-created on first INSERT and
+ * persist for the lifetime of the test file. Between tests, cleanup()
+ * DELETEs all rows (instead of DROP/CREATE) so schema is preserved but
+ * data doesn't leak between tests.
  */
 
 import { MemoryAdapter } from "./adapter.js";
@@ -23,8 +28,11 @@ export const adapterType: "memory" | "postgres" | "mysql" =
 // Shared adapter instance for real databases (single connection pool)
 let _sharedAdapter: any = null;
 
-// Track ALL tables ever created so we can drop them when a new adapter starts
-const _allCreatedTables = new Set<string>();
+// Module-level schema tracking — shared across all AutoMigrateAdapter
+// instances within a single test file (vitest worker). This lets tables
+// accumulate columns across tests without being dropped/recreated.
+const _knownTables = new Set<string>();
+const _tableColumns = new Map<string, Set<string>>();
 
 let _factory: () => DatabaseAdapter;
 
@@ -64,8 +72,9 @@ export function createTestAdapter(): DatabaseAdapter {
 }
 
 /**
- * Clean up test tables. Call this in afterEach/afterAll to drop tables
- * created during tests. Does NOT close the shared connection.
+ * Clean up test data. Call this in afterEach/afterAll to delete rows
+ * created during tests. Schema (tables/columns) is preserved.
+ * Does NOT close the shared connection.
  */
 export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void> {
   if (adapter instanceof AutoMigrateAdapter) {
@@ -73,74 +82,128 @@ export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void
   }
 }
 
+const isPg = (): boolean => !!PG_TEST_URL;
+const isMysql = (): boolean => !!MYSQL_TEST_URL;
+
+/**
+ * Infer a SQL column type from the INSERT values.
+ */
+function inferType(colName: string, insertSql: string): string {
+  if (colName.endsWith("_id")) return "INTEGER";
+
+  const valMatch = insertSql.match(/VALUES\s*\(([^)]+)\)/i);
+  if (!valMatch) return "TEXT";
+
+  const columns = insertSql.match(/\(([^)]+)\)\s*VALUES/i);
+  if (!columns) return "TEXT";
+
+  const colNames = columns[1].split(",").map(c => c.trim().replace(/"/g, "").replace(/`/g, ""));
+  const values = valMatch[1].split(",").map(v => v.trim());
+
+  const idx = colNames.indexOf(colName);
+  if (idx < 0 || idx >= values.length) return "TEXT";
+
+  const val = values[idx];
+  if (val === "NULL") return "TEXT";
+  if (val === "TRUE" || val === "FALSE") return isPg() ? "BOOLEAN" : "INTEGER";
+  if (/^-?\d+$/.test(val)) return "INTEGER";
+  if (/^-?\d+\.\d+$/.test(val)) return isPg() ? "DOUBLE PRECISION" : "DOUBLE";
+  return "TEXT";
+}
+
+/**
+ * Ensure a table exists with the needed columns. Uses module-level
+ * schema tracking so tables persist across adapter instances.
+ */
+async function ensureTable(
+  inner: any,
+  tableName: string,
+  colStr: string,
+  insertSql: string
+): Promise<void> {
+  const columns = colStr.trim()
+    ? colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""))
+    : [];
+
+  if (!_knownTables.has(tableName)) {
+    const colDefs = columns
+      .filter((c) => c !== "id")
+      .map((c) => {
+        const type = inferType(c, insertSql);
+        return isMysql() ? `\`${c}\` ${type}` : `"${c}" ${type}`;
+      });
+
+    const idCol = isPg()
+      ? '"id" SERIAL PRIMARY KEY'
+      : isMysql()
+        ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
+        : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
+
+    const createSql = isMysql()
+      ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
+      : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
+
+    try {
+      await inner.exec(createSql);
+    } catch {
+      // Table might already exist
+    }
+    _knownTables.add(tableName);
+    _tableColumns.set(tableName, new Set(columns.length ? columns : ["id"]));
+    return;
+  }
+
+  // Table already known — add missing columns
+  const known = _tableColumns.get(tableName)!;
+  for (const col of columns) {
+    if (col === "id" || known.has(col)) continue;
+    try {
+      const type = inferType(col, insertSql);
+      const alterSql = isMysql()
+        ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` ${type}`
+        : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" ${type}`;
+      await inner.exec(alterSql);
+    } catch {
+      // Column might already exist
+    }
+    known.add(col);
+  }
+}
+
 /**
  * Wraps a real database adapter and auto-creates tables when an INSERT
- * targets a table that doesn't exist yet. This lets the existing test
- * suite run against real databases without adding explicit CREATE TABLE
- * statements to every test.
- *
- * Each instance gets its own table/column tracking. When a table is first
- * seen in an INSERT, it is DROP-ed (if it existed from a previous adapter)
- * and recreated fresh with the correct columns. This ensures test isolation.
+ * targets a table that doesn't exist yet. Uses DELETE-based cleanup
+ * for test isolation: schema persists, data is cleaned between tests.
  */
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
-  private knownTables = new Set<string>();
-  private createdTables = new Set<string>();
-  private tableColumns = new Map<string, Set<string>>();
+  // Track tables this adapter instance has inserted into (for cleanup)
+  private touchedTables = new Set<string>();
 
   constructor(inner: any) {
     this.inner = inner;
   }
 
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
-
     try {
       return await this.inner.execute(sql, binds);
     } catch (e: any) {
-      // If table doesn't exist, create it empty and retry
       const msg = e?.message || "";
       const tableMatch = msg.match(/relation "(\w+)" does not exist/i)
         || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
       if (tableMatch) {
         const tableName = tableMatch[1];
-        // Extract column names from the SQL WHERE clause to create minimal table
+        // Extract column names from SQL to create minimal table
         const colMatches = sql.match(/["`](\w+)["`]\.\s*["`](\w+)["`]/g) || [];
         const cols = new Set<string>();
         for (const m of colMatches) {
           const col = m.match(/["`](\w+)["`]\s*$/)?.[1];
           if (col && col !== tableName) cols.add(col);
         }
-        // Also match bare column references
         const whereMatch = sql.match(/WHERE\s+["`]?(\w+)["`]?\s*(?:=|IN)/i);
         if (whereMatch) cols.add(whereMatch[1]);
 
-        const idCol = this.isPg()
-          ? '"id" SERIAL PRIMARY KEY'
-          : this.isMysql()
-            ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
-            : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
-
-        const colDefs = [...cols].filter(c => c !== "id").map(c => {
-          // FK columns should be INTEGER to avoid type mismatch errors
-          const type = c.endsWith("_id") ? "INTEGER" : "TEXT";
-          return this.isMysql() ? `\`${c}\` ${type}` : `"${c}" ${type}`;
-        });
-
-        const createSql = this.isMysql()
-          ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
-          : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
-
-        try {
-          await this.inner.exec(createSql);
-          this.knownTables.add(tableName);
-          this.createdTables.add(tableName);
-          _allCreatedTables.add(tableName);
-          this.tableColumns.set(tableName, new Set(["id", ...cols]));
-        } catch {
-          // ignore
-        }
-        // Retry the original query
+        await ensureTable(this.inner, tableName, [...cols].join(", "), sql);
         return this.inner.execute(sql, binds);
       }
       throw e;
@@ -148,66 +211,42 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
-
-    // Auto-create table on INSERT if it doesn't exist
-    // Handle both double-quoted (PG/SQLite) and backtick-quoted (MySQL) identifiers
+    // Auto-create table on INSERT
     const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]*)\)/i);
     if (insertMatch) {
       const [, tableName, colStr] = insertMatch;
-      await this.ensureTable(tableName, colStr, sql);
+      await ensureTable(this.inner, tableName, colStr, sql);
+      this.touchedTables.add(tableName);
     }
 
-    // Auto-handle CREATE TABLE
+    // Track CREATE TABLE
     const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
     if (createMatch) {
-      this.knownTables.add(createMatch[1]);
-      this.createdTables.add(createMatch[1]);
-      _allCreatedTables.add(createMatch[1]);
+      _knownTables.add(createMatch[1]);
+      this.touchedTables.add(createMatch[1]);
     }
 
-    // Auto-handle DROP TABLE
+    // Track DROP TABLE
     const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
     if (dropMatch) {
-      this.knownTables.delete(dropMatch[1]);
-      this.createdTables.delete(dropMatch[1]);
-      _allCreatedTables.delete(dropMatch[1]);
-      this.tableColumns.delete(dropMatch[1]);
+      _knownTables.delete(dropMatch[1]);
+      _tableColumns.delete(dropMatch[1]);
+      this.touchedTables.delete(dropMatch[1]);
     }
 
     try {
       return await this.inner.executeMutation(sql, binds);
     } catch (e: any) {
-      // If table doesn't exist, create it and retry
       const msg = e?.message || e?.sqlMessage || "";
       const tableMatch = msg.match(/relation "(\w+)" does not exist/i)
         || msg.match(/Table '[\w.]*\.?(\w+)' doesn't exist/i);
       if (tableMatch) {
         const tableName = tableMatch[1];
-        const createSql = this.isMysql()
-          ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (\`id\` INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB`
-          : `CREATE TABLE IF NOT EXISTS "${tableName}" ("id" ${this.isPg() ? 'SERIAL' : 'INTEGER'} PRIMARY KEY)`;
-        try {
-          await this.inner.exec(createSql);
-          this.knownTables.add(tableName);
-          this.createdTables.add(tableName);
-          _allCreatedTables.add(tableName);
-          this.tableColumns.set(tableName, new Set(["id"]));
-        } catch {}
-
-        // Also handle empty INSERT (no columns) — add columns from SQL
+        // Create minimal table and retry
         const insertCols = sql.match(/\(([^)]*)\)\s*VALUES/i);
-        if (insertCols && insertCols[1].trim()) {
-          const cols = insertCols[1].split(",").map(c => c.trim().replace(/"/g, "").replace(/`/g, ""));
-          for (const col of cols) {
-            if (col === "id") continue;
-            try {
-              const alterSql = this.isMysql()
-                ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` TEXT`
-                : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`;
-              await this.inner.exec(alterSql);
-            } catch {}
-          }
-        }
+        const colStr = insertCols?.[1] || "";
+        await ensureTable(this.inner, tableName, colStr, sql);
+        this.touchedTables.add(tableName);
         return this.inner.executeMutation(sql, binds);
       }
       throw e;
@@ -227,134 +266,35 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Infer a SQL column type from the INSERT values.
-   */
-  private inferType(colName: string, insertSql: string): string {
-    // FK columns should always be INTEGER
-    if (colName.endsWith("_id")) return "INTEGER";
-
-    // Look at the VALUES clause to infer types
-    const valMatch = insertSql.match(/VALUES\s*\(([^)]+)\)/i);
-    if (!valMatch) return "TEXT";
-
-    const columns = insertSql.match(/\(([^)]+)\)\s*VALUES/i);
-    if (!columns) return "TEXT";
-
-    const colNames = columns[1].split(",").map(c => c.trim().replace(/"/g, "").replace(/`/g, ""));
-    const values = valMatch[1].split(",").map(v => v.trim());
-
-    const idx = colNames.indexOf(colName);
-    if (idx < 0 || idx >= values.length) return "TEXT";
-
-    const val = values[idx];
-    if (val === "NULL") return "TEXT";
-    if (val === "TRUE" || val === "FALSE") return this.isPg() ? "BOOLEAN" : "INTEGER";
-    if (/^-?\d+$/.test(val)) return "INTEGER";
-    if (/^-?\d+\.\d+$/.test(val)) return this.isPg() ? "DOUBLE PRECISION" : "DOUBLE";
-    return "TEXT";
-  }
-
-  /**
-   * Ensure a table exists with the needed columns.
-   * If this adapter hasn't seen the table before but it was created by a
-   * previous adapter, DROP it and recreate with correct columns/types.
-   */
-  private async ensureTable(tableName: string, colStr: string, insertSql: string): Promise<void> {
-    const columns = colStr.trim()
-      ? colStr.split(",").map((c) => c.trim().replace(/"/g, "").replace(/`/g, ""))
-      : [];
-
-    if (!this.knownTables.has(tableName)) {
-      // Always DROP first — the table may exist from a previous test file
-      // (module-level state resets per test file but DB state persists)
-      try {
-        const dropSql = this.isMysql()
-          ? `DROP TABLE IF EXISTS \`${tableName}\``
-          : `DROP TABLE IF EXISTS "${tableName}" CASCADE`;
-        await this.inner.exec(dropSql);
-      } catch {
-        // ignore
-      }
-
-      // Create the table with inferred column types
-      const colDefs = columns
-        .filter((c) => c !== "id")
-        .map((c) => {
-          const type = this.inferType(c, insertSql);
-          return `"${c}" ${type}`;
-        });
-
-      const idCol = this.isPg()
-        ? '"id" SERIAL PRIMARY KEY'
-        : this.isMysql()
-          ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
-          : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
-
-      const colDefsQuoted = this.isMysql()
-        ? columns.filter((c) => c !== "id").map((c) => {
-            const type = this.inferType(c, insertSql);
-            return `\`${c}\` ${type}`;
-          })
-        : colDefs;
-
-      const createSql = this.isMysql()
-        ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefsQuoted].join(", ")}) ENGINE=InnoDB`
-        : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
-
-      try {
-        await this.inner.exec(createSql);
-      } catch {
-        // Table might already exist
-      }
-      this.knownTables.add(tableName);
-      this.createdTables.add(tableName);
-      _allCreatedTables.add(tableName);
-      this.tableColumns.set(tableName, new Set(columns));
-      return;
-    }
-
-    // Table already known to this adapter — add missing columns
-    const known = this.tableColumns.get(tableName)!;
-    for (const col of columns) {
-      if (col === "id" || known.has(col)) continue;
-      try {
-        const type = this.inferType(col, insertSql);
-        const alterSql = this.isMysql()
-          ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` ${type}`
-          : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" ${type}`;
-        await this.inner.exec(alterSql);
-      } catch {
-        // Column might already exist
-      }
-      known.add(col);
-    }
-  }
-
-  private isPg(): boolean {
-    return !!PG_TEST_URL;
-  }
-
-  private isMysql(): boolean {
-    return !!MYSQL_TEST_URL;
-  }
-
-  /**
-   * Drop all tables created by this adapter. Does NOT close the shared connection.
+   * Delete all rows from tables touched by this adapter instance.
+   * Schema (tables/columns) is preserved for the next test.
    */
   async cleanup(): Promise<void> {
-    for (const table of this.createdTables) {
+    for (const table of this.touchedTables) {
+      if (!_knownTables.has(table)) continue;
       try {
-        const dropSql = this.isMysql()
-          ? `DROP TABLE IF EXISTS \`${table}\``
-          : `DROP TABLE IF EXISTS "${table}" CASCADE`;
-        await this.inner.exec(dropSql);
+        const deleteSql = isMysql()
+          ? `DELETE FROM \`${table}\``
+          : `DELETE FROM "${table}"`;
+        await this.inner.exec(deleteSql);
+        // Reset auto-increment so IDs are predictable across tests
+        if (isPg()) {
+          // Find all sequences for this table and reset them
+          try {
+            const seqs = await this.inner.execute(
+              `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname LIKE '${table}_%_seq'`
+            );
+            for (const seq of seqs) {
+              await this.inner.exec(`ALTER SEQUENCE "${(seq as any).relname}" RESTART WITH 1`);
+            }
+          } catch {}
+        } else if (isMysql()) {
+          try { await this.inner.exec(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`); } catch {}
+        }
       } catch {
-        // ignore cleanup errors
+        // Table may have been dropped by the test itself
       }
-      _allCreatedTables.delete(table);
     }
-    this.createdTables.clear();
-    this.knownTables.clear();
-    this.tableColumns.clear();
+    this.touchedTables.clear();
   }
 }
