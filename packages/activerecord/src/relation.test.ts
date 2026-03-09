@@ -179,3 +179,20 @@ describe("not respond to arel method", () => {
     expect((post as any).arel).toBeUndefined();
   });
 });
+
+describe("isBlank / isPresent", () => {
+  it("isBlank returns true when no records exist", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    expect(await User.all().isBlank()).toBe(true);
+    expect(await User.all().isPresent()).toBe(false);
+
+    await User.create({ name: "Alice" });
+    expect(await User.all().isBlank()).toBe(false);
+    expect(await User.all().isPresent()).toBe(true);
+  });
+});

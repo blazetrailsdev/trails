@@ -940,3 +940,26 @@ describe("STI (Rails-guided)", () => {
     expect(await Company.all().count()).toBe(3);
   });
 });
+
+describe("abstract_class", () => {
+  it("marks a class as abstract", () => {
+    class ApplicationRecord extends Base {
+      static { this.abstractClass = true; }
+    }
+    expect(ApplicationRecord.abstractClass).toBe(true);
+    expect(Base.abstractClass).toBe(false);
+  });
+});
+
+describe("Base.inheritanceColumn", () => {
+  it("returns null when STI is not enabled", () => {
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+
+    expect(User.inheritanceColumn).toBeNull();
+  });
+});

@@ -76,3 +76,29 @@ describe("CloneTest", () => {
   it.skip("clone preserves frozen state", () => {});
   it.skip("clone of frozen record is not frozen", () => {});
 });
+
+describe("Base#clone", () => {
+  it("creates a shallow clone preserving id and persisted state", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "Alice" });
+    const c = u.clone();
+    expect(c.id).toBe(u.id);
+    expect(c.readAttribute("name")).toBe("Alice");
+    expect(c.isPersisted()).toBe(true);
+  });
+
+  it("clone is independent from original", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "Alice" });
+    const c = u.clone();
+    c.writeAttribute("name", "Bob");
+    expect(u.readAttribute("name")).toBe("Alice");
+    expect(c.readAttribute("name")).toBe("Bob");
+  });
+});

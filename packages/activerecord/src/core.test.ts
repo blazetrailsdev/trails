@@ -181,3 +181,179 @@ describe("CoreTest", () => {
   it.skip("inspect instance", () => {});
   it.skip("inspect new instance", () => {});
 });
+
+describe("frozen / isFrozen", () => {
+  it("is not frozen by default", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = new User({ name: "Alice" });
+    expect(user.isFrozen()).toBe(false);
+  });
+
+  it("is frozen after destroy", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = await User.create({ name: "Alice" });
+    await user.destroy();
+    expect(user.isFrozen()).toBe(true);
+  });
+
+  it("is frozen after delete", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = await User.create({ name: "Alice" });
+    await user.delete();
+    expect(user.isFrozen()).toBe(true);
+  });
+
+  it("prevents modification of frozen record", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = await User.create({ name: "Alice" });
+    await user.destroy();
+    expect(() => user.writeAttribute("name", "Bob")).toThrow("Cannot modify a frozen");
+  });
+
+  it("can be manually frozen", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = new User({ name: "Alice" });
+    user.freeze();
+    expect(user.isFrozen()).toBe(true);
+    expect(() => user.writeAttribute("name", "Bob")).toThrow("Cannot modify a frozen");
+  });
+});
+
+describe("Base#isEqual", () => {
+  it("returns true for same class and same id", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u1 = await User.create({ name: "Alice" });
+    const u2 = await User.find(u1.id);
+    expect(u1.isEqual(u2)).toBe(true);
+  });
+
+  it("returns false for different ids", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u1 = await User.create({ name: "Alice" });
+    const u2 = await User.create({ name: "Bob" });
+    expect(u1.isEqual(u2)).toBe(false);
+  });
+
+  it("returns false for new records", () => {
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    const u1 = new User({ name: "Alice" });
+    const u2 = new User({ name: "Alice" });
+    expect(u1.isEqual(u2)).toBe(false);
+  });
+
+  it("returns false for non-Base objects", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    expect(u.isEqual("not a record")).toBe(false);
+    expect(u.isEqual(null)).toBe(false);
+  });
+});
+
+describe("Base.logger", () => {
+  it("defaults to null", () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.adapter = adapter; }
+    }
+    expect(User.logger).toBe(null);
+  });
+
+  it("can set and get a logger", () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.adapter = adapter; }
+    }
+    const myLogger = { debug: () => {}, info: () => {} };
+    User.logger = myLogger;
+    expect(User.logger).toBe(myLogger);
+    User.logger = null; // cleanup
+  });
+});
+
+describe("Base.new()", () => {
+  it("creates an unsaved record instance", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = User.new({ name: "Alice" });
+    expect(user.isNewRecord()).toBe(true);
+    expect(user.readAttribute("name")).toBe("Alice");
+  });
+});
+
+describe("toKey()", () => {
+  it("returns [id] for persisted records", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = await User.create({ name: "Alice" });
+    expect(user.toKey()).toEqual([user.id]);
+  });
+
+  it("returns null for new records", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.adapter = adapter;
+
+    const user = new User({});
+    expect(user.toKey()).toBeNull();
+  });
+});

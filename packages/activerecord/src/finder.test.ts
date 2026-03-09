@@ -2689,3 +2689,48 @@ describe("Finders edge cases (Rails-guided)", () => {
     expect(await User.where({ name: "Bob" }).exists()).toBe(false);
   });
 });
+
+describe("Base.findByAttribute", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("finds a record by a single attribute", async () => {
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "Alice" });
+    await User.create({ name: "Bob" });
+    const found = await User.findByAttribute("name", "Bob");
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("name")).toBe("Bob");
+  });
+
+  it("returns null when not found", async () => {
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const found = await User.findByAttribute("name", "Nobody");
+    expect(found).toBeNull();
+  });
+});
+
+describe("Base.respondToMissingFinder", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("returns true for valid dynamic finders", () => {
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+    }
+    expect(User.respondToMissingFinder("findByName")).toBe(true);
+    expect(User.respondToMissingFinder("findByEmail")).toBe(true);
+  });
+
+  it("returns false for invalid dynamic finders", () => {
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    expect(User.respondToMissingFinder("findByFoo")).toBe(false);
+    expect(User.respondToMissingFinder("something")).toBe(false);
+  });
+});

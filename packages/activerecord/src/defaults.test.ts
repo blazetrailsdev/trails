@@ -321,3 +321,21 @@ describe("Sqlite3DefaultExpressionTest", () => {
   // SQLite3-specific default expression tests require a SQLite3 adapter.
   it.skip("schema dump includes default expression — requires SQLite3 adapter", () => {});
 });
+
+describe("Base.columnDefaults", () => {
+  it("returns default values for all attributes", () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "Anonymous" });
+        this.attribute("active", "boolean", { default: true });
+        this.adapter = adapter;
+      }
+    }
+    const defaults = User.columnDefaults;
+    expect(defaults.name).toBe("Anonymous");
+    expect(defaults.active).toBe(true);
+    expect(defaults.id).toBe(null);
+  });
+});

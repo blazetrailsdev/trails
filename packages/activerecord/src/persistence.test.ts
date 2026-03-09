@@ -2196,3 +2196,42 @@ describe("update_column / touch edge cases (Rails-guided)", () => {
     expect(reloaded.readAttribute("updated_at")).toBeInstanceOf(Date);
   });
 });
+
+describe("previouslyNewRecord", () => {
+  it("returns false before first save", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = new User({ name: "Alice" });
+    expect(user.isPreviouslyNewRecord()).toBe(false);
+  });
+
+  it("returns true after first save", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = new User({ name: "Alice" });
+    await user.save();
+    expect(user.isPreviouslyNewRecord()).toBe(true);
+    expect(user.isNewRecord()).toBe(false);
+  });
+
+  it("returns false after subsequent saves", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = await User.create({ name: "Alice" });
+    expect(user.isPreviouslyNewRecord()).toBe(true);
+    await user.update({ name: "Bob" });
+    expect(user.isPreviouslyNewRecord()).toBe(false);
+  });
+});

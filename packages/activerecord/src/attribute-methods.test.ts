@@ -1091,3 +1091,138 @@ describe("alias_attribute (Rails-guided)", () => {
     expect(p.readAttribute("price_cents")).toBe(1500);
   });
 });
+
+describe("humanAttributeName", () => {
+  it("converts snake_case to human-readable form", () => {
+    expect(Base.humanAttributeName("first_name")).toBe("First name");
+    expect(Base.humanAttributeName("email")).toBe("Email");
+    expect(Base.humanAttributeName("created_at")).toBe("Created at");
+  });
+});
+
+describe("attributePresent()", () => {
+  it("returns true for non-null, non-empty values", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.attribute("email", "string");
+    User.adapter = adapter;
+
+    const user = new User({ name: "Alice" });
+    expect(user.attributePresent("name")).toBe(true);
+    expect(user.attributePresent("email")).toBe(false); // null
+  });
+
+  it("returns false for empty strings", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.adapter = adapter;
+
+    const user = new User({ name: "  " });
+    expect(user.attributePresent("name")).toBe(false);
+  });
+});
+
+describe("attributesBeforeTypeCast on Base", () => {
+  it("returns raw values before type casting", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = new User({ name: "Alice", age: "25" });
+    const raw = u.attributesBeforeTypeCast;
+    expect(raw.age).toBe("25");
+    expect(u.readAttribute("age")).toBe(25);
+  });
+});
+
+describe("columnForAttribute on Base", () => {
+  it("returns column metadata", () => {
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const u = new User({ name: "Alice" });
+    const col = u.columnForAttribute("name");
+    expect(col).not.toBeNull();
+    expect(col!.name).toBe("name");
+    expect(u.columnForAttribute("nope")).toBeNull();
+  });
+});
+
+describe("Base.attributeTypes", () => {
+  it("returns a map of attribute name to type object", () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+    }
+    const types = User.attributeTypes;
+    expect(types).toHaveProperty("id");
+    expect(types).toHaveProperty("name");
+    expect(types).toHaveProperty("age");
+    expect(types.name.cast("42")).toBe("42");
+    expect(types.age.cast("42")).toBe(42);
+  });
+});
+
+describe("Base.columnsHash", () => {
+  it("returns a hash of column definitions", () => {
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+
+    const hash = User.columnsHash();
+    expect(hash["name"].type).toBe("string");
+    expect(hash["age"].type).toBe("integer");
+    expect(hash["id"].type).toBe("integer");
+  });
+});
+
+describe("Base.contentColumns", () => {
+  it("excludes PK, FK, and timestamp columns", () => {
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.attribute("department_id", "integer");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+
+    const content = User.contentColumns();
+    expect(content).toContain("name");
+    expect(content).toContain("email");
+    expect(content).not.toContain("id");
+    expect(content).not.toContain("department_id");
+    expect(content).not.toContain("created_at");
+    expect(content).not.toContain("updated_at");
+  });
+});
+
+describe("ignoredColumns", () => {
+  it("can be set and retrieved on a model class", () => {
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+
+    User.ignoredColumns = ["legacy_field"];
+    expect(User.ignoredColumns).toEqual(["legacy_field"]);
+  });
+});
