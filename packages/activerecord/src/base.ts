@@ -132,6 +132,50 @@ export class Base extends Model {
   }
 
   /**
+   * Map ActiveModel type names to SQL column types.
+   */
+  private static sqlTypeFor(typeName: string): string {
+    switch (typeName) {
+      case "integer":
+      case "big_integer":
+        return "INTEGER";
+      case "float":
+      case "decimal":
+        return "REAL";
+      case "boolean":
+        return "INTEGER";
+      case "binary":
+        return "BLOB";
+      default:
+        return "TEXT";
+    }
+  }
+
+  /**
+   * Create the database table for this model from its attribute definitions.
+   * Drops the table first if it already exists to handle schema changes
+   * between tests.
+   *
+   * This is a test/development helper — in production, use migrations.
+   */
+  static async createTable(): Promise<void> {
+    const table = this.tableName;
+    const pk = this.primaryKey;
+    await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${table}"`);
+
+    const colDefs: string[] = [`"${pk}" INTEGER PRIMARY KEY AUTOINCREMENT`];
+    for (const [name, def] of this._attributeDefinitions) {
+      if (name === pk) continue;
+      const sqlType = this.sqlTypeFor(def.type?.name || "string");
+      colDefs.push(`"${name}" ${sqlType}`);
+    }
+
+    await this.adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "${table}" (${colDefs.join(", ")})`
+    );
+  }
+
+  /**
    * Set the database adapter for this model class.
    */
   static set adapter(adapter: DatabaseAdapter) {
