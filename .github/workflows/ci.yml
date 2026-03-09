@@ -55,7 +55,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run
+      - run: npx vitest run --no-file-parallelism
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
@@ -82,7 +82,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run
+      - run: npx vitest run --no-file-parallelism
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
 
