@@ -257,6 +257,11 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner = inner;
   }
 
+  /** Expose created tables for test introspection (mirrors MemoryAdapter.tables). */
+  get tables(): Set<string> {
+    return _createdTables;
+  }
+
   private async setup(): Promise<void> {
     if (_needsCleanup && !_cleanupInProgress) {
       _needsCleanup = false;

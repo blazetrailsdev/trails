@@ -1273,6 +1273,26 @@ export class MigrationContext {
     this._indexes.delete(name);
   }
 
+  private _mapType(type: string): string {
+    const an = this._adapterName;
+    switch (type.toLowerCase()) {
+      case "string": return `VARCHAR(255)`;
+      case "text": return "TEXT";
+      case "integer": return "INTEGER";
+      case "float": return an === "postgres" ? "DOUBLE PRECISION" : "REAL";
+      case "decimal": return "DECIMAL(10, 0)";
+      case "boolean": return "BOOLEAN";
+      case "date": return "DATE";
+      case "datetime": case "timestamp": return an === "postgres" ? "TIMESTAMP" : "DATETIME";
+      case "binary": return an === "postgres" ? "BYTEA" : "BLOB";
+      case "primary_key":
+        if (an === "postgres") return "SERIAL PRIMARY KEY";
+        if (an === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
+        return "INTEGER PRIMARY KEY AUTOINCREMENT";
+      default: return type.toUpperCase();
+    }
+  }
+
   async addColumn(
     table: string,
     column: string,
@@ -1280,7 +1300,7 @@ export class MigrationContext {
     _options?: ColumnOptions
   ): Promise<void> {
     await this.adapter.executeMutation(
-      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${type.toUpperCase()}`
+      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type)}`
     );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
@@ -1313,7 +1333,7 @@ export class MigrationContext {
     _options?: ColumnOptions
   ): Promise<void> {
     await this.adapter.executeMutation(
-      `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${type.toUpperCase()}`
+      `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`
     );
   }
 
