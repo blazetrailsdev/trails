@@ -1302,7 +1302,25 @@ describe("HasManyAssociationsTest", () => {
   });
 
   // Skipped tests — DB-specific features, STI, composites, HABTM, etc.
-  it.skip("sti subselect count", () => {});
+  it("sti subselect count", async () => {
+    const a = freshAdapter();
+    class StiPost extends Base {
+      static { this.attribute("title", "string"); this.attribute("type", "string"); this.attribute("tag_id", "integer"); this.adapter = a; }
+    }
+    enableSti(StiPost);
+    class StiSpecialPost extends StiPost {}
+    registerSubclass(StiSpecialPost);
+    registerModel(StiPost);
+    registerModel(StiSpecialPost);
+
+    await StiSpecialPost.create({ title: "A", tag_id: 1 });
+    await StiSpecialPost.create({ title: "B", tag_id: 1 });
+    await StiPost.create({ title: "C", tag_id: 1 }); // base class, not SpecialPost
+
+    // Count on STI subclass with where + limit should use subselect
+    const count = await StiSpecialPost.where({ tag_id: 1 }).limit(10).count();
+    expect(count).toBe(2); // Only SpecialPost, not base StiPost
+  });
   it("anonymous has many", async () => {
     class AnonAuthor extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }

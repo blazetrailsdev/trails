@@ -15872,7 +15872,36 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("DISTINCT");
   });
 
-  it.skip("find with sti join", () => { /* needs STI + join integration */ });
+  it("find with sti join", async () => {
+    const a = createTestAdapter();
+    class Comment extends Base {
+      static { this.attribute("body", "string"); this.attribute("type", "string"); this.attribute("post_id", "integer"); this.adapter = a; }
+    }
+    enableSti(Comment);
+    class SpecialComment extends Comment {}
+    registerSubclass(SpecialComment);
+    class SubSpecialComment extends SpecialComment {}
+    registerSubclass(SubSpecialComment);
+    class Post extends Base {
+      static { this.attribute("title", "string"); this.adapter = a; }
+    }
+    Associations.hasMany.call(Post, "specialComments", { className: "SpecialComment", foreignKey: "post_id" });
+    registerModel(Comment); registerModel(SpecialComment); registerModel(SubSpecialComment); registerModel(Post);
+
+    const post = await Post.create({ title: "STI Post" });
+    await Comment.create({ body: "regular", type: "Comment", post_id: post.id });
+    await SpecialComment.create({ body: "special", post_id: post.id });
+    await SubSpecialComment.create({ body: "sub-special", post_id: post.id });
+
+    // Association join should only match SpecialComment and SubSpecialComment
+    const sql = Post.joins("specialComments").where({ id: post.id }).toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("SpecialComment");
+
+    // Query should find the post (it has special comments)
+    const results = await Post.joins("specialComments").where({ id: post.id }).toArray();
+    expect(results.length).toBeGreaterThan(0);
+  });
 
   it("find with conditions on reflection", async () => {
     const { Post, Author } = makeModels();
@@ -22656,7 +22685,28 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).toContain("authors.name");
   });
 
-  it.skip("find with sti join", () => { /* needs STI + left join integration */ });
+  it("find with sti join", async () => {
+    const a = createTestAdapter();
+    class LComment extends Base {
+      static { this.attribute("body", "string"); this.attribute("type", "string"); this.attribute("post_id", "integer"); this.adapter = a; }
+    }
+    enableSti(LComment);
+    class LSpecialComment extends LComment {}
+    registerSubclass(LSpecialComment);
+    class LPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = a; }
+    }
+    Associations.hasMany.call(LPost, "lSpecialComments", { className: "LSpecialComment", foreignKey: "post_id" });
+    registerModel(LComment); registerModel(LSpecialComment); registerModel(LPost);
+
+    const post = await LPost.create({ title: "STI Post" });
+    await LComment.create({ body: "regular", type: "LComment", post_id: post.id });
+    await LSpecialComment.create({ body: "special", post_id: post.id });
+
+    const sql = LPost.leftOuterJoins("lSpecialComments").where({ id: post.id }).toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toContain("LSpecialComment");
+  });
 
   it("does not override select", () => {
     const { Post } = makeModels();

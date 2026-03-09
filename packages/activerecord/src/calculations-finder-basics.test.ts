@@ -616,7 +616,7 @@ describe("FinderTest", () => {
   });
 
   it.skip("find by sql with sti on joined table", async () => {
-    // requires joins and fixture setup
+    // requires real DB adapter with JOIN support
   });
 
   it.skip("find with eager loading collection and ordering by collection primary key", async () => {

@@ -2,6 +2,8 @@ import { Table, SelectManager, Visitors, Nodes } from "@rails-ts/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
+import { modelRegistry } from "./associations.js";
+import { getInheritanceColumn, isStiSubclass } from "./sti.js";
 
 /**
  * Range — represents a BETWEEN range for where clauses.
@@ -841,7 +843,8 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add an INNER JOIN.
+   * Add an INNER JOIN. Accepts an association name, a raw SQL string, or
+   * a table name with an ON condition.
    *
    * Mirrors: ActiveRecord::Relation#joins
    */
@@ -851,19 +854,34 @@ export class Relation<T extends Base> {
     if (on) {
       rel._joinClauses.push({ type: "inner", table: tableOrSql, on });
     } else {
-      rel._rawJoins.push(tableOrSql);
+      const resolved = rel._resolveAssociationJoin(tableOrSql);
+      if (resolved) {
+        rel._joinClauses.push({ type: "inner", table: resolved.table, on: resolved.on });
+      } else {
+        rel._rawJoins.push(tableOrSql);
+      }
     }
     return rel;
   }
 
   /**
-   * Add a LEFT OUTER JOIN.
+   * Add a LEFT OUTER JOIN. Accepts an association name or a table name
+   * with an ON condition.
    *
    * Mirrors: ActiveRecord::Relation#left_joins
    */
-  leftJoins(table: string, on: string): Relation<T> {
+  leftJoins(table: string, on?: string): Relation<T> {
     const rel = this._clone();
-    rel._joinClauses.push({ type: "left", table, on });
+    if (on) {
+      rel._joinClauses.push({ type: "left", table, on });
+    } else {
+      const resolved = rel._resolveAssociationJoin(table);
+      if (resolved) {
+        rel._joinClauses.push({ type: "left", table: resolved.table, on: resolved.on });
+      } else {
+        rel._joinClauses.push({ type: "left", table, on: "1=1" });
+      }
+    }
     return rel;
   }
 
@@ -873,8 +891,82 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#left_outer_joins
    */
   leftOuterJoins(table?: string, on?: string): Relation<T> {
-    if (!table || !on) return this._clone();
+    if (!table) return this._clone();
     return this.leftJoins(table, on);
+  }
+
+  /**
+   * Resolve an association name to a JOIN table and ON condition.
+   * Returns null if the name is not a recognized association.
+   */
+  private _resolveAssociationJoin(name: string): { table: string; on: string } | null {
+    const modelClass = this._modelClass as any;
+    const associations: any[] = modelClass._associations ?? [];
+    const assocDef = associations.find((a: any) => a.name === name);
+    if (!assocDef) return null;
+
+    const _underscore = (n: string) =>
+      n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+        .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+        .toLowerCase();
+    const _camelize = (n: string) =>
+      n.replace(/(^|_)(.)/g, (_m, _p1, p2) => p2.toUpperCase());
+    const _singularize = (n: string) =>
+      n.endsWith("ies") ? n.slice(0, -3) + "y" :
+      n.endsWith("ses") ? n.slice(0, -2) :
+      n.endsWith("s") ? n.slice(0, -1) : n;
+
+    const sourceTable = modelClass.tableName;
+    const sourcePk = modelClass.primaryKey ?? "id";
+
+    if (assocDef.type === "belongsTo") {
+      const foreignKey = assocDef.options.foreignKey ?? `${_underscore(name)}_id`;
+      const className = assocDef.options.className ?? _camelize(name);
+      const targetModel = modelRegistry.get(className);
+      if (!targetModel) return null;
+      const targetTable = targetModel.tableName;
+      const targetPk = assocDef.options.primaryKey ?? targetModel.primaryKey ?? "id";
+      let onClause = `"${targetTable}"."${targetPk}" = "${sourceTable}"."${foreignKey}"`;
+
+      // STI type condition on target
+      const inheritanceCol = getInheritanceColumn(targetModel);
+      if (inheritanceCol && isStiSubclass(targetModel)) {
+        const stiNames = [targetModel.name, ...(targetModel.descendants ?? []).map((d: any) => d.name)];
+        const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+        onClause += ` AND "${targetTable}"."${inheritanceCol}" IN (${inList})`;
+      }
+
+      return { table: targetTable, on: onClause };
+    }
+
+    if (assocDef.type === "hasOne" || assocDef.type === "hasMany") {
+      const className = assocDef.options.className ??
+        _camelize(assocDef.type === "hasMany" ? _singularize(name) : name);
+      const targetModel = modelRegistry.get(className);
+      if (!targetModel) return null;
+      const targetTable = targetModel.tableName;
+      const primaryKey = assocDef.options.primaryKey ?? sourcePk;
+      const foreignKey = assocDef.options.foreignKey ?? `${_underscore(modelClass.name)}_id`;
+      let onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${primaryKey}"`;
+
+      // Polymorphic type condition
+      if (assocDef.options.as) {
+        const typeCol = `${_underscore(assocDef.options.as)}_type`;
+        onClause += ` AND "${targetTable}"."${typeCol}" = '${modelClass.name}'`;
+      }
+
+      // STI type condition on target
+      const inheritanceCol = getInheritanceColumn(targetModel);
+      if (inheritanceCol && isStiSubclass(targetModel)) {
+        const stiNames = [targetModel.name, ...(targetModel.descendants ?? []).map((d: any) => d.name)];
+        const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+        onClause += ` AND "${targetTable}"."${inheritanceCol}" IN (${inList})`;
+      }
+
+      return { table: targetTable, on: onClause };
+    }
+
+    return null;
   }
 
   /**

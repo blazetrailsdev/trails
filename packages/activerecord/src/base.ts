@@ -1198,6 +1198,15 @@ export class Base extends Model {
   }
 
   /**
+   * Scope: add a LEFT OUTER JOIN.
+   *
+   * Mirrors: ActiveRecord::Base.left_outer_joins
+   */
+  static leftOuterJoins(...args: any[]) {
+    return (this.all() as any).leftOuterJoins(...args);
+  }
+
+  /**
    * Scope: return an empty relation.
    *
    * Mirrors: ActiveRecord::Base.none
