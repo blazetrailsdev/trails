@@ -3267,11 +3267,8 @@ export class Relation<T extends Base> {
   async updateCounters(counters: Record<string, number>): Promise<number> {
     if (this._isNone) return 0;
     const table = this._modelClass.arelTable;
-    const isMemory = this._modelClass.adapter.constructor.name === "MemoryAdapter";
     const setClauses = Object.entries(counters)
-      .map(([key, val]) => isMemory
-        ? `"${key}" = "${key}" + ${val}`
-        : `"${key}" = COALESCE("${key}", 0) + ${val}`)
+      .map(([key, val]) => `"${key}" = COALESCE("${key}", 0) + ${val}`)
       .join(", ");
     let sql = `UPDATE "${table.name}" SET ${setClauses}`;
     const whereConditions = this._buildWhereStrings(table);

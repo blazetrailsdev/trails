@@ -425,6 +425,17 @@ export class MemoryAdapter implements DatabaseAdapter {
       for (const row of rows) {
         if (!where || this.evaluateWhere(row, where)) {
           for (const [col, val] of assignments) {
+            // Handle COALESCE("col", default) +/- N
+            if (typeof val === "string") {
+              const coalesceMatch = val.match(/^COALESCE\("?(\w+)"?,\s*(-?\d+(?:\.\d+)?)\)\s*([+-])\s*(-?\d+(?:\.\d+)?)$/i);
+              if (coalesceMatch && coalesceMatch[1] === col) {
+                const current = row[col] != null ? Number(row[col]) : Number(coalesceMatch[2]);
+                const op = coalesceMatch[3];
+                const amount = Number(coalesceMatch[4]);
+                row[col] = op === "+" ? current + amount : current - amount;
+                continue;
+              }
+            }
             // Handle column-relative arithmetic: "col" + N or "col" - N
             if (typeof val === "string") {
               const arithMatch = val.match(/^"?(\w+)"?\s*([+-])\s*(-?\d+(?:\.\d+)?)$/);
@@ -800,7 +811,21 @@ export class MemoryAdapter implements DatabaseAdapter {
 
   private parseAssignments(setStr: string): [string, unknown][] {
     const results: [string, unknown][] = [];
-    const parts = setStr.split(",");
+    // Split on commas that are not inside parentheses
+    const parts: string[] = [];
+    let depth = 0;
+    let current = "";
+    for (const ch of setStr) {
+      if (ch === "(") depth++;
+      else if (ch === ")") depth--;
+      if (ch === "," && depth === 0) {
+        parts.push(current);
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    if (current) parts.push(current);
     for (const part of parts) {
       const eqIdx = part.indexOf("=");
       if (eqIdx === -1) continue;

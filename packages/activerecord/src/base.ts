@@ -1399,9 +1399,7 @@ export class Base extends Model {
   ): Promise<number> {
     const table = this.arelTable;
     const pkQuoted = typeof id === "number" ? String(id) : `'${id}'`;
-    const isMemory = this.adapter.constructor.name === "MemoryAdapter";
-    const setExpr = isMemory ? `"${attribute}" + ${by}` : `COALESCE("${attribute}", 0) + ${by}`;
-    const sql = `UPDATE "${table.name}" SET "${attribute}" = ${setExpr} WHERE "${this.primaryKey}" = ${pkQuoted}`;
+    const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by} WHERE "${this.primaryKey}" = ${pkQuoted}`;
     return this.adapter.executeMutation(sql);
   }
 
@@ -1429,11 +1427,8 @@ export class Base extends Model {
   ): Promise<number> {
     const ids = Array.isArray(id) ? id : [id];
     const table = this.arelTable;
-    const isMemory = this.adapter.constructor.name === "MemoryAdapter";
     const setClause = Object.entries(counters)
-      .map(([attr, amount]) => isMemory
-        ? `"${attr}" = "${attr}" + ${amount}`
-        : `"${attr}" = COALESCE("${attr}", 0) + ${amount}`)
+      .map(([attr, amount]) => `"${attr}" = COALESCE("${attr}", 0) + ${amount}`)
       .join(", ");
     const idList = ids.map((i) => typeof i === "number" ? String(i) : `'${i}'`).join(", ");
     const sql = `UPDATE "${table.name}" SET ${setClause} WHERE "${this.primaryKey}" IN (${idList})`;
