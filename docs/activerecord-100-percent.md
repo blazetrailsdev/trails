@@ -1,7 +1,9 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **71.9%** (3,904 matched / 5,428 total Ruby tests). 1,523 stubs need converting, 1 test is missing entirely.
+Current state: **~72.2%** (~3,914 matched / 5,428 total Ruby tests). ~1,513 stubs need converting, 1 test is missing entirely. Raw test stats: 6,523 passed, 1,335 skipped.
 
+> **Progress update (2026-03-08, session 3):** Added scoped preloading support — the preloader now applies association `scope` lambdas when loading hasMany, hasOne, and through associations. Converted 10 more tests (scoped dependent delete, scoped through preloading, scoped through loading). Coverage: 6,523 passed / 1,335 skipped.
+>
 > **Progress update (2026-03-08, session 2):** Jumped from 67.7% to 71.9% (+230 tests). Key new features implemented:
 >
 > - **`has_many :through` and `has_one :through`** — full loading support including through `has_one`, `belongs_to`, and `has_many` intermediaries. `loadHasOneThrough` resolves through chains. `loadHasManyThrough` handles both `belongs_to` source (FK on join record) and `has_many` source (FK on target pointing back to join record). Source association lookup tries both singular and plural names.
@@ -24,9 +26,9 @@ This document groups the remaining work into feature areas, identifies dependenc
 
 | # | Feature Area | Stubs | Done | Key Dependencies | Parallel? |
 |---|---|---|---|---|---|
-| 1 | Through Associations | ~200 | ~120 | Associations core | **Partial** — basic through works, polymorphic through works, nested through partially |
-| 2 | HasMany Associations | ~150 | ~130 | Associations core, fixtures | **Partial** |
-| 3 | Eager Loading / Preloading | ~170 | ~80 | Associations (all types), JOINs | **Partial** — through preloading works |
+| 1 | Through Associations | ~195 | ~125 | Associations core | **Partial** — basic through works, polymorphic through works, scoped through works, nested through partially |
+| 2 | HasMany Associations | ~148 | ~132 | Associations core, fixtures | **Partial** |
+| 3 | Eager Loading / Preloading | ~168 | ~82 | Associations (all types), JOINs | **Partial** — through preloading works, scoped preloading works |
 | 4 | Base / Persistence / Attributes | ~130 | ~120 | Mostly standalone | **Partial** |
 | 5 | Autosave Associations | ~140 | ~95 | Associations (all types) | **Partial** |
 | 6 | Association Misc | ~130 | ~90 | Associations core | **Partial** |
