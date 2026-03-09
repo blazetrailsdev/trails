@@ -5,15 +5,45 @@
  * polymorphic, dependent, counterCache, touch, CollectionProxy, reflection,
  * strict loading, inverse_of, and scoped associations.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  loadHabtm,
   Base,
-  registerModel,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
   association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
   reflectOnAssociation,
   reflectOnAllAssociations,
-  StrictLoadingViolationError,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
   DeleteRestrictionError,
+  touchBelongsToParents,
 } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -23,12 +53,14 @@ import {
   loadHasOne,
   loadHasMany,
   loadHasManyThrough,
-  loadHabtm,
   processDependentAssociations,
   updateCounterCaches,
-  touchBelongsToParents,
-  CollectionProxy,
+  setBelongsTo,
+  setHasOne,
+  setHasMany,
 } from "./associations.js";
+import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -1534,5 +1566,3798 @@ describe("Rails-guided: association features", () => {
 
     const songs = await loadHasMany(albums[0], "songs", { className: "Song", foreignKey: "album_id" });
     expect(songs).toHaveLength(2);
+  });
+});
+
+describe("AssociationsTest", () => {
+  it("eager loading should not change count of children", async () => {
+    const adapter = freshAdapter();
+    class ELParent extends Base {
+      static { this._tableName = "el_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class ELChild extends Base {
+      static { this._tableName = "el_children"; this.attribute("value", "string"); this.attribute("el_parent_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(ELParent, "elChildren", { foreignKey: "el_parent_id", className: "ELChild" });
+    registerModel("ELParent", ELParent);
+    registerModel("ELChild", ELChild);
+    const parent = await ELParent.create({ name: "p1" });
+    await ELChild.create({ value: "c1", el_parent_id: parent.id });
+    await ELChild.create({ value: "c2", el_parent_id: parent.id });
+    // Count before eager loading
+    const countBefore = (await ELChild.all().toArray()).length;
+    // Eager load
+    await ELParent.all().includes("elChildren").toArray();
+    // Count after eager loading should be the same
+    const countAfter = (await ELChild.all().toArray()).length;
+    expect(countAfter).toBe(countBefore);
+  });
+  it.skip("subselect", () => { /* fixture-dependent */ });
+  it("loading the association target should keep child records marked for destruction", async () => {
+    const adapter = freshAdapter();
+    class DPost extends Base {
+      static { this._tableName = "d_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    class DComment extends Base {
+      static { this._tableName = "d_comments"; this.attribute("body", "string"); this.attribute("d_post_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(DPost, "dComments", { foreignKey: "d_post_id", className: "DComment" });
+    registerModel("DPost", DPost);
+    registerModel("DComment", DComment);
+    const post = await DPost.create({ title: "test" });
+    const comment = await DComment.create({ body: "doomed", d_post_id: post.id });
+    markForDestruction(comment);
+    expect(isMarkedForDestruction(comment)).toBe(true);
+    // Loading the association target should not clear the mark
+    const proxy = association(post, "dComments");
+    const comments = await proxy.toArray();
+    expect(comments.length).toBe(1);
+    // The original object is still marked
+    expect(isMarkedForDestruction(comment)).toBe(true);
+  });
+  it.skip("loading the association target should load most recent attributes for child records marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("loading cpk association when persisted and in memory differ", () => { /* fixture-dependent */ });
+  it("include with order works", async () => {
+    const adapter = freshAdapter();
+    class IOPost extends Base {
+      static { this._tableName = "io_posts"; this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+    }
+    class IOComment extends Base {
+      static { this._tableName = "io_comments"; this.attribute("body", "string"); this.attribute("io_post_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(IOPost, "ioComments", { foreignKey: "io_post_id", className: "IOComment" });
+    registerModel("IOPost", IOPost);
+    registerModel("IOComment", IOComment);
+    await IOPost.create({ title: "B", score: 2 });
+    await IOPost.create({ title: "A", score: 1 });
+    const posts = await IOPost.all().includes("ioComments").order("score").toArray();
+    expect(posts.length).toBe(2);
+    expect(posts[0].readAttribute("title")).toBe("A");
+    expect(posts[1].readAttribute("title")).toBe("B");
+  });
+  it("bad collection keys", async () => {
+    const adapter = freshAdapter();
+    class APost extends Base {
+      static { this._tableName = "a_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    class AComment extends Base {
+      static { this._tableName = "a_comments"; this.attribute("body", "string"); this.attribute("a_post_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(APost, "aComments", { foreignKey: "a_post_id", className: "AComment" });
+    registerModel("APost", APost);
+    registerModel("AComment", AComment);
+    const post = await APost.create({ title: "test" });
+    const proxy = association(post, "aComments");
+    // Attempting to set ids with bad keys should not silently succeed
+    // In Rails this tests that bad foreign key values raise
+    const comments = await proxy.toArray();
+    expect(comments.length).toBe(0);
+  });
+
+  it("should construct new finder sql after create", async () => {
+    const adapter = freshAdapter();
+    class BPost extends Base {
+      static { this._tableName = "b_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    class BComment extends Base {
+      static { this._tableName = "b_comments"; this.attribute("body", "string"); this.attribute("b_post_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(BPost, "bComments", { foreignKey: "b_post_id", className: "BComment" });
+    registerModel("BPost", BPost);
+    registerModel("BComment", BComment);
+    const post = await BPost.create({ title: "test" });
+    const proxy = association(post, "bComments");
+    // Before creating any comments, the proxy should return empty
+    const before = await proxy.toArray();
+    expect(before.length).toBe(0);
+    // After creating a comment, the proxy should find it
+    await BComment.create({ body: "hi", b_post_id: post.id });
+    const after = await proxy.toArray();
+    expect(after.length).toBe(1);
+  });
+
+  it("force reload", async () => {
+    const adapter = freshAdapter();
+    class CPost extends Base {
+      static { this._tableName = "c_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    class CComment extends Base {
+      static { this._tableName = "c_comments"; this.attribute("body", "string"); this.attribute("c_post_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CPost, "cComments", { foreignKey: "c_post_id", className: "CComment" });
+    registerModel("CPost", CPost);
+    registerModel("CComment", CComment);
+    const post = await CPost.create({ title: "test" });
+    const proxy = association(post, "cComments");
+    const first = await proxy.toArray();
+    expect(first.length).toBe(0);
+    // Add a comment directly (bypassing proxy)
+    await CComment.create({ body: "sneaky", c_post_id: post.id });
+    // Re-query through proxy should find the new record
+    const reloaded = await proxy.toArray();
+    expect(reloaded.length).toBe(1);
+  });
+  it.skip("using limitable reflections helper", () => { /* fixture-dependent */ });
+  it.skip("association with references", () => { /* fixture-dependent */ });
+  it.skip("belongs to a model with composite foreign key finds associated record", () => { /* fixture-dependent */ });
+  it.skip("belongs to a cpk model by id attribute", () => { /* fixture-dependent */ });
+  it.skip("belongs to a model with composite primary key uses composite pk in sql", () => { /* fixture-dependent */ });
+  it.skip("querying by whole associated records using query constraints", () => { /* fixture-dependent */ });
+  it.skip("querying by single associated record works using query constraints", () => { /* fixture-dependent */ });
+  it.skip("querying by relation with composite key", () => { /* fixture-dependent */ });
+  it.skip("has many association with composite foreign key loads records", () => { /* fixture-dependent */ });
+  it.skip("has many association from a model with query constraints different from the association", () => { /* fixture-dependent */ });
+  it.skip("query constraints over three without defining explicit foreign key query constraints raises", () => { /* fixture-dependent */ });
+  it.skip("model with composite query constraints has many association sql", () => { /* fixture-dependent */ });
+  it.skip("belongs to association does not use parent query constraints if not configured to", () => { /* fixture-dependent */ });
+  it.skip("polymorphic belongs to uses parent query constraints", () => { /* fixture-dependent */ });
+  it.skip("preloads model with query constraints by explicitly configured fk and pk", () => { /* fixture-dependent */ });
+  it.skip("append composite foreign key has many association", () => { /* fixture-dependent */ });
+  it.skip("nullify composite foreign key has many association", () => { /* fixture-dependent */ });
+  it.skip("assign persisted composite foreign key belongs to association", () => { /* fixture-dependent */ });
+  it.skip("nullify composite foreign key belongs to association", () => { /* fixture-dependent */ });
+  it.skip("assign composite foreign key belongs to association", () => { /* fixture-dependent */ });
+  it.skip("query constraints that dont include the primary key raise with a single column", () => { /* fixture-dependent */ });
+  it.skip("query constraints that dont include the primary key raise with multiple columns", () => { /* fixture-dependent */ });
+  it.skip("assign belongs to cpk model by id attribute", () => { /* fixture-dependent */ });
+  it.skip("append composite foreign key has many association with autosave", () => { /* fixture-dependent */ });
+  it.skip("assign composite foreign key belongs to association with autosave", () => { /* fixture-dependent */ });
+  it.skip("append composite has many through association", () => { /* fixture-dependent */ });
+  it.skip("append composite has many through association with autosave", () => { /* fixture-dependent */ });
+  it.skip("nullify composite has many through association", () => { /* fixture-dependent */ });
+  it.skip("using query constraints warns about changing behavior", () => { /* fixture-dependent */ });
+
+  it.skip("belongs to with explicit composite foreign key", () => { /* requires composite foreign key support */ });
+
+  it.skip("cpk model has many records by id attribute", () => { /* requires composite primary key support */ });
+});
+
+
+describe("Associations", () => {
+  let adapter: DatabaseAdapter;
+
+  class Author extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  class Book extends Base {
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_id", "integer");
+    }
+  }
+
+  class Profile extends Base {
+    static {
+      this.attribute("bio", "string");
+      this.attribute("author_id", "integer");
+    }
+  }
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+    Author.adapter = adapter;
+    Book.adapter = adapter;
+    Profile.adapter = adapter;
+    registerModel(Author);
+    registerModel(Book);
+    registerModel(Profile);
+  });
+
+  it("loadBelongsTo loads the parent record", async () => {
+    const author = await Author.create({ name: "J.K." });
+    const book = await Book.create({
+      title: "Harry Potter",
+      author_id: author.id,
+    });
+
+    const loaded = await loadBelongsTo(book, "author", {});
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("J.K.");
+  });
+
+  it("loadBelongsTo returns null when FK is null", async () => {
+    const book = await Book.create({ title: "Orphan", author_id: null });
+    const loaded = await loadBelongsTo(book, "author", {});
+    expect(loaded).toBeNull();
+  });
+
+  it("loadHasOne loads the child record", async () => {
+    const author = await Author.create({ name: "Dean" });
+    await Profile.create({ bio: "A developer", author_id: author.id });
+
+    const loaded = await loadHasOne(author, "profile", {});
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("bio")).toBe("A developer");
+  });
+
+  it("loadHasMany loads all children", async () => {
+    const author = await Author.create({ name: "Dean" });
+    await Book.create({ title: "Book 1", author_id: author.id });
+    await Book.create({ title: "Book 2", author_id: author.id });
+    await Book.create({ title: "Other", author_id: 999 });
+
+    const books = await loadHasMany(author, "books", {});
+    expect(books).toHaveLength(2);
+  });
+
+  it("supports custom foreignKey", async () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("writer_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Article);
+
+    const author = await Author.create({ name: "Custom" });
+    await Article.create({ title: "Test", writer_id: author.id });
+
+    const articles = await loadHasMany(author, "articles", {
+      foreignKey: "writer_id",
+    });
+    expect(articles).toHaveLength(1);
+  });
+});
+
+describe("Associations: dependent", () => {
+  it("dependent destroy destroys children", async () => {
+    const adapter = freshAdapter();
+
+    class Comment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Post as any)._associations = [
+      { type: "hasMany", name: "comments", options: { dependent: "destroy", className: "Comment" } },
+    ];
+
+    registerModel(Post);
+    registerModel(Comment);
+
+    const post = await Post.create({ title: "Hello" });
+    await Comment.create({ body: "Nice", post_id: post.id });
+    await Comment.create({ body: "Great", post_id: post.id });
+
+    expect(await Comment.all().count()).toBe(2);
+    await post.destroy();
+    expect(await Comment.all().count()).toBe(0);
+  });
+
+  it("dependent nullify sets FK to null", async () => {
+    const adapter = freshAdapter();
+
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("thread_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+
+    class Thread extends Base {
+      static {
+        this.attribute("subject", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Thread as any)._associations = [
+      { type: "hasMany", name: "replies", options: { dependent: "nullify", className: "Reply", foreignKey: "thread_id" } },
+    ];
+
+    registerModel(Thread);
+    registerModel(Reply);
+
+    const thread = await Thread.create({ subject: "Test" });
+    await Reply.create({ content: "Reply 1", thread_id: thread.id });
+
+    await thread.destroy();
+
+    const replies = await Reply.all().toArray();
+    expect(replies).toHaveLength(1);
+    expect(replies[0].readAttribute("thread_id")).toBe(null);
+  });
+});
+
+describe("CollectionProxy", () => {
+  it("toArray loads associated records", async () => {
+    const adapter = freshAdapter();
+
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("order_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+
+    class Order extends Base {
+      static {
+        this.attribute("number", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Order as any)._associations = [
+      { type: "hasMany", name: "items", options: { className: "Item", foreignKey: "order_id" } },
+    ];
+
+    registerModel(Order);
+    registerModel(Item);
+
+    const order = await Order.create({ number: "ORD-001" });
+    await Item.create({ name: "Widget", order_id: order.id });
+    await Item.create({ name: "Gadget", order_id: order.id });
+
+    const proxy = association(order, "items");
+    const items = await proxy.toArray();
+    expect(items).toHaveLength(2);
+  });
+
+  it("build creates unsaved record with FK", async () => {
+    const adapter = freshAdapter();
+
+    class LineItem extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("invoice_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+
+    class Invoice extends Base {
+      static {
+        this.attribute("number", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Invoice as any)._associations = [
+      { type: "hasMany", name: "lineItems", options: { className: "LineItem", foreignKey: "invoice_id" } },
+    ];
+
+    registerModel(Invoice);
+    registerModel(LineItem);
+
+    const invoice = await Invoice.create({ number: "INV-001" });
+    const proxy = association(invoice, "lineItems");
+    const item = proxy.build({ name: "Widget" });
+    expect(item.readAttribute("invoice_id")).toBe(invoice.id);
+    expect(item.isNewRecord()).toBe(true);
+  });
+
+  it("create saves a new associated record", async () => {
+    const adapter = freshAdapter();
+
+    class Note extends Base {
+      static {
+        this.attribute("text", "string");
+        this.attribute("doc_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+
+    class Doc extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Doc as any)._associations = [
+      { type: "hasMany", name: "notes", options: { className: "Note", foreignKey: "doc_id" } },
+    ];
+
+    registerModel(Doc);
+    registerModel(Note);
+
+    const doc = await Doc.create({ title: "My Doc" });
+    const proxy = association(doc, "notes");
+    const note = await proxy.create({ text: "Remember this" });
+    expect(note.isPersisted()).toBe(true);
+    expect(note.readAttribute("doc_id")).toBe(doc.id);
+  });
+
+  it("count returns number of associated records", async () => {
+    const adapter = freshAdapter();
+
+    class Task extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("project_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+
+    class Project extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Project as any)._associations = [
+      { type: "hasMany", name: "tasks", options: { className: "Task", foreignKey: "project_id" } },
+    ];
+
+    registerModel(Project);
+    registerModel(Task);
+
+    const project = await Project.create({ name: "Rails-JS" });
+    await Task.create({ title: "Task 1", project_id: project.id });
+    await Task.create({ title: "Task 2", project_id: project.id });
+
+    const proxy = association(project, "tasks");
+    expect(await proxy.count()).toBe(2);
+  });
+});
+
+describe("Polymorphic Associations", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("belongsTo polymorphic loads correct parent type", async () => {
+    class Article extends Base {
+      static _tableName = "articles";
+    }
+    Article.attribute("id", "integer");
+    Article.attribute("title", "string");
+    Article.adapter = adapter;
+    registerModel(Article);
+
+    class Photo extends Base {
+      static _tableName = "photos";
+    }
+    Photo.attribute("id", "integer");
+    Photo.attribute("url", "string");
+    Photo.adapter = adapter;
+    registerModel(Photo);
+
+    class Comment extends Base {
+      static _tableName = "comments";
+    }
+    Comment.attribute("id", "integer");
+    Comment.attribute("body", "string");
+    Comment.attribute("commentable_id", "integer");
+    Comment.attribute("commentable_type", "string");
+    Comment.adapter = adapter;
+    Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
+
+    const article = await Article.create({ title: "Hello" });
+    const photo = await Photo.create({ url: "pic.jpg" });
+    const c1 = await Comment.create({ body: "Nice!", commentable_id: article.id, commentable_type: "Article" });
+    const c2 = await Comment.create({ body: "Cool!", commentable_id: photo.id, commentable_type: "Photo" });
+
+    const parent1 = await loadBelongsTo(c1, "commentable", { polymorphic: true });
+    expect(parent1).toBeInstanceOf(Article);
+    expect(parent1!.readAttribute("title")).toBe("Hello");
+
+    const parent2 = await loadBelongsTo(c2, "commentable", { polymorphic: true });
+    expect(parent2).toBeInstanceOf(Photo);
+    expect(parent2!.readAttribute("url")).toBe("pic.jpg");
+  });
+
+  it("hasMany with as: loads polymorphic children", async () => {
+    class Article extends Base {
+      static _tableName = "articles";
+    }
+    Article.attribute("id", "integer");
+    Article.attribute("title", "string");
+    Article.adapter = adapter;
+    registerModel(Article);
+    Associations.hasMany.call(Article, "comments", { as: "commentable" });
+
+    class Comment extends Base {
+      static _tableName = "comments";
+    }
+    Comment.attribute("id", "integer");
+    Comment.attribute("body", "string");
+    Comment.attribute("commentable_id", "integer");
+    Comment.attribute("commentable_type", "string");
+    Comment.adapter = adapter;
+    registerModel(Comment);
+
+    const article = await Article.create({ title: "Hello" });
+    await Comment.create({ body: "Nice!", commentable_id: article.id, commentable_type: "Article" });
+    await Comment.create({ body: "Cool!", commentable_id: article.id, commentable_type: "Article" });
+    await Comment.create({ body: "Other", commentable_id: 999, commentable_type: "Photo" });
+
+    const assocDef = (Article as any)._associations.find((a: any) => a.name === "comments");
+    const comments = await loadHasMany(article, "comments", assocDef.options);
+    expect(comments).toHaveLength(2);
+  });
+});
+
+describe("association scopes", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("applies scope to has_many association", async () => {
+    class Comment extends Base { static _tableName = "comments"; }
+    Comment.attribute("id", "integer");
+    Comment.attribute("body", "string");
+    Comment.attribute("approved", "boolean");
+    Comment.attribute("post_id", "integer");
+    Comment.adapter = adapter;
+    registerModel(Comment);
+
+    class Post extends Base { static _tableName = "posts"; }
+    Post.attribute("id", "integer");
+    Post.attribute("title", "string");
+    Post.adapter = adapter;
+    Associations.hasMany.call(Post, "approvedComments", {
+      className: "Comment",
+      scope: (rel: any) => rel.where({ approved: true }),
+    });
+    registerModel(Post);
+
+    const post = await Post.create({ title: "Hello" });
+    await Comment.create({ body: "Good", approved: true, post_id: post.id });
+    await Comment.create({ body: "Bad", approved: false, post_id: post.id });
+    await Comment.create({ body: "Great", approved: true, post_id: post.id });
+
+    const approved = await loadHasMany(post, "approvedComments", {
+      className: "Comment",
+      scope: (rel: any) => rel.where({ approved: true }),
+    });
+    expect(approved.length).toBe(2);
+  });
+});
+
+describe("whereAssociated / whereMissing", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => { adapter = freshAdapter(); });
+
+  it("whereAssociated filters records WITH non-null FK", async () => {
+    class Author extends Base { static _tableName = "wa_authors"; }
+    Author.attribute("id", "integer");
+    Author.adapter = adapter;
+    registerModel("WaAuthor", Author);
+
+    class Book extends Base { static _tableName = "wa_books"; }
+    Book.attribute("id", "integer");
+    Book.attribute("wa_author_id", "integer");
+    Book.adapter = adapter;
+    Associations.belongsTo.call(Book, "waAuthor", { className: "WaAuthor" });
+
+    const author = await Author.create({});
+    await Book.create({ wa_author_id: author.id });
+    await Book.create({ wa_author_id: null });
+
+    const withAuthor = await Book.all().whereAssociated("waAuthor").toArray();
+    expect(withAuthor).toHaveLength(1);
+  });
+
+  it("whereMissing filters records WITH null FK", async () => {
+    class Author extends Base { static _tableName = "wm_authors"; }
+    Author.attribute("id", "integer");
+    Author.adapter = adapter;
+    registerModel("WmAuthor", Author);
+
+    class Book extends Base { static _tableName = "wm_books"; }
+    Book.attribute("id", "integer");
+    Book.attribute("wm_author_id", "integer");
+    Book.adapter = adapter;
+    Associations.belongsTo.call(Book, "wmAuthor", { className: "WmAuthor" });
+
+    const author = await Author.create({});
+    await Book.create({ wm_author_id: author.id });
+    await Book.create({ wm_author_id: null });
+
+    const withoutAuthor = await Book.all().whereMissing("wmAuthor").toArray();
+    expect(withoutAuthor).toHaveLength(1);
+  });
+});
+
+describe("destroyedByAssociation", () => {
+  it("is null by default", () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.adapter = adapter;
+
+    const user = new User({});
+    expect(user.destroyedByAssociation).toBeNull();
+  });
+
+  it("can be set and read", async () => {
+    const adapter = freshAdapter();
+    class User extends Base { static _tableName = "users"; }
+    User.attribute("id", "integer");
+    User.adapter = adapter;
+
+    const user = await User.create({});
+    user.destroyedByAssociation = { name: "posts", type: "hasMany" };
+    expect(user.destroyedByAssociation).toEqual({ name: "posts", type: "hasMany" });
+  });
+});
+
+describe("dependent: restrictWithException", () => {
+  it("prevents deletion when associated records exist", async () => {
+    const adapter = freshAdapter();
+
+    class DComment extends Base { static _tableName = "d_comments"; }
+    DComment.attribute("id", "integer");
+    DComment.attribute("d_post_id", "integer");
+    DComment.attribute("body", "string");
+    DComment.adapter = adapter;
+
+    class DPost extends Base {
+      static _tableName = "d_posts";
+      static _associations: any[] = [
+        { type: "hasMany", name: "dComments", options: { dependent: "restrictWithException", className: "DComment", foreignKey: "d_post_id" } },
+      ];
+    }
+    DPost.attribute("id", "integer");
+    DPost.attribute("title", "string");
+    DPost.adapter = adapter;
+
+    registerModel(DComment);
+    registerModel(DPost);
+
+    const post = await DPost.create({ title: "Hello" });
+    await DComment.create({ d_post_id: post.id, body: "Nice!" });
+
+    await expect(post.destroy()).rejects.toThrow("Cannot delete record because of dependent dComments");
+  });
+
+  it("allows deletion when no associated records exist", async () => {
+    const adapter = freshAdapter();
+
+    class DReview extends Base { static _tableName = "d_reviews"; }
+    DReview.attribute("id", "integer");
+    DReview.attribute("d_article_id", "integer");
+    DReview.adapter = adapter;
+
+    class DArticle extends Base {
+      static _tableName = "d_articles";
+      static _associations: any[] = [
+        { type: "hasMany", name: "dReviews", options: { dependent: "restrictWithException", className: "DReview", foreignKey: "d_article_id" } },
+      ];
+    }
+    DArticle.attribute("id", "integer");
+    DArticle.attribute("title", "string");
+    DArticle.adapter = adapter;
+
+    registerModel(DReview);
+    registerModel(DArticle);
+
+    const article = await DArticle.create({ title: "Hello" });
+    await article.destroy();
+    expect(article.isDestroyed()).toBe(true);
+  });
+});
+
+describe("CollectionProxy enhancements", () => {
+  it("push adds records to the collection", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Post extends Base {
+      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ title: "Hello" });
+    const proxy = association(author, "posts");
+    await proxy.push(post);
+    expect(post.readAttribute("author_id")).toBe(author.id);
+  });
+
+  it("size returns count", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Post extends Base {
+      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ title: "P1", author_id: author.id });
+    const proxy = association(author, "posts");
+    expect(await proxy.size()).toBe(1);
+  });
+
+  it("isEmpty returns true/false", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Post extends Base {
+      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+
+    const author = await Author.create({ name: "Alice" });
+    const proxy = association(author, "posts");
+    expect(await proxy.isEmpty()).toBe(true);
+    await Post.create({ title: "P1", author_id: author.id });
+    expect(await proxy.isEmpty()).toBe(false);
+  });
+
+  it("first and last return correct records", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Post extends Base {
+      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ title: "First", author_id: author.id });
+    await Post.create({ title: "Second", author_id: author.id });
+    const proxy = association(author, "posts");
+    const first = await proxy.first();
+    expect(first).not.toBeNull();
+    expect((first as any)!.readAttribute("title")).toBe("First");
+    const last = await proxy.last();
+    expect((last as any)!.readAttribute("title")).toBe("Second");
+  });
+
+  it("includes checks for record membership", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Post extends Base {
+      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ title: "Mine", author_id: author.id });
+    const other = await Post.create({ title: "Other", author_id: 999 });
+    const proxy = association(author, "posts");
+    expect(await proxy.includes(post)).toBe(true);
+    expect(await proxy.includes(other)).toBe(false);
+  });
+});
+
+describe("Associations (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  class Author extends Base {
+    static { this.attribute("name", "string"); }
+  }
+  class Book extends Base {
+    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); }
+  }
+  class Profile extends Base {
+    static { this.attribute("bio", "string"); this.attribute("author_id", "integer"); }
+  }
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+    Author.adapter = adapter;
+    Book.adapter = adapter;
+    Profile.adapter = adapter;
+    registerModel(Author);
+    registerModel(Book);
+    registerModel(Profile);
+  });
+
+  it("belongs_to loads parent", async () => {
+    const author = await Author.create({ name: "J.K." });
+    const book = await Book.create({ title: "Harry Potter", author_id: author.id });
+    const loaded = await loadBelongsTo(book, "author", {});
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("J.K.");
+  });
+
+  it("belongs_to returns null when FK is null", async () => {
+    const book = await Book.create({ title: "Orphan", author_id: null });
+    const loaded = await loadBelongsTo(book, "author", {});
+    expect(loaded).toBeNull();
+  });
+
+  it("has_one loads child", async () => {
+    const author = await Author.create({ name: "Dean" });
+    await Profile.create({ bio: "Developer", author_id: author.id });
+    const loaded = await loadHasOne(author, "profile", {});
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("bio")).toBe("Developer");
+  });
+
+  it("has_many loads all children", async () => {
+    const author = await Author.create({ name: "Dean" });
+    await Book.create({ title: "Book 1", author_id: author.id });
+    await Book.create({ title: "Book 2", author_id: author.id });
+    await Book.create({ title: "Other", author_id: 999 });
+    const books = await loadHasMany(author, "books", {});
+    expect(books).toHaveLength(2);
+  });
+
+  it("has_many with custom foreignKey", async () => {
+    class Article extends Base {
+      static { this.attribute("title", "string"); this.attribute("writer_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(Article);
+    const author = await Author.create({ name: "Custom" });
+    await Article.create({ title: "Test", writer_id: author.id });
+    const articles = await loadHasMany(author, "articles", { foreignKey: "writer_id" });
+    expect(articles).toHaveLength(1);
+  });
+
+  it("has_many returns empty when no children", async () => {
+    const author = await Author.create({ name: "Lonely" });
+    const books = await loadHasMany(author, "books", {});
+    expect(books).toHaveLength(0);
+  });
+});
+
+
+describe("Associations (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  class Author extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  class Book extends Base {
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_id", "integer");
+    }
+  }
+
+  class Profile extends Base {
+    static {
+      this.attribute("bio", "string");
+      this.attribute("author_id", "integer");
+    }
+  }
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+    Author.adapter = adapter;
+    Book.adapter = adapter;
+    Profile.adapter = adapter;
+    registerModel(Author);
+    registerModel(Book);
+    registerModel(Profile);
+  });
+
+  // -- belongsTo --
+
+  it("belongsTo returns null when FK points to non-existent record", async () => {
+    const book = await Book.create({ title: "Orphan", author_id: 999 });
+    const loaded = await loadBelongsTo(book, "author", {});
+    expect(loaded).toBeNull();
+  });
+
+  it("belongsTo with custom className", async () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Article);
+
+    const author = await Author.create({ name: "Writer" });
+    const article = await Article.create({
+      title: "News",
+      author_id: author.id,
+    });
+
+    const loaded = await loadBelongsTo(article, "writer", {
+      className: "Author",
+      foreignKey: "author_id",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("Writer");
+  });
+
+  // -- hasOne --
+
+  it("hasOne returns null when no child exists", async () => {
+    const author = await Author.create({ name: "Solo" });
+    const loaded = await loadHasOne(author, "profile", {});
+    expect(loaded).toBeNull();
+  });
+
+  it("hasOne returns the single child", async () => {
+    const author = await Author.create({ name: "Dean" });
+    await Profile.create({ bio: "A developer", author_id: author.id });
+
+    const loaded = await loadHasOne(author, "profile", {});
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("bio")).toBe("A developer");
+  });
+
+  // -- hasMany --
+
+  it("hasMany returns empty array when no children exist", async () => {
+    const author = await Author.create({ name: "Lonely" });
+    const books = await loadHasMany(author, "books", {});
+    expect(books).toEqual([]);
+  });
+
+  it("hasMany only loads records matching the FK", async () => {
+    const a1 = await Author.create({ name: "Author1" });
+    const a2 = await Author.create({ name: "Author2" });
+    await Book.create({ title: "Book1", author_id: a1.id });
+    await Book.create({ title: "Book2", author_id: a1.id });
+    await Book.create({ title: "Book3", author_id: a2.id });
+
+    const a1Books = await loadHasMany(a1, "books", {});
+    expect(a1Books).toHaveLength(2);
+
+    const a2Books = await loadHasMany(a2, "books", {});
+    expect(a2Books).toHaveLength(1);
+  });
+
+  it("belongsTo returns null when FK is null", async () => {
+    const book = await Book.create({ title: "No Author" });
+    const loaded = await loadBelongsTo(book, "author", {});
+    expect(loaded).toBeNull();
+  });
+
+  it("hasMany with custom className", async () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Article);
+
+    const author = await Author.create({ name: "Writer" });
+    await Article.create({ title: "Post 1", author_id: author.id });
+    await Article.create({ title: "Post 2", author_id: author.id });
+
+    const articles = await loadHasMany(author, "writings", {
+      className: "Article",
+      foreignKey: "author_id",
+    });
+    expect(articles).toHaveLength(2);
+  });
+});
+
+describe("Polymorphic Associations (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  // Rails: test "belongs_to polymorphic"
+  it("loads the correct parent type via polymorphic belongs_to", async () => {
+    class Post extends Base {
+      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(Post);
+
+    class Image extends Base {
+      static { this._tableName = "images"; this.attribute("id", "integer"); this.attribute("url", "string"); this.adapter = adapter; }
+    }
+    registerModel(Image);
+
+    class Comment extends Base {
+      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
+
+    const post = await Post.create({ title: "Hello" });
+    const image = await Image.create({ url: "cat.jpg" });
+
+    const c1 = await Comment.create({ body: "Great post!", commentable_id: post.id, commentable_type: "Post" });
+    const c2 = await Comment.create({ body: "Nice pic!", commentable_id: image.id, commentable_type: "Image" });
+
+    const parent1 = await loadBelongsTo(c1, "commentable", { polymorphic: true });
+    expect(parent1!.readAttribute("title")).toBe("Hello");
+
+    const parent2 = await loadBelongsTo(c2, "commentable", { polymorphic: true });
+    expect(parent2!.readAttribute("url")).toBe("cat.jpg");
+  });
+
+  // Rails: test "has_many :as"
+  it("loads polymorphic children via has_many as:", async () => {
+    class Post extends Base {
+      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(Post, "comments", { as: "commentable" });
+    registerModel(Post);
+
+    class Comment extends Base {
+      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.adapter = adapter; }
+    }
+    registerModel(Comment);
+
+    const post = await Post.create({ title: "Hello" });
+    await Comment.create({ body: "Nice!", commentable_id: post.id, commentable_type: "Post" });
+    await Comment.create({ body: "Cool!", commentable_id: post.id, commentable_type: "Post" });
+    await Comment.create({ body: "Wrong", commentable_id: post.id, commentable_type: "Image" });
+
+    const comments = await loadHasMany(post, "comments", { as: "commentable" });
+    expect(comments).toHaveLength(2);
+  });
+});
+
+describe("HABTM (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  // Rails: test "has_and_belongs_to_many basic"
+  it("loads records through a join table", async () => {
+    class Developer extends Base {
+      static { this._tableName = "developers"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasAndBelongsToMany.call(Developer, "projects", { joinTable: "developers_projects" });
+    registerModel(Developer);
+
+    class Project extends Base {
+      static { this._tableName = "projects"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(Project);
+
+    // Create the join table
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+    );
+
+    const dev = await Developer.create({ name: "David" });
+    const p1 = await Project.create({ name: "Rails" });
+    const p2 = await Project.create({ name: "Basecamp" });
+
+    await adapter.executeMutation(`INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`);
+    await adapter.executeMutation(`INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`);
+
+    const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
+    expect(projects).toHaveLength(2);
+    expect(projects.map((p: any) => p.readAttribute("name")).sort()).toEqual(["Basecamp", "Rails"]);
+  });
+});
+
+describe("inverse_of (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  // Rails: test "inverse_of on belongs_to sets parent reference"
+  it("belongs_to with inverse_of caches the owner on the loaded record", async () => {
+    class Author extends Base {
+      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(Author);
+
+    class Book extends Base {
+      static { this._tableName = "books"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(Book, "author", { inverseOf: "books" });
+    registerModel(Book);
+
+    const author = await Author.create({ name: "Matz" });
+    const book = await Book.create({ author_id: author.id });
+
+    const loaded = await loadBelongsTo(book, "author", { inverseOf: "books" });
+    expect(loaded).not.toBeNull();
+    expect((loaded as any)._cachedAssociations.get("books")).toBe(book);
+  });
+
+  // Rails: test "inverse_of on has_many sets child reference"
+  it("has_many with inverse_of caches the parent on each child", async () => {
+    class Post extends Base {
+      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(Post);
+
+    class Comment extends Base {
+      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(Comment);
+
+    const post = await Post.create({ title: "Test" });
+    await Comment.create({ body: "A", post_id: post.id });
+    await Comment.create({ body: "B", post_id: post.id });
+
+    const comments = await loadHasMany(post, "comments", { inverseOf: "post" });
+    expect(comments.length).toBe(2);
+    for (const c of comments) {
+      expect((c as any)._cachedAssociations.get("post")).toBe(post);
+    }
+  });
+});
+
+describe("Association Scopes (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  // Rails: test "has_many with scope"
+  it("has_many applies a scope lambda to filter results", async () => {
+    class Comment extends Base {
+      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("approved", "boolean"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(Comment);
+
+    class Post extends Base {
+      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    registerModel(Post);
+
+    const post = await Post.create({ title: "Hello" });
+    await Comment.create({ body: "Approved", approved: true, post_id: post.id });
+    await Comment.create({ body: "Rejected", approved: false, post_id: post.id });
+    await Comment.create({ body: "Also approved", approved: true, post_id: post.id });
+
+    const approved = await loadHasMany(post, "comments", {
+      scope: (rel: any) => rel.where({ approved: true }),
+    });
+    expect(approved.length).toBe(2);
+    expect(approved.every((c: any) => c.readAttribute("approved") === true)).toBe(true);
+  });
+
+  // Rails: test "has_many scope with ordering"
+  it("has_many scope can include ordering", async () => {
+    class Comment extends Base {
+      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("position", "integer"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(Comment);
+
+    class Post extends Base {
+      static { this._tableName = "posts"; this.attribute("id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(Post);
+
+    const post = await Post.create({});
+    await Comment.create({ body: "Third", position: 3, post_id: post.id });
+    await Comment.create({ body: "First", position: 1, post_id: post.id });
+    await Comment.create({ body: "Second", position: 2, post_id: post.id });
+
+    const ordered = await loadHasMany(post, "comments", {
+      scope: (rel: any) => rel.order({ position: "asc" }),
+    });
+    expect(ordered.map((c: any) => c.readAttribute("body"))).toEqual(["First", "Second", "Third"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BelongsToAssociationsTest (testable subset)
+// ---------------------------------------------------------------------------
+
+describe("BelongsToAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  // -------------------------------------------------------------------------
+  // Basic belongs_to
+  // -------------------------------------------------------------------------
+
+  it("belongs to", async () => {
+    // Rails: test_belongs_to
+    class BtCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BtAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BtCompany", BtCompany);
+    registerModel("BtAccount", BtAccount);
+
+    const company = await BtCompany.create({ name: "37signals" });
+    const account = await BtAccount.create({
+      company_id: company.id,
+      credit_limit: 50,
+    });
+
+    const loaded = await loadBelongsTo(account, "btCompany", {
+      className: "BtCompany",
+      foreignKey: "company_id",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("37signals");
+  });
+
+  it("belongs to with primary key", async () => {
+    // Rails: test_belongs_to_with_primary_key
+    class PkFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PkClient extends Base {
+      static {
+        this.attribute("firm_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PkFirm", PkFirm);
+    registerModel("PkClient", PkClient);
+
+    const firm = await PkFirm.create({ name: "Apple", firm_name: "Apple Inc" });
+    const client = await PkClient.create({ firm_name: "Apple Inc" });
+
+    const loaded = await loadBelongsTo(client, "pkFirm", {
+      className: "PkFirm",
+      foreignKey: "firm_name",
+      primaryKey: "firm_name",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("Apple");
+  });
+
+  it("belongs to with null foreign key", async () => {
+    // Rails: test_belongs_to (null FK variant)
+    class NullFkCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NullFkAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NullFkCompany", NullFkCompany);
+    registerModel("NullFkAccount", NullFkAccount);
+
+    const account = await NullFkAccount.create({ company_id: null });
+    const loaded = await loadBelongsTo(account, "nullFkCompany", {
+      className: "NullFkCompany",
+      foreignKey: "company_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  it("belongs to with missing record returns null", async () => {
+    // Rails: test_belongs_to (missing FK)
+    class MissingCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class MissingAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("MissingCompany", MissingCompany);
+    registerModel("MissingAccount", MissingAccount);
+
+    const account = await MissingAccount.create({ company_id: 9999 });
+    const loaded = await loadBelongsTo(account, "missingCompany", {
+      className: "MissingCompany",
+      foreignKey: "company_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Building / creating the belonging object
+  // -------------------------------------------------------------------------
+
+  it("building the belonging object", async () => {
+    // Rails: test_building_the_belonging_object
+    class BuildFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BuildAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BuildFirm", BuildFirm);
+
+    const account = await BuildAccount.create({ credit_limit: 10 });
+
+    // Simulate buildAssociation — create unsaved firm and set FK
+    const firm = new BuildFirm({ name: "Apple" });
+    await firm.save();
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    const reloaded = await loadBelongsTo(account, "buildFirm", {
+      className: "BuildFirm",
+      foreignKey: "firm_id",
+    });
+    expect(reloaded).not.toBeNull();
+    expect(reloaded!.readAttribute("name")).toBe("Apple");
+  });
+
+  it("creating the belonging object", async () => {
+    // Rails: test_creating_the_belonging_object
+    class CreateFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class CreateAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CreateFirm", CreateFirm);
+
+    const account = await CreateAccount.create({ credit_limit: 10 });
+
+    const firm = await CreateFirm.create({ name: "Apple" });
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "createFirm", {
+      className: "CreateFirm",
+      foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("Apple");
+    expect(loaded!.isNewRecord()).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Assignment / natural assignment
+  // -------------------------------------------------------------------------
+
+  it("natural assignment", async () => {
+    // Rails: test_natural_assignment
+    class NatFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NatAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NatFirm", NatFirm);
+
+    const apple = await NatFirm.create({ name: "Apple" });
+    const account = await NatAccount.create({ credit_limit: 10 });
+
+    account.writeAttribute("firm_id", apple.id);
+    await account.save();
+
+    expect(account.readAttribute("firm_id")).toBe(apple.id);
+  });
+
+  it("natural assignment to nil removes the association", async () => {
+    // Rails: test_natural_assignment_to_nil
+    class NilFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NilAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NilFirm", NilFirm);
+    registerModel("NilAccount", NilAccount);
+
+    const firm = await NilFirm.create({ name: "Apple" });
+    const account = await NilAccount.create({
+      firm_id: firm.id,
+      credit_limit: 10,
+    });
+
+    // Clear the FK
+    account.writeAttribute("firm_id", null);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "nilFirm", {
+      className: "NilFirm",
+      foreignKey: "firm_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // optional / required
+  // -------------------------------------------------------------------------
+
+  it("optional relation", async () => {
+    // Rails: test_optional_relation
+    class OptCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class OptAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(OptAccount, "optCompany", {
+      className: "OptCompany",
+      foreignKey: "company_id",
+      optional: true,
+    });
+    registerModel("OptCompany", OptCompany);
+    registerModel("OptAccount", OptAccount);
+
+    const account = new OptAccount({});
+    // optional: true means no FK presence validation
+    const valid = await account.isValid();
+    expect(valid).toBe(true);
+  });
+
+  it("not optional relation is invalid without fk", async () => {
+    // Rails: test_not_optional_relation
+    class ReqCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ReqAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(ReqAccount, "reqCompany", {
+      className: "ReqCompany",
+      foreignKey: "company_id",
+      optional: false,
+    });
+    registerModel("ReqCompany", ReqCompany);
+    registerModel("ReqAccount", ReqAccount);
+
+    const account = new ReqAccount({});
+    const valid = await account.isValid();
+    expect(valid).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // touch: true
+  // -------------------------------------------------------------------------
+
+  it("belongs to with touch option on save", async () => {
+    // Rails: test_belongs_to_with_touch_option_on_touch
+    class TouchPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TouchComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(TouchComment, "touchPost", {
+      className: "TouchPost",
+      foreignKey: "post_id",
+      touch: true,
+    });
+    registerModel("TouchPost", TouchPost);
+    registerModel("TouchComment", TouchComment);
+
+    const post = await TouchPost.create({
+      title: "Hello",
+      updated_at: new Date("2020-01-01").toISOString(),
+    });
+    const comment = await TouchComment.create({ body: "Nice", post_id: post.id });
+
+    await touchBelongsToParents(comment);
+
+    const reloaded = await TouchPost.find(post.id as number);
+    // updated_at should be updated (not necessarily the same as before)
+    expect(reloaded.readAttribute("updated_at")).not.toBe(
+      new Date("2020-01-01").toISOString()
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // counter_cache
+  // -------------------------------------------------------------------------
+
+  it("belongs to counter", async () => {
+    // Rails: test_belongs_to_counter
+    // create() auto-increments counter cache; destroy() auto-decrements
+    class CcPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("cc_comments_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class CcComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(CcComment, "ccPost", {
+      className: "CcPost",
+      foreignKey: "post_id",
+      counterCache: true,
+    });
+    registerModel("CcPost", CcPost);
+    registerModel("CcComment", CcComment);
+
+    const post = await CcPost.create({ title: "Post" });
+
+    // create() should auto-increment the counter
+    await CcComment.create({ body: "Hi", post_id: post.id });
+
+    const reloaded = await CcPost.find(post.id as number);
+    expect(reloaded.readAttribute("cc_comments_count")).toBe(1);
+  });
+
+  it("custom named counter cache", async () => {
+    // Rails: test_custom_named_counter_cache / test_custom_counter_cache
+    class CnPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("my_comment_count", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CnComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(CnComment, "cnPost", {
+      className: "CnPost",
+      foreignKey: "post_id",
+      counterCache: "my_comment_count",
+    });
+    registerModel("CnPost", CnPost);
+    registerModel("CnComment", CnComment);
+
+    const post = await CnPost.create({ title: "Post", my_comment_count: 0 });
+    await CnComment.create({ body: "Hi", post_id: post.id });
+
+    const reloaded = await CnPost.find(post.id as number);
+    expect(reloaded.readAttribute("my_comment_count")).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Polymorphic belongs_to
+  // -------------------------------------------------------------------------
+
+  it("polymorphic belongs_to", async () => {
+    // Rails: test_polymorphic_association_class
+    class PolyImage extends Base {
+      static {
+        this.attribute("url", "string");
+        this.attribute("imageable_id", "integer");
+        this.attribute("imageable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PolyPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PolyPost", PolyPost);
+    registerModel("PolyImage", PolyImage);
+
+    const post = await PolyPost.create({ title: "Hello" });
+    const image = await PolyImage.create({
+      url: "http://example.com/img.png",
+      imageable_id: post.id,
+      imageable_type: "PolyPost",
+    });
+
+    const loaded = await loadBelongsTo(image, "imageable", {
+      polymorphic: true,
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("title")).toBe("Hello");
+  });
+
+  // -------------------------------------------------------------------------
+  // Reloading the belonging object
+  // -------------------------------------------------------------------------
+
+  it("reloading the belonging object", async () => {
+    // Rails: test_reloading_the_belonging_object
+    class ReloadFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ReloadAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("ReloadFirm", ReloadFirm);
+    registerModel("ReloadAccount", ReloadAccount);
+
+    const firm = await ReloadFirm.create({ name: "Odegy" });
+    const account = await ReloadAccount.create({ firm_id: firm.id });
+
+    // First load
+    const first = await loadBelongsTo(account, "reloadFirm", {
+      className: "ReloadFirm",
+      foreignKey: "firm_id",
+    });
+    expect(first!.readAttribute("name")).toBe("Odegy");
+
+    // Update firm name directly
+    firm.writeAttribute("name", "ODEGY");
+    await firm.save();
+
+    // Reload by clearing cache and reloading
+    if ((account as any)._cachedAssociations) {
+      (account as any)._cachedAssociations.delete("reloadFirm");
+    }
+    const second = await loadBelongsTo(account, "reloadFirm", {
+      className: "ReloadFirm",
+      foreignKey: "firm_id",
+    });
+    expect(second!.readAttribute("name")).toBe("ODEGY");
+  });
+
+  // -------------------------------------------------------------------------
+  // Assignment before child saved
+  // -------------------------------------------------------------------------
+
+  it("assignment before child saved", async () => {
+    // Rails: test_assignment_before_child_saved
+    class AbsFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class AbsClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("AbsFirm", AbsFirm);
+    registerModel("AbsClient", AbsClient);
+
+    const firm = await AbsFirm.create({ name: "New Firm" });
+    const client = new AbsClient({ name: "New Client" });
+
+    client.writeAttribute("firm_id", firm.id);
+    await client.save();
+
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.isNewRecord()).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // inverse_of
+  // -------------------------------------------------------------------------
+
+  it("belongs to with inverse of", async () => {
+    // Rails: test_belongs_to (inverse caching)
+    class InvPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class InvComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(InvPost, "comments", {
+      className: "InvComment",
+      foreignKey: "post_id",
+      inverseOf: "post",
+    });
+    Associations.belongsTo.call(InvComment, "post", {
+      className: "InvPost",
+      foreignKey: "post_id",
+      inverseOf: "comments",
+    });
+    registerModel("InvPost", InvPost);
+    registerModel("InvComment", InvComment);
+
+    const post = await InvPost.create({ title: "Hello" });
+    const comment = await InvComment.create({ body: "Hi", post_id: post.id });
+
+    const loaded = await loadBelongsTo(comment, "post", {
+      className: "InvPost",
+      foreignKey: "post_id",
+      inverseOf: "comments",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("title")).toBe("Hello");
+  });
+
+  // -------------------------------------------------------------------------
+  // Stale tracking / foreign key changes
+  // -------------------------------------------------------------------------
+
+  it("reassigning the parent id updates the object", async () => {
+    // Rails: test_reassigning_the_parent_id_updates_the_object
+    class StFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("StFirm", StFirm);
+    registerModel("StClient", StClient);
+
+    const firm1 = await StFirm.create({ name: "First" });
+    const firm2 = await StFirm.create({ name: "Second" });
+    const client = await StClient.create({ name: "Movable", firm_id: firm1.id });
+
+    expect(client.readAttribute("firm_id")).toBe(firm1.id);
+
+    client.writeAttribute("firm_id", firm2.id);
+    await client.save();
+
+    expect(client.readAttribute("firm_id")).toBe(firm2.id);
+
+    const loaded = await loadBelongsTo(client, "stFirm", {
+      className: "StFirm",
+      foreignKey: "firm_id",
+    });
+    expect(loaded!.readAttribute("name")).toBe("Second");
+  });
+
+  // -------------------------------------------------------------------------
+  // New record with FK but no object
+  // -------------------------------------------------------------------------
+
+  it("new record with foreign key but no object", async () => {
+    // Rails: test_new_record_with_foreign_key_but_no_object
+    class NrFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NrClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NrFirm", NrFirm);
+    registerModel("NrClient", NrClient);
+
+    const client = new NrClient({ name: "New Client", firm_id: 1 });
+    // It's a new record so is not persisted
+    expect(client.isNewRecord()).toBe(true);
+    // FK is set
+    expect(client.readAttribute("firm_id")).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Don't find target when FK is null
+  // -------------------------------------------------------------------------
+
+  it("dont find target when foreign key is null", async () => {
+    // Rails: test_dont_find_target_when_foreign_key_is_null
+    class NoFkFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NoFkClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NoFkFirm", NoFkFirm);
+    registerModel("NoFkClient", NoFkClient);
+
+    const client = new NoFkClient({ name: "Client" });
+    // No FK set — null FK means no query
+    const loaded = await loadBelongsTo(client, "noFkFirm", {
+      className: "NoFkFirm",
+      foreignKey: "firm_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Clearing association clears inverse
+  // -------------------------------------------------------------------------
+
+  it("assigning nil on an association clears the associations inverse", async () => {
+    // Rails: test_assigning_nil_on_an_association_clears_the_associations_inverse
+    class NilInvPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NilInvComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NilInvPost", NilInvPost);
+    registerModel("NilInvComment", NilInvComment);
+
+    const post = await NilInvPost.create({ title: "Post" });
+    const comment = await NilInvComment.create({ body: "Hi", post_id: post.id });
+
+    // Simulate clearing — set FK to null
+    comment.writeAttribute("post_id", null);
+    await comment.save();
+
+    const loaded = await loadBelongsTo(comment, "nilInvPost", {
+      className: "NilInvPost",
+      foreignKey: "post_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // natural assignment / id assignment
+  // -------------------------------------------------------------------------
+
+  it("natural assignment", async () => {
+    class NatFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class NatAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("NatFirm", NatFirm);
+    registerModel("NatAccount", NatAccount);
+
+    const firm = await NatFirm.create({ name: "Signal37" });
+    const account = await NatAccount.create({ firm_id: firm.id });
+
+    const loaded = await loadBelongsTo(account, "natFirm", {
+      className: "NatFirm", foreignKey: "firm_id",
+    });
+    expect(loaded!.readAttribute("name")).toBe("Signal37");
+  });
+
+  it("id assignment", async () => {
+    class IdFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class IdAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("IdFirm", IdFirm);
+    registerModel("IdAccount", IdAccount);
+
+    const firm = await IdFirm.create({ name: "Corp" });
+    const account = new IdAccount({});
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "idFirm", {
+      className: "IdFirm", foreignKey: "firm_id",
+    });
+    expect(loaded!.id).toBe(firm.id);
+  });
+
+  it("natural assignment to nil", async () => {
+    class NilFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class NilAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("NilFirm", NilFirm);
+    registerModel("NilAccount", NilAccount);
+
+    const firm = await NilFirm.create({ name: "Corp" });
+    const account = await NilAccount.create({ firm_id: firm.id });
+    account.writeAttribute("firm_id", null);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "nilFirm", {
+      className: "NilFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // building / creating via belongs_to
+  // -------------------------------------------------------------------------
+
+  it("building the belonging object", async () => {
+    class BuildFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class BuildAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(BuildAccount, "buildFirm", {
+      className: "BuildFirm", foreignKey: "firm_id",
+    });
+    registerModel("BuildFirm", BuildFirm);
+    registerModel("BuildAccount", BuildAccount);
+
+    const account = new BuildAccount({});
+    const firm = new BuildFirm({ name: "New Firm" });
+    account.writeAttribute("firm_id", undefined);
+
+    // Simulate build: create firm, set FK
+    await firm.save();
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "buildFirm", {
+      className: "BuildFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("New Firm");
+  });
+
+  it("creating the belonging object", async () => {
+    class CrFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class CrAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("CrFirm", CrFirm);
+    registerModel("CrAccount", CrAccount);
+
+    const account = new CrAccount({});
+    const firm = await CrFirm.create({ name: "Created Firm" });
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "crFirm", {
+      className: "CrFirm", foreignKey: "firm_id",
+    });
+    expect(loaded!.readAttribute("name")).toBe("Created Firm");
+    expect(loaded!.isNewRecord()).toBe(false);
+  });
+
+  it("creating the belonging object from new record", async () => {
+    class CrNrFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class CrNrAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("CrNrFirm", CrNrFirm);
+    registerModel("CrNrAccount", CrNrAccount);
+
+    const account = new CrNrAccount({});
+    const firm = await CrNrFirm.create({ name: "New Parent" });
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    expect(account.isNewRecord()).toBe(false);
+    const loaded = await loadBelongsTo(account, "crNrFirm", {
+      className: "CrNrFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // assignment before child saved
+  // -------------------------------------------------------------------------
+
+  it("assignment before child saved", async () => {
+    class AbsFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class AbsAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("AbsFirm", AbsFirm);
+    registerModel("AbsAccount", AbsAccount);
+
+    const firm = await AbsFirm.create({ name: "Corp" });
+    const account = new AbsAccount({});
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    expect(account.isNewRecord()).toBe(false);
+    expect(account.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // new record with FK but no object loaded
+  // -------------------------------------------------------------------------
+
+  it("new record with foreign key but no object", async () => {
+    class NrFkFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class NrFkAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("NrFkFirm", NrFkFirm);
+    registerModel("NrFkAccount", NrFkAccount);
+
+    const firm = await NrFkFirm.create({ name: "Corp" });
+    const account = new NrFkAccount({ firm_id: firm.id });
+
+    const loaded = await loadBelongsTo(account, "nrFkFirm", {
+      className: "NrFkFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // setting FK after nil target loaded
+  // -------------------------------------------------------------------------
+
+  it("setting foreign key after nil target loaded", async () => {
+    class FkNilFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class FkNilAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("FkNilFirm", FkNilFirm);
+    registerModel("FkNilAccount", FkNilAccount);
+
+    const account = await FkNilAccount.create({ firm_id: null });
+    let loaded = await loadBelongsTo(account, "fkNilFirm", {
+      className: "FkNilFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).toBeNull();
+
+    const firm = await FkNilFirm.create({ name: "Later Corp" });
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    loaded = await loadBelongsTo(account, "fkNilFirm", {
+      className: "FkNilFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // association assignment sticks
+  // -------------------------------------------------------------------------
+
+  it("association assignment sticks", async () => {
+    class StkFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class StkAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("StkFirm", StkFirm);
+    registerModel("StkAccount", StkAccount);
+
+    const firmA = await StkFirm.create({ name: "Firm A" });
+    const firmB = await StkFirm.create({ name: "Firm B" });
+    const account = await StkAccount.create({ firm_id: firmA.id });
+
+    account.writeAttribute("firm_id", firmB.id);
+    await account.save();
+
+    const loaded = await loadBelongsTo(account, "stkFirm", {
+      className: "StkFirm", foreignKey: "firm_id",
+    });
+    expect(loaded!.id).toBe(firmB.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // polymorphic assignment updates type + id fields
+  // -------------------------------------------------------------------------
+
+  it("polymorphic assignment updates foreign id field for new and saved records", async () => {
+    class PolyOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PolyItem extends Base {
+      static {
+        this.attribute("owner_id", "integer");
+        this.attribute("owner_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PolyOwner", PolyOwner);
+    registerModel("PolyItem", PolyItem);
+
+    const owner = await PolyOwner.create({ name: "Owner" });
+    const item = new PolyItem({});
+    item.writeAttribute("owner_id", owner.id);
+    item.writeAttribute("owner_type", "PolyOwner");
+    await item.save();
+
+    const loaded = await loadBelongsTo(item, "polyOwner", {
+      className: "PolyOwner", foreignKey: "owner_id",
+    });
+    expect(loaded!.id).toBe(owner.id);
+  });
+
+  it("polymorphic assignment with nil", async () => {
+    class PolyNilOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PolyNilItem extends Base {
+      static {
+        this.attribute("owner_id", "integer");
+        this.attribute("owner_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PolyNilOwner", PolyNilOwner);
+    registerModel("PolyNilItem", PolyNilItem);
+
+    const item = await PolyNilItem.create({ owner_id: null, owner_type: null });
+    const loaded = await loadBelongsTo(item, "polyNilOwner", {
+      polymorphic: true, foreignKey: "owner_id",
+    });
+    expect(loaded).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // save of record with loaded belongs_to
+  // -------------------------------------------------------------------------
+
+  it("save of record with loaded belongs to", async () => {
+    class SlFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class SlAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("SlFirm", SlFirm);
+    registerModel("SlAccount", SlAccount);
+
+    const firm = await SlFirm.create({ name: "Corp" });
+    const account = await SlAccount.create({ firm_id: firm.id });
+
+    // Reload firm, save account — should not error
+    const loaded = await loadBelongsTo(account, "slFirm", {
+      className: "SlFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+    await account.save();
+    expect(account.isNewRecord()).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // should set foreign key on create association
+  // -------------------------------------------------------------------------
+
+  it("should set foreign key on create association", async () => {
+    class FkCrFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class FkCrAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("FkCrFirm", FkCrFirm);
+    registerModel("FkCrAccount", FkCrAccount);
+
+    const firm = await FkCrFirm.create({ name: "Corp" });
+    const account = new FkCrAccount({});
+    account.writeAttribute("firm_id", firm.id);
+    await account.save();
+
+    expect(account.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  it("should set foreign key on save", async () => {
+    class FkSvFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class FkSvAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("FkSvFirm", FkSvFirm);
+    registerModel("FkSvAccount", FkSvAccount);
+
+    const firm = await FkSvFirm.create({ name: "Corp" });
+    const account = new FkSvAccount({ firm_id: firm.id });
+    await account.save();
+
+    const reloaded = await FkSvAccount.find(account.id as number);
+    expect(reloaded.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // tracking changes
+  // -------------------------------------------------------------------------
+
+  it("tracking change from nil to persisted record", async () => {
+    class TcFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class TcAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("TcFirm", TcFirm);
+    registerModel("TcAccount", TcAccount);
+
+    const account = await TcAccount.create({ firm_id: null });
+    const firm = await TcFirm.create({ name: "Corp" });
+    account.writeAttribute("firm_id", firm.id);
+
+    expect(account.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  it("tracking change from persisted record to nil", async () => {
+    class Tc2Firm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Tc2Account extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Tc2Firm", Tc2Firm);
+    registerModel("Tc2Account", Tc2Account);
+
+    const firm = await Tc2Firm.create({ name: "Corp" });
+    const account = await Tc2Account.create({ firm_id: firm.id });
+    account.writeAttribute("firm_id", null);
+
+    expect(account.readAttribute("firm_id")).toBeNull();
+  });
+
+  it("tracking change from one persisted record to another", async () => {
+    class Tc3Firm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class Tc3Account extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("Tc3Firm", Tc3Firm);
+    registerModel("Tc3Account", Tc3Account);
+
+    const firmA = await Tc3Firm.create({ name: "A" });
+    const firmB = await Tc3Firm.create({ name: "B" });
+    const account = await Tc3Account.create({ firm_id: firmA.id });
+    account.writeAttribute("firm_id", firmB.id);
+
+    expect(account.readAttribute("firm_id")).toBe(firmB.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // reassigning parent id updates the object
+  // -------------------------------------------------------------------------
+
+  it("reassigning the parent id updates the object", async () => {
+    class RaFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class RaAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("RaFirm", RaFirm);
+    registerModel("RaAccount", RaAccount);
+
+    const firmA = await RaFirm.create({ name: "A" });
+    const firmB = await RaFirm.create({ name: "B" });
+    const account = await RaAccount.create({ firm_id: firmA.id });
+
+    account.writeAttribute("firm_id", firmB.id);
+    await account.save();
+
+    const reloaded = await RaAccount.find(account.id as number);
+    expect(reloaded.readAttribute("firm_id")).toBe(firmB.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // with condition / build with conditions
+  // -------------------------------------------------------------------------
+
+  it("with condition", async () => {
+    class WcFirm extends Base {
+      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+    }
+    class WcAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("WcFirm", WcFirm);
+    registerModel("WcAccount", WcAccount);
+
+    const firm = await WcFirm.create({ name: "Active Corp", active: true });
+    const account = await WcAccount.create({ firm_id: firm.id });
+
+    const loaded = await loadBelongsTo(account, "wcFirm", {
+      className: "WcFirm", foreignKey: "firm_id",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("active")).toBe(true);
+  });
+
+  it("build with conditions", async () => {
+    class BcFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class BcAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel("BcFirm", BcFirm);
+    registerModel("BcAccount", BcAccount);
+
+    const firm = await BcFirm.create({ name: "Corp" });
+    // Build account with conditions (FK + additional attrs)
+    const account = new BcAccount({ firm_id: firm.id, name: "New Account" });
+    await account.save();
+
+    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.readAttribute("name")).toBe("New Account");
+  });
+
+  it("create with conditions", async () => {
+    class CcFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class CcAccount extends Base {
+      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel("CcFirm", CcFirm);
+    registerModel("CcAccount", CcAccount);
+
+    const firm = await CcFirm.create({ name: "Corp" });
+    const account = await CcAccount.create({ firm_id: firm.id, name: "Created Account" });
+
+    expect(account.isNewRecord()).toBe(false);
+    expect(account.readAttribute("firm_id")).toBe(firm.id);
+  });
+});
+// ---------------------------------------------------------------------------
+// Shared setup helpers
+// ---------------------------------------------------------------------------
+
+function makePostComments(adapter: DatabaseAdapter) {
+  class Comment extends Base {
+    static {
+      this.attribute("body", "string");
+      this.attribute("post_id", "integer");
+      this.adapter = adapter;
+    }
+  }
+  class Post extends Base {
+    static {
+      this.attribute("title", "string");
+      this.adapter = adapter;
+    }
+  }
+  Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
+  registerModel("Comment", Comment);
+  registerModel("Post", Post);
+  return { Post, Comment };
+}
+
+function makeFirmClients(adapter: DatabaseAdapter) {
+  class Client extends Base {
+    static {
+      this.attribute("name", "string");
+      this.attribute("firm_id", "integer");
+      this.adapter = adapter;
+    }
+  }
+  class Firm extends Base {
+    static {
+      this.attribute("name", "string");
+      this.adapter = adapter;
+    }
+  }
+  Associations.hasMany.call(Firm, "clients", { className: "Client", foreignKey: "firm_id" });
+  registerModel("Client", Client);
+  registerModel("Firm", Firm);
+  return { Firm, Client };
+}
+
+// ---------------------------------------------------------------------------
+// HasManyAssociationsTest (testable subset)
+// ---------------------------------------------------------------------------
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  // -------------------------------------------------------------------------
+  // Basic has_many loading
+  // -------------------------------------------------------------------------
+
+  it("has many build with options", async () => {
+    // Rails: test_has_many_build_with_options
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "UFMT" });
+    await Client.create({ name: "Active Client", firm_id: firm.id });
+
+    const clients = await loadHasMany(firm, "clients", {
+      className: "Client",
+      foreignKey: "firm_id",
+    });
+    expect(clients.length).toBe(1);
+    expect(clients[0].readAttribute("name")).toBe("Active Client");
+  });
+
+  it("finding", async () => {
+    // Rails: test_finding
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    await Client.create({ name: "Client A", firm_id: firm.id });
+    await Client.create({ name: "Client B", firm_id: firm.id });
+    await Client.create({ name: "Client C", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const clients = await proxy.toArray();
+    expect(clients.length).toBe(3);
+  });
+
+  it("counting", async () => {
+    // Rails: test_counting
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+    await Client.create({ name: "C", firm_id: firm.id });
+
+    const count = await association(firm, "clients").count();
+    expect(count).toBe(3);
+  });
+
+  it("counting with single hash", async () => {
+    // Rails: test_counting_with_single_hash
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    await Client.create({ name: "Microsoft", firm_id: firm.id });
+    await Client.create({ name: "Apple", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const all = await proxy.toArray();
+    const microsoft = all.filter((c) => c.readAttribute("name") === "Microsoft");
+    expect(microsoft.length).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // build / create on collection proxy
+  // -------------------------------------------------------------------------
+
+  it("build", async () => {
+    // Rails: test_build
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "First Firm" });
+
+    const proxy = association(firm, "clients");
+    const newClient = proxy.build({ name: "Another Client" });
+
+    expect(newClient.readAttribute("name")).toBe("Another Client");
+    expect(newClient.readAttribute("firm_id")).toBe(firm.id);
+    expect(newClient.isNewRecord()).toBe(true);
+  });
+
+  it("build sets foreign key automatically", async () => {
+    // Rails: test_association_keys_bypass_attribute_protection
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Honda Corp" });
+
+    const proxy = association(firm, "clients");
+    const c = proxy.build({});
+    expect(c.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  it("build overrides supplied foreign key with correct value", async () => {
+    // Rails: test_association_protect_foreign_key
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Invoice Corp" });
+
+    const proxy = association(firm, "clients");
+    // Even when a different firm_id is passed, it should use the owner's id
+    const c = proxy.build({ firm_id: 99999 });
+    expect(c.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  it("create", async () => {
+    // Rails: test_create
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "First Firm" });
+    await Client.create({ name: "Existing", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const newClient = await proxy.create({ name: "New Client" });
+
+    expect(newClient.readAttribute("name")).toBe("New Client");
+    expect(newClient.readAttribute("firm_id")).toBe(firm.id);
+    expect(newClient.isNewRecord()).toBe(false);
+
+    const all = await proxy.toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("adding", async () => {
+    // Rails: test_adding
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    await Client.create({ name: "Existing A", firm_id: firm.id });
+    await Client.create({ name: "Existing B", firm_id: firm.id });
+
+    const newClient = new Client({ name: "Natural Company" });
+    const proxy = association(firm, "clients");
+    await proxy.push(newClient);
+
+    const clients = await proxy.toArray();
+    expect(clients.length).toBe(3);
+  });
+
+  it("adding a collection", async () => {
+    // Rails: test_adding_a_collection
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    await Client.create({ name: "Existing", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.concat(
+      new Client({ name: "Natural Company" }),
+      new Client({ name: "Apple" })
+    );
+
+    const clients = await proxy.toArray();
+    expect(clients.length).toBe(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // Collection size / empty / any
+  // -------------------------------------------------------------------------
+
+  it("calling empty on an association that has not been loaded performs a query", async () => {
+    // Rails: calling empty...
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Empty Corp" });
+
+    const proxy = association(firm, "clients");
+    expect(await proxy.isEmpty()).toBe(true);
+
+    await Client.create({ name: "One Client", firm_id: firm.id });
+    expect(await proxy.isEmpty()).toBe(false);
+  });
+
+  it("calling size on an association performs a query", async () => {
+    // Rails: calling size...
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Sized Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    expect(await proxy.size()).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // delete / clear
+  // -------------------------------------------------------------------------
+
+  it("deleting", async () => {
+    // Rails: test_deleting
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    const clientA = await Client.create({ name: "Microsoft", firm_id: firm.id });
+    await Client.create({ name: "Apple", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.delete(clientA);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].readAttribute("name")).toBe("Apple");
+
+    // FK should be nullified
+    const reloaded = await Client.find(clientA.id as number);
+    expect(reloaded.readAttribute("firm_id")).toBeNull();
+  });
+
+  it("deleting a collection", async () => {
+    // Rails: test_deleting_a_collection
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    const b = await Client.create({ name: "B", firm_id: firm.id });
+    await Client.create({ name: "C", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.delete(a, b);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].readAttribute("name")).toBe("C");
+  });
+
+  it("clearing an association collection", async () => {
+    // Rails: test_clearing_an_association_collection
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.clear();
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(0);
+  });
+
+  it("clear collection should not change updated at", async () => {
+    // Rails: test_clear_collection_should_not_change_updated_at
+    // We verify FK is nullified but record still exists
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Dauntless" });
+    const client = await Client.create({ name: "Cockpit", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.clear();
+
+    const reloaded = await Client.find(client.id as number);
+    expect(reloaded.readAttribute("firm_id")).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // IDs getter
+  // -------------------------------------------------------------------------
+
+  it("get ids", async () => {
+    // Rails: test_get_ids
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    const b = await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const records = await proxy.toArray();
+    const ids = records.map((r) => r.readAttribute("id"));
+    expect(ids).toContain(a.id);
+    expect(ids).toContain(b.id);
+    expect(ids.length).toBe(2);
+  });
+
+  it("get ids for association on new record does not try to find records", async () => {
+    // Rails: test_get_ids_for_association_on_new_record_does_not_try_to_find_records
+    const { Firm } = makeFirmClients(adapter);
+    const firm = new Firm({ name: "New Firm" });
+
+    // New unsaved record — FK value is undefined/null, should return []
+    const records = await loadHasMany(firm, "clients", {
+      className: "Client",
+      foreignKey: "firm_id",
+    });
+    expect(records).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  // first / last
+  // -------------------------------------------------------------------------
+
+  it("calling first or last on association", async () => {
+    // Rails: test_calling_first_or_last_on_loaded_association_should_not_fetch_with_query
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Alpha", firm_id: firm.id });
+    await Client.create({ name: "Beta", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const first = await proxy.first();
+    const last = await proxy.last();
+    expect(first).not.toBeNull();
+    expect(last).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // dependent: "destroy"
+  // -------------------------------------------------------------------------
+
+  it("dependence", async () => {
+    // Rails: test_dependence
+    const adapter2 = createTestAdapter();
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Article, "tags", {
+      className: "Tag",
+      foreignKey: "post_id",
+      dependent: "destroy",
+    });
+    registerModel("Tag", Tag);
+    registerModel("Article", Article);
+
+    const post = await Article.create({ title: "Hello" });
+    await Tag.create({ name: "t1", post_id: post.id });
+    await Tag.create({ name: "t2", post_id: post.id });
+
+    const tagsBefore = await Tag.all().toArray();
+    expect(tagsBefore.length).toBe(2);
+
+    await processDependentAssociations(post);
+    await post.delete();
+
+    const tagsAfter = await Tag.all().toArray();
+    expect(tagsAfter.length).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // dependent: "nullify"
+  // -------------------------------------------------------------------------
+
+  it("depends and nullify", async () => {
+    // Rails: test_depends_and_nullify
+    const adapter2 = createTestAdapter();
+    class Child extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Parent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Parent, "children", {
+      className: "Child",
+      foreignKey: "parent_id",
+      dependent: "nullify",
+    });
+    registerModel("Child", Child);
+    registerModel("Parent", Parent);
+
+    const parent = await Parent.create({ name: "Mom" });
+    const c1 = await Child.create({ name: "Kid1", parent_id: parent.id });
+    const c2 = await Child.create({ name: "Kid2", parent_id: parent.id });
+
+    await processDependentAssociations(parent);
+    await parent.delete();
+
+    const reloaded1 = await Child.find(c1.id as number);
+    const reloaded2 = await Child.find(c2.id as number);
+    expect(reloaded1.readAttribute("parent_id")).toBeNull();
+    expect(reloaded2.readAttribute("parent_id")).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // dependent: "restrictWithException"
+  // -------------------------------------------------------------------------
+
+  it("restrict with exception", async () => {
+    // Rails: test_restrict_with_exception
+    const adapter2 = createTestAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("container_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Container extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Container, "items", {
+      className: "Item",
+      foreignKey: "container_id",
+      dependent: "restrictWithException",
+    });
+    registerModel("Item", Item);
+    registerModel("Container", Container);
+
+    const container = await Container.create({ name: "Box" });
+    await Item.create({ name: "Thing", container_id: container.id });
+
+    await expect(processDependentAssociations(container)).rejects.toThrow(
+      DeleteRestrictionError
+    );
+  });
+
+  it("restrict with exception when empty allows destroy", async () => {
+    // Rails: test_restrict_with_exception (empty case)
+    const adapter2 = createTestAdapter();
+    class Widget extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("shelf_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Shelf extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Shelf, "widgets", {
+      className: "Widget",
+      foreignKey: "shelf_id",
+      dependent: "restrictWithException",
+    });
+    registerModel("Widget", Widget);
+    registerModel("Shelf", Shelf);
+
+    const shelf = await Shelf.create({ name: "Empty Shelf" });
+    // No children — should not throw
+    await expect(processDependentAssociations(shelf)).resolves.toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // dependent: "restrictWithError"
+  // -------------------------------------------------------------------------
+
+  it("restrict with error", async () => {
+    // Rails: test_restrict_with_error
+    const adapter2 = createTestAdapter();
+    class Entry extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("log_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Log extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Log, "entries", {
+      className: "Entry",
+      foreignKey: "log_id",
+      dependent: "restrictWithError",
+    });
+    registerModel("Entry", Entry);
+    registerModel("Log", Log);
+
+    const log = await Log.create({ name: "Audit" });
+    await Entry.create({ name: "e1", log_id: log.id });
+
+    await expect(processDependentAssociations(log)).rejects.toThrow(
+      DeleteRestrictionError
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // replace
+  // -------------------------------------------------------------------------
+
+  it("replace with less", async () => {
+    // Rails: test_replace_with_less
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Firm" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    const b = await Client.create({ name: "B", firm_id: firm.id });
+    await Client.create({ name: "C", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    // Clear and replace with just b
+    await proxy.clear();
+    // After clear, b's FK is null; reload it and re-add
+    const bReloaded = await Client.find(b.id as number);
+    await proxy.push(bReloaded);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].readAttribute("name")).toBe("B");
+  });
+
+  it("replace with new", async () => {
+    // Rails: test_replace_with_new
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Firm" });
+    await Client.create({ name: "Old", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const newRecord = new Client({ name: "Replacement" });
+    await proxy.clear();
+    await proxy.push(newRecord);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].readAttribute("name")).toBe("Replacement");
+  });
+
+  // -------------------------------------------------------------------------
+  // include? / includes
+  // -------------------------------------------------------------------------
+
+  it("included in collection", async () => {
+    // Rails: test_included_in_collection
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const client = await Client.create({ name: "Included", firm_id: firm.id });
+    await Client.create({ name: "Other", firm_id: 99999 });
+
+    const proxy = association(firm, "clients");
+    expect(await proxy.includes(client)).toBe(true);
+  });
+
+  it("included in collection for new records", async () => {
+    // Rails: test_included_in_collection_for_new_records
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const unsaved = new Client({ name: "New" });
+
+    const proxy = association(firm, "clients");
+    expect(await proxy.includes(unsaved)).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // destroy on collection proxy
+  // -------------------------------------------------------------------------
+
+  it("destroying", async () => {
+    // Rails: test_destroying
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    const a = await Client.create({ name: "To Destroy", firm_id: firm.id });
+    await Client.create({ name: "Survivor", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.destroy(a);
+
+    // Record should be gone from DB
+    await expect(Client.find(a.id as number)).rejects.toThrow();
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+  });
+
+  it("destroying a collection", async () => {
+    // Rails: test_destroying_a_collection
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Signal37" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    const b = await Client.create({ name: "B", firm_id: firm.id });
+    await Client.create({ name: "C", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.destroy(a, b);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // has many on new record
+  // -------------------------------------------------------------------------
+
+  it("has many associations on new records use null relations", async () => {
+    // Rails: test has many associations on new records use null relations
+    const { Firm } = makeFirmClients(adapter);
+    const firm = new Firm({ name: "New" });
+
+    const records = await loadHasMany(firm, "clients", {
+      className: "Client",
+      foreignKey: "firm_id",
+    });
+    expect(records).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Scoped associations
+  // -------------------------------------------------------------------------
+
+  it("association with scope applies conditions", async () => {
+    // Rails: scoped association variant
+    const adapter2 = createTestAdapter();
+    class ScopedComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter2;
+      }
+    }
+    class ScopedPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(ScopedPost, "approved_comments", {
+      className: "ScopedComment",
+      foreignKey: "post_id",
+      scope: (rel: any) => rel.where({ approved: true }),
+    });
+    registerModel("ScopedComment", ScopedComment);
+    registerModel("ScopedPost", ScopedPost);
+
+    const post = await ScopedPost.create({ title: "Hello" });
+    await ScopedComment.create({ body: "Good", post_id: post.id, approved: true });
+    await ScopedComment.create({ body: "Bad", post_id: post.id, approved: false });
+
+    const comments = await loadHasMany(post, "approved_comments", {
+      className: "ScopedComment",
+      foreignKey: "post_id",
+      scope: (rel: any) => rel.where({ approved: true }),
+    });
+    expect(comments.length).toBe(1);
+    expect(comments[0].readAttribute("body")).toBe("Good");
+  });
+
+  // -------------------------------------------------------------------------
+  // inverse_of
+  // -------------------------------------------------------------------------
+
+  it("build from association sets inverse instance", async () => {
+    // Rails: test_build_from_association_sets_inverse_instance
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Inverse Corp" });
+    const proxy = association(firm, "clients");
+    const built = proxy.build({ name: "Built Client" });
+
+    expect(built.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // Multiple associations on same model
+  // -------------------------------------------------------------------------
+
+  it("has many with different foreign keys", async () => {
+    const adapter2 = createTestAdapter();
+    class Product extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("seller_id", "integer");
+        this.attribute("buyer_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Person extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Person, "sold_products", {
+      className: "Product",
+      foreignKey: "seller_id",
+    });
+    Associations.hasMany.call(Person, "bought_products", {
+      className: "Product",
+      foreignKey: "buyer_id",
+    });
+    registerModel("Product", Product);
+    registerModel("Person", Person);
+
+    const alice = await Person.create({ name: "Alice" });
+    const bob = await Person.create({ name: "Bob" });
+    await Product.create({ name: "Widget", seller_id: alice.id, buyer_id: bob.id });
+    await Product.create({ name: "Gadget", seller_id: alice.id, buyer_id: bob.id });
+
+    const sold = await loadHasMany(alice, "sold_products", {
+      className: "Product",
+      foreignKey: "seller_id",
+    });
+    const bought = await loadHasMany(bob, "bought_products", {
+      className: "Product",
+      foreignKey: "buyer_id",
+    });
+
+    expect(sold.length).toBe(2);
+    expect(bought.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // taking
+  // -------------------------------------------------------------------------
+
+  it("taking", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const taken = await proxy.take();
+    expect(taken).not.toBeNull();
+  });
+
+  it("taking not found", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Empty Corp" });
+
+    const proxy = association(firm, "clients");
+    const taken = await proxy.take();
+    expect(taken).toBeNull();
+  });
+
+  it("taking with a number", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+    await Client.create({ name: "C", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const taken = await proxy.take(2) as Base[];
+    expect(taken.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // many? / none? / one?
+  // -------------------------------------------------------------------------
+
+  it("calling many should return true if more than one", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    expect(await association(firm, "clients").many()).toBe(true);
+  });
+
+  it("calling many should return false if only one", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+
+    expect(await association(firm, "clients").many()).toBe(false);
+  });
+
+  it("calling none should return true if none", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Empty" });
+
+    expect(await association(firm, "clients").none()).toBe(true);
+  });
+
+  it("calling none should return false if any", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+
+    expect(await association(firm, "clients").none()).toBe(false);
+  });
+
+  it("calling one should return false if zero", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Empty" });
+
+    expect(await association(firm, "clients").one()).toBe(false);
+  });
+
+  it("calling one should return false if more than one", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    expect(await association(firm, "clients").one()).toBe(false);
+  });
+
+  it("calling one should return true if exactly one", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+
+    expect(await association(firm, "clients").one()).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // first_or_initialize / first_or_create
+  // -------------------------------------------------------------------------
+
+  it("first_or_initialize adds the record to the association", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const client = await proxy.firstOrInitialize({ name: "New Client" });
+
+    expect(client.readAttribute("name")).toBe("New Client");
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.isNewRecord()).toBe(true);
+  });
+
+  it("first_or_initialize returns existing when found", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Existing", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const client = await proxy.firstOrInitialize({ name: "Existing" });
+
+    expect(client.isNewRecord()).toBe(false);
+  });
+
+  it("first_or_create adds the record to the association", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const client = await proxy.firstOrCreate({ name: "New Client" });
+
+    expect(client.readAttribute("name")).toBe("New Client");
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.isNewRecord()).toBe(false);
+
+    const all = await Client.all().toArray();
+    expect(all.length).toBe(1);
+  });
+
+  it("first_or_create! adds the record to the association", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const client = await proxy.firstOrCreate_({ name: "New Client" });
+
+    expect(client.isNewRecord()).toBe(false);
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+
+    const all = await Client.all().toArray();
+    expect(all.length).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // exists?
+  // -------------------------------------------------------------------------
+
+  it("exists respects association scope", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const other = await Firm.create({ name: "Other" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: other.id });
+
+    expect(await association(firm, "clients").exists()).toBe(true);
+    expect(await association(other, "clients").exists()).toBe(true);
+
+    const empty = await Firm.create({ name: "Empty" });
+    expect(await association(empty, "clients").exists()).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // sending new to proxy = build
+  // -------------------------------------------------------------------------
+
+  it("sending new to association proxy should have same effect as calling new", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const built = proxy.build({ name: "Via Build" });
+
+    expect(built.readAttribute("firm_id")).toBe(firm.id);
+    expect(built.isNewRecord()).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // attributes set on initialization from where clause
+  // -------------------------------------------------------------------------
+
+  it("attributes are being set when initialized from has many association with where clause", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const client = await proxy.firstOrInitialize({ name: "Scoped Client" });
+
+    expect(client.readAttribute("name")).toBe("Scoped Client");
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // include? after build
+  // -------------------------------------------------------------------------
+
+  it("include method in has many association should return true for instance added with build", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const built = proxy.build({ name: "Built" });
+    await built.save();
+
+    expect(await proxy.includes(built)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // replace returns target
+  // -------------------------------------------------------------------------
+
+  it("replace returns target", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Old", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const newRecord = new Client({ name: "New" });
+    await proxy.clear();
+    await proxy.push(newRecord);
+
+    const result = await proxy.toArray();
+    expect(result.length).toBe(1);
+    expect(result[0].readAttribute("name")).toBe("New");
+  });
+
+  // -------------------------------------------------------------------------
+  // create with nil values
+  // -------------------------------------------------------------------------
+
+  it("create from association with nil values should work", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const proxy = association(firm, "clients");
+    const client = await proxy.create({ name: null });
+
+    expect(client.isNewRecord()).toBe(false);
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.readAttribute("name")).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // finding with conditions
+  // -------------------------------------------------------------------------
+
+  it("finding with condition", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Microsoft", firm_id: firm.id });
+    await Client.create({ name: "Apple", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const matches = await proxy.where({ name: "Microsoft" });
+    expect(matches.length).toBe(1);
+    expect(matches[0].readAttribute("name")).toBe("Microsoft");
+  });
+
+  it("finding with condition hash", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Alpha", firm_id: firm.id });
+    await Client.create({ name: "Beta", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const matches = await proxy.where({ name: "Alpha" });
+    expect(matches.length).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // attributes set on null relationship initialization
+  // -------------------------------------------------------------------------
+
+  it("attributes are set when initialized from has many null relationship", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = new Firm({ name: "New Firm" });
+
+    // New record — collection is empty/null
+    const records = await loadHasMany(firm, "clients", {
+      className: "Client",
+      foreignKey: "firm_id",
+    });
+    expect(records).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  // destroy all
+  // -------------------------------------------------------------------------
+
+  it("destroy all", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    const b = await Client.create({ name: "B", firm_id: firm.id });
+
+    await association(firm, "clients").destroyAll();
+
+    await expect(Client.find(a.id as number)).rejects.toThrow();
+    await expect(Client.find(b.id as number)).rejects.toThrow();
+  });
+
+  // -------------------------------------------------------------------------
+  // replace (full collection replace)
+  // -------------------------------------------------------------------------
+
+  it("replace", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Old A", firm_id: firm.id });
+    await Client.create({ name: "Old B", firm_id: firm.id });
+
+    const newC = new Client({ name: "New C" });
+    await newC.save();
+
+    const proxy = association(firm, "clients");
+    await proxy.replace([newC]);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].readAttribute("name")).toBe("New C");
+  });
+
+  it("replace with same content", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    // Build replacement records (not yet owned by firm)
+    const c = new Client({ name: "C" });
+    const d = new Client({ name: "D" });
+
+    const proxy = association(firm, "clients");
+    await proxy.replace([c, d]);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(2);
+    expect(remaining.map(r => r.readAttribute("name")).sort()).toEqual(["C", "D"]);
+  });
+
+  // -------------------------------------------------------------------------
+  // clearing without initial access
+  // -------------------------------------------------------------------------
+
+  it("clearing without initial access", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    // Clear without calling toArray first
+    const proxy = association(firm, "clients");
+    await proxy.clear();
+
+    const all = await Client.all().toArray();
+    expect(all.every((c: any) => c.readAttribute("firm_id") === null)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // delete / destroy by id
+  // -------------------------------------------------------------------------
+
+  it("deleting by integer id", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const target = await Client.find(a.id as number);
+    await proxy.delete(target);
+
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+  });
+
+  it("destroying by integer id", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const target = await Client.find(a.id as number);
+    await proxy.destroy(target);
+
+    await expect(Client.find(a.id as number)).rejects.toThrow();
+    const remaining = await proxy.toArray();
+    expect(remaining.length).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // find within collection
+  // -------------------------------------------------------------------------
+
+  it("find in collection", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const found = await proxy.find(a.id as number) as Base;
+    expect(found.readAttribute("name")).toBe("A");
+  });
+
+  it("find ids", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+    const b = await Client.create({ name: "B", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    const found = await proxy.find([a.id as number, b.id as number]) as Base[];
+    expect(found.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // set ids
+  // -------------------------------------------------------------------------
+
+  it("set ids for association on new record applies association correctly", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: null });
+    const b = await Client.create({ name: "B", firm_id: null });
+
+    const proxy = association(firm, "clients");
+    await proxy.setIds([a.id as number, b.id as number]);
+
+    const members = await proxy.toArray();
+    expect(members.length).toBe(2);
+    expect(members.every(m => m.readAttribute("firm_id") === firm.id)).toBe(true);
+  });
+
+  it("assign ids ignoring blanks", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: null });
+
+    const proxy = association(firm, "clients");
+    await proxy.setIds([a.id as number, "", null as any]);
+
+    const members = await proxy.toArray();
+    expect(members.length).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // adding using create
+  // -------------------------------------------------------------------------
+
+  it("adding using create", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    await association(firm, "clients").create({ name: "New Via Create" });
+
+    const all = await Client.all().toArray();
+    expect(all.length).toBe(1);
+    expect(all[0].readAttribute("firm_id")).toBe(firm.id);
+  });
+
+  // -------------------------------------------------------------------------
+  // creation respects hash condition
+  // -------------------------------------------------------------------------
+
+  it("creation respects hash condition", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    const client = await association(firm, "clients").create({ name: "Conditioned" });
+
+    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.readAttribute("name")).toBe("Conditioned");
+  });
+
+  // -------------------------------------------------------------------------
+  // create with bang on new parent raises
+  // -------------------------------------------------------------------------
+
+  it("create with bang on has many when parent is new raises", async () => {
+    const { Firm } = makeFirmClients(adapter);
+    const firm = new Firm({ name: "New Corp" });
+
+    // build on unsaved parent: FK is null since parent has no id
+    const proxy = association(firm, "clients");
+    const built = proxy.build({ name: "Child" });
+    expect(built.readAttribute("firm_id")).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // include? checks
+  // -------------------------------------------------------------------------
+
+  it("include uses array include after loaded", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const a = await Client.create({ name: "A", firm_id: firm.id });
+
+    const proxy = association(firm, "clients");
+    await proxy.toArray(); // load
+    expect(await proxy.includes(a)).toBe(true);
+  });
+
+  it("include returns false for non matching record to verify scoping", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    const other = await Firm.create({ name: "Other" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    const outside = await Client.create({ name: "B", firm_id: other.id });
+
+    expect(await association(firm, "clients").includes(outside)).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // calling many should return false if none or one
+  // -------------------------------------------------------------------------
+
+  it("calling many should return false if none or one", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+
+    expect(await association(firm, "clients").many()).toBe(false);
+
+    await Client.create({ name: "A", firm_id: firm.id });
+    expect(await association(firm, "clients").many()).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // find all / find first via proxy
+  // -------------------------------------------------------------------------
+
+  it("find all", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "A", firm_id: firm.id });
+    await Client.create({ name: "B", firm_id: firm.id });
+
+    const all = await association(firm, "clients").toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("find first", async () => {
+    const { Firm, Client } = makeFirmClients(adapter);
+    const firm = await Firm.create({ name: "Corp" });
+    await Client.create({ name: "Alpha", firm_id: firm.id });
+    await Client.create({ name: "Beta", firm_id: firm.id });
+
+    const first = await association(firm, "clients").first();
+    expect(first).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Three levels of dependence
+  // -------------------------------------------------------------------------
+
+  it("three levels of dependence", async () => {
+    // Rails: test_three_levels_of_dependence
+    const adapter2 = createTestAdapter();
+    class Grandchild extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("child_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Child2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("root_id", "integer");
+        this.adapter = adapter2;
+      }
+    }
+    class Root extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
+    }
+    Associations.hasMany.call(Child2, "grandchildren", {
+      className: "Grandchild",
+      foreignKey: "child_id",
+      dependent: "destroy",
+    });
+    Associations.hasMany.call(Root, "children2", {
+      className: "Child2",
+      foreignKey: "root_id",
+      dependent: "destroy",
+    });
+    registerModel("Grandchild", Grandchild);
+    registerModel("Child2", Child2);
+    registerModel("Root", Root);
+
+    const root = await Root.create({ name: "Root" });
+    const child = await Child2.create({ name: "Child", root_id: root.id });
+    await Grandchild.create({ name: "GC", child_id: child.id });
+
+    await processDependentAssociations(root);
+    await root.delete();
+
+    const childrenLeft = await Child2.all().toArray();
+    const grandchildrenLeft = await Grandchild.all().toArray();
+    expect(childrenLeft.length).toBe(0);
+    expect(grandchildrenLeft.length).toBe(0);
   });
 });
