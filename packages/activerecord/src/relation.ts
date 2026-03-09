@@ -2633,7 +2633,9 @@ export class Relation<T extends Base> {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
             const targetFk = `${underscore(sourceName)}_id`;
             const targetIds = [...new Set(throughRecords.map((r: any) => r.readAttribute(targetFk)).filter((v: any) => v != null))];
-            targetRecords = targetIds.length > 0 ? await (targetModel as any).all().where({ id: targetIds }).toArray() : [];
+            let targetRel = (targetModel as any).all().where({ id: targetIds });
+            if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
+            targetRecords = targetIds.length > 0 ? await targetRel.toArray() : [];
             targetMap = new Map<unknown, any>();
             for (const r of targetRecords) targetMap.set(r.readAttribute("id"), r);
             getTargetsForThrough = (tr: any) => {
@@ -2649,7 +2651,9 @@ export class Relation<T extends Base> {
             const throughIds = [...new Set(throughRecords.map((r: any) => r.readAttribute("id")).filter((v: any) => v != null))];
             const sourceWhereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
             if (sourceAsName) sourceWhereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
-            targetRecords = throughIds.length > 0 ? await (targetModel as any).all().where(sourceWhereConditions).toArray() : [];
+            let sourceRel = (targetModel as any).all().where(sourceWhereConditions);
+            if (assocDef.options.scope) sourceRel = assocDef.options.scope(sourceRel);
+            targetRecords = throughIds.length > 0 ? await sourceRel.toArray() : [];
             getTargetsForThrough = (tr: any) => {
               const trId = tr.readAttribute("id");
               return targetRecords.filter((r: any) => r.readAttribute(sourceFk) == trId);
@@ -2674,7 +2678,9 @@ export class Relation<T extends Base> {
 
         const whereConditions: Record<string, unknown> = { [foreignKey]: pkValues };
         if (typeCol) whereConditions[typeCol] = modelClass.name;
-        const related = await (targetModel as any).all().where(whereConditions).toArray();
+        let hasManyRel = (targetModel as any).all().where(whereConditions);
+        if (assocDef.options.scope) hasManyRel = assocDef.options.scope(hasManyRel);
+        const related = await hasManyRel.toArray();
         const relatedMap = new Map<unknown, any[]>();
         for (const r of related) {
           const fk = r.readAttribute(foreignKey);
@@ -2748,7 +2754,9 @@ export class Relation<T extends Base> {
 
           const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
           const targetIds = [...new Set(throughRecords.map((r: any) => r.readAttribute(targetFk)).filter((v: any) => v != null))];
-          const targetRecords = targetIds.length > 0 ? await (targetModel as any).all().where({ id: targetIds }).toArray() : [];
+          let hotTargetRel = (targetModel as any).all().where({ id: targetIds });
+          if (assocDef.options.scope) hotTargetRel = assocDef.options.scope(hotTargetRel);
+          const targetRecords = targetIds.length > 0 ? await hotTargetRel.toArray() : [];
           const targetMap = new Map<unknown, any>();
           for (const r of targetRecords) targetMap.set(r.readAttribute("id"), r);
 
@@ -2775,7 +2783,9 @@ export class Relation<T extends Base> {
 
         const hasOneWhere: Record<string, unknown> = { [foreignKey]: pkValues };
         if (hasOneTypeCol) hasOneWhere[hasOneTypeCol] = modelClass.name;
-        const related = await (targetModel as any).all().where(hasOneWhere).toArray();
+        let hasOneRel = (targetModel as any).all().where(hasOneWhere);
+        if (assocDef.options.scope) hasOneRel = assocDef.options.scope(hasOneRel);
+        const related = await hasOneRel.toArray();
         const relatedMap = new Map<unknown, any>();
         for (const r of related) relatedMap.set(r.readAttribute(foreignKey), r);
 

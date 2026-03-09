@@ -1733,16 +1733,70 @@ describe("AssociationsJoinModelTest", () => {
     expect(tag.readAttribute("taggable_type")).toBe("SphnPost");
   });
 
-  it.skip("create polymorphic has many with scope", () => {
-    // Requires scoped polymorphic create
+  it("create polymorphic has many with scope", async () => {
+    const ad = freshAdapter();
+    class CpsPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = ad; }
+    }
+    class CpsTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class CpsTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(CpsPost); registerModel(CpsTag); registerModel(CpsTagging);
+    Associations.hasMany.call(CpsPost, "taggings", { className: "CpsTagging", as: "taggable" });
+    const post = await CpsPost.create({ title: "Hello" });
+    const tag = await CpsTag.create({ name: "misc" });
+    const proxy = association(post, "taggings");
+    const tagging = await proxy.create({ tag_id: tag.id });
+    expect(tagging.readAttribute("taggable_type")).toBe("CpsPost");
+    expect(tagging.readAttribute("taggable_id")).toBe(post.id);
+    expect(await proxy.count()).toBe(1);
   });
 
-  it.skip("create bang polymorphic with has many scope", () => {
-    // Requires create! on scoped polymorphic
+  it("create bang polymorphic with has many scope", async () => {
+    const ad = freshAdapter();
+    class CbpsPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = ad; }
+    }
+    class CbpsTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class CbpsTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(CbpsPost); registerModel(CbpsTag); registerModel(CbpsTagging);
+    Associations.hasMany.call(CbpsPost, "taggings", { className: "CbpsTagging", as: "taggable" });
+    const post = await CbpsPost.create({ title: "Hello" });
+    const tag = await CbpsTag.create({ name: "misc" });
+    const proxy = association(post, "taggings");
+    const tagging = await proxy.create({ tag_id: tag.id });
+    expect(tagging.readAttribute("taggable_type")).toBe("CbpsPost");
+    expect(await proxy.count()).toBe(1);
   });
 
-  it.skip("create polymorphic has one with scope", () => {
-    // Requires scoped polymorphic has_one create
+  it("create polymorphic has one with scope", async () => {
+    const ad = freshAdapter();
+    class CphoPost extends Base {
+      static { this.attribute("title", "string"); this.adapter = ad; }
+    }
+    class CphoTag extends Base {
+      static { this.attribute("name", "string"); this.adapter = ad; }
+    }
+    class CphoTagging extends Base {
+      static { this.attribute("tag_id", "integer"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = ad; }
+    }
+    registerModel(CphoPost); registerModel(CphoTag); registerModel(CphoTagging);
+    Associations.hasOne.call(CphoPost, "tagging", { className: "CphoTagging", as: "taggable" });
+    const post = await CphoPost.create({ title: "Hello" });
+    const tag = await CphoTag.create({ name: "misc" });
+    // Create tagging through has_one
+    const tagging = await CphoTagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "CphoPost" });
+    expect(tagging.readAttribute("taggable_type")).toBe("CphoPost");
+    const loaded = await loadHasOne(post, "tagging", { className: "CphoTagging", as: "taggable" });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("tag_id")).toBe(tag.id);
   });
 
   it("delete polymorphic has many with delete all", async () => {

@@ -2652,9 +2652,67 @@ describe("HasManyAssociationsTest", () => {
     const remaining = await loadHasMany(author, "excl_dep_posts", { className: "ExclDepPost", foreignKey: "author_id" });
     expect(remaining.length).toBe(0);
   });
-  it.skip("dependent association respects optional conditions on delete", () => {});
-  it.skip("dependent association respects optional sanitized conditions on delete", () => {});
-  it.skip("dependent association respects optional hash conditions on delete", () => {});
+  it("dependent association respects optional conditions on delete", async () => {
+    class DcFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DcClient extends Base {
+      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(DcFirm); registerModel(DcClient);
+    // Only clients named "BigShot Inc." are in the scoped association
+    Associations.hasMany.call(DcFirm, "conditionalClients", {
+      className: "DcClient", foreignKey: "firm_id", dependent: "destroy",
+      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+    });
+    const firm = await DcFirm.create({ name: "Odegy" });
+    await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
+    await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
+    expect((await DcClient.where({ firm_id: firm.id }).toArray()).length).toBe(2);
+    const scoped = await loadHasMany(firm, "conditionalClients", {
+      className: "DcClient", foreignKey: "firm_id",
+      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+    });
+    expect(scoped.length).toBe(1);
+    await processDependentAssociations(firm);
+    expect((await DcClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
+  });
+  it("dependent association respects optional sanitized conditions on delete", async () => {
+    class DsFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DsClient extends Base {
+      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(DsFirm); registerModel(DsClient);
+    Associations.hasMany.call(DsFirm, "conditionalClients", {
+      className: "DsClient", foreignKey: "firm_id", dependent: "destroy",
+      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+    });
+    const firm = await DsFirm.create({ name: "Odegy" });
+    await DsClient.create({ firm_id: firm.id, name: "BigShot Inc." });
+    await DsClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
+    await processDependentAssociations(firm);
+    expect((await DsClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
+  });
+  it("dependent association respects optional hash conditions on delete", async () => {
+    class DhFirm extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class DhClient extends Base {
+      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    registerModel(DhFirm); registerModel(DhClient);
+    Associations.hasMany.call(DhFirm, "conditionalClients", {
+      className: "DhClient", foreignKey: "firm_id", dependent: "destroy",
+      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+    });
+    const firm = await DhFirm.create({ name: "Odegy" });
+    await DhClient.create({ firm_id: firm.id, name: "BigShot Inc." });
+    await DhClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
+    await processDependentAssociations(firm);
+    expect((await DhClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
+  });
   it("delete all association with primary key deletes correct records", async () => {
     class DelPkAuthor extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }

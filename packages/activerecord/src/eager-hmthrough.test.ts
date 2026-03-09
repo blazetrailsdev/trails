@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, MemoryAdapter, registerModel } from "./index.js";
 import {
+  Associations,
   loadHasMany,
   loadHasManyThrough,
   loadBelongsTo,
@@ -2029,7 +2030,35 @@ describe("EagerAssociationTest", () => {
   it.skip("join eager with empty order should generate valid sql", () => {});
   it.skip("deep including through habtm", () => {});
   it.skip("eager load multiple associations with references", () => {});
-  it.skip("preloading has many through with custom scope", () => {});
+  it("preloading has many through with custom scope", async () => {
+    class PcsProject extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PcsDeveloper extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class PcsContractship extends Base {
+      static { this.attribute("pcs_project_id", "integer"); this.attribute("pcs_developer_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(PcsProject); registerModel(PcsDeveloper); registerModel(PcsContractship);
+    Associations.hasMany.call(PcsProject, "pcsContractships", { className: "PcsContractship", foreignKey: "pcs_project_id" });
+    Associations.hasMany.call(PcsProject, "scopedDevs", {
+      className: "PcsDeveloper", through: "pcsContractships", source: "pcsDeveloper",
+      scope: (rel: any) => rel.where({ name: "David" }),
+    });
+    Associations.belongsTo.call(PcsContractship, "pcsDeveloper", { className: "PcsDeveloper", foreignKey: "pcs_developer_id" });
+
+    const proj = await PcsProject.create({ name: "AR" });
+    const david = await PcsDeveloper.create({ name: "David" });
+    const bob = await PcsDeveloper.create({ name: "Bob" });
+    await PcsContractship.create({ pcs_project_id: proj.id, pcs_developer_id: david.id });
+    await PcsContractship.create({ pcs_project_id: proj.id, pcs_developer_id: bob.id });
+
+    const projects = await PcsProject.all().includes("scopedDevs").toArray();
+    const devs = (projects[0] as any)._preloadedAssociations.get("scopedDevs");
+    expect(devs.length).toBe(1);
+    expect(devs[0].readAttribute("name")).toBe("David");
+  });
   it.skip("scoping with a circular preload", () => {});
   it.skip("circular preload does not modify unscoped", () => {});
   it.skip("belongs_to association ignores the scoping", () => {});
