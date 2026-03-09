@@ -317,14 +317,24 @@ export class Relation<T extends Base> {
     ...args: Array<string | Record<string, "asc" | "desc">>
   ): Relation<T> {
     const rel = this._clone();
-    for (const arg of args) {
+    let i = 0;
+    while (i < args.length) {
+      const arg = args[i];
       if (typeof arg === "string") {
+        // Check if the next arg is a bare direction: order("title", "asc")
+        const next = args[i + 1];
+        if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
+          rel._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
+          i += 2;
+          continue;
+        }
         rel._orderClauses.push(arg);
       } else {
         for (const [col, dir] of Object.entries(arg)) {
           rel._orderClauses.push([col, dir]);
         }
       }
+      i++;
     }
     return rel;
   }
@@ -485,6 +495,13 @@ export class Relation<T extends Base> {
     const rel = this._clone();
     rel._orderClauses = rel._orderClauses.map((clause) => {
       if (typeof clause === "string") {
+        // Parse "column ASC/DESC" before reversing
+        const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
+        if (match) {
+          const col = match[1];
+          const dir = match[2].toUpperCase() === "ASC" ? "desc" : "asc";
+          return [col, dir] as [string, "asc" | "desc"];
+        }
         return [clause, "desc" as const];
       }
       const [col, dir] = clause;
@@ -1794,6 +1811,7 @@ export class Relation<T extends Base> {
       .map(([key, val]) => {
         if (val === null) return `"${key}" = NULL`;
         if (typeof val === "number") return `"${key}" = ${val}`;
+        if (typeof val === "boolean") return `"${key}" = ${val ? 1 : 0}`;
         return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
       })
       .join(", ");
