@@ -9,12 +9,13 @@
  * A small subset of structural/in-memory tests run fully.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MemoryAdapter, registerModel, association, DeleteRestrictionError } from "./index.js";
+import { Base, MemoryAdapter, registerModel, association, DeleteRestrictionError, enableSti, registerSubclass } from "./index.js";
 import {
   Associations,
   loadBelongsTo,
   loadHasOne,
   loadHasMany,
+  loadHasManyThrough,
   loadHabtm,
   processDependentAssociations,
   CollectionProxy,
@@ -2420,8 +2421,46 @@ describe("AssociationsJoinModelTest", () => {
     // Requires smart disambiguation
   });
 
-  it.skip("has many through has many with sti", () => {
-    // Requires STI + through
+  it("has many through has many with sti", async () => {
+    // Author -> SpecialPost (STI subclass of Post) -> Comments (through)
+    class StiPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("author_id", "integer");
+        this._tableName = "sti_posts";
+        this.adapter = adapter;
+        enableSti(StiPost);
+      }
+    }
+    class SpecialStiPost extends StiPost {
+      static { this.adapter = adapter; registerModel(SpecialStiPost); registerSubclass(SpecialStiPost); }
+    }
+    class StiAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class StiComment extends Base {
+      static { this.attribute("body", "string"); this.attribute("sti_post_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(StiPost); registerModel(StiAuthor); registerModel(StiComment);
+
+    Associations.hasMany.call(StiAuthor, "specialStiPosts", { className: "SpecialStiPost", foreignKey: "author_id" });
+    Associations.hasMany.call(StiAuthor, "specialPostComments", {
+      className: "StiComment", through: "specialStiPosts", source: "stiComments",
+    });
+    Associations.hasMany.call(SpecialStiPost, "stiComments", { className: "StiComment", foreignKey: "sti_post_id" });
+
+    const author = await StiAuthor.create({ name: "David" });
+    const normalPost = await StiPost.create({ title: "Normal", author_id: author.id });
+    const specialPost = await SpecialStiPost.create({ title: "Special", author_id: author.id });
+    await StiComment.create({ body: "on normal", sti_post_id: normalPost.id });
+    const specialComment = await StiComment.create({ body: "on special", sti_post_id: specialPost.id });
+
+    const comments = await loadHasManyThrough(author, "specialPostComments", {
+      className: "StiComment", through: "specialStiPosts", source: "stiComments",
+    });
+    expect(comments).toHaveLength(1);
+    expect(comments[0].readAttribute("body")).toBe("on special");
   });
 
   it.skip("distinct has many through should retain order", () => {
@@ -2538,8 +2577,46 @@ describe("AssociationsJoinModelTest", () => {
     expect(allTaggings.length).toBe(0);
   });
 
-  it.skip("has many through goes through all sti classes", () => {
-    // Requires STI traversal in through
+  it("has many through goes through all sti classes", async () => {
+    // Through a has_many to an STI class should include all STI subclasses
+    class StiPost2 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("author_id", "integer");
+        this._tableName = "sti_posts2";
+        this.adapter = adapter;
+        enableSti(StiPost2);
+      }
+    }
+    class SubStiPost2 extends StiPost2 {
+      static { this.adapter = adapter; registerModel(SubStiPost2); registerSubclass(SubStiPost2); }
+    }
+    class StiAuthor2 extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class StiComment2 extends Base {
+      static { this.attribute("body", "string"); this.attribute("sti_post2_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel(StiPost2); registerModel(StiAuthor2); registerModel(StiComment2);
+
+    Associations.hasMany.call(StiAuthor2, "stiPosts2", { className: "StiPost2", foreignKey: "author_id" });
+    Associations.hasMany.call(StiAuthor2, "stiPostComments2", {
+      className: "StiComment2", through: "stiPosts2", source: "stiComments2",
+    });
+    Associations.hasMany.call(StiPost2, "stiComments2", { className: "StiComment2", foreignKey: "sti_post2_id" });
+
+    const author = await StiAuthor2.create({ name: "David" });
+    const stiPost = await StiPost2.create({ title: "StiPost", author_id: author.id });
+    const subStiPost = await SubStiPost2.create({ title: "SubStiPost", author_id: author.id });
+    await StiComment2.create({ body: "on sti", sti_post2_id: stiPost.id });
+    await StiComment2.create({ body: "on sub_sti", sti_post2_id: subStiPost.id });
+
+    const comments = await loadHasManyThrough(author, "stiPostComments2", {
+      className: "StiComment2", through: "stiPosts2", source: "stiComments2",
+    });
+    // Should include comments from both StiPost2 and SubStiPost2
+    expect(comments).toHaveLength(2);
   });
 
   it.skip("has many with pluralize table names false", () => {

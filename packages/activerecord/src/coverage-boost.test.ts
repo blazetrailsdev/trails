@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType } from "./index.js";
+import { Base, Relation, Range, MemoryAdapter, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -18430,9 +18430,100 @@ describe("CascadedEagerLoadingTest", () => {
   it.skip("eager association loading with cascaded two levels and self table reference", () => { /* fixture-dependent */ });
   it.skip("eager association loading with cascaded two levels with condition", () => { /* fixture-dependent */ });
   it.skip("eager association loading with cascaded three levels by ping pong", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with has many sti", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with has many sti and subclasses", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with belongs to sti", () => { /* fixture-dependent */ });
+  it("eager association loading with has many sti", async () => {
+    const adapter = freshAdapter();
+    class StiTopic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("parent_id", "integer");
+        this._tableName = "sti_topics";
+        this.adapter = adapter;
+        enableSti(StiTopic);
+      }
+    }
+    class StiReply extends StiTopic {
+      static { this.adapter = adapter; registerModel(StiReply); registerSubclass(StiReply); }
+    }
+    registerModel(StiTopic);
+    (StiTopic as any)._associations = [
+      { type: "hasMany", name: "replies", options: { className: "StiReply", foreignKey: "parent_id" } },
+    ];
+
+    const topic1 = await StiTopic.create({ title: "First" });
+    const topic2 = await StiTopic.create({ title: "Second" });
+    await StiReply.create({ title: "Re: First", parent_id: topic1.id });
+    await StiReply.create({ title: "Re: First 2", parent_id: topic1.id });
+
+    const topics = await StiTopic.all().where({ type: null }).includes("replies").toArray();
+    expect(topics).toHaveLength(2);
+    const t1Replies = (topics.find((t: any) => t.readAttribute("title") === "First") as any)._preloadedAssociations.get("replies");
+    expect(t1Replies).toHaveLength(2);
+    const t2Replies = (topics.find((t: any) => t.readAttribute("title") === "Second") as any)._preloadedAssociations.get("replies");
+    expect(t2Replies).toHaveLength(0);
+  });
+  it("eager association loading with has many sti and subclasses", async () => {
+    const adapter = freshAdapter();
+    class StiTopic2 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("parent_id", "integer");
+        this._tableName = "sti_topics2";
+        this.adapter = adapter;
+        enableSti(StiTopic2);
+      }
+    }
+    class StiReply2 extends StiTopic2 {
+      static { this.adapter = adapter; registerModel(StiReply2); registerSubclass(StiReply2); }
+    }
+    class StiSillyReply2 extends StiReply2 {
+      static { this.adapter = adapter; registerModel(StiSillyReply2); registerSubclass(StiSillyReply2); }
+    }
+    registerModel(StiTopic2);
+    (StiTopic2 as any)._associations = [
+      { type: "hasMany", name: "replies", options: { className: "StiReply2", foreignKey: "parent_id" } },
+    ];
+
+    const topic = await StiTopic2.create({ title: "First" });
+    await StiReply2.create({ title: "Re: First", parent_id: topic.id });
+    await StiSillyReply2.create({ title: "Silly Re: First", parent_id: topic.id });
+
+    const topics = await StiTopic2.all().where({ type: null }).includes("replies").toArray();
+    expect(topics).toHaveLength(1);
+    const replies = (topics[0] as any)._preloadedAssociations.get("replies");
+    // Should include both StiReply2 and StiSillyReply2
+    expect(replies).toHaveLength(2);
+  });
+  it("eager association loading with belongs to sti", async () => {
+    const adapter = freshAdapter();
+    class StiTopic3 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("parent_id", "integer");
+        this._tableName = "sti_topics3";
+        this.adapter = adapter;
+        enableSti(StiTopic3);
+      }
+    }
+    class StiReply3 extends StiTopic3 {
+      static { this.adapter = adapter; registerModel(StiReply3); registerSubclass(StiReply3); }
+    }
+    registerModel(StiTopic3);
+    (StiReply3 as any)._associations = [
+      { type: "belongsTo", name: "topic", options: { className: "StiTopic3", foreignKey: "parent_id" } },
+    ];
+
+    const topic = await StiTopic3.create({ title: "First" });
+    await StiReply3.create({ title: "Re: First", parent_id: topic.id });
+
+    const replies = await StiReply3.all().includes("topic").toArray();
+    expect(replies).toHaveLength(1);
+    const parentTopic = (replies[0] as any)._preloadedAssociations.get("topic");
+    expect(parentTopic).not.toBeNull();
+    expect(parentTopic.readAttribute("title")).toBe("First");
+  });
   it.skip("eager association loading with multiple stis and order", () => { /* fixture-dependent */ });
   it.skip("eager association loading of stis with multiple references", () => { /* fixture-dependent */ });
   it("eager association loading where first level returns nil", async () => {
