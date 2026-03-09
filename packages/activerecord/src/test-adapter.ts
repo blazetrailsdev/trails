@@ -34,6 +34,35 @@ let _sharedAdapter: any = null;
 const _knownTables = new Set<string>();
 const _tableColumns = new Map<string, Set<string>>();
 
+/**
+ * Delete all rows from all known tables and reset auto-increment.
+ * Called automatically when a new AutoMigrateAdapter is created.
+ */
+async function _deleteAllData(inner: any): Promise<void> {
+  for (const table of _knownTables) {
+    try {
+      const deleteSql = isMysql()
+        ? `DELETE FROM \`${table}\``
+        : `DELETE FROM "${table}"`;
+      await inner.exec(deleteSql);
+      if (isPg()) {
+        try {
+          const seqs = await inner.execute(
+            `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname LIKE '${table}_%_seq'`
+          );
+          for (const seq of seqs) {
+            await inner.exec(`ALTER SEQUENCE "${(seq as any).relname}" RESTART WITH 1`);
+          }
+        } catch {}
+      } else if (isMysql()) {
+        try { await inner.exec(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`); } catch {}
+      }
+    } catch {
+      // Table may not exist yet
+    }
+  }
+}
+
 let _factory: () => DatabaseAdapter;
 
 if (PG_TEST_URL) {
@@ -64,8 +93,8 @@ if (PG_TEST_URL) {
 
 /**
  * Create a fresh adapter for testing. Each call returns a new adapter
- * instance with a clean state. For real databases, the underlying
- * connection pool is shared to avoid connection exhaustion.
+ * instance with a clean state. For real databases, data from previous
+ * tests is automatically deleted on first use.
  */
 export function createTestAdapter(): DatabaseAdapter {
   return _factory();
@@ -177,8 +206,7 @@ async function ensureTable(
  */
 class AutoMigrateAdapter implements DatabaseAdapter {
   private inner: DatabaseAdapter & { exec(sql: string): Promise<void> | void; close?(): Promise<void> | void };
-  // Track tables this adapter instance has inserted into (for cleanup)
-  private touchedTables = new Set<string>();
+  private hasInserted = false;
 
   constructor(inner: any) {
     this.inner = inner;
@@ -215,15 +243,19 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     const insertMatch = sql.match(/INSERT\s+INTO\s+["`](\w+)["`]\s+\(([^)]*)\)/i);
     if (insertMatch) {
       const [, tableName, colStr] = insertMatch;
+      // Clean all data before the first INSERT of this adapter instance.
+      // This ensures test isolation: each test gets a clean database.
+      if (!this.hasInserted) {
+        this.hasInserted = true;
+        await _deleteAllData(this.inner);
+      }
       await ensureTable(this.inner, tableName, colStr, sql);
-      this.touchedTables.add(tableName);
     }
 
     // Track CREATE TABLE
     const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
     if (createMatch) {
       _knownTables.add(createMatch[1]);
-      this.touchedTables.add(createMatch[1]);
     }
 
     // Track DROP TABLE
@@ -231,7 +263,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
     if (dropMatch) {
       _knownTables.delete(dropMatch[1]);
       _tableColumns.delete(dropMatch[1]);
-      this.touchedTables.delete(dropMatch[1]);
     }
 
     try {
@@ -246,7 +277,6 @@ class AutoMigrateAdapter implements DatabaseAdapter {
         const insertCols = sql.match(/\(([^)]*)\)\s*VALUES/i);
         const colStr = insertCols?.[1] || "";
         await ensureTable(this.inner, tableName, colStr, sql);
-        this.touchedTables.add(tableName);
         return this.inner.executeMutation(sql, binds);
       }
       throw e;
@@ -266,35 +296,10 @@ class AutoMigrateAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Delete all rows from tables touched by this adapter instance.
-   * Schema (tables/columns) is preserved for the next test.
+   * Delete all rows from known tables. Also called automatically
+   * via autoClean() on next adapter's first operation.
    */
   async cleanup(): Promise<void> {
-    for (const table of this.touchedTables) {
-      if (!_knownTables.has(table)) continue;
-      try {
-        const deleteSql = isMysql()
-          ? `DELETE FROM \`${table}\``
-          : `DELETE FROM "${table}"`;
-        await this.inner.exec(deleteSql);
-        // Reset auto-increment so IDs are predictable across tests
-        if (isPg()) {
-          // Find all sequences for this table and reset them
-          try {
-            const seqs = await this.inner.execute(
-              `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname LIKE '${table}_%_seq'`
-            );
-            for (const seq of seqs) {
-              await this.inner.exec(`ALTER SEQUENCE "${(seq as any).relname}" RESTART WITH 1`);
-            }
-          } catch {}
-        } else if (isMysql()) {
-          try { await this.inner.exec(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`); } catch {}
-        }
-      } catch {
-        // Table may have been dropped by the test itself
-      }
-    }
-    this.touchedTables.clear();
+    await _deleteAllData(this.inner);
   }
 }
