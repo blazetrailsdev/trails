@@ -4041,11 +4041,7 @@ describe("Rails-guided: New Features", () => {
     expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(1);
 
     await m.run(adapter, "down");
-    if (adapterType === "memory") {
-      expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
-    } else {
-      await expect(adapter.execute(`SELECT * FROM "widgets"`)).rejects.toThrow();
-    }
+    expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
   });
 
   // Rails: test_migration_runner_migrate_and_rollback

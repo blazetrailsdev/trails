@@ -68,8 +68,6 @@ jobs:
         env:
           MARIADB_DATABASE: rails_js_test
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
-          MARIADB_CHARACTER_SET: utf8mb4
-          MARIADB_COLLATION: utf8mb4_bin
         ports:
           - 3306:3306
         options: >-
@@ -84,6 +82,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Set MariaDB to case-sensitive collation
+        run: |
+          mysql -h 127.0.0.1 -u root -e "ALTER DATABASE rails_js_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
       - run: npx vitest run --no-file-parallelism
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
