@@ -3100,7 +3100,37 @@ describe("HasManyAssociationsTest", () => {
   it.skip("modifying a through a has many should raise", () => {});
   it.skip("associations order should be priority over throughs order", () => {});
   it.skip("dynamic find should respect association order for through", () => {});
-  it.skip("has many through respects hash conditions", () => {});
+  it("has many through respects hash conditions", async () => {
+    class HcAuthor extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class HcPost extends Base {
+      static { this.attribute("hc_author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    class HcComment extends Base {
+      static { this.attribute("hc_post_id", "integer"); this.attribute("body", "string"); this.adapter = adapter; }
+    }
+    registerModel(HcAuthor); registerModel(HcPost); registerModel(HcComment);
+    Associations.hasMany.call(HcAuthor, "hcPosts", { className: "HcPost", foreignKey: "hc_author_id" });
+    // Through association with scope condition
+    Associations.hasMany.call(HcAuthor, "helloPostComments", {
+      className: "HcComment", through: "hcPosts", source: "hcComments",
+      scope: (rel: any) => rel.where({ body: "hello" }),
+    });
+    Associations.hasMany.call(HcPost, "hcComments", { className: "HcComment", foreignKey: "hc_post_id" });
+
+    const author = await HcAuthor.create({ name: "David" });
+    const post = await HcPost.create({ hc_author_id: author.id, title: "Hello World" });
+    await HcComment.create({ hc_post_id: post.id, body: "hello" });
+    await HcComment.create({ hc_post_id: post.id, body: "goodbye" });
+
+    const comments = await loadHasMany(author, "helloPostComments", {
+      className: "HcComment", through: "hcPosts", source: "hcComments",
+      scope: (rel: any) => rel.where({ body: "hello" }),
+    });
+    expect(comments.length).toBe(1);
+    expect(comments[0].readAttribute("body")).toBe("hello");
+  });
   it("include checks if record exists if target not loaded", async () => {
     class InclAuthor extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }

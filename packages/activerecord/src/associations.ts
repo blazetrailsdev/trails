@@ -361,7 +361,9 @@ export async function loadHasManyThrough(
       .map((r) => r.readAttribute(targetFk))
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
-    return (targetModel as any).all().where({ [targetModel.primaryKey]: targetIds }).toArray();
+    let rel = (targetModel as any).all().where({ [targetModel.primaryKey]: targetIds });
+    if (options.scope) rel = options.scope(rel);
+    return rel.toArray();
   } else {
     // Source is has_many/has_one: target has FK pointing back to through record
     const sourceAsName = sourceAssoc?.options?.as;
@@ -375,7 +377,9 @@ export async function loadHasManyThrough(
     if (throughIds.length === 0) return [];
     const whereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
     if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
-    return (targetModel as any).all().where(whereConditions).toArray();
+    let rel2 = (targetModel as any).all().where(whereConditions);
+    if (options.scope) rel2 = options.scope(rel2);
+    return rel2.toArray();
   }
 }
 
