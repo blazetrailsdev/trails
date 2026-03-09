@@ -28,6 +28,12 @@ export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
   _wrapWithScopeProxy = wrapper;
 }
 
+/** @internal Hook called when a model's adapter is set. Used by test-adapter.ts. */
+let _onAdapterSet: ((modelClass: any) => void) | null = null;
+export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): void {
+  _onAdapterSet = hook;
+}
+
 /**
  * Base — the core ActiveRecord class with persistence and finders.
  *
@@ -130,6 +136,7 @@ export class Base extends Model {
    */
   static set adapter(adapter: DatabaseAdapter) {
     this._adapter = adapter;
+    if (_onAdapterSet) _onAdapterSet(this);
   }
 
   static get adapter(): DatabaseAdapter {
