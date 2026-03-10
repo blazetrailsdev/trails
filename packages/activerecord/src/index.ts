@@ -47,6 +47,7 @@ export {
   SoleRecordExceeded,
   StrictLoadingViolationError,
   DeleteRestrictionError,
+  UnknownAttributeError,
   SubclassNotFound,
 } from "./errors.js";
 export {

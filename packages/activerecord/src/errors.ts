@@ -151,6 +151,19 @@ export class SubclassNotFound extends Error {
  *
  * Mirrors: ActiveRecord::DeleteRestrictionError
  */
+export class UnknownAttributeError extends Error {
+  readonly record: any;
+  readonly attribute: string;
+
+  constructor(record: any, attribute: string) {
+    const model = record?.constructor?.name ?? "Record";
+    super(`unknown attribute '${attribute}' for ${model}.`);
+    this.name = "UnknownAttributeError";
+    this.record = record;
+    this.attribute = attribute;
+  }
+}
+
 export class DeleteRestrictionError extends Error {
   readonly record: any;
   readonly association: string;

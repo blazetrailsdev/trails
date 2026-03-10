@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
+import { UnknownAttributeError } from "./errors.js";
 
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
@@ -35,6 +36,14 @@ export function acceptsNestedAttributesFor(
   const assocExists = associations.find((a: any) => a.name === associationName);
   if (!assocExists) {
     throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
+  }
+
+  // Rails raises ArgumentError for polymorphic belongs_to
+  if (assocExists.type === "belongsTo" && assocExists.options?.polymorphic) {
+    throw new Error(
+      `Cannot build a polymorphic belongs_to association '${associationName}' with nested attributes. ` +
+      `You need to define which model to use for the polymorphic association.`
+    );
   }
 
   // Store config on the class
@@ -151,11 +160,33 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
     const childPk = (targetModel as any).primaryKey || "id";
 
+    // Get known attribute names from the target model
+    const knownAttrs = new Set<string>();
+    const attrDefs: Map<string, any> | undefined = (targetModel as any)._attributeDefinitions;
+    if (attrDefs) {
+      for (const name of attrDefs.keys()) {
+        knownAttrs.add(name);
+      }
+    }
+    // Also allow the primary key and foreign key
+    knownAttrs.add(childPk);
+    knownAttrs.add(foreignKey);
+
     for (const attrs of attrsList) {
       const { _destroy, ...restAttrs } = attrs as any;
       const pkValue = restAttrs[childPk];
       // Remove PK from child attrs so it's not set as a regular attribute during update
       const { [childPk]: _pkIgnored, ...childAttrs } = restAttrs;
+
+      // Validate attributes against the target model's known columns
+      if (knownAttrs.size > 0) {
+        for (const key of Object.keys(childAttrs)) {
+          if (!knownAttrs.has(key)) {
+            const dummy = new (targetModel as any)();
+            throw new UnknownAttributeError(dummy, key);
+          }
+        }
+      }
 
       // Check _destroy before rejectIf — destroy should work regardless of rejectIf
       if (_destroy && config.options.allowDestroy) {
