@@ -644,6 +644,12 @@ export class MemoryAdapter implements DatabaseAdapter {
     // Always-true (empty NOT IN generates 1=1)
     if (condition.trim() === "1=1") return true;
 
+    // NOT (...) — negate the inner expression
+    const notMatch = condition.trim().match(/^NOT\s*\((.+)\)$/i);
+    if (notMatch) {
+      return !this.evaluateCondition(row, notMatch[1].trim());
+    }
+
     // Helper to get column name from a "table"."col" or just "col" pattern
     const getCol = (tableOrCol: string, col?: string): string =>
       col !== undefined ? col : tableOrCol;

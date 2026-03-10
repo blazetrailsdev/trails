@@ -14,10 +14,12 @@ import { getInheritanceColumn, isStiSubclass } from "./sti.js";
 export class Range {
   readonly begin: unknown;
   readonly end: unknown;
+  readonly excludeEnd: boolean;
 
-  constructor(begin: unknown, end: unknown) {
+  constructor(begin: unknown, end: unknown, excludeEnd: boolean = false) {
     this.begin = begin;
     this.end = end;
+    this.excludeEnd = excludeEnd;
   }
 }
 
@@ -2457,7 +2459,12 @@ export class Relation<T extends Base> {
         if (value === null) {
           nodes.push(table.get(key).isNull());
         } else if (value instanceof Range) {
-          nodes.push(table.get(key).between(value.begin, value.end));
+          if (value.excludeEnd) {
+            nodes.push(table.get(key).gteq(value.begin));
+            nodes.push(table.get(key).lt(value.end));
+          } else {
+            nodes.push(table.get(key).between(value.begin, value.end));
+          }
         } else if (Array.isArray(value)) {
           nodes.push(table.get(key).in(value));
         } else {
@@ -2469,6 +2476,8 @@ export class Relation<T extends Base> {
       for (const [key, value] of Object.entries(clause)) {
         if (value === null) {
           nodes.push(table.get(key).isNotNull());
+        } else if (value instanceof Range) {
+          nodes.push(table.get(key).notBetween(value.begin, value.end));
         } else if (Array.isArray(value)) {
           nodes.push(table.get(key).notIn(value));
         } else {
@@ -2512,7 +2521,12 @@ export class Relation<T extends Base> {
         if (value === null) {
           manager.where(table.get(key).isNull());
         } else if (value instanceof Range) {
-          manager.where(table.get(key).between(value.begin, value.end));
+          if (value.excludeEnd) {
+            manager.where(table.get(key).gteq(value.begin));
+            manager.where(table.get(key).lt(value.end));
+          } else {
+            manager.where(table.get(key).between(value.begin, value.end));
+          }
         } else if (Array.isArray(value)) {
           manager.where(table.get(key).in(value));
         } else {
@@ -2524,6 +2538,8 @@ export class Relation<T extends Base> {
       for (const [key, value] of Object.entries(clause)) {
         if (value === null) {
           manager.where(table.get(key).isNotNull());
+        } else if (value instanceof Range) {
+          manager.where(table.get(key).notBetween(value.begin, value.end));
         } else if (Array.isArray(value)) {
           manager.where(table.get(key).notIn(value));
         } else {
@@ -2578,7 +2594,11 @@ export class Relation<T extends Base> {
         } else if (value instanceof Range) {
           const begin = typeof value.begin === "number" ? String(value.begin) : `'${String(value.begin).replace(/'/g, "''")}'`;
           const end = typeof value.end === "number" ? String(value.end) : `'${String(value.end).replace(/'/g, "''")}'`;
-          conditions.push(`"${table.name}"."${key}" BETWEEN ${begin} AND ${end}`);
+          if (value.excludeEnd) {
+            conditions.push(`"${table.name}"."${key}" >= ${begin} AND "${table.name}"."${key}" < ${end}`);
+          } else {
+            conditions.push(`"${table.name}"."${key}" BETWEEN ${begin} AND ${end}`);
+          }
         } else if (typeof value === "boolean") {
           conditions.push(
             `"${table.name}"."${key}" = ${value ? "TRUE" : "FALSE"}`
@@ -2605,6 +2625,10 @@ export class Relation<T extends Base> {
       for (const [key, value] of Object.entries(clause)) {
         if (value === null) {
           conditions.push(`"${table.name}"."${key}" IS NOT NULL`);
+        } else if (value instanceof Range) {
+          const begin = typeof value.begin === "number" ? String(value.begin) : `'${String(value.begin).replace(/'/g, "''")}'`;
+          const end = typeof value.end === "number" ? String(value.end) : `'${String(value.end).replace(/'/g, "''")}'`;
+          conditions.push(`NOT ("${table.name}"."${key}" BETWEEN ${begin} AND ${end})`);
         } else if (typeof value === "boolean") {
           conditions.push(
             `"${table.name}"."${key}" != ${value ? "TRUE" : "FALSE"}`
