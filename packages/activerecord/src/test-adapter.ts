@@ -40,6 +40,9 @@ const _createdColumns = new Map<string, Set<string>>();
 // Populated when Base.adapter is set. Consumed before first DB operation.
 const _pendingModels = new Map<string, Map<string, string>>();
 
+// Tables with composite primary keys: table → string[] of PK columns.
+const _pendingCpk = new Map<string, string[]>();
+
 // Model classes registered via the hook — used to lazily extract attributes.
 const _registeredModelClasses = new Set<any>();
 
@@ -96,12 +99,21 @@ function extractColumnsFromModels(): void {
     const attrs: Map<string, { name: string; type: { name?: string } }> =
       modelClass._attributeDefinitions;
 
+    // Detect composite primary key
+    const pk = modelClass.primaryKey;
+    const isCpk = Array.isArray(pk);
+
     const columns = new Map<string, string>();
     if (attrs) {
       for (const [name, def] of attrs) {
-        if (name === "id") continue;
+        // Skip "id" for non-CPK models (auto-generated), but keep all CPK columns
+        if (name === "id" && !isCpk) continue;
         columns.set(name, sqlType(def.type?.name || "string"));
       }
+    }
+
+    if (isCpk) {
+      _pendingCpk.set(tableName, pk as string[]);
     }
 
     const existing = _pendingModels.get(tableName);
@@ -120,25 +132,37 @@ function extractColumnsFromModels(): void {
 async function processPendingModels(inner: any): Promise<void> {
   for (const [tableName, columns] of _pendingModels) {
     if (!_createdTables.has(tableName)) {
-      // Create the table
-      const idCol = isPg()
-        ? '"id" SERIAL PRIMARY KEY'
-        : isMysql()
-          ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
-          : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
+      const cpkCols = _pendingCpk.get(tableName);
 
       const colDefs = [...columns.entries()].map(([col, type]) =>
         isMysql() ? `\`${col}\` ${type}` : `"${col}" ${type}`
       );
 
-      const createSql = isMysql()
-        ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
-        : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
+      let createSql: string;
+      if (cpkCols) {
+        // Composite primary key — no auto-increment id column
+        const pkConstraint = isMysql()
+          ? `PRIMARY KEY (${cpkCols.map(c => `\`${c}\``).join(", ")})`
+          : `PRIMARY KEY (${cpkCols.map(c => `"${c}"`).join(", ")})`;
+        createSql = isMysql()
+          ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[...colDefs, pkConstraint].join(", ")}) ENGINE=InnoDB`
+          : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[...colDefs, pkConstraint].join(", ")})`;
+      } else {
+        // Standard single-column auto-increment primary key
+        const idCol = isPg()
+          ? '"id" SERIAL PRIMARY KEY'
+          : isMysql()
+            ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
+            : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
+        createSql = isMysql()
+          ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
+          : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[idCol, ...colDefs].join(", ")})`;
+      }
 
       try {
         await inner.exec(createSql);
         _createdTables.add(tableName);
-        _createdColumns.set(tableName, new Set(["id", ...columns.keys()]));
+        _createdColumns.set(tableName, cpkCols ? new Set(columns.keys()) : new Set(["id", ...columns.keys()]));
       } catch (e: any) {
         // Log but don't add to _createdTables so we retry next time
         console.error(`[test-adapter] Failed to create table "${tableName}": ${e?.message}`);
@@ -166,6 +190,7 @@ async function processPendingModels(inner: any): Promise<void> {
     }
   }
   _pendingModels.clear();
+  _pendingCpk.clear();
 }
 
 /**
