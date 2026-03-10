@@ -3286,6 +3286,8 @@ export const TEST_OVERRIDES: Record<string, string | null> = {
   "strips leading unicode byte order mark when present": null,
   "respects the frozen_string_literal magic comment": null,
   "builds a rack app from string": null,
+  // Prevent fuzzy mismatch — this Ruby test should match the TS test inside Rack::Multipart describe
+  "parses content-disposition with escaped parameter values in name": "Rack::Multipart > parses content-disposition with escaped parameter values in name",
 
   // ==========================================================================
   // ActiveRecord overrides

@@ -398,6 +398,12 @@ describe("Rack::Utils, \"cookies\"", () => {
     expect(result).toEqual(["name=; path=/a/b; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"]);
   });
 
+  it("sets and deletes cookies in header hash", () => {
+    const header: Record<string, any> = { "set-cookie": null };
+    const result = Utils.deleteCookieHeaderBang(header, "name");
+    expect(result).toBeNull();
+    expect(header["set-cookie"]).toBe("name=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  });
 });
 
 describe("Rack::Utils, \"get_byte_ranges\"", () => {

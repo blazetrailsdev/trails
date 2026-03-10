@@ -35,6 +35,14 @@ it("parses filename with unescaped percentage characters that look like partial 
   expect(files.tempfile.read()).toBe("contents");
 });
 
+it("parses filename with unescaped percentage characters that look like partial hex escapes", () => {
+  const params = parseFixture("filename_with_unescaped_percentages3", "----WebKitFormBoundary2NHc7OhsgU68l3Al")!;
+  const files = params["document"]["attachment"];
+  expect(files.filename).toBe("100%");
+  expect(files.type).toBe("image/jpeg");
+  expect(files.tempfile.read()).toBe("contents");
+});
+
 it("raises a RuntimeError for invalid file path", () => {
   expect(() => new UploadedFile("non-existant")).toThrow();
 });
@@ -110,6 +118,13 @@ it("treats a multipart limit of 0 as no limit", () => {
   const boundary = "AaB03x";
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
   const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_total_limit: 0 });
+  expect(result!["a"]).toBe("val");
+});
+
+it("treats a multipart limit of 0 as no limit", () => {
+  const boundary = "AaB03x";
+  const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
+  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_file_limit: 0 });
   expect(result!["a"]).toBe("val");
 });
 
