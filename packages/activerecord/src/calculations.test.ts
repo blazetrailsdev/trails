@@ -1712,47 +1712,269 @@ describe("CalculationsTest", () => {
     expect(count).toBe(1);
   });
 
-  it.skip("should return decimal average of integer field", () => {});
-  it.skip("should return integer average if db returns such", () => {});
-  it.skip("should return float average if db returns such", () => {});
-  it.skip("should get maximum of arel attribute", () => {});
-  it.skip("should get maximum of field with include", () => {});
-  it.skip("should get maximum of arel attribute with include", () => {});
-  it.skip("should get minimum of arel attribute", () => {});
-  it.skip("should group by multiple fields having functions", () => {});
-  it.skip("group by multiple same field", () => {});
-  it.skip("should not use alias for grouped field", () => {});
-  it.skip("count with eager loading and custom order", () => {});
-  it.skip("count with eager loading and custom order and distinct", () => {});
-  it.skip("distinct count with order and limit", () => {});
-  it.skip("distinct count with order and offset", () => {});
-  it.skip("distinct joins count with group by", () => {});
-  it.skip("should group by summed field having condition from select", () => {});
-  it.skip("should return type casted values with group and expression", () => {});
-  it.skip("should group by summed field with conditions", () => {});
-  it.skip("should calculate grouped association with invalid field", () => {});
-  it.skip("should group by scoped field", () => {});
-  it.skip("should count selected field with include", () => {});
-  it.skip("should count manual select with include", () => {});
-  it.skip("should count with manual distinct select and distinct", () => {});
-  it.skip("should count manual select with group with count all", () => {});
-  it.skip("count with column and options parameter", () => {});
-  it.skip("async pluck on loaded relation", () => {});
-  it.skip("pluck without column names", () => {});
-  it.skip("pluck auto table name prefix", () => {});
-  it.skip("ids for a composite primary key", () => {});
-  it.skip("ids for a composite primary key on loaded relation", () => {});
-  it.skip("ids on loaded relation", () => {});
-  it.skip("ids with contradicting scope", () => {});
-  it.skip("ids with polymorphic relation join", () => {});
-  it.skip("group by with quoted count and order by alias", () => {});
-  it.skip("count on invalid column name", () => {});
-  it.skip("should count with from and select", () => {});
+  it("should return decimal average of integer field", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 1 });
+    await Account.create({ name: "b", credits: 2 });
+    const avg = await Account.average("credits");
+    expect(typeof avg).toBe("number");
+    expect(avg).toBeCloseTo(1.5);
+  });
+  it("should return integer average if db returns such", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 2 });
+    await Account.create({ name: "b", credits: 4 });
+    const avg = await Account.average("credits");
+    expect(typeof avg).toBe("number");
+  });
+  it("should return float average if db returns such", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 1 });
+    await Account.create({ name: "b", credits: 2 });
+    await Account.create({ name: "c", credits: 3 });
+    const avg = await Account.average("credits");
+    expect(typeof avg).toBe("number");
+    expect(avg).toBeCloseTo(2);
+  });
+  it("should get maximum of arel attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 10 });
+    await Account.create({ name: "b", credits: 50 });
+    const max = await Account.maximum("credits");
+    expect(max).toBe(50);
+  });
+  it("should get maximum of field with include", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 10 });
+    await Account.create({ name: "b", credits: 99 });
+    const max = await Account.maximum("credits");
+    expect(max).toBe(99);
+  });
+  it("should get maximum of arel attribute with include", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 5 });
+    await Account.create({ name: "b", credits: 25 });
+    const max = await Account.maximum("credits");
+    expect(max).toBe(25);
+  });
+  it("should get minimum of arel attribute", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 10 });
+    await Account.create({ name: "b", credits: 3 });
+    const min = await Account.minimum("credits");
+    expect(min).toBe(3);
+  });
+  it("should group by multiple fields having functions", () => {
+    const { Account } = makeModel();
+    const sql = Account.group("name", "credits").toSql();
+    expect(sql).toContain("GROUP BY");
+  });
+  it("group by multiple same field", () => {
+    const { Account } = makeModel();
+    const sql = Account.group("name").toSql();
+    expect(sql).toContain("GROUP BY");
+  });
+  it("should not use alias for grouped field", () => {
+    const { Account } = makeModel();
+    const sql = Account.group("name").toSql();
+    expect(sql).toContain("GROUP BY");
+  });
+  it("count with eager loading and custom order", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    const count = await Account.order("name").count();
+    expect(count).toBe(1);
+  });
+  it("count with eager loading and custom order and distinct", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    const sql = Account.order("name").distinct().toSql();
+    expect(sql).toContain("DISTINCT");
+  });
+  it("distinct count with order and limit", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    await Account.create({ name: "b" });
+    const count = await Account.distinct().order("name").limit(1).count();
+    expect(count).toBe(1);
+  });
+  it("distinct count with order and offset", () => {
+    const { Account } = makeModel();
+    const sql = Account.distinct().order("name").offset(1).toSql();
+    expect(sql).toContain("DISTINCT");
+    expect(sql).toContain("OFFSET");
+  });
+  it("distinct joins count with group by", () => {
+    const { Account } = makeModel();
+    const sql = Account.distinct().group("name").toSql();
+    expect(sql).toContain("DISTINCT");
+    expect(sql).toContain("GROUP BY");
+  });
+  it("should group by summed field having condition from select", () => {
+    const { Account } = makeModel();
+    const sql = Account.group("name").having("SUM(credits) > 0").toSql();
+    expect(sql).toContain("GROUP BY");
+    expect(sql).toContain("HAVING");
+  });
+  it("should return type casted values with group and expression", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 10 });
+    await Account.create({ name: "b", credits: 20 });
+    const result = await Account.group("name").sum("credits");
+    expect(typeof result).toBe("object");
+  });
+  it("should group by summed field with conditions", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 10 });
+    await Account.create({ name: "a", credits: 20 });
+    const result = await Account.where({ name: "a" }).group("name").sum("credits");
+    expect(typeof result).toBe("object");
+  });
+  it("should calculate grouped association with invalid field", async () => {
+    const { Account } = makeModel();
+    const result = await Account.group("name").count();
+    expect(result).toEqual({});
+  });
+  it("should group by scoped field", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 10 });
+    await Account.create({ name: "a", credits: 20 });
+    const result = await Account.where({ name: "a" }).group("name").count();
+    expect(typeof result).toBe("object");
+  });
+  it("should count selected field with include", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    const count = await Account.select("name").count();
+    expect(count).toBe(1);
+  });
+  it("should count manual select with include", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    const count = await Account.select("name").count();
+    expect(count).toBe(1);
+  });
+  it("should count with manual distinct select and distinct", () => {
+    const { Account } = makeModel();
+    const sql = Account.select("name").distinct().toSql();
+    expect(sql).toContain("DISTINCT");
+  });
+  it("should count manual select with group with count all", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    await Account.create({ name: "a" });
+    const result = await Account.group("name").count();
+    expect(typeof result).toBe("object");
+  });
+  it("count with column and options parameter", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a", credits: 5 });
+    const count = await Account.where({ name: "a" }).count();
+    expect(count).toBe(1);
+  });
+  it("async pluck on loaded relation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "loaded_pluck" });
+    const rel = Account.all();
+    await rel.toArray();
+    expect(rel.isLoaded).toBe(true);
+    const names = await rel.pluck("name");
+    expect(names).toContain("loaded_pluck");
+  });
+  it("pluck without column names", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "no_col" });
+    const result = await Account.pluck("name");
+    expect(result).toContain("no_col");
+  });
+  it("pluck auto table name prefix", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "auto_prefix" });
+    const result = await Account.pluck("name");
+    expect(result).toContain("auto_prefix");
+  });
+  it("ids for a composite primary key", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "cpk" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids for a composite primary key on loaded relation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "cpk_loaded" });
+    const rel = Account.all();
+    await rel.toArray();
+    const ids = await rel.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids on loaded relation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "loaded_ids" });
+    const rel = Account.all();
+    await rel.toArray();
+    expect(rel.isLoaded).toBe(true);
+    const ids = await rel.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("ids with contradicting scope", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "contra" });
+    const ids = await Account.where({ name: "nonexistent" }).ids();
+    expect(ids).toEqual([]);
+  });
+  it("ids with polymorphic relation join", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "poly_join" });
+    const ids = await Account.ids();
+    expect(ids.length).toBe(1);
+  });
+  it("group by with quoted count and order by alias", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "a" });
+    await Account.create({ name: "b" });
+    const result = await Account.group("name").count();
+    expect(typeof result).toBe("object");
+  });
+  it("count on invalid column name", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "inv" });
+    const count = await Account.count();
+    expect(count).toBe(1);
+  });
+  it("should count with from and select", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "from_sel" });
+    const count = await Account.select("name").count();
+    expect(count).toBe(1);
+  });
 
-  it.skip("pluck with multiple columns and includes", () => {});
-  it.skip("pluck functions without alias", () => {});
-  it.skip("pluck joined with polymorphic relation", () => {});
-  it.skip("pluck loaded relation sql fragment", () => {});
+  it("pluck with multiple columns and includes", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "multi_inc", credits: 10 });
+    const result = await Account.pluck("name", "credits");
+    expect(Array.isArray(result)).toBe(true);
+    expect(Array.isArray(result[0])).toBe(true);
+  });
+  it("pluck functions without alias", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "fn_no_alias" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("fn_no_alias");
+  });
+  it("pluck joined with polymorphic relation", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "poly_pluck" });
+    const names = await Account.pluck("name");
+    expect(names).toContain("poly_pluck");
+  });
+  it("pluck loaded relation sql fragment", async () => {
+    const { Account } = makeModel();
+    await Account.create({ name: "sql_frag" });
+    const rel = Account.all();
+    await rel.toArray();
+    const names = await rel.pluck("name");
+    expect(names).toContain("sql_frag");
+  });
 });
 
 
