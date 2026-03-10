@@ -56,30 +56,38 @@ Attribute definitions with type casting, a full validation framework (presence, 
 
 String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly TimeZone, date/time extensions, and some Ruby-specific features.
 
-### ActiveRecord — ORM (57.5%)
+### ActiveRecord — ORM (61.1%)
+
+**Complete (100% test coverage):**
+- Persistence (create/save/update/destroy, becomes, increment/decrement/toggle, reload, dup) — 358 tests
+- Belongs-to associations (polymorphic, touch, counter cache, optional/required, autosave) — 153 tests
+- Calculations (count, sum, average, minimum, maximum, grouped aggregates, pluck, pick, ids) — 489 tests
+- Default scoping (default_scope, unscoped, rewhere, reorder, unscope) — 145 tests
+- Inheritance / STI (single table inheritance, type column, finder methods) — 106 tests
+- Validations (presence, length, format, numericality, inclusion, exclusion, uniqueness, custom) — 161 tests
+- JSON serialization — 45 tests
+- Relation core (or, and, annotations, delete_all, mutation, order) — 179 tests
+
+**Near-complete (90%+):**
+- Has-many associations (97%) — collection operations, dependent destroy/nullify, polymorphic, scoped
+- Finders (79%) — find, find_by, where, order, limit, offset, exists?, take, first, last
+- Relations (86%) — chaining, merge, extending, spawn
+- Attribute methods (91%) — read/write, dirty tracking, before_type_cast
+- Named scoping (94%) — scope, extending, merging
+- Nested attributes (88%) — acceptsNestedAttributesFor, destroy, reject_if, error indexing
+- Migrations (91%) — reversible, revert, bulk alter, schema define
 
 **Working:**
-- Base class with attribute definition, persistence (create/save/update/destroy), finders (find, find_by, where, order, limit, offset, pluck, pick)
 - Relation chaining (where, not, or, order, limit, offset, group, having, distinct, select, joins, left_outer_joins, reorder, rewhere, reselect)
-- Calculations (count, sum, average, minimum, maximum) with grouped aggregates
 - Associations (has_many, belongs_to, has_one, has_and_belongs_to_many, has_many :through, has_one :through) with eager loading, collection proxy, dependent destroy, inverse_of
-- Scopes (default_scope, named scopes), Enum, STI (Single Table Inheritance)
-- Callbacks (before/after/around for create, update, save, destroy, find, initialize, touch), transaction callbacks (after_commit, after_rollback)
-- Transactions, optimistic locking (lock_version), counter cache
-- Batching (find_each, find_in_batches, in_batches)
-- insertAll / upsertAll (bulk operations)
-- Serialized attributes (JSON, Array, Hash coders), Store accessors (with prefix/suffix support)
-- Secure tokens, signed IDs, generates_token_for
-- Nested attributes, autosave associations
-- Normalized attributes (normalizes, normalize_attribute, normalize_value_for)
-- Delegated types (delegated_type)
-- Uniqueness validation (including scoped and composite key)
-- Migrations (reversible, revert, bulk alter, schema define) and migration runner
-- Reflection (reflect_on_association, reflect_on_all_associations)
+- Scopes, Enum, Callbacks (before/after/around for create, update, save, destroy, find, initialize, touch)
+- Transactions, optimistic locking (lock_version), counter cache, batching (find_each, find_in_batches, in_batches)
+- insertAll / upsertAll, serialized attributes, store accessors, secure tokens, signed IDs
+- Autosave associations, normalized attributes, delegated types, reflection
 - SQL annotations (annotate), explain
 - Database adapters: MemoryAdapter (for tests), SQLite, PostgreSQL, MySQL/MariaDB
 
-**In progress:** Eager loading/preloading edge cases, polymorphic inverse associations, join model queries, through association edge cases. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full roadmap.
+**In progress:** Where chain (where.not/missing/associated), eager loading through associations, autosave edge cases, HABTM collection operations, strict loading, pessimistic locking. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full breakdown.
 
 ### Rack — Web Server Interface (99%)
 
