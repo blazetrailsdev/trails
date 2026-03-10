@@ -974,19 +974,99 @@ describe("AttributeMethodsTest", () => {
     expect(p.id).toBeDefined();
   });
 
-  it.skip("#id_value alias returns the value in the id column, when id column exists", () => {});
-  it.skip("attribute_for_inspect with a string", () => {});
-  it.skip("attribute_present", () => {});
-  it.skip("caching a nil primary key", () => {});
-  it.skip("respond_to?", () => {});
-  it.skip("respond_to? with a custom primary key", () => {});
-  it.skip("id_before_type_cast with a custom primary key", () => {});
-  it.skip("read attributes_before_type_cast", () => {});
-  it.skip("read attributes_before_type_cast on a boolean", () => {});
-  it.skip("read overridden attribute with predicate respects override", () => {});
-  it.skip("write time to date attribute", () => {});
-  it.skip("setting a time zone-aware attribute to UTC", () => {});
-  it.skip("attribute_names on a new record", () => {});
+  it("#id_value alias returns the value in the id column, when id column exists", async () => {
+    const { Post } = makeModel();
+    const p = await Post.create({ title: "id_value_test" });
+    expect(p.id).toBeDefined();
+    expect(p.id).not.toBeNull();
+  });
+  it("attribute_for_inspect with a string", () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "hello" });
+    expect(p.attributeForInspect("title")).toBe('"hello"');
+  });
+  it("attribute_present", () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "present", score: null });
+    expect(p.attributePresent("title")).toBe(true);
+    expect(p.attributePresent("score")).toBe(false);
+  });
+  it("caching a nil primary key", () => {
+    const { Post } = makeModel();
+    const p = new Post({});
+    expect(p.id).toBeNull();
+    // Accessing id again should still return null (not throw)
+    expect(p.id).toBeNull();
+  });
+  it("respond_to?", () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "resp" });
+    expect(p.hasAttribute("title")).toBe(true);
+    expect(p.hasAttribute("score")).toBe(true);
+    expect(p.hasAttribute("nonexistent")).toBe(false);
+  });
+  it("respond_to? with a custom primary key", () => {
+    class CustomPK extends Base {
+      static { this.attribute("custom_id", "integer"); this.attribute("name", "string"); this.primaryKey = "custom_id"; this.adapter = adapter; }
+    }
+    const p = new CustomPK({ name: "test" });
+    expect(p.hasAttribute("custom_id")).toBe(true);
+    expect(p.hasAttribute("name")).toBe(true);
+  });
+  it("id_before_type_cast with a custom primary key", () => {
+    class CustomPK extends Base {
+      static { this.attribute("custom_id", "integer"); this.attribute("name", "string"); this.primaryKey = "custom_id"; this.adapter = adapter; }
+    }
+    const p = new CustomPK({ custom_id: "42", name: "test" });
+    expect(p.readAttributeBeforeTypeCast("custom_id")).toBe("42");
+    expect(p.readAttribute("custom_id")).toBe(42);
+  });
+  it("read attributes_before_type_cast", () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "raw", score: "99" });
+    const raw = p.attributesBeforeTypeCast;
+    expect(raw.score).toBe("99");
+    expect(p.readAttribute("score")).toBe(99);
+  });
+  it("read attributes_before_type_cast on a boolean", () => {
+    class PostBool extends Base {
+      static { this.attribute("title", "string"); this.attribute("published", "boolean"); this.adapter = adapter; }
+    }
+    const p = new PostBool({ title: "test", published: "true" });
+    expect(p.readAttributeBeforeTypeCast("published")).toBe("true");
+    expect(p.readAttribute("published")).toBe(true);
+  });
+  it("read overridden attribute with predicate respects override", () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "overridden" });
+    expect(p.attributePresent("title")).toBe(true);
+    expect(p.readAttribute("title")).toBe("overridden");
+  });
+  it("write time to date attribute", () => {
+    class Event extends Base {
+      static { this.attribute("name", "string"); this.attribute("starts_on", "date"); this.adapter = adapter; }
+    }
+    const e = new Event({ name: "party", starts_on: "2024-06-15" });
+    const val = e.readAttribute("starts_on");
+    expect(val).toBeDefined();
+  });
+  it("setting a time zone-aware attribute to UTC", () => {
+    class Event extends Base {
+      static { this.attribute("name", "string"); this.attribute("created_at", "datetime"); this.adapter = adapter; }
+    }
+    const utcDate = new Date("2024-06-15T12:00:00Z");
+    const e = new Event({ name: "utc", created_at: utcDate });
+    const val = e.readAttribute("created_at");
+    expect(val).toBeInstanceOf(Date);
+    expect((val as Date).toISOString()).toBe("2024-06-15T12:00:00.000Z");
+  });
+  it("attribute_names on a new record", () => {
+    const { Post } = makeModel();
+    const p = new Post({});
+    const names = p.attributeNames();
+    expect(names).toContain("title");
+    expect(names).toContain("score");
+  });
 });
 
 
