@@ -99,6 +99,9 @@ export class TableDefinition {
   }
 
   decimal(name: string, options: ColumnOptions = {}): this {
+    if (options.scale !== undefined && options.precision === undefined) {
+      throw new Error("Error adding decimal column: precision is required if scale is specified");
+    }
     this.columns.push({ name, type: "decimal", options });
     return this;
   }
@@ -1255,6 +1258,8 @@ export class MigrationContext {
   private _tables = new Set<string>();
   private _columns = new Map<string, Set<string>>();
   private _indexes = new Map<string, { columns: string[]; unique: boolean; name?: string }[]>();
+  tableNamePrefix = "";
+  tableNameSuffix = "";
 
   constructor(private adapter: DatabaseAdapter) {}
 
@@ -1312,8 +1317,15 @@ export class MigrationContext {
     table: string,
     column: string,
     type: string,
-    _options?: ColumnOptions
+    _options?: ColumnOptions & { ifNotExists?: boolean }
   ): Promise<void> {
+    const ifNotExists = _options?.ifNotExists ?? false;
+    if (this._columns.has(table) && this._columns.get(table)!.has(column)) {
+      if (!ifNotExists) {
+        throw new Error(`Column "${column}" already exists in table "${table}"`);
+      }
+      return;
+    }
     await this.adapter.executeMutation(
       `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type)}`
     );
@@ -1403,20 +1415,22 @@ export class MigrationContext {
   }
 
   async renameTable(from: string, to: string): Promise<void> {
+    const fullFrom = `${this.tableNamePrefix}${from}${this.tableNameSuffix}`;
+    const fullTo = `${this.tableNamePrefix}${to}${this.tableNameSuffix}`;
     await this.adapter.executeMutation(
-      `ALTER TABLE "${from}" RENAME TO "${to}"`
+      `ALTER TABLE "${fullFrom}" RENAME TO "${fullTo}"`
     );
-    this._tables.delete(from);
-    this._tables.add(to);
-    const cols = this._columns.get(from);
+    this._tables.delete(fullFrom);
+    this._tables.add(fullTo);
+    const cols = this._columns.get(fullFrom);
     if (cols) {
-      this._columns.delete(from);
-      this._columns.set(to, cols);
+      this._columns.delete(fullFrom);
+      this._columns.set(fullTo, cols);
     }
-    const indexes = this._indexes.get(from);
+    const indexes = this._indexes.get(fullFrom);
     if (indexes) {
-      this._indexes.delete(from);
-      this._indexes.set(to, indexes);
+      this._indexes.delete(fullFrom);
+      this._indexes.set(fullTo, indexes);
     }
   }
 

@@ -192,10 +192,42 @@ describe("MigrationTest", () => {
     expect(ctx.columnExists("users", "name")).toBe(true);
   });
 
-  it.skip("add column with if not exists not set", () => {});
-  it.skip("rename table with prefix and suffix", () => {});
-  it.skip("decimal scale without precision should raise", () => {});
-  it.skip("add and remove index", () => {});
+  it("add column with if not exists not set", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => { t.string("name"); });
+    await expect(
+      ctx.addColumn("users", "name", "string")
+    ).rejects.toThrow(/already exists/);
+  });
+
+  it("rename table with prefix and suffix", async () => {
+    const { ctx } = freshContext();
+    ctx.tableNamePrefix = "pre_";
+    ctx.tableNameSuffix = "_suf";
+    await ctx.createTable("pre_old_suf", {}, (t) => { t.string("value"); });
+
+    await ctx.renameTable("old", "new");
+    expect(ctx.tableExists("pre_old_suf")).toBe(false);
+    expect(ctx.tableExists("pre_new_suf")).toBe(true);
+  });
+
+  it("decimal scale without precision should raise", () => {
+    const td = new TableDefinition("products");
+    expect(() => {
+      td.decimal("price", { scale: 2 });
+    }).toThrow(/precision/i);
+  });
+
+  it("add and remove index", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => { t.string("email"); });
+
+    await ctx.addIndex("users", "email");
+    expect(ctx.indexExists("users", "email")).toBe(true);
+
+    await ctx.removeIndex("users", { column: "email" });
+    expect(ctx.indexExists("users", "email")).toBe(false);
+  });
 });
 
 // ==========================================================================
