@@ -13,6 +13,7 @@
     "db:down": "docker compose down",
     "api:compare": "cd scripts/api-compare && bash fetch-rails.sh && ruby extract-ruby-api.rb && npx tsx extract-ts-api.ts && npx tsx compare.ts",
     "test:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx compare.ts",
+    "convention:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx convention-compare.ts",
     "test:stubs": "npm run test:compare && npx tsx scripts/test-compare/generate-stubs.ts"
   },
   "devDependencies": {
