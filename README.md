@@ -15,6 +15,8 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 | `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **65.4%** | ORM — persistence, querying, associations, migrations |
 | `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption |
 
+**57.5%** complete — 5,729 tests matched against 9,960 Rails tests.
+
 ### Web Layer
 
 | Package | Rails Equivalent | Status | Description |
@@ -23,7 +25,7 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 | `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **27.9%** | Routing, middleware stack, cookies, sessions, security |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters |
 
-Overall: **51.5%** real — 7,256 tests matched against 14,087 Rails tests.
+**37%** complete — 1,527 tests matched against 4,127 Rails tests.
 
 ## Quick Example
 
