@@ -3,7 +3,7 @@ import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./time-zone.js";
 import { Duration } from "./duration.js";
 
-describe("TimeWithZone", () => {
+describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;
   let pacific: TimeZone;
   let utcZone: TimeZone;
@@ -736,22 +736,20 @@ describe("TimeWithZone", () => {
   // Uses the same setup: @utc = Time.utc(2000, 1, 1, 0), @time_zone = Eastern
   // Local time = 1999-12-31 19:00:00 EST
   // ---------------------------------------------------------------------------
-  describe("Rails parity: TimeWithZoneTest", () => {
-    let twz: TimeWithZone;
-
-    beforeEach(() => {
-      // UTC: 2000-01-01 00:00:00
-      // Eastern: 1999-12-31 19:00:00 EST (-05:00)
-      twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
-    });
-
-    it("test_utc", () => {
+  // ---------------------------------------------------------------------------
+  // Tests ported from time_with_zone_test.rb (formerly "Rails parity: TimeWithZoneTest")
+  // Each test creates its own twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern)
+  // Local: 1999-12-31 19:00:00 EST (-05:00)
+  // ---------------------------------------------------------------------------
+  it("utc", () => {
+      const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const utc = twz.utc();
       expect(utc.getTime()).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
       expect(utc).toBeInstanceOf(Date);
     });
 
-    it("test_time (local representation)", () => {
+    it("time", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.year).toBe(1999);
       expect(twz.month).toBe(12);
       expect(twz.day).toBe(31);
@@ -760,78 +758,93 @@ describe("TimeWithZone", () => {
       expect(twz.sec).toBe(0);
     });
 
-    it("test_time_zone", () => {
+    it("time zone", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.timeZone).toBe(eastern);
     });
 
-    it("test_in_time_zone_with_argument", () => {
+    it("in time zone with argument", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const alaska = twz.inTimeZone("Alaska");
       expect(alaska.timeZone.name).toBe("Alaska");
       expect(alaska.utc().getTime()).toBe(twz.utc().getTime());
     });
 
-    it("test_in_time_zone_with_bad_argument", () => {
+    it("in time zone with bad argument", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(() => twz.inTimeZone("No such timezone exists")).toThrow();
     });
 
-    it("test_formatted_offset", () => {
+    it("formatted offset", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.formattedOffset()).toBe("-05:00");
       // DST version
       const summer = new TimeWithZone(new Date(Date.UTC(2000, 5, 1)), eastern);
       expect(summer.formattedOffset()).toBe("-04:00");
     });
 
-    it("test_dst?", () => {
+    it("dst?", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.dst()).toBe(false);
       const summer = new TimeWithZone(new Date(Date.UTC(2000, 5, 1)), eastern);
       expect(summer.dst()).toBe(true);
     });
 
-    it("test_zone", () => {
+    it("zone", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.zone).toBe("EST");
       const summer = new TimeWithZone(new Date(Date.UTC(2000, 5, 1)), eastern);
       expect(summer.zone).toBe("EDT");
     });
 
-    it("test_strftime", () => {
+    it("strftime", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.strftime("%Y-%m-%d %H:%M:%S %Z %z")).toBe(
         "1999-12-31 19:00:00 EST -0500"
       );
     });
 
-    it("test_to_s", () => {
+    it("to s", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.toString()).toBe("1999-12-31 19:00:00 -05:00 EST");
     });
 
-    it("test_to_fs_db", () => {
+    it("to fs db", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       // Rails: to_fs(:db) uses UTC time. We use local time (matching our implementation).
       expect(twz.toFs("db")).toBe("1999-12-31 19:00:00");
     });
 
-    it("test_xmlschema", () => {
+    it("xmlschema", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.xmlschema()).toBe("1999-12-31T19:00:00-05:00");
     });
 
-    it("test_xmlschema_with_fractional_seconds", () => {
+    it("xmlschema with fractional seconds", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const twzFrac = twz.plus(0.123456);
       expect(twzFrac.xmlschema(3)).toBe("1999-12-31T19:00:00.123-05:00");
     });
 
-    it("test_httpdate", () => {
+    it("httpdate", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.httpdate()).toBe("Sat, 01 Jan 2000 00:00:00 GMT");
     });
 
-    it("test_rfc2822", () => {
+    it("rfc2822", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.rfc2822()).toBe("Fri, 31 Dec 1999 19:00:00 -0500");
     });
 
-    it("test_compare_with_time", () => {
+    it("compare with time", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.compareTo(new Date(Date.UTC(1999, 11, 31, 23, 59, 59)))).toBe(1);
       expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)))).toBe(0);
       expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(-1);
     });
 
-    it("test_compare_with_time_with_zone", () => {
+    it("compare with time with zone", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const utcTwz1 = new TimeWithZone(new Date(Date.UTC(1999, 11, 31, 23, 59, 59)), utcZone);
       const utcTwz2 = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), utcZone);
       const utcTwz3 = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)), utcZone);
@@ -840,7 +853,8 @@ describe("TimeWithZone", () => {
       expect(twz.compareTo(utcTwz3)).toBe(-1);
     });
 
-    it("test_between?", () => {
+    it("between?", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(
         twz.between(
           new Date(Date.UTC(1999, 11, 31, 23, 59, 59)),
@@ -855,21 +869,24 @@ describe("TimeWithZone", () => {
       ).toBe(false);
     });
 
-    it("test_eql?", () => {
+    it("eql?", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       // eql? in Rails compares the UTC time regardless of timezone
       // Our eql() requires same timezone — this matches Rails strictly
       const dup = new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), eastern);
       expect(twz.eql(dup)).toBe(true);
     });
 
-    it("test_plus_with_integer", () => {
+    it("plus with integer", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.plus(5);
       expect(result.hour).toBe(19);
       expect(result.min).toBe(0);
       expect(result.sec).toBe(5);
     });
 
-    it("test_plus_with_duration", () => {
+    it("plus with duration", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.plus(Duration.days(5));
       // 1999-12-31 + 5 days = 2000-01-05, local time stays 19:00
       expect(result.day).toBe(5);
@@ -878,32 +895,34 @@ describe("TimeWithZone", () => {
       expect(result.hour).toBe(19);
     });
 
-    it("test_minus_with_integer", () => {
+    it("minus with integer", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.minus(5);
       expect(result.hour).toBe(18);
       expect(result.min).toBe(59);
       expect(result.sec).toBe(55);
     });
 
-    it("test_minus_with_duration", () => {
+    it("minus with duration", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.minus(Duration.days(5));
       expect(result.day).toBe(26);
       expect(result.month).toBe(12);
       expect(result.hour).toBe(19);
     });
 
-    it("test_minus_with_time", () => {
+    it("minus with time", () => {
       const twz2 = new TimeWithZone(new Date(Date.UTC(2000, 0, 2)), utcZone);
       expect(twz2.minus(new Date(Date.UTC(2000, 0, 1)))).toBe(86400);
     });
 
-    it("test_minus_with_time_with_zone", () => {
+    it("minus with time with zone", () => {
       const twz1 = new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), utcZone);
       const twz2 = new TimeWithZone(new Date(Date.UTC(2000, 0, 2)), utcZone);
       expect(twz2.minus(twz1)).toBe(86400);
     });
 
-    it("test_to_a equivalent (date part value methods)", () => {
+    it("to a", () => {
       // Rails: [45, 30, 5, 1, 2, 2000, 2, 32, false, "HST"]
       const hawaii = TimeZone.find("Hawaii");
       const twzH = new TimeWithZone(
@@ -922,19 +941,19 @@ describe("TimeWithZone", () => {
       expect(twzH.zone).toBe("HST");
     });
 
-    it("test_to_f", () => {
+    it("to f", () => {
       const hawaii = TimeZone.find("Hawaii");
       const twzH = new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), hawaii);
       expect(twzH.toF()).toBe(946684800.0);
     });
 
-    it("test_to_i", () => {
+    it("to i", () => {
       const hawaii = TimeZone.find("Hawaii");
       const twzH = new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), hawaii);
       expect(twzH.toI()).toBe(946684800);
     });
 
-    it("test_to_date", () => {
+    it("to date", () => {
       // 1 sec before midnight Jan 1 EST
       const beforeMidnight = new TimeWithZone(
         new Date(Date.UTC(2000, 0, 1, 4, 59, 59)),
@@ -972,24 +991,25 @@ describe("TimeWithZone", () => {
       expect(atMidnight2.day).toBe(2);
     });
 
-    it("test_acts_like_time", () => {
+    it("acts like time", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.actsLikeTime()).toBe(true);
     });
 
-    it("test_blank?", () => {
+    it("blank?", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.isBlank()).toBe(false);
     });
 
-    it("test_usec_returns_0_when_no_fractional", () => {
+    it("usec returns 0 when no fractional", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.usec).toBe(0);
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Rails parity: DST transition tests
+  // DST transition tests (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: DST transitions", () => {
-    it("test_plus_and_minus_enforce_spring_dst_rules", () => {
+  it("plus and minus enforce spring dst rules", () => {
       // 2006-04-02 06:59:59 UTC = 2006-04-02 01:59:59 EST (1 sec before DST)
       const utc = new Date(Date.UTC(2006, 3, 2, 6, 59, 59));
       let twz = new TimeWithZone(utc, eastern);
@@ -1016,7 +1036,7 @@ describe("TimeWithZone", () => {
       expect(twz.zone).toBe("EST");
     });
 
-    it("test_plus_and_minus_enforce_fall_dst_rules", () => {
+    it("plus and minus enforce fall dst rules", () => {
       // 2006-10-29 05:59:59 UTC = 2006-10-29 01:59:59 EDT (1 sec before DST end)
       const utc = new Date(Date.UTC(2006, 9, 29, 5, 59, 59));
       let twz = new TimeWithZone(utc, eastern);
@@ -1043,7 +1063,7 @@ describe("TimeWithZone", () => {
       expect(twz.zone).toBe("EDT");
     });
 
-    it("test_advance_1_day_across_spring_dst_transition", () => {
+    it("advance 1 day across spring dst transition", () => {
       // 2006-04-01 10:30 EST, spring DST transition on Apr 2 at 2AM
       const twz = eastern.local(2006, 4, 1, 10, 30);
       // Advance 1 day should preserve wall clock time
@@ -1054,7 +1074,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_day_across_spring_dst_transition_backwards", () => {
+    it("advance 1 day across spring dst transition backwards", () => {
       const twz = eastern.local(2006, 4, 2, 10, 30);
       const result = twz.advance({ days: -1 });
       expect(result.day).toBe(1);
@@ -1063,7 +1083,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_day_expressed_as_seconds_across_spring_dst", () => {
+    it("advance 1 day expressed as seconds across spring dst", () => {
       // Adding 86400 seconds across spring DST results in 11:30 EDT (not 10:30)
       // because 86400 seconds is exactly 24 hours but the day was only 23 hours
       const twz = eastern.local(2006, 4, 1, 10, 30);
@@ -1074,7 +1094,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_day_expressed_as_hours_across_spring_dst", () => {
+    it("advance 1 day expressed as hours across spring dst", () => {
       const twz = eastern.local(2006, 4, 1, 10, 30);
       const result = twz.advance({ hours: 24 });
       expect(result.day).toBe(2);
@@ -1082,7 +1102,7 @@ describe("TimeWithZone", () => {
       expect(result.min).toBe(30);
     });
 
-    it("test_advance_1_day_across_fall_dst_transition", () => {
+    it("advance 1 day across fall dst transition", () => {
       // 2006-10-28 10:30 EDT, fall DST transition on Oct 29 at 2AM
       const twz = eastern.local(2006, 10, 28, 10, 30);
       const result = twz.advance({ days: 1 });
@@ -1092,7 +1112,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_day_across_fall_dst_transition_backwards", () => {
+    it("advance 1 day across fall dst transition backwards", () => {
       const twz = eastern.local(2006, 10, 29, 10, 30);
       const result = twz.advance({ days: -1 });
       expect(result.day).toBe(28);
@@ -1101,7 +1121,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_day_expressed_as_seconds_across_fall_dst", () => {
+    it("advance 1 day expressed as seconds across fall dst", () => {
       // Adding 86400 seconds across fall DST results in 9:30 EST
       // because 86400 seconds is 24 hours but the day was 25 hours
       const twz = eastern.local(2006, 10, 28, 10, 30);
@@ -1112,7 +1132,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_week_across_spring_dst_transition", () => {
+    it("advance 1 week across spring dst transition", () => {
       const twz = eastern.local(2006, 4, 1, 10, 30);
       const result = twz.advance({ weeks: 1 });
       expect(result.day).toBe(8);
@@ -1121,7 +1141,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_week_across_spring_dst_transition_backwards", () => {
+    it("advance 1 week across spring dst transition backwards", () => {
       const twz = eastern.local(2006, 4, 8, 10, 30);
       const result = twz.advance({ weeks: -1 });
       expect(result.day).toBe(1);
@@ -1130,7 +1150,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_week_across_fall_dst_transition", () => {
+    it("advance 1 week across fall dst transition", () => {
       const twz = eastern.local(2006, 10, 28, 10, 30);
       const result = twz.advance({ weeks: 1 });
       expect(result.month).toBe(11);
@@ -1140,7 +1160,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_week_across_fall_dst_transition_backwards", () => {
+    it("advance 1 week across fall dst transition backwards", () => {
       const twz = eastern.local(2006, 11, 4, 10, 30);
       const result = twz.advance({ weeks: -1 });
       expect(result.month).toBe(10);
@@ -1150,7 +1170,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_month_across_spring_dst_transition", () => {
+    it("advance 1 month across spring dst transition", () => {
       const twz = eastern.local(2006, 4, 1, 10, 30);
       const result = twz.advance({ months: 1 });
       expect(result.month).toBe(5);
@@ -1160,7 +1180,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_month_across_spring_dst_transition_backwards", () => {
+    it("advance 1 month across spring dst transition backwards", () => {
       const twz = eastern.local(2006, 5, 1, 10, 30);
       const result = twz.advance({ months: -1 });
       expect(result.month).toBe(4);
@@ -1170,7 +1190,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_month_across_fall_dst_transition", () => {
+    it("advance 1 month across fall dst transition", () => {
       const twz = eastern.local(2006, 10, 28, 10, 30);
       const result = twz.advance({ months: 1 });
       expect(result.month).toBe(11);
@@ -1180,7 +1200,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EST");
     });
 
-    it("test_advance_1_month_across_fall_dst_transition_backwards", () => {
+    it("advance 1 month across fall dst transition backwards", () => {
       const twz = eastern.local(2006, 11, 28, 10, 30);
       const result = twz.advance({ months: -1 });
       expect(result.month).toBe(10);
@@ -1190,7 +1210,7 @@ describe("TimeWithZone", () => {
       expect(result.zone).toBe("EDT");
     });
 
-    it("test_advance_1_year", () => {
+    it("advance 1 year", () => {
       const twz = eastern.local(2008, 2, 15, 10, 30);
       const forward = twz.advance({ years: 1 });
       expect(forward.year).toBe(2009);
@@ -1205,7 +1225,7 @@ describe("TimeWithZone", () => {
       expect(backward.day).toBe(15);
     });
 
-    it("test_advance_1_year_during_dst", () => {
+    it("advance 1 year during dst", () => {
       const twz = eastern.local(2008, 7, 15, 10, 30);
       const forward = twz.advance({ years: 1 });
       expect(forward.year).toBe(2009);
@@ -1216,7 +1236,7 @@ describe("TimeWithZone", () => {
       expect(forward.zone).toBe("EDT");
     });
 
-    it("test_advance_1_year_from_leap_day", () => {
+    it("advance 1 year from leap day", () => {
       const twz = eastern.local(2004, 2, 29);
       const result = twz.advance({ years: 1 });
       expect(result.year).toBe(2005);
@@ -1224,7 +1244,7 @@ describe("TimeWithZone", () => {
       expect(result.day).toBe(28); // clamped
     });
 
-    it("test_advance_1_month_from_last_day_of_january", () => {
+    it("advance 1 month from last day of january", () => {
       const twz = eastern.local(2005, 1, 31);
       const result = twz.advance({ months: 1 });
       expect(result.year).toBe(2005);
@@ -1232,27 +1252,21 @@ describe("TimeWithZone", () => {
       expect(result.day).toBe(28);
     });
 
-    it("test_advance_1_month_from_last_day_of_january_during_leap_year", () => {
+    it("advance 1 month from last day of january during leap year", () => {
       const twz = eastern.local(2000, 1, 31);
       const result = twz.advance({ months: 1 });
       expect(result.year).toBe(2000);
       expect(result.month).toBe(2);
       expect(result.day).toBe(29);
     });
-  });
 
   // ---------------------------------------------------------------------------
   // Rails parity: change() tests
   // ---------------------------------------------------------------------------
-  describe("Rails parity: change()", () => {
-    let twz: TimeWithZone;
 
-    beforeEach(() => {
-      twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
-      // Local: 1999-12-31 19:00:00 EST
-    });
 
     it("change year", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ year: 2001 });
       expect(result.year).toBe(2001);
       expect(result.month).toBe(12);
@@ -1261,6 +1275,7 @@ describe("TimeWithZone", () => {
     });
 
     it("change month", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ month: 3 });
       expect(result.month).toBe(3);
       expect(result.day).toBe(31);
@@ -1268,6 +1283,7 @@ describe("TimeWithZone", () => {
     });
 
     it("change month clamps day (Feb has fewer days)", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ month: 2 });
       expect(result.month).toBe(2);
       // 1999 is not a leap year, Feb has 28 days; original day is 31 -> clamped
@@ -1277,12 +1293,14 @@ describe("TimeWithZone", () => {
     });
 
     it("change day", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ day: 15 });
       expect(result.day).toBe(15);
       expect(result.hour).toBe(19);
     });
 
     it("change hour resets min and sec", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ hour: 6 });
       expect(result.hour).toBe(6);
       expect(result.min).toBe(0);
@@ -1290,6 +1308,7 @@ describe("TimeWithZone", () => {
     });
 
     it("change min keeps hour", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ min: 15 });
       expect(result.hour).toBe(19);
       expect(result.min).toBe(15);
@@ -1297,24 +1316,20 @@ describe("TimeWithZone", () => {
     });
 
     it("change sec", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.change({ sec: 30 });
       expect(result.hour).toBe(19);
       expect(result.min).toBe(0);
       expect(result.sec).toBe(30);
     });
-  });
 
   // ---------------------------------------------------------------------------
   // Rails parity: advance() tests
   // ---------------------------------------------------------------------------
-  describe("Rails parity: advance()", () => {
-    let twz: TimeWithZone;
 
-    beforeEach(() => {
-      twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
-    });
 
     it("advance years", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.advance({ years: 2 });
       expect(result.year).toBe(2001);
       expect(result.month).toBe(12);
@@ -1323,6 +1338,7 @@ describe("TimeWithZone", () => {
     });
 
     it("advance months", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.advance({ months: 3 });
       expect(result.month).toBe(3);
       expect(result.day).toBe(31);
@@ -1330,6 +1346,7 @@ describe("TimeWithZone", () => {
     });
 
     it("advance days", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.advance({ days: 4 });
       expect(result.month).toBe(1);
       expect(result.day).toBe(4);
@@ -1337,6 +1354,7 @@ describe("TimeWithZone", () => {
     });
 
     it("advance hours", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.advance({ hours: 6 });
       expect(result.day).toBe(1);
       expect(result.hour).toBe(1);
@@ -1345,24 +1363,24 @@ describe("TimeWithZone", () => {
     });
 
     it("advance minutes", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.advance({ minutes: 15 });
       expect(result.hour).toBe(19);
       expect(result.min).toBe(15);
     });
 
     it("advance seconds", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.advance({ seconds: 30 });
       expect(result.hour).toBe(19);
       expect(result.min).toBe(0);
       expect(result.sec).toBe(30);
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Rails parity: TimeZoneTest
+  // TimeZoneTest (from time_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: TimeZoneTest", () => {
-    it("test_local", () => {
+  it("local", () => {
       const hawaii = TimeZone.find("Hawaii");
       const time = hawaii.local(2007, 2, 5, 15, 30, 45);
       expect(time.hour).toBe(15);
@@ -1371,7 +1389,7 @@ describe("TimeWithZone", () => {
       expect(time.timeZone).toBe(hawaii);
     });
 
-    it("test_local_enforces_spring_dst_rules", () => {
+    it("local enforces spring dst rules", () => {
       // 2006 spring DST: Apr 2 at 2:00 AM EST → 3:00 AM EDT
       const zone = TimeZone.find("Eastern Time (US & Canada)");
 
@@ -1397,7 +1415,7 @@ describe("TimeWithZone", () => {
       expect(twz3.zone).toBe("EDT");
     });
 
-    it("test_local_enforces_fall_dst_rules", () => {
+    it("local enforces fall dst rules", () => {
       // 1AM during fall DST transition is ambiguous
       const zone = TimeZone.find("Eastern Time (US & Canada)");
       const twz = zone.local(2006, 10, 29, 1);
@@ -1406,7 +1424,7 @@ describe("TimeWithZone", () => {
       expect(twz.zone).toBe("EDT");
     });
 
-    it("test_at", () => {
+    it("at", () => {
       const zone = TimeZone.find("Eastern Time (US & Canada)");
       const secs = 946684800.0;
       const twz = zone.at(secs);
@@ -1419,7 +1437,7 @@ describe("TimeWithZone", () => {
       expect(twz.toF()).toBe(secs);
     });
 
-    it("test_parse", () => {
+    it("parse", () => {
       const zone = TimeZone.find("Eastern Time (US & Canada)");
       const twz = zone.parse("1999-12-31 19:00:00");
       expect(twz.hour).toBe(19);
@@ -1430,7 +1448,7 @@ describe("TimeWithZone", () => {
       expect(twz.timeZone).toBe(zone);
     });
 
-    it("test_parse_with_timezone_in_string", () => {
+    it("parse string with timezone", () => {
       const zone = TimeZone.find("Eastern Time (US & Canada)");
       // String with explicit timezone offset should be respected
       const twz = zone.parse("2024-01-15T12:00:00Z");
@@ -1439,12 +1457,12 @@ describe("TimeWithZone", () => {
       expect(twz.hour).toBe(7);
     });
 
-    it("test_parse_with_invalid_string throws", () => {
+    it("parse with invalid string", () => {
       const zone = TimeZone.find("Eastern Time (US & Canada)");
       expect(() => zone.parse("foobar")).toThrow();
     });
 
-    it("test_parse_doesnt_use_local_dst", () => {
+    it("parse doesnt use local dst", () => {
       const zone = TimeZone.find("UTC");
       const twz = zone.parse("2013-03-10 02:00:00");
       // UTC has no DST, so 2:00 AM should stay as-is
@@ -1452,7 +1470,7 @@ describe("TimeWithZone", () => {
       expect(twz.day).toBe(10);
     });
 
-    it("test_unknown_timezones_delegation_to_tzinfo (IANA names)", () => {
+    it("unknown timezones delegation to tzinfo", () => {
       const zone = TimeZone.find("America/Montevideo");
       expect(zone).toBeInstanceOf(TimeZone);
       expect(zone.name).toBe("America/Montevideo");
@@ -1467,53 +1485,50 @@ describe("TimeWithZone", () => {
         expect(typeof zone.utcOffset).toBe("number");
       }
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Rails parity: formatting and serialization
+  // formatting and serialization (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: formatting", () => {
-    let twz: TimeWithZone;
 
-    beforeEach(() => {
-      // Same as Rails: @utc = Time.utc(2000, 1, 1, 0)
-      twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
-    });
 
-    it("test_to_fs with non-existent format falls back to default", () => {
+    it("to fs not existent", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       // Rails: to_fs(:not_existent) returns the default format
       expect(twz.toFs("not_existent")).toBe(twz.toString());
     });
 
-    it("test_to_fs rfc822", () => {
+    it("to fs rfc822", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.toFs("rfc822")).toBe(twz.rfc2822());
     });
 
-    it("test_to_fs rfc2822", () => {
+    it("to fs rfc2822", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.toFs("rfc2822")).toBe(twz.rfc2822());
     });
 
-    it("test_to_fs iso8601", () => {
+    it("to fs iso8601", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.toFs("iso8601")).toBe(twz.xmlschema());
     });
 
     it("strftime with composite format", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       expect(twz.strftime("%Y-%m-%d %H:%M:%S %Z %z")).toBe(
         "1999-12-31 19:00:00 EST -0500"
       );
     });
 
     it("JSON serialization uses ISO 8601 with 3 fraction digits", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const json = JSON.stringify({ time: twz });
       expect(JSON.parse(json).time).toBe(twz.asJson());
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Rails parity: far future / past dates
+  // far future / past dates (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: far future and past dates", () => {
-    it("test_utc_to_local_conversion_with_far_future_datetime", () => {
+  it("utc to local conversion with far future datetime", () => {
       // 2050-01-01 00:00:00 UTC → 2049-12-31 19:00:00 EST
       const twz = new TimeWithZone(
         new Date(Date.UTC(2050, 0, 1, 0, 0, 0)),
@@ -1525,18 +1540,16 @@ describe("TimeWithZone", () => {
       expect(twz.hour).toBe(19);
     });
 
-    it("test_local_to_utc_conversion_with_far_future_datetime", () => {
+    it("local to utc conversion with far future datetime", () => {
       const twz = eastern.local(2049, 12, 31, 19, 0, 0);
       const utcMs = twz.utc().getTime();
       expect(utcMs).toBe(Date.UTC(2050, 0, 1, 0, 0, 0));
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Additional comparison tests
+  // Additional comparison tests (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: before? and after?", () => {
-    it("test_before", () => {
+  it("before", () => {
       const twz = new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 0)), eastern);
       const before = new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 11, 59, 59)), eastern);
       const same = new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 0)), eastern);
@@ -1546,13 +1559,11 @@ describe("TimeWithZone", () => {
       expect(twz.compareTo(same)).toBe(0);      // same moment
       expect(twz.compareTo(after)).toBe(-1);    // twz is before after
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Multiple timezone conversion tests
+  // Multiple timezone conversion tests (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: cross-timezone", () => {
-    it("Hawaii timezone basic operations", () => {
+  it("Hawaii timezone basic operations", () => {
       const hawaii = TimeZone.find("Hawaii");
       const twz = hawaii.local(2000, 1, 1, 0, 0, 0);
 
@@ -1594,26 +1605,22 @@ describe("TimeWithZone", () => {
       expect(pacific_twz.hour).toBe(5);  // PDT
       expect(hawaii_twz.hour).toBe(2);   // HST
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Seconds since midnight
+  // Seconds since midnight (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: seconds_since_midnight", () => {
-    it("calculates seconds since midnight correctly", () => {
+  it("calculates seconds since midnight correctly", () => {
       // 1999-12-31 19:00:00 EST = 19 * 3600 seconds since midnight
       const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const expectedSeconds = 19 * 3600;
       const actualSeconds = twz.hour * 3600 + twz.min * 60 + twz.sec;
       expect(actualSeconds).toBe(expectedSeconds);
     });
-  });
 
   // ---------------------------------------------------------------------------
-  // Duration arithmetic with Duration class
+  // Duration arithmetic with Duration class (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
-  describe("Rails parity: Duration arithmetic", () => {
-    it("plus Duration.days(5)", () => {
+  it("plus Duration.days(5)", () => {
       const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
       const result = twz.plus(Duration.days(5));
       expect(result.day).toBe(5);
@@ -1664,5 +1671,4 @@ describe("TimeWithZone", () => {
       expect(result.sec).toBe(1);
       expect(result.zone).toBe("EDT");
     });
-  });
 });

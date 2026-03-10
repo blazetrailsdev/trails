@@ -1,6 +1,6 @@
 # ActiveSupport: Road to 100% Test Coverage
 
-Current state: **21.4%** real (606 matched / 2,826 total Ruby tests), 2,209 stubs remaining.
+Current state: **27.8%** real (787 matched / 2,826 total Ruby tests), 2,036 stubs remaining.
 
 ## How coverage is measured
 
@@ -30,16 +30,16 @@ The compare script (`npm run test:compare`) extracts test names from both Rails 
 | ordered-hash | 34 / 42 | 8 |
 | error-reporter | 29 / 32 | 3 |
 | safe-buffer | 19 / 41 | 22 |
-| time_with_zone | 203 tests | New implementation, not yet compared |
-| time_zone | (shared with time_with_zone) | New implementation |
-| string_ext | 51 / 148 | 40 skipped, split into string-ext.test.ts |
-| inflector | 158 / 56 | 32 skipped, split into inflector.test.ts |
+| string_ext | 126 / 148 | 22 stubs remaining |
+| inflector | 55 / 56 | 1 missing |
 | concern | 2 / 17 | 15 |
 
 ### Needs work (0% — stubs only)
 
 | File | Stubs | Notes |
 |---|---|---|
+| time_with_zone | 179 | Implementation exists (203 TS tests), needs name matching |
+| time_zone | 108 | Implementation exists, needs name matching |
 | hash_with_indifferent_access | 93 | HWIA edge cases |
 | multibyte_chars | 76 | Unicode/multibyte handling |
 | date_time_ext | 68 | DateTime extensions |
@@ -64,9 +64,9 @@ Plus 60+ smaller files with < 25 stubs each.
 
 ### Highest ROI (most stubs, foundational)
 
-1. **string_ext** (40 skipped) — Needs truncate_bytes, remove, separator options, etc.
-2. **hash_with_indifferent_access** (93 stubs) — Core data structure, used everywhere
-3. **inflector** (32 skipped) — Mostly acronym/locale/clear API, runtime inflection config
+1. **time_with_zone** (179 stubs) — Implementation exists, needs test name matching
+2. **time_zone** (108 stubs) — Implementation exists, needs test name matching
+3. **hash_with_indifferent_access** (93 stubs) — Core data structure, used everywhere
 4. **json/encoding** (46 stubs) — JSON serialization
 
 ### Medium effort, good payoff

@@ -19,7 +19,9 @@ const PACKAGE_TEST_FILES: Record<string, string[]> = {
   arel: ["packages/arel/src/arel.test.ts"],
   activemodel: ["packages/activemodel/src/activemodel.test.ts"],
   activesupport: [
-    "packages/activesupport/src/activesupport.test.ts",
+    "packages/activesupport/src/inflector.test.ts",
+    "packages/activesupport/src/string-ext.test.ts",
+    "packages/activesupport/src/time-with-zone.test.ts",
     "packages/activesupport/src/callbacks.test.ts",
     "packages/activesupport/src/concern.test.ts",
     "packages/activesupport/src/class-attribute.test.ts",
