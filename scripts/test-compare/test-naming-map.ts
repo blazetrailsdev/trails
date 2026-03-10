@@ -2759,11 +2759,20 @@ export const TEST_OVERRIDES: Record<string, string | null> = {
   // ==========================================================================
   // Arel overrides
   // ==========================================================================
-  // Ruby-only features we skip
-  "SqlLiteralTest > serializes into YAML": "SqlLiteralTest > serializes into YAML",
-  "SqlLiteralTest > generates a Fragments node": "SqlLiteralTest > generates a Fragments node",
-  "can define a dispatch method": "can define a dispatch method",
-  "should visit_Set": "should visit_Set",
+  // Ruby-only features — null-override (no TS equivalent)
+  "SqlLiteralTest > serializes into YAML": null,
+  "SqlLiteralTest > generates a Fragments node": null,
+  "can define a dispatch method": null,
+  "should visit_Set": null,
+  // Fix fuzzy match collision: pin "is equal to other true nodes" to correct TS test
+  "is equal to other true nodes": "Arel > Nodes True (ported stubs) > is equal to other true nodes",
+  // Fix description collisions for duplicate test names across Ruby files
+  "UpdateManagerTest > chains": "Arel > Update Manager (ported stubs) > chains",
+  "SelectManagerTest > chains": "Arel > SelectManager (additional) > chains",
+  "SelectManagerTest > converts to sqlliterals with multiple items": "Arel > SelectManager (additional) > converts to sqlliterals with multiple items",
+  "SelectManagerTest > responds to join": "Arel > SelectManager (additional) > responds to join",
+  "SelectManagerTest > copies where clauses when nesting is triggered": "Arel > SelectManager (additional) > copies where clauses when nesting is triggered",
+  "TableTest > takes multiple parameters": "Arel > Table (ported stubs) > takes multiple parameters",
   // Duplicate test name - map to existing test
   "AttributeTest > can be constructed with an exclusive range":
     "Arel > Attribute between (range variants) > can be constructed with an exclusive range",

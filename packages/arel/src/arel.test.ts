@@ -2947,13 +2947,13 @@ describe("Arel", () => {
       expect(a.orders.length).not.toBe(b.orders.length);
     });
 
-    it("CurrentRow is equal to other current row nodes", () => {
+    it("is equal to other current row nodes", () => {
       const a = new Nodes.CurrentRow();
       const b = new Nodes.CurrentRow();
       expect(a.constructor).toBe(b.constructor);
     });
 
-    it("CurrentRow is not equal with other nodes", () => {
+    it("is not equal with other nodes", () => {
       const a = new Nodes.CurrentRow();
       expect(a).not.toBeInstanceOf(Nodes.Preceding);
     });
@@ -3398,7 +3398,7 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain('"name"');
     });
 
-    it("takes multiple parameters for project", () => {
+    it("takes multiple parameters", () => {
       const mgr = users.project(users.get("name"), users.get("email"));
       expect(mgr.toSql()).toContain('"name"');
       expect(mgr.toSql()).toContain('"email"');
@@ -3470,7 +3470,7 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain('"age"');
     });
 
-    it("chains set", () => {
+    it("chains", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       expect(mgr.set([[users.get("name"), "dean"]])).toBe(mgr);
@@ -3491,7 +3491,7 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain("WHERE");
     });
 
-    it("chains where", () => {
+    it("chains", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
@@ -6201,15 +6201,9 @@ describe("Arel", () => {
   });
 });
 
-describe("SqlLiteralTest", () => {
-  it.skip("serializes into YAML", () => { /* fixture-dependent */ });
-  it.skip("generates a Fragments node", () => { /* fixture-dependent */ });
-});
-
-describe("can define a dispatch method", () => {
-  it.skip("can define a dispatch method", () => { /* fixture-dependent */ });
-});
-
-describe("should visit_Set", () => {
-  it.skip("should visit_Set", () => { /* fixture-dependent */ });
-});
+// SqlLiteralTest:
+//   "serializes into YAML" — Ruby-only (YAML serialization), null-overridden in test-naming-map.ts
+//   "generates a Fragments node" — Fragments node not implemented in TS, null-overridden in test-naming-map.ts
+// visitors/to_sql_test.rb:
+//   "can define a dispatch method" — Ruby metaprogramming (Class.new + define_method), null-overridden in test-naming-map.ts
+//   "should visit_Set" — Ruby Set type, null-overridden in test-naming-map.ts
