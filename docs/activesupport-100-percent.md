@@ -30,22 +30,22 @@ The compare script (`npm run test:compare`) extracts test names from both Rails 
 | ordered-hash | 34 / 42 | 8 |
 | error-reporter | 29 / 32 | 3 |
 | safe-buffer | 19 / 41 | 22 |
-| time_with_zone | 203 / 179 | — |
-| time_zone | 203 / 108 | — |
+| time_with_zone | 203 tests | New implementation, not yet compared |
+| time_zone | (shared with time_with_zone) | New implementation |
+| string_ext | 51 / 148 | 40 skipped, split into string-ext.test.ts |
+| inflector | 158 / 56 | 32 skipped, split into inflector.test.ts |
 | concern | 2 / 17 | 15 |
 
 ### Needs work (0% — stubs only)
 
 | File | Stubs | Notes |
 |---|---|---|
-| string_ext | 147 | String extensions (inflection, encoding, etc.) |
 | hash_with_indifferent_access | 93 | HWIA edge cases |
 | multibyte_chars | 76 | Unicode/multibyte handling |
 | date_time_ext | 68 | DateTime extensions |
 | test_case | 62 | Test framework utilities |
 | date_ext | 56 | Date extensions |
 | module | 53 | Module extensions |
-| inflector | 48 | Inflection edge cases |
 | xml_mini | 47 | XML serialization |
 | json/encoding | 46 | JSON encoding edge cases |
 | broadcast_logger | 37 | Multi-destination logging |
@@ -64,10 +64,10 @@ Plus 60+ smaller files with < 25 stubs each.
 
 ### Highest ROI (most stubs, foundational)
 
-1. **string_ext** (147 stubs) — Many are inflection tests that may already work
-3. **hash_with_indifferent_access** (93 stubs) — Core data structure, used everywhere
-4. **inflector** (48 stubs) — Pluralize/singularize edge cases
-5. **json/encoding** (46 stubs) — JSON serialization
+1. **string_ext** (40 skipped) — Needs truncate_bytes, remove, separator options, etc.
+2. **hash_with_indifferent_access** (93 stubs) — Core data structure, used everywhere
+3. **inflector** (32 skipped) — Mostly acronym/locale/clear API, runtime inflection config
+4. **json/encoding** (46 stubs) — JSON serialization
 
 ### Medium effort, good payoff
 
@@ -80,7 +80,7 @@ Plus 60+ smaller files with < 25 stubs each.
 ### Lower ROI / complex
 
 - **multibyte_chars** (76 stubs) — Unicode normalization, Ruby-specific encoding
-- **date/time extensions** (68 + 56 + 21 stubs) — Requires TimeZone infrastructure
+- **date/time extensions** (68 + 56 + 21 stubs) — TimeZone now available, needs porting
 - **xml_mini** (47 stubs) — XML parsing/serialization
 - **test_case** (62 stubs) — Test framework utilities
 - **share_lock** (25 stubs) — Thread concurrency primitives
