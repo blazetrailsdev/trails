@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **66.3%** real (3,599 matched / 5,428 total Ruby tests), 1,812 stubs remaining.
+Current state: **64.2%** real (3,706 matched / 5,771 total Ruby tests), 1,945 stubs remaining.
 
 ## How coverage is measured
 
@@ -35,11 +35,11 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 
 ## Current status by test file
 
-### Complete (100% pass rate) — 322 tests across 20 files
+### Complete (100% pass rate) — 274 tests across 27 files
 
 | File | Tests | | File | Tests |
 |---|---|---|---|---|
-| belongs-to | 153 | | explain | 14 |
+| sqlite-adapter (combined) | 104 | | explain | 14 |
 | custom-properties | 38 | | numericality | 14 |
 | json-serialization | 23 | | nested-attributes | 10 |
 | mutation | 21 | | presence | 8 |
@@ -56,6 +56,7 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 |---|---|---|
 | has-many | 306 / 311 | 5 |
 | calculations | 211 / 233 | 22 |
+| belongs-to | 153 / 153 | 0 |
 | attribute-methods | 126 / 133 | 7 |
 | default-scoping | 88 / 96 | 8 |
 | relation-scoping | 62 / 64 | 2 |
@@ -76,72 +77,88 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 | relations | 234 / 279 | 45 |
 | finder | 221 / 260 | 39 |
 | persistence | 123 / 153 | 30 |
-| enum | 75 / 97 | 22 |
 | batches | 86 / 107 | 21 |
 | transactions | 80 / 98 | 18 |
-| nested-attributes | 78 / 127 | 49 |
-| named-scoping | 61 / 73 | 12 |
+| enum | 75 / 97 | 22 |
 | inheritance | 65 / 73 | 8 |
+| named-scoping | 61 / 73 | 12 |
 | dirty | 50 / 62 | 12 |
 | store | 42 / 50 | 8 |
-| primary-keys | 41 / 60 | 19 |
 | select | 23 / 26 | 3 |
 | update-all | 23 / 26 | 3 |
+| left-outer-join | 16 / 19 | 3 |
+| dup | 17 / 19 | 2 |
+| token-for | 16 / 18 | 2 |
+| schema | 12 / 14 | 2 |
+| delegated-type | 11 / 13 | 2 |
+
+Plus smaller files: excluding (8/11), finder (8/9), secure-token (8/9), serialization (8/9), nested-attributes (3/4).
 
 ### Needs work (below 70%)
 
 | File | Passing / Total | Skipped |
 |---|---|---|
-| has-one-habtm (combined) | 209 / 362 | 153 |
-| eager | 105 / 197 | 92 |
-| autosave-association | 87 / 177 | 90 |
+| associations (misc) | 25 / 130 | 105 |
 | base | 83 / 186 | 103 |
 | has-many-through | 66 / 165 | 99 |
-| associations (misc) | 25 / 130 | 105 |
+| eager | 105 / 197 | 92 |
+| autosave-association | 87 / 177 | 90 |
+| migration | 19 / 90 | 71 |
+| has-one-habtm (combined) | 162 / 397 | 225 |
+| insert-all | 19 / 73 | 54 |
+| relation | 1 / 51 | 50 |
+| nested-attributes | 78 / 127 | 49 |
 | where | 15 / 62 | 47 |
+| where-chain | 10 / 54 | 44 |
+| reflection | 24 / 67 | 43 |
+| inverse | 52 / 93 | 41 |
 | counter-cache | 14 / 55 | 41 |
 | strict-loading | 14 / 54 | 40 |
-| inverse | 52 / 93 | 41 |
-| serialized-attribute | 30 / 59 | 29 |
-| migration | 19 / 90 | 71 |
-| reflection | 24 / 67 | 43 |
-| insert-all | 19 / 73 | 54 |
-| where-chain | 10 / 54 | 44 |
 | transaction-callbacks | 19 / 57 | 38 |
+| serialized-attribute | 30 / 59 | 29 |
 | optimistic locking | 19 / 50 | 31 |
-| defaults | 12 / 25 | 13 |
 
-Plus smaller files: signed-id (16/29), callbacks (17/46), aggregations (14/25), sanitize (13/22), cascaded-eager-loading (8/27), readonly (5/14), cache-key (7/12), modules (9/14), touch-later (6/11), association validation (5/10), clone (2/4), extensions (4/12), required (4/7), field-ordered-values (6/10), delegated-type (11/13), token-for (16/18), secure-token (8/9), dup (17/19), schema (12/14), left-outer-join (16/19), serialization (8/9), excluding (8/11).
+Plus smaller files: cascaded-eager-loading (8/27), primary-keys (41/60), signed-id (16/29), defaults (12/25), callbacks (17/46), aggregations (14/25), invertible (18/28), sanitize (13/22), readonly (5/14), modules (9/14), cache-key (7/12), touch-later (6/11), association validation (5/10), field-ordered-values (6/10), extensions (4/12), required (4/7), clone (2/4), habtm (0/4), comment (0/17), where-clause (0/21), with (0/16), null-relation (6/9), querying-methods-delegation (2/3), reload-cache (0/1).
 
-### DB adapter stubs (need real DB connections)
+### DB adapter tests
 
-| File | Passing | Skipped |
-|---|---|---|
-| sqlite-adapter | 157 | 24 |
-| postgres-adapter | 57 | 995 |
-| mysql-adapter | 32 | 184 |
+| File | Matched | Skipped (null) | Stubs |
+|---|---|---|---|
+| sqlite-adapter | 104 | 23 | 0 |
+| mysql-adapter | 1 | 0 | 183 |
+
+MySQL adapter stubs need real DB connections. PostgreSQL adapter tests are still excluded from comparison.
 
 ## Recommended next targets
 
 ### Highest ROI
 
-1. **base.test.ts** (103 stubs, 45%) — broad coverage, good infrastructure
-2. **associations.test.ts** (105 stubs, 19%) — misc association edge cases
+1. **associations.test.ts** (105 stubs, 19%) — misc association edge cases
+2. **base.test.ts** (103 stubs, 45%) — broad coverage, good infrastructure
 3. **has-many-through.test.ts** (99 stubs, 40%) — through associations
-4. **migration.test.ts** (71 stubs, 21%) — migration edge cases
-5. **insert-all.test.ts** (54 stubs, 26%) — bulk operations
+4. **eager.test.ts** (92 stubs, 53%) — eager loading
+5. **autosave-association.test.ts** (90 stubs, 49%) — autosave edge cases
+
+### Medium effort
+
+6. **migration.test.ts** (71 stubs, 21%) — migration edge cases
+7. **insert-all.test.ts** (54 stubs, 26%) — bulk operations
+8. **relation.test.ts** (50 stubs, 2%) — core relation methods
+9. **nested-attributes.test.ts** (49 stubs, 61%) — CPK, dirty tracking
+10. **where.test.ts** (47 stubs, 24%) — where clause conditions
 
 ### Association-heavy (larger effort)
 
-6. **has-one-habtm.test.ts** (153 stubs) — HABTM + has_one
-7. **eager.test.ts** (92 stubs) — eager loading
-8. **autosave-association.test.ts** (90 stubs) — autosave edge cases
+- **has-one-habtm.test.ts** (225 stubs combined) — HABTM + has_one across multiple Ruby files
+- **where-chain.test.ts** (44 stubs) — where.not/missing/associated
+- **counter-cache.test.ts** (41 stubs) — counter cache
+- **strict-loading.test.ts** (40 stubs) — strict loading modes
 
 ### Lower ROI / complex
 
 - Composite primary keys — scattered across files
 - Pessimistic locking — needs FOR UPDATE support
-- DB adapters — need real DB connections, large stub counts
+- MySQL adapter — needs real DB connection (183 stubs)
 - Ruby-only concepts (marshal, YAML) — permanently skip
 
 ## Tracking progress
@@ -150,4 +167,4 @@ Plus smaller files: signed-id (16/29), callbacks (17/46), aggregations (14/25), 
 npm run test:compare
 ```
 
-Target: `activerecord: 100% real (5428 matched, 0 stub / 5428 total)`
+Target: `activerecord: 100% real (5771 matched, 0 stub / 5771 total)`
