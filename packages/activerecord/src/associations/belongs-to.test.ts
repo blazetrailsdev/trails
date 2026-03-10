@@ -41,19 +41,6 @@ describe("BelongsToWithForeignKeyTest", () => {
   });
 });
 
-describe("BelongsToWithForeignKeyTest", () => {
-  it("destroy linked models", async () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const p = await Post.create({ title: "linked" });
-    expect(p.isPersisted()).toBe(true);
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
-  });
-});
-
 
 describe("touch on belongs_to", () => {
   let adapter: DatabaseAdapter;

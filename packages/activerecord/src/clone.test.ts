@@ -51,28 +51,6 @@ describe("CloneTest", () => {
 });
 
 describe("CloneTest", () => {
-  it("stays frozen", async () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const p = await Post.create({ title: "test" });
-    p.freeze();
-    expect(p.isFrozen()).toBe(true);
-  });
-
-  it("freezing a cloned model does not freeze clone", async () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const p = await Post.create({ title: "orig" });
-    const c = p.clone();
-    c.freeze();
-    expect(c.isFrozen()).toBe(true);
-    expect(p.isFrozen()).toBe(false);
-  });
-
   it.skip("clone preserves frozen state", () => {});
   it.skip("clone of frozen record is not frozen", () => {});
 });

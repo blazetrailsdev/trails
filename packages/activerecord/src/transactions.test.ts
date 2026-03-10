@@ -372,31 +372,6 @@ describe("TransactionTest", () => {
     expect(await Post.count()).toBe(1);
   });
 
-  it("raise after destroy", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const p = await Post.create({ title: "destroy-test" }) as any;
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
-  });
-
-  it("rollback dirty changes", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const p = await Post.create({ title: "original" }) as any;
-    try {
-      await transaction(Post, async () => {
-        await p.update({ title: "changed" });
-        throw new Error("rollback");
-      });
-    } catch (_) { /* expected */ }
-    expect(p).not.toBeNull();
-  });
-
   it.skip("after_commit on update", () => {});
   it.skip("after_commit on destroy", () => {});
   it.skip("after commit fires in correct order", () => {});
@@ -810,28 +785,6 @@ describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
     await p.update({ title: "changed" });
     expect(log).toContain("updated");
     expect(p.readAttribute("lock_version")).toBe(1);
-  });
-});
-
-describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
-  it("after commit callbacks with optimistic locking", async () => {
-    const adapter = freshAdapter();
-    const log: string[] = [];
-    class Item extends Base {
-      static {
-        this._tableName = "items";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
-        this.afterCreate(function() { log.push("created"); });
-        this.afterUpdate(function() { log.push("updated"); });
-      }
-    }
-    const item = await Item.create({ title: "test" });
-    expect(log).toContain("created");
-    await item.update({ title: "changed" });
-    expect(log).toContain("updated");
-    expect(item.readAttribute("lock_version")).toBe(1);
   });
 });
 

@@ -277,22 +277,6 @@ describe("TooManyOrTest", () => {
   });
 });
 
-describe("TooManyOrTest", () => {
-  it("too many or", () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    // Should not throw even with many OR conditions
-    let rel = Post.where({ title: "a" });
-    for (let i = 0; i < 5; i++) {
-      rel = rel.or(Post.where({ title: String(i) }));
-    }
-    const sql = rel.toSql();
-    expect(sql).toContain("OR");
-  });
-});
-
 
 describe("Relation#or", () => {
   it("combines two where clauses with OR", async () => {

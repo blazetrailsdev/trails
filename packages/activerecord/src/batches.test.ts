@@ -91,18 +91,6 @@ describe("EachTest", () => {
 describe("EachTest", () => {
   const adapter = freshAdapter();
 
-  it("in batches should yield relation if block given", async () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
-    const batches: any[][] = [];
-    for await (const batch of Post.all().findInBatches({ batchSize: 2 })) {
-      batches.push(batch);
-    }
-    expect(batches.length).toBeGreaterThan(0);
-  });
-
   it("in batches has attribute readers", async () => {
     class Post extends Base {
       static { this.attribute("title", "string"); this.adapter = adapter; }
@@ -239,24 +227,6 @@ describe("EachTest", () => {
     }
     expect(collected.length).toBeLessThanOrEqual(5);
     expect(collected.length).toBeGreaterThan(0);
-  });
-
-  it("find in batches should end at the finish option", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    const posts: any[] = [];
-    for (let i = 0; i < 8; i++) {
-      const p = await Post.create({ title: `post-${i}` }) as any;
-      posts.push(p);
-    }
-    const finishId = posts[4].id;
-    const collected: any[] = [];
-    for await (const batch of Post.all().findInBatches({ batchSize: 3, finish: finishId })) {
-      collected.push(...batch);
-    }
-    expect(collected.length).toBeLessThanOrEqual(5);
   });
 
   it("find in batches should return an enumerator", async () => {
@@ -492,19 +462,6 @@ describe("EachTest", () => {
       collected.push(record);
     }
     expect(collected.length).toBe(6);
-  });
-
-  it("in batches has attribute readers", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    for (let i = 0; i < 3; i++) await Post.create({ title: `attr-${i}` });
-    for await (const batchRel of Post.all().inBatches({ batchSize: 2 })) {
-      const records = await batchRel.toArray();
-      expect(Array.isArray(records)).toBe(true);
-      break;
-    }
   });
 
   it("in batches touch all affect all records", async () => {

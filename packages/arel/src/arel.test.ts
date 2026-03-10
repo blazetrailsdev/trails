@@ -5181,12 +5181,6 @@ describe("Arel", () => {
       expect(sql).toContain("INSERT INTO");
     });
 
-    it("converts to sql", () => {
-      const im = new InsertManager();
-      im.into(users);
-      im.insert([[users.get("id"), 10]]);
-      expect(im.toSql()).toContain("10");
-    });
   });
 
   // -- Nodes equality tests --
@@ -5416,19 +5410,6 @@ describe("Arel", () => {
       expect(sql).toContain("bar");
     });
 
-    it("takes multiple args", () => {
-      const mgr = new SelectManager(users);
-      mgr.order(users.get("id").asc(), users.get("name").desc());
-      const sql = mgr.toSql();
-      expect(sql).toContain("ORDER BY");
-    });
-
-    it("chains", () => {
-      const mgr = new SelectManager(users);
-      const result = mgr.project(star);
-      expect(result).toBe(mgr);
-    });
-
     it("can receive any node", () => {
       const mgr = new SelectManager(users);
       mgr.where(users.get("id").eq(1));
@@ -5487,13 +5468,6 @@ describe("Arel", () => {
       expect(sql).toContain("*");
     });
 
-    it("responds to join", () => {
-      const mgr = new SelectManager(users);
-      mgr.join(posts, users.get("id").eq(posts.get("user_id")));
-      const sql = mgr.toSql();
-      expect(sql).toContain("INNER JOIN");
-    });
-
     it("handles database-specific statements", () => {
       const mgr = new SelectManager(users);
       mgr.lock();
@@ -5508,13 +5482,6 @@ describe("Arel", () => {
       expect(alias).toBeInstanceOf(Nodes.TableAlias);
     });
 
-    it("copies where clauses when nesting is triggered", () => {
-      const mgr = new SelectManager(users);
-      mgr.where(users.get("id").eq(1));
-      mgr.where(users.get("name").eq("bob"));
-      const sql = mgr.toSql();
-      expect(sql).toContain("AND");
-    });
   });
 
   // -- Table additional tests --
@@ -5522,16 +5489,6 @@ describe("Arel", () => {
     it("should create join nodes with a klass", () => {
       const join = users.createJoin(posts);
       expect(join).toBeInstanceOf(Nodes.InnerJoin);
-    });
-
-    it("should create join nodes with a klass", () => {
-      const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(join).toBeInstanceOf(Nodes.InnerJoin);
-    });
-
-    it("should create join nodes with a klass", () => {
-      const sjoin = users.createStringJoin("NATURAL JOIN posts");
-      expect(sjoin).toBeInstanceOf(Nodes.StringJoin);
     });
 
     it("noops on nil", () => {

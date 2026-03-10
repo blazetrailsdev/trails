@@ -342,10 +342,6 @@ describe("EagerLoadingTooManyIdsTest", () => {
   it.skip("eager loading too many ids", () => { /* fixture-dependent */ });
 });
 
-describe("EagerLoadingTooManyIdsTest", () => {
-  it.skip("eager loading too many ids", () => { /* fixture-dependent */ });
-});
-
 
 describe("Eager Loading", () => {
   it("includes preloads belongsTo associations", async () => {

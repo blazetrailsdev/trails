@@ -392,20 +392,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   it.skip("supports permitted classes for default column serializer — YAML-specific, not applicable to TypeScript", () => {});
 });
 
-describe("SerializedAttributeTestWithYamlSafeLoad", () => {
-  // These tests cover YAML safe_load behavior which is Ruby/YAML-specific.
-  // TypeScript uses JSON serialization instead, so these are not applicable.
-  it.skip("nil is always persisted as null — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("serialized attribute with default — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("serialized attributes from database on subclass — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("serialized attribute on alias attribute — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("unexpected serialized type — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("serialize attribute via select method when time zone available — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("should raise exception on serialized attribute with type mismatch — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("serialized time attribute — YAML-specific, not applicable to TypeScript", () => {});
-  it.skip("supports permitted classes for default column serializer — YAML-specific, not applicable to TypeScript", () => {});
-});
-
 
 describe("serialize", () => {
   let adapter: DatabaseAdapter;

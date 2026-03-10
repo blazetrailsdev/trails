@@ -29,7 +29,3 @@ function freshAdapter(): DatabaseAdapter {
 describe("ReloadAssociationCacheTest", () => {
   it.skip("reload sets correct owner for association cache", () => { /* fixture-dependent */ });
 });
-
-describe("ReloadAssociationCacheTest", () => {
-  it.skip("reload sets correct owner for association cache", () => { /* fixture-dependent */ });
-});

@@ -8418,41 +8418,6 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("DirtyTest", () => {
-    it("changes accessible through both strings and symbols", () => {
-      class Person extends Model {
-        static { this.attribute("name", "string"); }
-      }
-      const p = new Person({ name: "Alice" });
-      p.writeAttribute("name", "Bob");
-      expect(p.changes["name"]).toEqual(["Alice", "Bob"]);
-    });
-
-    it("be consistent with symbols arguments after the changes are applied", () => {
-      class Person extends Model {
-        static { this.attribute("name", "string"); }
-      }
-      const p = new Person({ name: "Alice" });
-      p.writeAttribute("name", "Bob");
-      p.changesApplied();
-      expect(p.previousChanges["name"]).toEqual(["Alice", "Bob"]);
-    });
-
-    it("restore_attributes can restore only some attributes", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.attribute("age", "integer");
-        }
-      }
-      const p = new Person({ name: "Alice", age: 25 });
-      p.writeAttribute("name", "Bob");
-      p.writeAttribute("age", 30);
-      p.clearAttributeChanges(["name"]);
-      expect(p.attributeChanged("age")).toBe(true);
-    });
-  });
-
   describe("ErrorTest", () => {
     it("match? handles extra options match", () => {
       const errors = new Errors({});
@@ -8492,12 +8457,6 @@ describe("ActiveModel", () => {
       expect(errors.fullMessages).toEqual(["Name can't be blank"]);
     });
 
-    it("merge does not import errors when merging with self", () => {
-      const errors = new Errors({});
-      errors.add("name", "invalid");
-      errors.merge(errors);
-      expect(errors.count).toBe(1);
-    });
   });
 
   describe("SerializationTest", () => {
@@ -8810,17 +8769,6 @@ describe("ActiveModel", () => {
         }
       }
       expect(Person.validatorsOn("name").length).toBeGreaterThan(0);
-    });
-
-    it("validate with bang and context", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true, on: "create" });
-        }
-      }
-      const p = new Person({});
-      expect(() => p.validateBang("create")).toThrow();
     });
 
     it("strict validation in custom validator helper", () => {
@@ -9522,16 +9470,6 @@ describe("ActiveModel", () => {
       expect(p.errors.count).toBeGreaterThan(0);
     });
 
-    it("validates format of without lambda without arguments", () => {
-      class Person extends Model {
-        static {
-          this.attribute("email", "string");
-          this.validates("email", { format: { with: /@/ } });
-        }
-      }
-      const p = new Person({ email: "test@example.com" });
-      expect(p.isValid()).toBe(true);
-    });
   });
 
   describe("ComparisonValidationTest", () => {

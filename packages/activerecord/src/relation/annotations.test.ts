@@ -318,66 +318,6 @@ describe("AnnotateTest", () => {
   });
 });
 
-describe("AnnotateTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
-  it("annotate wraps content in an inline comment", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const sql = Post.all().annotate("my comment").toSql();
-    expect(sql).toContain("my comment");
-  });
-  it("annotate is sanitized", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const sql = Post.all().annotate("safe comment").toSql();
-    expect(sql).toContain("safe comment");
-  });
-});
-
-describe("WithAnnotationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
-  function makeModel() {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    return { Post };
-  }
-  it("belongs to with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("belongs_to_comment").toSql();
-    expect(sql).toContain("belongs_to_comment");
-  });
-  it("has and belongs to many with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("habtm_comment").toSql();
-    expect(sql).toContain("habtm_comment");
-  });
-  it("has one with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("has_one_comment").toSql();
-    expect(sql).toContain("has_one_comment");
-  });
-  it("has many with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("has_many_comment").toSql();
-    expect(sql).toContain("has_many_comment");
-  });
-  it("has many through with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("through_comment").toSql();
-    expect(sql).toContain("through_comment");
-  });
-  it("has many through with annotation includes a query comment when eager loading", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("eager_comment").toSql();
-    expect(sql).toContain("eager_comment");
-  });
-});
-
 
 describe("annotate()", () => {
   it("adds SQL comments to the query", () => {

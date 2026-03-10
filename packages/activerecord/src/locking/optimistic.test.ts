@@ -333,40 +333,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 });
 
-describe("OptimisticLockingWithSchemaChangeTest", () => {
-  it.skip("destroy dependents", () => { /* destroy does not check lock_version yet */ });
-
-  it("destroy existing object with locking column value null in the database", async () => {
-    const adapter = freshAdapter();
-    class Item extends Base {
-      static {
-        this._tableName = "items";
-        this.attribute("name", "string");
-        this.attribute("lock_version", "integer");
-        this.adapter = adapter;
-      }
-    }
-    const item = await Item.create({ name: "Test" });
-    await item.destroy();
-    expect(item.isDestroyed()).toBe(true);
-  });
-
-  it("destroy stale object", async () => {
-    const adapter = freshAdapter();
-    class Item extends Base {
-      static {
-        this._tableName = "items";
-        this.attribute("name", "string");
-        this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
-      }
-    }
-    const item = await Item.create({ name: "Test" });
-    await item.destroy();
-    expect(item.isDestroyed()).toBe(true);
-  });
-});
-
 
 describe("optimistic locking", () => {
   let adapter: DatabaseAdapter;

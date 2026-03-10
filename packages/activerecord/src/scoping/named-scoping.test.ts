@@ -1053,21 +1053,6 @@ describe("Scopes (Rails-guided)", () => {
     expect(result).toHaveLength(1);
   });
 
-  it("scope with arguments", async () => {
-    class Product extends Base {
-      static {
-        this.attribute("price", "integer");
-        this.adapter = adapter;
-        this.scope("cheaperThan", (rel: any, price: number) => rel.where("price < ?", price));
-      }
-    }
-    await Product.create({ price: 5 });
-    await Product.create({ price: 50 });
-
-    const result = await (Product as any).cheaperThan(10).toArray();
-    expect(result).toHaveLength(1);
-  });
-
   it("default_scope is applied to all queries", async () => {
     class Post extends Base {
       static {

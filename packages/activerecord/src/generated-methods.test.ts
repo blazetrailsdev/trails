@@ -59,36 +59,3 @@ describe("GeneratedMethodsTest", () => {
     expect(ref!.name).toBe("tag");
   });
 });
-
-describe("GeneratedMethodsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
-
-  it("association methods override attribute methods of same name", () => {
-    class Item extends Base {
-      static { this.attribute("label", "string"); this.attribute("category_id", "integer"); this.adapter = adapter; }
-    }
-    Associations.belongsTo.call(Item, "category", {});
-    const ref = reflectOnAssociation(Item, "category");
-    expect(ref).not.toBeNull();
-    expect(ref!.macro).toBe("belongsTo");
-  });
-
-  it("model method overrides association method", () => {
-    class Item extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
-    }
-    const item = new Item({ label: "test" });
-    expect(item.readAttribute("label")).toBe("test");
-  });
-
-  it("included module overwrites association methods", () => {
-    class Item extends Base {
-      static { this.attribute("label", "string"); this.attribute("owner_id", "integer"); this.adapter = adapter; }
-    }
-    Associations.belongsTo.call(Item, "owner", {});
-    const ref = reflectOnAssociation(Item, "owner");
-    expect(ref).not.toBeNull();
-    expect(ref!.name).toBe("owner");
-  });
-});

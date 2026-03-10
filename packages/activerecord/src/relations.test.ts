@@ -4877,14 +4877,6 @@ describe("RelationTest", () => {
     expect(sql).toContain("FROM");
   });
 
-  it("finding with asc order with string", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const sql = Post.order({ title: "asc" }).toSql();
-    expect(sql).toContain("ASC");
-  });
-
   it("support upper and lower case directions", () => {
     class Post extends Base {
       static { this.attribute("title", "string"); this.adapter = adapter; }
@@ -4893,23 +4885,6 @@ describe("RelationTest", () => {
     const sql2 = Post.order({ title: "desc" }).toSql();
     expect(sql1).toContain("ASC");
     expect(sql2).toContain("DESC");
-  });
-
-  it("finding with order concatenated", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
-    }
-    const sql = Post.order("title").order("body").toSql();
-    expect(sql).toContain("ORDER BY");
-  });
-
-  it("finding with order and take", async () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    await Post.create({ title: "a" });
-    const result = await Post.order("title").take();
-    expect(result).not.toBeNull();
   });
 
   it("joins with nil argument", () => {
@@ -4927,29 +4902,6 @@ describe("RelationTest", () => {
     await Post.create({ title: "a" });
     const results = await Post.where({ title: "a" }).toArray();
     expect(results.length).toBeGreaterThanOrEqual(0);
-  });
-
-  it("blank like arguments to query methods dont raise errors", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(() => Post.all().joins()).not.toThrow();
-    expect(() => Post.all().leftOuterJoins()).not.toThrow();
-  });
-
-  it("find with readonly option", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(Post.all().readonly().isReadonly).toBe(true);
-  });
-
-  it("default scoping finder methods", async () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    await Post.create({ title: "a" });
-    expect(await Post.all().first()).not.toBeNull();
   });
 
   it("ordering with extra spaces", () => {
@@ -5025,14 +4977,6 @@ describe("RelationTest", () => {
     }
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
-  });
-
-  it("select with aggregates", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const sql = Post.select("COUNT(*) as total").toSql();
-    expect(sql).toContain("COUNT");
   });
 
   it("count explicit columns", async () => {
@@ -5454,16 +5398,6 @@ describe("RelationTest", () => {
     }
     await Post.create({ title: "existing" });
     const result = await Post.createOrFindBy({ title: "existing" });
-    expect(result).not.toBeNull();
-  });
-
-  it("find_by! with hash conditions returns the first matching record", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    await Post.create({ title: "findme" });
-    const result = await Post.findBy({ title: "findme" });
     expect(result).not.toBeNull();
   });
 

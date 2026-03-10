@@ -45,23 +45,3 @@ describe("AsyncHasOneAssociationsTest", () => {
     expect(account!.readAttribute("credit_limit")).toBe(100);
   });
 });
-
-describe("AsyncHasOneAssociationsTest", () => {
-  it("async load has one", async () => {
-    const adapter = freshAdapter();
-    class AHFirm extends Base {
-      static { this._tableName = "ah_firms"; this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class AHAccount extends Base {
-      static { this._tableName = "ah_accounts"; this.attribute("credit_limit", "integer"); this.attribute("ah_firm_id", "integer"); this.adapter = adapter; }
-    }
-    Associations.hasOne.call(AHFirm, "ahAccount", { foreignKey: "ah_firm_id", className: "AHAccount" });
-    registerModel("AHFirm", AHFirm);
-    registerModel("AHAccount", AHAccount);
-    const firm = await AHFirm.create({ name: "Test Corp" });
-    await AHAccount.create({ credit_limit: 100, ah_firm_id: firm.id });
-    const account = await loadHasOne(firm, "ahAccount", { className: "AHAccount", foreignKey: "ah_firm_id" });
-    expect(account).not.toBeNull();
-    expect(account!.readAttribute("credit_limit")).toBe(100);
-  });
-});

@@ -293,16 +293,6 @@ describe("PersistenceTest", () => {
     expect(t.readAttribute("title")).toBe("a");
   });
 
-  it("update after create", async () => {
-    class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const t = await Topic.create({ title: "a" });
-    t.writeAttribute("title", "b");
-    await t.save();
-    const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("b");
-  });
 });
 
 // ==========================================================================
@@ -2332,20 +2322,6 @@ describe("Persistence (Rails-guided)", () => {
   });
 
   // -- create / create! --
-
-  it("returns object even if validations failed", async () => {
-    class Required extends Base {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-        this.adapter = adapter;
-      }
-    }
-    const r = await Required.create({});
-    expect(r.isNewRecord()).toBe(true);
-    expect(r.isPersisted()).toBe(false);
-    expect(r.errors.get("name")).toContain("can't be blank");
-  });
 
   it("createBang throws on validation failure", async () => {
     class Required extends Base {

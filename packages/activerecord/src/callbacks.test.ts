@@ -457,47 +457,6 @@ describe("SetCallbackTest", () => {
   });
 });
 
-describe("CallbackOrderTest", () => {
-  it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
-    const adapter = freshAdapter();
-    const log: string[] = [];
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-        this.beforeCreate(function() { log.push("first"); });
-        this.beforeCreate(function() { log.push("second"); });
-        this.afterCreate(function() { log.push("after"); });
-      }
-    }
-    await Post.create({ title: "test" });
-    expect(log[0]).toBe("first");
-    expect(log[1]).toBe("second");
-    expect(log[2]).toBe("after");
-  });
-});
-
-describe("CallbacksOnActionAndConditionTest", () => {
-  it("callback on action with condition", async () => {
-    const adapter = freshAdapter();
-    const log: string[] = [];
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean", { default: false });
-        this.adapter = adapter;
-        this.beforeSave(function(record: any) {
-          if (record.readAttribute("published")) { log.push("published_save"); }
-        });
-      }
-    }
-    await Post.create({ title: "draft", published: false });
-    expect(log).not.toContain("published_save");
-    await Post.create({ title: "live", published: true });
-    expect(log).toContain("published_save");
-  });
-});
-
 describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
   it("trigger once on multiple deletion within transaction 2", async () => {
     const adp = freshAdapter();
@@ -588,32 +547,6 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
   });
 });
 
-describe("CallbacksOnMultipleActionsTest", () => {
-  it("after commit on multiple actions", async () => {
-    const adapter = freshAdapter();
-    const log: string[] = [];
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-        this.afterCreate(function() { log.push("created"); });
-        this.afterUpdate(function() { log.push("updated"); });
-        this.afterDestroy(function() { log.push("destroyed"); });
-      }
-    }
-    const p = await Post.create({ title: "a" });
-    expect(log).toContain("created");
-    p.writeAttribute("title", "b");
-    await p.save();
-    expect(log).toContain("updated");
-    await p.destroy();
-    expect(log).toContain("destroyed");
-  });
-
-  it.skip("before commit actions", () => { /* fixture-dependent */ });
-  it.skip("before commit update in same transaction", () => { /* fixture-dependent */ });
-});
-
 describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("created callback called on last to save of separate instances in a transaction 2", async () => {
     const adp = freshAdapter();
@@ -699,8 +632,6 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
     expect(log).toContain("updated:a2");
   });
 
-  it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => { /* fixture-dependent */ });
-
   it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction 2", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
@@ -719,25 +650,6 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
     expect(log).toContain("updated:b2");
   });
 
-  it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => { /* fixture-dependent */ });
-});
-
-describe("SetCallbackTest", () => {
-  it("set callback with on", async () => {
-    const adapter = freshAdapter();
-    const log: string[] = [];
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-        this.beforeCreate(function() { log.push("before_create"); });
-        this.beforeSave(function() { log.push("before_save"); });
-      }
-    }
-    await Post.create({ title: "test" });
-    expect(log).toContain("before_create");
-    expect(log).toContain("before_save");
-  });
 });
 
 

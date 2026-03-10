@@ -29,7 +29,3 @@ function freshAdapter(): DatabaseAdapter {
 describe("ReservedWordsMigrationTest", () => {
   it.skip("drop index from table named values", () => { /* fixture-dependent */ });
 });
-
-describe("ReservedWordsMigrationTest", () => {
-  it.skip("drop index from table named values", () => { /* fixture-dependent */ });
-});

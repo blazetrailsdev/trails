@@ -312,20 +312,6 @@ describe("TimestampsWithoutTransactionTest", () => {
   it.skip("index is created for both timestamps", () => { /* fixture-dependent */ });
 });
 
-describe("TimestampsWithoutTransactionTest", () => {
-  it("do not write timestamps on save if they are not attributes", async () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    // No created_at/updated_at defined, save should work without error
-    const p = await Post.create({ title: "no timestamps" });
-    expect(p.isPersisted()).toBe(true);
-    expect(p.readAttribute("created_at") ?? undefined).toBeUndefined();
-  });
-  it.skip("index is created for both timestamps", () => { /* fixture-dependent */ });
-});
-
 
 describe("Timestamps", () => {
   it("auto-sets created_at and updated_at on insert", async () => {
@@ -751,12 +737,6 @@ describe("Timestamps (Rails-guided)", () => {
   beforeEach(() => {
     adapter = freshAdapter();
     Article.adapter = adapter;
-  });
-
-  it("sets created_at and updated_at on create", async () => {
-    const article = await Article.create({ title: "Hello", body: "World" });
-    expect(article.readAttribute("created_at")).toBeInstanceOf(Date);
-    expect(article.readAttribute("updated_at")).toBeInstanceOf(Date);
   });
 
   it("created_at and updated_at match on first save", async () => {

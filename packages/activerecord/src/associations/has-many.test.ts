@@ -69,46 +69,6 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
-  it("transaction when deleting persisted", async () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const p = await Post.create({ title: "to delete" });
-    expect(p.isPersisted()).toBe(true);
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
-  });
-
-  it("transaction when deleting new record", async () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const p = new Post({ title: "new" });
-    expect(p.isNewRecord()).toBe(true);
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
-  });
-});
-
-describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
-  it("should generate valid sql", () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const sql = Post.order("title").reorder("title DESC").toSql();
-    expect(sql).toContain("ORDER BY");
-  });
-});
-
-describe("HasManyAssociationsTestPrimaryKeys", () => {
-  it.skip("custom primary key on new record should fetch with query", () => { /* fixture-dependent */ });
-  it.skip("blank custom primary key on new record should not run queries", () => { /* fixture-dependent */ });
-});
-
 
 describe("HasManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;

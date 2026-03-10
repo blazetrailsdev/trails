@@ -43,20 +43,3 @@ describe("CustomLockingTest", () => {
     expect(p.readAttribute("lock_version")).toBe(1);
   });
 });
-
-describe("CustomLockingTest", () => {
-  it("custom lock", async () => {
-    const adapter = freshAdapter();
-    class Widget extends Base {
-      static {
-        this._tableName = "widgets";
-        this.attribute("name", "string");
-        this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
-      }
-    }
-    const w = await Widget.create({ name: "test" });
-    await w.update({ name: "updated" });
-    expect(w.readAttribute("lock_version")).toBe(1);
-  });
-});

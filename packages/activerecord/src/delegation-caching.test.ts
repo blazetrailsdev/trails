@@ -38,16 +38,3 @@ describe("DelegationCachingTest", () => {
     expect(r1.toSql()).not.toBe(r2.toSql());
   });
 });
-
-describe("DelegationCachingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
-  it("delegation doesn't override methods defined in other relation subclasses", async () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const r1 = Post.where({ title: "x" });
-    const r2 = Post.where({ title: "y" });
-    expect(r1.toSql()).not.toBe(r2.toSql());
-  });
-});

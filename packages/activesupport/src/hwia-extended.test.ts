@@ -4275,7 +4275,6 @@ describe("MethodWrappersTest", () => {
 
 describe("CacheSerializerWithFallbackTest", () => {
   it.skip(" serializer can load  dump", () => { /* fixture-dependent */ });
-  it.skip(" serializer can load  dump", () => { /* fixture-dependent */ });
   it.skip(" serializer handles unrecognized payloads gracefully", () => { /* fixture-dependent */ });
   it.skip(" serializer logs unrecognized payloads", () => { /* fixture-dependent */ });
   it.skip(" serializer can compress entries", () => { /* fixture-dependent */ });
@@ -4348,9 +4347,6 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
 
 describe("TaggedLoggingWithoutBlockTest", () => {
   it.skip("shares tags across threads", () => { /* fixture-dependent */ });
-  it.skip("keeps each tag in their own instance", () => { /* fixture-dependent */ });
-  it.skip("does not share the same formatter instance of the original logger", () => { /* fixture-dependent */ });
-  it.skip("keeps broadcasting functionality", () => { /* fixture-dependent */ });
   it.skip("keeps formatter singleton class methods", () => { /* fixture-dependent */ });
   it.skip("accepts non-String objects", () => { /* fixture-dependent */ });
 });
@@ -6087,29 +6083,6 @@ describe("DateExtCalculationsTest", () => {
   it.skip("date advance should not change passed options hash", () => { /* fixture-dependent */ });
 });
 
-describe("XMLMiniEngineTest", () => {
-  it.skip("file from xml", () => { /* fixture-dependent */ });
-  it.skip("exception thrown on expansion attack", () => { /* fixture-dependent */ });
-  it.skip("setting backend", () => { /* fixture-dependent */ });
-  it.skip("blank returns empty hash", () => { /* fixture-dependent */ });
-  it.skip("parse from frozen string", () => { /* fixture-dependent */ });
-  it.skip("array type makes an array", () => { /* fixture-dependent */ });
-  it.skip("one node document as hash", () => { /* fixture-dependent */ });
-  it.skip("one node with attributes document as hash", () => { /* fixture-dependent */ });
-  it.skip("products node with book node as hash", () => { /* fixture-dependent */ });
-  it.skip("products node with two book nodes as hash", () => { /* fixture-dependent */ });
-  it.skip("single node with content as hash", () => { /* fixture-dependent */ });
-  it.skip("children with children", () => { /* fixture-dependent */ });
-  it.skip("children with text", () => { /* fixture-dependent */ });
-  it.skip("children with non adjacent text", () => { /* fixture-dependent */ });
-  it.skip("parse from io", () => { /* fixture-dependent */ });
-  it.skip("children with simple cdata", () => { /* fixture-dependent */ });
-  it.skip("children with multiple cdata", () => { /* fixture-dependent */ });
-  it.skip("children with text and cdata", () => { /* fixture-dependent */ });
-  it.skip("children with blank text", () => { /* fixture-dependent */ });
-  it.skip("children with blank text and attribute", () => { /* fixture-dependent */ });
-});
-
 describe("CacheKeyTest", () => {
   // Simple cache key expansion utility
   function expandCacheKey(key: unknown, namespace?: string): string {
@@ -6259,12 +6232,6 @@ describe("CallbackTerminatorTest", () => {
 
 
 
-describe("CoreExtStringMultibyteTest", () => {
-  it.skip("core ext adds mb chars", () => { /* fixture-dependent */ });
-  it.skip("string should recognize utf8 strings", () => { /* fixture-dependent */ });
-  it.skip("mb chars returns instance of proxy class", () => { /* fixture-dependent */ });
-});
-
 
 describe("ExcludingDuplicatesCallbackTest", () => {
   it("excludes duplicates in one call", () => {
@@ -6286,77 +6253,6 @@ describe("ExcludingDuplicatesCallbackTest", () => {
 
 
 
-
-describe("ParsingTest", () => {
-  it.skip("symbol", () => { /* fixture-dependent */ });
-  it.skip("date", () => { /* fixture-dependent */ });
-  it.skip("datetime", () => { /* fixture-dependent */ });
-  it.skip("duration", () => { /* fixture-dependent */ });
-  it.skip("integer", () => { /* fixture-dependent */ });
-  it.skip("float", () => { /* fixture-dependent */ });
-  it.skip("decimal", () => { /* fixture-dependent */ });
-  it.skip("boolean", () => { /* fixture-dependent */ });
-  it.skip("string", () => { /* fixture-dependent */ });
-  it.skip("yaml", () => { /* fixture-dependent */ });
-  it.skip("hexBinary", () => { /* fixture-dependent */ });
-  it.skip("base64Binary and binary", () => { /* fixture-dependent */ });
-});
-
-describe("RenameKeyTest", () => {
-  function renameKey2(key: string, options: { dasherize?: boolean; camelize?: boolean | "lower" | "upper" } = {}): string {
-    let result = key;
-    if (options.camelize === true || options.camelize === "upper") {
-      result = camelize(result, true);
-    } else if (options.camelize === "lower") {
-      result = camelize(result, false);
-    } else if (options.dasherize !== false) {
-      const leadingMatch = result.match(/^(_+)/);
-      const trailingMatch = result.match(/(_+)$/);
-      const leading = leadingMatch ? leadingMatch[1] : "";
-      const trailing = trailingMatch ? trailingMatch[1] : "";
-      const inner = result.slice(leading.length, result.length - trailing.length);
-      result = leading + dasherize(inner) + trailing;
-    }
-    return result;
-  }
-
-  it("rename key dasherizes by default", () => {
-    expect(renameKey2("foo_bar")).toBe("foo-bar");
-  });
-  it("rename key dasherizes with dasherize true", () => {
-    expect(renameKey2("foo_bar", { dasherize: true })).toBe("foo-bar");
-  });
-  it("rename key does nothing with dasherize false", () => {
-    expect(renameKey2("foo_bar", { dasherize: false })).toBe("foo_bar");
-  });
-  it("rename key camelizes with camelize true", () => {
-    expect(renameKey2("foo_bar", { camelize: true })).toBe("FooBar");
-  });
-  it("rename key lower camelizes with camelize lower", () => {
-    expect(renameKey2("foo_bar", { camelize: "lower" })).toBe("fooBar");
-  });
-  it("rename key lower camelizes with camelize upper", () => {
-    expect(renameKey2("foo_bar", { camelize: "upper" })).toBe("FooBar");
-  });
-  it("rename key does not dasherize leading underscores", () => {
-    expect(renameKey2("__foo_bar")).toBe("__foo-bar");
-  });
-  it("rename key with leading underscore dasherizes interior underscores", () => {
-    expect(renameKey2("_foo_bar")).toBe("_foo-bar");
-  });
-  it("rename key does not dasherize trailing underscores", () => {
-    expect(renameKey2("foo_bar__")).toBe("foo-bar__");
-  });
-  it("rename key with trailing underscore dasherizes interior underscores", () => {
-    expect(renameKey2("foo_bar_")).toBe("foo-bar_");
-  });
-  it("rename key does not dasherize multiple leading underscores", () => {
-    expect(renameKey2("___foo_bar")).toBe("___foo-bar");
-  });
-  it("rename key does not dasherize multiple trailing underscores", () => {
-    expect(renameKey2("foo_bar___")).toBe("foo-bar___");
-  });
-});
 
 describe("ResetCallbackTest", () => {
   it("reset impacts subclasses", () => {
@@ -6397,61 +6293,10 @@ describe("RunSpecificCallbackTest", () => {
 
 
 
-describe("StringAccessTest", () => {
-  it("#at with Range, returns a substring containing characters at offsets", () => {
-    expect(at("hello", [1, 3])).toBe("ell");
-    expect(at("hello", [0, -1])).toBe("hello");
-    expect(at("hello", [2, 2])).toBe("l");
-  });
-  it("#at with Regex, returns the matching portion of the string", () => {
-    expect(at("hello world", /\w+/)).toBe("hello");
-    expect(at("hello", /xyz/)).toBeUndefined();
-    expect(at("abc123", /\d+/)).toBe("123");
-  });
-  it("#first with Integer >= string length still returns a new string", () => {
-    expect(first("hello", 100)).toBe("hello");
-    expect(first("hi", 50)).toBe("hi");
-  });
-  it("#first with Integer returns a non-frozen string", () => {
-    expect(typeof first("hello", 2)).toBe("string");
-    expect(typeof first("hello", 0)).toBe("string");
-  });
-  it("#last with Integer >= string length still returns a new string", () => {
-    expect(last("hello", 100)).toBe("hello");
-    expect(last("hi", 50)).toBe("hi");
-  });
-  it("#last with Integer returns a non-frozen string", () => {
-    expect(typeof last("hello", 2)).toBe("string");
-    expect(typeof last("hello", 0)).toBe("string");
-  });
-});
-
-describe("StringConversionsTest", () => {
-  it.skip("string to time", () => { /* fixture-dependent */ });
-  it.skip("timestamp string to time", () => { /* fixture-dependent */ });
-  it.skip("string to time utc offset", () => { /* fixture-dependent */ });
-  it.skip("partial string to time", () => { /* fixture-dependent */ });
-  it.skip("standard time string to time when current time is standard time", () => { /* fixture-dependent */ });
-  it.skip("standard time string to time when current time is daylight savings", () => { /* fixture-dependent */ });
-  it.skip("daylight savings string to time when current time is standard time", () => { /* fixture-dependent */ });
-  it.skip("daylight savings string to time when current time is daylight savings", () => { /* fixture-dependent */ });
-  it.skip("partial string to time when current time is standard time", () => { /* fixture-dependent */ });
-  it.skip("partial string to time when current time is daylight savings", () => { /* fixture-dependent */ });
-  it.skip("string to datetime", () => { /* fixture-dependent */ });
-  it.skip("partial string to datetime", () => { /* fixture-dependent */ });
-  it.skip("string to date", () => { /* fixture-dependent */ });
-});
-
 describe("StringExcludeTest", () => {
   it("inverse of #include", () => {
     expect(exclude("hello world" as any, "world" as any)).toBe(false);
     expect(exclude("hello world" as any, "xyz" as any)).toBe(true);
-  });
-});
-
-describe("StringIndentTest", () => {
-  it("by default, indents with tabs if the existing indentation uses them", () => {
-    expect(indent("\tfoo", 1, "\t")).toBe("\t\tfoo");
   });
 });
 
@@ -6583,30 +6428,9 @@ describe("TaggedLoggingWithoutBlockTest", () => {
 
 
 
-describe("ThreadSafetyTest", () => {
-  it.skip("#with_backend should be thread-safe", () => { /* fixture-dependent */ });
-  it.skip("nested #with_backend should be thread-safe", () => { /* fixture-dependent */ });
-});
-
-
-describe("WithBackendTest", () => {
-  it.skip("#with_backend should switch backend and then switch back", () => { /* fixture-dependent */ });
-  it.skip("backend switch inside #with_backend block", () => { /* fixture-dependent */ });
-});
-
-
-describe("DateExtBehaviorTest", () => {
-  it.skip("date acts like date", () => { /* fixture-dependent */ });
-  it.skip("blank?", () => { /* fixture-dependent */ });
-  it.skip("freeze doesnt clobber memoized instance methods", () => { /* fixture-dependent */ });
-  it.skip("can freeze twice", () => { /* fixture-dependent */ });
-});
 
 
 
-describe("MultibyteProxyText", () => {
-  it.skip("custom multibyte encoder", () => { /* fixture-dependent */ });
-});
 
 describe("RawTest", () => {
   it.skip("does not compress values read with \\\"raw\\\" enabled", () => { /* fixture-dependent */ });
@@ -6618,19 +6442,6 @@ describe("ShareLockTest", () => {
   it.skip("detects free thread", () => { /* fixture-dependent */ });
   it.skip("detects already released", () => { /* fixture-dependent */ });
   it.skip("detects remains latched", () => { /* fixture-dependent */ });
-});
-
-describe("TimeExtMarshalingTest", () => {
-  it.skip("marshalling with utc instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling with local instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling with frozen utc instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling with frozen local instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling preserves fractional seconds", () => { /* fixture-dependent */ });
-  it.skip("last quarter on 31st", () => { /* fixture-dependent */ });
-});
-
-describe("ToFsTest", () => {
-  it.skip("to fs db", () => { /* fixture-dependent */ });
 });
 
 describe("entering with blocking", () => {

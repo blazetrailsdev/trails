@@ -135,33 +135,3 @@ describe("RevertBulkAlterTableMigrationsTest", () => {
     }
   });
 });
-
-describe("RevertBulkAlterTableMigrationsTest", () => {
-  it("bulk revert", async () => {
-    const rvAdapter = freshAdapter();
-    function makeRvMig(m: Migration): Migration { (m as any).adapter = rvAdapter; return m; }
-    // Create a table, add a column, then revert (down) both
-    class BulkMig extends Migration {
-      async change() {
-        await this.createTable("rv_bulk", (t) => { t.string("name"); });
-        await this.addColumn("rv_bulk", "extra", "string");
-      }
-    }
-    const m = makeRvMig(new BulkMig());
-    await m.up();
-    // Verify table was created with the extra column
-    await rvAdapter.executeMutation(`INSERT INTO "rv_bulk" ("name", "extra") VALUES ('test', 'val')`);
-    const rows = await rvAdapter.execute(`SELECT * FROM "rv_bulk"`);
-    expect(rows.length).toBe(1);
-    expect(rows[0].extra).toBe("val");
-    // Revert should drop the table
-    await m.down();
-    // Table should be gone - selecting from it should return empty or throw
-    try {
-      const after = await rvAdapter.execute(`SELECT * FROM "rv_bulk"`);
-      expect(after.length).toBe(0);
-    } catch {
-      // Table doesn't exist, which is expected
-    }
-  });
-});

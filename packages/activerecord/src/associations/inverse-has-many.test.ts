@@ -248,11 +248,6 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
-  it.skip("that we can load associations that have the same reciprocal name from different models", () => { /* fixture-dependent */ });
-  it.skip("that we can create associations that have the same reciprocal name from different models", () => { /* fixture-dependent */ });
-});
-
-describe("InverseMultipleHasManyInversesForSameModel", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => { adapter = freshAdapter(); });
 

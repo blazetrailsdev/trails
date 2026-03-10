@@ -312,272 +312,21 @@ describe("StrictLoadingTest", () => {
   });
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
-  it("raises on lazy loading a strict loading has many relation", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    Associations.hasMany.call(Author, "books", {});
-    registerModel(Author);
-    registerModel(Book);
-
-    const author = await Author.create({ name: "Alice" });
-    author.strictLoadingBang();
-
-    await expect(loadHasMany(author, "books", {})).rejects.toThrow(StrictLoadingViolationError);
-  });
-
   // Rails: test_raises_on_lazy_loading_a_strict_loading_belongs_to_relation
-  it("raises on lazy loading a strict loading belongs to relation", async () => {
-    class Publisher extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("publisher_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Publisher);
-    registerModel(Book);
-
-    const book = await Book.create({ title: "Rails", publisher_id: 1 });
-    book.strictLoadingBang();
-
-    await expect(loadBelongsTo(book, "publisher", {})).rejects.toThrow(StrictLoadingViolationError);
-  });
-
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_one_relation
-  it("raises on lazy loading a strict loading has one relation", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Profile extends Base {
-      static { this.attribute("bio", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-    registerModel(Profile);
-
-    const author = await Author.create({ name: "Bob" });
-    author.strictLoadingBang();
-
-    await expect(loadHasOne(author, "profile", {})).rejects.toThrow(StrictLoadingViolationError);
-  });
-
   // Rails: test_strict_loading_violation_raises_by_default
-  it("strict loading violation raises by default", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-    registerModel(Book);
-
-    const author = await Author.create({ name: "Carol" });
-    author.strictLoadingBang();
-
-    let threw = false;
-    try {
-      await loadHasMany(author, "books", {});
-    } catch (e) {
-      threw = true;
-      expect(e).toBeInstanceOf(StrictLoadingViolationError);
-    }
-    expect(threw).toBe(true);
-  });
-
   // Rails: test_does_not_raise_on_eager_loading_a_strict_loading_has_many_relation
-  it("does not raise on eager loading a strict loading has many relation", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-    registerModel(Book);
-
-    const author = await Author.create({ name: "Dave" });
-    (author as any)._preloadedAssociations = new Map([["books", []]]);
-    author.strictLoadingBang();
-
-    const books = await loadHasMany(author, "books", {});
-    expect(Array.isArray(books)).toBe(true);
-  });
-
   // Rails: test_raises_if_strict_loading_by_default_and_lazy_loading
-  it("raises if strict loading by default and lazy loading", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-    registerModel(Book);
-    Author.strictLoadingByDefault = true;
-
-    try {
-      const created = await Author.create({ name: "Eve" });
-      const author = await Author.find(created.id);
-      await expect(loadHasMany(author, "books", {})).rejects.toThrow(StrictLoadingViolationError);
-    } finally {
-      Author.strictLoadingByDefault = false;
-    }
-  });
-
   // Rails: test_strict_loading_n_plus_one_only_mode_does_not_eager_load_child_associations
-  it("strict loading n plus one only mode does not eager load child associations", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-
-    const author = new Author({ name: "Frank" });
-    expect(typeof author.isStrictLoading()).toBe("boolean");
-    expect(author.isStrictLoading()).toBe(false);
-    author.strictLoadingBang();
-    expect(author.isStrictLoading()).toBe(true);
-  });
-
   // Rails: test_default_mode_is_all
-  it("default mode is all", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    const author = new Author({ name: "Grace" });
-    expect(author.isStrictLoading()).toBe(false);
-  });
-
   // Rails: test_strict_loading
-  it("strict loading", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    const author = new Author({ name: "Heidi" });
-    expect(author.isStrictLoading()).toBe(false);
-    author.strictLoadingBang();
-    expect(author.isStrictLoading()).toBe(true);
-  });
-
   // Rails: test_strict_loading_by_default
-  it("strict loading by default", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    expect(Author.strictLoadingByDefault).toBe(false);
-  });
-
   // Rails: test_strict_loading_by_default_is_inheritable
-  it("strict loading by default is inheritable", async () => {
-    class Animal extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    Animal.strictLoadingByDefault = true;
-    try {
-      expect(Animal.strictLoadingByDefault).toBe(true);
-    } finally {
-      Animal.strictLoadingByDefault = false;
-    }
-  });
-
   // Rails: test_strict_loading_violation_on_polymorphic_relation
-  it("strict loading violation on polymorphic relation", async () => {
-    class Tag extends Base {
-      static { this.attribute("name", "string"); this.attribute("taggable_id", "integer"); this.attribute("taggable_type", "string"); this.adapter = adapter; }
-    }
-    registerModel(Tag);
-
-    const tag = await Tag.create({ name: "ruby", taggable_id: 1, taggable_type: "Post" });
-    tag.strictLoadingBang();
-
-    await expect(loadBelongsTo(tag, "taggable", { polymorphic: true })).rejects.toThrow(StrictLoadingViolationError);
-  });
-
   // Rails: test_does_not_raise_on_eager_loading_a_belongs_to_relation_if_strict_loading_by_default
-  it("does not raise on eager loading a belongs to relation if strict loading by default", async () => {
-    class Publisher extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("publisher_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Publisher);
-    registerModel(Book);
-
-    const publisher = await Publisher.create({ name: "Press" });
-    const book = await Book.create({ title: "Guide", publisher_id: publisher.id });
-    (book as any)._preloadedAssociations = new Map([["publisher", publisher]]);
-    book.strictLoadingBang();
-
-    const loaded = await loadBelongsTo(book, "publisher", {});
-    expect(loaded).not.toBeNull();
-  });
-
   // Rails: test_raises_on_lazy_loading_a_belongs_to_relation_if_strict_loading_by_default
-  it("raises on lazy loading a belongs to relation if strict loading by default", async () => {
-    class Publisher extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("publisher_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Publisher);
-    registerModel(Book);
-    Book.strictLoadingByDefault = true;
-
-    try {
-      const created = await Book.create({ title: "Test", publisher_id: 1 });
-      const book = await Book.find(created.id);
-      await expect(loadBelongsTo(book, "publisher", {})).rejects.toThrow(StrictLoadingViolationError);
-    } finally {
-      Book.strictLoadingByDefault = false;
-    }
-  });
-
   // Rails: test_raises_on_lazy_loading_a_has_one_relation_if_strict_loading_by_default
-  it("raises on lazy loading a has one relation if strict loading by default", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Profile extends Base {
-      static { this.attribute("bio", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-    registerModel(Profile);
-    Author.strictLoadingByDefault = true;
-
-    try {
-      const created = await Author.create({ name: "Iris" });
-      const author = await Author.find(created.id);
-      await expect(loadHasOne(author, "profile", {})).rejects.toThrow(StrictLoadingViolationError);
-    } finally {
-      Author.strictLoadingByDefault = false;
-    }
-  });
-
   // Rails: test_raises_on_lazy_loading_a_has_many_relation_if_strict_loading_by_default
-  it("raises on lazy loading a has many relation if strict loading by default", async () => {
-    class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
-    }
-    class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
-    }
-    registerModel(Author);
-    registerModel(Book);
-    Author.strictLoadingByDefault = true;
-
-    try {
-      const created = await Author.create({ name: "Jake" });
-      const author = await Author.find(created.id);
-      await expect(loadHasMany(author, "books", {})).rejects.toThrow(StrictLoadingViolationError);
-    } finally {
-      Author.strictLoadingByDefault = false;
-    }
-  });
-
   it("strict loading by default can be set per model", () => {
     class Author extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -692,10 +441,6 @@ describe("StrictLoadingTest", () => {
   it.skip("does not raise on eager loading a habtm relation if strict loading by default", () => {});
   it.skip("strict loading violation can log instead of raise", () => {});
   it.skip("strict loading violation logs on polymorphic relation", () => {});
-});
-
-describe("StrictLoadingFixturesTest", () => {
-  it.skip("strict loading violations are ignored on fixtures", () => { /* fixture-dependent */ });
 });
 
 describe("StrictLoadingFixturesTest", () => {

@@ -40,15 +40,3 @@ describe("WithTest", () => {
     expect(sql).toContain("WITH");
   });
 });
-
-describe("WithTest", () => {
-  it("with generates CTE", () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    const rel = Post.all().with("recent_posts", "SELECT * FROM posts WHERE created_at > '2024-01-01'");
-    const sql = rel.toSql();
-    expect(sql).toContain("WITH");
-  });
-});

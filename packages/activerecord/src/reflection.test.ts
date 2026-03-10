@@ -316,7 +316,6 @@ describe("ReflectionTest", () => {
   });
   it.skip("belongs to reflection with custom primary key", () => {});
   it.skip("has many reflection scope", () => {});
-  it.skip("has many through reflection", () => {});
   it.skip("has many through reflection scope", () => {});
   it.skip("association primary key raises error when nil", () => {});
   it.skip("has many through join keys", () => {});

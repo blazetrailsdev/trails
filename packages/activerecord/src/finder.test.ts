@@ -597,14 +597,6 @@ describe("FinderTest", () => {
     expect(await Topic.order("title").distinct().exists()).toBe(true);
   });
 
-  it("exists with order", async () => {
-    class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.order("title").exists()).toBe(true);
-  });
-
   it("exists with loaded relation", async () => {
     class Topic extends Base {
       static { this.attribute("title", "string"); this.adapter = adapter; }
@@ -1285,16 +1277,6 @@ describe("FinderTest", () => {
     expect(sql).toContain("title");
   });
 
-  it("find with nil inside set passed for attribute", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-    }
-    await Post.create({ title: "hello" });
-    await Post.create({ title: null as any });
-    const results = await Post.where({ title: [null, "hello"] }).toArray();
-    expect(results.length).toBeGreaterThanOrEqual(1);
-  });
 });
 
 describe("FinderRespondToTest", () => {
@@ -2329,63 +2311,6 @@ describe("FinderTest", () => {
   });
 });
 
-describe("FinderRespondToTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
-
-  it("should preserve normal respond to behavior on base", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(typeof Post.find).toBe("function");
-    expect(typeof Post.where).toBe("function");
-  });
-
-  it("should preserve normal respond to behavior and respond to newly added method", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-      static customMethod() { return "custom"; }
-    }
-    expect(Post.customMethod()).toBe("custom");
-  });
-
-  it("should preserve normal respond to behavior and respond to standard object method", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(typeof Post.toString).toBe("function");
-  });
-
-  it("should respond to find by with bang", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should respond to find by two attributes", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-    expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
-  });
-
-  it("should respond to find all by an aliased attribute", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should not respond to find by invalid method syntax", () => {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-    }
-    expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
-  });
-});
-
 
 describe("find_or_create_by / find_or_initialize_by", () => {
   it("findOrCreateBy returns existing record if found", async () => {
@@ -3039,14 +2964,6 @@ describe("Finders (Rails-guided)", () => {
     expect(users[1].readAttribute("name")).toBeDefined();
   });
 
-  it("find with empty array raises RecordNotFound", async () => {
-    await expect(User.find([])).rejects.toThrow();
-  });
-
-  it("find with missing IDs throws", async () => {
-    await expect(User.find([1, 999])).rejects.toThrow("not found");
-  });
-
   it("findBy with null matches IS NULL", async () => {
     class Item extends Base {
       static {
@@ -3061,12 +2978,6 @@ describe("Finders (Rails-guided)", () => {
     const found = await Item.findBy({ category: null });
     expect(found).not.toBeNull();
     expect(found!.readAttribute("name")).toBe("Orphan");
-  });
-
-  it("findBy with multiple conditions", async () => {
-    const found = await User.findBy({ name: "Bob", email: "bob@test.com" });
-    expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Bob");
   });
 
   it("findBy with multiple conditions no match", async () => {

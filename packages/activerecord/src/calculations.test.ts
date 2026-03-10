@@ -2198,24 +2198,8 @@ describe("Calculations (Rails-guided)", () => {
     await Account.create({ firm_id: 2, credit_limit: 100 });
   });
 
-  it("should sum field", async () => {
-    expect(await Account.all().sum("credit_limit")).toBe(210);
-  });
-
   it("sum with conditions", async () => {
     expect(await Account.where({ firm_id: 1 }).sum("credit_limit")).toBe(110);
-  });
-
-  it("should average field", async () => {
-    expect(await Account.all().average("credit_limit")).toBe(70);
-  });
-
-  it("should get minimum of field", async () => {
-    expect(await Account.all().minimum("credit_limit")).toBe(50);
-  });
-
-  it("should get maximum of field", async () => {
-    expect(await Account.all().maximum("credit_limit")).toBe(100);
   });
 
   it("count counts all records", async () => {

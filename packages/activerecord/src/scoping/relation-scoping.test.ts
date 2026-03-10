@@ -448,59 +448,6 @@ describe("NestedRelationScopingTest", () => {
   });
 });
 
-describe("NestedRelationScopingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
-  function makeModel() {
-    class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
-    }
-    return { Post };
-  }
-  it("merge options", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "alice" });
-    await Post.create({ title: "B", author: "bob" });
-    const results = await Post.where({ author: "alice" }).toArray();
-    expect(results.length).toBe(1);
-  });
-  it("merge inner scope has priority", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "alice" });
-    await Post.create({ title: "B", author: "bob" });
-    const merged = Post.where({ author: "alice" }).merge(Post.where({ title: "A" }));
-    const results = await merged.toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].author).toBe("alice");
-  });
-  it("replace options", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "alice" });
-    await Post.create({ title: "B", author: "alice" });
-    const results = await Post.where({ author: "alice" }).toArray();
-    expect(results.length).toBe(2);
-  });
-  it("three level nested exclusive scoped find", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "x" });
-    await Post.create({ title: "B", author: "y" });
-    await Post.create({ title: "C", author: "z" });
-    const all = await Post.all().toArray();
-    expect(all.length).toBe(3);
-  });
-  it("nested scoped create", async () => {
-    const { Post } = makeModel();
-    const post = await Post.create({ title: "nested", author: "alice" });
-    expect(post.readAttribute("title")).toBe("nested");
-  });
-  it("nested exclusive scope for create", async () => {
-    const { Post } = makeModel();
-    const post = await Post.create({ title: "T1", author: "alice" });
-    const found = await Post.where({ author: "alice" }).toArray();
-    expect(found[0].id).toBe(post.id);
-  });
-});
-
 
 describe("scoping()", () => {
   let adapter: DatabaseAdapter;
