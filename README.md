@@ -8,15 +8,15 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 
 | Package | Rails Equivalent | Status | Description |
 |---------|-----------------|--------|-------------|
-| `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **98.1%** | SQL AST builder and query generation |
+| `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **99.3%** | SQL AST builder and query generation |
 | `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **98.4%** | Attributes, validations, callbacks, dirty tracking, serialization |
 | `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption |
 | `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **66.3%** | ORM — persistence, querying, associations, migrations |
-| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **98.6%** | Modular web server interface, request/response, middleware |
+| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **99%** | Modular web server interface, request/response, middleware |
 | `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **27.9%** | Routing, middleware stack, cookies, sessions, security |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters |
 
-Overall: **51.4%** real — 7,069 tests matched against 13,744 Rails tests.
+Overall: **51.5%** real — 7,079 tests matched against 13,744 Rails tests.
 
 ## Quick Example
 
@@ -44,7 +44,7 @@ query.toSql();
 
 ## What's Implemented
 
-### Arel — SQL AST and Query Building (98.1%)
+### Arel — SQL AST and Query Building (99.3%)
 
 Full SQL AST with nodes for SELECT, INSERT, UPDATE, DELETE, JOINs, subqueries, CTEs, window functions, set operations (UNION/INTERSECT/EXCEPT), and CASE expressions. Visitor pattern generates SQL strings. Essentially complete.
 
@@ -86,7 +86,7 @@ String inflection (pluralize, singularize, camelize, underscore, tableize, etc.)
 
 **In progress:** Where chain (where.not/missing/associated), eager loading through associations, autosave edge cases, HABTM collection operations, strict loading, pessimistic locking. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full breakdown.
 
-### Rack — Web Server Interface (98.6%)
+### Rack — Web Server Interface (99%)
 
 Request/Response objects, multipart parsing (file uploads), Builder (middleware composition), middleware (ContentType, ContentLength, ETag, ConditionalGet, Deflater, Head, MethodOverride, Runtime, Sendfile, Lock, Static, ShowExceptions, ShowStatus, CommonLogger, Cascade, URLMap), MIME type registry, MockRequest/MockResponse for testing, HTTP Basic auth, Headers, Events, Logger, and RewindableInput. Essentially complete — the only skipped tests are Ruby-specific `.ru` config file parsing features.
 
