@@ -246,6 +246,8 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
       "string-ext.test.ts", "hwia-module-string.test.ts", "safe-buffer.test.ts",
       "hwia-extended.test.ts",
     ],
+    "time_zone_test.rb": ["time-zone.test.ts"],
+    "time_with_zone_test.rb": ["time-with-zone.test.ts"],
   },
   actiondispatch: {
     // Routing tests all map to routing.test.ts
