@@ -1278,7 +1278,15 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     const fkValue = record.readAttribute(foreignKey);
     if (fkValue === null || fkValue === undefined) continue;
 
-    const className = assoc.options.className ?? camelize(assoc.name);
+    let className: string;
+    if (assoc.options.polymorphic) {
+      const typeCol = `${underscore(assoc.name)}_type`;
+      const typeName = record.readAttribute(typeCol) as string | null;
+      if (!typeName) continue;
+      className = typeName;
+    } else {
+      className = assoc.options.className ?? camelize(assoc.name);
+    }
     const targetModel = resolveModel(className);
 
     const parent = await targetModel.findBy({ [targetModel.primaryKey]: fkValue });
