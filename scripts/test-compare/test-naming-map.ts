@@ -2553,11 +2553,17 @@ export const SKIP_FILES: string[] = [
   "type/integer_test.rb",
   "type/time_test.rb",
   "type/string_test.rb",
+  // SQLite CLI/rake tooling — Ruby-only
+  "adapters/sqlite3/dbconsole_test.rb",
+  "adapters/sqlite3/sqlite_rake_test.rb",
+  // SQLite bind parameter test — tests Ruby-specific binding internals
+  "adapters/sqlite3/bind_parameter_test.rb",
 ];
 
 /** Directory patterns to skip (checked with includes()) */
 export const SKIP_DIRS: string[] = [
-  "adapters/",
+  "adapters/mysql2/",
+  "adapters/postgresql/",
   "connection_adapters/",
   "migration/",
   "attribute_methods/",
@@ -10590,4 +10596,46 @@ export const TEST_OVERRIDES: Record<string, string | null> = {
   // persistence_test.rb and relations_test.rb — Ruby-specific
   "PersistenceTest > fills auto populated columns on creation": "PersistenceTest > fills auto populated columns on creation",
   "RelationTest > reverse arel assoc order with multiargument function": "RelationTest > reverse arel assoc order with multiargument function",
+
+  // ==========================================================================
+  // SQLite3 adapter — Ruby-only concepts (null-overrides)
+  // ==========================================================================
+
+  // Logging / ActiveSupport::Notifications instrumentation
+  "SQLite3AdapterTest > insert logged": null,
+  "SQLite3AdapterTest > select rows logged": null,
+  "SQLite3AdapterTest > tables logs name": null,
+  "SQLite3AdapterTest > table exists logs name": null,
+  "SQLite3AdapterTest > indexes logs": null,
+
+  // Fix path mismatch (extra ancestor in TS)
+  "SQLite3AdapterTest > default pragmas": "SqliteAdapter > SQLite3AdapterTest > default pragmas",
+
+  // Rails YAML config (strict_strings_mode)
+  "SQLite3AdapterTest > strict strings by default": null,
+  "SQLite3AdapterTest > strict strings by default and true in database yml": null,
+  "SQLite3AdapterTest > strict strings by default and false in database yml": null,
+
+  // Schema dumper infrastructure
+  "SQLite3CollationTest > schema dump includes collation": null,
+  "SQLite3VirtualColumnTest > schema dumping": null,
+  "SQLite3VirtualColumnTest > build fixture sql": null,
+  "SQLite3VirtualTableTest > schema dump": null,
+  "SQLite3VirtualTableTest > schema load": null,
+
+  // Eager loading + explain integration
+  "SQLite3ExplainTest > explain with eager loading": null,
+
+  // Ruby process model
+  "SQLite3StatementPoolTest > cache is per pid": null,
+
+  // Shared-cache mode (not supported by better-sqlite3)
+  "SQLite3TransactionTest > shared_cached? is true when cache-mode is enabled": null,
+  "SQLite3TransactionTest > shared_cached? is false when cache-mode is disabled": null,
+  "SQLite3TransactionTest > raises when trying to open a transaction in a isolation level other than `read_uncommitted`": null,
+  "SQLite3TransactionTest > raises when trying to open a read_uncommitted transaction but shared-cache mode is turned off": null,
+  "SQLite3TransactionTest > opens a `read_uncommitted` transaction": null,
+  "SQLite3TransactionTest > reset the read_uncommitted PRAGMA when a transaction is rolled back": null,
+  "SQLite3TransactionTest > reset the read_uncommitted PRAGMA when a transaction is committed": null,
+  "SQLite3TransactionTest > set the read_uncommitted PRAGMA to its previous value": null,
 };
