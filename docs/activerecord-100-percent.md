@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **62.9%** real (3,413 matched / 5,428 total Ruby tests), 1,997 stubs remaining.
+Current state: **66.3%** real (3,599 matched / 5,428 total Ruby tests), 1,812 stubs remaining.
 
 ## How coverage is measured
 
@@ -35,78 +35,83 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 
 ## Current status by test file
 
-### Complete (100% pass rate) — 2,614 tests across 44 files
+### Complete (100% pass rate) — 322 tests across 20 files
 
 | File | Tests | | File | Tests |
 |---|---|---|---|---|
-| calculations | 489 | | or | 47 |
-| finder | 413 | | json-serialization | 45 |
-| persistence | 358 | | custom-properties | 38 |
-| attribute-methods | 161 | | sti | 38 |
-| belongs-to | 153 | | validations | 30 |
-| default-scoping | 145 | | ordered-options | 28 |
-| inheritance | 106 | | delete-all | 28 |
-| uniqueness | 95 | | time-travel | 27 |
-| annotations | 53 | | relation (core) | 21 |
-| migration | 49 | | mutation, dup | 20 each |
-
-Plus 24 smaller files (autosave, boolean, dup, errors, explain, generated-methods, habtm-scoping, has-many-scoping, instrumentation, inverse, length, normalized-attribute, null-relation, numericality, presence, query-constraints, querying-methods-delegation, secure-password, structural-compatibility, suppressor, absence, and, bidirectional-destroy).
+| belongs-to | 153 | | explain | 14 |
+| custom-properties | 38 | | numericality | 14 |
+| json-serialization | 23 | | nested-attributes | 10 |
+| mutation | 21 | | presence | 8 |
+| suppressor | 6 | | boolean | 5 |
+| absence | 5 | | length | 5 |
+| order | 4 | | structural-compatibility | 4 |
+| bidirectional-destroy | 3 | | and | 3 |
+| annotations | 2 | | inheritance | 2 |
+| custom | 1 | | errors | 1 |
 
 ### Near-complete (90%+ pass rate)
 
 | File | Passing / Total | Skipped |
 |---|---|---|
-| relations | 731 / 747 | 16 |
-| has-many | 307 / 314 | 7 |
-| calculations-finder-basics | 213 / 235 | 22 |
-| merging | 107 / 108 | 1 |
-| named-scoping | 106 / 112 | 6 |
-| core | 84 / 86 | 2 |
-| dirty | 82 / 87 | 5 |
-| relation-scoping | 70 / 72 | 2 |
-| timestamp | 70 / 72 | 2 |
-| select | 37 / 40 | 3 |
+| has-many | 306 / 311 | 5 |
+| calculations | 211 / 233 | 22 |
+| attribute-methods | 126 / 133 | 7 |
+| default-scoping | 88 / 96 | 8 |
+| relation-scoping | 62 / 64 | 2 |
+| uniqueness | 54 / 55 | 1 |
+| timestamp | 39 / 40 | 1 |
+| merging | 32 / 33 | 1 |
 | inner-join | 28 / 31 | 3 |
-| serialization | 20 / 22 | 2 |
-| token-for | 17 / 18 | 1 |
-| excluding | 15 / 16 | 1 |
-| composite-primary-key | 11 / 12 | 1 |
+| or | 26 / 27 | 1 |
+| core | 22 / 24 | 2 |
+| validations | 20 / 21 | 1 |
+| normalized-attribute | 14 / 15 | 1 |
+| delete-all | 12 / 13 | 1 |
 
 ### Solid progress (70–89%)
 
-| File | Passing / Total | Skipped | What's left |
-|---|---|---|---|
-| associations (misc) | 264 / 298 | 34 | Various edge cases |
-| base | 236 / 331 | 95 | Misc features |
-| enum | 146 / 176 | 30 | Edge cases |
-| nested-attributes | 135 / 153 | 18 | CPK, dirty tracking |
-| transactions | 125 / 159 | 34 | Savepoints, nesting |
-| batches | 121 / 138 | 17 | Edge cases |
-| callbacks | 80 / 107 | 27 | Around callbacks |
-| store | 50 / 57 | 7 | Edge cases |
-| primary-keys | 50 / 59 | 9 | Non-standard PKs |
-| aggregations | 46 / 64 | 18 | Aggregation edge cases |
+| File | Passing / Total | Skipped |
+|---|---|---|
+| relations | 234 / 279 | 45 |
+| finder | 221 / 260 | 39 |
+| persistence | 123 / 153 | 30 |
+| enum | 75 / 97 | 22 |
+| batches | 86 / 107 | 21 |
+| transactions | 80 / 98 | 18 |
+| nested-attributes | 78 / 127 | 49 |
+| named-scoping | 61 / 73 | 12 |
+| inheritance | 65 / 73 | 8 |
+| dirty | 50 / 62 | 12 |
+| store | 42 / 50 | 8 |
+| primary-keys | 41 / 60 | 19 |
+| select | 23 / 26 | 3 |
+| update-all | 23 / 26 | 3 |
 
 ### Needs work (below 70%)
 
 | File | Passing / Total | Skipped |
 |---|---|---|
-| has-one-habtm | 179 / 399 | 220 |
-| eager-hmthrough | 155 / 340 | 185 |
-| autosave-association | 119 / 238 | 119 |
-| where-chain | 30 / 117 | 87 |
-| insert-all | 42 / 113 | 71 |
-| strict-loading | 42 / 111 | 69 |
-| counter-cache | 45 / 112 | 67 |
-| reflection | 44 / 99 | 55 |
-| where | 93 / 139 | 46 |
-| reflection-migration | 40 / 84 | 44 |
-| serialized-attribute | 52 / 91 | 39 |
-| defaults | 25 / 62 | 37 |
-| preloader | 17 / 45 | 28 |
-| optimistic locking | 29 / 54 | 25 |
+| has-one-habtm (combined) | 209 / 362 | 153 |
+| eager | 105 / 197 | 92 |
+| autosave-association | 87 / 177 | 90 |
+| base | 83 / 186 | 103 |
+| has-many-through | 66 / 165 | 99 |
+| associations (misc) | 25 / 130 | 105 |
+| where | 15 / 62 | 47 |
+| counter-cache | 14 / 55 | 41 |
+| strict-loading | 14 / 54 | 40 |
+| inverse | 52 / 93 | 41 |
+| serialized-attribute | 30 / 59 | 29 |
+| migration | 19 / 90 | 71 |
+| reflection | 24 / 67 | 43 |
+| insert-all | 19 / 73 | 54 |
+| where-chain | 10 / 54 | 44 |
+| transaction-callbacks | 19 / 57 | 38 |
+| optimistic locking | 19 / 50 | 31 |
+| defaults | 12 / 25 | 13 |
 
-Plus ~20 smaller files with 5–20 skips each (inverse associations, transaction-callbacks, signed-id, readonly, etc.).
+Plus smaller files: signed-id (16/29), callbacks (17/46), aggregations (14/25), sanitize (13/22), cascaded-eager-loading (8/27), readonly (5/14), cache-key (7/12), modules (9/14), touch-later (6/11), association validation (5/10), clone (2/4), extensions (4/12), required (4/7), field-ordered-values (6/10), delegated-type (11/13), token-for (16/18), secure-token (8/9), dup (17/19), schema (12/14), left-outer-join (16/19), serialization (8/9), excluding (8/11).
 
 ### DB adapter stubs (need real DB connections)
 
@@ -120,21 +125,21 @@ Plus ~20 smaller files with 5–20 skips each (inverse associations, transaction
 
 ### Highest ROI
 
-1. **base.test.ts** (95 stubs, 71%) — broad coverage, good infrastructure
-2. **where-chain.test.ts** (87 stubs, 25%) — where.not/missing/associated
-3. **insert-all.test.ts** (71 stubs, 37%) — bulk operations
-4. **strict-loading.test.ts** (69 stubs, 37%) — strict loading modes
-5. **counter-cache.test.ts** (67 stubs, 40%) — counter cache
+1. **base.test.ts** (103 stubs, 45%) — broad coverage, good infrastructure
+2. **associations.test.ts** (105 stubs, 19%) — misc association edge cases
+3. **has-many-through.test.ts** (99 stubs, 40%) — through associations
+4. **migration.test.ts** (71 stubs, 21%) — migration edge cases
+5. **insert-all.test.ts** (54 stubs, 26%) — bulk operations
 
 ### Association-heavy (larger effort)
 
-6. **has-one-habtm.test.ts** (220 stubs) — HABTM + has_one
-7. **eager-hmthrough.test.ts** (185 stubs) — eager loading through
-8. **autosave-association.test.ts** (119 stubs) — autosave edge cases
+6. **has-one-habtm.test.ts** (153 stubs) — HABTM + has_one
+7. **eager.test.ts** (92 stubs) — eager loading
+8. **autosave-association.test.ts** (90 stubs) — autosave edge cases
 
 ### Lower ROI / complex
 
-- Composite primary keys — scattered across files (~30 tests total)
+- Composite primary keys — scattered across files
 - Pessimistic locking — needs FOR UPDATE support
 - DB adapters — need real DB connections, large stub counts
 - Ruby-only concepts (marshal, YAML) — permanently skip

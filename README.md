@@ -8,15 +8,15 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 
 | Package | Rails Equivalent | Status | Description |
 |---------|-----------------|--------|-------------|
-| `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **99.3%** | SQL AST builder and query generation |
-| `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **99%** | Attributes, validations, callbacks, dirty tracking, serialization |
-| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **67.4%** | Core utilities, inflection, caching, notifications, encryption |
-| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **62.9%** | ORM — persistence, querying, associations, migrations |
-| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **99%** | Modular web server interface, request/response, middleware |
+| `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **98.1%** | SQL AST builder and query generation |
+| `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **98.4%** | Attributes, validations, callbacks, dirty tracking, serialization |
+| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption |
+| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **66.3%** | ORM — persistence, querying, associations, migrations |
+| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **98.6%** | Modular web server interface, request/response, middleware |
 | `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **27.9%** | Routing, middleware stack, cookies, sessions, security |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters |
 
-Overall: **50.1%** real — 6,892 tests matched against 13,744 Rails tests.
+Overall: **51.4%** real — 7,069 tests matched against 13,744 Rails tests.
 
 ## Quick Example
 
@@ -44,50 +44,49 @@ query.toSql();
 
 ## What's Implemented
 
-### Arel — SQL AST and Query Building (99.3%)
+### Arel — SQL AST and Query Building (98.1%)
 
 Full SQL AST with nodes for SELECT, INSERT, UPDATE, DELETE, JOINs, subqueries, CTEs, window functions, set operations (UNION/INTERSECT/EXCEPT), and CASE expressions. Visitor pattern generates SQL strings. Essentially complete.
 
-### ActiveModel — Model Layer (99%)
+### ActiveModel — Model Layer (98.4%)
 
 Attribute definitions with type casting, a full validation framework (presence, length, format, numericality, inclusion, exclusion, custom validators), lifecycle callbacks (before/after/around for validation and save), dirty tracking (changes, previous changes, changed attributes), and serialization.
 
-### ActiveSupport — Core Utilities (67.4%)
+### ActiveSupport — Core Utilities (21.4%)
 
 String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly TimeZone, date/time extensions, and some Ruby-specific features.
 
-### ActiveRecord — ORM (62.9%)
+### ActiveRecord — ORM (66.3%)
 
-**Complete (100% test coverage) — 2,614 tests across 44 files:**
-- Finders (find, find_by, exists?, take, first/last, sole, positional finders) — 413 tests
-- Calculations (count, sum, average, minimum, maximum, grouped aggregates, pluck, pick, ids) — 489 tests
-- Persistence (create/save/update/destroy, becomes, increment/decrement/toggle, reload, dup) — 358 tests
-- Attribute methods (read/write, dirty tracking, before_type_cast, inspect) — 161 tests
+**Complete (100% test coverage) — 322 tests across 20 files:**
 - Belongs-to associations (polymorphic, touch, counter cache, optional/required, autosave) — 153 tests
-- Default scoping (default_scope, unscoped, rewhere, reorder, unscope) — 145 tests
-- Inheritance / STI (single table inheritance, type column, finder methods) — 106 tests
-- Validations (presence, length, format, numericality, inclusion, exclusion, uniqueness, custom) — 161 tests
-- Relation core (or, and, annotations, delete_all, mutation, order) — 179 tests
-- Migrations (reversible, revert, bulk alter, schema define) — 49 tests
-- JSON serialization, custom properties, boolean, dup, errors, explain, and more
+- Custom properties, JSON serialization, mutation, explain — 96 tests
+- Validations (presence, length, numericality, absence, custom) — 42 tests
+- Nested attributes, suppressor, boolean, structural compatibility, and more
 
 **Near-complete (90%+):**
-- Relations (98%) — chaining, merge, extending, spawn, readonly, distinct
-- Has-many associations (97%) — collection operations, dependent destroy/nullify, polymorphic, scoped
-- Named scoping (94%) — scope, extending, merging
-- Dirty tracking (94%), timestamps (97%), relation scoping (97%)
+- Has-many associations (98%) — collection operations, dependent destroy/nullify, polymorphic, scoped
+- Calculations (91%) — count, sum, average, minimum, maximum, grouped aggregates, pluck, pick, ids
+- Attribute methods (95%) — read/write, dirty tracking, before_type_cast, inspect
+- Default scoping (92%), relation scoping (97%), timestamps (98%), merging (97%)
+- Uniqueness validation (98%), inner joins (90%), or clauses (96%)
+
+**Solid progress (70–89%):**
+- Relations (84%) — chaining, merge, extending, spawn, readonly, distinct
+- Finders (85%) — find, find_by, exists?, take, first/last, sole
+- Persistence (80%) — create/save/update/destroy, becomes, increment/decrement/toggle, reload
+- Enum (77%), batches (80%), transactions (82%), named scoping (84%)
+- Nested attributes (61%), inheritance (89%), dirty tracking (81%)
 
 **Working:**
-- Where clauses (67%) — conditions, ranges, subqueries, whereMissing, whereAssociated
-- Associations (has_one, HABTM, has_many :through, has_one :through) with eager loading, inverse_of
-- Scopes, Enum, Callbacks, Transactions, optimistic locking, counter cache
-- Batching, insertAll/upsertAll, serialized attributes, store accessors
-- Nested attributes (88%), autosave, secure tokens, signed IDs, delegated types
+- Where clauses, associations (has_one, HABTM, has_many :through), eager loading, inverse_of
+- Callbacks, optimistic locking, counter cache, autosave, store accessors
+- insertAll/upsertAll, serialized attributes, secure tokens, signed IDs, delegated types
 - Database adapters: MemoryAdapter (for tests), SQLite, PostgreSQL, MySQL/MariaDB
 
 **In progress:** Where chain (where.not/missing/associated), eager loading through associations, autosave edge cases, HABTM collection operations, strict loading, pessimistic locking. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full breakdown.
 
-### Rack — Web Server Interface (99%)
+### Rack — Web Server Interface (98.6%)
 
 Request/Response objects, multipart parsing (file uploads), Builder (middleware composition), middleware (ContentType, ContentLength, ETag, ConditionalGet, Deflater, Head, MethodOverride, Runtime, Sendfile, Lock, Static, ShowExceptions, ShowStatus, CommonLogger, Cascade, URLMap), MIME type registry, MockRequest/MockResponse for testing, HTTP Basic auth, Headers, Events, Logger, and RewindableInput. Essentially complete — the only skipped tests are Ruby-specific `.ru` config file parsing features.
 
