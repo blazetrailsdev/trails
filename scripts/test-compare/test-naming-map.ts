@@ -590,7 +590,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
   // ==========================================================================
   activesupport: {
     "inflector_test.rb": [
-      { file: "activesupport.test.ts", describeBlock: "Inflector" },
+      { file: "inflector.test.ts", describeBlock: "InflectorTest" },
       { file: "hwia-module-string.test.ts", describeBlock: "InflectorTest" },
     ],
     "callbacks_test.rb": [
@@ -630,9 +630,10 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "hwia-module-string.test.ts", describeBlock: "HashWithIndifferentAccessTest" },
     ],
     "core_ext/string_ext_test.rb": [
-      { file: "activesupport.test.ts", describeBlock: "String utilities" },
-      { file: "activesupport.test.ts", describeBlock: "String access" },
-      { file: "activesupport.test.ts", describeBlock: "String transformations" },
+      { file: "string-ext.test.ts", describeBlock: "StringInflectionsTest" },
+      { file: "string-ext.test.ts", describeBlock: "StringAccessTest" },
+      { file: "string-ext.test.ts", describeBlock: "StringExcludeTest" },
+      { file: "string-ext.test.ts", describeBlock: "StringIndentTest" },
       { file: "hwia-module-string.test.ts", describeBlock: "StringInflectionsTest" },
       { file: "safe-buffer.test.ts", describeBlock: "OutputSafetyTest" },
       { file: "safe-buffer.test.ts", describeBlock: "SafeBufferTest" },

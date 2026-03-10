@@ -240,6 +240,13 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "adapters/sqlite3/virtual_column_test.rb": ["sqlite-adapter.test.ts"],
     "adapters/sqlite3/virtual_table_test.rb": ["sqlite-adapter.test.ts"],
   },
+  activesupport: {
+    "inflector_test.rb": ["inflector.test.ts", "hwia-module-string.test.ts"],
+    "core_ext/string_ext_test.rb": [
+      "string-ext.test.ts", "hwia-module-string.test.ts", "safe-buffer.test.ts",
+      "hwia-extended.test.ts",
+    ],
+  },
   actiondispatch: {
     // Routing tests all map to routing.test.ts
     "dispatch/routing_test.rb": ["routing.test.ts"],
