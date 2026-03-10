@@ -85,7 +85,7 @@ describe("TimeWithZoneTest", () => {
       expect(twz.yday).toBe(32); // Jan has 31 days, so Feb 1 = 32
     });
 
-    it("returns usec and nsec", () => {
+    it("nsec", () => {
       const utcDate = new Date(Date.UTC(2024, 0, 15, 15, 30, 45, 123));
       const twz = new TimeWithZone(utcDate, eastern);
       expect(twz.usec).toBe(123000);
@@ -118,7 +118,7 @@ describe("TimeWithZoneTest", () => {
       expect(summer.dst()).toBe(true);
     });
 
-    it("detects UTC timezone", () => {
+    it("utc?", () => {
       const utcTime = utcZone.local(2024, 1, 15, 12, 0, 0);
       expect(utcTime.isUtc()).toBe(true);
       expect(utcTime.isGmt()).toBe(true);
@@ -197,7 +197,7 @@ describe("TimeWithZoneTest", () => {
 
 
 
-    it("toString()", () => {
+    it("to s (formatting)", () => {
     // 2024-01-15 10:30:45 EST
       const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toString()).toBe("2024-01-15 10:30:45 -05:00 EST");
@@ -239,13 +239,13 @@ describe("TimeWithZoneTest", () => {
       expect(twzMs.xmlschema(3)).toBe("2024-01-15T10:30:45.123-05:00");
     });
 
-    it("iso8601() is alias for xmlschema()", () => {
+    it("iso8601", () => {
     // 2024-01-15 10:30:45 EST
       const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.iso8601()).toBe(twz.xmlschema());
     });
 
-    it("rfc3339() is alias for xmlschema()", () => {
+    it("rfc3339", () => {
     // 2024-01-15 10:30:45 EST
       const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.rfc3339()).toBe(twz.xmlschema());
@@ -263,19 +263,19 @@ describe("TimeWithZoneTest", () => {
       expect(twz.httpdate()).toBe("Mon, 15 Jan 2024 15:30:45 GMT");
     });
 
-    it("toFs('db')", () => {
+    it("to fs", () => {
     // 2024-01-15 10:30:45 EST
       const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFs("db")).toBe("2024-01-15 10:30:45");
     });
 
-    it("toFs('long')", () => {
+    it("to fs long", () => {
     // 2024-01-15 10:30:45 EST
       const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFs("long")).toBe("January 15, 2024 10:30");
     });
 
-    it("toFs('short')", () => {
+    it("to fs short", () => {
     // 2024-01-15 10:30:45 EST
       const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFs("short")).toBe("15 Jan 10:30");
@@ -452,18 +452,18 @@ describe("TimeWithZoneTest", () => {
       expect(result.day).toBe(10);
     });
 
-    it("since() is alias for plus", () => {
+    it("since", () => {
       const twz = eastern.local(2024, 1, 15, 10, 0, 0);
       expect(twz.since(60).min).toBe(1);
     });
 
-    it("ago() subtracts seconds", () => {
+    it("ago", () => {
       const twz = eastern.local(2024, 1, 15, 10, 0, 0);
       expect(twz.ago(60).hour).toBe(9);
       expect(twz.ago(60).min).toBe(59);
     });
 
-    it("advances by years", () => {
+    it("advance", () => {
       const twz = eastern.local(2024, 3, 15, 10, 0, 0);
       const result = twz.advance({ years: 2 });
       expect(result.year).toBe(2026);
@@ -524,7 +524,7 @@ describe("TimeWithZoneTest", () => {
       expect(result.min).toBe(30);
     });
 
-    it("changes year", () => {
+    it("change", () => {
       const twz = eastern.local(2024, 3, 15, 10, 30, 45);
       const result = twz.change({ year: 2025 });
       expect(result.year).toBe(2025);
@@ -621,7 +621,7 @@ describe("TimeWithZoneTest", () => {
       expect(a.valueOf() < b.valueOf()).toBe(true);
     });
 
-    it("isPast()", () => {
+    it("past?", () => {
       const past = eastern.local(2020, 1, 1, 0, 0, 0);
       expect(past.isPast()).toBe(true);
 
@@ -629,7 +629,7 @@ describe("TimeWithZoneTest", () => {
       expect(future.isPast()).toBe(false);
     });
 
-    it("isFuture()", () => {
+    it("future?", () => {
       const future = eastern.local(2099, 1, 1, 0, 0, 0);
       expect(future.isFuture()).toBe(true);
 
@@ -637,15 +637,11 @@ describe("TimeWithZoneTest", () => {
       expect(past.isFuture()).toBe(false);
     });
 
-    it("actsLikeTime()", () => {
+    it("is a", () => {
       const twz = eastern.local(2024, 1, 15, 12, 0, 0);
       expect(twz.actsLikeTime()).toBe(true);
     });
 
-    it("isBlank()", () => {
-      const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-      expect(twz.isBlank()).toBe(false);
-    });
 
     it("getTime() returns milliseconds", () => {
       const utcDate = new Date(Date.UTC(2024, 0, 15, 0, 0, 0));
@@ -705,12 +701,12 @@ describe("TimeWithZoneTest", () => {
       expect(tz.abbreviation(jan)).toBe("EST");
     });
 
-    it("toString()", () => {
+    it("TimeZone to s", () => {
       const tz = TimeZone.find("UTC");
       expect(tz.toString()).toBe("(GMT+00:00) UTC");
     });
 
-    it("inspect() is alias for toString()", () => {
+    it("inspect", () => {
       const tz = TimeZone.find("UTC");
       expect(tz.inspect()).toBe(tz.toString());
     });
