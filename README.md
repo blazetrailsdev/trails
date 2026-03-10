@@ -63,7 +63,7 @@ Attribute definitions with type casting, a full validation framework (presence, 
 
 ### ActiveSupport — Core Utilities (21.4%)
 
-String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly TimeZone, date/time extensions, and some Ruby-specific features.
+String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, TimeZone and TimeWithZone (DST-aware timezone handling with 150+ Rails named zones), HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly date/time extensions and some Ruby-specific features.
 
 ### ActiveRecord — ORM (65.4%)
 

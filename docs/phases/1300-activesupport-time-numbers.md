@@ -43,10 +43,12 @@ days(5).until(date)         // Date relative to another date
 - `advance({ years, months, days, hours, minutes, seconds })`
 - `ago(duration)` / `since(duration)` / `in(duration)`
 
-### TimeZone support
-- `TimeZone` class with IANA timezone database
+### TimeZone support ✓
+- `TimeZone` class with IANA timezone database (150+ Rails name mappings)
+- `TimeWithZone` class — timezone-aware time with DST handling
 - `inTimeZone(zone)` — convert between zones
 - Named zones: `"Eastern Time (US & Canada)"` etc.
+- 203 passing tests ported from Rails test suite
 
 ### Key Rails reference
 - `activesupport/test/core_ext/time_ext_test.rb`

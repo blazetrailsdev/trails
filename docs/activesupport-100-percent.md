@@ -30,15 +30,15 @@ The compare script (`npm run test:compare`) extracts test names from both Rails 
 | ordered-hash | 34 / 42 | 8 |
 | error-reporter | 29 / 32 | 3 |
 | safe-buffer | 19 / 41 | 22 |
+| time_with_zone | 203 / 179 | — |
+| time_zone | 203 / 108 | — |
 | concern | 2 / 17 | 15 |
 
 ### Needs work (0% — stubs only)
 
 | File | Stubs | Notes |
 |---|---|---|
-| time_with_zone | 179 | TimeZone support |
 | string_ext | 147 | String extensions (inflection, encoding, etc.) |
-| time_zone | 108 | TimeZone class |
 | hash_with_indifferent_access | 93 | HWIA edge cases |
 | multibyte_chars | 76 | Unicode/multibyte handling |
 | date_time_ext | 68 | DateTime extensions |
@@ -64,8 +64,7 @@ Plus 60+ smaller files with < 25 stubs each.
 
 ### Highest ROI (most stubs, foundational)
 
-1. **time_with_zone** (179 stubs) — Needed by ActiveRecord timestamps, but large effort
-2. **string_ext** (147 stubs) — Many are inflection tests that may already work
+1. **string_ext** (147 stubs) — Many are inflection tests that may already work
 3. **hash_with_indifferent_access** (93 stubs) — Core data structure, used everywhere
 4. **inflector** (48 stubs) — Pluralize/singularize edge cases
 5. **json/encoding** (46 stubs) — JSON serialization
