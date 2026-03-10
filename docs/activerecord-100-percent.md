@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **61.1%** real (3,318 matched / 5,428 total Ruby tests), 2,092 stubs remaining.
+Current state: **62.9%** real (3,413 matched / 5,428 total Ruby tests), 1,997 stubs remaining.
 
 ## How coverage is measured
 
@@ -35,73 +35,78 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 
 ## Current status by test file
 
-### Complete (100% pass rate)
+### Complete (100% pass rate) — 2,614 tests across 44 files
 
-These files have all tests passing with zero stubs:
+| File | Tests | | File | Tests |
+|---|---|---|---|---|
+| calculations | 489 | | or | 47 |
+| finder | 413 | | json-serialization | 45 |
+| persistence | 358 | | custom-properties | 38 |
+| attribute-methods | 161 | | sti | 38 |
+| belongs-to | 153 | | validations | 30 |
+| default-scoping | 145 | | ordered-options | 28 |
+| inheritance | 106 | | delete-all | 28 |
+| uniqueness | 95 | | time-travel | 27 |
+| annotations | 53 | | relation (core) | 21 |
+| migration | 49 | | mutation, dup | 20 each |
 
-| File | Tests |
-|---|---|
-| belongs-to | 153 |
-| persistence | 358 |
-| calculations + finder-basics | 489 + 213 |
-| default-scoping | 145 |
-| inheritance | 106 |
-| validations (all) | 161 |
-| json-serialization | 45 |
-| relation (core, or, and, annotations, delete-all, mutation, order) | 179 |
-| sti | 38 |
-| boolean, dup, errors, explain, suppressor, time-travel | 112 |
-| normalized-attribute, secure-password, query-constraints | 46 |
+Plus 24 smaller files (autosave, boolean, dup, errors, explain, generated-methods, habtm-scoping, has-many-scoping, instrumentation, inverse, length, normalized-attribute, null-relation, numericality, presence, query-constraints, querying-methods-delegation, secure-password, structural-compatibility, suppressor, absence, and, bidirectional-destroy).
 
 ### Near-complete (90%+ pass rate)
 
-| File | Pass rate | Passing | Skipped | What's left |
-|---|---|---|---|---|
-| has-many | 97% | 307 | 7 | Custom primary key tests |
-| merging | 99% | 107 | 1 | Edge case |
-| core | 97% | 84 | 2 | Minor |
-| relation-scoping | 97% | 70 | 2 | Minor |
-| timestamp | 97% | 70 | 2 | Minor |
-| named-scoping | 94% | 106 | 6 | Edge cases |
-| dirty | 94% | 82 | 5 | Edge cases |
-| select | 92% | 37 | 3 | Minor |
-| attribute-methods | 91% | 148 | 13 | Mixed |
-| migration | 91% | 45 | 4 | DDL edge cases |
+| File | Passing / Total | Skipped |
+|---|---|---|
+| relations | 731 / 747 | 16 |
+| has-many | 307 / 314 | 7 |
+| calculations-finder-basics | 213 / 235 | 22 |
+| merging | 107 / 108 | 1 |
+| named-scoping | 106 / 112 | 6 |
+| core | 84 / 86 | 2 |
+| dirty | 82 / 87 | 5 |
+| relation-scoping | 70 / 72 | 2 |
+| timestamp | 70 / 72 | 2 |
+| select | 37 / 40 | 3 |
+| inner-join | 28 / 31 | 3 |
+| serialization | 20 / 22 | 2 |
+| token-for | 17 / 18 | 1 |
+| excluding | 15 / 16 | 1 |
+| composite-primary-key | 11 / 12 | 1 |
 
-### Solid progress (70–90%)
+### Solid progress (70–89%)
 
-| File | Pass rate | Passing | Skipped | What's left |
-|---|---|---|---|---|
-| nested-attributes | 88% | 135 | 18 | CPK, association dirty tracking |
-| associations (misc) | 88% | 264 | 34 | Various edge cases |
-| batches | 87% | 121 | 17 | Edge cases |
-| store | 87% | 50 | 7 | Edge cases |
-| relations | 86% | 644 | 103 | Complex queries |
-| enum | 82% | 146 | 30 | Edge cases |
-| finder | 79% | 330 | 83 | Complex finders, joins |
-| transactions | 78% | 125 | 34 | Savepoints, nesting |
-| callbacks | 74% | 80 | 27 | Around callbacks, ordering |
-| base | 71% | 236 | 95 | Misc features |
+| File | Passing / Total | Skipped | What's left |
+|---|---|---|---|
+| associations (misc) | 264 / 298 | 34 | Various edge cases |
+| base | 236 / 331 | 95 | Misc features |
+| enum | 146 / 176 | 30 | Edge cases |
+| nested-attributes | 135 / 153 | 18 | CPK, dirty tracking |
+| transactions | 125 / 159 | 34 | Savepoints, nesting |
+| batches | 121 / 138 | 17 | Edge cases |
+| callbacks | 80 / 107 | 27 | Around callbacks |
+| store | 50 / 57 | 7 | Edge cases |
+| primary-keys | 50 / 59 | 9 | Non-standard PKs |
+| aggregations | 46 / 64 | 18 | Aggregation edge cases |
 
 ### Needs work (below 70%)
 
-| File | Pass rate | Passing | Skipped | What's left |
-|---|---|---|---|---|
-| where | 45% | 63 | 76 | Complex where clauses |
-| where-chain | 25% | 30 | 87 | where.not, where.missing, where.associated |
-| has-one-habtm | 44% | 179 | 220 | HABTM collection ops, has_one edge cases |
-| eager-hmthrough | 45% | 155 | 185 | Eager loading through associations |
-| autosave-association | 50% | 119 | 119 | Autosave edge cases |
-| counter-cache | 40% | 45 | 67 | Counter cache with associations |
-| strict-loading | 37% | 42 | 69 | Strict loading modes |
-| insert-all | 37% | 42 | 71 | Bulk insert edge cases |
-| reflection | 44% | 44 | 55 | Reflection API |
-| reflection-migration | 47% | 40 | 44 | Migration reflection |
-| defaults | 40% | 25 | 37 | Default values |
-| optimistic locking | 53% | 29 | 25 | Locking edge cases |
-| preloader | 37% | 17 | 28 | Preloading edge cases |
-| inverse associations | 33–63% | various | various | Inverse association handling |
-| pessimistic locking | 16% | 2 | 10 | FOR UPDATE, lock! |
+| File | Passing / Total | Skipped |
+|---|---|---|
+| has-one-habtm | 179 / 399 | 220 |
+| eager-hmthrough | 155 / 340 | 185 |
+| autosave-association | 119 / 238 | 119 |
+| where-chain | 30 / 117 | 87 |
+| insert-all | 42 / 113 | 71 |
+| strict-loading | 42 / 111 | 69 |
+| counter-cache | 45 / 112 | 67 |
+| reflection | 44 / 99 | 55 |
+| where | 93 / 139 | 46 |
+| reflection-migration | 40 / 84 | 44 |
+| serialized-attribute | 52 / 91 | 39 |
+| defaults | 25 / 62 | 37 |
+| preloader | 17 / 45 | 28 |
+| optimistic locking | 29 / 54 | 25 |
+
+Plus ~20 smaller files with 5–20 skips each (inverse associations, transaction-callbacks, signed-id, readonly, etc.).
 
 ### DB adapter stubs (need real DB connections)
 
@@ -111,26 +116,21 @@ These files have all tests passing with zero stubs:
 | postgres-adapter | 57 | 995 |
 | mysql-adapter | 32 | 184 |
 
-These are mostly stub placeholders. Converting them requires running against real databases and implementing adapter-specific SQL features.
-
 ## Recommended next targets
 
-### Highest ROI (most stubs, most tractable)
+### Highest ROI
 
-1. **relations.test.ts** (103 stubs) — 86% pass rate, good infrastructure
-2. **base.test.ts** (95 stubs) — 71% pass rate, broad coverage
-3. **where-chain.test.ts** (87 stubs) — where.not/missing/associated chains
-4. **finder.test.ts** (83 stubs) — complex finders, joins
-5. **where.test.ts** (76 stubs) — complex where clauses
+1. **base.test.ts** (95 stubs, 71%) — broad coverage, good infrastructure
+2. **where-chain.test.ts** (87 stubs, 25%) — where.not/missing/associated
+3. **insert-all.test.ts** (71 stubs, 37%) — bulk operations
+4. **strict-loading.test.ts** (69 stubs, 37%) — strict loading modes
+5. **counter-cache.test.ts** (67 stubs, 40%) — counter cache
 
-### Medium ROI (association-heavy)
+### Association-heavy (larger effort)
 
-6. **has-one-habtm.test.ts** (220 stubs) — HABTM + has_one, large file
+6. **has-one-habtm.test.ts** (220 stubs) — HABTM + has_one
 7. **eager-hmthrough.test.ts** (185 stubs) — eager loading through
 8. **autosave-association.test.ts** (119 stubs) — autosave edge cases
-9. **insert-all.test.ts** (71 stubs) — bulk operations
-10. **strict-loading.test.ts** (69 stubs) — strict loading modes
-11. **counter-cache.test.ts** (67 stubs) — counter cache with associations
 
 ### Lower ROI / complex
 
@@ -139,20 +139,10 @@ These are mostly stub placeholders. Converting them requires running against rea
 - DB adapters — need real DB connections, large stub counts
 - Ruby-only concepts (marshal, YAML) — permanently skip
 
-## What "converting a stub" typically involves
-
-1. **Trivial unskips** — feature already works, just change `it.skip` to `it`. (~10%)
-2. **Inline model setup** — test needs multi-model fixture graph with MemoryAdapter. (~40%)
-3. **Missing feature implementation** — build the feature, then write the test. (~30%)
-4. **Adapter/SQL limitations** — extend MemoryAdapter's SQL parser. (~15%)
-5. **Ruby-only concepts** — marshal, YAML, Ruby threading. Permanently skip. (~5%)
-
 ## Tracking progress
 
-Run `npm run test:compare` after each batch of work. The key metric is:
-
 ```
-activerecord: XX.X% real (NNNN matched, NNNN stub / 5428 total)
+npm run test:compare
 ```
 
 Target: `activerecord: 100% real (5428 matched, 0 stub / 5428 total)`
