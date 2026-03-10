@@ -2789,8 +2789,42 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
   });
-  it.skip("destroy all on composite primary key model", () => {});
-  it.skip("composite primary key join table", () => {});
+  it("destroy all on composite primary key model", async () => {
+    class CpkItem extends Base {
+      static { this._tableName = "cpk_da_items"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    registerModel("CpkItem", CpkItem);
+    await CpkItem.create({ shop_id: 1, id: 1, name: "A" });
+    await CpkItem.create({ shop_id: 1, id: 2, name: "B" });
+    const count = await CpkItem.count();
+    expect(count).toBe(2);
+    const items = await CpkItem.all().toArray();
+    for (const item of items) { await item.destroy(); }
+    expect(await CpkItem.count()).toBe(0);
+  });
+  it("composite primary key join table", async () => {
+    class CpkJtOwner extends Base {
+      static { this._tableName = "cpk_jt_owners"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkJtJoin extends Base {
+      static { this._tableName = "cpk_jt_joins"; this.attribute("cpk_jt_owner_region_id", "integer"); this.attribute("cpk_jt_owner_id", "integer"); this.attribute("cpk_jt_item_id", "integer"); this.adapter = adapter; }
+    }
+    class CpkJtItem extends Base {
+      static { this._tableName = "cpk_jt_items"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkJtOwner, "cpkJtJoins", { foreignKey: ["cpk_jt_owner_region_id", "cpk_jt_owner_id"], className: "CpkJtJoin" });
+    Associations.belongsTo.call(CpkJtJoin, "cpkJtItem", { className: "CpkJtItem" });
+    Associations.hasMany.call(CpkJtOwner, "cpkJtItems", { through: "cpkJtJoins", className: "CpkJtItem", source: "cpkJtItem" });
+    registerModel("CpkJtOwner", CpkJtOwner);
+    registerModel("CpkJtJoin", CpkJtJoin);
+    registerModel("CpkJtItem", CpkJtItem);
+    const owner = await CpkJtOwner.create({ region_id: 1, id: 1, name: "Owner" });
+    const item = await CpkJtItem.create({ name: "Widget" });
+    await CpkJtJoin.create({ cpk_jt_owner_region_id: 1, cpk_jt_owner_id: 1, cpk_jt_item_id: item.id });
+    const items = await loadHasManyThrough(owner, "cpkJtItems", { through: "cpkJtJoins", className: "CpkJtItem", source: "cpkJtItem" });
+    expect(items.length).toBe(1);
+    expect(items[0].readAttribute("name")).toBe("Widget");
+  });
   it("destroy all on association clears scope", async () => {
     class HmtDaClrOwner extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -4029,8 +4063,53 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("circular autosave association correctly saves multiple records", () => {});
   it.skip("post has many tags through association with composite query constraints", () => {});
   it.skip("tags has manu posts through association with composite query constraints", () => {});
-  it.skip("loading cpk association with unpersisted owner", () => {});
-  it.skip("cpk stale target", () => {});
+  it("loading cpk association with unpersisted owner", async () => {
+    class CpkHmtOwner extends Base {
+      static { this._tableName = "cpk_hmt_owners"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkHmtJoin extends Base {
+      static { this._tableName = "cpk_hmt_joins"; this.attribute("cpk_hmt_owner_region_id", "integer"); this.attribute("cpk_hmt_owner_id", "integer"); this.attribute("cpk_hmt_target_id", "integer"); this.adapter = adapter; }
+    }
+    class CpkHmtTarget extends Base {
+      static { this._tableName = "cpk_hmt_targets"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkHmtOwner, "cpkHmtJoins", { foreignKey: ["cpk_hmt_owner_region_id", "cpk_hmt_owner_id"], className: "CpkHmtJoin" });
+    Associations.belongsTo.call(CpkHmtJoin, "cpkHmtTarget", { className: "CpkHmtTarget" });
+    Associations.hasMany.call(CpkHmtOwner, "cpkHmtTargets", { through: "cpkHmtJoins", className: "CpkHmtTarget", source: "cpkHmtTarget" });
+    registerModel("CpkHmtOwner", CpkHmtOwner);
+    registerModel("CpkHmtJoin", CpkHmtJoin);
+    registerModel("CpkHmtTarget", CpkHmtTarget);
+    // Unpersisted owner — should return empty
+    const owner = new CpkHmtOwner({ name: "New" });
+    const targets = await loadHasManyThrough(owner, "cpkHmtTargets", { through: "cpkHmtJoins", className: "CpkHmtTarget", source: "cpkHmtTarget" });
+    expect(targets).toHaveLength(0);
+  });
+  it("cpk stale target", async () => {
+    class CpkStOwner extends Base {
+      static { this._tableName = "cpk_st_owners"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkStJoin extends Base {
+      static { this._tableName = "cpk_st_joins"; this.attribute("cpk_st_owner_region_id", "integer"); this.attribute("cpk_st_owner_id", "integer"); this.attribute("cpk_st_target_id", "integer"); this.adapter = adapter; }
+    }
+    class CpkStTarget extends Base {
+      static { this._tableName = "cpk_st_targets"; this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkStOwner, "cpkStJoins", { foreignKey: ["cpk_st_owner_region_id", "cpk_st_owner_id"], className: "CpkStJoin" });
+    Associations.belongsTo.call(CpkStJoin, "cpkStTarget", { className: "CpkStTarget" });
+    Associations.hasMany.call(CpkStOwner, "cpkStTargets", { through: "cpkStJoins", className: "CpkStTarget", source: "cpkStTarget" });
+    registerModel("CpkStOwner", CpkStOwner);
+    registerModel("CpkStJoin", CpkStJoin);
+    registerModel("CpkStTarget", CpkStTarget);
+    const owner = await CpkStOwner.create({ region_id: 1, id: 1, name: "Owner" });
+    const target = await CpkStTarget.create({ name: "Target" });
+    const join = await CpkStJoin.create({ cpk_st_owner_region_id: 1, cpk_st_owner_id: 1, cpk_st_target_id: target.id });
+    let targets = await loadHasManyThrough(owner, "cpkStTargets", { through: "cpkStJoins", className: "CpkStTarget", source: "cpkStTarget" });
+    expect(targets).toHaveLength(1);
+    // Delete the join — target becomes stale
+    await join.destroy();
+    targets = await loadHasManyThrough(owner, "cpkStTargets", { through: "cpkStJoins", className: "CpkStTarget", source: "cpkStTarget" });
+    expect(targets).toHaveLength(0);
+  });
   it.skip("cpk association build through singular", () => {});
 
   it.skip("has many through create record", () => {});

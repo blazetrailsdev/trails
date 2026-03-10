@@ -188,7 +188,24 @@ describe("TokenForTest", () => {
     expect(found).not.toBeNull();
     expect(found!.readAttribute("name")).toBe("test");
   });
-  it.skip("finds record with a composite primary key", () => { /* fixture-dependent */ });
+  it("finds record with a composite primary key", async () => {
+    const adapter = freshAdapter();
+    class CpkItem extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    const item = await CpkItem.create({ shop_id: 1, id: 42, name: "cpk-test" });
+    const token = item.signedId();
+    const found = await CpkItem.findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("name")).toBe("cpk-test");
+    expect(found!.id).toEqual([1, 42]);
+  });
   it("raises when no primary key has been declared", () => {
     const adapter = freshAdapter();
     class NoPkItem extends Base {

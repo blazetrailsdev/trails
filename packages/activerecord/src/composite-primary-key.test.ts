@@ -114,5 +114,77 @@ describe("CompositePrimaryKeyTest", () => {
     expect(o.isPersisted()).toBe(true);
   });
 
-  it.skip("assigning a non array value to model with composite primary key raises", () => { /* needs array composite PK support */ });
+  it("assigning a non array value to model with composite primary key raises", () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    expect(Order.compositePrimaryKey).toBe(true);
+    expect(Order.primaryKey).toEqual(["shop_id", "id"]);
+  });
+
+  it("composite primary key returns array id", async () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = new Order({ shop_id: 1, id: 42 });
+    expect(o.id).toEqual([1, 42]);
+  });
+
+  it("composite primary key set id distributes values", () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = new Order();
+    o.id = [5, 10];
+    expect(o.readAttribute("shop_id")).toBe(5);
+    expect(o.readAttribute("id")).toBe(10);
+  });
+
+  it("composite primary key create and find", async () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+
+    const o = await Order.create({ shop_id: 1, id: 42, name: "Widget" });
+    expect(o.id).toEqual([1, 42]);
+    expect(o.isPersisted()).toBe(true);
+
+    const found = await Order.find([1, 42]);
+    expect(found.readAttribute("name")).toBe("Widget");
+  });
+
+  it("composite primary key update", async () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("status", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+
+    const o = await Order.create({ shop_id: 1, id: 1, status: "pending" });
+    await o.update({ status: "shipped" });
+    await o.reload();
+    expect(o.readAttribute("status")).toBe("shipped");
+  });
+
+  it("composite primary key destroy", async () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+
+    const o = await Order.create({ shop_id: 1, id: 1 });
+    await o.destroy();
+    expect(o.isDestroyed()).toBe(true);
+    const count = await Order.count();
+    expect(count).toBe(0);
+  });
+
+  it("composite primary key dup removes all pk columns", async () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = new Order({ shop_id: 1, id: 42, name: "Widget" });
+    const copy = o.dup();
+    expect(copy.readAttribute("shop_id")).toBeNull();
+    expect(copy.readAttribute("id")).toBeNull();
+    expect(copy.readAttribute("name")).toBe("Widget");
+    expect(copy.isNewRecord()).toBe(true);
+  });
 });

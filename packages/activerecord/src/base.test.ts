@@ -1468,7 +1468,17 @@ describe("BasicsTest", () => {
     expect(u.isPersisted()).toBe(false);
     expect(u.isDestroyed()).toBe(true);
   });
-  it.skip("dup for a composite primary key model", () => {});
+  it("dup for a composite primary key model", async () => {
+    class Order extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = new Order({ shop_id: 1, id: 42, name: "Widget" });
+    const copy = o.dup();
+    expect(copy.readAttribute("shop_id")).toBeNull();
+    expect(copy.readAttribute("id")).toBeNull();
+    expect(copy.readAttribute("name")).toBe("Widget");
+    expect(copy.isNewRecord()).toBe(true);
+  });
   it("dup does not copy associations", async () => {
     class User extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
@@ -1627,10 +1637,278 @@ describe("BasicsTest", () => {
     class User extends Base {
       static { this.attribute("name", "string"); this.adapter = adapter; }
     }
-    // SQL should quote table and column names
     const sql = User.where({ name: "test" }).toSql();
     expect(sql).toContain("name");
     expect(sql).toContain("test");
+  });
+
+  // --- Tests matching Ruby BasicsTest names ---
+
+  it("toggle attribute", async () => {
+    class User extends Base {
+      static { this.attribute("active", "boolean", { default: false }); this.adapter = adapter; }
+    }
+    const u = await User.create({ active: false });
+    u.toggle("active");
+    expect(u.readAttribute("active")).toBe(true);
+  });
+
+  it("has attribute", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = new User();
+    expect(u.hasAttribute("name")).toBe(true);
+    expect(u.hasAttribute("nonexistent")).toBe(false);
+  });
+
+  it("has attribute with symbol", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    expect(User.hasAttributeDefinition("name")).toBe(true);
+    expect(User.hasAttributeDefinition("nonexistent")).toBe(false);
+  });
+
+  it("attribute names", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+    }
+    const names = User.attributeNames();
+    expect(names).toContain("name");
+    expect(names).toContain("age");
+  });
+
+  it("attribute names on abstract class", () => {
+    class AbstractModel extends Base {
+      static { this.abstractClass = true; }
+    }
+    expect(AbstractModel.attributeNames()).toEqual([]);
+  });
+
+  it("initialize with attributes", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = new User({ name: "test" });
+    expect(u.readAttribute("name")).toBe("test");
+    expect(u.isNewRecord()).toBe(true);
+  });
+
+  it("equality", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u1 = await User.create({ name: "a" });
+    const u2 = await User.find(u1.id);
+    expect(u1.isEqual(u2)).toBe(true);
+  });
+
+  it("equality of new records", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u1 = new User({ name: "a" });
+    const u2 = new User({ name: "a" });
+    expect(u1.isEqual(u2)).toBe(false);
+  });
+
+  it("dup", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "orig" });
+    const d = u.dup();
+    expect(d.isNewRecord()).toBe(true);
+    expect(d.id).toBeNull();
+    expect(d.readAttribute("name")).toBe("orig");
+  });
+
+  it("reload", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "orig" });
+    u.writeAttribute("name", "changed");
+    await u.reload();
+    expect(u.readAttribute("name")).toBe("orig");
+  });
+
+  it("last", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "a" });
+    await User.create({ name: "b" });
+    const last = await User.last();
+    expect((last as Base).readAttribute("name")).toBe("b");
+  });
+
+  it("all", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "a" });
+    await User.create({ name: "b" });
+    const all = await User.all().toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("distinct delegates to scoped", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "a" });
+    await User.create({ name: "a" });
+    const sql = User.distinct().toSql();
+    expect(sql).toContain("DISTINCT");
+  });
+
+  it("abstract class table name", () => {
+    class AbstractModel extends Base {
+      static { this.abstractClass = true; }
+    }
+    class ConcreteModel extends AbstractModel {}
+    expect(AbstractModel.abstractClass).toBe(true);
+    expect(ConcreteModel.tableName).toBe("concrete_models");
+  });
+
+  it("#present? and #blank? on ActiveRecord::Base classes", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    expect(await User.all().isBlank()).toBe(true);
+    await User.create({ name: "a" });
+    expect(await User.all().isBlank()).toBe(false);
+  });
+
+  it("select symbol", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    await User.create({ name: "x" });
+    const sql = User.select("name").toSql();
+    expect(sql).toContain("name");
+  });
+
+  it("limit should take value from latest limit", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const sql = User.limit(5).limit(3).toSql();
+    expect(sql).toContain("3");
+  });
+
+  it("previously new record returns boolean", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = new User({ name: "a" });
+    expect(u.isPreviouslyNewRecord()).toBe(false);
+    await u.save();
+    expect(u.isPreviouslyNewRecord()).toBe(true);
+  });
+
+  it("previously changed", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u = await User.create({ name: "orig" });
+    u.writeAttribute("name", "changed");
+    await u.save();
+    expect(u.previousChanges).toBeDefined();
+  });
+
+  it("auto id", () => {
+    class User extends Base {}
+    expect(User.primaryKey).toBe("id");
+  });
+
+  it("null fields", async () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const sql = User.where({ name: null }).toSql();
+    expect(sql).toContain("IS NULL");
+  });
+
+  it("readonly attributes", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.attrReadonly("name");
+      }
+    }
+    const u = await User.create({ name: "orig" });
+    u.writeAttribute("name", "changed");
+    await u.save();
+    await u.reload();
+    expect(u.readAttribute("name")).toBe("orig");
+  });
+
+  it("readonly attributes on a new record", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.attrReadonly("name");
+      }
+    }
+    const u = await User.create({ name: "allowed" });
+    expect(u.readAttribute("name")).toBe("allowed");
+  });
+
+  it("scoped can take a values hash", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const rel = User.where({ name: "test" });
+    const hash = rel.whereValuesHash();
+    expect(hash.name).toBe("test");
+  });
+
+  it("records without an id have unique hashes", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const u1 = new User({ name: "a" });
+    const u2 = new User({ name: "a" });
+    expect(u1.isEqual(u2)).toBe(false);
+  });
+
+  it("ignored columns are stored as an array of string", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+      }
+    }
+    expect(User.ignoredColumns).toEqual(["secret"]);
+  });
+
+  it("singular table name guesses for individual table", () => {
+    class Person extends Base {}
+    expect(Person.tableName).toBe("people");
+    class Category extends Base {}
+    expect(Category.tableName).toBe("categories");
+  });
+
+  it("quoted table name after set table name", () => {
+    class User extends Base {
+      static { this.tableName = "custom_users"; }
+    }
+    expect(User.tableName).toBe("custom_users");
+  });
+
+  it("no limit offset", () => {
+    class User extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    const sql = User.all().toSql();
+    expect(sql).not.toContain("LIMIT");
+    expect(sql).not.toContain("OFFSET");
   });
 });
 

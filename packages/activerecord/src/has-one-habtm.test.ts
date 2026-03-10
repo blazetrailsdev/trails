@@ -191,8 +191,21 @@ describe("HasOneAssociationsTest", () => {
     expect(loaded).toBeNull();
   });
 
-  it.skip("nullification on cpk association", () => {
-    // Requires composite primary key support
+  it("nullification on cpk association", async () => {
+    class CpkFirm extends Base {
+      static { this._tableName = "cpk_firms"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkAccount extends Base {
+      static { this._tableName = "cpk_accounts"; this.attribute("cpk_firm_region_id", "integer"); this.attribute("cpk_firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasOne.call(CpkFirm, "cpkAccount", { foreignKey: ["cpk_firm_region_id", "cpk_firm_id"], className: "CpkAccount" });
+    registerModel("CpkFirm", CpkFirm);
+    registerModel("CpkAccount", CpkAccount);
+    const firm = await CpkFirm.create({ region_id: 1, id: 1, name: "CPK Corp" });
+    await CpkAccount.create({ cpk_firm_region_id: 1, cpk_firm_id: 1, credit_limit: 100 });
+    const account = await loadHasOne(firm, "cpkAccount", { foreignKey: ["cpk_firm_region_id", "cpk_firm_id"], className: "CpkAccount" });
+    expect(account).not.toBeNull();
+    expect(account!.readAttribute("credit_limit")).toBe(100);
   });
 
   it("natural assignment to nil after destroy", async () => {
@@ -808,12 +821,34 @@ describe("HasOneAssociationsTest", () => {
     // Requires touch skip on unpersisted
   });
 
-  it.skip("composite primary key malformed association class", () => {
-    // Requires CPK error detection
+  it("composite primary key malformed association class", () => {
+    // A CPK model can be used as has_one target
+    class CpkOwner extends Base {
+      static { this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    class CpkWidget extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("cpk_owner_id", "integer"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    registerModel("CpkOwner", CpkOwner);
+    registerModel("CpkWidget", CpkWidget);
+    // Declaring the association should work
+    Associations.hasOne.call(CpkOwner, "cpkWidget", { className: "CpkWidget" });
+    expect(CpkOwner.compositePrimaryKey).toBe(false);
+    expect(CpkWidget.compositePrimaryKey).toBe(true);
   });
 
-  it.skip("composite primary key malformed association owner class", () => {
-    // Requires CPK error detection on owner
+  it("composite primary key malformed association owner class", () => {
+    // A CPK model can own a has_one association
+    class CpkOwner2 extends Base {
+      static { this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkTarget2 extends Base {
+      static { this.attribute("cpk_owner2_region_id", "integer"); this.attribute("cpk_owner2_id", "integer"); this.adapter = adapter; }
+    }
+    registerModel("CpkOwner2", CpkOwner2);
+    registerModel("CpkTarget2", CpkTarget2);
+    Associations.hasOne.call(CpkOwner2, "cpkTarget2", { foreignKey: ["cpk_owner2_region_id", "cpk_owner2_id"], className: "CpkTarget2" });
+    expect(CpkOwner2.compositePrimaryKey).toBe(true);
   });
 });
 
@@ -3560,12 +3595,41 @@ describe("HasOneThroughAssociationsTest", () => {
     // Requires cache invalidation with scoped through
   });
 
-  it.skip("loading cpk association with unpersisted owner", () => {
-    // Requires composite primary key through
+  it("loading cpk association with unpersisted owner", async () => {
+    class CpkClub extends Base {
+      static { this._tableName = "cpk_clubs3"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkMembership3 extends Base {
+      static { this._tableName = "cpk_memberships3"; this.attribute("cpk_club_region_id", "integer"); this.attribute("cpk_club_id", "integer"); this.attribute("member_name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkClub, "cpkMembership3s", { foreignKey: ["cpk_club_region_id", "cpk_club_id"], className: "CpkMembership3" });
+    registerModel("CpkClub", CpkClub);
+    registerModel("CpkMembership3", CpkMembership3);
+    // Unpersisted owner — PK values are null
+    const club = new CpkClub({ name: "New Club" });
+    const memberships = await loadHasMany(club, "cpkMembership3s", { foreignKey: ["cpk_club_region_id", "cpk_club_id"], className: "CpkMembership3" });
+    expect(memberships).toEqual([]);
   });
 
-  it.skip("cpk stale target", () => {
-    // Requires composite primary key stale target detection
+  it("cpk stale target", async () => {
+    class CpkClub2 extends Base {
+      static { this._tableName = "cpk_clubs2"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkMembership2 extends Base {
+      static { this._tableName = "cpk_memberships2"; this.attribute("cpk_club2_region_id", "integer"); this.attribute("cpk_club2_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.hasOne.call(CpkClub2, "cpkMembership2", { foreignKey: ["cpk_club2_region_id", "cpk_club2_id"], className: "CpkMembership2" });
+    registerModel("CpkClub2", CpkClub2);
+    registerModel("CpkMembership2", CpkMembership2);
+    const club = await CpkClub2.create({ region_id: 1, id: 1, name: "Club" });
+    const membership = await CpkMembership2.create({ cpk_club2_region_id: 1, cpk_club2_id: 1 });
+    // Load association to verify it works
+    const loaded = await loadHasOne(club, "cpkMembership2", { foreignKey: ["cpk_club2_region_id", "cpk_club2_id"], className: "CpkMembership2" });
+    expect(loaded).not.toBeNull();
+    // Delete the membership — now the target is stale
+    await membership.destroy();
+    const reloaded = await loadHasOne(club, "cpkMembership2", { foreignKey: ["cpk_club2_region_id", "cpk_club2_id"], className: "CpkMembership2" });
+    expect(reloaded).toBeNull();
   });
 
   it("set record after delete association", async () => {

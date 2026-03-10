@@ -443,9 +443,36 @@ describe("CounterCacheTest", () => {
     const reloaded = await Topic.find(t.id);
     expect(reloaded.readAttribute("replies_count")).toBe(10);
   });
-  it.skip("increment counter for cpk model", () => {});
-  it.skip("increment counter for multiple cpk model records", () => {});
-  it.skip("decrement counter for cpk model", () => {});
+  it("increment counter for cpk model", async () => {
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 0 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
+    await CpkOrder.incrementCounter("items_count", [1, 1]);
+    const reloaded = await CpkOrder.find([1, 1]);
+    expect(reloaded.readAttribute("items_count")).toBe(1);
+  });
+  it("increment counter for multiple cpk model records", async () => {
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 0 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o1 = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
+    const o2 = await CpkOrder.create({ shop_id: 1, id: 2, items_count: 0 });
+    await CpkOrder.updateCounters([[1, 1], [1, 2]], { items_count: 5 });
+    const r1 = await CpkOrder.find([1, 1]);
+    const r2 = await CpkOrder.find([1, 2]);
+    expect(r1.readAttribute("items_count")).toBe(5);
+    expect(r2.readAttribute("items_count")).toBe(5);
+  });
+  it("decrement counter for cpk model", async () => {
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 10 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
+    await CpkOrder.decrementCounter("items_count", [1, 1]);
+    const reloaded = await CpkOrder.find([1, 1]);
+    expect(reloaded.readAttribute("items_count")).toBe(9);
+  });
   it.skip("reset counters by counter name", () => {});
   it.skip("reset multiple counters", () => {});
   it.skip("reset counters with string argument", () => {});
@@ -486,7 +513,15 @@ describe("CounterCacheTest", () => {
     expect(reloaded.readAttribute("replies_count")).toBe(1);
     expect(reloaded.readAttribute("views_count")).toBe(10);
   });
-  it.skip("update counter for decrement for cpk model", () => {});
+  it("update counter for decrement for cpk model", async () => {
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 10 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
+    await CpkOrder.updateCounters([1, 1], { items_count: -3 });
+    const reloaded = await CpkOrder.find([1, 1]);
+    expect(reloaded.readAttribute("items_count")).toBe(7);
+  });
   it.skip("reset the right counter if two have the same foreign key", () => {});
   it.skip("reset counter of has_many :through association", () => {});
   it.skip("the passed symbol needs to be an association name or counter name", () => {});

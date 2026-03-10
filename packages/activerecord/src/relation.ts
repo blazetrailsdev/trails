@@ -298,7 +298,7 @@ export class Relation<T extends Base> {
   excluding(...records: T[]): Relation<T> {
     const ids = records.map((r) => r.id).filter((id) => id != null);
     if (ids.length === 0) return this;
-    return this.whereNot({ [this._modelClass.primaryKey]: ids });
+    return this.whereNot({ [this._modelClass.primaryKey as string]: ids });
   }
 
   /**
@@ -1344,7 +1344,7 @@ export class Relation<T extends Base> {
     if (this._isNone) return n !== undefined ? [] : null;
     let rel: Relation<T>;
     if (this._orderClauses.length === 0) {
-      rel = this.order({ [this._modelClass.primaryKey]: "desc" as const });
+      rel = this.order({ [this._modelClass.primaryKey as string]: "desc" as const });
     } else {
       rel = this.reverseOrder();
     }
@@ -1457,7 +1457,7 @@ export class Relation<T extends Base> {
     rel._limitValue = 1;
     rel._offsetValue = (this._offsetValue ?? 0) + index;
     if (rel._orderClauses.length === 0 && rel._rawOrderClauses.length === 0) {
-      rel._orderClauses.push(this._modelClass.primaryKey);
+      rel._orderClauses.push(this._modelClass.primaryKey as string);
     }
     const records = await rel.toArray();
     return records[0] ?? null;
@@ -1466,7 +1466,7 @@ export class Relation<T extends Base> {
   private async _findNthFromLast(index: number): Promise<T | null> {
     let rel: Relation<T>;
     if (this._orderClauses.length === 0 && this._rawOrderClauses.length === 0) {
-      rel = this.order({ [this._modelClass.primaryKey]: "desc" as const });
+      rel = this.order({ [this._modelClass.primaryKey as string]: "desc" as const });
     } else {
       rel = this.reverseOrder();
     }
@@ -1677,7 +1677,7 @@ export class Relation<T extends Base> {
         rel = this.where(conditions as Record<string, unknown>);
       } else {
         // Primary key lookup
-        rel = this.where({ [this._modelClass.primaryKey]: conditions });
+        rel = this.where({ [this._modelClass.primaryKey as string]: conditions });
       }
     }
     const c = await rel.count();
@@ -1797,7 +1797,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#ids
    */
   async ids(): Promise<unknown[]> {
-    return this.pluck(this._modelClass.primaryKey);
+    return this.pluck(this._modelClass.primaryKey as string);
   }
 
   /**
@@ -2058,9 +2058,10 @@ export class Relation<T extends Base> {
       return `(${vals.join(", ")})`;
     });
 
+    const pk = this._modelClass.primaryKey;
     const uniqueCols = options?.uniqueBy
       ? (Array.isArray(options.uniqueBy) ? options.uniqueBy : [options.uniqueBy])
-      : [this._modelClass.primaryKey];
+      : (Array.isArray(pk) ? pk : [pk]);
 
     let sql: string;
     const isMysql = !!process.env.MYSQL_TEST_URL;
@@ -2253,7 +2254,7 @@ export class Relation<T extends Base> {
 
       // Ensure deterministic ordering; support custom order direction (Rails 7.1)
       if (rel._orderClauses.length === 0) {
-        rel._orderClauses.push(order ? [pk, order] : pk);
+        rel._orderClauses.push(order ? [pk as string, order] : pk as string);
       }
 
       // Apply start/finish range constraints
@@ -2305,7 +2306,7 @@ export class Relation<T extends Base> {
         const pkQuoted = typeof lastId === "number" ? String(lastId) : `'${lastId}'`;
         rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${pk}" > ${pkQuoted}`);
       }
-      rel._orderClauses = [pk];
+      rel._orderClauses = [pk as string];
       rel._limitValue = batchSize;
 
       const records = await rel.toArray();
@@ -2314,7 +2315,7 @@ export class Relation<T extends Base> {
       // Create a scoped relation for just these PKs
       const ids = records.map((r) => (r as any).id);
       const batchRel = this._clone();
-      batchRel._whereClauses.push({ [pk]: ids });
+      batchRel._whereClauses.push({ [pk as string]: ids });
       yield batchRel;
 
       if (records.length < batchSize) break;
@@ -2976,11 +2977,11 @@ export class Relation<T extends Base> {
   async find(...ids: unknown[]): Promise<T | T[]> {
     const pk = this._modelClass.primaryKey;
     if (ids.length === 1 && !Array.isArray(ids[0])) {
-      const records = await this.where({ [pk]: ids[0] }).limit(1).toArray();
+      const records = await this.where({ [pk as string]: ids[0] }).limit(1).toArray();
       if (records.length === 0) {
         throw new RecordNotFound(
           `Couldn't find ${this._modelClass.name} with '${pk}'=${ids[0]}`,
-          this._modelClass.name, pk, ids[0]
+          this._modelClass.name, pk as string, ids[0]
         );
       }
       return records[0];
@@ -2989,14 +2990,14 @@ export class Relation<T extends Base> {
     if (flatIds.length === 0) {
       throw new RecordNotFound(
         `Couldn't find ${this._modelClass.name} with an empty list of ids`,
-        this._modelClass.name, pk, []
+        this._modelClass.name, pk as string, []
       );
     }
-    const records = await this.where({ [pk]: flatIds }).toArray();
+    const records = await this.where({ [pk as string]: flatIds }).toArray();
     if (records.length !== flatIds.length) {
       throw new RecordNotFound(
         `Couldn't find all ${this._modelClass.name} with '${pk}': (${flatIds.join(", ")})`,
-        this._modelClass.name, pk, flatIds
+        this._modelClass.name, pk as string, flatIds
       );
     }
     return records;

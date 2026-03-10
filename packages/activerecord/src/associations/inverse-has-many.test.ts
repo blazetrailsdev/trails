@@ -194,7 +194,23 @@ describe("InverseHasManyTests", () => {
     }
   });
 
-  it.skip("inverse should be set on composite primary key child", () => { /* needs composite PK */ });
+  it("inverse should be set on composite primary key child", async () => {
+    const adapter = freshAdapter();
+    class CpkMan extends Base {
+      static { this._tableName = "cpk_men"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkInterest extends Base {
+      static { this._tableName = "cpk_interests"; this.attribute("cpk_man_region_id", "integer"); this.attribute("cpk_man_id", "integer"); this.attribute("topic", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkMan, "cpkInterests", { foreignKey: ["cpk_man_region_id", "cpk_man_id"], className: "CpkInterest", inverseOf: "cpkMan" });
+    registerModel("CpkMan", CpkMan);
+    registerModel("CpkInterest", CpkInterest);
+    const m = await CpkMan.create({ region_id: 1, id: 1, name: "Gordon" });
+    await CpkInterest.create({ cpk_man_region_id: 1, cpk_man_id: 1, topic: "chess" });
+    const interests = await loadHasMany(m, "cpkInterests", { foreignKey: ["cpk_man_region_id", "cpk_man_id"], className: "CpkInterest", inverseOf: "cpkMan" });
+    expect(interests.length).toBe(1);
+    expect((interests[0] as any)._cachedAssociations?.get("cpkMan")).toBe(m);
+  });
 
   it("raise record not found error when invalid ids are passed", async () => {
     const { Man } = makeModels();

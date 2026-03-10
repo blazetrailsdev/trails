@@ -124,6 +124,7 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "finder_respond_to_test.rb": ["finder.test.ts"],
     "habtm_destroy_order_test.rb": ["habtm.test.ts"],
     "inheritance_test.rb": ["inheritance.test.ts", "sti.test.ts"],
+    "primary_keys_test.rb": ["primary-keys.test.ts", "composite-primary-key.test.ts"],
     "inherited_test.rb": ["inheritance.test.ts"],
     "invertible_migration_test.rb": ["invertible.test.ts"],
     "migration_test.rb": ["migration.test.ts", "bulk-alter-table.test.ts", "copy.test.ts"],
@@ -733,15 +734,21 @@ function printSummary(result: TestComparisonResult) {
     const total = pkgComp.matched + pkgComp.stub + pkgComp.skipped + pkgComp.missing;
     console.log(`  ${pkg}: ${pkgComp.coveragePercent}% real (${pkgComp.matched} matched, ${pkgComp.stub} stub / ${total} total)`);
 
-    const unmappedFiles = pkgComp.files
-      .filter((f) => f.matched === 0 && f.tests.length > 0)
-      .sort((a, b) => b.tests.length - a.tests.length)
-      .slice(0, 5);
+    // Per-file breakdown sorted by stub count (highest first)
+    const filesWithTests = pkgComp.files
+      .filter((f) => f.tests.length > 0)
+      .sort((a, b) => (b.stub + b.missing) - (a.stub + a.missing));
 
-    if (unmappedFiles.length > 0) {
-      for (const f of unmappedFiles) {
-        console.log(`    ✗ ${f.rubyFile}: ${f.tests.length} tests (no TS match)`);
-      }
+    for (const f of filesWithTests) {
+      const fTotal = f.matched + f.stub + f.skipped + f.missing;
+      const fPct = fTotal > 0 ? Math.round((f.matched / fTotal) * 100) : 0;
+      const parts: string[] = [];
+      if (f.matched > 0) parts.push(`${f.matched} pass`);
+      if (f.stub > 0) parts.push(`${f.stub} stub`);
+      if (f.missing > 0) parts.push(`${f.missing} miss`);
+      if (f.skipped > 0) parts.push(`${f.skipped} null`);
+      const status = f.matched === 0 && f.stub === 0 ? " ✗" : fPct === 100 ? " ✓" : "";
+      console.log(`    ${fPct.toString().padStart(3)}% ${f.rubyFile} (${parts.join(", ")})${status}`);
     }
   }
 

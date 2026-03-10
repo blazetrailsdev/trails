@@ -1616,7 +1616,25 @@ describe("AssociationsTest", () => {
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
   it.skip("loading the association target should load most recent attributes for child records marked for destruction", () => { /* fixture-dependent */ });
-  it.skip("loading cpk association when persisted and in memory differ", () => { /* fixture-dependent */ });
+  it("loading cpk association when persisted and in memory differ", async () => {
+    const adapter = freshAdapter();
+    class CpkOrder extends Base {
+      static { this._tableName = "cpk_orders"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("status", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkOrderItem extends Base {
+      static { this._tableName = "cpk_order_items"; this.attribute("cpk_order_shop_id", "integer"); this.attribute("cpk_order_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkOrder, "cpkOrderItems", { foreignKey: ["cpk_order_shop_id", "cpk_order_id"], className: "CpkOrderItem" });
+    registerModel("CpkOrder", CpkOrder);
+    registerModel("CpkOrderItem", CpkOrderItem);
+    const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
+    await CpkOrderItem.create({ cpk_order_shop_id: 1, cpk_order_id: 1, name: "Widget" });
+    // Change in memory but don't persist
+    order.writeAttribute("status", "closed");
+    // Loading association should still find items by persisted CPK
+    const items = await loadHasMany(order, "cpkOrderItems", { foreignKey: ["cpk_order_shop_id", "cpk_order_id"], className: "CpkOrderItem" });
+    expect(items.length).toBe(1);
+  });
   it("include with order works", async () => {
     const adapter = freshAdapter();
     class IOPost extends Base {
@@ -1700,8 +1718,41 @@ describe("AssociationsTest", () => {
   it.skip("using limitable reflections helper", () => { /* fixture-dependent */ });
   it.skip("association with references", () => { /* fixture-dependent */ });
   it.skip("belongs to a model with composite foreign key finds associated record", () => { /* fixture-dependent */ });
-  it.skip("belongs to a cpk model by id attribute", () => { /* fixture-dependent */ });
-  it.skip("belongs to a model with composite primary key uses composite pk in sql", () => { /* fixture-dependent */ });
+  it("belongs to a cpk model by id attribute", async () => {
+    const adapter = freshAdapter();
+    class CpkBook extends Base {
+      static { this._tableName = "cpk_books"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("title", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkChapter extends Base {
+      static { this._tableName = "cpk_chapters"; this.attribute("cpk_book_shop_id", "integer"); this.attribute("cpk_book_id", "integer"); this.attribute("number", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(CpkChapter, "cpkBook", { foreignKey: ["cpk_book_shop_id", "cpk_book_id"], className: "CpkBook" });
+    registerModel("CpkBook", CpkBook);
+    registerModel("CpkChapter", CpkChapter);
+    const book = await CpkBook.create({ shop_id: 1, id: 10, title: "CPK Guide" });
+    const chapter = await CpkChapter.create({ cpk_book_shop_id: 1, cpk_book_id: 10, number: 1 });
+    const loaded = await loadBelongsTo(chapter, "cpkBook", { foreignKey: ["cpk_book_shop_id", "cpk_book_id"], className: "CpkBook" });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("title")).toBe("CPK Guide");
+    expect(loaded!.id).toEqual([1, 10]);
+  });
+  it("belongs to a model with composite primary key uses composite pk in sql", async () => {
+    const adapter = freshAdapter();
+    class CpkAuthor extends Base {
+      static { this._tableName = "cpk_authors"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkPost extends Base {
+      static { this._tableName = "cpk_posts"; this.attribute("cpk_author_region_id", "integer"); this.attribute("cpk_author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(CpkPost, "cpkAuthor", { foreignKey: ["cpk_author_region_id", "cpk_author_id"], className: "CpkAuthor" });
+    registerModel("CpkAuthor", CpkAuthor);
+    registerModel("CpkPost", CpkPost);
+    const author = await CpkAuthor.create({ region_id: 1, id: 5, name: "Alice" });
+    const post = await CpkPost.create({ cpk_author_region_id: 1, cpk_author_id: 5, title: "Hello" });
+    const loaded = await loadBelongsTo(post, "cpkAuthor", { foreignKey: ["cpk_author_region_id", "cpk_author_id"], className: "CpkAuthor" });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.id).toEqual([1, 5]);
+  });
   it.skip("querying by whole associated records using query constraints", () => { /* fixture-dependent */ });
   it.skip("querying by single associated record works using query constraints", () => { /* fixture-dependent */ });
   it.skip("querying by relation with composite key", () => { /* fixture-dependent */ });
@@ -1719,7 +1770,23 @@ describe("AssociationsTest", () => {
   it.skip("assign composite foreign key belongs to association", () => { /* fixture-dependent */ });
   it.skip("query constraints that dont include the primary key raise with a single column", () => { /* fixture-dependent */ });
   it.skip("query constraints that dont include the primary key raise with multiple columns", () => { /* fixture-dependent */ });
-  it.skip("assign belongs to cpk model by id attribute", () => { /* fixture-dependent */ });
+  it("assign belongs to cpk model by id attribute", async () => {
+    const adapter = freshAdapter();
+    class CpkTarget extends Base {
+      static { this._tableName = "cpk_targets"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkRef extends Base {
+      static { this._tableName = "cpk_refs"; this.attribute("cpk_target_shop_id", "integer"); this.attribute("cpk_target_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(CpkRef, "cpkTarget", { foreignKey: ["cpk_target_shop_id", "cpk_target_id"], className: "CpkTarget" });
+    registerModel("CpkTarget", CpkTarget);
+    registerModel("CpkRef", CpkRef);
+    const target = await CpkTarget.create({ shop_id: 2, id: 7, name: "test" });
+    const ref = await CpkRef.create({ cpk_target_shop_id: 2, cpk_target_id: 7 });
+    const loaded = await loadBelongsTo(ref, "cpkTarget", { foreignKey: ["cpk_target_shop_id", "cpk_target_id"], className: "CpkTarget" });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.id).toEqual([2, 7]);
+  });
   it.skip("append composite foreign key has many association with autosave", () => { /* fixture-dependent */ });
   it.skip("assign composite foreign key belongs to association with autosave", () => { /* fixture-dependent */ });
   it.skip("append composite has many through association", () => { /* fixture-dependent */ });
@@ -1729,7 +1796,25 @@ describe("AssociationsTest", () => {
 
   it.skip("belongs to with explicit composite foreign key", () => { /* requires composite foreign key support */ });
 
-  it.skip("cpk model has many records by id attribute", () => { /* requires composite primary key support */ });
+  it("cpk model has many records by id attribute", async () => {
+    const adapter = freshAdapter();
+    class CpkParent extends Base {
+      static { this._tableName = "cpk_parents"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkChild extends Base {
+      static { this._tableName = "cpk_children"; this.attribute("cpk_parent_region_id", "integer"); this.attribute("cpk_parent_id", "integer"); this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkParent, "cpkChildren", { foreignKey: ["cpk_parent_region_id", "cpk_parent_id"], className: "CpkChild" });
+    registerModel("CpkParent", CpkParent);
+    registerModel("CpkChild", CpkChild);
+    const parent = await CpkParent.create({ region_id: 1, id: 1, name: "P" });
+    await CpkChild.create({ cpk_parent_region_id: 1, cpk_parent_id: 1, label: "A" });
+    await CpkChild.create({ cpk_parent_region_id: 1, cpk_parent_id: 1, label: "B" });
+    await CpkChild.create({ cpk_parent_region_id: 2, cpk_parent_id: 1, label: "C" }); // different region
+    const children = await loadHasMany(parent, "cpkChildren", { foreignKey: ["cpk_parent_region_id", "cpk_parent_id"], className: "CpkChild" });
+    expect(children.length).toBe(2);
+    expect(children.map((c) => c.readAttribute("label")).sort()).toEqual(["A", "B"]);
+  });
 });
 
 

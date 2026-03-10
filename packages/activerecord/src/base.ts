@@ -42,7 +42,7 @@ export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): 
 export class Base extends Model {
   // -- Class-level configuration --
   static _tableName: string | null = null;
-  static _primaryKey = "id";
+  static _primaryKey: string | string[] = "id";
   static _adapter: DatabaseAdapter | null = null;
   static _abstractClass = false;
   static _tableNamePrefix = "";
@@ -114,12 +114,59 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.primary_key
    */
-  static get primaryKey(): string {
+  static get primaryKey(): string | string[] {
     return this._primaryKey;
   }
 
-  static set primaryKey(key: string) {
+  static set primaryKey(key: string | string[]) {
     this._primaryKey = key;
+  }
+
+  /**
+   * Returns true if this model uses a composite primary key.
+   *
+   * Mirrors: ActiveRecord::Base.composite_primary_key?
+   */
+  static get compositePrimaryKey(): boolean {
+    return Array.isArray(this._primaryKey);
+  }
+
+  /**
+   * Quote a single value for use in SQL.
+   */
+  private static _quoteValue(val: unknown): string {
+    if (val === null) return "NULL";
+    if (typeof val === "number") return String(val);
+    if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
+    if (val instanceof Date) return `'${val.toISOString()}'`;
+    return `'${String(val).replace(/'/g, "''")}'`;
+  }
+
+  /**
+   * Build a WHERE clause for the primary key of a given record.
+   * For simple PK: `"id" = 42`
+   * For composite PK: `"shop_id" = 1 AND "id" = 42`
+   */
+  static _buildPkWhere(idValue: unknown): string {
+    const pk = this.primaryKey;
+    if (Array.isArray(pk)) {
+      const values = idValue as unknown[];
+      return pk.map((col, i) => `"${col}" = ${this._quoteValue(values[i])}`).join(" AND ");
+    }
+    return `"${pk}" = ${this._quoteValue(idValue)}`;
+  }
+
+  /**
+   * Override attribute() to prevent generating an accessor for "id",
+   * since Base already defines id getter/setter with CPK support.
+   */
+  static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
+    super.attribute(name, typeName, options);
+    // If we just defined an "id" accessor on a subclass prototype, remove it
+    // so Base.prototype.id (which handles CPK) is used instead.
+    if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
+      delete (this.prototype as any).id;
+    }
   }
 
   /**
@@ -705,16 +752,58 @@ export class Base extends Model {
       return this.find(ids);
     }
     const id = ids[0];
+
+    // CPK: find([shop_id, id]) finds a single record by composite tuple
+    if (this.compositePrimaryKey && Array.isArray(id)) {
+      // Check if this is a single tuple or array of tuples
+      if (id.length > 0 && Array.isArray(id[0])) {
+        // Array of tuples: find([[1,2], [3,4]])
+        const tuples = id as unknown[][];
+        if (tuples.length === 0) {
+          throw new RecordNotFound(
+            `${this.name}: couldn't find all with an empty list of ids`,
+            this.name, String(this.primaryKey), []
+          );
+        }
+        const pk = this.primaryKey as string[];
+        const whereParts = tuples.map((tuple) =>
+          `(${pk.map((col, i) => `"${col}" = ${this._quoteValue(tuple[i])}`).join(" AND ")})`
+        );
+        const records = await this.all()
+          .where(whereParts.join(" OR "))
+          .toArray();
+        if (records.length !== tuples.length) {
+          throw new RecordNotFound(
+            `${this.name}: couldn't find all with composite primary key`,
+            this.name, String(this.primaryKey), id
+          );
+        }
+        return records;
+      }
+      // Single tuple: find([shop_id, id])
+      const pk = this.primaryKey as string[];
+      const whereConditions: Record<string, unknown> = {};
+      pk.forEach((col, i) => { whereConditions[col] = (id as unknown[])[i]; });
+      const record = await this.all().where(whereConditions).first();
+      if (!record) {
+        throw new RecordNotFound(
+          `${this.name} with ${this.primaryKey}=[${id}] not found`,
+          this.name, String(this.primaryKey), id
+        );
+      }
+      return record;
+    }
+
     // Multiple IDs — return an array
     if (Array.isArray(id)) {
       if (id.length === 0) {
         throw new RecordNotFound(
           `${this.name}: couldn't find all with an empty list of ids`,
-          this.name, this.primaryKey, []
+          this.name, String(this.primaryKey), []
         );
       }
       const records = await this.all()
-        .where({ [this.primaryKey]: id })
+        .where({ [this.primaryKey as string]: id })
         .toArray();
       // Ensure all IDs were found
       if (records.length !== id.length) {
@@ -722,17 +811,17 @@ export class Base extends Model {
         const missing = id.filter((i) => !foundIds.has(i));
         throw new RecordNotFound(
           `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
-          this.name, this.primaryKey, id
+          this.name, String(this.primaryKey), id
         );
       }
       return records;
     }
     // Single ID — use all() so STI type filter is applied
-    const record = await this.all().where({ [this.primaryKey]: id }).first();
+    const record = await this.all().where({ [this.primaryKey as string]: id }).first();
     if (!record) {
       throw new RecordNotFound(
         `${this.name} with ${this.primaryKey}=${id} not found`,
-        this.name, this.primaryKey, id
+        this.name, String(this.primaryKey), id
       );
     }
     return record;
@@ -1055,7 +1144,7 @@ export class Base extends Model {
       return this.all().where(idOrConditions as Record<string, unknown>).isAny();
     }
     // Treat as primary key
-    const record = await this.findBy({ [this.primaryKey]: idOrConditions });
+    const record = await this.findBy({ [this.primaryKey as string]: idOrConditions });
     return record !== null;
   }
 
@@ -1398,8 +1487,7 @@ export class Base extends Model {
     by: number = 1
   ): Promise<number> {
     const table = this.arelTable;
-    const pkQuoted = typeof id === "number" ? String(id) : `'${id}'`;
-    const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by} WHERE "${this.primaryKey}" = ${pkQuoted}`;
+    const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by} WHERE ${this._buildPkWhere(id)}`;
     return this.adapter.executeMutation(sql);
   }
 
@@ -1425,11 +1513,18 @@ export class Base extends Model {
     id: unknown | unknown[],
     counters: Record<string, number>
   ): Promise<number> {
-    const ids = Array.isArray(id) ? id : [id];
     const table = this.arelTable;
     const setClause = Object.entries(counters)
       .map(([attr, amount]) => `"${attr}" = COALESCE("${attr}", 0) + ${amount}`)
       .join(", ");
+    if (Array.isArray(this.primaryKey)) {
+      // For CPK: id can be a single tuple [1,2] or array of tuples [[1,2],[3,4]]
+      const tuples = (Array.isArray(id) && Array.isArray(id[0])) ? id as unknown[][] : [id as unknown[]];
+      const whereParts = tuples.map((t) => `(${this._buildPkWhere(t)})`);
+      const sql = `UPDATE "${table.name}" SET ${setClause} WHERE ${whereParts.join(" OR ")}`;
+      return this.adapter.executeMutation(sql);
+    }
+    const ids = Array.isArray(id) ? id : [id];
     const idList = ids.map((i) => typeof i === "number" ? String(i) : `'${i}'`).join(", ");
     const sql = `UPDATE "${table.name}" SET ${setClause} WHERE "${this.primaryKey}" IN (${idList})`;
     return this.adapter.executeMutation(sql);
@@ -1702,12 +1797,22 @@ export class Base extends Model {
    */
   get id(): unknown {
     const ctor = this.constructor as typeof Base;
-    return this.readAttribute(ctor.primaryKey);
+    const pk = ctor.primaryKey;
+    if (Array.isArray(pk)) {
+      return pk.map((col) => this.readAttribute(col));
+    }
+    return this.readAttribute(pk);
   }
 
   set id(value: unknown) {
     const ctor = this.constructor as typeof Base;
-    this.writeAttribute(ctor.primaryKey, value);
+    const pk = ctor.primaryKey;
+    if (Array.isArray(pk)) {
+      const values = value as unknown[];
+      pk.forEach((col, i) => this.writeAttribute(col, values[i]));
+    } else {
+      this.writeAttribute(pk, value);
+    }
   }
 
   /**
@@ -1988,8 +2093,9 @@ export class Base extends Model {
     const columns: string[] = [];
     const values: unknown[] = [];
 
+    const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
     for (const [key, value] of Object.entries(attrs)) {
-      if (key === ctor.primaryKey && value === null) continue;
+      if (pkCols.includes(key) && value === null) continue;
       columns.push(key);
       values.push(value);
     }
@@ -2018,7 +2124,7 @@ export class Base extends Model {
     this._pendingOperation = ctor.adapter
       .executeMutation(sql)
       .then((insertedId) => {
-        if (this.id === null) {
+        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
           this._attributes.set(ctor.primaryKey, insertedId);
         }
       });
@@ -2062,11 +2168,7 @@ export class Base extends Model {
       })
       .join(", ");
 
-    const pk = this.id;
-    const pkQuoted =
-      typeof pk === "number"
-        ? String(pk)
-        : `'${String(pk).replace(/'/g, "''")}'`;
+    const pkWhere = ctor._buildPkWhere(this.id);
 
     // Optimistic locking: include lock_version in WHERE and increment it
     let lockClause = "";
@@ -2080,7 +2182,7 @@ export class Base extends Model {
       ? `${setClause}, "lock_version" = ${this.readAttribute("lock_version")}`
       : setClause;
 
-    const sql = `UPDATE "${table.name}" SET ${finalSetClause} WHERE "${ctor.primaryKey}" = ${pkQuoted}${lockClause}`;
+    const sql = `UPDATE "${table.name}" SET ${finalSetClause} WHERE ${pkWhere}${lockClause}`;
     this._pendingOperation = ctor.adapter.executeMutation(sql).then((affected) => {
       if (lockClause && affected === 0) {
         throw new StaleObjectError(this, "update");
@@ -2130,16 +2232,12 @@ export class Base extends Model {
     ctor._callbackChain.run("destroy", this, () => {
       const table = ctor.arelTable;
       const pk = this.id;
-      if (pk == null) {
+      if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
         // New (unpersisted) record — nothing to delete from DB
         return;
       }
-      const pkQuoted =
-        typeof pk === "number"
-          ? String(pk)
-          : `'${String(pk).replace(/'/g, "''")}'`;
 
-      const sql = `DELETE FROM "${table.name}" WHERE "${ctor.primaryKey}" = ${pkQuoted}`;
+      const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}`;
       this._pendingOperation = ctor.adapter.executeMutation(sql).then(() => {});
     });
 
@@ -2177,18 +2275,13 @@ export class Base extends Model {
     const table = ctor.arelTable;
     const pk = this.id;
 
-    if (pk == null) {
+    if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
       // New (unpersisted) record — nothing to delete
       this._destroyed = true;
       return this;
     }
 
-    const pkQuoted =
-      typeof pk === "number"
-        ? String(pk)
-        : `'${String(pk).replace(/'/g, "''")}'`;
-
-    const sql = `DELETE FROM "${table.name}" WHERE "${ctor.primaryKey}" = ${pkQuoted}`;
+    const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}`;
     await ctor.adapter.executeMutation(sql);
 
     this._destroyed = true;
@@ -2203,11 +2296,7 @@ export class Base extends Model {
    */
   static async delete(id: unknown): Promise<number> {
     const table = this.arelTable;
-    const pkQuoted =
-      typeof id === "number"
-        ? String(id)
-        : `'${String(id).replace(/'/g, "''")}'`;
-    const sql = `DELETE FROM "${table.name}" WHERE "${this.primaryKey}" = ${pkQuoted}`;
+    const sql = `DELETE FROM "${table.name}" WHERE ${this._buildPkWhere(id)}`;
     return this.adapter.executeMutation(sql);
   }
 
@@ -2219,15 +2308,13 @@ export class Base extends Model {
   async reload(): Promise<this> {
     const ctor = this.constructor as typeof Base;
     const row = await ctor.adapter.execute(
-      `SELECT * FROM "${ctor.tableName}" WHERE "${ctor.primaryKey}" = ${
-        typeof this.id === "number" ? this.id : `'${this.id}'`
-      }`
+      `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)}`
     );
 
     if (row.length === 0) {
       throw new RecordNotFound(
         `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
-        ctor.name, ctor.primaryKey, this.id
+        ctor.name, String(ctor.primaryKey), this.id
       );
     }
 
@@ -2246,15 +2333,13 @@ export class Base extends Model {
    */
   async lockBang(lockClause: string = "FOR UPDATE"): Promise<this> {
     const ctor = this.constructor as typeof Base;
-    const pk = this.id;
-    const pkQuoted = typeof pk === "number" ? String(pk) : `'${pk}'`;
-    const sql = `SELECT * FROM "${ctor.tableName}" WHERE "${ctor.primaryKey}" = ${pkQuoted} ${lockClause}`;
+    const sql = `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)} ${lockClause}`;
     const rows = await ctor.adapter.execute(sql);
 
     if (rows.length === 0) {
       throw new RecordNotFound(
-        `${ctor.name} with ${ctor.primaryKey}=${pk} not found`,
-        ctor.name, ctor.primaryKey, pk
+        `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
+        ctor.name, ctor.primaryKey as string, this.id
       );
     }
 
@@ -2473,13 +2558,7 @@ export class Base extends Model {
       })
       .join(", ");
 
-    const pk = this.id;
-    const pkQuoted =
-      typeof pk === "number"
-        ? String(pk)
-        : `'${String(pk).replace(/'/g, "''")}'`;
-
-    const sql = `UPDATE "${table.name}" SET ${setClauses} WHERE "${ctor.primaryKey}" = ${pkQuoted}`;
+    const sql = `UPDATE "${table.name}" SET ${setClauses} WHERE ${ctor._buildPkWhere(this.id)}`;
     await ctor.adapter.executeMutation(sql);
 
     // Reset dirty tracking to reflect the new persisted state
@@ -2494,7 +2573,10 @@ export class Base extends Model {
   dup(): Base {
     const ctor = this.constructor as typeof Base;
     const attrs = { ...this.attributes };
-    delete attrs[ctor.primaryKey]; // Remove PK so it's a new record
+    const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
+    for (const col of pkCols) {
+      delete attrs[col]; // Remove PK so it's a new record
+    }
     const copy = new ctor(attrs);
     return copy;
   }
@@ -2661,7 +2743,12 @@ export class Base extends Model {
       const payload = JSON.parse(json);
       if (options?.purpose && payload.purpose !== options.purpose) return null;
       if (payload.expiresAt && Date.now() > payload.expiresAt) return null;
-      return this.findBy({ [this.primaryKey]: payload.id });
+      if (Array.isArray(this.primaryKey)) {
+        const conditions: Record<string, unknown> = {};
+        (this.primaryKey as string[]).forEach((col, i) => { conditions[col] = payload.id[i]; });
+        return this.findBy(conditions);
+      }
+      return this.findBy({ [this.primaryKey as string]: payload.id });
     } catch {
       return null;
     }

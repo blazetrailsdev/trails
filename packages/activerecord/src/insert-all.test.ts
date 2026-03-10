@@ -259,8 +259,28 @@ describe("InsertAllTest", () => {
     await Book.insertAll(records);
     expect(records).toEqual(original);
   });
-  it.skip("insert_all with composite primary key", () => {});
-  it.skip("upsert_all with composite primary key", () => {});
+  it("insert_all with composite primary key", async () => {
+    const adapter = freshAdapter();
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    await CpkOrder.insertAll([
+      { shop_id: 1, id: 1, name: "A" },
+      { shop_id: 1, id: 2, name: "B" },
+    ]);
+    const count = await CpkOrder.count();
+    expect(count).toBe(2);
+  });
+  it("upsert_all with composite primary key", async () => {
+    const adapter = freshAdapter();
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "original" }]);
+    await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "updated" }]);
+    const record = await CpkOrder.find([1, 1]);
+    expect(record.readAttribute("name")).toBe("updated");
+  });
   it.skip("insert_all can insert rows with all defaults", () => {});
   it.skip("insert_all generates correct sql", () => {});
   it.skip("upsert_all generates correct sql", () => {});
@@ -280,8 +300,29 @@ describe("InsertAllTest", () => {
   it.skip("insert all and upsert all with expression index", () => {});
   it.skip("insert all and upsert all raises when index is missing", () => {});
   it.skip("insert all and upsert all finds index with inverted unique by columns", () => {});
-  it.skip("insert all and upsert all works with composite primary keys when unique by is provided", () => {});
-  it.skip("insert all and upsert all works with composite primary keys when unique by is not provided", () => {});
+  it("insert all and upsert all works with composite primary keys when unique by is provided", async () => {
+    const adapter = freshAdapter();
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "first" }]);
+    await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "second" }], { uniqueBy: ["shop_id", "id"] });
+    const count = await CpkOrder.count();
+    expect(count).toBe(1);
+    const record = await CpkOrder.find([1, 1]);
+    expect(record.readAttribute("name")).toBe("second");
+  });
+  it("insert all and upsert all works with composite primary keys when unique by is not provided", async () => {
+    const adapter = freshAdapter();
+    class CpkOrder extends Base {
+      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "first" }]);
+    // Without uniqueBy, defaults to composite primary key
+    await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "updated" }]);
+    const count = await CpkOrder.count();
+    expect(count).toBe(1);
+  });
   it.skip("insert all and upsert all with aliased attributes", () => {});
   it.skip("insert all and upsert all with sti", () => {});
   it.skip("upsert and db warnings", () => {});

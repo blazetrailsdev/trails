@@ -348,8 +348,40 @@ describe("PreloaderTest", () => {
   it.skip("preload belongs to association with composite foreign key", () => { /* needs composite keys */ });
   it.skip("preload loaded belongs to association with composite foreign key", () => { /* needs composite keys */ });
   it.skip("preload has many through association with composite query constraints", () => { /* needs composite keys */ });
-  it.skip("preloads has many on model with a composite primary key through id attribute", () => { /* needs composite keys */ });
-  it.skip("preloads belongs to a composite primary key model through id attribute", () => { /* needs composite keys */ });
+  it("preloads has many on model with a composite primary key through id attribute", async () => {
+    const adapter = freshAdapter();
+    class CpkPLOwner extends Base {
+      static { this._tableName = "cpk_pl_owners"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkPLChild extends Base {
+      static { this._tableName = "cpk_pl_children"; this.attribute("cpk_pl_owner_shop_id", "integer"); this.attribute("cpk_pl_owner_id", "integer"); this.attribute("label", "string"); this.adapter = adapter; }
+    }
+    Associations.hasMany.call(CpkPLOwner, "cpkPLChildren", { foreignKey: ["cpk_pl_owner_shop_id", "cpk_pl_owner_id"], className: "CpkPLChild" });
+    registerModel("CpkPLOwner", CpkPLOwner);
+    registerModel("CpkPLChild", CpkPLChild);
+    const owner = await CpkPLOwner.create({ shop_id: 1, id: 1, name: "O" });
+    await CpkPLChild.create({ cpk_pl_owner_shop_id: 1, cpk_pl_owner_id: 1, label: "A" });
+    await CpkPLChild.create({ cpk_pl_owner_shop_id: 1, cpk_pl_owner_id: 1, label: "B" });
+    const children = await loadHasMany(owner, "cpkPLChildren", { foreignKey: ["cpk_pl_owner_shop_id", "cpk_pl_owner_id"], className: "CpkPLChild" });
+    expect(children.length).toBe(2);
+  });
+  it("preloads belongs to a composite primary key model through id attribute", async () => {
+    const adapter = freshAdapter();
+    class CpkPLTarget extends Base {
+      static { this._tableName = "cpk_pl_targets"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+    }
+    class CpkPLRef extends Base {
+      static { this._tableName = "cpk_pl_refs"; this.attribute("cpk_pl_target_region_id", "integer"); this.attribute("cpk_pl_target_id", "integer"); this.adapter = adapter; }
+    }
+    Associations.belongsTo.call(CpkPLRef, "cpkPLTarget", { foreignKey: ["cpk_pl_target_region_id", "cpk_pl_target_id"], className: "CpkPLTarget" });
+    registerModel("CpkPLTarget", CpkPLTarget);
+    registerModel("CpkPLRef", CpkPLRef);
+    const target = await CpkPLTarget.create({ region_id: 1, id: 5, name: "T" });
+    const ref = await CpkPLRef.create({ cpk_pl_target_region_id: 1, cpk_pl_target_id: 5 });
+    const loaded = await loadBelongsTo(ref, "cpkPLTarget", { foreignKey: ["cpk_pl_target_region_id", "cpk_pl_target_id"], className: "CpkPLTarget" });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.id).toEqual([1, 5]);
+  });
 
   it("preload keeps built has many records no ops", async () => {
     const adapter = freshAdapter();

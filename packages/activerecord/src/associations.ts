@@ -7,9 +7,10 @@ import { getInheritanceColumn, findStiClass } from "./sti.js";
  * Association options.
  */
 export interface AssociationOptions {
-  foreignKey?: string;
+  foreignKey?: string | string[];
   className?: string;
-  primaryKey?: string;
+  primaryKey?: string | string[];
+  queryConstraints?: string[];
   dependent?: "destroy" | "nullify" | "delete" | "restrictWithException" | "restrictWithError";
   inverseOf?: string;
   through?: string;
@@ -153,8 +154,7 @@ export async function loadBelongsTo(
     throw new StrictLoadingViolationError(record, assocName);
   }
 
-  const foreignKey = options.foreignKey ?? `${underscore(assocName)}_id`;
-  const primaryKey = options.primaryKey ?? "id";
+  const defaultFk = `${underscore(assocName)}_id`;
 
   // Polymorphic: use the _type column to determine the target model
   let className: string;
@@ -168,10 +168,38 @@ export async function loadBelongsTo(
   }
 
   const targetModel = resolveModel(className);
-  const fkValue = record.readAttribute(foreignKey);
+
+  // Resolve foreign key and primary key (may be arrays for CPK)
+  const foreignKey = options.foreignKey ?? (
+    options.queryConstraints
+      ? options.queryConstraints
+      : Array.isArray(targetModel.primaryKey) && !options.primaryKey
+        ? targetModel.primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
+        : defaultFk
+  );
+  const primaryKey = options.primaryKey ?? targetModel.primaryKey;
+
+  // Composite FK/PK: build multi-column where
+  if (Array.isArray(foreignKey)) {
+    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    const conditions: Record<string, unknown> = {};
+    for (let i = 0; i < foreignKey.length; i++) {
+      const fkVal = record.readAttribute(foreignKey[i]);
+      if (fkVal === null || fkVal === undefined) return null;
+      conditions[pkCols[i]] = fkVal;
+    }
+    const result = await targetModel.findBy(conditions);
+    if (result && options.inverseOf) {
+      (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
+      (result as any)._cachedAssociations.set(options.inverseOf, record);
+    }
+    return result;
+  }
+
+  const fkValue = record.readAttribute(foreignKey as string);
   if (fkValue === null || fkValue === undefined) return null;
 
-  const result = await targetModel.findBy({ [primaryKey]: fkValue });
+  const result = await targetModel.findBy({ [primaryKey as string]: fkValue });
 
   // Set inverse_of: store reference back to the owner
   if (result && options.inverseOf) {
@@ -213,20 +241,48 @@ export async function loadHasOne(
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
   const targetModel = resolveModel(className);
-  const pkValue = record.readAttribute(primaryKey);
-  if (pkValue === null || pkValue === undefined) return null;
 
   // Polymorphic "as" option: has_one :image, as: :imageable
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
+    const pkValue = record.readAttribute(primaryKey as string);
+    if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
     return targetModel.findBy({
-      [foreignKey]: pkValue,
+      [foreignKey as string]: pkValue,
       [typeCol]: ctor.name,
     });
   }
 
-  const foreignKey = options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  // Resolve FK columns (may be array for CPK)
+  const foreignKey = options.foreignKey ?? (
+    options.queryConstraints
+      ? options.queryConstraints
+      : Array.isArray(primaryKey)
+        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+        : `${underscore(ctor.name)}_id`
+  );
+
+  // Composite FK/PK: build multi-column where
+  if (Array.isArray(foreignKey)) {
+    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    const conditions: Record<string, unknown> = {};
+    for (let i = 0; i < foreignKey.length; i++) {
+      const pkVal = record.readAttribute(pkCols[i]);
+      if (pkVal === null || pkVal === undefined) return null;
+      conditions[foreignKey[i]] = pkVal;
+    }
+    const result = await targetModel.findBy(conditions);
+    if (result && options.inverseOf) {
+      (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
+      (result as any)._cachedAssociations.set(options.inverseOf, record);
+    }
+    return result;
+  }
+
+  const pkValue = record.readAttribute(primaryKey as string);
+  if (pkValue === null || pkValue === undefined) return null;
+
   let result: Base | null;
   if (options.scope) {
     let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
@@ -265,7 +321,7 @@ export function buildHasOne(
 
   const buildAttrs: Record<string, unknown> = {
     ...attrs,
-    [foreignKey]: record.readAttribute(primaryKey),
+    [foreignKey as string]: record.readAttribute(primaryKey as string),
   };
   if (options.as) {
     buildAttrs[`${underscore(options.as)}_type`] = ctor.name;
@@ -336,21 +392,53 @@ export async function loadHasMany(
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
   const targetModel = resolveModel(className);
-  const pkValue = record.readAttribute(primaryKey);
-  if (pkValue === null || pkValue === undefined) return [];
 
   // Polymorphic "as" option: has_many :comments, as: :commentable
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
+    const pkValue = record.readAttribute(primaryKey as string);
+    if (pkValue === null || pkValue === undefined) return [];
     const typeCol = `${underscore(options.as)}_type`;
     const rel = (targetModel as any).all().where({
-      [foreignKey]: pkValue,
+      [foreignKey as string]: pkValue,
       [typeCol]: ctor.name,
     });
     return rel.toArray();
   }
 
-  const foreignKey = options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  // Resolve FK columns (may be array for CPK)
+  const foreignKey = options.foreignKey ?? (
+    options.queryConstraints
+      ? options.queryConstraints
+      : Array.isArray(primaryKey)
+        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+        : `${underscore(ctor.name)}_id`
+  );
+
+  // Composite FK/PK: build multi-column where
+  if (Array.isArray(foreignKey)) {
+    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    const conditions: Record<string, unknown> = {};
+    for (let i = 0; i < foreignKey.length; i++) {
+      const pkVal = record.readAttribute(pkCols[i]);
+      if (pkVal === null || pkVal === undefined) return [];
+      conditions[foreignKey[i]] = pkVal;
+    }
+    let rel = (targetModel as any).all().where(conditions);
+    if (options.scope) rel = options.scope(rel);
+    const results: Base[] = await rel.toArray();
+    if (options.inverseOf) {
+      for (const child of results) {
+        (child as any)._cachedAssociations = (child as any)._cachedAssociations ?? new Map();
+        (child as any)._cachedAssociations.set(options.inverseOf, record);
+      }
+    }
+    return results;
+  }
+
+  const pkValue = record.readAttribute(primaryKey as string);
+  if (pkValue === null || pkValue === undefined) return [];
+
   let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
   // Apply association scope
   if (options.scope) {
@@ -418,10 +506,10 @@ export async function loadHasManyThrough(
     // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
     const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
     const targetIds = throughRecords
-      .map((r) => r.readAttribute(targetFk))
+      .map((r) => r.readAttribute(targetFk as string))
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
-    let rel = (targetModel as any).all().where({ [targetModel.primaryKey]: targetIds });
+    let rel = (targetModel as any).all().where({ [targetModel.primaryKey as string]: targetIds });
     if (options.scope) rel = options.scope(rel);
     return rel.toArray();
   } else {
@@ -432,10 +520,10 @@ export async function loadHasManyThrough(
       ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
       : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
     const throughIds = throughRecords
-      .map((r) => r.readAttribute((r.constructor as typeof Base).primaryKey))
+      .map((r) => r.readAttribute((r.constructor as typeof Base).primaryKey as string))
       .filter((v) => v !== null && v !== undefined);
     if (throughIds.length === 0) return [];
-    const whereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
+    const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
     if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
     let rel2 = (targetModel as any).all().where(whereConditions);
     if (options.scope) rel2 = options.scope(rel2);
@@ -493,7 +581,7 @@ export async function loadHasOneThrough(
   const fkValue = throughRecord.readAttribute(targetFk);
   if (fkValue === null || fkValue === undefined) return null;
   const targetModel = resolveModel(className);
-  return targetModel.findBy({ [targetModel.primaryKey]: fkValue });
+  return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
 }
 
 /**
@@ -527,7 +615,7 @@ export async function loadHabtm(
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
   const ownerFk = `${underscore(ctor.name)}_id`;
   const targetFk = `${underscore(singularize(assocName))}_id`;
-  const pkValue = record.readAttribute(ctor.primaryKey);
+  const pkValue = record.readAttribute(ctor.primaryKey as string);
   if (pkValue === null || pkValue === undefined) return [];
 
   // Query the join table to get target IDs
@@ -539,7 +627,7 @@ export async function loadHabtm(
   const targetIds = joinRows.map((r) => r[targetFk]).filter((v) => v != null);
   if (targetIds.length === 0) return [];
 
-  return (targetModel as any).all().where({ [targetModel.primaryKey]: targetIds }).toArray();
+  return (targetModel as any).all().where({ [targetModel.primaryKey as string]: targetIds }).toArray();
 }
 
 /**
@@ -572,7 +660,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
           : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
         const typeCol = asName ? `${underscore(asName)}_type` : null;
         for (const child of children) {
-          child.writeAttribute(foreignKey, null);
+          child.writeAttribute(foreignKey as string, null);
           if (typeCol) child.writeAttribute(typeCol, null);
           await child.save();
         }
@@ -598,7 +686,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
         const foreignKey = hasOneAsName
           ? (assoc.options.foreignKey ?? `${underscore(hasOneAsName)}_id`)
           : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
-        child.writeAttribute(foreignKey, null);
+        child.writeAttribute(foreignKey as string, null);
         if (hasOneAsName) child.writeAttribute(`${underscore(hasOneAsName)}_type`, null);
         await child.save();
       } else if (dep === "restrictWithException") {
@@ -664,7 +752,7 @@ export class CollectionProxy {
 
     const buildAttrs: Record<string, unknown> = {
       ...attrs,
-      [foreignKey]: this._record.readAttribute(primaryKey),
+      [foreignKey as string]: this._record.readAttribute(primaryKey as string),
     };
     if (asName) {
       buildAttrs[`${underscore(asName)}_type`] = ctor.name;
@@ -736,10 +824,10 @@ export class CollectionProxy {
       : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey);
+    const pkValue = this._record.readAttribute(primaryKey as string);
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
-      record.writeAttribute(foreignKey, pkValue);
+      record.writeAttribute(foreignKey as string, pkValue);
       if (typeCol) record.writeAttribute(typeCol, ctor.name);
       await record.save();
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
@@ -758,7 +846,7 @@ export class CollectionProxy {
     const throughModel = resolveModel(throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey);
+    const pkValue = this._record.readAttribute(primaryKey as string);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
@@ -768,15 +856,15 @@ export class CollectionProxy {
       if (record.isNewRecord()) await record.save();
       // Create the join record
       const joinAttrs: Record<string, unknown> = {
-        [ownerFk]: pkValue,
-        [sourceFk]: record.readAttribute((record.constructor as typeof Base).primaryKey),
+        [ownerFk as string]: pkValue,
+        [sourceFk]: record.readAttribute((record.constructor as typeof Base).primaryKey as string),
       };
       // Handle polymorphic through (as option on through association)
       if (throughAssoc.options.as) {
         const typeCol = `${underscore(throughAssoc.options.as)}_type`;
         joinAttrs[`${underscore(throughAssoc.options.as)}_id`] = pkValue;
         joinAttrs[typeCol] = ctor.name;
-        delete joinAttrs[ownerFk];
+        delete joinAttrs[ownerFk as string];
       }
       await throughModel.create(joinAttrs);
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
@@ -810,7 +898,7 @@ export class CollectionProxy {
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
-      record.writeAttribute(foreignKey, null);
+      record.writeAttribute(foreignKey as string, null);
       if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
@@ -827,16 +915,16 @@ export class CollectionProxy {
     const throughModel = resolveModel(throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey);
+    const pkValue = this._record.readAttribute(primaryKey as string);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
-      const targetPk = record.readAttribute((record.constructor as typeof Base).primaryKey);
+      const targetPk = record.readAttribute((record.constructor as typeof Base).primaryKey as string);
       // Find and destroy the join record
       const joinRecord = await throughModel.findBy({
-        [ownerFk]: pkValue,
+        [ownerFk as string]: pkValue,
         [sourceFk]: targetPk,
       });
       if (joinRecord) await joinRecord.destroy();
@@ -873,8 +961,8 @@ export class CollectionProxy {
   async includes(record: Base): Promise<boolean> {
     const records = await this.toArray();
     const pk = (record.constructor as typeof Base).primaryKey;
-    const targetId = record.readAttribute(pk);
-    return records.some(r => r.readAttribute(pk) === targetId);
+    const targetId = record.readAttribute(pk as string);
+    return records.some(r => r.readAttribute(pk as string) === targetId);
   }
 
   /**
@@ -1028,11 +1116,11 @@ export class CollectionProxy {
     const targetModel = (records[0]?.constructor ?? Object) as typeof Base;
     const pk = targetModel.primaryKey ?? "id";
     if (Array.isArray(id)) {
-      const found = records.filter(r => id.includes(r.readAttribute(pk) as number));
+      const found = records.filter(r => id.includes(r.readAttribute(pk as string) as number));
       if (found.length !== id.length) throw new Error(`Couldn't find all records with ids: ${id}`);
       return found;
     }
-    const found = records.find(r => r.readAttribute(pk) === id);
+    const found = records.find(r => r.readAttribute(pk as string) === id);
     if (!found) throw new Error(`Couldn't find record with id=${id}`);
     return found;
   }
@@ -1081,7 +1169,7 @@ export async function updateCounterCaches(
     if (assoc.type !== "belongsTo" || !assoc.options.counterCache) continue;
 
     const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
-    const fkValue = record.readAttribute(foreignKey);
+    const fkValue = record.readAttribute(foreignKey as string);
     if (fkValue === null || fkValue === undefined) continue;
 
     // For polymorphic, resolve model from _type column
@@ -1102,7 +1190,7 @@ export async function updateCounterCaches(
         ? assoc.options.counterCache
         : `${pluralize(underscore(ctor.name))}_count`;
 
-    const parent = await targetModel.findBy({ [targetModel.primaryKey]: fkValue });
+    const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;
 
     if (direction === "increment") {
@@ -1135,14 +1223,14 @@ export function setBelongsTo(
   const primaryKey = options.primaryKey ?? "id";
 
   if (target) {
-    record.writeAttribute(foreignKey, target.readAttribute(primaryKey));
+    record.writeAttribute(foreignKey as string, target.readAttribute(primaryKey as string));
     // Polymorphic: set the _type column
     if (options.polymorphic) {
       const typeCol = `${underscore(assocName)}_type`;
       record.writeAttribute(typeCol, (target.constructor as typeof Base).name);
     }
   } else {
-    record.writeAttribute(foreignKey, null);
+    record.writeAttribute(foreignKey as string, null);
     if (options.polymorphic) {
       const typeCol = `${underscore(assocName)}_type`;
       record.writeAttribute(typeCol, null);
@@ -1174,7 +1262,7 @@ export async function setHasOne(
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const pkValue = record.readAttribute(primaryKey);
+  const pkValue = record.readAttribute(primaryKey as string);
 
   // Polymorphic "as" option
   const asName = options.as;
@@ -1186,17 +1274,17 @@ export async function setHasOne(
   // Nullify old target
   const className = options.className ?? camelize(assocName);
   const targetModel = resolveModel(className);
-  const findConditions: Record<string, unknown> = { [foreignKey]: pkValue };
+  const findConditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
   if (typeCol) findConditions[typeCol] = ctor.name;
   const existing = await targetModel.findBy(findConditions);
   if (existing && existing !== target) {
-    existing.writeAttribute(foreignKey, null);
+    existing.writeAttribute(foreignKey as string, null);
     if (typeCol) existing.writeAttribute(typeCol, null);
     await existing.save();
   }
 
   if (target) {
-    target.writeAttribute(foreignKey, pkValue);
+    target.writeAttribute(foreignKey as string, pkValue);
     if (typeCol) target.writeAttribute(typeCol, ctor.name);
     if (target.isPersisted()) await target.save();
   }
@@ -1226,7 +1314,7 @@ export async function setHasMany(
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const pkValue = record.readAttribute(primaryKey);
+  const pkValue = record.readAttribute(primaryKey as string);
 
   // Polymorphic "as" option
   const asName = options.as;
@@ -1238,7 +1326,7 @@ export async function setHasMany(
   // Nullify old targets
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveModel(className);
-  const findConditions: Record<string, unknown> = { [foreignKey]: pkValue };
+  const findConditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
   if (typeCol) findConditions[typeCol] = ctor.name;
   const existing = await (targetModel as any).where(findConditions).toArray();
   for (const old of existing) {
@@ -1251,7 +1339,7 @@ export async function setHasMany(
 
   // Set FK on new targets
   for (const t of targets) {
-    t.writeAttribute(foreignKey, pkValue);
+    t.writeAttribute(foreignKey as string, pkValue);
     if (typeCol) t.writeAttribute(typeCol, ctor.name);
     if (t.isPersisted()) await t.save();
 
@@ -1275,7 +1363,7 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     if (assoc.type !== "belongsTo" || !assoc.options.touch) continue;
 
     const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
-    const fkValue = record.readAttribute(foreignKey);
+    const fkValue = record.readAttribute(foreignKey as string);
     if (fkValue === null || fkValue === undefined) continue;
 
     let className: string;
@@ -1289,7 +1377,7 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     }
     const targetModel = resolveModel(className);
 
-    const parent = await targetModel.findBy({ [targetModel.primaryKey]: fkValue });
+    const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;
 
     await parent.touch();
