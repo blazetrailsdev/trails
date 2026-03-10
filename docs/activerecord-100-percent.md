@@ -130,6 +130,21 @@ Plus smaller files: cascaded-eager-loading (8/27), signed-id (16/29), defaults (
 
 MySQL adapter stubs need real DB connections. PostgreSQL adapter tests are still excluded from comparison.
 
+## Missing capabilities
+
+These are features that Rails implements but we haven't built yet. Tests that appear to "pass" for these areas are actually using workarounds (e.g. `readAttribute`) rather than the real Rails API.
+
+### Dynamic attribute accessors (high priority)
+
+In Rails, `method_missing` and `define_attribute_methods` generate getter/setter/predicate methods on the fly for each column — so `user.name` works instead of `user.readAttribute("name")`. Our `attribute-methods.test.ts` tests (126/133 passing) use `readAttribute`/`writeAttribute` everywhere, masking the fact that dynamic accessors aren't implemented.
+
+**What's needed:** When `attribute()` is called (or columns are loaded from the schema), define ES getters/setters on the class prototype via `Object.defineProperty`, or use a `Proxy` on instances. This would enable:
+- `user.name` (getter) — delegates to `readAttribute("name")`
+- `user.name = "dean"` (setter) — delegates to `writeAttribute("name", "dean")`
+- `user.name?` equivalent (predicate) — `user.isName()` or similar convention
+
+**Affected tests:** `attribute-methods.test.ts` lines ~753-896 (method_missing group), plus any test that should use `model.column` syntax.
+
 ## Recommended next targets
 
 ### Highest ROI
