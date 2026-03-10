@@ -4996,6 +4996,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
     class User extends Base {
       static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
     }
+    await User.all().deleteAll();
     await User.create({ name: "A" });
     await User.create({ name: "B" });
     const names: string[] = [];

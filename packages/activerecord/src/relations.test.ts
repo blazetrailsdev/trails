@@ -2841,8 +2841,9 @@ describe("Relation#invertWhere", () => {
   it("swaps where and whereNot clauses", async () => {
     const adapter = freshAdapter();
     class InvertWhereUser extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static { this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
     }
+    await InvertWhereUser.all().deleteAll();
     const alice = await InvertWhereUser.create({ name: "Alice", role: "admin" });
     const bob = await InvertWhereUser.create({ name: "Bob", role: "user" });
     const charlie = await InvertWhereUser.create({ name: "Charlie", role: "admin" });
