@@ -14,7 +14,6 @@ describe("TimeWithZoneTest", () => {
     utcZone = TimeZone.find("UTC");
   });
 
-  describe("construction via TimeZone", () => {
     it("creates from TimeZone.local()", () => {
       const twz = eastern.local(2024, 3, 15, 10, 30, 0);
       expect(twz.year).toBe(2024);
@@ -50,9 +49,7 @@ describe("TimeWithZoneTest", () => {
       expect(twz.hour).toBe(12);
       expect(twz.day).toBe(15);
     });
-  });
 
-  describe("local time accessors", () => {
     it("returns correct local components", () => {
       // 2024-01-15 15:30:45 UTC
       const utcDate = new Date(Date.UTC(2024, 0, 15, 15, 30, 45, 123));
@@ -94,9 +91,7 @@ describe("TimeWithZoneTest", () => {
       expect(twz.usec).toBe(123000);
       expect(twz.nsec).toBe(123000000);
     });
-  });
 
-  describe("timezone info", () => {
     it("returns timezone abbreviation", () => {
       // Winter (EST)
       const winter = eastern.local(2024, 1, 15, 12, 0, 0);
@@ -136,9 +131,7 @@ describe("TimeWithZoneTest", () => {
       const twz = eastern.local(2024, 1, 15, 12, 0, 0);
       expect(twz.gmtOffset).toBe(twz.utcOffset);
     });
-  });
 
-  describe("conversions", () => {
     it("utc() returns a Date in UTC", () => {
       const twz = eastern.local(2024, 1, 15, 10, 30, 0);
       const utc = twz.utc();
@@ -201,31 +194,32 @@ describe("TimeWithZoneTest", () => {
       expect(tokyoTime.hour).toBe(2);
       expect(tokyoTime.day).toBe(16);
     });
-  });
 
-  describe("formatting", () => {
-    let twz: TimeWithZone;
 
-    beforeEach(() => {
-      // 2024-01-15 10:30:45 EST
-      twz = eastern.local(2024, 1, 15, 10, 30, 45);
-    });
 
     it("toString()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toString()).toBe("2024-01-15 10:30:45 -05:00 EST");
     });
 
     it("inspect()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.inspect()).toBe(
         "Monday, 15 January 2024 10:30:45.000 EST -05:00"
       );
     });
 
     it("formattedOffset() with colon", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.formattedOffset()).toBe("-05:00");
     });
 
     it("formattedOffset() without colon", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.formattedOffset(false)).toBe("-0500");
     });
 
@@ -235,6 +229,8 @@ describe("TimeWithZoneTest", () => {
     });
 
     it("xmlschema() / iso8601()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.xmlschema()).toBe("2024-01-15T10:30:45-05:00");
     });
 
@@ -244,77 +240,100 @@ describe("TimeWithZoneTest", () => {
     });
 
     it("iso8601() is alias for xmlschema()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.iso8601()).toBe(twz.xmlschema());
     });
 
     it("rfc3339() is alias for xmlschema()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.rfc3339()).toBe(twz.xmlschema());
     });
 
     it("rfc2822()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.rfc2822()).toBe("Mon, 15 Jan 2024 10:30:45 -0500");
     });
 
     it("httpdate() returns UTC-based HTTP date", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.httpdate()).toBe("Mon, 15 Jan 2024 15:30:45 GMT");
     });
 
     it("toFs('db')", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFs("db")).toBe("2024-01-15 10:30:45");
     });
 
     it("toFs('long')", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFs("long")).toBe("January 15, 2024 10:30");
     });
 
     it("toFs('short')", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFs("short")).toBe("15 Jan 10:30");
     });
 
     it("toFormattedS() is alias for toFs()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toFormattedS("db")).toBe(twz.toFs("db"));
     });
 
     it("asJson() returns ISO 8601 with 3 fraction digits", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.asJson()).toBe("2024-01-15T10:30:45.000-05:00");
     });
 
     it("toJSON() is alias for asJson()", () => {
+    // 2024-01-15 10:30:45 EST
+      const twz = eastern.local(2024, 1, 15, 10, 30, 45);
       expect(twz.toJSON()).toBe(twz.asJson());
     });
-  });
 
-  describe("strftime", () => {
-    let twz: TimeWithZone;
 
-    beforeEach(() => {
-      // Monday, 2024-01-15 10:05:09 EST
-      twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
-    });
 
     it("formats year tokens", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%Y")).toBe("2024");
       expect(twz.strftime("%C")).toBe("20");
       expect(twz.strftime("%y")).toBe("24");
     });
 
     it("formats month/day tokens", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%m")).toBe("01");
       expect(twz.strftime("%d")).toBe("15");
       expect(twz.strftime("%e")).toBe("15");
     });
 
     it("formats day-of-year", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%j")).toBe("015");
     });
 
     it("formats time tokens", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%H")).toBe("10");
       expect(twz.strftime("%M")).toBe("05");
       expect(twz.strftime("%S")).toBe("09");
     });
 
     it("formats 12-hour time", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%I")).toBe("10");
       expect(twz.strftime("%P")).toBe("am");
       expect(twz.strftime("%p")).toBe("AM");
@@ -325,31 +344,43 @@ describe("TimeWithZoneTest", () => {
     });
 
     it("formats milliseconds", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%L")).toBe("042");
     });
 
     it("formats timezone", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%z")).toBe("-0500");
       expect(twz.strftime("%Z")).toBe("EST");
       expect(twz.strftime("%:z")).toBe("-05:00");
     });
 
     it("formats day names", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%A")).toBe("Monday");
       expect(twz.strftime("%a")).toBe("Mon");
     });
 
     it("formats month names", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%B")).toBe("January");
       expect(twz.strftime("%b")).toBe("Jan");
     });
 
     it("formats wday", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%w")).toBe("1"); // Monday
       expect(twz.strftime("%u")).toBe("1"); // Monday (ISO)
     });
 
     it("handles - flag to remove padding", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%-d")).toBe("15");
       expect(twz.strftime("%-m")).toBe("1");
       expect(twz.strftime("%-H")).toBe("10");
@@ -358,21 +389,25 @@ describe("TimeWithZoneTest", () => {
     });
 
     it("formats composite patterns", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%Y-%m-%d %H:%M:%S")).toBe("2024-01-15 10:05:09");
     });
 
     it("handles literal % and special chars", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%%")).toBe("%");
       expect(twz.strftime("%n")).toBe("\n");
       expect(twz.strftime("%t")).toBe("\t");
     });
 
     it("formats unix timestamp", () => {
+    // Monday, 2024-01-15 10:05:09 EST
+      const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
       expect(twz.strftime("%s")).toBe(String(twz.toI()));
     });
-  });
 
-  describe("arithmetic", () => {
     it("plus() adds seconds", () => {
       const twz = eastern.local(2024, 1, 15, 10, 0, 0);
       const result = twz.plus(3600); // 1 hour
@@ -427,9 +462,7 @@ describe("TimeWithZoneTest", () => {
       expect(twz.ago(60).hour).toBe(9);
       expect(twz.ago(60).min).toBe(59);
     });
-  });
 
-  describe("advance", () => {
     it("advances by years", () => {
       const twz = eastern.local(2024, 3, 15, 10, 0, 0);
       const result = twz.advance({ years: 2 });
@@ -490,9 +523,7 @@ describe("TimeWithZoneTest", () => {
       expect(result.hour).toBe(0);
       expect(result.min).toBe(30);
     });
-  });
 
-  describe("change", () => {
     it("changes year", () => {
       const twz = eastern.local(2024, 3, 15, 10, 30, 45);
       const result = twz.change({ year: 2025 });
@@ -540,9 +571,7 @@ describe("TimeWithZoneTest", () => {
       const result = twz.change({ usec: 500000 });
       expect(result.msec).toBe(500);
     });
-  });
 
-  describe("comparison", () => {
     it("compareTo returns -1, 0, 1", () => {
       const a = eastern.local(2024, 1, 15, 10, 0, 0);
       const b = eastern.local(2024, 1, 15, 12, 0, 0);
@@ -591,9 +620,7 @@ describe("TimeWithZoneTest", () => {
       const b = eastern.local(2024, 1, 15, 12, 0, 0);
       expect(a.valueOf() < b.valueOf()).toBe(true);
     });
-  });
 
-  describe("temporal queries", () => {
     it("isPast()", () => {
       const past = eastern.local(2020, 1, 1, 0, 0, 0);
       expect(past.isPast()).toBe(true);
@@ -609,9 +636,7 @@ describe("TimeWithZoneTest", () => {
       const past = eastern.local(2020, 1, 1, 0, 0, 0);
       expect(past.isFuture()).toBe(false);
     });
-  });
 
-  describe("type checking", () => {
     it("actsLikeTime()", () => {
       const twz = eastern.local(2024, 1, 15, 12, 0, 0);
       expect(twz.actsLikeTime()).toBe(true);
@@ -627,9 +652,7 @@ describe("TimeWithZoneTest", () => {
       const twz = new TimeWithZone(utcDate, eastern);
       expect(twz.getTime()).toBe(utcDate.getTime());
     });
-  });
 
-  describe("TimeZone", () => {
     it("find() with Rails name", () => {
       const tz = TimeZone.find("Eastern Time (US & Canada)");
       expect(tz.name).toBe("Eastern Time (US & Canada)");
@@ -691,9 +714,7 @@ describe("TimeWithZoneTest", () => {
       const tz = TimeZone.find("UTC");
       expect(tz.inspect()).toBe(tz.toString());
     });
-  });
 
-  describe("edge cases", () => {
     it("handles half-hour offset timezones", () => {
       const india = TimeZone.find("Asia/Kolkata");
       const twz = india.local(2024, 1, 15, 12, 0, 0);
@@ -729,7 +750,6 @@ describe("TimeWithZoneTest", () => {
       expect(twz.month).toBe(2);
       expect(twz.day).toBe(29);
     });
-  });
 
   // ---------------------------------------------------------------------------
   // Rails parity tests — ported from Rails activesupport/test/core_ext/time_with_zone_test.rb
