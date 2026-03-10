@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **64.2%** real (3,706 matched / 5,771 total Ruby tests), 1,945 stubs remaining.
+Current state: **65.4%** real (3,776 matched / 5,771 total Ruby tests), 1,866 stubs remaining.
 
 ## How coverage is measured
 
@@ -35,20 +35,21 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 
 ## Current status by test file
 
-### Complete (100% pass rate) — 274 tests across 27 files
+### Complete (100% pass rate) — 334 tests across 28 files
 
 | File | Tests | | File | Tests |
 |---|---|---|---|---|
 | sqlite-adapter (combined) | 104 | | explain | 14 |
-| custom-properties | 38 | | numericality | 14 |
-| json-serialization | 23 | | nested-attributes | 10 |
-| mutation | 21 | | presence | 8 |
-| suppressor | 6 | | boolean | 5 |
-| absence | 5 | | length | 5 |
-| order | 4 | | structural-compatibility | 4 |
-| bidirectional-destroy | 3 | | and | 3 |
-| annotations | 2 | | inheritance | 2 |
-| custom | 1 | | errors | 1 |
+| primary-keys (+ CPK) | 60 | | numericality | 14 |
+| custom-properties | 38 | | nested-attributes | 10 |
+| json-serialization | 23 | | presence | 8 |
+| mutation | 21 | | boolean | 5 |
+| suppressor | 6 | | length | 5 |
+| absence | 5 | | structural-compatibility | 4 |
+| order | 4 | | and | 3 |
+| bidirectional-destroy | 3 | | annotations | 2 |
+| inheritance | 2 | | custom | 1 |
+| errors | 1 | | | |
 
 ### Near-complete (90%+ pass rate)
 
@@ -118,7 +119,7 @@ Plus smaller files: excluding (8/11), finder (8/9), secure-token (8/9), serializ
 | serialized-attribute | 30 / 59 | 29 |
 | optimistic locking | 19 / 50 | 31 |
 
-Plus smaller files: cascaded-eager-loading (8/27), primary-keys (41/60), signed-id (16/29), defaults (12/25), callbacks (17/46), aggregations (14/25), invertible (18/28), sanitize (13/22), readonly (5/14), modules (9/14), cache-key (7/12), touch-later (6/11), association validation (5/10), field-ordered-values (6/10), extensions (4/12), required (4/7), clone (2/4), habtm (0/4), comment (0/17), where-clause (0/21), with (0/16), null-relation (6/9), querying-methods-delegation (2/3), reload-cache (0/1).
+Plus smaller files: cascaded-eager-loading (8/27), signed-id (16/29), defaults (12/25), callbacks (17/46), aggregations (14/25), invertible (18/28), sanitize (13/22), readonly (5/14), modules (9/14), cache-key (7/12), touch-later (6/11), association validation (5/10), field-ordered-values (6/10), extensions (4/12), required (4/7), clone (2/4), habtm (0/4), comment (0/17), where-clause (0/21), with (0/16), null-relation (6/9), querying-methods-delegation (2/3), reload-cache (0/1).
 
 ### DB adapter tests
 
@@ -156,7 +157,6 @@ MySQL adapter stubs need real DB connections. PostgreSQL adapter tests are still
 
 ### Lower ROI / complex
 
-- Composite primary keys — scattered across files
 - Pessimistic locking — needs FOR UPDATE support
 - MySQL adapter — needs real DB connection (183 stubs)
 - Ruby-only concepts (marshal, YAML) — permanently skip

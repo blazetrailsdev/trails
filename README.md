@@ -11,12 +11,12 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 | `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **99.3%** | SQL AST builder and query generation |
 | `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **98.4%** | Attributes, validations, callbacks, dirty tracking, serialization |
 | `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption |
-| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **64.2%** | ORM — persistence, querying, associations, migrations |
+| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **65.4%** | ORM — persistence, querying, associations, migrations |
 | `@rails-ts/rack` | [Rack](https://rack.github.io/) | **99%** | Modular web server interface, request/response, middleware |
 | `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **27.9%** | Routing, middleware stack, cookies, sessions, security |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters |
 
-Overall: **51%** real — 7,186 tests matched against 14,087 Rails tests.
+Overall: **51.5%** real — 7,256 tests matched against 14,087 Rails tests.
 
 ## Quick Example
 
@@ -56,9 +56,10 @@ Attribute definitions with type casting, a full validation framework (presence, 
 
 String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly TimeZone, date/time extensions, and some Ruby-specific features.
 
-### ActiveRecord — ORM (64.2%)
+### ActiveRecord — ORM (65.4%)
 
-**Complete (100% test coverage) — 322 tests across 20 files:**
+**Complete (100% test coverage) — 334 tests across 28 files:**
+- Primary keys and composite primary keys — 60 tests
 - Belongs-to associations (polymorphic, touch, counter cache, optional/required, autosave) — 153 tests
 - Custom properties, JSON serialization, mutation, explain — 96 tests
 - Validations (presence, length, numericality, absence, custom) — 42 tests
