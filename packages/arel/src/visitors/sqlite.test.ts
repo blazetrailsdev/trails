@@ -13,12 +13,6 @@ describe("Arel", () => {
               expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
             });
 
-                    it("should handle nil", () => {
-              const visitor = new Visitors.ToSql();
-              const node = users.get("name").eq(null);
-              expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
-            });
-
             it.todo("defaults limit to -1", () => {});
 
             it.todo("does not support locking", () => {});

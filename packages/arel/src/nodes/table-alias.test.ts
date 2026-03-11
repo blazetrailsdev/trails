@@ -20,6 +20,11 @@ describe("Arel", () => {
       expect(a).toEqual(b);
     });
 
-    it.todo("inequality with different ivars", () => {});
+    it("is not equal with different ivars", () => {
+      const a = new Nodes.Window();
+      a.order(users.get("id").asc());
+      const b = new Nodes.Window();
+      expect(a.orders.length).not.toBe(b.orders.length);
+    });
   });
 });

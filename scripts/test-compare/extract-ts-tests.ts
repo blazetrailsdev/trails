@@ -1,10 +1,3 @@
-#!/usr/bin/env npx tsx
-/**
- * Extracts test metadata from our TypeScript test files.
- * Uses the TypeScript Compiler API to parse describe/it blocks.
- * Outputs output/ts-tests.json
- */
-
 import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
@@ -21,7 +14,7 @@ function getPackageTestFiles(): Record<string, string[]> {
 
   for (const pkg of packages) {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
-    const files = globSync(pattern, { cwd: ROOT_DIR });
+    const files = globSync(pattern, { cwd: ROOT_DIR }).sort();
     
     // Special case for actionpack which has multiple sub-packages
     if (pkg === "actionpack") continue;
@@ -30,9 +23,14 @@ function getPackageTestFiles(): Record<string, string[]> {
   }
 
   // ActionPack special handling
-  result["actiondispatch"] = globSync("packages/actionpack/src/actiondispatch/**/*.test.ts", { cwd: ROOT_DIR });
-  result["actioncontroller"] = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", { cwd: ROOT_DIR });
-  result["actionview"] = globSync("packages/actionpack/src/actionview/**/*.test.ts", { cwd: ROOT_DIR });
+  const actionDispatchFiles = globSync("packages/actionpack/src/actiondispatch/**/*.test.ts", { cwd: ROOT_DIR }).sort();
+  const actionControllerFiles = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", { cwd: ROOT_DIR }).sort();
+  const actionViewFiles = globSync("packages/actionpack/src/actionview/**/*.test.ts", { cwd: ROOT_DIR }).sort();
+
+  result["actiondispatch"] = actionDispatchFiles;
+  // Shared test files also relevant to controller/ Ruby tests
+  result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
+  result["actionview"] = actionViewFiles;
 
   return result;
 }
@@ -52,214 +50,165 @@ function main() {
   }
 
   // Print summary
-  for (const [pkg, data] of Object.entries(manifest.packages)) {
-    console.log(`  ${pkg}: ${data.files.length} files, ${data.totalTests} tests`);
+  console.log("TS Test Extraction Summary:");
+  for (const [pkg, pkgInfo] of Object.entries(manifest.packages)) {
+    const totalTests = pkgInfo.files.reduce((sum, f) => sum + f.testCases.length, 0);
+    console.log(`  ${pkg}: ${pkgInfo.files.length} files, ${totalTests} tests`);
   }
 
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  }
   const outputPath = path.join(OUTPUT_DIR, "ts-tests.json");
   fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2));
   console.log(`\nWritten to ${outputPath}`);
 }
 
 function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo {
-  const testFiles: TestFileInfo[] = [];
-
-  for (const filePath of files) {
-    if (!fs.existsSync(filePath)) {
-      console.warn(`  Warning: ${filePath} not found, skipping`);
-      continue;
-    }
-
-    const sourceText = fs.readFileSync(filePath, "utf-8");
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      sourceText,
-      ts.ScriptTarget.Latest,
-      true,
-    );
-
-    const relPath = path.relative(ROOT_DIR, filePath);
-    const testCases: TestCaseInfo[] = [];
-    const describeStack: string[] = [];
-
-    visitNode(sourceFile, sourceFile, describeStack, testCases, relPath);
-
-    if (testCases.length > 0) {
-      const className = path.basename(filePath, ".test.ts");
-      testFiles.push({
-        file: relPath,
-        className,
-        testCases,
-        testCount: testCases.length,
-      });
-    }
-  }
-
-  const totalTests = testFiles.reduce((sum, f) => sum + f.testCount, 0);
-
-  return {
-    files: testFiles,
-    totalTests,
+  const pkgInfo: TestPackageInfo = {
+    name: pkgName,
+    files: [],
   };
+
+  for (const file of files) {
+    const fileInfo = extractFileTests(file);
+    pkgInfo.files.push(fileInfo);
+  }
+
+  return pkgInfo;
 }
 
-function visitNode(
-  node: ts.Node,
-  sourceFile: ts.SourceFile,
-  describeStack: string[],
-  testCases: TestCaseInfo[],
-  relPath: string,
-) {
-  if (ts.isCallExpression(node)) {
-    const callInfo = parseTestCall(node, sourceFile);
-
-    if (callInfo) {
-      if (callInfo.type === "describe") {
-        describeStack.push(callInfo.description);
-
-        // Visit children inside the describe block
-        const callback = getCallbackArg(node);
-        if (callback) {
-          ts.forEachChild(callback, (child) => {
-            visitNode(child, sourceFile, describeStack, testCases, relPath);
-          });
-        }
-
-        describeStack.pop();
-        return; // Don't visit children again
-      }
-
-      if (callInfo.type === "it" || callInfo.type === "it.skip") {
-        const ancestors = [...describeStack];
-        const testPath = [...ancestors, callInfo.description].join(" > ");
-        const line = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
-        const assertions = extractExpectMatchers(node, sourceFile);
-
-        testCases.push({
-          path: testPath,
-          description: callInfo.description,
-          ancestors,
-          file: relPath,
-          line,
-          style: "it",
-          assertions,
-          pending: callInfo.type === "it.skip",
-        });
-        return;
-      }
-    }
-  }
-
-  // For ExpressionStatements, check the inner expression
-  if (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression)) {
-    visitNode(node.expression, sourceFile, describeStack, testCases, relPath);
-    return;
-  }
-
-  ts.forEachChild(node, (child) => {
-    visitNode(child, sourceFile, describeStack, testCases, relPath);
+function extractFileTests(filePath: string): TestFileInfo {
+  const program = ts.createProgram([filePath], {
+    target: ts.ScriptTarget.ESNext,
+    module: ts.ModuleKind.CommonJS,
   });
-}
+  const sourceFile = program.getSourceFile(filePath);
 
-interface TestCallInfo {
-  type: "describe" | "it" | "it.skip";
-  description: string;
-}
-
-function parseTestCall(node: ts.CallExpression, sourceFile: ts.SourceFile): TestCallInfo | null {
-  const expr = node.expression;
-
-  // describe("...", () => {})
-  if (ts.isIdentifier(expr)) {
-    const name = expr.text;
-    if (name === "describe" || name === "describeIfPg" || name === "describeIfMysql") {
-      const desc = getFirstStringArg(node);
-      if (desc) return { type: "describe", description: desc };
-    }
-    if (name === "it" || name === "test") {
-      const desc = getFirstStringArg(node);
-      if (desc) return { type: "it", description: desc };
-    }
+  if (!sourceFile) {
+    throw new Error(`Could not load source file: ${filePath}`);
   }
 
-  // it.skip("...", () => {}) or describe.skip(...)
-  if (ts.isPropertyAccessExpression(expr)) {
-    const obj = expr.expression;
-    const prop = expr.name.text;
+  const relativePath = path.relative(ROOT_DIR, filePath);
+  const fileInfo: TestFileInfo = {
+    file: relativePath,
+    className: pkgFromPath(relativePath),
+    testCases: [],
+  };
 
-    if (ts.isIdentifier(obj)) {
-      if (obj.text === "it" && prop === "skip") {
-        const desc = getFirstStringArg(node);
-        if (desc) return { type: "it.skip", description: desc };
-      }
-      if (obj.text === "describe" && prop === "skip") {
-        const desc = getFirstStringArg(node);
-        if (desc) return { type: "describe", description: desc };
-      }
-      if (obj.text === "it" && prop === "todo") {
-        const desc = getFirstStringArg(node);
-        if (desc) return { type: "it.skip", description: desc };
-      }
-    }
-  }
+  const currentAncestors: string[] = [];
 
-  return null;
-}
+  function visit(node: ts.Node) {
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      if (ts.isIdentifier(expression)) {
+        const funcName = expression.text;
 
-function getFirstStringArg(node: ts.CallExpression): string | null {
-  if (node.arguments.length === 0) return null;
-  const first = node.arguments[0];
-
-  if (ts.isStringLiteral(first)) return first.text;
-  if (ts.isNoSubstitutionTemplateLiteral(first)) return first.text;
-  if (ts.isTemplateExpression(first)) {
-    // For template literals, just use the head text
-    return first.head.text + "...";
-  }
-
-  return null;
-}
-
-function getCallbackArg(node: ts.CallExpression): ts.Node | null {
-  for (const arg of node.arguments) {
-    if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) {
-      return arg.body;
-    }
-  }
-  return null;
-}
-
-function extractExpectMatchers(node: ts.Node, sourceFile: ts.SourceFile): string[] {
-  const matchers: string[] = [];
-  findExpectMatchers(node, matchers);
-  return [...new Set(matchers)];
-}
-
-function findExpectMatchers(node: ts.Node, results: string[]) {
-  if (ts.isCallExpression(node)) {
-    const expr = node.expression;
-    // expect(...).toXxx()
-    if (ts.isPropertyAccessExpression(expr)) {
-      const matcherName = expr.name.text;
-      if (matcherName.startsWith("to") || matcherName.startsWith("not")) {
-        // Check if the object is an expect() call or chained .not
-        if (isExpectChain(expr.expression)) {
-          results.push(matcherName);
+        if (funcName === "describe") {
+          const title = getFirstArgString(node);
+          if (title) {
+            currentAncestors.push(title);
+            ts.forEachChild(node, visit);
+            currentAncestors.pop();
+            return;
+          }
+        } else if (funcName === "it" || funcName === "test") {
+          const title = getFirstArgString(node);
+          if (title) {
+            const testCase: TestCaseInfo = {
+              path: [...currentAncestors, title].join(" > "),
+              description: title,
+              ancestors: [...currentAncestors],
+              file: relativePath,
+              line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+              style: funcName as "it" | "test",
+              assertions: countAssertions(node),
+              pending: false,
+            };
+            fileInfo.testCases.push(testCase);
+          }
+        }
+      } else if (ts.isPropertyAccessExpression(expression)) {
+        // Handle it.skip, it.todo, it.only, etc.
+        const base = expression.expression;
+        if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
+          const modifier = expression.name.text;
+          const title = getFirstArgString(node);
+          if (title) {
+            const testCase: TestCaseInfo = {
+              path: [...currentAncestors, title].join(" > "),
+              description: title,
+              ancestors: [...currentAncestors],
+              file: relativePath,
+              line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+              style: base.text as "it" | "test",
+              assertions: countAssertions(node),
+              pending: modifier === "skip" || modifier === "todo",
+            };
+            fileInfo.testCases.push(testCase);
+          }
         }
       }
     }
+    ts.forEachChild(node, visit);
   }
 
-  ts.forEachChild(node, (child) => findExpectMatchers(child, results));
+  visit(sourceFile);
+  return fileInfo;
+}
+
+function getFirstArgString(node: ts.CallExpression): string | null {
+  if (node.arguments.length > 0) {
+    const firstArg = node.arguments[0];
+    if (ts.isStringLiteral(firstArg) || ts.isNoSubstitutionTemplateLiteral(firstArg)) {
+      return firstArg.text;
+    }
+  }
+  return null;
+}
+
+function pkgFromPath(relPath: string): string {
+  const parts = relPath.split(path.sep);
+  // packages/arel/src/... -> arel
+  if (parts[0] === "packages" && parts[1]) {
+    if (parts[1] === "actionpack" && parts[3]) {
+      return parts[3]; // actiondispatch, actioncontroller, actionview
+    }
+    return parts[1];
+  }
+  return "unknown";
+}
+
+function countAssertions(node: ts.Node): string[] {
+  const assertions: string[] = [];
+
+  function findExpect(n: ts.Node) {
+    if (ts.isCallExpression(n)) {
+      const exp = n.expression;
+      if (ts.isIdentifier(exp) && exp.text === "expect") {
+        // Find the matcher
+        let parent = n.parent;
+        if (parent && ts.isPropertyAccessExpression(parent)) {
+          // expect(x).toBe(y) -> parent is .toBe
+          assertions.push(parent.name.text);
+        }
+      }
+    }
+    ts.forEachChild(n, findExpect);
+  }
+
+  ts.forEachChild(node, findExpect);
+  return assertions;
 }
 
 function isExpectChain(node: ts.Node): boolean {
   if (ts.isCallExpression(node)) {
-    const expr = node.expression;
-    if (ts.isIdentifier(expr) && expr.text === "expect") return true;
-    if (ts.isPropertyAccessExpression(expr)) {
-      return isExpectChain(expr.expression);
+    const expression = node.expression;
+    if (ts.isIdentifier(expression) && expression.text === "expect") {
+      return true;
+    }
+    if (ts.isPropertyAccessExpression(expression)) {
+      return isExpectChain(expression.expression);
     }
   }
   if (ts.isPropertyAccessExpression(node)) {
