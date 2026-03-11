@@ -48,10 +48,6 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
  *   actiondispatch/actioncontroller: snake_case → kebab-case
  */
 function rubyFileToConventionTs(rubyFile: string, pkg: string): string {
-  // Single-file packages
-  if (pkg === "arel") return "arel.test.ts";
-  if (pkg === "activemodel") return "activemodel.test.ts";
-
   // Rack: spec_foo.rb → foo.test.ts (keep underscores in basename)
   if (pkg === "rack") {
     const base = path.basename(rubyFile, ".rb");
