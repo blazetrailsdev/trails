@@ -37,7 +37,11 @@ describe("Arel", () => {
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
     });
 
-    it.todo("chains", () => {});
+    it("chains", () => {
+      const mgr = new DeleteManager();
+      expect(mgr.from(users)).toBe(mgr);
+      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+    });
 
     it("handles limit properly", () => {
       const mgr = new DeleteManager();

@@ -36,11 +36,35 @@ describe("Arel", () => {
       expect(visitor.compile(node)).toContain("IN");
     });
 
-    it.todo("should handle nil", () => {});
-    it.todo("should handle nulls first", () => {});
-    it.todo("should handle nulls last", () => {});
-    it.todo("should handle nulls first reversed", () => {});
-    it.todo("should handle nulls last reversed", () => {});
+    it("should handle nil", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("name").eq(null);
+      expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
+    });
+
+    it("should handle nulls first", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("id").asc().nullsFirst();
+      expect(visitor.compile(node)).toContain("NULLS FIRST");
+    });
+
+    it("should handle nulls last", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("id").asc().nullsLast();
+      expect(visitor.compile(node)).toContain("NULLS LAST");
+    });
+
+    it("should handle nulls first reversed", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("id").asc().nullsLast().reverse();
+      expect(visitor.compile(node)).toContain("NULLS FIRST");
+    });
+
+    it("should handle nulls last reversed", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("id").asc().nullsFirst().reverse();
+      expect(visitor.compile(node)).toContain("NULLS LAST");
+    });
 
     it.todo("defaults limit to 18446744073709551615", () => {});
     it.todo("uses DUAL for empty from", () => {});

@@ -52,6 +52,12 @@ describe("Arel", () => {
       expect(a).not.toEqual(b);
     });
 
-    it.todo("operation ordering", () => {});
+    it("operation ordering", () => {
+      const node = new Nodes.UnaryOperation("-", users.get("age"));
+      const ordering = node.desc();
+      expect(ordering).toBeInstanceOf(Nodes.Descending);
+      expect(ordering.expr).toBe(node);
+      expect(ordering.isDescending()).toBe(true);
+    });
   });
 });

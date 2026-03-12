@@ -49,6 +49,63 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain("LIMIT 10");
     });
 
+    it("should not quote sql literals", () => {
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(new Nodes.SqlLiteral("NOW()"))).toBe("NOW()");
+    });
+
+    it("should handle false", () => {
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(new Nodes.False())).toBe("FALSE");
+    });
+
+    it("should handle Addition", () => {
+      expect(users.project(users.get("age").add(1).as("next")).toSql()).toBe(
+        'SELECT "users"."age" + 1 AS next FROM "users"',
+      );
+    });
+
+    it("should handle Subtraction", () => {
+      expect(users.project(users.get("age").subtract(1).as("prev")).toSql()).toBe(
+        'SELECT "users"."age" - 1 AS prev FROM "users"',
+      );
+    });
+
+    it("should handle Multiplication", () => {
+      expect(users.project(users.get("age").multiply(2).as("double")).toSql()).toBe(
+        'SELECT "users"."age" * 2 AS double FROM "users"',
+      );
+    });
+
+    it("should handle Division", () => {
+      expect(users.project(users.get("age").divide(2).as("half")).toSql()).toBe(
+        'SELECT "users"."age" / 2 AS half FROM "users"',
+      );
+    });
+
+    it("should handle Contains", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("tags").contains("foo");
+      expect(visitor.compile(node)).toContain("@>");
+    });
+
+    it("should handle Overlaps", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("tags").overlaps("bar");
+      expect(visitor.compile(node)).toContain("&&");
+    });
+
+    it("should compile literal SQL", () => {
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(new Nodes.SqlLiteral("1 = 1"))).toBe("1 = 1");
+    });
+
+    it("should compile Arel nodes", () => {
+      const visitor = new Visitors.ToSql();
+      const node = users.get("id").eq(1);
+      expect(visitor.compile(node)).toBe('"users"."id" = 1');
+    });
+
     it.todo("can define a dispatch method", () => {});
     it.todo("should visit built-in functions", () => {});
     it.todo("should construct a valid generic SQL statement", () => {});
@@ -148,17 +205,5 @@ describe("Arel", () => {
     it.todo("wraps nested groupings in brackets only once", () => {});
     it.todo("works without default branch", () => {});
     it.todo("supports #when with two arguments and no #then", () => {});
-
-    // Misplaced descriptions that need to exist in this file for convention mapping.
-    it.todo("should not quote sql literals", () => {});
-    it.todo("should handle false", () => {});
-    it.todo("should handle Multiplication", () => {});
-    it.todo("should handle Division", () => {});
-    it.todo("should handle Addition", () => {});
-    it.todo("should handle Subtraction", () => {});
-    it.todo("should handle Contains", () => {});
-    it.todo("should handle Overlaps", () => {});
-    it.todo("should compile literal SQL", () => {});
-    it.todo("should compile Arel nodes", () => {});
   });
 });
