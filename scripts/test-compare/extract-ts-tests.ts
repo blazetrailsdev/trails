@@ -16,9 +16,6 @@ function getPackageTestFiles(): Record<string, string[]> {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
     const files = globSync(pattern, { cwd: ROOT_DIR }).sort();
     
-    // Special case for actionpack which has multiple sub-packages
-    if (pkg === "actionpack") continue;
-
     result[pkg] = files;
   }
 

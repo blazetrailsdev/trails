@@ -7,35 +7,38 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("unary-operation", () => {
-                it("construct", () => {
-          const node = new Nodes.UnaryOperation("-", users.get("age"));
-          expect(node.operator).toBe("-");
-          expect(node.operand).toBe(users.get("age").relation.get("age").relation ? node.operand : node.operand);
-          expect(node.operand).toBeInstanceOf(Nodes.Attribute);
-        });
+    it("construct", () => {
+      const attr = users.get("age");
+      const node = new Nodes.UnaryOperation("-", attr);
+      expect(node.operator).toBe("-");
+      expect(node.operand).toBe(attr);
+      expect(node.operand).toBeInstanceOf(Nodes.Attribute);
+    });
 
-                it("operation alias", () => {
-          const node = new Nodes.UnaryOperation("-", users.get("age"));
-          const aliased = node.as("negated_age");
-          expect(aliased).toBeInstanceOf(Nodes.As);
-        });
+    it("operation alias", () => {
+      const node = new Nodes.UnaryOperation("-", users.get("age"));
+      const aliased = node.as("negated_age");
+      expect(aliased).toBeInstanceOf(Nodes.As);
+      expect(aliased.left).toBe(node);
+      expect(aliased.right).toBeInstanceOf(Nodes.SqlLiteral);
+    });
 
-                it("equality with same ivars", () => {
-          const a = new Nodes.UnaryOperation("-", users.get("age"));
-          const b = new Nodes.UnaryOperation("-", users.get("age"));
-          expect(a.operator).toBe(b.operator);
-        });
+    it("expr", () => {
+      const attr = users.get("id");
+      const node = new Nodes.UnaryOperation("-", attr);
+      expect(node.operand).toBe(attr);
+    });
 
-                it("inequality with different ivars", () => {
-          const a = new Nodes.UnaryOperation("-", users.get("age"));
-          const b = new Nodes.UnaryOperation("+", users.get("age"));
-          expect(a.operator).not.toBe(b.operator);
-        });
+    it("equality with same ivars", () => {
+      const a = new Nodes.UnaryOperation("-", users.get("age"));
+      const b = new Nodes.UnaryOperation("-", users.get("age"));
+      expect(a).toEqual(b);
+    });
 
-                    it("operation ordering", () => {
-              const node = new Nodes.UnaryOperation("-", users.get("age"));
-              expect(node.asc()).toBeInstanceOf(Nodes.Ascending);
-              expect(node.desc()).toBeInstanceOf(Nodes.Descending);
-            });
+    it("inequality with different ivars", () => {
+      const a = new Nodes.UnaryOperation("-", users.get("age"));
+      const b = new Nodes.UnaryOperation("-", users.get("id"));
+      expect(a).not.toEqual(b);
+    });
   });
 });
