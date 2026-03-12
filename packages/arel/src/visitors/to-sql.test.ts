@@ -174,7 +174,9 @@ describe("Arel", () => {
     it("can handle three dot ranges", () => {
       const begin = 1;
       const end = 10;
-      const node = new Nodes.Grouping(new Nodes.And([users.get("id").gteq(begin), users.get("id").lt(end)]));
+      const node = new Nodes.Grouping(
+        new Nodes.And([users.get("id").gteq(begin), users.get("id").lt(end)]),
+      );
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain(">=");
       expect(sql).toContain("<");
@@ -271,16 +273,19 @@ describe("Arel", () => {
           return visitor.visit(this);
         }
       }
-      expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(Visitors.UnsupportedVisitError);
+      expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(
+        Visitors.UnsupportedVisitError,
+      );
     });
 
     it("refuses mixed binds", () => {
-      expect(() => new Nodes.BoundSqlLiteral("id = ? AND name = :name", [1], { name: "x" })).toThrow();
+      expect(
+        () => new Nodes.BoundSqlLiteral("id = ? AND name = :name", [1], { name: "x" }),
+      ).toThrow();
     });
 
     it("requires all named bind params to be supplied", () => {
-      const node = new Nodes.BoundSqlLiteral("id = :id", [], {} as any);
-      expect(() => new Visitors.ToSql().compile(node)).toThrow();
+      expect(() => new Nodes.BoundSqlLiteral("id = :id", [], {} as any)).toThrow();
     });
 
     it("requires positional binds to match the placeholders", () => {
@@ -289,9 +294,11 @@ describe("Arel", () => {
     });
 
     it("should apply Not to the whole expression", () => {
-      const node = new Nodes.Not(new Nodes.And([users.get("id").eq(1), users.get("name").eq("Alice")]));
+      const node = new Nodes.Not(
+        new Nodes.And([users.get("id").eq(1), users.get("name").eq("Alice")]),
+      );
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toMatch(/^NOT \\(.+\\)$/);
+      expect(sql).toMatch(/^NOT \(.*\)$/);
     });
 
     it("should chain predications on named functions", () => {
@@ -645,7 +652,9 @@ describe("Arel", () => {
           return visitor.visit(this);
         }
       }
-      expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(Visitors.UnsupportedVisitError);
+      expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(
+        Visitors.UnsupportedVisitError,
+      );
     });
 
     it("will only consider named binds starting with a letter", () => {

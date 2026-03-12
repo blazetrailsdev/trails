@@ -127,10 +127,13 @@ export class Attribute extends Node {
     return new NotIn(this, values.map(buildQuoted) as any);
   }
 
-  between(range: [unknown, unknown]): Between | LessThanOrEqual;
-  between(begin: unknown, end: unknown): Between | LessThanOrEqual;
-  between(rangeObj: { begin: unknown; end: unknown }): Between | LessThanOrEqual;
-  between(beginOrRange: unknown, end?: unknown): Between | LessThanOrEqual {
+  between(range: [unknown, unknown]): Between | LessThanOrEqual | GreaterThanOrEqual;
+  between(begin: unknown, end: unknown): Between | LessThanOrEqual | GreaterThanOrEqual;
+  between(rangeObj: {
+    begin: unknown;
+    end: unknown;
+  }): Between | LessThanOrEqual | GreaterThanOrEqual;
+  between(beginOrRange: unknown, end?: unknown): Between | LessThanOrEqual | GreaterThanOrEqual {
     let beginVal: unknown;
     let endVal: unknown;
     if (Array.isArray(beginOrRange) && end === undefined) {
@@ -153,6 +156,9 @@ export class Attribute extends Node {
     }
     if (beginVal === -Infinity) {
       return new LessThanOrEqual(this, buildQuoted(endVal));
+    }
+    if (endVal === Infinity) {
+      return new GreaterThanOrEqual(this, buildQuoted(beginVal));
     }
     return new Between(this, new And([buildQuoted(beginVal), buildQuoted(endVal)]));
   }
