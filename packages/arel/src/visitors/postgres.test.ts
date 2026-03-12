@@ -67,7 +67,7 @@ describe("Arel", () => {
       const visitor = new Visitors.ToSql();
       const products = new Table("products");
       const node = products.get("metadata").contains('{"foo":"bar"}');
-      expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{\"foo\":\"bar\"}'`);
+      expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{"foo":"bar"}'`);
     });
 
     it("should handle Overlaps", () => {
