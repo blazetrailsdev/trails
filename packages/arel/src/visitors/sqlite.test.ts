@@ -42,6 +42,9 @@ describe("Arel", () => {
       expect(visitor.compile(new Nodes.True())).toBe("1");
       expect(visitor.compile(new Nodes.False())).toBe("0");
       expect(visitor.compile(users.get("active").eq(true))).toBe('"users"."active" = 1');
+      expect(visitor.compile(new Nodes.Equality(users.get("active"), true as any))).toBe(
+        '"users"."active" = 1',
+      );
     });
 
     it("should construct a valid generic SQL statement", () => {

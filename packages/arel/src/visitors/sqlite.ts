@@ -39,8 +39,8 @@ export class SQLite extends ToSql {
 
     // SQLite does not support locking; ignore lock clause entirely.
 
-    if ((node as any).comment) {
-      this.visit((node as any).comment);
+    if (node.comment) {
+      this.visit(node.comment);
     }
 
     return this.collector;

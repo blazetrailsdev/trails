@@ -437,17 +437,16 @@ describe("Arel", () => {
     });
 
     it("can be constructed with an infinite range", () => {
-      // -Infinity..Infinity is always true, just produce a lteq Infinity
+      // -Infinity..Infinity is always true
       const node = users.get("id").between(-Infinity, Infinity);
       const sql = new Visitors.ToSql().compile(node);
-      // -Infinity start → lteq end
-      expect(sql).toContain("<=");
+      expect(sql).toBe("TRUE");
     });
 
     it("can be constructed with a quoted infinite range", () => {
       const node = users.get("id").between(-Infinity, Infinity);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBeDefined();
+      expect(sql).toBe("TRUE");
     });
 
     it("can be constructed with a range ending at Infinity", () => {

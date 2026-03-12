@@ -437,7 +437,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#comment
    */
   comment(...values: string[]): this {
-    (this.ast as any).comment = new Comment(...values);
+    this.ast.comment = new Comment(...values);
     return this;
   }
 

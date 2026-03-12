@@ -192,8 +192,8 @@ export class ToSql implements NodeVisitor<SQLString> {
       this.visit(node.lock);
     }
 
-    if ((node as any).comment) {
-      this.visit((node as any).comment);
+    if (node.comment) {
+      this.visit(node.comment);
     }
 
     return this.collector;
@@ -1063,7 +1063,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     } else if (typeof v === "number") {
       this.collector.append(String(v));
     } else if (typeof v === "boolean") {
-      this.collector.append(v ? "TRUE" : "FALSE");
+      this.collector.append(this.quote(v));
     } else if (typeof v === "bigint") {
       this.collector.append(v.toString());
     } else if (v instanceof Date) {
