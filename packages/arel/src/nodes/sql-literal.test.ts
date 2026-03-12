@@ -83,8 +83,20 @@ describe("Arel", () => {
       expect(lit).toBeInstanceOf(Nodes.Node);
     });
 
-    it.todo("serializes into YAML", () => {});
+    it("serializes into YAML", () => {
+      const lit = new Nodes.SqlLiteral("NOW()");
+      const yaml = lit.toYAML();
+      expect(yaml).toContain("sql_literal");
+      expect(yaml).toContain("NOW()");
+    });
 
-    it.todo("generates a Fragments node", () => {});
+    it("generates a Fragments node", () => {
+      const a = new Nodes.SqlLiteral("foo");
+      const b = new Nodes.SqlLiteral("bar");
+      const fragments = a.join(b);
+      expect(fragments).toBeInstanceOf(Nodes.Fragments);
+      const sql = new Visitors.ToSql().compile(fragments);
+      expect(sql).toBe("foobar");
+    });
   });
 });

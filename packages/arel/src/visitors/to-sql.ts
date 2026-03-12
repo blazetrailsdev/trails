@@ -3,13 +3,20 @@ import { SQLString } from "../collectors/sql-string.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 
+export class UnsupportedVisitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnsupportedVisitError";
+  }
+}
+
 /**
  * ToSql visitor — walks the AST and produces SQL strings.
  *
  * Mirrors: Arel::Visitors::ToSql
  */
 export class ToSql implements NodeVisitor<SQLString> {
-  private collector!: SQLString;
+  protected collector!: SQLString;
 
   compile(node: Node): string {
     this.collector = new SQLString();
@@ -82,7 +89,10 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.Descending) return this.visitDescending(node);
     if (node instanceof Nodes.Offset) return this.visitOffset(node);
     if (node instanceof Nodes.Limit) return this.visitLimit(node);
+    if (node instanceof Nodes.Top) return this.visitTop(node);
     if (node instanceof Nodes.Lock) return this.visitLock(node);
+    if (node instanceof Nodes.DistinctOn) return this.visitDistinctOn(node);
+    if (node instanceof Nodes.Bin) return this.visitBin(node);
 
     // Boolean
     if (node instanceof Nodes.And) return this.visitAnd(node);
@@ -120,6 +130,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.BoundSqlLiteral) return this.visitBoundSqlLiteral(node);
     if (node instanceof Nodes.BindParam) return this.visitBindParam(node);
     if (node instanceof Nodes.Concat) return this.visitConcat(node);
+    if (node instanceof Nodes.Fragments) return this.visitFragments(node);
 
     // Functions
     if (node instanceof Nodes.NamedFunction) return this.visitNamedFunction(node);
@@ -145,12 +156,12 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.ValuesList) return this.visitValuesList(node);
     if (node instanceof Table) return this.visitTable(node);
 
-    throw new Error(`Unknown node type: ${node.constructor.name}`);
+    throw new UnsupportedVisitError(`Unknown node type: ${node.constructor.name}`);
   }
 
   // -- Statements --
 
-  private visitSelectStatement(node: Nodes.SelectStatement): SQLString {
+  protected visitSelectStatement(node: Nodes.SelectStatement): SQLString {
     if (node.with) {
       this.visit(node.with);
       this.collector.append(" ");
@@ -181,14 +192,14 @@ export class ToSql implements NodeVisitor<SQLString> {
       this.visit(node.lock);
     }
 
-    if ((node as any).comment) {
-      this.visit((node as any).comment);
+    if (node.comment) {
+      this.visit(node.comment);
     }
 
     return this.collector;
   }
 
-  private visitSelectCore(node: Nodes.SelectCore): SQLString {
+  protected visitSelectCore(node: Nodes.SelectCore): SQLString {
     this.collector.append("SELECT");
 
     if (node.setQuantifier) {
@@ -219,7 +230,8 @@ export class ToSql implements NodeVisitor<SQLString> {
 
     if (node.havings.length > 0) {
       this.collector.append(" HAVING ");
-      this.visitArray(node.havings, ", ");
+      const conditions = node.havings.length === 1 ? node.havings[0] : new Nodes.And(node.havings);
+      this.visit(conditions);
     }
 
     if (node.windows.length > 0) {
@@ -518,7 +530,9 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   private visitGrouping(node: Nodes.Grouping): SQLString {
     this.collector.append("(");
-    this.visit(node.expr);
+    let inner: Node = node.expr;
+    while (inner instanceof Nodes.Grouping) inner = inner.expr;
+    this.visit(inner);
     this.collector.append(")");
     return this.collector;
   }
@@ -537,7 +551,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitOffset(node: Nodes.Offset): SQLString {
+  protected visitOffset(node: Nodes.Offset): SQLString {
     this.collector.append("OFFSET ");
     if (node.expr instanceof Node) {
       this.visit(node.expr);
@@ -547,7 +561,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitLimit(node: Nodes.Limit): SQLString {
+  protected visitLimit(node: Nodes.Limit): SQLString {
     this.collector.append("LIMIT ");
     if (node.expr instanceof Node) {
       this.visit(node.expr);
@@ -557,13 +571,44 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitLock(node: Nodes.Lock): SQLString {
+  protected visitTop(node: Nodes.Top): SQLString {
+    this.collector.append("TOP ");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else {
+      this.collector.append(String(node.expr));
+    }
+    return this.collector;
+  }
+
+  protected visitLock(node: Nodes.Lock): SQLString {
     if (node.expr instanceof Node) {
       this.visit(node.expr);
     } else if (typeof node.expr === "string") {
       this.collector.append(node.expr);
     } else {
       this.collector.append("FOR UPDATE");
+    }
+    return this.collector;
+  }
+
+  protected visitDistinctOn(node: Nodes.DistinctOn): SQLString {
+    this.collector.append("DISTINCT ON (");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  protected visitBin(node: Nodes.Bin): SQLString {
+    // Generic visitor: just emit the inner expression.
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
     }
     return this.collector;
   }
@@ -699,7 +744,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- BindParam --
 
-  private visitBindParam(node: Nodes.BindParam): SQLString {
+  protected visitBindParam(node: Nodes.BindParam): SQLString {
     if (node.value !== undefined) {
       this.collector.append(this.quote(node.value));
     } else {
@@ -720,10 +765,15 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- Concat --
 
-  private visitConcat(node: Nodes.Concat): SQLString {
+  protected visitConcat(node: Nodes.Concat): SQLString {
     this.visit(node.left);
     this.collector.append(" || ");
     this.visit(node.right);
+    return this.collector;
+  }
+
+  protected visitFragments(node: Nodes.Fragments): SQLString {
+    for (const part of node.values) this.visit(part);
     return this.collector;
   }
 
@@ -805,12 +855,12 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- Boolean literals --
 
-  private visitTrue(_node: Nodes.True): SQLString {
+  protected visitTrue(_node: Nodes.True): SQLString {
     this.collector.append("TRUE");
     return this.collector;
   }
 
-  private visitFalse(_node: Nodes.False): SQLString {
+  protected visitFalse(_node: Nodes.False): SQLString {
     this.collector.append("FALSE");
     return this.collector;
   }
@@ -902,7 +952,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- Cte --
 
-  private visitCte(node: Nodes.Cte): SQLString {
+  protected visitCte(node: Nodes.Cte): SQLString {
     this.collector.append(`"${node.name}" AS `);
     if (node.materialized === "materialized") {
       this.collector.append("MATERIALIZED ");
@@ -1013,7 +1063,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     } else if (typeof v === "number") {
       this.collector.append(String(v));
     } else if (typeof v === "boolean") {
-      this.collector.append(v ? "TRUE" : "FALSE");
+      this.collector.append(this.quote(v));
     } else if (typeof v === "bigint") {
       this.collector.append(v.toString());
     } else if (v instanceof Date) {
@@ -1035,14 +1085,14 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArray(nodes: Node[], separator: string): void {
+  protected visitArray(nodes: Node[], separator: string): void {
     for (let i = 0; i < nodes.length; i++) {
       if (i > 0) this.collector.append(separator);
       this.visit(nodes[i]);
     }
   }
 
-  private quote(value: unknown): string {
+  protected quote(value: unknown): string {
     if (value === null || value === undefined) return "NULL";
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";

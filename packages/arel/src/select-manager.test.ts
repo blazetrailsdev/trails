@@ -830,38 +830,127 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain("ORDER BY");
     });
 
-    it.todo("should chain", () => {});
+    it("should chain", () => {
+      const mgr = new SelectManager(users);
+      expect(mgr.project(star)).toBe(mgr);
+      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+      expect(mgr.order(users.get("id").asc())).toBe(mgr);
+    });
 
-    it.todo("takes *args", () => {});
+    it("takes *args", () => {
+      const mgr = users.project(star).order(users.get("id").asc(), users.get("name").desc());
+      expect(mgr.orders.length).toBe(2);
+      expect(mgr.toSql()).toContain("ORDER BY");
+    });
 
-    it.todo("should create join nodes with a full outer join klass", () => {});
+    it("should create join nodes with a full outer join klass", () => {
+      const mgr = new SelectManager(users);
+      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.FullOuterJoin);
+      expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
+    });
 
-    it.todo("should create join nodes with an outer join klass", () => {});
+    it("should create join nodes with an outer join klass", () => {
+      const mgr = new SelectManager(users);
+      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.OuterJoin);
+      expect(join).toBeInstanceOf(Nodes.OuterJoin);
+    });
 
-    it.todo("should create join nodes with a right outer join klass", () => {});
+    it("should create join nodes with a right outer join klass", () => {
+      const mgr = new SelectManager(users);
+      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.RightOuterJoin);
+      expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
+    });
 
-    it.todo("takes the full outer join class", () => {});
+    it("takes the full outer join class", () => {
+      const mgr = users
+        .project(star)
+        .fullOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+      expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.FullOuterJoin);
+      expect(mgr.toSql()).toContain("FULL OUTER JOIN");
+    });
 
-    it.todo("takes the right outer join class", () => {});
+    it("takes the right outer join class", () => {
+      const mgr = users
+        .project(star)
+        .rightOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+      expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.RightOuterJoin);
+      expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
+    });
 
-    it.todo("takes an attribute", () => {});
+    it("takes an attribute", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(users.get("id").over(mgr.window("w")));
+      const sql = mgr.toSql();
+      expect(sql).toContain("OVER");
+    });
 
-    it.todo("makes strings literals", () => {});
+    it("makes strings literals", () => {
+      const mgr = new SelectManager();
+      mgr.from("users").project("*");
+      expect(mgr.froms[0]).toBeInstanceOf(Nodes.SqlLiteral);
+      expect(mgr.toSql()).toContain("FROM users");
+    });
 
-    it.todo("takes an order", () => {});
+    it("takes an order", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(users.get("id").over(mgr.window("w").order(users.get("id").asc())));
+      expect(mgr.toSql()).toContain("ORDER BY");
+    });
 
-    it.todo("takes an order with multiple columns", () => {});
+    it("takes an order with multiple columns", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(
+        users
+          .get("id")
+          .over(mgr.window("w").order(users.get("id").asc(), users.get("name").desc())),
+      );
+      const sql = mgr.toSql();
+      expect(sql).toContain("ORDER BY");
+      expect(sql).toContain(",");
+    });
 
-    it.todo("takes a partition", () => {});
+    it("takes a partition", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(users.get("id").over(mgr.window("w").partition(users.get("name"))));
+      expect(mgr.toSql()).toContain("PARTITION BY");
+    });
 
-    it.todo("takes a partition with multiple columns", () => {});
+    it("takes a partition with multiple columns", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(users.get("id").over(mgr.window("w").partition(users.get("name"), users.get("age"))));
+      const sql = mgr.toSql();
+      expect(sql).toContain("PARTITION BY");
+      expect(sql).toContain(",");
+    });
 
-    it.todo("takes a range frame, unbounded following", () => {});
+    it("takes a range frame, unbounded following", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(users.get("id"));
+      const win = mgr.window("w");
+      win.frame(new Nodes.Range(new Nodes.Following()));
+      const sql = mgr.toSql();
+      expect(sql).toContain("RANGE");
+      expect(sql).toContain("UNBOUNDED FOLLOWING");
+    });
 
-    it.todo("copies where", () => {});
+    it("copies where", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(star).where(users.get("id").eq(1)).where(users.get("name").eq("Alice"));
+      const whereSql = mgr.whereSql();
+      expect(whereSql).toContain("WHERE");
+      expect(whereSql).toContain("AND");
+      expect(mgr.constraints.length).toBe(2);
+    });
 
-    it.todo("returns nil when there are no wheres", () => {});
+    it("returns nil when there are no wheres", () => {
+      const mgr = new SelectManager(users).project(star);
+      expect(mgr.whereSql()).toBeNull();
+    });
 
-    it.todo("knows take", () => {});
+    it("knows take", () => {
+      const mgr = new SelectManager(users).project(star).take(5);
+      expect(mgr.limit).toBeInstanceOf(Nodes.Limit);
+      expect(mgr.toSql()).toContain("LIMIT 5");
+    });
   });
 });

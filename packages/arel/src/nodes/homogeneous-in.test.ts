@@ -18,8 +18,17 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("homogeneous-in", () => {
-    it.todo("in", () => {});
+    it("in", () => {
+      const node = users.get("id").in([1, 2, 3]);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe('"users"."id" IN (1, 2, 3)');
+    });
 
-    it.todo("custom attribute node", () => {});
+    it("custom attribute node", () => {
+      const attr = new Nodes.Attribute(users, "id");
+      const node = attr.in([1, 2]);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain('"users"."id" IN');
+    });
   });
 });

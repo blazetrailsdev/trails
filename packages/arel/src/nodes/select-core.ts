@@ -34,6 +34,18 @@ export class SelectCore extends Node {
     this.source.left = value;
   }
 
+  clone(): SelectCore {
+    const c = new SelectCore();
+    c.source = new JoinSource(this.source.left, [...this.source.right]);
+    c.projections = [...this.projections];
+    c.wheres = [...this.wheres];
+    c.groups = [...this.groups];
+    c.havings = [...this.havings];
+    c.windows = [...this.windows];
+    c.setQuantifier = this.setQuantifier;
+    return c;
+  }
+
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }

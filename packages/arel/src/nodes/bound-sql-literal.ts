@@ -46,6 +46,12 @@ export class BoundSqlLiteral extends Node {
     if (hasNamedPlaceholders && hasPositionalBinds) {
       throw new Error("Cannot mix positional and named bind parameters");
     }
+
+    // Named placeholders must have corresponding named binds supplied.
+    if (hasNamedPlaceholders && !hasNamedBinds) {
+      const first = namedMatches[0]?.slice(1) ?? "bind";
+      throw new Error(`Missing named bind parameter: :${first}`);
+    }
   }
 
   /**

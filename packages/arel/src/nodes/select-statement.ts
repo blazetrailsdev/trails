@@ -1,5 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
 import { SelectCore } from "./select-core.js";
+import { Comment } from "./comment.js";
 
 /**
  * SelectStatement — the full SELECT with cores, order, limit, offset, lock.
@@ -13,6 +14,7 @@ export class SelectStatement extends Node {
   offset: Node | null;
   lock: Node | null;
   with: Node | null;
+  comment: Comment | null;
 
   constructor() {
     super();
@@ -22,6 +24,7 @@ export class SelectStatement extends Node {
     this.offset = null;
     this.lock = null;
     this.with = null;
+    this.comment = null;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

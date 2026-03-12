@@ -25,6 +25,11 @@ describe("Arel", () => {
       expect(typeof result).toBe("string");
     });
 
-    it.todo("compile", () => {});
+    it("compile", () => {
+      const collector = new Collectors.SQLString();
+      collector.append("SELECT ");
+      collector.append("1");
+      expect(collector.value).toBe("SELECT 1");
+    });
   });
 });

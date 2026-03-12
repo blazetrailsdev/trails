@@ -18,8 +18,30 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("composite", () => {
-    it.todo("composite collector performs multiple collections at once", () => {});
+    it("composite collector performs multiple collections at once", () => {
+      const sql = new Collectors.SQLString();
+      const binds = new Collectors.Bind();
+      const composite = new Collectors.Composite(sql, binds);
 
-    it.todo("retryable on composite collector propagates", () => {});
+      composite.append("SELECT ");
+      composite.addBind(123);
+
+      expect(sql.value).toBe("SELECT ?");
+      expect(sql.bindValues).toEqual([123]);
+      expect(binds.value).toEqual(["SELECT ?", [123]]);
+    });
+
+    it("retryable on composite collector propagates", () => {
+      const sql = new Collectors.SQLString();
+      const binds = new Collectors.Bind();
+      const composite = new Collectors.Composite(sql, binds);
+
+      expect(composite.retryable).toBe(true);
+      sql.retryable = false;
+      expect(composite.retryable).toBe(false);
+
+      composite.retryable = true;
+      expect(sql.retryable).toBe(true);
+    });
   });
 });

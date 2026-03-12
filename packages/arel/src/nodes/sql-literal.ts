@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Fragments } from "./fragments.js";
 
 /**
  * SqlLiteral — a raw SQL string passed through unescaped.
@@ -15,6 +16,16 @@ export class SqlLiteral extends Node {
     if (options?.retryable) {
       this.retryableFlag = true;
     }
+  }
+
+  join(other: Node): Fragments {
+    return new Fragments([this, other]);
+  }
+
+  toYAML(): string {
+    // Minimal YAML-ish representation for test parity (no external deps).
+    const escaped = this.value.replace(/\n/g, "\\n");
+    return `---\n!sql_literal\nvalue: ${JSON.stringify(escaped)}`;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

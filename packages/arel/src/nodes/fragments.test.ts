@@ -25,10 +25,24 @@ describe("Arel", () => {
       expect(lit).toBeInstanceOf(Nodes.Node);
     });
 
-    it.todo("is equal with equal values", () => {});
+    it("is equal with equal values", () => {
+      const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
+      const b = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
+      expect(a.eql(b)).toBe(true);
+      expect(a.hash()).toBe(b.hash());
+    });
 
-    it.todo("is not equal with different values", () => {});
+    it("is not equal with different values", () => {
+      const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo")]);
+      const b = new Nodes.Fragments([new Nodes.SqlLiteral("bar")]);
+      expect(a.eql(b)).toBe(false);
+    });
 
-    it.todo("can be joined with other nodes", () => {});
+    it("can be joined with other nodes", () => {
+      const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo")]);
+      const joined = a.join(new Nodes.SqlLiteral("bar"));
+      const sql = new Visitors.ToSql().compile(joined);
+      expect(sql).toBe("foobar");
+    });
   });
 });

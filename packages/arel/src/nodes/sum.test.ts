@@ -43,6 +43,12 @@ describe("Arel", () => {
       expect(users.project(sum).order(users.get("name").asc()).toSql()).toContain("ORDER BY");
     });
 
-    it.todo("should order the sum", () => {});
+    it("should order the sum", () => {
+      const win = new Nodes.Window().order(users.get("name").asc());
+      const sumOver = users.get("age").sum().over(win);
+      const sql = users.project(sumOver).toSql();
+      expect(sql).toContain("OVER");
+      expect(sql).toContain("ORDER BY");
+    });
   });
 });

@@ -5,6 +5,7 @@ export { Or } from "./or.js";
 export { Not } from "./not.js";
 export { Grouping } from "./grouping.js";
 export { SqlLiteral } from "./sql-literal.js";
+export { Fragments } from "./fragments.js";
 export { Quoted } from "./quoted.js";
 export { Casted } from "./casted.js";
 export { Attribute } from "./attribute.js";

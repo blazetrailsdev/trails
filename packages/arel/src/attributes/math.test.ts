@@ -18,26 +18,34 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("math", () => {
-    it("maximum should be compatible with", () => {
+    it("compiles maximum()", () => {
       const max = users.get("age").maximum();
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(max)).toBe('MAX("users"."age")');
     });
 
-    it("minimum should be compatible with", () => {
+    it("compiles minimum()", () => {
       const min = users.get("age").minimum();
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(min)).toBe('MIN("users"."age")');
     });
 
-    it("attribute node should be compatible with", () => {
+    it("compiles an attribute", () => {
       const attr = users.get("age");
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(attr)).toBe('"users"."age"');
     });
 
-    it.todo("average should be compatible with ", () => {});
+    it("compiles average()", () => {
+      const avg = users.get("age").average();
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(avg)).toBe('AVG("users"."age")');
+    });
 
-    it.todo("count should be compatible with ", () => {});
+    it("compiles count()", () => {
+      const count = users.get("age").count();
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(count)).toBe('COUNT("users"."age")');
+    });
   });
 });

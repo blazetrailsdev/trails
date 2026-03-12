@@ -18,36 +18,104 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("dot", () => {
-    it.todo("named function", () => {});
+    const dot = new Visitors.Dot();
 
-    it.todo("Arel Nodes BindParam", () => {});
+    it("named function", () => {
+      const node = new Nodes.NamedFunction("COUNT", [users.get("id")]);
+      const out = dot.compile(node);
+      expect(out).toContain("NamedFunction");
+    });
 
-    it.todo("ActiveModel Attribute", () => {});
+    it("Arel Nodes BindParam", () => {
+      const node = new Nodes.BindParam();
+      const out = dot.compile(node);
+      expect(out).toContain("BindParam");
+    });
 
-    it.todo("Arel Nodes CurrentRow", () => {});
+    it("ActiveModel Attribute", () => {
+      const node = users.get("id");
+      const out = dot.compile(node);
+      expect(out).toContain("Attribute");
+    });
 
-    it.todo("Arel Nodes Distinct", () => {});
+    it("Arel Nodes CurrentRow", () => {
+      const node = new Nodes.CurrentRow();
+      const out = dot.compile(node);
+      expect(out).toContain("CurrentRow");
+    });
 
-    it.todo("Arel Nodes Case and friends", () => {});
+    it("Arel Nodes Distinct", () => {
+      const node = new Nodes.Distinct();
+      const out = dot.compile(node);
+      expect(out).toContain("Distinct");
+    });
 
-    it.todo("Arel Nodes InfixOperation", () => {});
+    it("Arel Nodes Case and friends", () => {
+      const node = new Nodes.Case(users.get("status")).when("active", "A").else("Z");
+      const out = dot.compile(node);
+      expect(out).toContain("Case");
+    });
 
-    it.todo("Arel Nodes RegExp", () => {});
+    it("Arel Nodes InfixOperation", () => {
+      const node = new Nodes.InfixOperation("+", users.get("age"), new Nodes.Quoted(1));
+      const out = dot.compile(node);
+      expect(out).toContain("InfixOperation");
+    });
 
-    it.todo("Arel Nodes NotRegExp", () => {});
+    it("Arel Nodes RegExp", () => {
+      const node = new Nodes.Regexp(users.get("name"), new Nodes.Quoted("a.*"));
+      const out = dot.compile(node);
+      expect(out).toContain("Regexp");
+    });
 
-    it.todo("Arel Nodes UnaryOperation", () => {});
+    it("Arel Nodes NotRegExp", () => {
+      const node = new Nodes.NotRegexp(users.get("name"), new Nodes.Quoted("a.*"));
+      const out = dot.compile(node);
+      expect(out).toContain("NotRegexp");
+    });
 
-    it.todo("Arel Nodes With", () => {});
+    it("Arel Nodes UnaryOperation", () => {
+      const node = new Nodes.UnaryOperation("NOT ", users.get("active"));
+      const out = dot.compile(node);
+      expect(out).toContain("UnaryOperation");
+    });
 
-    it.todo("Arel Nodes SelectCore", () => {});
+    it("Arel Nodes With", () => {
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
+      const stmt = new SelectManager().with(cte).project("1").ast;
+      const out = dot.compile(stmt);
+      expect(out).toContain("With");
+      expect(out).toContain("Cte");
+    });
 
-    it.todo("Arel Nodes SelectStatement", () => {});
+    it("Arel Nodes SelectCore", () => {
+      const stmt = users.project(star).ast;
+      const out = dot.compile(stmt.cores[0]);
+      expect(out).toContain("SelectCore");
+    });
 
-    it.todo("Arel Nodes InsertStatement", () => {});
+    it("Arel Nodes SelectStatement", () => {
+      const stmt = users.project(star).ast;
+      const out = dot.compile(stmt);
+      expect(out).toContain("SelectStatement");
+    });
 
-    it.todo("Arel Nodes UpdateStatement", () => {});
+    it("Arel Nodes InsertStatement", () => {
+      const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
+      const out = dot.compile(stmt);
+      expect(out).toContain("InsertStatement");
+    });
 
-    it.todo("Arel Nodes DeleteStatement", () => {});
+    it("Arel Nodes UpdateStatement", () => {
+      const stmt = new UpdateManager().table(users).set([[users.get("name"), "sam"]]).ast;
+      const out = dot.compile(stmt);
+      expect(out).toContain("UpdateStatement");
+    });
+
+    it("Arel Nodes DeleteStatement", () => {
+      const stmt = new DeleteManager().from(users).ast;
+      const out = dot.compile(stmt);
+      expect(out).toContain("DeleteStatement");
+    });
   });
 });

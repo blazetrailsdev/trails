@@ -49,20 +49,100 @@ describe("Arel", () => {
       expect(result).toContain("LIKE");
     });
 
-    it.todo("defaults to FOR UPDATE", () => {});
-    it.todo("allows a custom string to be used as a lock", () => {});
-    it.todo("should support DISTINCT ON", () => {});
-    it.todo("should support DISTINCT", () => {});
-    it.todo("encloses LATERAL queries in parens", () => {});
-    it.todo("produces LATERAL queries with alias", () => {});
-    it.todo("should know how to visit case sensitive", () => {});
-    it.todo("can handle case insensitive", () => {});
-    it.todo("increments each bind param", () => {});
-    it.todo("should know how to visit with array arguments", () => {});
-    it.todo("should know how to visit with CubeDimension Argument", () => {});
-    it.todo("should know how to generate parenthesis when supplied with many Dimensions", () => {});
-    it.todo("should construct a valid generic SQL statement", () => {});
-    it.todo("should handle column names on both sides", () => {});
+    it("defaults to FOR UPDATE", () => {
+      const mgr = users.project(star).lock();
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain("FOR UPDATE");
+    });
+
+    it("allows a custom string to be used as a lock", () => {
+      const mgr = users.project(star).lock("FOR SHARE");
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain("FOR SHARE");
+    });
+
+    it("should support DISTINCT ON", () => {
+      const mgr = new SelectManager(users).project(star).distinctOn(users.get("id"));
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain("DISTINCT ON");
+    });
+
+    it("should support DISTINCT", () => {
+      const mgr = new SelectManager(users).project(star).distinct();
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain("SELECT DISTINCT");
+    });
+
+    it("encloses LATERAL queries in parens", () => {
+      const sub = users.project(users.get("id"));
+      const lat = sub.lateral();
+      const sql = new Visitors.PostgreSQL().compile(lat as any);
+      expect(sql).toContain("LATERAL (");
+      expect(sql).toContain(")");
+    });
+
+    it("produces LATERAL queries with alias", () => {
+      const sub = users.project(users.get("id"));
+      const lat = sub.lateral("t");
+      const sql = new Visitors.PostgreSQL().compile(lat as any);
+      expect(sql).toContain("LATERAL (");
+      expect(sql).toContain('"t"');
+    });
+
+    it("should know how to visit case sensitive", () => {
+      const node = users.get("name").matches("foo%", true);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("LIKE");
+    });
+
+    it("can handle case insensitive", () => {
+      const node = users.get("name").matches("foo%", false);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("LIKE");
+    });
+
+    it("increments each bind param", () => {
+      const visitor = new Visitors.PostgreSQLWithBinds();
+      const a = users.get("id").eq(new Nodes.BindParam());
+      const b = users.get("name").eq(new Nodes.BindParam());
+      const sql = visitor.compile(new Nodes.And([a, b]));
+      expect(sql).toContain("$1");
+      expect(sql).toContain("$2");
+    });
+
+    it("should know how to visit with array arguments", () => {
+      const node = users.get("id").in([1, 2, 3]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("IN (1, 2, 3)");
+    });
+
+    it("should know how to visit with CubeDimension Argument", () => {
+      const mgr = users.project(star).group(new Nodes.Cube([users.get("id")]));
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain("CUBE(");
+    });
+
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const mgr = users
+        .project(star)
+        .group(new Nodes.Cube([users.get("id"), users.get("name")]));
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain('CUBE("users"."id", "users"."name")');
+    });
+
+    it("should construct a valid generic SQL statement", () => {
+      const mgr = users.project(users.get("id")).where(users.get("id").gt(1));
+      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      expect(sql).toContain("SELECT");
+      expect(sql).toContain("FROM");
+      expect(sql).toContain("WHERE");
+    });
+
+    it("should handle column names on both sides", () => {
+      const node = users.get("id").eq(posts.get("user_id"));
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toBe('"users"."id" = "posts"."user_id"');
+    });
     it("should handle Contains", () => {
       const visitor = new Visitors.ToSql();
       const products = new Table("products");

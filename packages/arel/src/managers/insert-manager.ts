@@ -14,8 +14,9 @@ import { ToSql } from "../visitors/to-sql.js";
 export class InsertManager {
   readonly ast: InsertStatement;
 
-  constructor() {
+  constructor(table?: Table | null) {
     this.ast = new InsertStatement();
+    if (table) this.into(table);
   }
 
   /**

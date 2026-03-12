@@ -31,6 +31,8 @@ import { Regexp as RegexpNode, NotRegexp } from "./regexp.js";
 import { IsDistinctFrom, IsNotDistinctFrom } from "./distinct-from.js";
 import { Case } from "./case.js";
 import { InfixOperation } from "./infix-operation.js";
+import { Over, NamedWindow, Window } from "./window.js";
+import { True } from "./true-false.js";
 
 function buildQuoted(value: unknown): Node {
   if (value instanceof Node) return value;
@@ -126,10 +128,16 @@ export class Attribute extends Node {
     return new NotIn(this, values.map(buildQuoted) as any);
   }
 
-  between(range: [unknown, unknown]): Between | LessThanOrEqual;
-  between(begin: unknown, end: unknown): Between | LessThanOrEqual;
-  between(rangeObj: { begin: unknown; end: unknown }): Between | LessThanOrEqual;
-  between(beginOrRange: unknown, end?: unknown): Between | LessThanOrEqual {
+  between(range: [unknown, unknown]): Between | LessThanOrEqual | GreaterThanOrEqual | True;
+  between(begin: unknown, end: unknown): Between | LessThanOrEqual | GreaterThanOrEqual | True;
+  between(rangeObj: {
+    begin: unknown;
+    end: unknown;
+  }): Between | LessThanOrEqual | GreaterThanOrEqual | True;
+  between(
+    beginOrRange: unknown,
+    end?: unknown,
+  ): Between | LessThanOrEqual | GreaterThanOrEqual | True {
     let beginVal: unknown;
     let endVal: unknown;
     if (Array.isArray(beginOrRange) && end === undefined) {
@@ -150,8 +158,14 @@ export class Attribute extends Node {
       beginVal = beginOrRange;
       endVal = end;
     }
+    if (beginVal === -Infinity && endVal === Infinity) {
+      return new True();
+    }
     if (beginVal === -Infinity) {
       return new LessThanOrEqual(this, buildQuoted(endVal));
+    }
+    if (endVal === Infinity) {
+      return new GreaterThanOrEqual(this, buildQuoted(beginVal));
     }
     return new Between(this, new And([buildQuoted(beginVal), buildQuoted(endVal)]));
   }
@@ -440,6 +454,18 @@ export class Attribute extends Node {
    */
   overlaps(other: unknown): InfixOperation {
     return new InfixOperation("&&", this, buildQuoted(other));
+  }
+
+  /**
+   * Apply a window to this expression.
+   *
+   * Mirrors: `OVER` support on Arel expressions.
+   */
+  over(window?: Window | NamedWindow | string | null): Over {
+    if (!window) return new Over(this, null);
+    if (typeof window === "string") return new Over(this, new SqlLiteral(window));
+    if (window instanceof NamedWindow) return new Over(this, new SqlLiteral(`"${window.name}"`));
+    return new Over(this, window);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

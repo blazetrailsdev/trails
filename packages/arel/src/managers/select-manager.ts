@@ -4,7 +4,7 @@ import { SelectCore } from "../nodes/select-core.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { Attribute } from "../nodes/attribute.js";
 import { Distinct } from "../nodes/distinct.js";
-import { Offset, Limit, Lock, On } from "../nodes/unary.js";
+import { Offset, Limit, Lock, On, DistinctOn } from "../nodes/unary.js";
 import {
   InnerJoin,
   OuterJoin,
@@ -13,6 +13,7 @@ import {
   CrossJoin,
   StringJoin,
 } from "../nodes/join.js";
+import type { Join } from "../nodes/join.js";
 import { Quoted } from "../nodes/quoted.js";
 import { Union, UnionAll, Intersect, Except } from "../nodes/set-operations.js";
 import { With, WithRecursive, TableAlias } from "../nodes/with.js";
@@ -401,7 +402,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#distinct_on
    */
   distinctOn(value: Node): this {
-    this.core.setQuantifier = value;
+    this.core.setQuantifier = new DistinctOn(value);
     return this;
   }
 
@@ -436,7 +437,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#comment
    */
   comment(...values: string[]): this {
-    (this.ast as any).comment = new Comment(...values);
+    this.ast.comment = new Comment(...values);
     return this;
   }
 
@@ -516,8 +517,24 @@ export class SelectManager {
   /**
    * Factory: create a join node.
    */
-  createJoin(to: Node, constraint?: Node, klass?: typeof InnerJoin): InnerJoin {
-    return new InnerJoin(to, constraint ? new On(constraint) : null);
+  private static readonly defaultJoinConstructor = InnerJoin;
+
+  private static isJoinConstructor(
+    value: unknown,
+  ): value is new (left: Node, right: Node | null) => Join {
+    return typeof value === "function";
+  }
+
+  createJoin(
+    to: Node,
+    constraint?: Node,
+    klass?: new (left: Node, right: Node | null) => Join,
+  ): Join {
+    const JoinKlass =
+      klass && SelectManager.isJoinConstructor(klass)
+        ? klass
+        : SelectManager.defaultJoinConstructor;
+    return new JoinKlass(to, constraint ? new On(constraint) : null);
   }
 
   /**

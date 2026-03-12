@@ -31,6 +31,10 @@ describe("Arel", () => {
       expect(c1.name).toBe(c2.name);
     });
 
-    it.todo("should create Equality nodes", () => {});
+    it("should create Equality nodes", () => {
+      const grouped = new Nodes.Grouping(users.get("id").eq(1));
+      const sql = new Visitors.ToSql().compile(grouped);
+      expect(sql).toBe('("users"."id" = 1)');
+    });
   });
 });

@@ -35,7 +35,16 @@ describe("Arel", () => {
       expect(a).not.toEqual(b);
     });
 
-    it.todo("default to sql", () => {});
-    it.todo("mysql to sql", () => {});
+    it("default to sql", () => {
+      const node = new Nodes.Bin(new Nodes.SqlLiteral("zomg"));
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe("zomg");
+    });
+
+    it("mysql to sql", () => {
+      const node = new Nodes.Bin(new Nodes.SqlLiteral("zomg"));
+      const sql = new Visitors.MySQL().compile(node);
+      expect(sql).toBe("BINARY zomg");
+    });
   });
 });
