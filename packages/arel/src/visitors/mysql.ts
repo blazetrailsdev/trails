@@ -84,7 +84,8 @@ export class MySQL extends ToSql {
 
     if (node.havings.length > 0) {
       this.collector.append(" HAVING ");
-      this.visitArray(node.havings, ", ");
+      const conditions = node.havings.length === 1 ? node.havings[0] : new Nodes.And(node.havings);
+      this.visit(conditions);
     }
 
     if (node.windows.length > 0) {
