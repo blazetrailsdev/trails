@@ -267,7 +267,7 @@ describe("Arel", () => {
       expect(sql).toContain("'1,2'");
     });
 
-    it("raises not implemented error", () => {
+    it("raises UnsupportedVisitError for unsupported nodes", () => {
       class Unknown extends Nodes.Node {
         accept<T>(visitor: Nodes.NodeVisitor<T>): T {
           return visitor.visit(this);
@@ -644,17 +644,6 @@ describe("Arel", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("CASE WHEN");
       expect(sql).toContain("END");
-    });
-
-    it("unsupported input should raise UnsupportedVisitError", () => {
-      class Unknown extends Nodes.Node {
-        accept<T>(visitor: Nodes.NodeVisitor<T>): T {
-          return visitor.visit(this);
-        }
-      }
-      expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(
-        Visitors.UnsupportedVisitError,
-      );
     });
 
     it("will only consider named binds starting with a letter", () => {
