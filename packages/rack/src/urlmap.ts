@@ -65,6 +65,10 @@ export class URLMap {
       }
     }
 
-    return [404, { "content-type": "text/plain", "content-length": "9", "x-cascade": "pass" }, ["Not Found"]];
+    return [
+      404,
+      { "content-type": "text/plain", "content-length": "9", "x-cascade": "pass" },
+      ["Not Found"],
+    ];
   }
 }

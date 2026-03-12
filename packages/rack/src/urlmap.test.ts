@@ -4,11 +4,15 @@ import { MockRequest } from "./mock-request.js";
 
 describe("Rack::URLMap", () => {
   const echoApp = async (env: Record<string, any>) =>
-    [200, {
-      "x-scriptname": env["SCRIPT_NAME"],
-      "x-pathinfo": env["PATH_INFO"],
-      "content-type": "text/plain",
-    }, [""]] as any;
+    [
+      200,
+      {
+        "x-scriptname": env["SCRIPT_NAME"],
+        "x-pathinfo": env["PATH_INFO"],
+        "content-type": "text/plain",
+      },
+      [""],
+    ] as any;
 
   it("dispatches paths correctly", async () => {
     const map = new URLMap({
@@ -67,13 +71,45 @@ describe("Rack::URLMap", () => {
   it("dispatches hosts correctly", async () => {
     const map = new URLMap({
       "http://foo.org/": async (env) =>
-        [200, { "content-type": "text/plain", "x-position": "foo.org", "x-host": env["HTTP_HOST"] || env["SERVER_NAME"] }, [""]] as any,
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "foo.org",
+            "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          },
+          [""],
+        ] as any,
       "http://subdomain.foo.org/": async (env) =>
-        [200, { "content-type": "text/plain", "x-position": "subdomain.foo.org", "x-host": env["HTTP_HOST"] || env["SERVER_NAME"] }, [""]] as any,
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "subdomain.foo.org",
+            "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          },
+          [""],
+        ] as any,
       "http://bar.org/": async (env) =>
-        [200, { "content-type": "text/plain", "x-position": "bar.org", "x-host": env["HTTP_HOST"] || env["SERVER_NAME"] }, [""]] as any,
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "bar.org",
+            "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          },
+          [""],
+        ] as any,
       "/": async (env) =>
-        [200, { "content-type": "text/plain", "x-position": "default.org", "x-host": env["HTTP_HOST"] || env["SERVER_NAME"] }, [""]] as any,
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "default.org",
+            "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          },
+          [""],
+        ] as any,
     });
 
     let res = await new MockRequest((env) => map.call(env)).get("/");
@@ -88,7 +124,10 @@ describe("Rack::URLMap", () => {
     expect(res.status).toBe(200);
     expect(res.headers["x-position"]).toBe("foo.org");
 
-    res = await new MockRequest((env) => map.call(env)).get("/", { HTTP_HOST: "subdomain.foo.org", SERVER_NAME: "foo.org" });
+    res = await new MockRequest((env) => map.call(env)).get("/", {
+      HTTP_HOST: "subdomain.foo.org",
+      SERVER_NAME: "foo.org",
+    });
     expect(res.status).toBe(200);
     expect(res.headers["x-position"]).toBe("subdomain.foo.org");
 
@@ -100,24 +139,33 @@ describe("Rack::URLMap", () => {
     expect(res.status).toBe(200);
     expect(res.headers["x-position"]).toBe("default.org");
 
-    res = await new MockRequest((env) => map.call(env)).get("/", { HTTP_HOST: "example.org:9292", SERVER_PORT: "9292" });
+    res = await new MockRequest((env) => map.call(env)).get("/", {
+      HTTP_HOST: "example.org:9292",
+      SERVER_PORT: "9292",
+    });
     expect(res.status).toBe(200);
     expect(res.headers["x-position"]).toBe("default.org");
   });
 
   it("be nestable", async () => {
     const map = new URLMap({
-      "/foo": (env) => new URLMap({
-        "/bar": (env2) => new URLMap({
-          "/quux": async (env3) =>
-            [200, {
-              "content-type": "text/plain",
-              "x-position": "/foo/bar/quux",
-              "x-pathinfo": env3["PATH_INFO"],
-              "x-scriptname": env3["SCRIPT_NAME"],
-            }, [""]] as any,
-        }).call(env2),
-      }).call(env),
+      "/foo": (env) =>
+        new URLMap({
+          "/bar": (env2) =>
+            new URLMap({
+              "/quux": async (env3) =>
+                [
+                  200,
+                  {
+                    "content-type": "text/plain",
+                    "x-position": "/foo/bar/quux",
+                    "x-pathinfo": env3["PATH_INFO"],
+                    "x-scriptname": env3["SCRIPT_NAME"],
+                  },
+                  [""],
+                ] as any,
+            }).call(env2),
+        }).call(env),
     });
 
     let res = await new MockRequest((env) => map.call(env)).get("/foo/bar");
@@ -132,8 +180,28 @@ describe("Rack::URLMap", () => {
 
   it("route root apps correctly", async () => {
     const map = new URLMap({
-      "/": async (env) => [200, { "content-type": "text/plain", "x-position": "root", "x-pathinfo": env["PATH_INFO"], "x-scriptname": env["SCRIPT_NAME"] }, [""]] as any,
-      "/foo": async (env) => [200, { "content-type": "text/plain", "x-position": "foo", "x-pathinfo": env["PATH_INFO"], "x-scriptname": env["SCRIPT_NAME"] }, [""]] as any,
+      "/": async (env) =>
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "root",
+            "x-pathinfo": env["PATH_INFO"],
+            "x-scriptname": env["SCRIPT_NAME"],
+          },
+          [""],
+        ] as any,
+      "/foo": async (env) =>
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "foo",
+            "x-pathinfo": env["PATH_INFO"],
+            "x-scriptname": env["SCRIPT_NAME"],
+          },
+          [""],
+        ] as any,
     });
 
     let res = await new MockRequest((env) => map.call(env)).get("/foo/bar");
@@ -157,8 +225,28 @@ describe("Rack::URLMap", () => {
 
   it("not squeeze slashes", async () => {
     const map = new URLMap({
-      "/": async (env) => [200, { "content-type": "text/plain", "x-position": "root", "x-pathinfo": env["PATH_INFO"], "x-scriptname": env["SCRIPT_NAME"] }, [""]] as any,
-      "/foo": async (env) => [200, { "content-type": "text/plain", "x-position": "foo", "x-pathinfo": env["PATH_INFO"], "x-scriptname": env["SCRIPT_NAME"] }, [""]] as any,
+      "/": async (env) =>
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "root",
+            "x-pathinfo": env["PATH_INFO"],
+            "x-scriptname": env["SCRIPT_NAME"],
+          },
+          [""],
+        ] as any,
+      "/foo": async (env) =>
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "foo",
+            "x-pathinfo": env["PATH_INFO"],
+            "x-scriptname": env["SCRIPT_NAME"],
+          },
+          [""],
+        ] as any,
     });
 
     const res = await new MockRequest((env) => map.call(env)).get("/http://example.org/bar");
@@ -170,7 +258,17 @@ describe("Rack::URLMap", () => {
 
   it("not be case sensitive with hosts", async () => {
     const map = new URLMap({
-      "http://example.org/": async (env) => [200, { "content-type": "text/plain", "x-position": "root", "x-pathinfo": env["PATH_INFO"], "x-scriptname": env["SCRIPT_NAME"] }, [""]] as any,
+      "http://example.org/": async (env) =>
+        [
+          200,
+          {
+            "content-type": "text/plain",
+            "x-position": "root",
+            "x-pathinfo": env["PATH_INFO"],
+            "x-scriptname": env["SCRIPT_NAME"],
+          },
+          [""],
+        ] as any,
     });
 
     let res = await new MockRequest((env) => map.call(env)).get("http://example.org/");

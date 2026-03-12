@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -81,7 +121,7 @@ describe("TouchLaterTest", () => {
     const inv = await Invoice.create({ amount: 100 });
     const before = inv.readAttribute("updated_at");
     // Small delay so timestamp differs
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     await inv.touch();
     const after = inv.readAttribute("updated_at");
     expect(after).toBeDefined();
@@ -101,7 +141,9 @@ describe("TouchLaterTest", () => {
     expect(reloaded.readAttribute("updated_at")).toBeDefined();
   });
 
-  it.skip("touch later an association dont autosave parent", () => { /* needs association autosave */ });
+  it.skip("touch later an association dont autosave parent", () => {
+    /* needs association autosave */
+  });
 
   it("touch touches immediately with a custom time", async () => {
     const Invoice = makeTouchModel();
@@ -112,8 +154,16 @@ describe("TouchLaterTest", () => {
     expect(updatedAt).toBeInstanceOf(Date);
   });
 
-  it.skip("touch later dont hit the db", () => { /* touchLater not implemented */ });
-  it.skip("touching three deep", () => { /* needs multi-level association touch */ });
-  it.skip("touching through nested attributes without before committed on all records", () => { /* needs nested attributes + touch */ });
-  it.skip("touching through nested attributes with before committed on all records", () => { /* needs nested attributes + touch */ });
+  it.skip("touch later dont hit the db", () => {
+    /* touchLater not implemented */
+  });
+  it.skip("touching three deep", () => {
+    /* needs multi-level association touch */
+  });
+  it.skip("touching through nested attributes without before committed on all records", () => {
+    /* needs nested attributes + touch */
+  });
+  it.skip("touching through nested attributes with before committed on all records", () => {
+    /* needs nested attributes + touch */
+  });
 });

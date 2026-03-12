@@ -32,7 +32,7 @@ export function htmlEscape(value: unknown): SafeBuffer {
  */
 export function htmlEscapeOnce(str: string): SafeBuffer {
   const escaped = str.replace(/&(?!amp;|lt;|gt;|quot;|#39;)|[<>"']/g, (c) =>
-    c === "&" ? "&amp;" : HTML_ESCAPE[c]
+    c === "&" ? "&amp;" : HTML_ESCAPE[c],
   );
   return new SafeBuffer(escaped, true);
 }
@@ -71,8 +71,7 @@ export class SafeBuffer {
   concat(other: string | SafeBuffer): SafeBuffer {
     if (!this._safe) {
       // If this buffer is not safe, just append as-is
-      const otherStr =
-        other instanceof SafeBuffer ? other.toString() : String(other);
+      const otherStr = other instanceof SafeBuffer ? other.toString() : String(other);
       return new SafeBuffer(this._value + otherStr, false);
     }
 
@@ -81,18 +80,13 @@ export class SafeBuffer {
         return new SafeBuffer(this._value + other.toString(), true);
       } else {
         // Escape unsafe buffer
-        const escaped = other
-          .toString()
-          .replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
+        const escaped = other.toString().replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
         return new SafeBuffer(this._value + escaped, true);
       }
     }
 
     // Escape raw string before appending to safe buffer
-    const escaped = String(other).replace(
-      HTML_ESCAPE_PATTERN,
-      (c) => HTML_ESCAPE[c]
-    );
+    const escaped = String(other).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
     return new SafeBuffer(this._value + escaped, true);
   }
 
@@ -101,8 +95,7 @@ export class SafeBuffer {
     if (!this._safe) {
       throw new Error("Safe concat called on unsafe buffer");
     }
-    const otherStr =
-      other instanceof SafeBuffer ? other.toString() : String(other);
+    const otherStr = other instanceof SafeBuffer ? other.toString() : String(other);
     return new SafeBuffer(this._value + otherStr, true);
   }
 
@@ -114,10 +107,8 @@ export class SafeBuffer {
   /** slice — returns a substring as a SafeBuffer with same safety. */
   slice(start: number, end?: number): SafeBuffer {
     return new SafeBuffer(
-      end !== undefined
-        ? this._value.slice(start, end)
-        : this._value.slice(start),
-      this._safe
+      end !== undefined ? this._value.slice(start, end) : this._value.slice(start),
+      this._safe,
     );
   }
 

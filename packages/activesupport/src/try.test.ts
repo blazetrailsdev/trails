@@ -23,12 +23,20 @@ describe("ObjectTryTest", () => {
   });
 
   it("valid method", () => {
-    const obj = { upcase() { return "HELLO"; } };
+    const obj = {
+      upcase() {
+        return "HELLO";
+      },
+    };
     expect(tryCall(obj, "upcase")).toBe("HELLO");
   });
 
   it("argument forwarding", () => {
-    const obj = { slice(n: number) { return "hello".slice(0, n); } };
+    const obj = {
+      slice(n: number) {
+        return "hello".slice(0, n);
+      },
+    };
     expect(tryCall(obj, "slice", 3)).toBe("hel");
   });
 
@@ -63,7 +71,9 @@ describe("ObjectTryTest", () => {
 
   it("try with instance eval block", () => {
     const obj = { x: 10 };
-    const result = tryWith(obj, function(o) { return o.x * 2; });
+    const result = tryWith(obj, function (o) {
+      return o.x * 2;
+    });
     expect(result).toBe(20);
   });
 
@@ -84,33 +94,59 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with method on delegator", () => {
-    const obj = { delegate: { value() { return 42; } } };
+    const obj = {
+      delegate: {
+        value() {
+          return 42;
+        },
+      },
+    };
     expect(tryCall(obj.delegate, "value")).toBe(42);
   });
 
   it("try with method on delegator target", () => {
-    const target = { info() { return "target"; } };
+    const target = {
+      info() {
+        return "target";
+      },
+    };
     expect(tryCall(target, "info")).toBe("target");
   });
 
   it("try with overridden method on delegator", () => {
-    const obj = { toString() { return "custom"; } };
+    const obj = {
+      toString() {
+        return "custom";
+      },
+    };
     expect(tryCall(obj, "toString")).toBe("custom");
   });
 
   it("try with private method on delegator", () => {
-    const obj = { pub() { return "public"; } };
+    const obj = {
+      pub() {
+        return "public";
+      },
+    };
     expect(tryCall(obj, "pub")).toBe("public");
     expect(tryCall(obj, "priv")).toBeUndefined();
   });
 
   it("try with private method on delegator bang", () => {
-    const obj = { pub() { return "ok"; } };
+    const obj = {
+      pub() {
+        return "ok";
+      },
+    };
     expect(() => tryBang(obj, "priv")).toThrow();
   });
 
   it("try with private method on delegator target", () => {
-    const target = { doIt() { return "done"; } };
+    const target = {
+      doIt() {
+        return "done";
+      },
+    };
     expect(tryCall(target, "doIt")).toBe("done");
   });
 
@@ -130,7 +166,11 @@ describe("tryCall", () => {
   });
 
   it("calls method with args", () => {
-    const s = { padStart(n: number, c: string) { return "hi".padStart(n, c); } };
+    const s = {
+      padStart(n: number, c: string) {
+        return "hi".padStart(n, c);
+      },
+    };
     expect(tryCall(s, "padStart", 5, "*")).toBe("***hi");
   });
 });

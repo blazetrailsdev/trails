@@ -12,6 +12,7 @@ The compare script (`npm run test:compare`) extracts test names from both Rails 
 A "stub" is an `it.skip()` that matched a Ruby test name. The goal is 0 stubs.
 
 Other commands:
+
 - **`npm run api:compare`** — Compares exported class/method signatures against Rails' public API.
 - **`npm run test:generate-stubs`** — Generates `it.skip()` stubs for unmatched Rails tests.
 
@@ -23,13 +24,13 @@ Tests run against three backends in CI: in-memory (default), PostgreSQL 17, and 
 
 TS test files mirror the Rails test file structure:
 
-| Rails file | TS file |
-|---|---|
-| `finder_test.rb` | `finder.test.ts` |
-| `associations/has_many_associations_test.rb` | `associations/has-many.test.ts` |
-| `validations/uniqueness_validation_test.rb` | `validations/uniqueness.test.ts` |
-| `locking_test.rb` | `locking/optimistic.test.ts` + `locking/pessimistic.test.ts` |
-| `relation/where_test.rb` | `relation/where.test.ts` |
+| Rails file                                   | TS file                                                      |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| `finder_test.rb`                             | `finder.test.ts`                                             |
+| `associations/has_many_associations_test.rb` | `associations/has-many.test.ts`                              |
+| `validations/uniqueness_validation_test.rb`  | `validations/uniqueness.test.ts`                             |
+| `locking_test.rb`                            | `locking/optimistic.test.ts` + `locking/pessimistic.test.ts` |
+| `relation/where_test.rb`                     | `relation/where.test.ts`                                     |
 
 Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test class name.
 
@@ -37,96 +38,96 @@ Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test cla
 
 ### Complete (100% pass rate) — 334 tests across 28 files
 
-| File | Tests | | File | Tests |
-|---|---|---|---|---|
-| sqlite-adapter (combined) | 104 | | explain | 14 |
-| primary-keys (+ CPK) | 60 | | numericality | 14 |
-| custom-properties | 38 | | nested-attributes | 10 |
-| json-serialization | 23 | | presence | 8 |
-| mutation | 21 | | boolean | 5 |
-| suppressor | 6 | | length | 5 |
-| absence | 5 | | structural-compatibility | 4 |
-| order | 4 | | and | 3 |
-| bidirectional-destroy | 3 | | annotations | 2 |
-| inheritance | 2 | | custom | 1 |
-| errors | 1 | | | |
+| File                      | Tests |     | File                     | Tests |
+| ------------------------- | ----- | --- | ------------------------ | ----- |
+| sqlite-adapter (combined) | 104   |     | explain                  | 14    |
+| primary-keys (+ CPK)      | 60    |     | numericality             | 14    |
+| custom-properties         | 38    |     | nested-attributes        | 10    |
+| json-serialization        | 23    |     | presence                 | 8     |
+| mutation                  | 21    |     | boolean                  | 5     |
+| suppressor                | 6     |     | length                   | 5     |
+| absence                   | 5     |     | structural-compatibility | 4     |
+| order                     | 4     |     | and                      | 3     |
+| bidirectional-destroy     | 3     |     | annotations              | 2     |
+| inheritance               | 2     |     | custom                   | 1     |
+| errors                    | 1     |     |                          |       |
 
 ### Near-complete (90%+ pass rate)
 
-| File | Passing / Total | Skipped |
-|---|---|---|
-| has-many | 306 / 311 | 5 |
-| calculations | 211 / 233 | 22 |
-| belongs-to | 153 / 153 | 0 |
-| attribute-methods | 126 / 133 | 7 |
-| default-scoping | 88 / 96 | 8 |
-| relation-scoping | 62 / 64 | 2 |
-| uniqueness | 54 / 55 | 1 |
-| timestamp | 39 / 40 | 1 |
-| merging | 32 / 33 | 1 |
-| inner-join | 28 / 31 | 3 |
-| or | 26 / 27 | 1 |
-| core | 22 / 24 | 2 |
-| validations | 20 / 21 | 1 |
-| normalized-attribute | 14 / 15 | 1 |
-| delete-all | 12 / 13 | 1 |
+| File                 | Passing / Total | Skipped |
+| -------------------- | --------------- | ------- |
+| has-many             | 306 / 311       | 5       |
+| calculations         | 211 / 233       | 22      |
+| belongs-to           | 153 / 153       | 0       |
+| attribute-methods    | 126 / 133       | 7       |
+| default-scoping      | 88 / 96         | 8       |
+| relation-scoping     | 62 / 64         | 2       |
+| uniqueness           | 54 / 55         | 1       |
+| timestamp            | 39 / 40         | 1       |
+| merging              | 32 / 33         | 1       |
+| inner-join           | 28 / 31         | 3       |
+| or                   | 26 / 27         | 1       |
+| core                 | 22 / 24         | 2       |
+| validations          | 20 / 21         | 1       |
+| normalized-attribute | 14 / 15         | 1       |
+| delete-all           | 12 / 13         | 1       |
 
 ### Solid progress (70–89%)
 
-| File | Passing / Total | Skipped |
-|---|---|---|
-| relations | 234 / 279 | 45 |
-| finder | 221 / 260 | 39 |
-| persistence | 123 / 153 | 30 |
-| batches | 86 / 107 | 21 |
-| transactions | 80 / 98 | 18 |
-| enum | 75 / 97 | 22 |
-| inheritance | 65 / 73 | 8 |
-| named-scoping | 61 / 73 | 12 |
-| dirty | 50 / 62 | 12 |
-| store | 42 / 50 | 8 |
-| select | 23 / 26 | 3 |
-| update-all | 23 / 26 | 3 |
-| left-outer-join | 16 / 19 | 3 |
-| dup | 17 / 19 | 2 |
-| token-for | 16 / 18 | 2 |
-| schema | 12 / 14 | 2 |
-| delegated-type | 11 / 13 | 2 |
+| File            | Passing / Total | Skipped |
+| --------------- | --------------- | ------- |
+| relations       | 234 / 279       | 45      |
+| finder          | 221 / 260       | 39      |
+| persistence     | 123 / 153       | 30      |
+| batches         | 86 / 107        | 21      |
+| transactions    | 80 / 98         | 18      |
+| enum            | 75 / 97         | 22      |
+| inheritance     | 65 / 73         | 8       |
+| named-scoping   | 61 / 73         | 12      |
+| dirty           | 50 / 62         | 12      |
+| store           | 42 / 50         | 8       |
+| select          | 23 / 26         | 3       |
+| update-all      | 23 / 26         | 3       |
+| left-outer-join | 16 / 19         | 3       |
+| dup             | 17 / 19         | 2       |
+| token-for       | 16 / 18         | 2       |
+| schema          | 12 / 14         | 2       |
+| delegated-type  | 11 / 13         | 2       |
 
 Plus smaller files: excluding (8/11), finder (8/9), secure-token (8/9), serialization (8/9), nested-attributes (3/4).
 
 ### Needs work (below 70%)
 
-| File | Passing / Total | Skipped |
-|---|---|---|
-| associations (misc) | 25 / 130 | 105 |
-| base | 83 / 186 | 103 |
-| has-many-through | 66 / 165 | 99 |
-| eager | 105 / 197 | 92 |
-| autosave-association | 87 / 177 | 90 |
-| migration | 19 / 90 | 71 |
-| has-one-habtm (combined) | 162 / 397 | 225 |
-| insert-all | 19 / 73 | 54 |
-| relation | 1 / 51 | 50 |
-| nested-attributes | 78 / 127 | 49 |
-| where | 15 / 62 | 47 |
-| where-chain | 10 / 54 | 44 |
-| reflection | 24 / 67 | 43 |
-| inverse | 52 / 93 | 41 |
-| counter-cache | 14 / 55 | 41 |
-| strict-loading | 14 / 54 | 40 |
-| transaction-callbacks | 19 / 57 | 38 |
-| serialized-attribute | 30 / 59 | 29 |
-| optimistic locking | 19 / 50 | 31 |
+| File                     | Passing / Total | Skipped |
+| ------------------------ | --------------- | ------- |
+| associations (misc)      | 25 / 130        | 105     |
+| base                     | 83 / 186        | 103     |
+| has-many-through         | 66 / 165        | 99      |
+| eager                    | 105 / 197       | 92      |
+| autosave-association     | 87 / 177        | 90      |
+| migration                | 19 / 90         | 71      |
+| has-one-habtm (combined) | 162 / 397       | 225     |
+| insert-all               | 19 / 73         | 54      |
+| relation                 | 1 / 51          | 50      |
+| nested-attributes        | 78 / 127        | 49      |
+| where                    | 15 / 62         | 47      |
+| where-chain              | 10 / 54         | 44      |
+| reflection               | 24 / 67         | 43      |
+| inverse                  | 52 / 93         | 41      |
+| counter-cache            | 14 / 55         | 41      |
+| strict-loading           | 14 / 54         | 40      |
+| transaction-callbacks    | 19 / 57         | 38      |
+| serialized-attribute     | 30 / 59         | 29      |
+| optimistic locking       | 19 / 50         | 31      |
 
 Plus smaller files: cascaded-eager-loading (8/27), signed-id (16/29), defaults (12/25), callbacks (17/46), aggregations (14/25), invertible (18/28), sanitize (13/22), readonly (5/14), modules (9/14), cache-key (7/12), touch-later (6/11), association validation (5/10), field-ordered-values (6/10), extensions (4/12), required (4/7), clone (2/4), habtm (0/4), comment (0/17), where-clause (0/21), with (0/16), null-relation (6/9), querying-methods-delegation (2/3), reload-cache (0/1).
 
 ### DB adapter tests
 
-| File | Matched | Skipped (null) | Stubs |
-|---|---|---|---|
-| sqlite-adapter | 104 | 23 | 0 |
-| mysql-adapter | 1 | 0 | 183 |
+| File           | Matched | Skipped (null) | Stubs |
+| -------------- | ------- | -------------- | ----- |
+| sqlite-adapter | 104     | 23             | 0     |
+| mysql-adapter  | 1       | 0              | 183   |
 
 MySQL adapter stubs need real DB connections. PostgreSQL adapter tests are still excluded from comparison.
 
@@ -139,6 +140,7 @@ These are features that Rails implements but we haven't built yet. Tests that ap
 In Rails, `method_missing` and `define_attribute_methods` generate getter/setter/predicate methods on the fly for each column — so `user.name` works instead of `user.readAttribute("name")`. Our `attribute-methods.test.ts` tests (126/133 passing) use `readAttribute`/`writeAttribute` everywhere, masking the fact that dynamic accessors aren't implemented.
 
 **What's needed:** When `attribute()` is called (or columns are loaded from the schema), define ES getters/setters on the class prototype via `Object.defineProperty`, or use a `Proxy` on instances. This would enable:
+
 - `user.name` (getter) — delegates to `readAttribute("name")`
 - `user.name = "dean"` (setter) — delegates to `writeAttribute("name", "dean")`
 - `user.name?` equivalent (predicate) — `user.isName()` or similar convention

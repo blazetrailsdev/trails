@@ -50,7 +50,9 @@ describe("ActionView::Template::Handler", () => {
   it("setDefault changes the default", () => {
     class OtherHandler implements TemplateHandler {
       extensions = ["other"];
-      render() { return ""; }
+      render() {
+        return "";
+      }
     }
     TemplateHandlerRegistry.register(new OtherHandler());
     TemplateHandlerRegistry.setDefault("other");
@@ -70,7 +72,9 @@ describe("ActionView::Template::Handler", () => {
   it("register multiple handlers", () => {
     class TsxHandler implements TemplateHandler {
       extensions = ["tsx", "jsx"];
-      render() { return "<div/>"; }
+      render() {
+        return "<div/>";
+      }
     }
     TemplateHandlerRegistry.register(new TsxHandler());
     expect(TemplateHandlerRegistry.has("tsx")).toBe(true);
@@ -94,7 +98,11 @@ describe("ActionView::EjsHandler", () => {
   });
 
   it("escapes HTML in escaped output", () => {
-    const result = handler.render("<%= html %>", { html: "<script>alert('xss')</script>" }, context);
+    const result = handler.render(
+      "<%= html %>",
+      { html: "<script>alert('xss')</script>" },
+      context,
+    );
     expect(result).toBe("&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;");
   });
 
@@ -108,7 +116,11 @@ describe("ActionView::EjsHandler", () => {
   });
 
   it("renders multiple expressions", () => {
-    const result = handler.render("<%= first %> <%= last %>", { first: "Dean", last: "Marano" }, context);
+    const result = handler.render(
+      "<%= first %> <%= last %>",
+      { first: "Dean", last: "Marano" },
+      context,
+    );
     expect(result).toBe("Dean Marano");
   });
 
@@ -146,10 +158,14 @@ describe("ActionView::EjsHandler", () => {
 <ul>
 <%- items %>
 </ul>`;
-    const result = handler.render(template, {
-      title: "Posts",
-      items: "<li>Post 1</li><li>Post 2</li>",
-    }, context);
+    const result = handler.render(
+      template,
+      {
+        title: "Posts",
+        items: "<li>Post 1</li><li>Post 2</li>",
+      },
+      context,
+    );
     expect(result).toContain("<h1>Posts</h1>");
     expect(result).toContain("<li>Post 1</li>");
   });
@@ -284,8 +300,7 @@ describe("ActionView::LookupContext", () => {
     });
 
     it("throws MissingTemplate when not found", async () => {
-      await expect(ctx.render("posts", "missing", "html"))
-        .rejects.toThrow(MissingTemplate);
+      await expect(ctx.render("posts", "missing", "html")).rejects.toThrow(MissingTemplate);
     });
 
     it("MissingTemplate has metadata", async () => {
@@ -337,7 +352,12 @@ describe("ActionView::LookupContext", () => {
 
     it("passes locals to layout", async () => {
       resolver.add("posts/index", "html", "ejs", "<p>inner</p>");
-      resolver.addLayout("application", "html", "ejs", "<title><%= pageTitle %></title><%- yield %>");
+      resolver.addLayout(
+        "application",
+        "html",
+        "ejs",
+        "<title><%= pageTitle %></title><%- yield %>",
+      );
       const output = await ctx.render("posts", "index", "html", { pageTitle: "My App" });
       expect(output).toBe("<title>My App</title><p>inner</p>");
     });
@@ -345,53 +365,46 @@ describe("ActionView::LookupContext", () => {
 
   describe("renderPartial", () => {
     it("renders a partial", async () => {
-      resolver.addPartial("posts/form", "html", "ejs", '<form><%= action %></form>');
+      resolver.addPartial("posts/form", "html", "ejs", "<form><%= action %></form>");
       const output = await ctx.renderPartial("form", "posts", "html", { action: "/posts" });
       expect(output).toBe("<form>/posts</form>");
     });
 
     it("throws for missing partial", async () => {
-      await expect(ctx.renderPartial("missing", "posts", "html"))
-        .rejects.toThrow(MissingTemplate);
+      await expect(ctx.renderPartial("missing", "posts", "html")).rejects.toThrow(MissingTemplate);
     });
   });
 
   describe("renderCollection", () => {
     it("renders each item with a partial", async () => {
       resolver.addPartial("posts/post", "html", "ejs", "<li><%= post.title %></li>");
-      const output = await ctx.renderCollection(
-        "post", "posts", "html",
-        [{ title: "First" }, { title: "Second" }]
-      );
+      const output = await ctx.renderCollection("post", "posts", "html", [
+        { title: "First" },
+        { title: "Second" },
+      ]);
       expect(output).toBe("<li>First</li><li>Second</li>");
     });
 
     it("provides counter variable", async () => {
       resolver.addPartial("posts/post", "html", "ejs", "<%= post_counter %>:");
-      const output = await ctx.renderCollection(
-        "post", "posts", "html",
-        ["a", "b", "c"]
-      );
+      const output = await ctx.renderCollection("post", "posts", "html", ["a", "b", "c"]);
       expect(output).toBe("0:1:2:");
     });
 
     it("provides iteration info", async () => {
-      resolver.addPartial("posts/item", "html", "ejs",
-        "<%= item_iteration.first ? 'FIRST' : '' %><%= item_iteration.last ? 'LAST' : '' %>");
-      const output = await ctx.renderCollection(
-        "item", "posts", "html",
-        [1, 2, 3]
+      resolver.addPartial(
+        "posts/item",
+        "html",
+        "ejs",
+        "<%= item_iteration.first ? 'FIRST' : '' %><%= item_iteration.last ? 'LAST' : '' %>",
       );
+      const output = await ctx.renderCollection("item", "posts", "html", [1, 2, 3]);
       expect(output).toBe("FIRSTLAST");
     });
 
     it("uses custom as variable name", async () => {
       resolver.addPartial("posts/card", "html", "ejs", "<div><%= entry %></div>");
-      const output = await ctx.renderCollection(
-        "card", "posts", "html",
-        ["A", "B"],
-        "entry"
-      );
+      const output = await ctx.renderCollection("card", "posts", "html", ["A", "B"], "entry");
       expect(output).toBe("<div>A</div><div>B</div>");
     });
 

@@ -8,22 +8,22 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 
 ### Data Layer
 
-| Package | Rails Equivalent | Status | Description |
-|---------|-----------------|--------|-------------|
-| `@rails-ts/arel` | [Arel](https://api.rubyonrails.org/classes/Arel.html) | **99.3%** | SQL AST builder and query generation |
-| `@rails-ts/activemodel` | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html) | **98.4%** | Attributes, validations, callbacks, dirty tracking, serialization |
-| `@rails-ts/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **65.4%** | ORM — persistence, querying, associations, migrations |
-| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption |
+| Package                   | Rails Equivalent                                                        | Status    | Description                                                       |
+| ------------------------- | ----------------------------------------------------------------------- | --------- | ----------------------------------------------------------------- |
+| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.3%** | SQL AST builder and query generation                              |
+| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **98.4%** | Attributes, validations, callbacks, dirty tracking, serialization |
+| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **65.4%** | ORM — persistence, querying, associations, migrations             |
+| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption    |
 
 **57.5%** complete — 5,729 tests matched against 9,960 Rails tests.
 
 ### Web Layer
 
-| Package | Rails Equivalent | Status | Description |
-|---------|-----------------|--------|-------------|
-| `@rails-ts/rack` | [Rack](https://rack.github.io/) | **99%** | Modular web server interface, request/response, middleware |
-| `@rails-ts/actiondispatch` | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html) | **27.9%** | Routing, middleware stack, cookies, sessions, security |
-| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters |
+| Package                      | Rails Equivalent                                                              | Status    | Description                                                |
+| ---------------------------- | ----------------------------------------------------------------------------- | --------- | ---------------------------------------------------------- |
+| `@rails-ts/rack`             | [Rack](https://rack.github.io/)                                               | **99%**   | Modular web server interface, request/response, middleware |
+| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **27.9%** | Routing, middleware stack, cookies, sessions, security     |
+| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters           |
 
 **37%** complete — 1,527 tests matched against 4,127 Rails tests.
 
@@ -44,9 +44,10 @@ query.to_sql
 ```typescript
 // TypeScript / rails-ts
 const users = new Arel.Table("users");
-const query = users.project(users.get("name"))
-                   .where(users.get("age").gt(21))
-                   .order(users.get("name").asc());
+const query = users
+  .project(users.get("name"))
+  .where(users.get("age").gt(21))
+  .order(users.get("name").asc());
 query.toSql();
 // => SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC
 ```
@@ -68,6 +69,7 @@ String inflection (pluralize, singularize, camelize, underscore, tableize, etc.)
 ### ActiveRecord — ORM (65.4%)
 
 **Complete (100% test coverage) — 334 tests across 28 files:**
+
 - Primary keys and composite primary keys — 60 tests
 - Belongs-to associations (polymorphic, touch, counter cache, optional/required, autosave) — 153 tests
 - Custom properties, JSON serialization, mutation, explain — 96 tests
@@ -75,6 +77,7 @@ String inflection (pluralize, singularize, camelize, underscore, tableize, etc.)
 - Nested attributes, suppressor, boolean, structural compatibility, and more
 
 **Near-complete (90%+):**
+
 - Has-many associations (98%) — collection operations, dependent destroy/nullify, polymorphic, scoped
 - Calculations (91%) — count, sum, average, minimum, maximum, grouped aggregates, pluck, pick, ids
 - Attribute methods (95%) — read/write, dirty tracking, before_type_cast, inspect
@@ -82,6 +85,7 @@ String inflection (pluralize, singularize, camelize, underscore, tableize, etc.)
 - Uniqueness validation (98%), inner joins (90%), or clauses (96%)
 
 **Solid progress (70–89%):**
+
 - Relations (84%) — chaining, merge, extending, spawn, readonly, distinct
 - Finders (85%) — find, find_by, exists?, take, first/last, sole
 - Persistence (80%) — create/save/update/destroy, becomes, increment/decrement/toggle, reload
@@ -89,6 +93,7 @@ String inflection (pluralize, singularize, camelize, underscore, tableize, etc.)
 - Nested attributes (61%), inheritance (89%), dirty tracking (81%)
 
 **Working:**
+
 - Where clauses, associations (has_one, HABTM, has_many :through), eager loading, inverse_of
 - Callbacks, optimistic locking, counter cache, autosave, store accessors
 - insertAll/upsertAll, serialized attributes, secure tokens, signed IDs, delegated types
@@ -102,7 +107,7 @@ Request/Response objects, multipart parsing (file uploads), Builder (middleware 
 
 ### ActionDispatch — Routing and Middleware (27.9%)
 
-Route DSL (resources, resource, namespace, scope, member, collection, concerns, constraints, shallow routes), route matching and URL generation, route helpers (_path/_url), middleware stack, cookies (signed, encrypted, permanent), flash messages, session handling (CookieStore), CSRF protection, content negotiation (respond_to), Content Security Policy, Permissions Policy, SSL enforcement, Host Authorization, HTTP authentication (Basic, Token, Digest), request ID tracking, and redirect helpers. Early stage — routing core works, but controller integration and many middleware edge cases remain.
+Route DSL (resources, resource, namespace, scope, member, collection, concerns, constraints, shallow routes), route matching and URL generation, route helpers (\_path/\_url), middleware stack, cookies (signed, encrypted, permanent), flash messages, session handling (CookieStore), CSRF protection, content negotiation (respond_to), Content Security Policy, Permissions Policy, SSL enforcement, Host Authorization, HTTP authentication (Basic, Token, Digest), request ID tracking, and redirect helpers. Early stage — routing core works, but controller integration and many middleware edge cases remain.
 
 ### ActionController — Controllers (17.9%)
 
@@ -110,14 +115,14 @@ Base controller with rendering (templates, JSON, plain text, status codes), filt
 
 ## Ruby to TypeScript Conventions
 
-| Ruby / Rails | TypeScript / `rails-ts` | Example |
-|--------------|-------------------------|---------|
-| `valid?` | `isValid()` | Predicates (`?`) become `is*` prefix. |
-| `save!` | `saveBang()` | Bang methods (`!`) become `*Bang` suffix. |
-| `initialize` | `constructor` | Standard TypeScript class constructors. |
-| `table[:id]` | `table.get("id")` | The `[]` operator is mapped to `get()`. |
-| `model[:id]` | `model.readAttribute("id")` | Explicit attribute reading. |
-| `model[:id] = 1` | `model.writeAttribute("id", 1)` | Explicit attribute writing. |
+| Ruby / Rails     | TypeScript / `rails-ts`         | Example                                   |
+| ---------------- | ------------------------------- | ----------------------------------------- |
+| `valid?`         | `isValid()`                     | Predicates (`?`) become `is*` prefix.     |
+| `save!`          | `saveBang()`                    | Bang methods (`!`) become `*Bang` suffix. |
+| `initialize`     | `constructor`                   | Standard TypeScript class constructors.   |
+| `table[:id]`     | `table.get("id")`               | The `[]` operator is mapped to `get()`.   |
+| `model[:id]`     | `model.readAttribute("id")`     | Explicit attribute reading.               |
+| `model[:id] = 1` | `model.writeAttribute("id", 1)` | Explicit attribute writing.               |
 
 ## Design Principles
 
@@ -162,11 +167,11 @@ Both scripts fetch the Rails source, extract Ruby definitions, extract our TypeS
 
 Tests run against all three database backends in CI:
 
-| Backend | How to run locally | Env variable |
-|---------|-------------------|--------------|
-| In-memory (default) | `npx vitest run` | (none) |
-| PostgreSQL | `PG_TEST_URL=postgres://... npx vitest run` | `PG_TEST_URL` |
-| MySQL/MariaDB | `MYSQL_TEST_URL=mysql://... npx vitest run` | `MYSQL_TEST_URL` |
+| Backend             | How to run locally                          | Env variable     |
+| ------------------- | ------------------------------------------- | ---------------- |
+| In-memory (default) | `npx vitest run`                            | (none)           |
+| PostgreSQL          | `PG_TEST_URL=postgres://... npx vitest run` | `PG_TEST_URL`    |
+| MySQL/MariaDB       | `MYSQL_TEST_URL=mysql://... npx vitest run` | `MYSQL_TEST_URL` |
 
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 

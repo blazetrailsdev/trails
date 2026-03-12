@@ -40,11 +40,7 @@ export interface ApiManifest {
 
 // --- Comparison results ---
 
-export type MethodStatus =
-  | "matched"
-  | "missing"
-  | "extra"
-  | "signature_mismatch";
+export type MethodStatus = "matched" | "missing" | "extra" | "signature_mismatch";
 
 export interface MethodComparison {
   rubyName: string;

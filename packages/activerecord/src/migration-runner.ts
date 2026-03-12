@@ -34,7 +34,7 @@ export class MigrationRunner {
    */
   private async ensureTable(): Promise<void> {
     await this.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`
+      `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
     );
   }
 
@@ -42,9 +42,7 @@ export class MigrationRunner {
    * Get all applied migration versions.
    */
   private async appliedVersions(): Promise<Set<string>> {
-    const rows = await this.adapter.execute(
-      `SELECT "version" FROM "schema_migrations"`
-    );
+    const rows = await this.adapter.execute(`SELECT "version" FROM "schema_migrations"`);
     return new Set(rows.map((r) => String(r.version)));
   }
 
@@ -62,7 +60,7 @@ export class MigrationRunner {
 
       await entry.migration.run(this.adapter, "up");
       await this.adapter.executeMutation(
-        `INSERT INTO "schema_migrations" ("version") VALUES ('${entry.version}')`
+        `INSERT INTO "schema_migrations" ("version") VALUES ('${entry.version}')`,
       );
     }
   }
@@ -77,16 +75,14 @@ export class MigrationRunner {
     const applied = await this.appliedVersions();
 
     // Find applied migrations in reverse order
-    const appliedMigrations = this.migrations
-      .filter((e) => applied.has(e.version))
-      .reverse();
+    const appliedMigrations = this.migrations.filter((e) => applied.has(e.version)).reverse();
 
     const toRollback = appliedMigrations.slice(0, steps);
 
     for (const entry of toRollback) {
       await entry.migration.run(this.adapter, "down");
       await this.adapter.executeMutation(
-        `DELETE FROM "schema_migrations" WHERE "version" = '${entry.version}'`
+        `DELETE FROM "schema_migrations" WHERE "version" = '${entry.version}'`,
       );
     }
   }
@@ -102,7 +98,7 @@ export class MigrationRunner {
 
     return this.migrations.map((entry) => ({
       version: entry.version,
-      status: applied.has(entry.version) ? "up" as const : "down" as const,
+      status: applied.has(entry.version) ? ("up" as const) : ("down" as const),
       name: entry.migration.constructor.name,
     }));
   }

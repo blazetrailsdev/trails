@@ -65,16 +65,13 @@ export class MysqlAdapter implements DatabaseAdapter {
    * Convert boolean values in binds to integers for MySQL compatibility.
    */
   private mysqlBinds(binds: unknown[]): unknown[] {
-    return binds.map(v => (v === true ? 1 : v === false ? 0 : v));
+    return binds.map((v) => (v === true ? 1 : v === false ? 0 : v));
   }
 
   /**
    * Execute a SELECT query and return rows.
    */
-  async execute(
-    sql: string,
-    binds: unknown[] = [],
-  ): Promise<Record<string, unknown>[]> {
+  async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
     const conn = await this.getConn();
     try {
       const [rows] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
@@ -87,10 +84,7 @@ export class MysqlAdapter implements DatabaseAdapter {
   /**
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    */
-  async executeMutation(
-    sql: string,
-    binds: unknown[] = [],
-  ): Promise<number> {
+  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
     const conn = await this.getConn();
     try {
       const [result] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));

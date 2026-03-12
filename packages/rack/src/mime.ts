@@ -2,7 +2,10 @@ import { MIME_TYPES } from "./mime-types.js";
 
 export { MIME_TYPES };
 
-export function mimeType(ext: string, fallback: string | null = "application/octet-stream"): string | null {
+export function mimeType(
+  ext: string,
+  fallback: string | null = "application/octet-stream",
+): string | null {
   const key = ext.toLowerCase();
   return key in MIME_TYPES ? MIME_TYPES[key] : fallback;
 }

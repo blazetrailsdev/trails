@@ -6,8 +6,11 @@ describe("Rack::Head", () => {
   function testResponse(headers: Record<string, any> = {}) {
     let closed = false;
     const body = ["foo"];
-    (body as any).close = () => { closed = true; };
-    const app = async () => [200, { "content-type": "test/plain", "content-length": "3" }, body] as any;
+    (body as any).close = () => {
+      closed = true;
+    };
+    const app = async () =>
+      [200, { "content-type": "test/plain", "content-length": "3" }, body] as any;
     const env = MockRequest.envFor("/", headers);
     const head = new Head(app);
     return { promise: head.call(env), body, getClosed: () => closed };

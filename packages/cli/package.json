@@ -8,7 +8,9 @@
   "exports": {
     ".": "./dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "@rails-ts/activerecord": "*",
     "@rails-ts/activesupport": "*",

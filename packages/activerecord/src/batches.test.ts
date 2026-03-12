@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -38,7 +78,10 @@ describe("EachTest", () => {
 
   it("find_each should honor limit if passed a block", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 10; i++) await Post.create({ title: `post ${i}` });
     const collected: any[] = [];
@@ -50,7 +93,10 @@ describe("EachTest", () => {
 
   it("find_each should honor limit if no block is passed", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
     const collected: any[] = [];
@@ -62,7 +108,10 @@ describe("EachTest", () => {
 
   it("find_in_batches should honor limit if passed a block", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 10; i++) await Post.create({ title: `post ${i}` });
     const batches: any[][] = [];
@@ -74,7 +123,10 @@ describe("EachTest", () => {
 
   it("find_in_batches should honor limit if no block is passed", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
     const batches: any[][] = [];
@@ -93,7 +145,10 @@ describe("EachTest", () => {
 
   it("in batches has attribute readers", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `post ${i}` });
     for await (const batch of Post.all().findInBatches({ batchSize: 2 })) {
@@ -105,7 +160,10 @@ describe("EachTest", () => {
   it("each should return a sized enumerator", async () => {
     const freshAdp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = freshAdp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = freshAdp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
     const collected: any[] = [];
@@ -117,7 +175,10 @@ describe("EachTest", () => {
 
   it("find in batches should end at the finish option", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 10; i++) await Post.create({ title: `post ${i}` });
     const batches: any[][] = [];
@@ -129,7 +190,10 @@ describe("EachTest", () => {
 
   it("find in batches should use any column as primary key", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
     const batches: any[][] = [];
@@ -147,7 +211,10 @@ describe("EachTest", () => {
   it("each should execute one query per batch", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 9; i++) await Post.create({ title: `post-${i}` });
     const collected: any[] = [];
@@ -160,7 +227,10 @@ describe("EachTest", () => {
   it("each should not return query chain and execute only one query", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
     const collected: any[] = [];
@@ -173,7 +243,10 @@ describe("EachTest", () => {
   it("each should raise if select is set without id", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const collected: any[] = [];
@@ -186,7 +259,10 @@ describe("EachTest", () => {
   it("each should execute if id is in select", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -200,7 +276,10 @@ describe("EachTest", () => {
   it("find in batches should return batches", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 7; i++) await Post.create({ title: `post-${i}` });
     const batches: any[][] = [];
@@ -213,11 +292,14 @@ describe("EachTest", () => {
   it("find in batches should start from the start option", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const posts: any[] = [];
     for (let i = 0; i < 5; i++) {
-      const p = await Post.create({ title: `post-${i}` }) as any;
+      const p = (await Post.create({ title: `post-${i}` })) as any;
       posts.push(p);
     }
     const startId = posts[2].id;
@@ -232,7 +314,10 @@ describe("EachTest", () => {
   it("find in batches should return an enumerator", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `post-${i}` });
     const batches: any[][] = [];
@@ -245,7 +330,10 @@ describe("EachTest", () => {
   it("in batches should not execute any query", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `post-${i}` });
     const batchRels: any[] = [];
@@ -258,7 +346,10 @@ describe("EachTest", () => {
   it("in batches should yield relation if block given", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
     const batchRels: any[] = [];
@@ -272,7 +363,10 @@ describe("EachTest", () => {
   it("in batches should be enumerable if no block given", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `post-${i}` });
     const batchRels: any[] = [];
@@ -285,7 +379,10 @@ describe("EachTest", () => {
   it("in batches each record should yield record if block is given", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `batch-rec-${i}` });
     const collected: any[] = [];
@@ -298,7 +395,10 @@ describe("EachTest", () => {
   it("in batches each record should be ordered by id", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `order-${i}` });
     const ids: any[] = [];
@@ -312,7 +412,10 @@ describe("EachTest", () => {
   it("in batches should return relations", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `rel-${i}` });
     for await (const batchRel of Post.all().inBatches({ batchSize: 2 })) {
@@ -323,7 +426,10 @@ describe("EachTest", () => {
   it("in batches should start from the start option", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `p-${i}` });
     const batchRels: any[] = [];
@@ -336,7 +442,10 @@ describe("EachTest", () => {
   it("in batches shouldnt execute query unless needed", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `lazy-${i}` });
     const batchRels: any[] = [];
@@ -349,7 +458,11 @@ describe("EachTest", () => {
   it("in batches update all affect all records", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated", "boolean");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `upd-${i}`, updated: false });
     for await (const batchRel of Post.all().inBatches({ batchSize: 2 })) {
@@ -362,7 +475,10 @@ describe("EachTest", () => {
   it("in batches delete all should not delete records in other batches", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `del-${i}` });
     const batchRels: any[] = [];
@@ -375,7 +491,10 @@ describe("EachTest", () => {
   it("in batches destroy all should not destroy records in other batches", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `destroy-${i}` });
     const batchRels: any[] = [];
@@ -388,7 +507,10 @@ describe("EachTest", () => {
   it("in batches should not be loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `load-${i}` });
     for await (const batchRel of Post.all().inBatches({ batchSize: 2 })) {
@@ -399,7 +521,10 @@ describe("EachTest", () => {
   it("in batches should be loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `load-${i}` });
     for await (const batchRel of Post.all().inBatches({ batchSize: 2 })) {
@@ -411,7 +536,10 @@ describe("EachTest", () => {
   it("in batches relations should not overlap with each other", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `overlap-${i}` });
     const seenIds = new Set<any>();
@@ -429,7 +557,10 @@ describe("EachTest", () => {
   it("find in batches should return a sized enumerator", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `sized-${i}` });
     const batches: any[][] = [];
@@ -444,7 +575,10 @@ describe("EachTest", () => {
   it("each should return an enumerator if no block is present", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `enum-${i}` });
     const gen = Post.all().findEach({ batchSize: 2 });
@@ -454,7 +588,10 @@ describe("EachTest", () => {
   it("each enumerator should execute one query per batch", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `enum-batch-${i}` });
     const collected: any[] = [];
@@ -467,7 +604,10 @@ describe("EachTest", () => {
   it("in batches touch all affect all records", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `touch-${i}` });
     const batchRels: any[] = [];
@@ -503,7 +643,10 @@ describe("EachTest2", () => {
   it("each should return a sized enumerator", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `sized-${i}` });
     const gen = Post.all().findEach({ batchSize: 2 });
@@ -513,7 +656,10 @@ describe("EachTest2", () => {
   it("find in batches shouldnt execute query unless needed", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `lazy-${i}` });
     const batches: any[][] = [];
@@ -526,7 +672,10 @@ describe("EachTest2", () => {
   it("find in batches should not use records after yielding them in case original array is modified", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `mod-${i}` });
     const allBatches: any[][] = [];
@@ -539,7 +688,11 @@ describe("EachTest2", () => {
   it("find in batches should not ignore the default scope if it is other then order", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("active", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `scope-${i}`, active: i % 2 === 0 });
     const collected: any[] = [];
@@ -552,7 +705,10 @@ describe("EachTest2", () => {
   it("in batches should end at the finish option", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 8; i++) await Post.create({ title: `p-${i}` });
     const collected: any[] = [];
@@ -566,7 +722,10 @@ describe("EachTest2", () => {
   it("in batches should use any column as primary key", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `col-${i}` });
     const collected: any[] = [];
@@ -580,7 +739,11 @@ describe("EachTest2", () => {
   it("in batches relations with condition should not overlap with each other", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("active", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 8; i++) await Post.create({ title: `cond-${i}`, active: true });
     const seenIds = new Set<any>();
@@ -598,7 +761,11 @@ describe("EachTest2", () => {
   it("in batches relations update all should not affect matching records in other batches", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("processed", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("processed", "boolean");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 6; i++) await Post.create({ title: `proc-${i}`, processed: false });
     for await (const batchRel of Post.all().inBatches({ batchSize: 3 })) {
@@ -611,7 +778,10 @@ describe("EachTest2", () => {
   it("in batches when loaded can return an enum", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `enum2-${i}` });
     const batchRels: any[] = [];
@@ -624,7 +794,10 @@ describe("EachTest2", () => {
   it("in batches should return an enumerator", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `iter2-${i}` });
     const gen = Post.all().inBatches({ batchSize: 2 });
@@ -634,7 +807,10 @@ describe("EachTest2", () => {
   it("in batches each record should return enumerator if no block given", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `rec2-${i}` });
     const gen = Post.all().findEach({ batchSize: 2 });
@@ -644,7 +820,11 @@ describe("EachTest2", () => {
   it("in batches update all returns rows affected", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("done", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("done", "boolean");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `rows2-${i}`, done: false });
     let total = 0;
@@ -658,7 +838,10 @@ describe("EachTest2", () => {
   it("in batches delete all returns rows affected", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `del-rows2-${i}` });
     let total = 0;
@@ -672,7 +855,10 @@ describe("EachTest2", () => {
   it("in batches destroy all returns rows affected", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `destroy-rows2-${i}` });
     const batchRels: any[] = [];
@@ -685,7 +871,10 @@ describe("EachTest2", () => {
   it("in batches if not loaded executes more queries", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `q2-${i}` });
     const batchRels: any[] = [];
@@ -698,7 +887,10 @@ describe("EachTest2", () => {
   it("in batches when loaded runs no queries", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `loaded2-${i}` });
     const allRecords = await Post.all().toArray();
@@ -716,195 +908,426 @@ describe("EachTest2", () => {
 // ==========================================================================
 describe("EachTest3", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("warn if order scope is set", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("logger not required", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("find in batches should quote batch order with desc order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("each should raise if order is invalid", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches without block should raise if order is invalid", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("find in batches should not ignore the default scope if it is other then order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches should error on ignore the order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches destroy all returns rows affected", async () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     await Post.create({ title: "a" });
     expect(await Post.count()).toBeGreaterThanOrEqual(0);
   });
   it("in batches when loaded runs no queries with order argument", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.order("id")).toBeInstanceOf(Relation);
   });
   it("in batches when loaded runs no queries with start and end arguments", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches when loaded runs no queries with start and end arguments and reverse order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches when loaded can return an enum", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches when loaded runs no queries when batching over cpk model", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches when loaded iterates using custom column", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches executes range queries when unconstrained", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches executes in queries when unconstrained and opted out of ranges", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches executes in queries when constrained", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.where({ title: "a" })).toBeInstanceOf(Relation);
   });
   it("in batches executes range queries when constrained and opted in into ranges", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches no subqueries for whole tables batching", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches should quote batch order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches should quote batch order with desc order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches enumerator should quote batch order with desc order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches enumerator each record should quote batch order with desc order", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches should not use records after yielding them in case original array is modified", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches should not ignore default scope without order statements", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches with custom columns raises when start missing items", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches with custom columns raises when finish missing items", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches with custom columns raises when non unique columns", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in batches iterating using custom columns", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("find in batches should return a sized enumerator", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in_batches should return limit records when limit is less than batch size and load is ", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in_batches should return limit records when limit is greater than batch size and load is ", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in_batches should return limit records when limit is a multiple of the batch size and load is ", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("in_batches should return all if the limit is greater than the number of records when load is ", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".find_each bypasses the query cache for its own queries", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".find_each does not disable the query cache inside the given block", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".find_in_batches bypasses the query cache for its own queries", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".find_in_batches does not disable the query cache inside the given block", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".in_batches bypasses the query cache for its own queries", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".in_batches does not disable the query cache inside the given block", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".find_each iterates over composite primary key", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".in_batches with scope and using composite primary key", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".find_each with multiple column ordering and using composite primary key", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".in_batches should start from the start option when using composite primary key with multiple column ordering", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".in_batches should end at the finish option when using composite primary key with multiple column ordering", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it(".in_batches with scope and multiple column ordering and using composite primary key", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
 });
-
 
 describe("findEach / findInBatches", () => {
   it("find in batches should return batches", async () => {
@@ -1028,10 +1451,14 @@ describe("findInBatches edge cases", () => {
 
 describe("findEach / findInBatches", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("findEach yields each record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -1046,7 +1473,9 @@ describe("findEach / findInBatches", () => {
   });
 
   it("findInBatches yields batches of records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -1064,7 +1493,9 @@ describe("findEach / findInBatches", () => {
 describe("inBatches", () => {
   it("yields Relation objects for each batch", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -1085,7 +1516,9 @@ describe("inBatches", () => {
 describe("findEach with start/finish", () => {
   it("finds records within a range", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -1106,7 +1539,11 @@ describe("findEach with order", () => {
   it("supports order: desc option", async () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -1124,11 +1561,16 @@ describe("findEach with order", () => {
 
 describe("Batches (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("find_in_batches returns batches", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 7; i++) await User.create({ name: `User ${i}` });
 
@@ -1141,7 +1583,10 @@ describe("Batches (Rails-guided)", () => {
 
   it("findEach yields individual records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await User.create({ name: `User ${i}` });
 
@@ -1154,7 +1599,11 @@ describe("Batches (Rails-guided)", () => {
 
   it("findInBatches with where clause", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Active1", active: true });
     await User.create({ name: "Inactive", active: false });
@@ -1169,7 +1618,10 @@ describe("Batches (Rails-guided)", () => {
 
   it("findInBatches with batch size of 1", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "A" });
     await User.create({ name: "B" });
@@ -1181,7 +1633,6 @@ describe("Batches (Rails-guided)", () => {
     expect(batchSizes).toEqual([1, 1]);
   });
 });
-
 
 describe("find_each / find_in_batches (Rails-guided)", () => {
   let adapter: DatabaseAdapter;

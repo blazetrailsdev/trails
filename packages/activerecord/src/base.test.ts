@@ -3,7 +3,44 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { MigrationRunner,  Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass , delegate} from "./index.js";
+import {
+  MigrationRunner,
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+  delegate,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +53,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -43,7 +85,9 @@ describe("BasicsTest", () => {
 
   it("switching between table name", () => {
     class User extends Base {
-      static { this.tableName = "people"; }
+      static {
+        this.tableName = "people";
+      }
     }
     expect(User.tableName).toBe("people");
   });
@@ -55,7 +99,9 @@ describe("BasicsTest", () => {
 
   it("has attribute", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); }
+      static {
+        this.attribute("name", "string");
+      }
     }
     const u = new User({ name: "test" });
     expect(u.hasAttribute("name")).toBe(true);
@@ -64,7 +110,10 @@ describe("BasicsTest", () => {
 
   it("attribute names", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
     }
     const names = User.attributeNames();
     expect(names).toContain("name");
@@ -73,7 +122,10 @@ describe("BasicsTest", () => {
 
   it("initialize with attributes", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "test" });
     expect(u.readAttribute("name")).toBe("test");
@@ -82,7 +134,10 @@ describe("BasicsTest", () => {
 
   it("equality", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = await User.create({ name: "a" });
     const u2 = await User.find(u1.id);
@@ -91,7 +146,10 @@ describe("BasicsTest", () => {
 
   it("equality of new records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
@@ -100,7 +158,10 @@ describe("BasicsTest", () => {
 
   it("dup", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "original" });
     const d = u.dup();
@@ -111,7 +172,10 @@ describe("BasicsTest", () => {
 
   it("reload", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "original" });
     u.writeAttribute("name", "modified");
@@ -121,7 +185,10 @@ describe("BasicsTest", () => {
 
   it("last", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     await User.create({ name: "b" });
@@ -131,7 +198,10 @@ describe("BasicsTest", () => {
 
   it("all", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     const all = await User.all().toArray();
@@ -140,7 +210,10 @@ describe("BasicsTest", () => {
 
   it("null fields", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.where({ name: null }).toSql();
     expect(sql).toContain("IS NULL");
@@ -148,7 +221,10 @@ describe("BasicsTest", () => {
 
   it("select symbol", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.select("name").toSql();
     expect(sql).toContain("name");
@@ -156,7 +232,10 @@ describe("BasicsTest", () => {
 
   it("previously new record returns boolean", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "a" });
     expect(u.isPreviouslyNewRecord()).toBe(false);
@@ -166,7 +245,10 @@ describe("BasicsTest", () => {
 
   it("previously changed", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "old" });
     u.writeAttribute("name", "new");
@@ -177,7 +259,10 @@ describe("BasicsTest", () => {
 
   it("records without an id have unique hashes", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
@@ -186,7 +271,10 @@ describe("BasicsTest", () => {
 
   it("table exists", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     // arelTable should exist
     expect(User.arelTable).toBeDefined();
@@ -195,7 +283,10 @@ describe("BasicsTest", () => {
 
   it("distinct delegates to scoped", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.distinct().toSql();
     expect(sql).toContain("DISTINCT");
@@ -203,7 +294,10 @@ describe("BasicsTest", () => {
 
   it("#present? and #blank? on ActiveRecord::Base classes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const blank = await User.all().isBlank();
     expect(blank).toBe(true);
@@ -213,7 +307,10 @@ describe("BasicsTest", () => {
 
   it("limit should take value from latest limit", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.limit(5).limit(3).toSql();
     expect(sql).toContain("3");
@@ -221,7 +318,10 @@ describe("BasicsTest", () => {
 
   it("create after initialize without block", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "test" });
     await u.save();
@@ -242,7 +342,10 @@ describe("BasicsTest", () => {
 
   it("scoped can take a values hash", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = User.where({ name: "test" });
     const attrs = (rel as any)._scopeAttributes ? (rel as any)._scopeAttributes() : {};
@@ -251,14 +354,19 @@ describe("BasicsTest", () => {
 
   it("abstract class table name", () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     expect(AbstractModel.abstractClass).toBe(true);
   });
 
   it("initialize with invalid attribute", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     // Should not throw when setting unknown attributes
     const u = new User({ name: "test", unknown: "value" } as any);
@@ -267,7 +375,10 @@ describe("BasicsTest", () => {
 
   it("many mutations", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "a" });
     u.writeAttribute("name", "b");
@@ -278,7 +389,10 @@ describe("BasicsTest", () => {
 
   it("custom mutator", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User();
     u.writeAttribute("name", "test");
@@ -294,7 +408,10 @@ describe("BasicsTest", () => {
 
   it("equality of destroyed records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     const id = u.id;
@@ -304,7 +421,10 @@ describe("BasicsTest", () => {
 
   it("hashing", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
@@ -314,7 +434,10 @@ describe("BasicsTest", () => {
 
   it("create after initialize with block", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "test" });
     await u.save();
@@ -323,7 +446,10 @@ describe("BasicsTest", () => {
 
   it("previously changed dup", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "old" });
     u.writeAttribute("name", "new");
@@ -333,7 +459,10 @@ describe("BasicsTest", () => {
 
   it("default values on empty strings", () => {
     class User extends Base {
-      static { this.attribute("name", "string", { default: "default" }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string", { default: "default" });
+        this.adapter = adapter;
+      }
     }
     const u = new User();
     expect(u.readAttribute("name")).toBe("default");
@@ -341,7 +470,10 @@ describe("BasicsTest", () => {
 
   it("successful comparison of like class records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = await User.create({ name: "a" });
     const u2 = await User.find(u1.id);
@@ -350,10 +482,16 @@ describe("BasicsTest", () => {
 
   it("failed comparison of unlike class records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "a" });
     const p = new Post({ title: "a" });
@@ -362,14 +500,19 @@ describe("BasicsTest", () => {
 
   it("table name guesses with inherited prefixes and suffixes", () => {
     class User extends Base {
-      static { this.tableNamePrefix = "app_"; }
+      static {
+        this.tableNamePrefix = "app_";
+      }
     }
     expect(User.tableName).toBe("app_users");
   });
 
   it("limit without comma", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.limit(5).toSql();
     expect(sql).toContain("LIMIT");
@@ -384,7 +527,9 @@ describe("BasicsTest", () => {
 
   it("columns should obey set primary key", () => {
     class User extends Base {
-      static { this.primaryKey = "uuid"; }
+      static {
+        this.primaryKey = "uuid";
+      }
     }
     expect(User.primaryKey).toBe("uuid");
   });
@@ -397,7 +542,11 @@ describe("BasicsTest", () => {
   it("attributes", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ title: "hello" }) as any;
     expect(p.readAttribute("title")).toBe("hello");
@@ -406,7 +555,10 @@ describe("BasicsTest", () => {
   it("comparison with different objects", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ title: "a" }) as any;
     expect(p).not.toEqual("a string");
@@ -416,17 +568,23 @@ describe("BasicsTest", () => {
   it("comparison with different objects in array", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p1 = await Post.create({ title: "a" }) as any;
-    const p2 = await Post.create({ title: "b" }) as any;
+    const p1 = (await Post.create({ title: "a" })) as any;
+    const p2 = (await Post.create({ title: "b" })) as any;
     expect(p1.id).not.toBe(p2.id);
   });
 
   it("equality with blank ids", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p1 = Post.new({}) as any;
     const p2 = Post.new({}) as any;
@@ -437,9 +595,12 @@ describe("BasicsTest", () => {
   it("previously new record on destroyed record", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "destroy me" }) as any;
+    const p = (await Post.create({ title: "destroy me" })) as any;
     expect(p.isNewRecord()).toBe(false);
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
@@ -448,16 +609,22 @@ describe("BasicsTest", () => {
   it("create after initialize with array param", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "from array" }) as any;
+    const p = (await Post.create({ title: "from array" })) as any;
     expect(p.id).toBeDefined();
   });
 
   it("load with condition", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "match" });
     await Post.create({ title: "no-match" });
@@ -468,7 +635,10 @@ describe("BasicsTest", () => {
   it("find by slug", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "slug-test" });
     const result = await Post.findBy({ title: "slug-test" });
@@ -478,7 +648,10 @@ describe("BasicsTest", () => {
   it("group weirds by from", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Post.group("title").from('"posts"').toSql();
     expect(sql).toContain("GROUP BY");
@@ -487,10 +660,13 @@ describe("BasicsTest", () => {
   it("preserving date objects", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const now = new Date();
-    const p = await Post.create({ title: "date-test" }) as any;
+    const p = (await Post.create({ title: "date-test" })) as any;
     expect(p.id).toBeDefined();
   });
 
@@ -498,7 +674,10 @@ describe("BasicsTest", () => {
     const adp = freshAdapter();
     class BlogPost extends Base {
       static tableName = "blog_posts";
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(BlogPost.tableName).toBe("blog_posts");
     const sql = BlogPost.all().toSql();
@@ -508,18 +687,24 @@ describe("BasicsTest", () => {
   it("create without prepared statement", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "no-prep" }) as any;
+    const p = (await Post.create({ title: "no-prep" })) as any;
     expect(p.id).toBeDefined();
   });
 
   it("destroy without prepared statement", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "destroy-no-prep" }) as any;
+    const p = (await Post.create({ title: "destroy-no-prep" })) as any;
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
   });
@@ -533,7 +718,12 @@ describe("BasicsTest2", () => {
   beforeEach(() => {
     const adp = createTestAdapter();
     class PostClass extends Base {
-      static { this.tableName = "posts"; this.adapter = adp; this.attribute("title", "string"); this.attribute("body", "string"); }
+      static {
+        this.tableName = "posts";
+        this.adapter = adp;
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
     }
     Post = PostClass;
   });
@@ -545,7 +735,10 @@ describe("BasicsTest2", () => {
 
   it("clone of new object with defaults", () => {
     class Item extends Base {
-      static { this.attribute("name", "string", { default: "default" }); this.adapter = createTestAdapter(); }
+      static {
+        this.attribute("name", "string", { default: "default" });
+        this.adapter = createTestAdapter();
+      }
     }
     const i = new Item();
     const c = i.dup();
@@ -554,7 +747,10 @@ describe("BasicsTest2", () => {
 
   it("clone of new object marks attributes as dirty", () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = createTestAdapter(); }
+      static {
+        this.attribute("name", "string");
+        this.adapter = createTestAdapter();
+      }
     }
     const i = new Item({ name: "test" });
     const c = i.dup();
@@ -569,7 +765,10 @@ describe("BasicsTest2", () => {
 
   it("bignum", async () => {
     class Counter extends Base {
-      static { this.attribute("count", "big_integer"); this.adapter = createTestAdapter(); }
+      static {
+        this.attribute("count", "big_integer");
+        this.adapter = createTestAdapter();
+      }
     }
     const c = await Counter.create({ count: 9007199254740991 });
     expect(Number(c.readAttribute("count"))).toBe(9007199254740991);
@@ -577,7 +776,9 @@ describe("BasicsTest2", () => {
 
   it("clear cache when setting table name", () => {
     class MyModel extends Base {
-      static { this.adapter = createTestAdapter(); }
+      static {
+        this.adapter = createTestAdapter();
+      }
     }
     MyModel.tableName = "my_table";
     expect(MyModel.tableName).toBe("my_table");
@@ -625,7 +826,10 @@ describe("BasicsTest2", () => {
 
   it("default values are deeply dupped", () => {
     class M extends Base {
-      static { this.attribute("name", "string", { default: "val" }); this.adapter = createTestAdapter(); }
+      static {
+        this.attribute("name", "string", { default: "val" });
+        this.adapter = createTestAdapter();
+      }
     }
     const a = new M();
     const b = new M();
@@ -634,8 +838,16 @@ describe("BasicsTest2", () => {
   });
 
   it("records of different classes have different hashes", () => {
-    class A extends Base { static { this.adapter = createTestAdapter(); } }
-    class B extends Base { static { this.adapter = createTestAdapter(); } }
+    class A extends Base {
+      static {
+        this.adapter = createTestAdapter();
+      }
+    }
+    class B extends Base {
+      static {
+        this.adapter = createTestAdapter();
+      }
+    }
     const a = new A();
     const b = new B();
     expect(a.isEqual(b as any)).toBe(false);
@@ -686,7 +898,10 @@ describe("BasicsTest2", () => {
 
   it("unicode column name", () => {
     class M extends Base {
-      static { this.attribute("名前", "string"); this.adapter = createTestAdapter(); }
+      static {
+        this.attribute("名前", "string");
+        this.adapter = createTestAdapter();
+      }
     }
     expect(M.hasAttributeDefinition("名前")).toBe(true);
   });
@@ -723,7 +938,10 @@ describe("BasicsTest", () => {
   it("generated association methods module name", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     // In TS, the class itself serves as the association methods container
     expect(typeof Post).toBe("function");
@@ -732,7 +950,10 @@ describe("BasicsTest", () => {
   it("generated relation methods module name", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     // Verify the model has relation-building methods
     expect(typeof Post.where).toBe("function");
@@ -742,7 +963,11 @@ describe("BasicsTest", () => {
   it("arel attribute normalization", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     // Arel table exists and can build attributes
     const table = Post.arelTable;
@@ -752,7 +977,10 @@ describe("BasicsTest", () => {
   it("equality of relation and array", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const arr = await Post.all().toArray();
@@ -763,7 +991,10 @@ describe("BasicsTest", () => {
   it("find reverse ordered last", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ score: 10 });
     await Post.create({ score: 20 });
@@ -774,7 +1005,11 @@ describe("BasicsTest", () => {
   it("find keeps multiple group values", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Post.group("title").group("body").toSql();
     expect(sql).toContain("GROUP BY");
@@ -783,7 +1018,10 @@ describe("BasicsTest", () => {
   it("find symbol ordered last", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ score: 5 });
     await Post.create({ score: 15 });
@@ -795,7 +1033,10 @@ describe("BasicsTest", () => {
   it("attribute names on table not exists", () => {
     const adp = freshAdapter();
     class Ghost extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const names = Ghost.attributeNames();
     expect(Array.isArray(names)).toBe(true);
@@ -804,7 +1045,10 @@ describe("BasicsTest", () => {
   it("column types typecast", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("count", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ count: "5" } as any);
     expect((p as any).readAttribute("count")).toBe(5);
@@ -813,7 +1057,10 @@ describe("BasicsTest", () => {
   it("typecasting aliases", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ views: "3" } as any);
     expect((p as any).readAttribute("views")).toBe(3);
@@ -822,7 +1069,10 @@ describe("BasicsTest", () => {
   it("dont clear inheritance column when setting explicitly", () => {
     const adp = freshAdapter();
     class Animal extends Base {
-      static { this.attribute("type", "string"); this.adapter = adp; }
+      static {
+        this.attribute("type", "string");
+        this.adapter = adp;
+      }
     }
     Animal.tableName = "animals";
     expect(Animal.tableName).toBe("animals");
@@ -832,7 +1082,10 @@ describe("BasicsTest", () => {
   it("resetting column information doesn't remove attribute methods", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Post.hasAttributeDefinition("title")).toBe(true);
   });
@@ -853,7 +1106,10 @@ describe("BasicsTest", () => {
   it("ignored columns not included in SELECT", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "hello" });
     const results = await Post.select("title").toArray();
@@ -870,14 +1126,20 @@ describe("BasicsTest", () => {
 
   it("column names are escaped", () => {
     class User extends Base {
-      static { this.attribute("order", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("order", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.where({ order: "test" }).toSql();
     expect(sql).toContain("order");
   });
   it("reserved word table", () => {
     class Select extends Base {
-      static { this.tableName = "selects"; this.adapter = adapter; }
+      static {
+        this.tableName = "selects";
+        this.adapter = adapter;
+      }
     }
     expect(Select.tableName).toBe("selects");
   });
@@ -903,7 +1165,10 @@ describe("BasicsTest", () => {
   it.skip("raise no method error for nonexistent method", () => {});
   it("table exists? is true for existing tables", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     // The arelTable exists (table definition is registered)
     expect(User.arelTable).toBeDefined();
@@ -916,7 +1181,9 @@ describe("BasicsTest", () => {
   });
   it("abstract? is true for abstract classes", () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     expect(AbstractModel.abstractClass).toBe(true);
   });
@@ -926,7 +1193,10 @@ describe("BasicsTest", () => {
   });
   it("current scope is reset", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = User.where({ name: "a" });
     await User.scoping(rel, async () => {
@@ -936,7 +1206,10 @@ describe("BasicsTest", () => {
   });
   it("scope updates on record creation", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     expect(u.isPersisted()).toBe(true);
@@ -944,19 +1217,29 @@ describe("BasicsTest", () => {
   });
   it("attribute method defined", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(User.hasAttributeDefinition("name")).toBe(true);
   });
   it("attribute method undefined", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(User.hasAttributeDefinition("nonexistent")).toBe(false);
   });
   it("find on abstract base class raises error", async () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     // Abstract classes shouldn't have their own table, but the adapter allows it
     // The key behavior is that abstractClass is true
@@ -968,7 +1251,12 @@ describe("BasicsTest", () => {
   it.skip("create works with optimistic locking", () => {});
   it("create with custom timestamps", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("created_at", "datetime"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     // Timestamps should be set on create if attributes exist
@@ -976,7 +1264,10 @@ describe("BasicsTest", () => {
   });
   it("update attributes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "old" });
     await u.update({ name: "new" });
@@ -985,7 +1276,10 @@ describe("BasicsTest", () => {
   });
   it("update attributes with bang", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "old" });
     await u.updateBang({ name: "new" });
@@ -993,7 +1287,10 @@ describe("BasicsTest", () => {
   });
   it("destroy! raises RecordNotDestroyed", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     // destroyBang should work on a normal record
@@ -1002,10 +1299,16 @@ describe("BasicsTest", () => {
   });
   it("becoming persisted record", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Admin extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     const admin = u.becomes(Admin);
@@ -1014,10 +1317,16 @@ describe("BasicsTest", () => {
   });
   it("becoming maintains changed status", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Admin extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     u.writeAttribute("name", "b");
@@ -1026,17 +1335,24 @@ describe("BasicsTest", () => {
   });
   it("column for attribute with inherited class", () => {
     class Parent extends Base {
-      static { this.attribute("name", "string"); }
+      static {
+        this.attribute("name", "string");
+      }
     }
     class Child extends Parent {
-      static { this.attribute("age", "integer"); }
+      static {
+        this.attribute("age", "integer");
+      }
     }
     expect(Child.attributeNames()).toContain("name");
     expect(Child.attributeNames()).toContain("age");
   });
   it("find first", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "first" });
     await User.create({ name: "second" });
@@ -1045,7 +1361,11 @@ describe("BasicsTest", () => {
   });
   it("find first with configured via set table name method", async () => {
     class CustomUser extends Base {
-      static { this.tableName = "custom_users"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.tableName = "custom_users";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(CustomUser.tableName).toBe("custom_users");
     await CustomUser.create({ name: "a" });
@@ -1054,7 +1374,10 @@ describe("BasicsTest", () => {
   });
   it("first", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     const first = await User.first();
@@ -1063,7 +1386,10 @@ describe("BasicsTest", () => {
   });
   it("first!", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     const first = await User.firstBang();
@@ -1071,20 +1397,29 @@ describe("BasicsTest", () => {
   });
   it("first! with empty table raises RecordNotFound", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(User.firstBang()).rejects.toThrow(RecordNotFound);
   });
   it("last with empty table returns nil", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const last = await User.last();
     expect(last).toBeNull();
   });
   it("last!", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     const last = await User.lastBang();
@@ -1092,38 +1427,56 @@ describe("BasicsTest", () => {
   });
   it("last! with empty table raises RecordNotFound", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(User.lastBang()).rejects.toThrow(RecordNotFound);
   });
   it("find an empty ids", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(User.find([])).rejects.toThrow(RecordNotFound);
   });
   it("exists? with defined table name returns true when record exists", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     expect(await User.exists(u.id)).toBe(true);
   });
   it("exists? returns false when parameter is nil", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.exists(null)).toBe(false);
   });
   it("exists returns false with false", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.exists(false)).toBe(false);
   });
   it("find by on hash conditions", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
     await User.create({ name: "bob" });
@@ -1133,7 +1486,10 @@ describe("BasicsTest", () => {
   });
   it("find or create from one attribute", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = await User.findOrCreateBy({ name: "alice" });
     expect(u1.isPersisted()).toBe(true);
@@ -1142,7 +1498,11 @@ describe("BasicsTest", () => {
   });
   it("find or create from two attributes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const u = await User.findOrCreateBy({ name: "alice", age: 30 });
     expect(u.isPersisted()).toBe(true);
@@ -1150,7 +1510,10 @@ describe("BasicsTest", () => {
   });
   it("find or initialize from one attribute", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.findOrInitializeBy({ name: "alice" });
     expect(u.isNewRecord()).toBe(true);
@@ -1159,7 +1522,10 @@ describe("BasicsTest", () => {
   it.skip("implicit readonly on left joins", () => {});
   it("to param with id", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     expect(u.toParam()).toBe(String(u.id));
@@ -1171,7 +1537,10 @@ describe("BasicsTest", () => {
   it.skip("type condition only applies to STI models", () => {});
   it("where with hash conditions returns only matching records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
     await User.create({ name: "bob" });
@@ -1181,7 +1550,10 @@ describe("BasicsTest", () => {
   });
   it("where with conditions returns empty when nothing matches", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
     const results = await User.where({ name: "nonexistent" }).toArray();
@@ -1189,7 +1561,10 @@ describe("BasicsTest", () => {
   });
   it("default select doesnt include all columns", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().toSql();
     // Default select is *, not individual columns
@@ -1197,7 +1572,10 @@ describe("BasicsTest", () => {
   });
   it("count returns correct count", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.count()).toBe(0);
     await User.create({ name: "a" });
@@ -1206,7 +1584,11 @@ describe("BasicsTest", () => {
   });
   it("new object has column defaults", () => {
     class Widget extends Base {
-      static { this.attribute("name", "string", { default: "widget" }); this.attribute("count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string", { default: "widget" });
+        this.attribute("count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const w = new Widget();
     expect(w.readAttribute("name")).toBe("widget");
@@ -1214,7 +1596,11 @@ describe("BasicsTest", () => {
   });
   it("find does not apply default scope when unscoped", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; this.defaultScope((rel: any) => rel.where({ name: "alice" })); }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ name: "alice" }));
+      }
     }
     await User.create({ name: "bob" });
     // unscoped bypasses default scope
@@ -1224,14 +1610,22 @@ describe("BasicsTest", () => {
   it.skip("find applies includes with default scope", () => {});
   it("find applies scope conditions", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; this.scope("active", (rel: any) => rel.where({ active: true })); }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+        this.scope("active", (rel: any) => rel.where({ active: true }));
+      }
     }
     const sql = (User as any).active().toSql();
     expect(sql).toContain("active");
   });
   it("all returns scoped relation", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = User.all();
     expect(rel).toBeDefined();
@@ -1239,16 +1633,22 @@ describe("BasicsTest", () => {
   });
   it("find by sql returns instances", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
-    const results = await User.findBySql("SELECT * FROM \"users\"");
+    const results = await User.findBySql('SELECT * FROM "users"');
     expect(results.length).toBe(1);
     expect(results[0].readAttribute("name")).toBe("alice");
   });
   it("pluck returns column values", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
     await User.create({ name: "bob" });
@@ -1258,7 +1658,10 @@ describe("BasicsTest", () => {
   });
   it("pick returns single value", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
     const name = await User.pick("name");
@@ -1266,7 +1669,10 @@ describe("BasicsTest", () => {
   });
   it("ids returns primary key values", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = await User.create({ name: "a" });
     const u2 = await User.create({ name: "b" });
@@ -1276,7 +1682,10 @@ describe("BasicsTest", () => {
   });
   it("minimum returns min value", async () => {
     class User extends Base {
-      static { this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     await User.create({ age: 10 });
     await User.create({ age: 20 });
@@ -1284,7 +1693,10 @@ describe("BasicsTest", () => {
   });
   it("maximum returns max value", async () => {
     class User extends Base {
-      static { this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     await User.create({ age: 10 });
     await User.create({ age: 20 });
@@ -1292,7 +1704,10 @@ describe("BasicsTest", () => {
   });
   it("sum returns sum value", async () => {
     class User extends Base {
-      static { this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     await User.create({ age: 10 });
     await User.create({ age: 20 });
@@ -1300,7 +1715,10 @@ describe("BasicsTest", () => {
   });
   it("average returns avg value", async () => {
     class User extends Base {
-      static { this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     await User.create({ age: 10 });
     await User.create({ age: 20 });
@@ -1308,7 +1726,10 @@ describe("BasicsTest", () => {
   });
   it("count with group returns hash", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "alice" });
     await User.create({ name: "alice" });
@@ -1318,7 +1739,10 @@ describe("BasicsTest", () => {
   });
   it("order returns ordered records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.order("name").toSql();
     expect(sql).toContain("ORDER BY");
@@ -1326,7 +1750,11 @@ describe("BasicsTest", () => {
   });
   it("order with multiple columns", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = User.order("name", "age").toSql();
     expect(sql).toContain("name");
@@ -1334,7 +1762,10 @@ describe("BasicsTest", () => {
   });
   it("group returns grouped records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.group("name").toSql();
     expect(sql).toContain("GROUP BY");
@@ -1342,14 +1773,20 @@ describe("BasicsTest", () => {
   });
   it("having filters groups", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.group("name").having("COUNT(*) > 1").toSql();
     expect(sql).toContain("HAVING");
   });
   it("offset skips records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.offset(5).toSql();
     expect(sql).toContain("OFFSET");
@@ -1357,7 +1794,10 @@ describe("BasicsTest", () => {
   });
   it("limit restricts records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.limit(10).toSql();
     expect(sql).toContain("LIMIT");
@@ -1365,21 +1805,30 @@ describe("BasicsTest", () => {
   });
   it("distinct returns unique records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.distinct().toSql();
     expect(sql).toContain("DISTINCT");
   });
   it("readonly? default is false", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "a" });
     expect(u.isReadonly()).toBe(false);
   });
   it("readonly! sets flag", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "a" });
     u.readonlyBang();
@@ -1387,14 +1836,20 @@ describe("BasicsTest", () => {
   });
   it("lock generates for update", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().lock().toSql();
     expect(sql).toContain("FOR UPDATE");
   });
   it("joins generates join sql", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.joins("INNER JOIN posts ON posts.user_id = users.id").toSql();
     expect(sql).toContain("INNER JOIN");
@@ -1403,7 +1858,10 @@ describe("BasicsTest", () => {
   it.skip("incomplete schema loading", () => {});
   it("primary key with no id", () => {
     class Widget extends Base {
-      static { this.primaryKey = "widget_id"; this.adapter = adapter; }
+      static {
+        this.primaryKey = "widget_id";
+        this.adapter = adapter;
+      }
     }
     expect(Widget.primaryKey).toBe("widget_id");
   });
@@ -1419,7 +1877,10 @@ describe("BasicsTest", () => {
   it.skip("time zone aware attribute with default timezone utc on utc can be created", () => {});
   it("singular table name guesses with prefixes and suffixes", () => {
     class PrefixedModel extends Base {
-      static { this.tableNamePrefix = "pre_"; this.tableNameSuffix = "_suf"; }
+      static {
+        this.tableNamePrefix = "pre_";
+        this.tableNameSuffix = "_suf";
+      }
     }
     expect(PrefixedModel.tableName).toBe("pre_prefixed_models_suf");
   });
@@ -1437,7 +1898,11 @@ describe("BasicsTest", () => {
   it.skip("equality of collection proxy and association relation", () => {});
   it("readonly attributes on a new record", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attrReadonly("name"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attrReadonly("name");
+        this.adapter = adapter;
+      }
     }
     expect(User.readonlyAttributes).toContain("name");
     const u = new User({ name: "a" });
@@ -1445,10 +1910,17 @@ describe("BasicsTest", () => {
   });
   it("readonly attributes in abstract class descendant", () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; this.attribute("code", "string"); this.attrReadonly("code"); }
+      static {
+        this.abstractClass = true;
+        this.attribute("code", "string");
+        this.attrReadonly("code");
+      }
     }
     class ConcreteModel extends AbstractModel {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(ConcreteModel.readonlyAttributes).toContain("code");
   });
@@ -1460,7 +1932,10 @@ describe("BasicsTest", () => {
   it.skip("attributes on dummy time with invalid time", () => {});
   it("previously persisted returns boolean", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     expect(u.isPersisted()).toBe(true);
@@ -1470,7 +1945,13 @@ describe("BasicsTest", () => {
   });
   it("dup for a composite primary key model", async () => {
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     const o = new Order({ shop_id: 1, id: 42, name: "Widget" });
     const copy = o.dup();
@@ -1481,7 +1962,10 @@ describe("BasicsTest", () => {
   });
   it("dup does not copy associations", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     const d = u.dup();
@@ -1490,7 +1974,10 @@ describe("BasicsTest", () => {
   });
   it("clone preserves subtype", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "a" });
     const d = u.dup();
@@ -1498,7 +1985,10 @@ describe("BasicsTest", () => {
   });
   it("bignum pk", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     // Test that large IDs work
     const u = await User.create({ name: "big" });
@@ -1506,7 +1996,10 @@ describe("BasicsTest", () => {
   });
   it("default char types", () => {
     class User extends Base {
-      static { this.attribute("name", "string", { default: "" }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string", { default: "" });
+        this.adapter = adapter;
+      }
     }
     const u = new User();
     expect(u.readAttribute("name")).toBe("");
@@ -1520,23 +2013,30 @@ describe("BasicsTest", () => {
   it.skip("connection in utc time", () => {});
   it("column name properly quoted", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.where({ name: "test" }).toSql();
-    expect(sql).toContain("\"name\"");
+    expect(sql).toContain('"name"');
   });
   it.skip("quoting arrays", () => {});
   it.skip("dont clear sequence name when setting explicitly", () => {});
   it("set table name symbol converted to string", () => {
     class User extends Base {
-      static { this.tableName = "custom_table"; }
+      static {
+        this.tableName = "custom_table";
+      }
     }
     expect(typeof User.tableName).toBe("string");
     expect(User.tableName).toBe("custom_table");
   });
   it("set table name with inheritance", () => {
     class Parent extends Base {
-      static { this.tableName = "custom_parents"; }
+      static {
+        this.tableName = "custom_parents";
+      }
     }
     class Child extends Parent {}
     // In Rails, STI children inherit the parent's table name
@@ -1547,7 +2047,10 @@ describe("BasicsTest", () => {
   it.skip("sequence name for cpk model", () => {});
   it("find multiple ordered last", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     await User.create({ name: "b" });
@@ -1567,16 +2070,23 @@ describe("BasicsTest", () => {
   it.skip("marshalling new record round trip with associations", () => {});
   it("attribute names on abstract class", () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; this.attribute("name", "string"); }
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+      }
     }
     expect(AbstractModel.attributeNames()).toContain("name");
   });
   it("table name with 2 abstract subclasses", () => {
     class AbstractBase extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     class AbstractMiddle extends AbstractBase {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     class Concrete extends AbstractMiddle {}
     expect(Concrete.tableName).toBe("concretes");
@@ -1587,7 +2097,11 @@ describe("BasicsTest", () => {
   it.skip("changing a connection handler in a main thread does not poison the other threads", () => {});
   it("ignored columns are not present in columns_hash", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("secret", "string"); this.ignoredColumns = ["secret"]; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+      }
     }
     // ignoredColumns is set
     expect(User.ignoredColumns).toContain("secret");
@@ -1596,7 +2110,9 @@ describe("BasicsTest", () => {
   it.skip("ignored columns have no attribute methods", () => {});
   it("ignored columns are stored as an array of string", () => {
     class User extends Base {
-      static { this.ignoredColumns = ["col1", "col2"]; }
+      static {
+        this.ignoredColumns = ["col1", "col2"];
+      }
     }
     expect(Array.isArray(User.ignoredColumns)).toBe(true);
     expect(User.ignoredColumns).toEqual(["col1", "col2"]);
@@ -1628,14 +2144,20 @@ describe("BasicsTest", () => {
   });
   it("default values", () => {
     class Widget extends Base {
-      static { this.attribute("name", "string", { default: "unnamed" }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string", { default: "unnamed" });
+        this.adapter = adapter;
+      }
     }
     const w = new Widget();
     expect(w.readAttribute("name")).toBe("unnamed");
   });
   it("quote", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.where({ name: "test" }).toSql();
     expect(sql).toContain("name");
@@ -1646,7 +2168,10 @@ describe("BasicsTest", () => {
 
   it("toggle attribute", async () => {
     class User extends Base {
-      static { this.attribute("active", "boolean", { default: false }); this.adapter = adapter; }
+      static {
+        this.attribute("active", "boolean", { default: false });
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ active: false });
     u.toggle("active");
@@ -1655,7 +2180,10 @@ describe("BasicsTest", () => {
 
   it("has attribute", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User();
     expect(u.hasAttribute("name")).toBe(true);
@@ -1664,7 +2192,10 @@ describe("BasicsTest", () => {
 
   it("has attribute with symbol", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(User.hasAttributeDefinition("name")).toBe(true);
     expect(User.hasAttributeDefinition("nonexistent")).toBe(false);
@@ -1672,7 +2203,11 @@ describe("BasicsTest", () => {
 
   it("attribute names", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const names = User.attributeNames();
     expect(names).toContain("name");
@@ -1681,14 +2216,19 @@ describe("BasicsTest", () => {
 
   it("attribute names on abstract class", () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     expect(AbstractModel.attributeNames()).toEqual([]);
   });
 
   it("initialize with attributes", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "test" });
     expect(u.readAttribute("name")).toBe("test");
@@ -1697,7 +2237,10 @@ describe("BasicsTest", () => {
 
   it("equality", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = await User.create({ name: "a" });
     const u2 = await User.find(u1.id);
@@ -1706,7 +2249,10 @@ describe("BasicsTest", () => {
 
   it("equality of new records", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
@@ -1715,7 +2261,10 @@ describe("BasicsTest", () => {
 
   it("dup", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "orig" });
     const d = u.dup();
@@ -1726,7 +2275,10 @@ describe("BasicsTest", () => {
 
   it("reload", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "orig" });
     u.writeAttribute("name", "changed");
@@ -1736,7 +2288,10 @@ describe("BasicsTest", () => {
 
   it("last", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     await User.create({ name: "b" });
@@ -1746,7 +2301,10 @@ describe("BasicsTest", () => {
 
   it("all", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     await User.create({ name: "b" });
@@ -1756,7 +2314,10 @@ describe("BasicsTest", () => {
 
   it("distinct delegates to scoped", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "a" });
     await User.create({ name: "a" });
@@ -1766,7 +2327,9 @@ describe("BasicsTest", () => {
 
   it("abstract class table name", () => {
     class AbstractModel extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     class ConcreteModel extends AbstractModel {}
     expect(AbstractModel.abstractClass).toBe(true);
@@ -1775,7 +2338,10 @@ describe("BasicsTest", () => {
 
   it("#present? and #blank? on ActiveRecord::Base classes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.all().isBlank()).toBe(true);
     await User.create({ name: "a" });
@@ -1784,7 +2350,10 @@ describe("BasicsTest", () => {
 
   it("select symbol", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "x" });
     const sql = User.select("name").toSql();
@@ -1793,7 +2362,10 @@ describe("BasicsTest", () => {
 
   it("limit should take value from latest limit", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.limit(5).limit(3).toSql();
     expect(sql).toContain("3");
@@ -1801,7 +2373,10 @@ describe("BasicsTest", () => {
 
   it("previously new record returns boolean", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "a" });
     expect(u.isPreviouslyNewRecord()).toBe(false);
@@ -1811,7 +2386,10 @@ describe("BasicsTest", () => {
 
   it("previously changed", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "orig" });
     u.writeAttribute("name", "changed");
@@ -1826,7 +2404,10 @@ describe("BasicsTest", () => {
 
   it("null fields", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.where({ name: null }).toSql();
     expect(sql).toContain("IS NULL");
@@ -1861,7 +2442,10 @@ describe("BasicsTest", () => {
 
   it("scoped can take a values hash", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = User.where({ name: "test" });
     const hash = rel.whereValuesHash();
@@ -1870,7 +2454,10 @@ describe("BasicsTest", () => {
 
   it("records without an id have unique hashes", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
@@ -1897,21 +2484,25 @@ describe("BasicsTest", () => {
 
   it("quoted table name after set table name", () => {
     class User extends Base {
-      static { this.tableName = "custom_users"; }
+      static {
+        this.tableName = "custom_users";
+      }
     }
     expect(User.tableName).toBe("custom_users");
   });
 
   it("no limit offset", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().toSql();
     expect(sql).not.toContain("LIMIT");
     expect(sql).not.toContain("OFFSET");
   });
 });
-
 
 describe("Base", () => {
   // -- Table name inference --
@@ -2139,9 +2730,7 @@ describe("Base", () => {
     });
 
     it("find_by! raises RecordNotFound if the record is missing", async () => {
-      await expect(User.findByBang({ name: "Nobody" })).rejects.toThrow(
-        "not found"
-      );
+      await expect(User.findByBang({ name: "Nobody" })).rejects.toThrow("not found");
     });
   });
 
@@ -2290,4 +2879,3 @@ describe("Base", () => {
     });
   });
 });
-

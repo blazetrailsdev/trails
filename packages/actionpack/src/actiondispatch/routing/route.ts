@@ -26,7 +26,10 @@ export interface RouteOptions {
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
 
-export type RedirectFunction = (params: Record<string, string>, request: { method: string; path: string }) => string;
+export type RedirectFunction = (
+  params: Record<string, string>,
+  request: { method: string; path: string },
+) => string;
 
 export interface RedirectOptions {
   path?: string;
@@ -61,7 +64,7 @@ export class Route {
     path: string,
     controller: string,
     action: string,
-    options: RouteOptions = {}
+    options: RouteOptions = {},
   ) {
     this.verb = verb.toUpperCase();
     this.path = normalizePath(path);
@@ -103,12 +106,18 @@ export class Route {
       return null;
     }
 
-    const reqSegments = normalizePath(requestPath)
-      .split("/")
-      .filter(Boolean);
+    const reqSegments = normalizePath(requestPath).split("/").filter(Boolean);
 
     const params: Record<string, string> = {};
-    const result = matchSegments(this.segments, reqSegments, 0, 0, params, this.constraints, this.anchor);
+    const result = matchSegments(
+      this.segments,
+      reqSegments,
+      0,
+      0,
+      params,
+      this.constraints,
+      this.anchor,
+    );
     if (!result) return null;
 
     return { route: this, params };
@@ -126,7 +135,7 @@ export class Route {
         const val = params[seg.name];
         if (val === undefined) {
           throw new Error(
-            `Missing required parameter :${seg.name} for route "${this.name ?? this.path}"`
+            `Missing required parameter :${seg.name} for route "${this.name ?? this.path}"`,
           );
         }
         parts.push(String(val));
@@ -163,7 +172,10 @@ export class Route {
   /**
    * Resolve a redirect target given matched params and request info.
    */
-  resolveRedirect(params: Record<string, string>, request: { method: string; path: string; host?: string }): { url: string; status: number } {
+  resolveRedirect(
+    params: Record<string, string>,
+    request: { method: string; path: string; host?: string },
+  ): { url: string; status: number } {
     const target = this.redirectTarget;
     if (!target) throw new Error("Route is not a redirect");
 
@@ -199,10 +211,22 @@ export class Route {
 
 // --- Path segment types ---
 
-interface StaticSegment { type: "static"; value: string }
-interface DynamicSegment { type: "dynamic"; name: string }
-interface GlobSegment { type: "glob"; name: string }
-interface OptionalGroup { type: "optional"; children: (StaticSegment | DynamicSegment)[] }
+interface StaticSegment {
+  type: "static";
+  value: string;
+}
+interface DynamicSegment {
+  type: "dynamic";
+  name: string;
+}
+interface GlobSegment {
+  type: "glob";
+  name: string;
+}
+interface OptionalGroup {
+  type: "optional";
+  children: (StaticSegment | DynamicSegment)[];
+}
 
 type PathSegment = StaticSegment | DynamicSegment | GlobSegment | OptionalGroup;
 
@@ -297,7 +321,15 @@ function matchSegments(
   if (seg.type === "static") {
     if (reqIdx >= reqSegments.length) return false;
     if (reqSegments[reqIdx] !== seg.value) return false;
-    return matchSegments(segments, reqSegments, segIdx + 1, reqIdx + 1, params, constraints, anchor);
+    return matchSegments(
+      segments,
+      reqSegments,
+      segIdx + 1,
+      reqIdx + 1,
+      params,
+      constraints,
+      anchor,
+    );
   }
 
   if (seg.type === "dynamic") {
@@ -305,13 +337,20 @@ function matchSegments(
     const val = reqSegments[reqIdx];
     const constraint = constraints[seg.name];
     if (constraint) {
-      const re = constraint instanceof RegExp
-        ? anchorRegExp(constraint)
-        : new RegExp(`^${constraint}$`);
+      const re =
+        constraint instanceof RegExp ? anchorRegExp(constraint) : new RegExp(`^${constraint}$`);
       if (!re.test(val)) return false;
     }
     params[seg.name] = val;
-    return matchSegments(segments, reqSegments, segIdx + 1, reqIdx + 1, params, constraints, anchor);
+    return matchSegments(
+      segments,
+      reqSegments,
+      segIdx + 1,
+      reqIdx + 1,
+      params,
+      constraints,
+      anchor,
+    );
   }
 
   if (seg.type === "glob") {
@@ -321,7 +360,9 @@ function matchSegments(
       const saved = { ...params };
       const globValue = reqSegments.slice(reqIdx, reqIdx + take).join("/");
       params[seg.name] = globValue;
-      if (matchSegments(segments, reqSegments, segIdx + 1, reqIdx + take, params, constraints, anchor)) {
+      if (
+        matchSegments(segments, reqSegments, segIdx + 1, reqIdx + take, params, constraints, anchor)
+      ) {
         return true;
       }
       // Restore params
@@ -353,9 +394,8 @@ function matchSegments(
         const val = reqSegments[childReqIdx];
         const constraint = constraints[child.name];
         if (constraint) {
-          const re = constraint instanceof RegExp
-            ? anchorRegExp(constraint)
-            : new RegExp(`^${constraint}$`);
+          const re =
+            constraint instanceof RegExp ? anchorRegExp(constraint) : new RegExp(`^${constraint}$`);
           if (!re.test(val)) {
             matched = false;
             break;
@@ -367,7 +407,9 @@ function matchSegments(
     }
 
     if (matched) {
-      if (matchSegments(segments, reqSegments, segIdx + 1, childReqIdx, params, constraints, anchor)) {
+      if (
+        matchSegments(segments, reqSegments, segIdx + 1, childReqIdx, params, constraints, anchor)
+      ) {
         return true;
       }
     }

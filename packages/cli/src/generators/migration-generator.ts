@@ -1,4 +1,13 @@
-import { GeneratorBase, GeneratorOptions, migrationTimestamp, classify, tableize, underscore, parseColumns, ColumnType } from "./base.js";
+import {
+  GeneratorBase,
+  GeneratorOptions,
+  migrationTimestamp,
+  classify,
+  tableize,
+  underscore,
+  parseColumns,
+  ColumnType,
+} from "./base.js";
 
 export class MigrationGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
@@ -12,7 +21,9 @@ export class MigrationGenerator extends GeneratorBase {
     const timestamp = migrationTimestamp();
     const filename = `db/migrations/${timestamp}-${dasherize(name)}.ts`;
 
-    this.createFile(filename, `import { Migration } from "@rails-ts/activerecord";
+    this.createFile(
+      filename,
+      `import { Migration } from "@rails-ts/activerecord";
 
 export class ${className} extends Migration {
   async up(): Promise<void> {
@@ -23,7 +34,8 @@ ${body.up}
 ${body.down}
   }
 }
-`);
+`,
+    );
 
     return this.getCreatedFiles();
   }
@@ -37,9 +49,7 @@ ${body.down}
     const createMatch = name.match(/^create[_-]?(.+)$/i);
     if (createMatch) {
       const table = underscore(createMatch[1]);
-      const colLines = columns
-        .map((c) => `      t.${c.type}("${c.name}");`)
-        .join("\n");
+      const colLines = columns.map((c) => `      t.${c.type}("${c.name}");`).join("\n");
       return {
         up: `    await this.createTable("${table}", (t) => {\n${colLines}\n      t.timestamps();\n    });`,
         down: `    await this.dropTable("${table}");`,
@@ -81,5 +91,9 @@ ${body.down}
 }
 
 function dasherize(name: string): string {
-  return name.replace(/([A-Z])/g, "-$1").toLowerCase().replace(/^-/, "").replace(/_/g, "-");
+  return name
+    .replace(/([A-Z])/g, "-$1")
+    .toLowerCase()
+    .replace(/^-/, "")
+    .replace(/_/g, "-");
 }

@@ -81,21 +81,38 @@ export function classify(name: string): string {
 
 export function tableize(name: string): string {
   // Simple pluralization: add "s", handle common cases
-  const snake = name.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "");
+  const snake = name
+    .replace(/([A-Z])/g, "_$1")
+    .toLowerCase()
+    .replace(/^_/, "");
   if (snake.endsWith("y")) return snake.slice(0, -1) + "ies";
-  if (snake.endsWith("s") || snake.endsWith("x") || snake.endsWith("sh") || snake.endsWith("ch")) return snake + "es";
+  if (snake.endsWith("s") || snake.endsWith("x") || snake.endsWith("sh") || snake.endsWith("ch"))
+    return snake + "es";
   return snake + "s";
 }
 
 export function underscore(name: string): string {
-  return name.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "");
+  return name
+    .replace(/([A-Z])/g, "_$1")
+    .toLowerCase()
+    .replace(/^_/, "");
 }
 
 export function dasherize(name: string): string {
   return underscore(name).replace(/_/g, "-");
 }
 
-export type ColumnType = "string" | "text" | "integer" | "float" | "decimal" | "boolean" | "date" | "datetime" | "timestamp" | "references";
+export type ColumnType =
+  | "string"
+  | "text"
+  | "integer"
+  | "float"
+  | "decimal"
+  | "boolean"
+  | "date"
+  | "datetime"
+  | "timestamp"
+  | "references";
 
 export function parseColumns(args: string[]): Array<{ name: string; type: ColumnType }> {
   const columns: Array<{ name: string; type: ColumnType }> = [];

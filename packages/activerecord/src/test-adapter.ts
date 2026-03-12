@@ -24,8 +24,11 @@ const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
 /** Which adapter backend is active. */
-export const adapterType: "memory" | "postgres" | "mysql" =
-  PG_TEST_URL ? "postgres" : MYSQL_TEST_URL ? "mysql" : "memory";
+export const adapterType: "memory" | "postgres" | "mysql" = PG_TEST_URL
+  ? "postgres"
+  : MYSQL_TEST_URL
+    ? "mysql"
+    : "memory";
 
 const isPg = (): boolean => !!PG_TEST_URL;
 const isMysql = (): boolean => !!MYSQL_TEST_URL;
@@ -135,15 +138,15 @@ async function processPendingModels(inner: any): Promise<void> {
       const cpkCols = _pendingCpk.get(tableName);
 
       const colDefs = [...columns.entries()].map(([col, type]) =>
-        isMysql() ? `\`${col}\` ${type}` : `"${col}" ${type}`
+        isMysql() ? `\`${col}\` ${type}` : `"${col}" ${type}`,
       );
 
       let createSql: string;
       if (cpkCols) {
         // Composite primary key — no auto-increment id column
         const pkConstraint = isMysql()
-          ? `PRIMARY KEY (${cpkCols.map(c => `\`${c}\``).join(", ")})`
-          : `PRIMARY KEY (${cpkCols.map(c => `"${c}"`).join(", ")})`;
+          ? `PRIMARY KEY (${cpkCols.map((c) => `\`${c}\``).join(", ")})`
+          : `PRIMARY KEY (${cpkCols.map((c) => `"${c}"`).join(", ")})`;
         createSql = isMysql()
           ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[...colDefs, pkConstraint].join(", ")}) ENGINE=InnoDB`
           : `CREATE TABLE IF NOT EXISTS "${tableName}" (${[...colDefs, pkConstraint].join(", ")})`;
@@ -152,7 +155,7 @@ async function processPendingModels(inner: any): Promise<void> {
         const idCol = isPg()
           ? '"id" SERIAL PRIMARY KEY'
           : isMysql()
-            ? '`id` INT AUTO_INCREMENT PRIMARY KEY'
+            ? "`id` INT AUTO_INCREMENT PRIMARY KEY"
             : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
         createSql = isMysql()
           ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`
@@ -162,7 +165,10 @@ async function processPendingModels(inner: any): Promise<void> {
       try {
         await inner.exec(createSql);
         _createdTables.add(tableName);
-        _createdColumns.set(tableName, cpkCols ? new Set(columns.keys()) : new Set(["id", ...columns.keys()]));
+        _createdColumns.set(
+          tableName,
+          cpkCols ? new Set(columns.keys()) : new Set(["id", ...columns.keys()]),
+        );
       } catch (e: any) {
         // Log but don't add to _createdTables so we retry next time
         console.error(`[test-adapter] Failed to create table "${tableName}": ${e?.message}`);
@@ -221,10 +227,12 @@ if (PG_TEST_URL) {
   const { PostgresAdapter } = await import("./adapters/postgres-adapter.js");
   _sharedAdapter = new PostgresAdapter(PG_TEST_URL);
   const rows = await _sharedAdapter.execute(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
   );
   for (const r of rows) {
-    try { await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${(r as any).tablename}" CASCADE`); } catch {}
+    try {
+      await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${(r as any).tablename}" CASCADE`);
+    } catch {}
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
@@ -233,7 +241,9 @@ if (PG_TEST_URL) {
   const rows = await _sharedAdapter.execute(`SHOW TABLES`);
   for (const r of rows) {
     const table = Object.values(r)[0] as string;
-    try { await _sharedAdapter.exec(`DROP TABLE IF EXISTS \`${table}\``); } catch {}
+    try {
+      await _sharedAdapter.exec(`DROP TABLE IF EXISTS \`${table}\``);
+    } catch {}
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else {
@@ -349,8 +359,9 @@ class SchemaAdapter implements DatabaseAdapter {
    */
   private async handleMissingTable(e: any, sql: string): Promise<boolean> {
     const msg = e?.message || e?.sqlMessage || "";
-    const tableMatch = msg.match(/relation "(\w+)" does not exist/i)
-      || msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i);
+    const tableMatch =
+      msg.match(/relation "(\w+)" does not exist/i) ||
+      msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i);
     if (!tableMatch) return false;
 
     const tableName = tableMatch[1];
@@ -384,11 +395,21 @@ class SchemaAdapter implements DatabaseAdapter {
     await this.setup();
     return this.inner.beginTransaction();
   }
-  async commit(): Promise<void> { return this.inner.commit(); }
-  async rollback(): Promise<void> { return this.inner.rollback(); }
-  async createSavepoint(name: string): Promise<void> { return this.inner.createSavepoint(name); }
-  async releaseSavepoint(name: string): Promise<void> { return this.inner.releaseSavepoint(name); }
-  async rollbackToSavepoint(name: string): Promise<void> { return this.inner.rollbackToSavepoint(name); }
+  async commit(): Promise<void> {
+    return this.inner.commit();
+  }
+  async rollback(): Promise<void> {
+    return this.inner.rollback();
+  }
+  async createSavepoint(name: string): Promise<void> {
+    return this.inner.createSavepoint(name);
+  }
+  async releaseSavepoint(name: string): Promise<void> {
+    return this.inner.releaseSavepoint(name);
+  }
+  async rollbackToSavepoint(name: string): Promise<void> {
+    return this.inner.rollbackToSavepoint(name);
+  }
 
   async exec(sql: string): Promise<void> {
     await this.setup();

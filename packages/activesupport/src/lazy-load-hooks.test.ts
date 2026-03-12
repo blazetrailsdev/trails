@@ -76,7 +76,9 @@ describe("LazyLoadHooksTest", () => {
   it("hook receives a context", () => {
     const ctx = { name: "MyClass" };
     let received: any = null;
-    onLoad("test_base", (base) => { received = base; });
+    onLoad("test_base", (base) => {
+      received = base;
+    });
     runLoadHooks("test_base", ctx);
     expect(received).toBe(ctx);
   });
@@ -85,7 +87,9 @@ describe("LazyLoadHooksTest", () => {
     const ctx = { name: "MyClass" };
     let received: any = null;
     runLoadHooks("test_base", ctx);
-    onLoad("test_base", (base) => { received = base; });
+    onLoad("test_base", (base) => {
+      received = base;
+    });
     expect(received).toBe(ctx);
   });
 
@@ -107,7 +111,9 @@ describe("LazyLoadHooksTest", () => {
     // In TS, hook always calls callback with base as argument
     let received: any = null;
     class MyClass {}
-    onLoad("test_base", (base) => { received = base; });
+    onLoad("test_base", (base) => {
+      received = base;
+    });
     runLoadHooks("test_base", MyClass);
     expect(received).toBe(MyClass);
   });
@@ -115,7 +121,9 @@ describe("LazyLoadHooksTest", () => {
   it("hook uses class eval when base is a module", () => {
     let received: any = null;
     const MyModule = {};
-    onLoad("test_base", (base) => { received = base; });
+    onLoad("test_base", (base) => {
+      received = base;
+    });
     runLoadHooks("test_base", MyModule);
     expect(received).toBe(MyModule);
   });
@@ -123,7 +131,9 @@ describe("LazyLoadHooksTest", () => {
   it("hook uses instance eval when base is an instance", () => {
     let received: any = null;
     const instance = { type: "instance" };
-    onLoad("test_base", (base) => { received = base; });
+    onLoad("test_base", (base) => {
+      received = base;
+    });
     runLoadHooks("test_base", instance);
     expect(received).toBe(instance);
   });

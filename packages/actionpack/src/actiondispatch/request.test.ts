@@ -373,12 +373,16 @@ describe("ActionDispatch::Request", () => {
 
   it("setting variant to a non-symbol value", () => {
     const req = new Request({});
-    expect(() => { req.variant = "mobile" as any; }).toThrow(TypeError);
+    expect(() => {
+      req.variant = "mobile" as any;
+    }).toThrow(TypeError);
   });
 
   it("setting variant to an array containing a non-symbol value", () => {
     const req = new Request({});
-    expect(() => { req.variant = ["mobile"] as any; }).toThrow(TypeError);
+    expect(() => {
+      req.variant = ["mobile"] as any;
+    }).toThrow(TypeError);
   });
 
   // --- Media type ---

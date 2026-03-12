@@ -4,8 +4,12 @@ import { MockRequest } from "./mock-request.js";
 
 class TestLock {
   synchronized = false;
-  lock() { this.synchronized = true; }
-  unlock() { this.synchronized = false; }
+  lock() {
+    this.synchronized = true;
+  }
+  unlock() {
+    this.synchronized = false;
+  }
 }
 
 describe("Rack::Lock", () => {
@@ -17,7 +21,9 @@ describe("Rack::Lock", () => {
     const env = MockRequest.envFor("/");
     const response = {
       closeCalled: false,
-      each(fn: (x: string) => void) { ["hi", "mom"].forEach(fn); },
+      each(fn: (x: string) => void) {
+        ["hi", "mom"].forEach(fn);
+      },
     };
     const app = lockApp(async () => [200, { "content-type": "text/plain" }, response] as any);
     const body = (await app.call(env))[2];
@@ -39,14 +45,21 @@ describe("Rack::Lock", () => {
 
   it("not delegate to_path if body does not implement it", async () => {
     const env = MockRequest.envFor("/");
-    const app = lockApp(async () => [200, { "content-type": "text/plain" }, ["Hello World"]] as any);
+    const app = lockApp(
+      async () => [200, { "content-type": "text/plain" }, ["Hello World"]] as any,
+    );
     const body = (await app.call(env))[2];
     expect(body.toPath).toBeUndefined();
   });
 
   it("call super on close", async () => {
     const env = MockRequest.envFor("/");
-    const response = { closeCalled: false, close() { this.closeCalled = true; } };
+    const response = {
+      closeCalled: false,
+      close() {
+        this.closeCalled = true;
+      },
+    };
     const app = lockApp(async () => [200, { "content-type": "text/plain" }, response] as any);
     await app.call(env);
     expect(response.closeCalled).toBe(false);
@@ -58,7 +71,10 @@ describe("Rack::Lock", () => {
     const lock = new TestLock();
     const env = MockRequest.envFor("/");
     const response = {};
-    const app = new Lock(async () => [200, { "content-type": "text/plain" }, response] as any, lock);
+    const app = new Lock(
+      async () => [200, { "content-type": "text/plain" }, response] as any,
+      lock,
+    );
     expect(lock.synchronized).toBe(false);
     const body = (await app.call(env))[2];
     expect(lock.synchronized).toBe(true);
@@ -81,7 +97,10 @@ describe("Rack::Lock", () => {
   it("call synchronize on lock", async () => {
     const lock = new TestLock();
     const env = MockRequest.envFor("/");
-    const app = new Lock(async () => [200, { "content-type": "text/plain" }, ["a", "b", "c"]] as any, lock);
+    const app = new Lock(
+      async () => [200, { "content-type": "text/plain" }, ["a", "b", "c"]] as any,
+      lock,
+    );
     expect(lock.synchronized).toBe(false);
     await app.call(env);
     expect(lock.synchronized).toBe(true);
@@ -90,7 +109,9 @@ describe("Rack::Lock", () => {
   it("unlock if the app raises", async () => {
     const lock = new TestLock();
     const env = MockRequest.envFor("/");
-    const app = new Lock(async () => { throw new Error("boom"); }, lock);
+    const app = new Lock(async () => {
+      throw new Error("boom");
+    }, lock);
     await expect(app.call(env)).rejects.toThrow("boom");
     expect(lock.synchronized).toBe(false);
   });
@@ -98,7 +119,9 @@ describe("Rack::Lock", () => {
   it("unlock if the app throws", async () => {
     const lock = new TestLock();
     const env = MockRequest.envFor("/");
-    const app = new Lock(async () => { throw new Error("bacon"); }, lock);
+    const app = new Lock(async () => {
+      throw new Error("bacon");
+    }, lock);
     await expect(app.call(env)).rejects.toThrow("bacon");
     expect(lock.synchronized).toBe(false);
   });
@@ -106,8 +129,12 @@ describe("Rack::Lock", () => {
   it("not unlock if an error is raised before the mutex is locked", async () => {
     let unlocked = false;
     const lock = {
-      lock() { throw new Error("lock failed"); },
-      unlock() { unlocked = true; },
+      lock() {
+        throw new Error("lock failed");
+      },
+      unlock() {
+        unlocked = true;
+      },
     };
     const env = MockRequest.envFor("/");
     const app = new Lock(async () => [200, { "content-type": "text/plain" }, []] as any, lock);
@@ -118,7 +145,9 @@ describe("Rack::Lock", () => {
   it("unlock if an exception occurs before returning", async () => {
     const lock = new TestLock();
     const env = MockRequest.envFor("/");
-    const app = new Lock(async () => { throw new TypeError("frozen"); }, lock);
+    const app = new Lock(async () => {
+      throw new TypeError("frozen");
+    }, lock);
     await expect(app.call(env)).rejects.toThrow();
     expect(lock.synchronized).toBe(false);
   });
@@ -127,7 +156,9 @@ describe("Rack::Lock", () => {
     const env = MockRequest.envFor("/");
     const envId = "env-id-123";
     env._id = envId;
-    const app = lockApp(async (innerEnv: any) => [200, { "content-type": "text/plain" }, [innerEnv._id]] as any);
+    const app = lockApp(
+      async (innerEnv: any) => [200, { "content-type": "text/plain" }, [innerEnv._id]] as any,
+    );
     const [, , body] = await app.call(env);
     const items: string[] = [];
     for (const x of body) items.push(x);

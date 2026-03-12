@@ -13,10 +13,7 @@ export function deepMerge<T extends AnyObject>(target: T, source: AnyObject): T 
   for (const key of Object.keys(source)) {
     const targetVal = result[key];
     const sourceVal = source[key];
-    if (
-      isPlainObject(targetVal) &&
-      isPlainObject(sourceVal)
-    ) {
+    if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
       result[key] = deepMerge(targetVal as AnyObject, sourceVal as AnyObject);
     } else {
       result[key] = sourceVal;
@@ -61,10 +58,7 @@ export function deepDup<T>(obj: T): T {
 /**
  * Pick only the specified keys from an object.
  */
-export function slice<T extends AnyObject, K extends keyof T>(
-  obj: T,
-  ...keys: K[]
-): Pick<T, K> {
+export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
     if (key in obj) {
@@ -77,10 +71,7 @@ export function slice<T extends AnyObject, K extends keyof T>(
 /**
  * Return a copy of the object without the specified keys.
  */
-export function except<T extends AnyObject, K extends keyof T>(
-  obj: T,
-  ...keys: K[]
-): Omit<T, K> {
+export function except<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
   const result = { ...obj };
   for (const key of keys) {
     delete result[key];
@@ -91,10 +82,7 @@ export function except<T extends AnyObject, K extends keyof T>(
 /**
  * Recursively transform all keys using the provided function.
  */
-export function deepTransformKeys(
-  obj: unknown,
-  fn: (key: string) => string
-): unknown {
+export function deepTransformKeys(obj: unknown, fn: (key: string) => string): unknown {
   if (Array.isArray(obj)) {
     return obj.map((item) => deepTransformKeys(item, fn));
   }
@@ -112,9 +100,7 @@ export function deepTransformKeys(
  * Recursively convert all keys to camelCase (Rails' symbolize_keys equivalent).
  */
 export function deepCamelizeKeys(obj: unknown): unknown {
-  return deepTransformKeys(obj, (key) =>
-    key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
-  );
+  return deepTransformKeys(obj, (key) => key.replace(/_([a-z])/g, (_, c) => c.toUpperCase()));
 }
 
 /**
@@ -122,7 +108,10 @@ export function deepCamelizeKeys(obj: unknown): unknown {
  */
 export function deepUnderscoreKeys(obj: unknown): unknown {
   return deepTransformKeys(obj, (key) =>
-    key.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
+    key
+      .replace(/([A-Z])/g, "_$1")
+      .toLowerCase()
+      .replace(/^_/, ""),
   );
 }
 
@@ -132,10 +121,7 @@ export function deepUnderscoreKeys(obj: unknown): unknown {
  * Otherwise returns an empty object.
  */
 export function extractOptions<T>(args: T[]): [T[], AnyObject] {
-  if (
-    args.length > 0 &&
-    isPlainObject(args[args.length - 1])
-  ) {
+  if (args.length > 0 && isPlainObject(args[args.length - 1])) {
     const options = args[args.length - 1] as unknown as AnyObject;
     return [args.slice(0, -1), options];
   }
@@ -196,9 +182,7 @@ export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
   const validSet = new Set(validKeys);
   for (const key of Object.keys(obj)) {
     if (!validSet.has(key)) {
-      throw new Error(
-        `Unknown key: ${key}. Valid keys are: ${validKeys.join(", ")}`
-      );
+      throw new Error(`Unknown key: ${key}. Valid keys are: ${validKeys.join(", ")}`);
     }
   }
 }
@@ -206,10 +190,7 @@ export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
 /**
  * Recursively transform all values using the provided function.
  */
-export function deepTransformValues(
-  obj: unknown,
-  fn: (value: unknown) => unknown
-): unknown {
+export function deepTransformValues(obj: unknown, fn: (value: unknown) => unknown): unknown {
   if (Array.isArray(obj)) {
     return obj.map((item) => deepTransformValues(item, fn));
   }
@@ -227,10 +208,7 @@ export function deepTransformValues(
  * Extract the specified keys from obj, removing them in-place and returning
  * them as a new object (Rails' extract!).
  */
-export function extractKeys<T extends AnyObject>(
-  obj: T,
-  ...keys: string[]
-): Partial<T> {
+export function extractKeys<T extends AnyObject>(obj: T, ...keys: string[]): Partial<T> {
   const result: Partial<T> = {};
   for (const key of keys) {
     if (key in obj) {
@@ -277,7 +255,7 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
     const keys = Object.keys(value as Record<string, unknown>);
     if (keys.length === 0) return [];
     return keys.flatMap((k) =>
-      buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`)
+      buildQueryParts((value as Record<string, unknown>)[k], `${prefix}[${k}]`),
     );
   }
   return [`${encodeQueryKey(prefix)}=${encodeQueryValue(value)}`];

@@ -222,8 +222,12 @@ export class DebugExceptions {
     }
 
     const message = lines.join("\n");
-    const logFn = this.logLevel === "warn" ? (logger.warn ?? logger.error) :
-                  this.logLevel === "info" ? (logger.info ?? logger.error) : logger.error;
+    const logFn =
+      this.logLevel === "warn"
+        ? (logger.warn ?? logger.error)
+        : this.logLevel === "info"
+          ? (logger.info ?? logger.error)
+          : logger.error;
     logFn.call(logger, message);
   }
 

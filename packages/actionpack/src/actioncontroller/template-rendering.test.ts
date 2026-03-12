@@ -18,7 +18,9 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
-function makeResponse(): Response { return new Response(); }
+function makeResponse(): Response {
+  return new Response();
+}
 
 // ==========================================================================
 // action_controller/render_template_test.rb
@@ -229,8 +231,9 @@ describe("ActionController template rendering", () => {
     TemplateController.layout = false;
 
     const c = new TemplateController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse()))
-      .rejects.toThrow(MissingTemplate);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      MissingTemplate,
+    );
   });
 
   it("render without lookupContext throws helpful error", async () => {
@@ -244,8 +247,9 @@ describe("ActionController template rendering", () => {
     NoCtxController.layout = false;
 
     const c = new NoCtxController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse()))
-      .rejects.toThrow(/No lookupContext configured/);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      /No lookupContext configured/,
+    );
   });
 
   it("json render still works with lookupContext set", async () => {
@@ -286,8 +290,9 @@ describe("ActionController template rendering", () => {
     TemplateController.lookupContext = ctx;
 
     const c = new TemplateController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse()))
-      .rejects.toThrow(/Render and\/or redirect/);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      /Render and\/or redirect/,
+    );
   });
 
   it("controller name derived from class name", async () => {
@@ -307,8 +312,12 @@ describe("ActionController template rendering", () => {
   });
 
   it("template has access to controller and action name", async () => {
-    resolver.add("info/debug", "html", "ejs",
-      "controller=<%= controller_name %> action=<%= action_name %>");
+    resolver.add(
+      "info/debug",
+      "html",
+      "ejs",
+      "controller=<%= controller_name %> action=<%= action_name %>",
+    );
 
     class InfoController extends Base {
       async debug() {

@@ -44,7 +44,7 @@ function verifyPassword(password: string, digest: string): boolean {
  */
 export function hasSecurePassword(
   modelClass: typeof Base,
-  options: { validations?: boolean } = {}
+  options: { validations?: boolean } = {},
 ): void {
   const runValidations = options.validations !== false;
 
@@ -118,4 +118,3 @@ export function hasSecurePassword(
 }
 
 export { hashPassword as _hashPassword, verifyPassword as _verifyPassword };
-

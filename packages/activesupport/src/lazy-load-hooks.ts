@@ -18,7 +18,7 @@ const loadedBases = new Map<string, any[]>();
 export function onLoad(
   name: string,
   options: { once?: boolean } | ((base: any) => void),
-  callback?: (base: any) => void
+  callback?: (base: any) => void,
 ): void {
   let opts: { once?: boolean };
   let cb: (base: any) => void;

@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -38,7 +78,10 @@ describe("OrTest", () => {
 
   it("or combines two relations", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const r1 = Post.where({ title: "a" });
     const r2 = Post.where({ title: "b" });
@@ -48,7 +91,10 @@ describe("OrTest", () => {
 
   it("structurally compatible returns true for same model", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const r1 = Post.where({ title: "a" });
     const r2 = Post.where({ title: "b" });
@@ -58,11 +104,17 @@ describe("OrTest", () => {
 
 describe("OrTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("score", "integer");
+        this.adapter = adapter;
+      }
     }
     return { User };
   }
@@ -134,13 +186,17 @@ describe("OrTest", () => {
 
   it("or with incompatible single value relations", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ score: 1 })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ score: 1 }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
   it("or with incompatible multi value relations", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ name: "b" })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ name: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
@@ -155,19 +211,25 @@ describe("OrTest", () => {
 
   it("or with unscope where column", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ score: 5 })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ score: 5 }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
   it("or with unscope order", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ name: "b" })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ name: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
   it("or with incompatible unscope", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ name: "b" })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ name: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
@@ -199,7 +261,9 @@ describe("OrTest", () => {
 
   it("or with sti relation", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ name: "b" })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ name: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
@@ -223,7 +287,9 @@ describe("OrTest", () => {
 
   it("or with references inequality", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ score: 1 })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ score: 1 }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
@@ -236,13 +302,18 @@ describe("OrTest", () => {
 
   it("or with annotate", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).annotate("hint").or(User.where({ name: "b" })).toSql();
+    const sql = User.where({ name: "a" })
+      .annotate("hint")
+      .or(User.where({ name: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
   it("structurally incompatible values", () => {
     const { User } = makeModel();
-    const sql = User.where({ name: "a" }).or(User.where({ name: "b" })).toSql();
+    const sql = User.where({ name: "a" })
+      .or(User.where({ name: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
@@ -265,7 +336,10 @@ describe("TooManyOrTest", () => {
   it("too many or", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Should not throw even with many OR conditions
     let rel = Post.where({ title: "a" });
@@ -276,7 +350,6 @@ describe("TooManyOrTest", () => {
     expect(sql).toContain("OR");
   });
 });
-
 
 describe("Relation#or", () => {
   it("combines two where clauses with OR", async () => {
@@ -312,7 +385,9 @@ describe("Relation#or", () => {
       }
     }
 
-    const sql = User.where({ name: "Alice" }).or(User.where({ age: 30 })).toSql();
+    const sql = User.where({ name: "Alice" })
+      .or(User.where({ age: 30 }))
+      .toSql();
     expect(sql).toContain("OR");
     expect(sql).toContain('"name"');
     expect(sql).toContain('"age"');
@@ -369,7 +444,9 @@ describe("Relation#or edge cases", () => {
 describe("or with scope", () => {
   it("combines two scoped relations with OR", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("role", "string");
@@ -409,7 +486,9 @@ describe("Relation Or (Rails-guided)", () => {
   });
 
   it("or with relation", async () => {
-    const result = await User.where({ name: "Alice" }).or(User.where({ name: "Charlie" })).toArray();
+    const result = await User.where({ name: "Alice" })
+      .or(User.where({ name: "Charlie" }))
+      .toArray();
     expect(result).toHaveLength(2);
     const names = result.map((r: Base) => r.readAttribute("name"));
     expect(names).toContain("Alice");
@@ -417,12 +496,16 @@ describe("Relation Or (Rails-guided)", () => {
   });
 
   it("or generates correct SQL", () => {
-    const sql = User.where({ name: "Alice" }).or(User.where({ age: 30 })).toSql();
+    const sql = User.where({ name: "Alice" })
+      .or(User.where({ age: 30 }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 
   it("or with count", async () => {
-    const count = await User.where({ age: 25 }).or(User.where({ age: 35 })).count();
+    const count = await User.where({ age: 25 })
+      .or(User.where({ age: 35 }))
+      .count();
     expect(count).toBe(2);
   });
 
@@ -434,7 +517,6 @@ describe("Relation Or (Rails-guided)", () => {
     expect(result).toHaveLength(3);
   });
 });
-
 
 describe("Relation#or (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -579,13 +661,13 @@ describe("OR queries (Rails-guided)", () => {
     expect(
       await User.where({ role: "admin" })
         .or(User.where({ role: "mod" }))
-        .exists()
+        .exists(),
     ).toBe(true);
 
     expect(
       await User.where({ role: "guest" })
         .or(User.where({ role: "mod" }))
-        .exists()
+        .exists(),
     ).toBe(false);
   });
 });

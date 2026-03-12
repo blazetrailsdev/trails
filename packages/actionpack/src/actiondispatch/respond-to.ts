@@ -25,16 +25,36 @@ export class Collector {
   private anyVariantHandler: FormatHandler | null = null;
 
   /** Register a handler for a specific format. */
-  html(handler?: FormatHandler): this { return this.on("html", handler); }
-  json(handler?: FormatHandler): this { return this.on("json", handler); }
-  xml(handler?: FormatHandler): this { return this.on("xml", handler); }
-  js(handler?: FormatHandler): this { return this.on("js", handler); }
-  text(handler?: FormatHandler): this { return this.on("text", handler); }
-  csv(handler?: FormatHandler): this { return this.on("csv", handler); }
-  atom(handler?: FormatHandler): this { return this.on("atom", handler); }
-  rss(handler?: FormatHandler): this { return this.on("rss", handler); }
-  yaml(handler?: FormatHandler): this { return this.on("yaml", handler); }
-  pdf(handler?: FormatHandler): this { return this.on("pdf", handler); }
+  html(handler?: FormatHandler): this {
+    return this.on("html", handler);
+  }
+  json(handler?: FormatHandler): this {
+    return this.on("json", handler);
+  }
+  xml(handler?: FormatHandler): this {
+    return this.on("xml", handler);
+  }
+  js(handler?: FormatHandler): this {
+    return this.on("js", handler);
+  }
+  text(handler?: FormatHandler): this {
+    return this.on("text", handler);
+  }
+  csv(handler?: FormatHandler): this {
+    return this.on("csv", handler);
+  }
+  atom(handler?: FormatHandler): this {
+    return this.on("atom", handler);
+  }
+  rss(handler?: FormatHandler): this {
+    return this.on("rss", handler);
+  }
+  yaml(handler?: FormatHandler): this {
+    return this.on("yaml", handler);
+  }
+  pdf(handler?: FormatHandler): this {
+    return this.on("pdf", handler);
+  }
 
   /** Register a handler for a named format. */
   on(format: string, handler?: FormatHandler): this {
@@ -76,11 +96,13 @@ export class Collector {
   }
 
   /** Negotiate the best format from an Accept header or explicit format. */
-  negotiate(options: {
-    accept?: string;
-    format?: string;
-    variant?: string;
-  } = {}): { format: string; handler: FormatHandler } | null {
+  negotiate(
+    options: {
+      accept?: string;
+      format?: string;
+      variant?: string;
+    } = {},
+  ): { format: string; handler: FormatHandler } | null {
     const { accept, format, variant } = options;
     this._variant = variant ?? null;
 
@@ -162,9 +184,7 @@ export class Collector {
       .split(",")
       .map((part) => {
         const [type, ...params] = part.trim().split(";");
-        const q = params
-          .map((p) => p.trim())
-          .find((p) => p.startsWith("q="));
+        const q = params.map((p) => p.trim()).find((p) => p.startsWith("q="));
         const quality = q ? parseFloat(q.slice(2)) : 1.0;
         return { type: type.trim(), quality };
       })
@@ -185,7 +205,7 @@ export class Collector {
  */
 export function respondTo(
   block: (collector: Collector) => void,
-  options: { accept?: string; format?: string; variant?: string } = {}
+  options: { accept?: string; format?: string; variant?: string } = {},
 ): unknown {
   const collector = new Collector();
   block(collector);

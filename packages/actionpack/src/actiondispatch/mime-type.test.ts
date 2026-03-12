@@ -96,14 +96,18 @@ describe("ActionDispatch::Mime::Type", () => {
   });
 
   it("custom type with type aliases", () => {
-    const custom = MimeType.register("application/x-testaliased", "testaliased", ["text/x-testaliased"]);
+    const custom = MimeType.register("application/x-testaliased", "testaliased", [
+      "text/x-testaliased",
+    ]);
     expect(MimeType.lookup("text/x-testaliased")).toBe(custom);
     MimeType.unregister("testaliased");
   });
 
   it("register callbacks", () => {
     let called = false;
-    MimeType.onRegister(() => { called = true; });
+    MimeType.onRegister(() => {
+      called = true;
+    });
     MimeType.register("application/x-callback-test", "callback_test");
     expect(called).toBe(true);
     MimeType.unregister("callback_test");

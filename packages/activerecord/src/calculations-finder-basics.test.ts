@@ -28,11 +28,17 @@ function freshAdapter(): DatabaseAdapter {
 // ==========================================================================
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeAccount() {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     return Account;
   }
@@ -325,11 +331,18 @@ describe("CalculationsTest", () => {
 // ==========================================================================
 describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeTopic() {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_name", "string"); this.attribute("approved", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
     }
     return Topic;
   }
@@ -513,7 +526,11 @@ describe("FinderTest", () => {
   it("find on multiple hash conditions", async () => {
     const Topic = makeTopic();
     await Topic.create({ title: "Hello", author_name: "Alice", approved: true });
-    const found = await Topic.where({ title: "Hello", author_name: "Alice", approved: true }).first();
+    const found = await Topic.where({
+      title: "Hello",
+      author_name: "Alice",
+      approved: true,
+    }).first();
     expect(found).not.toBeNull();
   });
 
@@ -629,11 +646,19 @@ describe("FinderTest", () => {
 // ==========================================================================
 describe("BasicsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeTopic() {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_name", "string"); this.attribute("approved", "boolean"); this.attribute("written_on", "date"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.attribute("written_on", "date");
+        this.adapter = adapter;
+      }
     }
     return Topic;
   }
@@ -736,7 +761,7 @@ describe("BasicsTest", () => {
     const Topic = makeTopic();
     await Topic.create({ title: "First" });
     const last = await Topic.create({ title: "Last" });
-    const found = await Topic.last() as any;
+    const found = (await Topic.last()) as any;
     expect(found).not.toBeNull();
     expect(found!.id).toBe(last.id);
   });
@@ -877,7 +902,10 @@ describe("BasicsTest", () => {
 
   it("switching between table name", async () => {
     class MyModel extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const original = MyModel.tableName;
     MyModel.tableName = "other_table";
@@ -906,11 +934,18 @@ describe("BasicsTest", () => {
 // ==========================================================================
 describe("InheritanceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeCompanyHierarchy() {
     class Company extends Base {
-      static { this.attribute("name", "string"); this.attribute("type", "string"); this.inheritanceColumn = "type"; this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+        this.adapter = adapter;
+      }
     }
     class Firm extends Company {}
     class Client extends Company {}
@@ -992,7 +1027,7 @@ describe("InheritanceTest", () => {
   it("find first within inheritance", async () => {
     const { Company } = makeCompanyHierarchy();
     const c = await Company.create({ name: "First" });
-    const found = await Company.first() as any;
+    const found = (await Company.first()) as any;
     expect(found).not.toBeNull();
     expect(found!.id).toBe(c.id);
   });
@@ -1002,7 +1037,7 @@ describe("InheritanceTest", () => {
     await Company.create({ name: "Old" });
     const count = await Company.updateAll({ name: "Updated" });
     expect(count).toBeGreaterThanOrEqual(1);
-    const found = await Company.first() as any;
+    const found = (await Company.first()) as any;
     expect(found!.readAttribute("name")).toBe("Updated");
   });
 
@@ -1026,7 +1061,10 @@ describe("InheritanceTest", () => {
 
   it("inherits custom primary key", async () => {
     class Root extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Child extends Root {}
     expect(Child.primaryKey).toBe(Root.primaryKey);
@@ -1041,7 +1079,10 @@ describe("InheritanceTest", () => {
 
   it("sti type from attributes disabled in non sti class", async () => {
     class Plain extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const p = new (Plain as any)({ name: "NoSTI" });
     expect(p.readAttribute("name")).toBe("NoSTI");
@@ -1057,10 +1098,18 @@ describe("InheritanceTest", () => {
       }
     }
     class Cucumber extends Vegetable {
-      static { registerModel(Cucumber); registerSubclass(Cucumber); this.adapter = adapter; }
+      static {
+        registerModel(Cucumber);
+        registerSubclass(Cucumber);
+        this.adapter = adapter;
+      }
     }
     class Cabbage extends Vegetable {
-      static { registerModel(Cabbage); registerSubclass(Cabbage); this.adapter = adapter; }
+      static {
+        registerModel(Cabbage);
+        registerSubclass(Cabbage);
+        this.adapter = adapter;
+      }
     }
     registerModel(Vegetable);
 
@@ -1088,10 +1137,15 @@ describe("InheritanceTest", () => {
 
   it("abstract inheritance base class", async () => {
     class AbstractBase extends Base {
-      static { this.abstractClass = true; this.adapter = adapter; }
+      static {
+        this.abstractClass = true;
+        this.adapter = adapter;
+      }
     }
     class ConcreteClass extends AbstractBase {
-      static { this.attribute("name", "string"); }
+      static {
+        this.attribute("name", "string");
+      }
     }
     expect(ConcreteClass.prototype).toBeInstanceOf(AbstractBase);
   });
@@ -1124,7 +1178,11 @@ describe("InheritanceTest", () => {
 
   it("new with abstract class", async () => {
     class AbstractCompany extends Base {
-      static { this.abstractClass = true; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class RealCompany extends AbstractCompany {}
     const rc = new (RealCompany as any)({ name: "Real" });
@@ -1150,7 +1208,10 @@ describe("InheritanceTest", () => {
 
   it("inheritance without mapping", async () => {
     class Vehicle extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Car extends Vehicle {}
     const car = new (Car as any)({ name: "Toyota" });
@@ -1164,11 +1225,20 @@ describe("InheritanceTest", () => {
 // ==========================================================================
 describe("AttributeMethodsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeTopic() {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_name", "string"); this.attribute("approved", "boolean"); this.attribute("written_on", "date"); this.attribute("bonus_time", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.attribute("written_on", "date");
+        this.attribute("bonus_time", "datetime");
+        this.adapter = adapter;
+      }
     }
     return Topic;
   }
@@ -1203,7 +1273,10 @@ describe("AttributeMethodsTest", () => {
 
   it("integers as nil", async () => {
     class Item extends Base {
-      static { this.attribute("value", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "integer");
+        this.adapter = adapter;
+      }
     }
     const item = await Item.create({ value: "" as any });
     // Empty string cast to integer yields null
@@ -1261,7 +1334,10 @@ describe("AttributeMethodsTest", () => {
 
   it("converted values are returned after assignment", async () => {
     class Item extends Base {
-      static { this.attribute("count", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adapter;
+      }
     }
     const item = new (Item as any)({ count: "42" });
     expect(item.readAttribute("count")).toBe(42);
@@ -1347,7 +1423,10 @@ describe("AttributeMethodsTest", () => {
 
   it("attributes without primary key", async () => {
     class NoPk extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const n = new (NoPk as any)({ name: "NoPK" });
     const attrs = n.attributes;
@@ -1368,11 +1447,17 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeAuthor() {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     return Author;
   }
@@ -1512,11 +1597,17 @@ describe("WhereTest", () => {
 // ==========================================================================
 describe("WhereChainTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makePost() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     return Post;
   }
@@ -1577,7 +1668,9 @@ describe("WhereChainTest", () => {
 
   it("rewhere with multiple overwriting conditions", async () => {
     const Post = makePost();
-    const sql = Post.where({ title: "A", author_id: 1 }).rewhere({ title: "B", author_id: 2 }).toSql();
+    const sql = Post.where({ title: "A", author_id: 1 })
+      .rewhere({ title: "B", author_id: 2 })
+      .toSql();
     expect(sql).toMatch(/B/);
     expect(sql).not.toMatch(/\bA\b/);
   });
@@ -1624,17 +1717,30 @@ describe("WhereChainTest", () => {
 
   it("associated with multiple associations", async () => {
     class MaAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class MaCategory extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class MaPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.attribute("category_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(MaPost, "maAuthor", { foreignKey: "author_id" });
     Associations.belongsTo.call(MaPost, "maCategory", { foreignKey: "category_id" });
-    registerModel(MaAuthor); registerModel(MaCategory); registerModel(MaPost);
+    registerModel(MaAuthor);
+    registerModel(MaCategory);
+    registerModel(MaPost);
     const author = await MaAuthor.create({ name: "Alice" });
     const category = await MaCategory.create({ name: "Tech" });
     await MaPost.create({ title: "Both", author_id: author.id, category_id: category.id });
@@ -1647,7 +1753,9 @@ describe("WhereChainTest", () => {
 
   it("associated with invalid association name", async () => {
     const Post = makePost();
-    expect(() => Post.all().whereAssociated("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
+    expect(() => Post.all().whereAssociated("nonexistent")).toThrow(
+      /Association named 'nonexistent' was not found/,
+    );
   });
 
   it.skip("rewhere with polymorphic association", async () => {
@@ -1664,11 +1772,18 @@ describe("WhereChainTest", () => {
 // ==========================================================================
 describe("InsertAllTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeBook() {
     class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     return Book;
   }
@@ -1702,7 +1817,7 @@ describe("InsertAllTest", () => {
     // insertAll with explicit id that conflicts should raise
     // In MemoryAdapter, duplicates on pk raise
     await expect(
-      Book.insertAll([{ id: b.id, title: "Duplicate", author: "Other" }])
+      Book.insertAll([{ id: b.id, title: "Duplicate", author: "Other" }]),
     ).rejects.toThrow();
   });
 
@@ -1722,10 +1837,13 @@ describe("InsertAllTest", () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Existing", author: "A" });
     // upsertAll with skip behavior
-    const result = await Book.upsertAll([
-      { id: b.id, title: "Skip Me", author: "A" },
-      { title: "New One", author: "B" },
-    ], { onDuplicate: "skip" } as any);
+    const result = await Book.upsertAll(
+      [
+        { id: b.id, title: "Skip Me", author: "A" },
+        { title: "New One", author: "B" },
+      ],
+      { onDuplicate: "skip" } as any,
+    );
     expect(result).toBeDefined();
     // Original should still have old title
     const existing = await Book.find(b.id);
@@ -1779,14 +1897,16 @@ describe("InsertAllTest", () => {
   it("upsert all passing both on duplicate and update only will raise an error", async () => {
     const Book = makeBook();
     await expect(
-      Book.upsertAll([{ title: "X" }], { onDuplicate: "skip", updateOnly: "title" } as any)
+      Book.upsertAll([{ title: "X" }], { onDuplicate: "skip", updateOnly: "title" } as any),
     ).rejects.toThrow();
   });
 
   it("upsert all only updates the column provided via update only", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "OldTitle", author: "OldAuthor" });
-    await Book.upsertAll([{ id: b.id, title: "NewTitle", author: "NewAuthor" }], { updateOnly: "author" } as any);
+    await Book.upsertAll([{ id: b.id, title: "NewTitle", author: "NewAuthor" }], {
+      updateOnly: "author",
+    } as any);
     const found = await Book.find(b.id);
     expect(found.readAttribute("author")).toBe("NewAuthor");
   });
@@ -1794,7 +1914,9 @@ describe("InsertAllTest", () => {
   it("upsert all only updates the list of columns provided via update only", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Title", author: "Author", status: 0 });
-    await Book.upsertAll([{ id: b.id, title: "NewTitle", author: "NewAuthor", status: 1 }], { updateOnly: ["title", "author"] } as any);
+    await Book.upsertAll([{ id: b.id, title: "NewTitle", author: "NewAuthor", status: 1 }], {
+      updateOnly: ["title", "author"],
+    } as any);
     const found = await Book.find(b.id);
     expect(found.readAttribute("title")).toBe("NewTitle");
     expect(found.readAttribute("author")).toBe("NewAuthor");
@@ -1810,7 +1932,10 @@ describe("InsertAllTest", () => {
   it("insert all with enum values", async () => {
     const Book = makeBook();
     defineEnum(Book, "status", { draft: 0, published: 1 });
-    await Book.insertAll([{ title: "Draft", status: 0 }, { title: "Published", status: 1 }]);
+    await Book.insertAll([
+      { title: "Draft", status: 0 },
+      { title: "Published", status: 1 },
+    ]);
     const all = await Book.all().toArray();
     expect(all.length).toBe(2);
   });
@@ -1818,7 +1943,9 @@ describe("InsertAllTest", () => {
   it("skip duplicates strategy does not secretly upsert", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Original", author: "First" });
-    await Book.upsertAll([{ id: b.id, title: "ShouldSkip", author: "Second" }], { onDuplicate: "skip" } as any);
+    await Book.upsertAll([{ id: b.id, title: "ShouldSkip", author: "Second" }], {
+      onDuplicate: "skip",
+    } as any);
     const found = await Book.find(b.id);
     expect(found.readAttribute("title")).toBe("Original");
   });

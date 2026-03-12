@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,16 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("ReadOnlyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -121,22 +166,41 @@ describe("ReadOnlyTest", () => {
     expect(posts[0].isReadonly()).toBe(true);
   });
 
-  it.skip("cant touch readonly column", () => { /* fixture-dependent */ });
-  it.skip("has many find readonly", () => { /* needs associations */ });
-  it.skip("has many with through is not implicitly marked readonly", () => { /* needs associations */ });
-  it.skip("has many with through is not implicitly marked readonly while finding by id", () => { /* needs associations */ });
-  it.skip("has many with through is not implicitly marked readonly while finding first", () => { /* needs associations */ });
-  it.skip("has many with through is not implicitly marked readonly while finding last", () => { /* needs associations */ });
-  it.skip("association collection method missing scoping not readonly", () => { /* needs associations */ });
+  it.skip("cant touch readonly column", () => {
+    /* fixture-dependent */
+  });
+  it.skip("has many find readonly", () => {
+    /* needs associations */
+  });
+  it.skip("has many with through is not implicitly marked readonly", () => {
+    /* needs associations */
+  });
+  it.skip("has many with through is not implicitly marked readonly while finding by id", () => {
+    /* needs associations */
+  });
+  it.skip("has many with through is not implicitly marked readonly while finding first", () => {
+    /* needs associations */
+  });
+  it.skip("has many with through is not implicitly marked readonly while finding last", () => {
+    /* needs associations */
+  });
+  it.skip("association collection method missing scoping not readonly", () => {
+    /* needs associations */
+  });
 });
 
 describe("ReadOnlyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -144,7 +208,6 @@ describe("ReadOnlyTest", () => {
   it.skip("cant touch readonly record", () => {});
   it.skip("cant update column readonly record", () => {});
 });
-
 
 describe("readonly", () => {
   let adapter: DatabaseAdapter;
@@ -185,10 +248,14 @@ describe("readonly", () => {
 
 describe("readonly()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("marks loaded records as readonly", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -203,7 +270,9 @@ describe("readonly()", () => {
 describe("attrReadonly", () => {
   it("allows setting readonly attributes on create", async () => {
     const adapter = freshAdapter();
-    class Product extends Base { static _tableName = "products"; }
+    class Product extends Base {
+      static _tableName = "products";
+    }
     Product.attribute("id", "integer");
     Product.attribute("sku", "string");
     Product.attribute("name", "string");
@@ -216,7 +285,9 @@ describe("attrReadonly", () => {
 
   it("ignores readonly attribute changes on update", async () => {
     const adapter = freshAdapter();
-    class Product extends Base { static _tableName = "products"; }
+    class Product extends Base {
+      static _tableName = "products";
+    }
     Product.attribute("id", "integer");
     Product.attribute("sku", "string");
     Product.attribute("name", "string");
@@ -236,7 +307,9 @@ describe("attrReadonly", () => {
 
   it("exposes readonlyAttributes list", () => {
     const adapter = freshAdapter();
-    class Product extends Base { static _tableName = "products"; }
+    class Product extends Base {
+      static _tableName = "products";
+    }
     Product.attribute("id", "integer");
     Product.attribute("sku", "string");
     Product.adapter = adapter;
@@ -248,11 +321,16 @@ describe("attrReadonly", () => {
 
 describe("Readonly (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("readonly records cannot be saved", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     const records = await User.all().readonly().toArray();
@@ -261,7 +339,6 @@ describe("Readonly (Rails-guided)", () => {
     await expect(user.save()).rejects.toThrow();
   });
 });
-
 
 describe("Readonly (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -273,7 +350,12 @@ describe("Readonly (Rails-guided)", () => {
   // Rails: test "readonly record cannot be saved"
   it("cant save readonly record", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await Post.create({ title: "Hello" });
     post.readonlyBang();
@@ -283,7 +365,12 @@ describe("Readonly (Rails-guided)", () => {
   // Rails: test "readonly record cannot be destroyed"
   it("raises on destroy for readonly records", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await Post.create({ title: "Hello" });
     post.readonlyBang();
@@ -293,7 +380,11 @@ describe("Readonly (Rails-guided)", () => {
   // Rails: test "readonly? predicate"
   it("isReadonly reflects the readonly state", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     const post = await Post.create({});
     expect(post.isReadonly()).toBe(false);

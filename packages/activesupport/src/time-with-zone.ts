@@ -35,15 +35,7 @@ export interface AdvanceOptions {
   seconds?: number;
 }
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const MONTH_NAMES = [
   "January",
@@ -61,8 +53,18 @@ const MONTH_NAMES = [
 ];
 
 const SHORT_MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -126,7 +128,9 @@ export class TimeWithZone {
 
   /** Whether the timezone is UTC */
   isUtc(): boolean {
-    return this.utcOffset === 0 && (this._timeZone.tzinfo === "Etc/UTC" || this._timeZone.name === "UTC");
+    return (
+      this.utcOffset === 0 && (this._timeZone.tzinfo === "Etc/UTC" || this._timeZone.name === "UTC")
+    );
   }
 
   /** Alias for isUtc() */
@@ -242,15 +246,7 @@ export class TimeWithZone {
       return new Date(this._utc.getTime() + utcOffsetOverride * 1000);
     }
     const l = this._local();
-    return new Date(
-      l.year,
-      l.month - 1,
-      l.day,
-      l.hour,
-      l.minute,
-      l.second,
-      l.millisecond
-    );
+    return new Date(l.year, l.month - 1, l.day, l.hour, l.minute, l.second, l.millisecond);
   }
 
   /** Alias for localtime() */
@@ -341,8 +337,7 @@ export class TimeWithZone {
       H: () => pad2(l.hour),
       k: () => String(l.hour).padStart(2, " "),
       I: () => pad2(l.hour === 0 ? 12 : l.hour > 12 ? l.hour - 12 : l.hour),
-      l: () =>
-        String(l.hour === 0 ? 12 : l.hour > 12 ? l.hour - 12 : l.hour).padStart(2, " "),
+      l: () => String(l.hour === 0 ? 12 : l.hour > 12 ? l.hour - 12 : l.hour).padStart(2, " "),
       P: () => (l.hour < 12 ? "am" : "pm"),
       p: () => (l.hour < 12 ? "AM" : "PM"),
       M: () => pad2(l.minute),
@@ -487,10 +482,7 @@ export class TimeWithZone {
       return new TimeWithZone(new Date(this._utc.getTime() + ms), this._timeZone);
     }
     // Number of seconds
-    return new TimeWithZone(
-      new Date(this._utc.getTime() + interval * 1000),
-      this._timeZone
-    );
+    return new TimeWithZone(new Date(this._utc.getTime() + interval * 1000), this._timeZone);
   }
 
   /**
@@ -562,7 +554,7 @@ export class TimeWithZone {
       l.hour,
       l.minute,
       l.second,
-      l.millisecond
+      l.millisecond,
     );
 
     // Now apply fixed parts as seconds on UTC
@@ -572,10 +564,7 @@ export class TimeWithZone {
     if (options.seconds) ms += options.seconds * 1000;
 
     if (ms !== 0) {
-      return new TimeWithZone(
-        new Date(newLocal._utc.getTime() + ms),
-        this._timeZone
-      );
+      return new TimeWithZone(new Date(newLocal._utc.getTime() + ms), this._timeZone);
     }
 
     return newLocal;
@@ -592,8 +581,7 @@ export class TimeWithZone {
     const day = Math.min(options.day ?? l.day, daysInMonth(year, month));
     const hour = options.hour ?? l.hour;
     // If hour changes, reset lower components unless explicitly set
-    const min =
-      options.min ?? (options.hour !== undefined ? 0 : l.minute);
+    const min = options.min ?? (options.hour !== undefined ? 0 : l.minute);
     const sec =
       options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : l.second);
     let ms = l.millisecond;
@@ -620,8 +608,7 @@ export class TimeWithZone {
    * Compare to another TimeWithZone or Date. Returns -1, 0, or 1.
    */
   compareTo(other: TimeWithZone | Date): number {
-    const otherMs =
-      other instanceof TimeWithZone ? other._utc.getTime() : other.getTime();
+    const otherMs = other instanceof TimeWithZone ? other._utc.getTime() : other.getTime();
     const thisMs = this._utc.getTime();
     if (thisMs < otherMs) return -1;
     if (thisMs > otherMs) return 1;
@@ -668,28 +655,20 @@ export class TimeWithZone {
 
   isToday(): boolean {
     const now = this._timeZone.now();
-    return (
-      this.year === now.year &&
-      this.month === now.month &&
-      this.day === now.day
-    );
+    return this.year === now.year && this.month === now.month && this.day === now.day;
   }
 
   isTomorrow(): boolean {
     const tomorrow = this._timeZone.now().advance({ days: 1 });
     return (
-      this.year === tomorrow.year &&
-      this.month === tomorrow.month &&
-      this.day === tomorrow.day
+      this.year === tomorrow.year && this.month === tomorrow.month && this.day === tomorrow.day
     );
   }
 
   isYesterday(): boolean {
     const yesterday = this._timeZone.now().advance({ days: -1 });
     return (
-      this.year === yesterday.year &&
-      this.month === yesterday.month &&
-      this.day === yesterday.day
+      this.year === yesterday.year && this.month === yesterday.month && this.day === yesterday.day
     );
   }
 

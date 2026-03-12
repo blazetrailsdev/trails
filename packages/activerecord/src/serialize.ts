@@ -73,7 +73,7 @@ const HASH_CODER: Coder = {
 export function serialize(
   modelClass: typeof Base,
   attribute: string,
-  options: { coder?: "json" | "array" | "hash" | Coder } = {}
+  options: { coder?: "json" | "array" | "hash" | Coder } = {},
 ): void {
   let coder: Coder;
   if (!options.coder || options.coder === "json") {
@@ -102,8 +102,8 @@ export function serialize(
 
     modelClass.prototype.readAttribute = function (name: string): unknown {
       const raw = originalRead.call(this, name);
-      const serializedAttrs: Map<string, Coder> | undefined =
-        ((this.constructor as any)._serializedAttributes);
+      const serializedAttrs: Map<string, Coder> | undefined = (this.constructor as any)
+        ._serializedAttributes;
       if (serializedAttrs?.has(name)) {
         return serializedAttrs.get(name)!.load(raw);
       }

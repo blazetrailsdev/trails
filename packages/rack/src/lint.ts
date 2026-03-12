@@ -1,16 +1,35 @@
 import type { RackApp } from "./mock-request.js";
 import {
-  REQUEST_METHOD, SERVER_NAME, SERVER_PORT, SERVER_PROTOCOL,
-  QUERY_STRING, PATH_INFO, SCRIPT_NAME, RACK_URL_SCHEME,
-  RACK_INPUT, RACK_ERRORS, RACK_HIJACK, RACK_IS_HIJACK,
-  RACK_EARLY_HINTS, RACK_RESPONSE_FINISHED, RACK_PROTOCOL,
-  CONTENT_TYPE, CONTENT_LENGTH, TRANSFER_ENCODING,
+  REQUEST_METHOD,
+  SERVER_NAME,
+  SERVER_PORT,
+  SERVER_PROTOCOL,
+  QUERY_STRING,
+  PATH_INFO,
+  SCRIPT_NAME,
+  RACK_URL_SCHEME,
+  RACK_INPUT,
+  RACK_ERRORS,
+  RACK_HIJACK,
+  RACK_IS_HIJACK,
+  RACK_EARLY_HINTS,
+  RACK_RESPONSE_FINISHED,
+  RACK_PROTOCOL,
+  CONTENT_TYPE,
+  CONTENT_LENGTH,
+  TRANSFER_ENCODING,
   STATUS_WITH_NO_ENTITY_BODY,
-  GET, HEAD, OPTIONS, CONNECT,
+  GET,
+  HEAD,
+  OPTIONS,
+  CONNECT,
 } from "./constants.js";
 
 export class LintError extends Error {
-  constructor(message: string) { super(message); this.name = "LintError"; }
+  constructor(message: string) {
+    super(message);
+    this.name = "LintError";
+  }
 }
 
 export class Lint {
@@ -78,7 +97,16 @@ export class Lint {
   }
 
   private checkEnv(env: Record<string, any>): void {
-    const required = [REQUEST_METHOD, SERVER_NAME, SERVER_PORT, SERVER_PROTOCOL, RACK_INPUT, RACK_ERRORS, QUERY_STRING, RACK_URL_SCHEME];
+    const required = [
+      REQUEST_METHOD,
+      SERVER_NAME,
+      SERVER_PORT,
+      SERVER_PROTOCOL,
+      RACK_INPUT,
+      RACK_ERRORS,
+      QUERY_STRING,
+      RACK_URL_SCHEME,
+    ];
     for (const key of required) {
       if (!(key in env)) {
         throw new LintError(`env missing required key ${key}`);

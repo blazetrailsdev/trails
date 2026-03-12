@@ -212,9 +212,11 @@ export class Base extends Model {
 
     const isPg = !!process.env.PG_TEST_URL;
     const isMysql = !!process.env.MYSQL_TEST_URL;
-    const pkDef = isPg ? `"${pk}" SERIAL PRIMARY KEY`
-      : isMysql ? `\`${pk}\` INT AUTO_INCREMENT PRIMARY KEY`
-      : `"${pk}" INTEGER PRIMARY KEY AUTOINCREMENT`;
+    const pkDef = isPg
+      ? `"${pk}" SERIAL PRIMARY KEY`
+      : isMysql
+        ? `\`${pk}\` INT AUTO_INCREMENT PRIMARY KEY`
+        : `"${pk}" INTEGER PRIMARY KEY AUTOINCREMENT`;
     const colDefs: string[] = [pkDef];
     for (const [name, def] of this._attributeDefinitions) {
       if (name === pk) continue;
@@ -223,7 +225,7 @@ export class Base extends Model {
     }
 
     await this.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "${table}" (${colDefs.join(", ")})`
+      `CREATE TABLE IF NOT EXISTS "${table}" (${colDefs.join(", ")})`,
     );
   }
 
@@ -238,7 +240,7 @@ export class Base extends Model {
   static get adapter(): DatabaseAdapter {
     if (!this._adapter) {
       throw new Error(
-        `No adapter configured for ${this.name}. Set ${this.name}.adapter = yourAdapter`
+        `No adapter configured for ${this.name}. Set ${this.name}.adapter = yourAdapter`,
       );
     }
     return this._adapter;
@@ -259,9 +261,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.human_attribute_name
    */
   static humanAttributeName(attr: string): string {
-    return attr
-      .replace(/_/g, " ")
-      .replace(/^\w/, (c) => c.toUpperCase());
+    return attr.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
   }
 
   /**
@@ -349,18 +349,26 @@ export class Base extends Model {
   }
 
   // -- Logger --
-  static _logger: { debug?: Function; info?: Function; warn?: Function; error?: Function } | null = null;
+  static _logger: { debug?: Function; info?: Function; warn?: Function; error?: Function } | null =
+    null;
 
   /**
    * Set or get the logger for SQL and lifecycle events.
    *
    * Mirrors: ActiveRecord::Base.logger
    */
-  static get logger(): { debug?: Function; info?: Function; warn?: Function; error?: Function } | null {
+  static get logger(): {
+    debug?: Function;
+    info?: Function;
+    warn?: Function;
+    error?: Function;
+  } | null {
     return this._logger;
   }
 
-  static set logger(log: { debug?: Function; info?: Function; warn?: Function; error?: Function } | null) {
+  static set logger(
+    log: { debug?: Function; info?: Function; warn?: Function; error?: Function } | null,
+  ) {
     this._logger = log;
   }
 
@@ -489,9 +497,10 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
    */
   static validatesAssociated(...associationNames: string[]): void {
-    this.beforeValidation(async function(this: Base) {
+    this.beforeValidation(async function (this: Base) {
       for (const name of associationNames) {
-        const cached = (this as any)._preloadedAssociations?.get(name) ??
+        const cached =
+          (this as any)._preloadedAssociations?.get(name) ??
           (this as any)._cachedAssociations?.get(name);
         if (!cached) continue;
         const records = Array.isArray(cached) ? cached : [cached];
@@ -516,19 +525,25 @@ export class Base extends Model {
   static enum(
     attribute: string,
     mapping: Record<string, number>,
-    options?: { prefix?: boolean | string; suffix?: boolean | string }
+    options?: { prefix?: boolean | string; suffix?: boolean | string },
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
       this._enums = new Map(this._enums);
     }
     this._enums.set(attribute, mapping);
 
-    const prefix = options?.prefix === true ? `${attribute}_`
-      : typeof options?.prefix === "string" ? `${options.prefix}_`
-      : "";
-    const suffix = options?.suffix === true ? `_${attribute}`
-      : typeof options?.suffix === "string" ? `_${options.suffix}`
-      : "";
+    const prefix =
+      options?.prefix === true
+        ? `${attribute}_`
+        : typeof options?.prefix === "string"
+          ? `${options.prefix}_`
+          : "";
+    const suffix =
+      options?.suffix === true
+        ? `_${attribute}`
+        : typeof options?.suffix === "string"
+          ? `_${options.suffix}`
+          : "";
 
     // Override readAttribute to return the symbol name
     const origRead = this.prototype.readAttribute;
@@ -561,17 +576,21 @@ export class Base extends Model {
       const methodBase = `${prefix}${name}${suffix}`;
 
       // Predicate: user.active? → user.isActive()
-      Object.defineProperty(this.prototype, `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`, {
-        value: function(this: Base) {
-          return this._attributes.get(attrName) === value;
+      Object.defineProperty(
+        this.prototype,
+        `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`,
+        {
+          value: function (this: Base) {
+            return this._attributes.get(attrName) === value;
+          },
+          writable: true,
+          configurable: true,
         },
-        writable: true,
-        configurable: true,
-      });
+      );
 
       // Bang setter: user.active! → user.activeBang()
       Object.defineProperty(this.prototype, `${methodBase}Bang`, {
-        value: function(this: Base) {
+        value: function (this: Base) {
           this.writeAttribute(attrName, value);
           return this;
         },
@@ -587,7 +606,7 @@ export class Base extends Model {
 
       // Static method that delegates to the scope
       Object.defineProperty(this, methodBase, {
-        value: function() {
+        value: function () {
           return (this as typeof Base).all()[methodBase]();
         },
         writable: true,
@@ -613,10 +632,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Store.store
    */
-  static store(
-    attribute: string,
-    options?: { accessors?: string[] }
-  ): void {
+  static store(attribute: string, options?: { accessors?: string[] }): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_storedAttributes")) {
       this._storedAttributes = new Map(this._storedAttributes);
     }
@@ -687,7 +703,7 @@ export class Base extends Model {
   static scope(
     name: string,
     fn: (rel: any, ...args: any[]) => any,
-    extension?: Record<string, Function>
+    extension?: Record<string, Function>,
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_scopes")) {
       this._scopes = new Map(this._scopes);
@@ -762,20 +778,23 @@ export class Base extends Model {
         if (tuples.length === 0) {
           throw new RecordNotFound(
             `${this.name}: couldn't find all with an empty list of ids`,
-            this.name, String(this.primaryKey), []
+            this.name,
+            String(this.primaryKey),
+            [],
           );
         }
         const pk = this.primaryKey as string[];
-        const whereParts = tuples.map((tuple) =>
-          `(${pk.map((col, i) => `"${col}" = ${this._quoteValue(tuple[i])}`).join(" AND ")})`
+        const whereParts = tuples.map(
+          (tuple) =>
+            `(${pk.map((col, i) => `"${col}" = ${this._quoteValue(tuple[i])}`).join(" AND ")})`,
         );
-        const records = await this.all()
-          .where(whereParts.join(" OR "))
-          .toArray();
+        const records = await this.all().where(whereParts.join(" OR ")).toArray();
         if (records.length !== tuples.length) {
           throw new RecordNotFound(
             `${this.name}: couldn't find all with composite primary key`,
-            this.name, String(this.primaryKey), id
+            this.name,
+            String(this.primaryKey),
+            id,
           );
         }
         return records;
@@ -783,12 +802,16 @@ export class Base extends Model {
       // Single tuple: find([shop_id, id])
       const pk = this.primaryKey as string[];
       const whereConditions: Record<string, unknown> = {};
-      pk.forEach((col, i) => { whereConditions[col] = (id as unknown[])[i]; });
+      pk.forEach((col, i) => {
+        whereConditions[col] = (id as unknown[])[i];
+      });
       const record = await this.all().where(whereConditions).first();
       if (!record) {
         throw new RecordNotFound(
           `${this.name} with ${this.primaryKey}=[${id}] not found`,
-          this.name, String(this.primaryKey), id
+          this.name,
+          String(this.primaryKey),
+          id,
         );
       }
       return record;
@@ -799,7 +822,9 @@ export class Base extends Model {
       if (id.length === 0) {
         throw new RecordNotFound(
           `${this.name}: couldn't find all with an empty list of ids`,
-          this.name, String(this.primaryKey), []
+          this.name,
+          String(this.primaryKey),
+          [],
         );
       }
       const records = await this.all()
@@ -811,17 +836,23 @@ export class Base extends Model {
         const missing = id.filter((i) => !foundIds.has(i));
         throw new RecordNotFound(
           `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
-          this.name, String(this.primaryKey), id
+          this.name,
+          String(this.primaryKey),
+          id,
         );
       }
       return records;
     }
     // Single ID — use all() so STI type filter is applied
-    const record = await this.all().where({ [this.primaryKey as string]: id }).first();
+    const record = await this.all()
+      .where({ [this.primaryKey as string]: id })
+      .first();
     if (!record) {
       throw new RecordNotFound(
         `${this.name} with ${this.primaryKey}=${id} not found`,
-        this.name, String(this.primaryKey), id
+        this.name,
+        String(this.primaryKey),
+        id,
       );
     }
     return record;
@@ -832,9 +863,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find_by
    */
-  static async findBy(
-    conditions: Record<string, unknown>
-  ): Promise<Base | null> {
+  static async findBy(conditions: Record<string, unknown>): Promise<Base | null> {
     const table = this.arelTable;
     const manager = table.project("*");
 
@@ -859,9 +888,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find_by!
    */
-  static async findByBang(
-    conditions: Record<string, unknown>
-  ): Promise<Base> {
+  static async findByBang(conditions: Record<string, unknown>): Promise<Base> {
     const record = await this.findBy(conditions);
     if (!record) {
       throw new RecordNotFound(`${this.name} not found`, this.name);
@@ -890,8 +917,8 @@ export class Base extends Model {
     if (!attrPart) return false;
     // Convert camelCase to snake_case: findByFirstName → first_name
     const attr = attrPart
-      .replace(/^./, c => c.toLowerCase())
-      .replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
+      .replace(/^./, (c) => c.toLowerCase())
+      .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
     return this._attributeDefinitions.has(attr);
   }
 
@@ -901,9 +928,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find_sole_by
    */
-  static async findSoleBy(
-    conditions: Record<string, unknown>
-  ): Promise<Base> {
+  static async findSoleBy(conditions: Record<string, unknown>): Promise<Base> {
     return this.all().where(conditions).sole();
   }
 
@@ -967,7 +992,7 @@ export class Base extends Model {
    */
   static async insertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[] }
+    options?: { uniqueBy?: string | string[] },
   ): Promise<number> {
     return this.all().insertAll(records, options);
   }
@@ -979,7 +1004,7 @@ export class Base extends Model {
    */
   static async upsertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[] }
+    options?: { uniqueBy?: string | string[] },
   ): Promise<number> {
     return this.all().upsertAll(records, options);
   }
@@ -1130,9 +1155,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.exists?
    */
-  static async exists(
-    idOrConditions?: unknown
-  ): Promise<boolean> {
+  static async exists(idOrConditions?: unknown): Promise<boolean> {
     if (idOrConditions === undefined) {
       return this.all().isAny();
     }
@@ -1140,8 +1163,14 @@ export class Base extends Model {
     if (idOrConditions === false || idOrConditions === null) {
       return false;
     }
-    if (typeof idOrConditions === "object" && idOrConditions !== null && !Array.isArray(idOrConditions)) {
-      return this.all().where(idOrConditions as Record<string, unknown>).isAny();
+    if (
+      typeof idOrConditions === "object" &&
+      idOrConditions !== null &&
+      !Array.isArray(idOrConditions)
+    ) {
+      return this.all()
+        .where(idOrConditions as Record<string, unknown>)
+        .isAny();
     }
     // Treat as primary key
     const record = await this.findBy({ [this.primaryKey as string]: idOrConditions });
@@ -1371,7 +1400,7 @@ export class Base extends Model {
    */
   static async findOrCreateBy(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<Base> {
     const record = await this.findBy(conditions);
     if (record) return record;
@@ -1385,7 +1414,7 @@ export class Base extends Model {
    */
   static async findOrInitializeBy(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<Base> {
     const record = await this.findBy(conditions);
     if (record) return record;
@@ -1400,7 +1429,7 @@ export class Base extends Model {
    */
   static async createOrFindBy(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<Base> {
     try {
       return await this.create({ ...conditions, ...extra });
@@ -1419,7 +1448,7 @@ export class Base extends Model {
    */
   static async createOrFindByBang(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<Base> {
     try {
       return await this.createBang({ ...conditions, ...extra });
@@ -1445,9 +1474,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.create
    */
-  static async create(
-    attrs: Record<string, unknown> = {}
-  ): Promise<Base> {
+  static async create(attrs: Record<string, unknown> = {}): Promise<Base> {
     const record = new this(attrs);
     await record.save();
     return record;
@@ -1458,9 +1485,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.create!
    */
-  static async createBang(
-    attrs: Record<string, unknown> = {}
-  ): Promise<Base> {
+  static async createBang(attrs: Record<string, unknown> = {}): Promise<Base> {
     const record = new this(attrs);
     await record.saveBang();
     return record;
@@ -1481,11 +1506,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.increment_counter
    */
-  static async incrementCounter(
-    attribute: string,
-    id: unknown,
-    by: number = 1
-  ): Promise<number> {
+  static async incrementCounter(attribute: string, id: unknown, by: number = 1): Promise<number> {
     const table = this.arelTable;
     const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by} WHERE ${this._buildPkWhere(id)}`;
     return this.adapter.executeMutation(sql);
@@ -1496,11 +1517,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.decrement_counter
    */
-  static async decrementCounter(
-    attribute: string,
-    id: unknown,
-    by: number = 1
-  ): Promise<number> {
+  static async decrementCounter(attribute: string, id: unknown, by: number = 1): Promise<number> {
     return this.incrementCounter(attribute, id, -by);
   }
 
@@ -1511,7 +1528,7 @@ export class Base extends Model {
    */
   static async updateCounters(
     id: unknown | unknown[],
-    counters: Record<string, number>
+    counters: Record<string, number>,
   ): Promise<number> {
     const table = this.arelTable;
     const setClause = Object.entries(counters)
@@ -1519,13 +1536,14 @@ export class Base extends Model {
       .join(", ");
     if (Array.isArray(this.primaryKey)) {
       // For CPK: id can be a single tuple [1,2] or array of tuples [[1,2],[3,4]]
-      const tuples = (Array.isArray(id) && Array.isArray(id[0])) ? id as unknown[][] : [id as unknown[]];
+      const tuples =
+        Array.isArray(id) && Array.isArray(id[0]) ? (id as unknown[][]) : [id as unknown[]];
       const whereParts = tuples.map((t) => `(${this._buildPkWhere(t)})`);
       const sql = `UPDATE "${table.name}" SET ${setClause} WHERE ${whereParts.join(" OR ")}`;
       return this.adapter.executeMutation(sql);
     }
     const ids = Array.isArray(id) ? id : [id];
-    const idList = ids.map((i) => typeof i === "number" ? String(i) : `'${i}'`).join(", ");
+    const idList = ids.map((i) => (typeof i === "number" ? String(i) : `'${i}'`)).join(", ");
     const sql = `UPDATE "${table.name}" SET ${setClause} WHERE "${this.primaryKey}" IN (${idList})`;
     return this.adapter.executeMutation(sql);
   }
@@ -1565,7 +1583,7 @@ export class Base extends Model {
     const record = new this(row);
     this._skipEncryption = false;
     record._newRecord = false;
-     (record as any)._dirty.snapshot(record._attributes);
+    (record as any)._dirty.snapshot(record._attributes);
     record.changesApplied();
     // Apply strict_loading_by_default
     if (this._strictLoadingByDefault) {
@@ -1911,7 +1929,9 @@ export class Base extends Model {
 
       // Exclude self if persisted
       if (this.isPersisted()) {
-        relation = relation.where(`"${ctor.arelTable.name}"."${ctor.primaryKey}" != ${(this as any).id}`);
+        relation = relation.where(
+          `"${ctor.arelTable.name}"."${ctor.primaryKey}" != ${(this as any).id}`,
+        );
       }
       const existing = await relation.first();
       if (existing) {
@@ -1929,7 +1949,7 @@ export class Base extends Model {
    */
   static validatesUniqueness(
     attribute: string,
-    options: { scope?: string | string[]; message?: string; conditions?: (this: any) => any } = {}
+    options: { scope?: string | string[]; message?: string; conditions?: (this: any) => any } = {},
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_asyncValidations")) {
       (this as any)._asyncValidations = [...((this as any)._asyncValidations ?? [])];
@@ -1946,7 +1966,8 @@ export class Base extends Model {
   async save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean> {
     if (this._destroyed) {
       throw new RecordNotSaved(
-        `Cannot save a destroyed ${(this.constructor as typeof Base).name}`, this
+        `Cannot save a destroyed ${(this.constructor as typeof Base).name}`,
+        this,
       );
     }
     if (this._readonly) {
@@ -1963,7 +1984,7 @@ export class Base extends Model {
       this._validationContext = null;
 
       // Run async validations (uniqueness)
-      if (!await this._runAsyncValidations()) return false;
+      if (!(await this._runAsyncValidations())) return false;
     }
 
     this._skipTouch = options?.touch === false;
@@ -2071,7 +2092,7 @@ export class Base extends Model {
     // If suppressed, skip the actual insert but update record state
     if (ctor._suppressed || (ctor as any).__proto__._suppressed) {
       this._newRecord = false;
-       (this as any)._dirty.snapshot(this._attributes);
+      (this as any)._dirty.snapshot(this._attributes);
       this.changesApplied();
       return;
     }
@@ -2081,10 +2102,16 @@ export class Base extends Model {
     // Auto-populate timestamps (unless touch: false)
     if (!this._skipTouch) {
       const now = new Date();
-      if (ctor._attributeDefinitions.has("created_at") && this.readAttribute("created_at") === null) {
+      if (
+        ctor._attributeDefinitions.has("created_at") &&
+        this.readAttribute("created_at") === null
+      ) {
         this._attributes.set("created_at", now);
       }
-      if (ctor._attributeDefinitions.has("updated_at") && this.readAttribute("updated_at") === null) {
+      if (
+        ctor._attributeDefinitions.has("updated_at") &&
+        this.readAttribute("updated_at") === null
+      ) {
         this._attributes.set("updated_at", now);
       }
     }
@@ -2121,13 +2148,11 @@ export class Base extends Model {
     } else {
       sql = `INSERT INTO "${table.name}" (${colList}) VALUES (${valList})`;
     }
-    this._pendingOperation = ctor.adapter
-      .executeMutation(sql)
-      .then((insertedId) => {
-        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
-          this._attributes.set(ctor.primaryKey, insertedId);
-        }
-      });
+    this._pendingOperation = ctor.adapter.executeMutation(sql).then((insertedId) => {
+      if (!Array.isArray(ctor.primaryKey) && this.id === null) {
+        this._attributes.set(ctor.primaryKey, insertedId);
+      }
+    });
   }
 
   private _performUpdate(): void {
@@ -2135,7 +2160,7 @@ export class Base extends Model {
 
     // If suppressed, skip the actual update
     if (ctor._suppressed || (ctor as any).__proto__._suppressed) {
-       (this as any)._dirty.snapshot(this._attributes);
+      (this as any)._dirty.snapshot(this._attributes);
       this.changesApplied();
       return;
     }
@@ -2160,10 +2185,10 @@ export class Base extends Model {
         const val = this.readAttribute(key);
         if (val === null) return `"${key}" = NULL`;
         if (typeof val === "number") return `"${key}" = ${val}`;
-        if (typeof val === "boolean")
-          return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
+        if (typeof val === "boolean") return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
         if (val instanceof Date) return `"${key}" = '${val.toISOString()}'`;
-        if (typeof val === "object") return `"${key}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
+        if (typeof val === "object")
+          return `"${key}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
         return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
       })
       .join(", ");
@@ -2308,13 +2333,15 @@ export class Base extends Model {
   async reload(): Promise<this> {
     const ctor = this.constructor as typeof Base;
     const row = await ctor.adapter.execute(
-      `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)}`
+      `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)}`,
     );
 
     if (row.length === 0) {
       throw new RecordNotFound(
         `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
-        ctor.name, String(ctor.primaryKey), this.id
+        ctor.name,
+        String(ctor.primaryKey),
+        this.id,
       );
     }
 
@@ -2322,7 +2349,7 @@ export class Base extends Model {
       this._attributes.set(key, value);
     }
 
-     (this as any)._dirty.snapshot(this._attributes);
+    (this as any)._dirty.snapshot(this._attributes);
     return this;
   }
 
@@ -2339,14 +2366,16 @@ export class Base extends Model {
     if (rows.length === 0) {
       throw new RecordNotFound(
         `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
-        ctor.name, ctor.primaryKey as string, this.id
+        ctor.name,
+        ctor.primaryKey as string,
+        this.id,
       );
     }
 
     for (const [key, value] of Object.entries(rows[0])) {
       this._attributes.set(key, value);
     }
-     (this as any)._dirty.snapshot(this._attributes);
+    (this as any)._dirty.snapshot(this._attributes);
     return this;
   }
 
@@ -2553,7 +2582,8 @@ export class Base extends Model {
         if (typeof val === "number") return `"${key}" = ${val}`;
         if (typeof val === "boolean") return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
         if (val instanceof Date) return `"${key}" = '${val.toISOString()}'`;
-        if (typeof val === "object") return `"${key}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
+        if (typeof val === "object")
+          return `"${key}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
         return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
       })
       .join(", ");
@@ -2593,7 +2623,7 @@ export class Base extends Model {
     copy._destroyed = this._destroyed;
     copy._readonly = this._readonly;
     if (!this._newRecord) {
-       (copy as any)._dirty.snapshot(copy._attributes);
+      (copy as any)._dirty.snapshot(copy._attributes);
       copy.changesApplied();
     }
     return copy;
@@ -2610,7 +2640,7 @@ export class Base extends Model {
     instance._attributes = this._attributes;
     instance._newRecord = this._newRecord;
     if (!this._newRecord) {
-       (instance as any)._dirty.snapshot(instance._attributes);
+      (instance as any)._dirty.snapshot(instance._attributes);
       instance.changesApplied();
     }
     return instance;
@@ -2673,7 +2703,8 @@ export class Base extends Model {
   static get columnDefaults(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [name, def] of this._attributeDefinitions) {
-      result[name] = typeof def.defaultValue === "function" ? def.defaultValue() : (def.defaultValue ?? null);
+      result[name] =
+        typeof def.defaultValue === "function" ? def.defaultValue() : (def.defaultValue ?? null);
     }
     return result;
   }
@@ -2745,7 +2776,9 @@ export class Base extends Model {
       if (payload.expiresAt && Date.now() > payload.expiresAt) return null;
       if (Array.isArray(this.primaryKey)) {
         const conditions: Record<string, unknown> = {};
-        (this.primaryKey as string[]).forEach((col, i) => { conditions[col] = payload.id[i]; });
+        (this.primaryKey as string[]).forEach((col, i) => {
+          conditions[col] = payload.id[i];
+        });
         return this.findBy(conditions);
       }
       return this.findBy({ [this.primaryKey as string]: payload.id });
@@ -2798,13 +2831,16 @@ export class Base extends Model {
   static sanitizeSqlArray(template: string, ...binds: unknown[]): string {
     let result = template;
     for (const bind of binds) {
-      const quoted = bind === null || bind === undefined
-        ? "NULL"
-        : typeof bind === "number"
-        ? String(bind)
-        : typeof bind === "boolean"
-        ? (bind ? "TRUE" : "FALSE")
-        : `'${String(bind).replace(/'/g, "''")}'`;
+      const quoted =
+        bind === null || bind === undefined
+          ? "NULL"
+          : typeof bind === "number"
+            ? String(bind)
+            : typeof bind === "boolean"
+              ? bind
+                ? "TRUE"
+                : "FALSE"
+              : `'${String(bind).replace(/'/g, "''")}'`;
       result = result.replace("?", quoted);
     }
     return result;
@@ -2829,7 +2865,10 @@ export class Base extends Model {
    */
   static sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
     return value
-      .replace(new RegExp(escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), escapeChar + escapeChar)
+      .replace(
+        new RegExp(escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
+        escapeChar + escapeChar,
+      )
       .replace(/%/g, escapeChar + "%")
       .replace(/_/g, escapeChar + "_");
   }
@@ -2947,18 +2986,31 @@ export class Base extends Model {
     };
   }
 
-
   // Underscore aliases for bang methods (Rails uses ! suffix, TS uses _ suffix)
-  static async first_(): Promise<Base> { return (this as any).firstBang(); }
-  static async last_(): Promise<Base> { return (this as any).lastBang(); }
+  static async first_(): Promise<Base> {
+    return (this as any).firstBang();
+  }
+  static async last_(): Promise<Base> {
+    return (this as any).lastBang();
+  }
   static async take_(): Promise<Base> {
     const r = await (this as any).all().take();
-    if (!r) throw new RecordNotFound(`${(this as any).name} record not found`, (this as any).name, (this as any).primaryKey, null);
+    if (!r)
+      throw new RecordNotFound(
+        `${(this as any).name} record not found`,
+        (this as any).name,
+        (this as any).primaryKey,
+        null,
+      );
     return r;
   }
-  static async findBy_(conditions: Record<string, unknown>): Promise<Base> { return (this as any).findByBang(conditions); }
+  static async findBy_(conditions: Record<string, unknown>): Promise<Base> {
+    return (this as any).findByBang(conditions);
+  }
 
-  previouslyNewRecord(): boolean { return this.isPreviouslyNewRecord(); }
+  previouslyNewRecord(): boolean {
+    return this.isPreviouslyNewRecord();
+  }
 
   static async tableExists(): Promise<boolean> {
     return true; // MemoryAdapter always has tables

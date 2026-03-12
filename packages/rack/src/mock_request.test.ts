@@ -3,11 +3,15 @@ import { MockRequest, FatalWarning } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 
 describe("Rack::MockRequest", () => {
-  const appId = async (env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
+  const appId = async (
+    env: Record<string, any>,
+  ): Promise<[number, Record<string, string>, any]> => {
     return [200, { "content-type": "text/plain" }, ["OK"]];
   };
 
-  const appEnv = async (env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
+  const appEnv = async (
+    env: Record<string, any>,
+  ): Promise<[number, Record<string, string>, any]> => {
     return [200, { "content-type": "text/plain" }, [JSON.stringify(env)]];
   };
 
@@ -39,7 +43,12 @@ describe("Rack::MockRequest", () => {
 
   it("should handle :input object that does not respond to set_encoding", () => {
     // In JS, any object with read() works as input
-    const input = { read() { return "data"; }, size: 4 };
+    const input = {
+      read() {
+        return "data";
+      },
+      size: 4,
+    };
     const env = MockRequest.envFor("/", { input });
     expect(env["rack.input"].read()).toBe("data");
   });
@@ -148,7 +157,7 @@ describe("Rack::MockRequest", () => {
     const env = MockRequest.envFor("/", {
       method: "POST",
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-      input: "--AaB03x\r\ncontent-disposition: form-data; name=\"foo\"\r\n\r\nbar\r\n--AaB03x--\r\n",
+      input: '--AaB03x\r\ncontent-disposition: form-data; name="foo"\r\n\r\nbar\r\n--AaB03x--\r\n',
     });
     expect(env["CONTENT_TYPE"]).toContain("multipart");
     expect(env["rack.input"].read()).toContain("foo");
@@ -167,8 +176,12 @@ describe("Rack::MockRequest", () => {
   it("call close on the original body object", async () => {
     let closed = false;
     const body = {
-      each(cb: (s: string) => void) { cb("hi"); },
-      close() { closed = true; },
+      each(cb: (s: string) => void) {
+        cb("hi");
+      },
+      close() {
+        closed = true;
+      },
     };
     const app = async (_env: any): Promise<[number, Record<string, string>, any]> => {
       return [200, { "content-type": "text/plain" }, body];

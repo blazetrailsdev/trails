@@ -8,9 +8,11 @@ describe("Rack::ShowExceptions", () => {
   }
 
   it("catches exceptions", async () => {
-    const req = new MockRequest((env) => showExceptions(async () => {
-      throw new Error("RuntimeError");
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showExceptions(async () => {
+        throw new Error("RuntimeError");
+      }).call(env),
+    );
     const res = await req.get("/", { HTTP_ACCEPT: "text/html" });
     expect(res.status).toBe(500);
     expect(res.bodyString).toContain("Error");
@@ -20,11 +22,14 @@ describe("Rack::ShowExceptions", () => {
   });
 
   it("handles exceptions with backtrace lines for files that are not readable", async () => {
-    const req = new MockRequest((env) => showExceptions(async () => {
-      const err = new Error("foo");
-      err.stack = "Error: foo\n    at nonexistent.rb:2:in `a': adf (RuntimeError)\n    bad-backtrace";
-      throw err;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showExceptions(async () => {
+        const err = new Error("foo");
+        err.stack =
+          "Error: foo\n    at nonexistent.rb:2:in `a': adf (RuntimeError)\n    bad-backtrace";
+        throw err;
+      }).call(env),
+    );
     const res = await req.get("/", { HTTP_ACCEPT: "text/html" });
     expect(res.status).toBe(500);
     expect(res.bodyString).toContain("Error");
@@ -33,11 +38,17 @@ describe("Rack::ShowExceptions", () => {
   });
 
   it("handles invalid POST data exceptions", async () => {
-    const req = new MockRequest((env) => showExceptions(async () => {
-      throw new Error("RuntimeError");
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showExceptions(async () => {
+        throw new Error("RuntimeError");
+      }).call(env),
+    );
     // Post with bad params that will throw on read
-    const badInput = { read() { throw new Error("parse error"); } };
+    const badInput = {
+      read() {
+        throw new Error("parse error");
+      },
+    };
     const res = await req.post("/", { HTTP_ACCEPT: "text/html" });
     expect(res.status).toBe(500);
     expect(res.bodyString).toContain("Error");
@@ -46,10 +57,12 @@ describe("Rack::ShowExceptions", () => {
   });
 
   it("works with binary data in the Rack environment", async () => {
-    const req = new MockRequest((env) => showExceptions(async (e: any) => {
-      e["foo"] = "\xCC";
-      throw new Error("RuntimeError");
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showExceptions(async (e: any) => {
+        e["foo"] = "\xCC";
+        throw new Error("RuntimeError");
+      }).call(env),
+    );
     const res = await req.get("/", { HTTP_ACCEPT: "text/html" });
     expect(res.status).toBe(500);
     expect(res.bodyString).toContain("Error");
@@ -85,11 +98,13 @@ describe("Rack::ShowExceptions", () => {
   });
 
   it("handles exceptions without a backtrace", async () => {
-    const req = new MockRequest((env) => showExceptions(async () => {
-      const err = new Error("RuntimeError");
-      err.stack = undefined;
-      throw err;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showExceptions(async () => {
+        const err = new Error("RuntimeError");
+        err.stack = undefined;
+        throw err;
+      }).call(env),
+    );
     const res = await req.get("/", { HTTP_ACCEPT: "text/html" });
     expect(res.status).toBe(500);
     expect(res.bodyString).toContain("Error");
@@ -103,8 +118,12 @@ describe("Rack::ShowExceptions", () => {
         return "foo";
       }
     }
-    const app = new CustomShowExceptions(async () => { throw new Error(""); });
-    const res = await new MockRequest((env) => app.call(env)).get("/", { HTTP_ACCEPT: "text/html" });
+    const app = new CustomShowExceptions(async () => {
+      throw new Error("");
+    });
+    const res = await new MockRequest((env) => app.call(env)).get("/", {
+      HTTP_ACCEPT: "text/html",
+    });
     expect(res.status).toBe(500);
     expect(res.bodyString).toBe("foo");
   });
@@ -117,11 +136,13 @@ describe("Rack::ShowExceptions", () => {
   });
 
   it("prefers Exception#detailed_message instead of Exception#message if available", async () => {
-    const req = new MockRequest((env) => showExceptions(async () => {
-      const err: any = new Error("regular_message");
-      err.detailedMessage = () => "detailed_message_test";
-      throw err;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showExceptions(async () => {
+        const err: any = new Error("regular_message");
+        err.detailedMessage = () => "detailed_message_test";
+        throw err;
+      }).call(env),
+    );
     const res = await req.get("/", { HTTP_ACCEPT: "text/html" });
     expect(res.status).toBe(500);
     expect(res.bodyString).toContain("detailed_message_test");

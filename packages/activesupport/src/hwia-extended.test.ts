@@ -2,12 +2,24 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger, BroadcastLogger, taggedLogging } from "./logger.js";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { at, from, to, first, last, indent, exclude } from "./string-utils.js";
-import { defineCallbacks, setCallback, skipCallback, resetCallbacks, runCallbacks } from "./callbacks.js";
+import {
+  defineCallbacks,
+  setCallback,
+  skipCallback,
+  resetCallbacks,
+  runCallbacks,
+} from "./callbacks.js";
 import { concern, includeConcern, hasConcern } from "./concern.js";
 import { transliterate } from "./transliterate.js";
 import { CurrentAttributes } from "./current-attributes.js";
 import { ordinalize, ordinal, dasherize, camelize, titleize } from "./inflector.js";
-import { moduleParentName, mattrAccessor, configAccessor, rescueFrom, handleRescue } from "./module-ext.js";
+import {
+  moduleParentName,
+  mattrAccessor,
+  configAccessor,
+  rescueFrom,
+  handleRescue,
+} from "./module-ext.js";
 import { Notifications } from "./notifications.js";
 import { MemoryStore, NullStore, FileStore } from "./cache/stores.js";
 import { MessageVerifier } from "./message-verifier.js";
@@ -28,9 +40,26 @@ import {
   compactBlankObj,
 } from "./hash-utils.js";
 import { OrderedHash } from "./ordered-hash.js";
-import { SafeBuffer, htmlEscape, htmlEscapeOnce, htmlSafe, isHtmlSafe, xmlNameEscape } from "./safe-buffer.js";
+import {
+  SafeBuffer,
+  htmlEscape,
+  htmlEscapeOnce,
+  htmlSafe,
+  isHtmlSafe,
+  xmlNameEscape,
+} from "./safe-buffer.js";
 import { ErrorReporter } from "./error-reporter.js";
-import { travelTo, travelBack, travel, freezeTime, currentTime, assertCalled, assertNotCalled, assertCalledOnInstanceOf, assertNotCalledOnInstanceOf } from "./testing-helpers.js";
+import {
+  travelTo,
+  travelBack,
+  travel,
+  freezeTime,
+  currentTime,
+  assertCalled,
+  assertNotCalled,
+  assertCalledOnInstanceOf,
+  assertNotCalledOnInstanceOf,
+} from "./testing-helpers.js";
 import {
   makeRange,
   overlap,
@@ -577,21 +606,33 @@ describe("RangeTest", () => {
   });
 
   it("overlap on time", () => {
-    const t1 = new Date("2023-01-01"), t2 = new Date("2023-06-01");
-    const t3 = new Date("2023-03-01"), t4 = new Date("2023-12-31");
+    const t1 = new Date("2023-01-01"),
+      t2 = new Date("2023-06-01");
+    const t3 = new Date("2023-03-01"),
+      t4 = new Date("2023-12-31");
     expect(overlap(makeRange(t1, t2), makeRange(t3, t4))).toBe(true);
   });
 
   it("no overlap on time", () => {
-    const t1 = new Date("2023-01-01"), t2 = new Date("2023-03-01");
-    const t3 = new Date("2023-06-01"), t4 = new Date("2023-12-31");
+    const t1 = new Date("2023-01-01"),
+      t2 = new Date("2023-03-01");
+    const t3 = new Date("2023-06-01"),
+      t4 = new Date("2023-12-31");
     expect(overlap(makeRange(t1, t2), makeRange(t3, t4))).toBe(false);
   });
 
-  it.skip("each on time with zone", () => { /* TimeWithZone not implemented */ });
-  it.skip("step on time with zone", () => { /* TimeWithZone not implemented */ });
-  it.skip("cover on time with zone", () => { /* TimeWithZone not implemented */ });
-  it.skip("case equals on time with zone", () => { /* TimeWithZone not implemented */ });
+  it.skip("each on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
+  it.skip("step on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
+  it.skip("cover on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
+  it.skip("case equals on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
 
   it("date time with each", () => {
     const r = makeRange(0, 4);
@@ -605,7 +646,9 @@ describe("RangeTest", () => {
 });
 
 describe("TestJSONEncoding", () => {
-  it.skip("process status", () => { /* Ruby process status object */ });
+  it.skip("process status", () => {
+    /* Ruby process status object */
+  });
 
   it("hash encoding", () => {
     const h = { a: 1, b: "hello" };
@@ -619,7 +662,9 @@ describe("TestJSONEncoding", () => {
     expect(parsed.key_one).toBe(1);
   });
 
-  it.skip("hash keys encoding option", () => { /* Ruby-specific encoding options */ });
+  it.skip("hash keys encoding option", () => {
+    /* Ruby-specific encoding options */
+  });
 
   it("utf8 string encoded properly", () => {
     const s = "こんにちは";
@@ -628,7 +673,9 @@ describe("TestJSONEncoding", () => {
     expect(parsed).toBe(s);
   });
 
-  it.skip("non utf8 string transcodes", () => { /* Ruby encoding transcoding */ });
+  it.skip("non utf8 string transcodes", () => {
+    /* Ruby encoding transcoding */
+  });
 
   it("wide utf8 chars", () => {
     const s = "🎉🚀";
@@ -678,10 +725,18 @@ describe("TestJSONEncoding", () => {
     expect(parsed.nested.y).toBeCloseTo(2.75);
   });
 
-  it.skip("hash like with options", () => { /* Ruby-specific hash-like objects */ });
-  it.skip("object to json with options", () => { /* Ruby-specific */ });
-  it.skip("struct to json with options", () => { /* Ruby Struct */ });
-  it.skip("struct to json with options nested", () => { /* Ruby Struct */ });
+  it.skip("hash like with options", () => {
+    /* Ruby-specific hash-like objects */
+  });
+  it.skip("object to json with options", () => {
+    /* Ruby-specific */
+  });
+  it.skip("struct to json with options", () => {
+    /* Ruby Struct */
+  });
+  it.skip("struct to json with options nested", () => {
+    /* Ruby Struct */
+  });
 
   it("hash should pass encoding options to children in as json", () => {
     const h = { nested: { a: 1 } };
@@ -745,8 +800,12 @@ describe("TestJSONEncoding", () => {
     expect(JSON.parse(JSON.stringify(arr))).toEqual(arr);
   });
 
-  it.skip("struct encoding", () => { /* Ruby Struct */ });
-  it.skip("data encoding", () => { /* Ruby Data class */ });
+  it.skip("struct encoding", () => {
+    /* Ruby Struct */
+  });
+  it.skip("data encoding", () => {
+    /* Ruby Data class */
+  });
 
   it("nil true and false represented as themselves", () => {
     expect(JSON.stringify(null)).toBe("null");
@@ -754,12 +813,24 @@ describe("TestJSONEncoding", () => {
     expect(JSON.stringify(false)).toBe("false");
   });
 
-  it.skip("json gem dump by passing active support encoder", () => { /* Ruby json gem */ });
-  it.skip("json gem generate by passing active support encoder", () => { /* Ruby json gem */ });
-  it.skip("json gem pretty generate by passing active support encoder", () => { /* Ruby json gem */ });
-  it.skip("twz to json with use standard json time format config set to false", () => { /* TimeWithZone */ });
-  it.skip("twz to json with use standard json time format config set to true", () => { /* TimeWithZone */ });
-  it.skip("twz to json with custom time precision", () => { /* TimeWithZone */ });
+  it.skip("json gem dump by passing active support encoder", () => {
+    /* Ruby json gem */
+  });
+  it.skip("json gem generate by passing active support encoder", () => {
+    /* Ruby json gem */
+  });
+  it.skip("json gem pretty generate by passing active support encoder", () => {
+    /* Ruby json gem */
+  });
+  it.skip("twz to json with use standard json time format config set to false", () => {
+    /* TimeWithZone */
+  });
+  it.skip("twz to json with use standard json time format config set to true", () => {
+    /* TimeWithZone */
+  });
+  it.skip("twz to json with custom time precision", () => {
+    /* TimeWithZone */
+  });
   it("time to json with custom time precision", () => {
     // toISOString always includes milliseconds; verify standard format
     const d = new Date("2023-01-15T10:30:00.123Z");
@@ -774,7 +845,9 @@ describe("TestJSONEncoding", () => {
     const noMs = isoStr.replace(/\.\d{3}Z$/, "Z");
     expect(noMs).toBe("2023-06-01T12:00:00Z");
   });
-  it.skip("twz to json when wrapping a date time", () => { /* TimeWithZone */ });
+  it.skip("twz to json when wrapping a date time", () => {
+    /* TimeWithZone */
+  });
 
   it("exception to json", () => {
     const err = new Error("boom");
@@ -791,7 +864,9 @@ describe("TestJSONEncoding", () => {
     expect(JSON.stringify(NaN)).toBe("null");
   });
 
-  it.skip("to json works on io objects", () => { /* Ruby IO */ });
+  it.skip("to json works on io objects", () => {
+    /* Ruby IO */
+  });
 });
 
 describe("HashExtTest", () => {
@@ -1065,56 +1140,146 @@ describe("HashExtTest", () => {
 });
 
 describe("HashToXmlTest", () => {
-  it.skip("one level", () => { /* fixture-dependent */ });
-  it.skip("one level dasherize false", () => { /* fixture-dependent */ });
-  it.skip("one level dasherize true", () => { /* fixture-dependent */ });
-  it.skip("one level camelize true", () => { /* fixture-dependent */ });
-  it.skip("one level camelize lower", () => { /* fixture-dependent */ });
-  it.skip("one level with types", () => { /* fixture-dependent */ });
-  it.skip("one level with nils", () => { /* fixture-dependent */ });
-  it.skip("one level with skipping types", () => { /* fixture-dependent */ });
-  it.skip("one level with yielding", () => { /* fixture-dependent */ });
-  it.skip("two levels", () => { /* fixture-dependent */ });
-  it.skip("two levels with second level overriding to xml", () => { /* fixture-dependent */ });
-  it.skip("two levels with array", () => { /* fixture-dependent */ });
-  it.skip("three levels with array", () => { /* fixture-dependent */ });
-  it.skip("multiple records from xml with attributes other than type ignores them without exploding", () => { /* fixture-dependent */ });
-  it.skip("single record from xml", () => { /* fixture-dependent */ });
-  it.skip("single record from xml with nil values", () => { /* fixture-dependent */ });
-  it.skip("multiple records from xml", () => { /* fixture-dependent */ });
-  it.skip("single record from xml with attributes other than type", () => { /* fixture-dependent */ });
-  it.skip("all caps key from xml", () => { /* fixture-dependent */ });
-  it.skip("empty array from xml", () => { /* fixture-dependent */ });
-  it.skip("empty array with whitespace from xml", () => { /* fixture-dependent */ });
-  it.skip("array with one entry from xml", () => { /* fixture-dependent */ });
-  it.skip("array with multiple entries from xml", () => { /* fixture-dependent */ });
-  it.skip("file from xml", () => { /* fixture-dependent */ });
-  it.skip("file from xml with defaults", () => { /* fixture-dependent */ });
-  it.skip("tag with attrs and whitespace", () => { /* fixture-dependent */ });
-  it.skip("empty cdata from xml", () => { /* fixture-dependent */ });
-  it.skip("xsd like types from xml", () => { /* fixture-dependent */ });
-  it.skip("type trickles through when unknown", () => { /* fixture-dependent */ });
-  it.skip("from xml raises on disallowed type attributes", () => { /* fixture-dependent */ });
-  it.skip("from xml disallows symbol and yaml types by default", () => { /* fixture-dependent */ });
-  it.skip("from xml array one", () => { /* fixture-dependent */ });
-  it.skip("from xml array many", () => { /* fixture-dependent */ });
-  it.skip("from trusted xml allows symbol and yaml types", () => { /* fixture-dependent */ });
-  it.skip("kernel method names to xml", () => { /* fixture-dependent */ });
-  it.skip("empty string works for typecast xml value", () => { /* fixture-dependent */ });
-  it.skip("escaping to xml", () => { /* fixture-dependent */ });
-  it.skip("unescaping from xml", () => { /* fixture-dependent */ });
-  it.skip("roundtrip to xml from xml", () => { /* fixture-dependent */ });
-  it.skip("datetime xml type with utc time", () => { /* fixture-dependent */ });
-  it.skip("datetime xml type with non utc time", () => { /* fixture-dependent */ });
-  it.skip("datetime xml type with far future date", () => { /* fixture-dependent */ });
-  it.skip("to xml dups options", () => { /* fixture-dependent */ });
-  it.skip("expansion count is limited", () => { /* fixture-dependent */ });
+  it.skip("one level", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level dasherize false", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level dasherize true", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level camelize true", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level camelize lower", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level with types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level with nils", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level with skipping types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one level with yielding", () => {
+    /* fixture-dependent */
+  });
+  it.skip("two levels", () => {
+    /* fixture-dependent */
+  });
+  it.skip("two levels with second level overriding to xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("two levels with array", () => {
+    /* fixture-dependent */
+  });
+  it.skip("three levels with array", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multiple records from xml with attributes other than type ignores them without exploding", () => {
+    /* fixture-dependent */
+  });
+  it.skip("single record from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("single record from xml with nil values", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multiple records from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("single record from xml with attributes other than type", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all caps key from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("empty array from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("empty array with whitespace from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("array with one entry from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("array with multiple entries from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("file from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("file from xml with defaults", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tag with attrs and whitespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("empty cdata from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("xsd like types from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("type trickles through when unknown", () => {
+    /* fixture-dependent */
+  });
+  it.skip("from xml raises on disallowed type attributes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("from xml disallows symbol and yaml types by default", () => {
+    /* fixture-dependent */
+  });
+  it.skip("from xml array one", () => {
+    /* fixture-dependent */
+  });
+  it.skip("from xml array many", () => {
+    /* fixture-dependent */
+  });
+  it.skip("from trusted xml allows symbol and yaml types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("kernel method names to xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("empty string works for typecast xml value", () => {
+    /* fixture-dependent */
+  });
+  it.skip("escaping to xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("unescaping from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("roundtrip to xml from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime xml type with utc time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime xml type with non utc time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime xml type with far future date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml dups options", () => {
+    /* fixture-dependent */
+  });
+  it.skip("expansion count is limited", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("OrderedHashTest", () => {
   it("order", () => {
     const h = new OrderedHash<string, number>();
-    h.set("b", 2); h.set("a", 1); h.set("c", 3);
+    h.set("b", 2);
+    h.set("a", 1);
+    h.set("c", 3);
     expect([...h.keys()]).toEqual(["b", "a", "c"]);
   });
 
@@ -1136,7 +1301,8 @@ describe("OrderedHashTest", () => {
 
   it("delete", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     h.delete("a");
     expect(h.has("a")).toBe(false);
     expect(h.size).toBe(1);
@@ -1144,14 +1310,19 @@ describe("OrderedHashTest", () => {
 
   it("to hash", () => {
     const h = new OrderedHash<string, number>();
-    h.set("x", 10); h.set("y", 20);
+    h.set("x", 10);
+    h.set("y", 20);
     expect(h.toObject()).toEqual({ x: 10, y: 20 });
   });
 
   it("to a", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
-    expect(h.toArray()).toEqual([["a", 1], ["b", 2]]);
+    h.set("a", 1);
+    h.set("b", 2);
+    expect(h.toArray()).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
   });
 
   it("has key", () => {
@@ -1170,7 +1341,8 @@ describe("OrderedHashTest", () => {
 
   it("each key", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     const keys: string[] = [];
     h.forEach((_, k) => keys.push(k));
     expect(keys).toEqual(["a", "b"]);
@@ -1178,46 +1350,61 @@ describe("OrderedHashTest", () => {
 
   it("each value", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     expect([...h.values()]).toEqual([1, 2]);
   });
 
   it("each", () => {
     const h = new OrderedHash<string, number>();
-    h.set("x", 10); h.set("y", 20);
+    h.set("x", 10);
+    h.set("y", 20);
     const entries: [string, number][] = [];
     for (const [k, v] of h) entries.push([k, v]);
-    expect(entries).toEqual([["x", 10], ["y", 20]]);
+    expect(entries).toEqual([
+      ["x", 10],
+      ["y", 20],
+    ]);
   });
 
   it("each with index", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     const indexed: [number, string, number][] = [];
     let i = 0;
-    for (const [k, v] of h) { indexed.push([i++, k, v]); }
+    for (const [k, v] of h) {
+      indexed.push([i++, k, v]);
+    }
     expect(indexed[0]).toEqual([0, "a", 1]);
     expect(indexed[1]).toEqual([1, "b", 2]);
   });
 
   it("each pair", () => {
     const h = new OrderedHash<string, number>();
-    h.set("p", 5); h.set("q", 6);
+    h.set("p", 5);
+    h.set("q", 6);
     const pairs: [string, number][] = [];
     for (const pair of h.entries()) pairs.push(pair);
-    expect(pairs).toEqual([["p", 5], ["q", 6]]);
+    expect(pairs).toEqual([
+      ["p", 5],
+      ["q", 6],
+    ]);
   });
 
   it("find all", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2); h.set("c", 3);
+    h.set("a", 1);
+    h.set("b", 2);
+    h.set("c", 3);
     const result = h.select((k, v) => v > 1);
     expect([...result.keys()]).toEqual(["b", "c"]);
   });
 
   it("select", () => {
     const h = new OrderedHash<string, number>();
-    h.set("x", 10); h.set("y", 5);
+    h.set("x", 10);
+    h.set("y", 5);
     const result = h.select((k, v) => v >= 10);
     expect(result.size).toBe(1);
     expect(result.get("x")).toBe(10);
@@ -1225,14 +1412,17 @@ describe("OrderedHashTest", () => {
 
   it("delete if", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2); h.set("c", 3);
+    h.set("a", 1);
+    h.set("b", 2);
+    h.set("c", 3);
     h.deleteIf((k, v) => v % 2 === 0);
     expect([...h.keys()]).toEqual(["a", "c"]);
   });
 
   it("reject!", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     h.deleteIf((k, v) => v > 1);
     expect(h.size).toBe(1);
     expect(h.has("a")).toBe(true);
@@ -1240,7 +1430,8 @@ describe("OrderedHashTest", () => {
 
   it("reject", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     const result = h.reject((k, v) => v > 1);
     expect(result.size).toBe(1);
     expect(result.get("a")).toBe(1);
@@ -1283,7 +1474,8 @@ describe("OrderedHashTest", () => {
 
   it("shift", () => {
     const h = new OrderedHash<string, number>();
-    h.set("first", 1); h.set("second", 2);
+    h.set("first", 1);
+    h.set("second", 2);
     const pair = h.shift();
     expect(pair).toEqual(["first", 1]);
     expect(h.size).toBe(1);
@@ -1291,7 +1483,8 @@ describe("OrderedHashTest", () => {
 
   it("keys", () => {
     const h = new OrderedHash<string, number>();
-    h.set("z", 3); h.set("a", 1);
+    h.set("z", 3);
+    h.set("a", 1);
     expect([...h.keys()]).toEqual(["z", "a"]);
   });
 
@@ -1309,13 +1502,19 @@ describe("OrderedHashTest", () => {
   });
 
   it("alternate initialization with splat", () => {
-    const h = OrderedHash.from([["a", 1], ["b", 2]]);
+    const h = OrderedHash.from([
+      ["a", 1],
+      ["b", 2],
+    ]);
     expect(h.get("a")).toBe(1);
     expect(h.get("b")).toBe(2);
   });
 
   it("alternate initialization with array", () => {
-    const h = OrderedHash.from([["x", 10], ["y", 20]]);
+    const h = OrderedHash.from([
+      ["x", 10],
+      ["y", 20],
+    ]);
     expect([...h.keys()]).toEqual(["x", "y"]);
   });
 
@@ -1325,7 +1524,8 @@ describe("OrderedHashTest", () => {
 
   it("replace updates keys", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     h.replace(new OrderedHash<string, number>([["c", 3]]));
     expect([...h.keys()]).toEqual(["c"]);
   });
@@ -1336,14 +1536,30 @@ describe("OrderedHashTest", () => {
     expect((h.get("data") as any).nested).toBe(true);
   });
 
-  it.skip("each after yaml serialization", () => { /* YAML not applicable in JS */ });
-  it.skip("each when yielding to block with splat", () => { /* Ruby-specific block pattern */ });
-  it.skip("each pair when yielding to block with splat", () => { /* Ruby-specific */ });
-  it.skip("order after yaml serialization", () => { /* YAML */ });
-  it.skip("order after yaml serialization with nested arrays", () => { /* YAML */ });
-  it.skip("psych serialize", () => { /* YAML/Psych */ });
-  it.skip("psych serialize tag", () => { /* YAML */ });
-  it.skip("has yaml tag", () => { /* YAML */ });
+  it.skip("each after yaml serialization", () => {
+    /* YAML not applicable in JS */
+  });
+  it.skip("each when yielding to block with splat", () => {
+    /* Ruby-specific block pattern */
+  });
+  it.skip("each pair when yielding to block with splat", () => {
+    /* Ruby-specific */
+  });
+  it.skip("order after yaml serialization", () => {
+    /* YAML */
+  });
+  it.skip("order after yaml serialization with nested arrays", () => {
+    /* YAML */
+  });
+  it.skip("psych serialize", () => {
+    /* YAML/Psych */
+  });
+  it.skip("psych serialize tag", () => {
+    /* YAML */
+  });
+  it.skip("has yaml tag", () => {
+    /* YAML */
+  });
 
   it("update sets keys", () => {
     const h = new OrderedHash<string, number>();
@@ -1356,7 +1572,8 @@ describe("OrderedHashTest", () => {
 
   it("invert", () => {
     const h = new OrderedHash<string, number>();
-    h.set("one", 1); h.set("two", 2);
+    h.set("one", 1);
+    h.set("two", 2);
     const inverted = h.invert();
     expect(inverted.get(1)).toBe("one");
     expect(inverted.get(2)).toBe("two");
@@ -1364,7 +1581,8 @@ describe("OrderedHashTest", () => {
 
   it("extractable", () => {
     const h = new OrderedHash<string, number>();
-    h.set("a", 1); h.set("b", 2);
+    h.set("a", 1);
+    h.set("b", 2);
     const [key, value] = [...h.entries()][0];
     expect(key).toBe("a");
     expect(value).toBe(1);
@@ -1417,16 +1635,36 @@ describe("SafeBufferTest", () => {
     expect(isHtmlSafe(buf)).toBe(true);
   });
 
-  it.skip("Should be converted to_yaml", () => { /* YAML not applicable */ });
-  it.skip("Should work in nested to_yaml conversion", () => { /* YAML */ });
-  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => { /* YAML */ });
-  it.skip("Should work with underscore", () => { /* Ruby underscore method */ });
-  it.skip("Should not return safe buffer from ", () => { /* Ruby gsub */ });
-  it.skip("Should not return safe buffer from !", () => { /* Ruby gsub! */ });
-  it.skip("can assign value into zero-index", () => { /* Ruby index assignment */ });
-  it.skip("can assign value into non zero-index", () => { /* Ruby index assignment */ });
-  it.skip("can assign value into slice", () => { /* Ruby slice assignment */ });
-  it.skip("can assign value into offset slice", () => { /* Ruby slice assignment */ });
+  it.skip("Should be converted to_yaml", () => {
+    /* YAML not applicable */
+  });
+  it.skip("Should work in nested to_yaml conversion", () => {
+    /* YAML */
+  });
+  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => {
+    /* YAML */
+  });
+  it.skip("Should work with underscore", () => {
+    /* Ruby underscore method */
+  });
+  it.skip("Should not return safe buffer from ", () => {
+    /* Ruby gsub */
+  });
+  it.skip("Should not return safe buffer from !", () => {
+    /* Ruby gsub! */
+  });
+  it.skip("can assign value into zero-index", () => {
+    /* Ruby index assignment */
+  });
+  it.skip("can assign value into non zero-index", () => {
+    /* Ruby index assignment */
+  });
+  it.skip("can assign value into slice", () => {
+    /* Ruby slice assignment */
+  });
+  it.skip("can assign value into offset slice", () => {
+    /* Ruby slice assignment */
+  });
 
   it("Should escape dirty buffers on add", () => {
     const safe = htmlSafe("safe part ");
@@ -1434,7 +1672,9 @@ describe("SafeBufferTest", () => {
     expect(result.toString()).toContain("&lt;unsafe&gt;");
   });
 
-  it.skip("Should preserve html_safe? status on multiplication", () => { /* Ruby string * */ });
+  it.skip("Should preserve html_safe? status on multiplication", () => {
+    /* Ruby string * */
+  });
 
   it("Should concat as a normal string when safe", () => {
     const buf = htmlSafe("hello ");
@@ -1466,7 +1706,9 @@ describe("SafeBufferTest", () => {
     expect(() => buf.safeConcat("<unsafe>")).toThrow();
   });
 
-  it.skip("Should not fail if the returned object is not a string", () => { /* Ruby-specific */ });
+  it.skip("Should not fail if the returned object is not a string", () => {
+    /* Ruby-specific */
+  });
 
   it("Should be safe when sliced if original value was safe", () => {
     const buf = htmlSafe("hello world");
@@ -1487,12 +1729,24 @@ describe("SafeBufferTest", () => {
     expect(isHtmlSafe(sliced)).toBe(true);
   });
 
-  it.skip("Should continue safe on chr", () => { /* Ruby chr */ });
-  it.skip("Should continue unsafe on chr", () => { /* Ruby chr */ });
-  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => { /* Ruby slice! */ });
-  it.skip("Should return a String on slice! if original value was not safe", () => { /* Ruby slice! */ });
-  it.skip("Should work with interpolation (array argument)", () => { /* Ruby % operator */ });
-  it.skip("Should work with interpolation (hash argument)", () => { /* Ruby % operator */ });
+  it.skip("Should continue safe on chr", () => {
+    /* Ruby chr */
+  });
+  it.skip("Should continue unsafe on chr", () => {
+    /* Ruby chr */
+  });
+  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => {
+    /* Ruby slice! */
+  });
+  it.skip("Should return a String on slice! if original value was not safe", () => {
+    /* Ruby slice! */
+  });
+  it.skip("Should work with interpolation (array argument)", () => {
+    /* Ruby % operator */
+  });
+  it.skip("Should work with interpolation (hash argument)", () => {
+    /* Ruby % operator */
+  });
 
   it("Should escape unsafe interpolated args", () => {
     const unsafe = "<script>alert(1)</script>";
@@ -1510,9 +1764,15 @@ describe("SafeBufferTest", () => {
     expect(isHtmlSafe(result)).toBe(true);
   });
 
-  it.skip("Should not affect frozen objects when accessing characters", () => { /* Ruby frozen */ });
-  it.skip("Should set back references", () => { /* Ruby regex back refs */ });
-  it.skip("Should support Enumerator", () => { /* Ruby enumerator */ });
+  it.skip("Should not affect frozen objects when accessing characters", () => {
+    /* Ruby frozen */
+  });
+  it.skip("Should set back references", () => {
+    /* Ruby regex back refs */
+  });
+  it.skip("Should support Enumerator", () => {
+    /* Ruby enumerator */
+  });
 });
 
 describe("OutputSafetyTest", () => {
@@ -1543,7 +1803,9 @@ describe("OutputSafetyTest", () => {
     expect(isHtmlSafe({})).toBe(false);
   });
 
-  it.skip("Adding an object not responding to `#to_str` to a safe string is deprecated", () => { /* Ruby-specific */ });
+  it.skip("Adding an object not responding to `#to_str` to a safe string is deprecated", () => {
+    /* Ruby-specific */
+  });
 
   it("Adding an object to a safe string returns a safe string", () => {
     const safe = htmlSafe("hello ");
@@ -1567,8 +1829,12 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toContain("&lt;script&gt;");
   });
 
-  it.skip("Prepending safe onto unsafe yields unsafe", () => { /* Ruby prepend method */ });
-  it.skip("Prepending unsafe onto safe yields escaped safe", () => { /* Ruby prepend method */ });
+  it.skip("Prepending safe onto unsafe yields unsafe", () => {
+    /* Ruby prepend method */
+  });
+  it.skip("Prepending unsafe onto safe yields escaped safe", () => {
+    /* Ruby prepend method */
+  });
 
   it("Concatting safe onto unsafe yields unsafe", () => {
     // A plain string concat'd with safe is still plain
@@ -1593,14 +1859,30 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toBe("ab");
   });
 
-  it.skip("Concatting safe onto unsafe with << yields unsafe", () => { /* Ruby << operator */ });
-  it.skip("Concatting unsafe onto safe with << yields escaped safe", () => { /* Ruby << operator */ });
-  it.skip("Concatting safe onto safe with << yields safe", () => { /* Ruby << operator */ });
-  it.skip("Concatting safe onto unsafe with % yields unsafe", () => { /* Ruby % operator */ });
-  it.skip("% method explicitly cast the argument to string", () => { /* Ruby % operator */ });
-  it.skip("Concatting unsafe onto safe with % yields escaped safe", () => { /* Ruby % operator */ });
-  it.skip("Concatting safe onto safe with % yields safe", () => { /* Ruby % operator */ });
-  it.skip("Concatting with % doesn't modify a string", () => { /* Ruby % operator */ });
+  it.skip("Concatting safe onto unsafe with << yields unsafe", () => {
+    /* Ruby << operator */
+  });
+  it.skip("Concatting unsafe onto safe with << yields escaped safe", () => {
+    /* Ruby << operator */
+  });
+  it.skip("Concatting safe onto safe with << yields safe", () => {
+    /* Ruby << operator */
+  });
+  it.skip("Concatting safe onto unsafe with % yields unsafe", () => {
+    /* Ruby % operator */
+  });
+  it.skip("% method explicitly cast the argument to string", () => {
+    /* Ruby % operator */
+  });
+  it.skip("Concatting unsafe onto safe with % yields escaped safe", () => {
+    /* Ruby % operator */
+  });
+  it.skip("Concatting safe onto safe with % yields safe", () => {
+    /* Ruby % operator */
+  });
+  it.skip("Concatting with % doesn't modify a string", () => {
+    /* Ruby % operator */
+  });
 
   it("Concatting an integer to safe always yields safe", () => {
     const safe = htmlSafe("count: ");
@@ -1609,23 +1891,45 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toBe("count: 42");
   });
 
-  it.skip("Inserting safe into safe yields safe", () => { /* Ruby insert method */ });
-  it.skip("Inserting unsafe into safe yields escaped safe", () => { /* Ruby insert method */ });
-  it.skip("Replacing safe with safe yields safe", () => { /* Ruby replace method */ });
-  it.skip("Replacing safe with unsafe yields escaped safe", () => { /* Ruby replace method */ });
-  it.skip("Replacing index of safe with safe yields safe", () => { /* Ruby []= method */ });
-  it.skip("Replacing index of safe with unsafe yields escaped safe", () => { /* Ruby []= method */ });
-  it.skip("Bytesplicing safe into safe yields safe", () => { /* Ruby bytesplice */ });
-  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => { /* Ruby bytesplice */ });
-  it.skip("emits normal string YAML", () => { /* YAML */ });
-  it.skip("call to_param returns a normal string", () => { /* Ruby to_param */ });
+  it.skip("Inserting safe into safe yields safe", () => {
+    /* Ruby insert method */
+  });
+  it.skip("Inserting unsafe into safe yields escaped safe", () => {
+    /* Ruby insert method */
+  });
+  it.skip("Replacing safe with safe yields safe", () => {
+    /* Ruby replace method */
+  });
+  it.skip("Replacing safe with unsafe yields escaped safe", () => {
+    /* Ruby replace method */
+  });
+  it.skip("Replacing index of safe with safe yields safe", () => {
+    /* Ruby []= method */
+  });
+  it.skip("Replacing index of safe with unsafe yields escaped safe", () => {
+    /* Ruby []= method */
+  });
+  it.skip("Bytesplicing safe into safe yields safe", () => {
+    /* Ruby bytesplice */
+  });
+  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => {
+    /* Ruby bytesplice */
+  });
+  it.skip("emits normal string YAML", () => {
+    /* YAML */
+  });
+  it.skip("call to_param returns a normal string", () => {
+    /* Ruby to_param */
+  });
 
   it("ERB::Util.html_escape should escape unsafe characters", () => {
     const result = htmlEscape('<script>alert("xss")</script>');
-    expect(result.toString()).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+    expect(result.toString()).toBe("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
   });
 
-  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => { /* Ruby encoding */ });
+  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
+    /* Ruby encoding */
+  });
 
   it("ERB::Util.html_escape should not escape safe strings", () => {
     const safe = htmlSafe("<b>bold</b>");
@@ -1640,7 +1944,9 @@ describe("OutputSafetyTest", () => {
     expect(raw.toString()).toBe("&lt;raw&gt;");
   });
 
-  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => { /* Ruby encoding */ });
+  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
+    /* Ruby encoding */
+  });
 
   it("ERB::Util.xml_name_escape should escape unsafe characters for XML names", () => {
     const result = xmlNameEscape("hello world");
@@ -1649,41 +1955,111 @@ describe("OutputSafetyTest", () => {
 });
 
 describe("MemCacheStoreTest", () => {
-  it.skip("validate pool arguments", () => { /* fixture-dependent */ });
-  it.skip("instantiating the store doesn't connect to Memcache", () => { /* fixture-dependent */ });
-  it.skip("clear also clears local cache", () => { /* fixture-dependent */ });
-  it.skip("short key normalization", () => { /* fixture-dependent */ });
-  it.skip("long key normalization", () => { /* fixture-dependent */ });
-  it.skip("namespaced key normalization", () => { /* fixture-dependent */ });
-  it.skip("multibyte string key normalization", () => { /* fixture-dependent */ });
-  it.skip("whole key digest on normalization", () => { /* fixture-dependent */ });
-  it.skip("raw values", () => { /* fixture-dependent */ });
-  it.skip("raw read entry compression", () => { /* fixture-dependent */ });
-  it.skip("raw values with marshal", () => { /* fixture-dependent */ });
-  it.skip("local cache raw values", () => { /* fixture-dependent */ });
-  it.skip("increment unset key", () => { /* fixture-dependent */ });
-  it.skip("write expires at", () => { /* fixture-dependent */ });
-  it.skip("write with unless exist", () => { /* fixture-dependent */ });
-  it.skip("increment expires in", () => { /* fixture-dependent */ });
-  it.skip("decrement unset key", () => { /* fixture-dependent */ });
-  it.skip("decrement expires in", () => { /* fixture-dependent */ });
-  it.skip("dalli cache nils", () => { /* fixture-dependent */ });
-  it.skip("local cache raw values with marshal", () => { /* fixture-dependent */ });
-  it.skip("read should return a different object id each time it is called", () => { /* fixture-dependent */ });
-  it.skip("no compress when below threshold", () => { /* fixture-dependent */ });
-  it.skip("no multiple compress", () => { /* fixture-dependent */ });
-  it.skip("unless exist expires when configured", () => { /* fixture-dependent */ });
-  it.skip("forwards string addresses if present", () => { /* fixture-dependent */ });
-  it.skip("falls back to localhost if no address provided and memcache servers undefined", () => { /* fixture-dependent */ });
-  it.skip("falls back to localhost if address provided as nil", () => { /* fixture-dependent */ });
-  it.skip("falls back to localhost if no address provided and memcache servers defined", () => { /* fixture-dependent */ });
-  it.skip("can load raw values from dalli store", () => { /* fixture-dependent */ });
-  it.skip("can load raw falsey values from dalli store", () => { /* fixture-dependent */ });
-  it.skip("can load raw values from dalli store with local cache", () => { /* fixture-dependent */ });
-  it.skip("can load raw falsey values from dalli store with local cache", () => { /* fixture-dependent */ });
-  it.skip("can read multi entries raw values from dalli store", () => { /* fixture-dependent */ });
-  it.skip("pool options work", () => { /* fixture-dependent */ });
-  it.skip("connection pooling by default", () => { /* fixture-dependent */ });
+  it.skip("validate pool arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("instantiating the store doesn't connect to Memcache", () => {
+    /* fixture-dependent */
+  });
+  it.skip("clear also clears local cache", () => {
+    /* fixture-dependent */
+  });
+  it.skip("short key normalization", () => {
+    /* fixture-dependent */
+  });
+  it.skip("long key normalization", () => {
+    /* fixture-dependent */
+  });
+  it.skip("namespaced key normalization", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multibyte string key normalization", () => {
+    /* fixture-dependent */
+  });
+  it.skip("whole key digest on normalization", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raw values", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raw read entry compression", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raw values with marshal", () => {
+    /* fixture-dependent */
+  });
+  it.skip("local cache raw values", () => {
+    /* fixture-dependent */
+  });
+  it.skip("increment unset key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("write expires at", () => {
+    /* fixture-dependent */
+  });
+  it.skip("write with unless exist", () => {
+    /* fixture-dependent */
+  });
+  it.skip("increment expires in", () => {
+    /* fixture-dependent */
+  });
+  it.skip("decrement unset key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("decrement expires in", () => {
+    /* fixture-dependent */
+  });
+  it.skip("dalli cache nils", () => {
+    /* fixture-dependent */
+  });
+  it.skip("local cache raw values with marshal", () => {
+    /* fixture-dependent */
+  });
+  it.skip("read should return a different object id each time it is called", () => {
+    /* fixture-dependent */
+  });
+  it.skip("no compress when below threshold", () => {
+    /* fixture-dependent */
+  });
+  it.skip("no multiple compress", () => {
+    /* fixture-dependent */
+  });
+  it.skip("unless exist expires when configured", () => {
+    /* fixture-dependent */
+  });
+  it.skip("forwards string addresses if present", () => {
+    /* fixture-dependent */
+  });
+  it.skip("falls back to localhost if no address provided and memcache servers undefined", () => {
+    /* fixture-dependent */
+  });
+  it.skip("falls back to localhost if address provided as nil", () => {
+    /* fixture-dependent */
+  });
+  it.skip("falls back to localhost if no address provided and memcache servers defined", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can load raw values from dalli store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can load raw falsey values from dalli store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can load raw values from dalli store with local cache", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can load raw falsey values from dalli store with local cache", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can read multi entries raw values from dalli store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("pool options work", () => {
+    /* fixture-dependent */
+  });
+  it.skip("connection pooling by default", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ErrorReporterTest", () => {
@@ -1692,7 +2068,9 @@ describe("ErrorReporterTest", () => {
     reporter.setContext({ user: "alice" });
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle(() => { throw new Error("boom"); });
+    reporter.handle(() => {
+      throw new Error("boom");
+    });
     expect(reported[0].context.user).toBe("alice");
   });
 
@@ -1701,7 +2079,9 @@ describe("ErrorReporterTest", () => {
     reporter.setContext({ user: "alice" });
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle([Error], { context: { user: "bob" } }, () => { throw new Error("boom"); });
+    reporter.handle([Error], { context: { user: "bob" } }, () => {
+      throw new Error("boom");
+    });
     expect(reported[0].context.user).toBe("bob");
   });
 
@@ -1709,7 +2089,9 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle([Error], { source: "my_lib" }, () => { throw new Error("boom"); });
+    reporter.handle([Error], { source: "my_lib" }, () => {
+      throw new Error("boom");
+    });
     expect(reported[0].source).toBe("my_lib");
   });
 
@@ -1719,7 +2101,9 @@ describe("ErrorReporterTest", () => {
     const sub = { report: (re: any) => reported.push(re) };
     reporter.subscribe(sub);
     reporter.disable(sub, () => {
-      reporter.handle(() => { throw new Error("boom"); });
+      reporter.handle(() => {
+        throw new Error("boom");
+      });
     });
     expect(reported).toHaveLength(0);
   });
@@ -1732,7 +2116,9 @@ describe("ErrorReporterTest", () => {
     reporter.subscribe(sub1);
     reporter.subscribe(sub2);
     reporter.disable(sub1, () => {
-      reporter.handle(() => { throw new Error("boom"); });
+      reporter.handle(() => {
+        throw new Error("boom");
+      });
     });
     expect(reported).toEqual(["sub2"]);
   });
@@ -1741,7 +2127,9 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle(() => { throw new Error("test error"); });
+    reporter.handle(() => {
+      throw new Error("test error");
+    });
     expect(reported).toHaveLength(1);
     expect(reported[0].error.message).toBe("test error");
   });
@@ -1750,7 +2138,11 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    expect(() => reporter.handle([TypeError], () => { throw new RangeError("out"); })).toThrow(RangeError);
+    expect(() =>
+      reporter.handle([TypeError], () => {
+        throw new RangeError("out");
+      }),
+    ).toThrow(RangeError);
     expect(reported).toHaveLength(0);
   });
 
@@ -1758,7 +2150,9 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle([TypeError, RangeError], () => { throw new TypeError("type"); });
+    reporter.handle([TypeError, RangeError], () => {
+      throw new TypeError("type");
+    });
     expect(reported).toHaveLength(1);
   });
 
@@ -1766,7 +2160,9 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle([Error], () => { throw new Error("swallowed"); });
+    reporter.handle([Error], () => {
+      throw new Error("swallowed");
+    });
     expect(reported[0].error.message).toBe("swallowed");
   });
 
@@ -1779,49 +2175,79 @@ describe("ErrorReporterTest", () => {
   it("#handle returns nil on handled raise", () => {
     const reporter = new ErrorReporter();
     reporter.subscribe({ report: () => {} });
-    const result = reporter.handle(() => { throw new Error("boom"); });
+    const result = reporter.handle(() => {
+      throw new Error("boom");
+    });
     expect(result).toBeUndefined();
   });
 
   it("#handle returns the value of the fallback as a proc on handled raise", () => {
     const reporter = new ErrorReporter();
     reporter.subscribe({ report: () => {} });
-    const result = reporter.handle([Error], { fallback: () => "default" }, () => { throw new Error("boom"); });
+    const result = reporter.handle([Error], { fallback: () => "default" }, () => {
+      throw new Error("boom");
+    });
     expect(result).toBe("default");
   });
 
   it("#handle raises if the fallback is not a callable", () => {
     const reporter = new ErrorReporter();
     reporter.subscribe({ report: () => {} });
-    const result = reporter.handle([Error], { fallback: "default" as any }, () => { throw new Error("boom"); });
+    const result = reporter.handle([Error], { fallback: "default" as any }, () => {
+      throw new Error("boom");
+    });
     expect(result).toBe("default");
   });
 
   it("#handle raises the error up if fallback is a proc that then also raises", () => {
     const reporter = new ErrorReporter();
     reporter.subscribe({ report: () => {} });
-    expect(() => reporter.handle([Error], { fallback: () => { throw new Error("fallback error"); } }, () => { throw new Error("original"); })).toThrow("fallback error");
+    expect(() =>
+      reporter.handle(
+        [Error],
+        {
+          fallback: () => {
+            throw new Error("fallback error");
+          },
+        },
+        () => {
+          throw new Error("original");
+        },
+      ),
+    ).toThrow("fallback error");
   });
 
   it("#record report any unhandled error and re-raise them", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re: any) => reported.push(re) });
-    expect(() => reporter.record(() => { throw new Error("re-raised"); })).toThrow("re-raised");
+    expect(() =>
+      reporter.record(() => {
+        throw new Error("re-raised");
+      }),
+    ).toThrow("re-raised");
     expect(reported).toHaveLength(1);
   });
 
   it("#record can be scoped to an exception class", () => {
     const reporter = new ErrorReporter();
     reporter.subscribe({ report: () => {} });
-    expect(() => reporter.record([TypeError], () => { throw new RangeError("not matched"); })).toThrow(RangeError);
+    expect(() =>
+      reporter.record([TypeError], () => {
+        throw new RangeError("not matched");
+      }),
+    ).toThrow(RangeError);
   });
 
   it("#record can be scoped to several exception classes", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re: any) => reported.push(re) });
-    expect(() => reporter.record([TypeError, RangeError], () => { throw new TypeError("t"); })).toThrow("t");
+    expect(() =>
+      reporter.record([TypeError, RangeError], () => {
+        throw new TypeError("t");
+      }),
+    ).toThrow("t");
     expect(reported).toHaveLength(1);
   });
 
@@ -1829,11 +2255,17 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re: any) => reported.push(re) });
-    expect(() => reporter.record([Error], () => { throw new Error("matched"); })).toThrow("matched");
+    expect(() =>
+      reporter.record([Error], () => {
+        throw new Error("matched");
+      }),
+    ).toThrow("matched");
     expect(reported).toHaveLength(1);
   });
 
-  it.skip("#report assigns a backtrace if it's missing", () => { /* Ruby backtrace */ });
+  it.skip("#report assigns a backtrace if it's missing", () => {
+    /* Ruby backtrace */
+  });
 
   it("#record passes through the return value", () => {
     const reporter = new ErrorReporter();
@@ -1855,7 +2287,9 @@ describe("ErrorReporterTest", () => {
     expect(reported[0].error.message).toBe("something unexpected");
   });
 
-  it.skip("#unexpected re-raise errors in development and test", () => { /* env-specific */ });
+  it.skip("#unexpected re-raise errors in development and test", () => {
+    /* env-specific */
+  });
 
   it("can have multiple subscribers", () => {
     const reporter = new ErrorReporter();
@@ -1863,7 +2297,9 @@ describe("ErrorReporterTest", () => {
     const log2: any[] = [];
     reporter.subscribe({ report: (re) => log1.push(re) });
     reporter.subscribe({ report: (re) => log2.push(re) });
-    reporter.handle(() => { throw new Error("multi"); });
+    reporter.handle(() => {
+      throw new Error("multi");
+    });
     expect(log1).toHaveLength(1);
     expect(log2).toHaveLength(1);
   });
@@ -1874,7 +2310,9 @@ describe("ErrorReporterTest", () => {
     const sub = { report: (re: any) => reported.push(re) };
     reporter.subscribe(sub);
     reporter.unsubscribe(sub);
-    reporter.handle(() => { throw new Error("unsub"); });
+    reporter.handle(() => {
+      throw new Error("unsub");
+    });
     expect(reported).toHaveLength(0);
   });
 
@@ -1882,7 +2320,9 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    reporter.handle(() => { throw new Error("boom"); });
+    reporter.handle(() => {
+      throw new Error("boom");
+    });
     expect(reported[0].severity).toBe("warning");
   });
 
@@ -1890,7 +2330,11 @@ describe("ErrorReporterTest", () => {
     const reporter = new ErrorReporter();
     const reported: any[] = [];
     reporter.subscribe({ report: (re) => reported.push(re) });
-    expect(() => reporter.record(() => { throw new Error("boom"); })).toThrow();
+    expect(() =>
+      reporter.record(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow();
     expect(reported[0].severity).toBe("error");
   });
 
@@ -1904,7 +2348,9 @@ describe("ErrorReporterTest", () => {
     expect(reported).toHaveLength(1);
   });
 
-  it.skip("causes can't be reported again either", () => { /* Ruby exception cause chain */ });
+  it.skip("causes can't be reported again either", () => {
+    /* Ruby exception cause chain */
+  });
 
   it("can report frozen exceptions", () => {
     const reporter = new ErrorReporter();
@@ -1918,9 +2364,15 @@ describe("ErrorReporterTest", () => {
   it("subscriber errors are re-raised if no logger is set", () => {
     const reporter = new ErrorReporter();
     reporter.subscribe({
-      report: () => { throw new Error("subscriber boom"); }
+      report: () => {
+        throw new Error("subscriber boom");
+      },
     });
-    expect(() => reporter.handle(() => { throw new Error("original"); })).toThrow("subscriber boom");
+    expect(() =>
+      reporter.handle(() => {
+        throw new Error("original");
+      }),
+    ).toThrow("subscriber boom");
   });
 
   it("subscriber errors are logged if a logger is set", () => {
@@ -1928,16 +2380,21 @@ describe("ErrorReporterTest", () => {
     const logged: string[] = [];
     reporter.logger = { error: (msg) => logged.push(msg) };
     reporter.subscribe({
-      report: () => { throw new Error("subscriber boom"); }
+      report: () => {
+        throw new Error("subscriber boom");
+      },
     });
-    reporter.handle(() => { throw new Error("original"); });
+    reporter.handle(() => {
+      throw new Error("original");
+    });
     expect(logged).toHaveLength(1);
   });
 });
 
-
 describe("TimeTravelTest", () => {
-  afterEach(() => { travelBack(); });
+  afterEach(() => {
+    travelBack();
+  });
 
   it("time helper travel", () => {
     const before = Date.now();
@@ -1948,7 +2405,9 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel with block", () => {
     let inside: Date | null = null;
-    travel(1000, () => { inside = currentTime(); });
+    travel(1000, () => {
+      inside = currentTime();
+    });
     expect(inside).not.toBeNull();
   });
 
@@ -1965,9 +2424,15 @@ describe("TimeTravelTest", () => {
     expect(inside!.getUTCFullYear()).toBe(2032);
   });
 
-  it.skip("time helper travel to with time zone", () => { /* TimeZone not implemented */ });
-  it.skip("time helper travel to with different system and application time zones", () => { /* TimeZone */ });
-  it.skip("time helper travel to with string for time zone", () => { /* TimeZone */ });
+  it.skip("time helper travel to with time zone", () => {
+    /* TimeZone not implemented */
+  });
+  it.skip("time helper travel to with different system and application time zones", () => {
+    /* TimeZone */
+  });
+  it.skip("time helper travel to with string for time zone", () => {
+    /* TimeZone */
+  });
 
   it("time helper travel to with string and milliseconds", () => {
     const target = new Date("2033-03-15T10:30:00Z");
@@ -1976,7 +2441,9 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCMonth()).toBe(2); // March = 2
   });
 
-  it.skip("time helper travel to with separate class", () => { /* Ruby-specific Time subclass */ });
+  it.skip("time helper travel to with separate class", () => {
+    /* Ruby-specific Time subclass */
+  });
 
   it("time helper travel back", () => {
     const before = new Date();
@@ -2015,23 +2482,45 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCFullYear()).toBe(2036);
   });
 
-  it.skip("time helper travel to with usec", () => { /* microseconds */ });
-  it.skip("time helper with usec true", () => { /* microseconds */ });
-  it.skip("time helper travel to with datetime and usec", () => { /* microseconds */ });
-  it.skip("time helper travel to with datetime and usec true", () => { /* microseconds */ });
-  it.skip("time helper travel to with string and usec", () => { /* microseconds */ });
-  it.skip("time helper travel to with string and usec true", () => { /* microseconds */ });
-  it.skip("time helper freeze time with usec true", () => { /* microseconds */ });
+  it.skip("time helper travel to with usec", () => {
+    /* microseconds */
+  });
+  it.skip("time helper with usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with datetime and usec", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with datetime and usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with string and usec", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with string and usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper freeze time with usec true", () => {
+    /* microseconds */
+  });
 
   it("time helper travel with subsequent block", () => {
     const results: number[] = [];
-    travelTo(new Date("2041-01-01"), () => { results.push(currentTime().getUTCFullYear()); });
-    travelTo(new Date("2042-01-01"), () => { results.push(currentTime().getUTCFullYear()); });
+    travelTo(new Date("2041-01-01"), () => {
+      results.push(currentTime().getUTCFullYear());
+    });
+    travelTo(new Date("2042-01-01"), () => {
+      results.push(currentTime().getUTCFullYear());
+    });
     expect(results).toEqual([2041, 2042]);
   });
 
-  it.skip("travel to will reset the usec to avoid mysql rounding", () => { /* DB-specific */ });
-  it.skip("time helper travel with time subclass", () => { /* Ruby Time subclass */ });
+  it.skip("travel to will reset the usec to avoid mysql rounding", () => {
+    /* DB-specific */
+  });
+  it.skip("time helper travel with time subclass", () => {
+    /* Ruby Time subclass */
+  });
 
   it("time helper freeze time", () => {
     freezeTime();
@@ -2042,7 +2531,9 @@ describe("TimeTravelTest", () => {
 
   it("time helper freeze time with block", () => {
     let frozen: Date | null = null;
-    freezeTime(() => { frozen = currentTime(); });
+    freezeTime(() => {
+      frozen = currentTime();
+    });
     expect(frozen).not.toBeNull();
   });
 
@@ -2056,32 +2547,44 @@ describe("TimeTravelTest", () => {
 describe("MethodCallAssertionsTest", () => {
   it("assert called with defaults to expect once", () => {
     const obj = { greet: (name: string) => `hello ${name}` };
-    assertCalled(obj, "greet", {}, () => { obj.greet("world"); });
+    assertCalled(obj, "greet", {}, () => {
+      obj.greet("world");
+    });
     // passes if called at least once (default)
   });
 
   it("assert called more than once", () => {
     const obj = { inc: () => 1 };
     assertCalled(obj, "inc", { times: 3 }, () => {
-      obj.inc(); obj.inc(); obj.inc();
+      obj.inc();
+      obj.inc();
+      obj.inc();
     });
   });
 
   it("assert called method with arguments", () => {
     const obj = { add: (a: number, b: number) => a + b };
-    assertCalled(obj, "add", {}, () => { obj.add(1, 2); });
+    assertCalled(obj, "add", {}, () => {
+      obj.add(1, 2);
+    });
   });
 
   it("assert called returns", () => {
     const obj = { val: () => 42 };
     let result: number | undefined;
-    assertCalled(obj, "val", {}, () => { result = obj.val(); });
+    assertCalled(obj, "val", {}, () => {
+      result = obj.val();
+    });
     expect(result).toBe(42);
   });
 
   it("assert called failure", () => {
     const obj = { noop: () => {} };
-    expect(() => assertCalled(obj, "noop", { times: 1 }, () => { /* not called */ })).toThrow();
+    expect(() =>
+      assertCalled(obj, "noop", { times: 1 }, () => {
+        /* not called */
+      }),
+    ).toThrow();
   });
 
   it("assert called with message", () => {
@@ -2091,28 +2594,44 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called with arguments", () => {
     const obj = { log: (msg: string) => msg };
-    assertCalled(obj, "log", {}, () => { obj.log("hello"); });
+    assertCalled(obj, "log", {}, () => {
+      obj.log("hello");
+    });
   });
 
   it("assert called with arguments and returns", () => {
     const obj = { calc: (x: number) => x * 2 };
     let r: number | undefined;
-    assertCalled(obj, "calc", {}, () => { r = obj.calc(5); });
+    assertCalled(obj, "calc", {}, () => {
+      r = obj.calc(5);
+    });
     expect(r).toBe(10);
   });
 
   it("assert called with failure", () => {
     const obj = { fn: () => {} };
-    expect(() => assertCalled(obj, "fn", { times: 2 }, () => { obj.fn(); })).toThrow();
+    expect(() =>
+      assertCalled(obj, "fn", { times: 2 }, () => {
+        obj.fn();
+      }),
+    ).toThrow();
   });
 
   it("assert called on instance of with defaults to expect once", () => {
-    class Greeter { greet() { return "hi"; } }
-    assertCalledOnInstanceOf(Greeter, "greet", { times: 1 }, () => { new Greeter().greet(); });
+    class Greeter {
+      greet() {
+        return "hi";
+      }
+    }
+    assertCalledOnInstanceOf(Greeter, "greet", { times: 1 }, () => {
+      new Greeter().greet();
+    });
   });
 
   it("assert called on instance of more than once", () => {
-    class Counter { count() {} }
+    class Counter {
+      count() {}
+    }
     assertCalledOnInstanceOf(Counter, "count", { times: 2 }, () => {
       new Counter().count();
       new Counter().count();
@@ -2120,12 +2639,22 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of with arguments", () => {
-    class Calc { add(a: number, b: number) { return a + b; } }
-    assertCalledOnInstanceOf(Calc, "add", { times: 1 }, () => { new Calc().add(1, 2); });
+    class Calc {
+      add(a: number, b: number) {
+        return a + b;
+      }
+    }
+    assertCalledOnInstanceOf(Calc, "add", { times: 1 }, () => {
+      new Calc().add(1, 2);
+    });
   });
 
   it("assert called on instance of returns", () => {
-    class Calculator { multiply(x: number) { return x * 3; } }
+    class Calculator {
+      multiply(x: number) {
+        return x * 3;
+      }
+    }
     let result: number | undefined;
     assertCalledOnInstanceOf(Calculator, "multiply", { times: 1 }, () => {
       result = new Calculator().multiply(4);
@@ -2134,49 +2663,78 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of failure", () => {
-    class MyClass { doThing() {} }
+    class MyClass {
+      doThing() {}
+    }
     expect(() => assertCalledOnInstanceOf(MyClass, "doThing", { times: 1 }, () => {})).toThrow();
   });
 
   it("assert called on instance of with message", () => {
-    class MyClass { action() {} }
+    class MyClass {
+      action() {}
+    }
     expect(() => assertCalledOnInstanceOf(MyClass, "action", { times: 1 }, () => {})).toThrow();
   });
 
-  it.skip("assert called on instance of nesting", () => { /* complex nesting */ });
+  it.skip("assert called on instance of nesting", () => {
+    /* complex nesting */
+  });
 
   it("assert not called", () => {
     const obj = { fn: () => {} };
-    assertNotCalled(obj, "fn", () => { /* fn never called */ });
+    assertNotCalled(obj, "fn", () => {
+      /* fn never called */
+    });
   });
 
   it("assert not called failure", () => {
     const obj = { fn: () => {} };
-    expect(() => assertNotCalled(obj, "fn", () => { obj.fn(); })).toThrow();
+    expect(() =>
+      assertNotCalled(obj, "fn", () => {
+        obj.fn();
+      }),
+    ).toThrow();
   });
 
   it("assert not called on instance of", () => {
-    class Widget { render() {} }
-    assertNotCalledOnInstanceOf(Widget, "render", () => { /* render not called */ });
+    class Widget {
+      render() {}
+    }
+    assertNotCalledOnInstanceOf(Widget, "render", () => {
+      /* render not called */
+    });
   });
 
   it("assert not called on instance of failure", () => {
-    class Widget { render() {} }
-    expect(() => assertNotCalledOnInstanceOf(Widget, "render", () => { new Widget().render(); })).toThrow();
+    class Widget {
+      render() {}
+    }
+    expect(() =>
+      assertNotCalledOnInstanceOf(Widget, "render", () => {
+        new Widget().render();
+      }),
+    ).toThrow();
   });
 
-  it.skip("assert not called on instance of nesting", () => { /* complex nesting */ });
-  it.skip("stub any instance", () => { /* Ruby-specific stub_any_instance */ });
-  it.skip("stub any instance with instance", () => { /* Ruby-specific */ });
+  it.skip("assert not called on instance of nesting", () => {
+    /* complex nesting */
+  });
+  it.skip("stub any instance", () => {
+    /* Ruby-specific stub_any_instance */
+  });
+  it.skip("stub any instance with instance", () => {
+    /* Ruby-specific */
+  });
   it("assert changes when assertions are included", () => {
     let counter = 0;
     const before = counter;
-    (() => { counter += 1; })();
+    (() => {
+      counter += 1;
+    })();
     expect(counter).not.toBe(before);
     expect(counter).toBe(1);
   });
 });
-
 
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {
@@ -2211,7 +2769,10 @@ describe("EnumerableTests", () => {
   });
 
   it("index with", () => {
-    const items = [{ id: 1, name: "a" }, { id: 2, name: "b" }];
+    const items = [
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+    ];
     const idx = indexBy(items, (x) => x.id);
     expect(idx[1]).toEqual({ id: 1, name: "a" });
     expect(idx[2]).toEqual({ id: 2, name: "b" });
@@ -2226,7 +2787,10 @@ describe("EnumerableTests", () => {
   it("many iterates only on what is needed", () => {
     let count = 0;
     const arr = [1, 2, 3, 4, 5];
-    many(arr, (x) => { count++; return x > 3; });
+    many(arr, (x) => {
+      count++;
+      return x > 3;
+    });
     // many stops after finding 2 matches
     expect(count).toBeLessThanOrEqual(arr.length);
   });
@@ -2250,7 +2814,10 @@ describe("EnumerableTests", () => {
   });
 
   it("pick", () => {
-    const items = [{ id: 1, name: "a" }, { id: 2, name: "b" }];
+    const items = [
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+    ];
     expect(pick(items, "id")).toBe(1);
   });
 
@@ -2287,13 +2854,20 @@ describe("EnumerableTests", () => {
   });
 
   it("in order of preserves duplicates", () => {
-    const items = [{ id: 1, val: "a" }, { id: 1, val: "b" }, { id: 2, val: "c" }];
+    const items = [
+      { id: 1, val: "a" },
+      { id: 1, val: "b" },
+      { id: 2, val: "c" },
+    ];
     const result = inOrderOf(items, (x) => x.id, [1, 2]);
     expect(result.length).toBe(3);
   });
 
   it("in order of preserves nested elements", () => {
-    const items = [{ id: 2, sub: { x: 1 } }, { id: 1, sub: { x: 2 } }];
+    const items = [
+      { id: 2, sub: { x: 1 } },
+      { id: 1, sub: { x: 2 } },
+    ];
     const result = inOrderOf(items, (x) => x.id, [1, 2]);
     expect(result[0].id).toBe(1);
   });
@@ -2321,27 +2895,69 @@ describe("EnumerableTests", () => {
 });
 
 describe("DateAndTimeCompatibilityTest", () => {
-  it.skip("time to time preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("time to time does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("time to time on utc value without preserve configured", () => { /* fixture-dependent */ });
-  it.skip("time to time on offset value without preserve configured", () => { /* fixture-dependent */ });
-  it.skip("time to time on tzinfo value without preserve configured", () => { /* fixture-dependent */ });
-  it.skip("time to time frozen preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("time to time frozen does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("datetime to time preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("datetime to time does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("datetime to time frozen preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("datetime to time frozen does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("twz to time preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("twz to time does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("twz to time frozen preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("twz to time frozen does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("string to time preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("string to time does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("string to time frozen preserves timezone", () => { /* fixture-dependent */ });
-  it.skip("string to time frozen does not preserve time zone", () => { /* fixture-dependent */ });
-  it.skip("to time preserves timezone is deprecated", () => { /* fixture-dependent */ });
-  it.skip("to time preserves timezone supports new values", () => { /* fixture-dependent */ });
+  it.skip("time to time preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time to time does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time to time on utc value without preserve configured", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time to time on offset value without preserve configured", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time to time on tzinfo value without preserve configured", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time to time frozen preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time to time frozen does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime to time preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime to time does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime to time frozen preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime to time frozen does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("twz to time preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("twz to time does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("twz to time frozen preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("twz to time frozen does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to time preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to time does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to time frozen preserves timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to time frozen does not preserve time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to time preserves timezone is deprecated", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to time preserves timezone supports new values", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CurrentAttributesTest", () => {
@@ -2368,7 +2984,9 @@ describe("CurrentAttributesTest", () => {
 
   it("read and write attribute with default value", () => {
     class CurrentWithDefault extends CurrentAttributes {
-      static { this.attribute("user", { default: "guest" }); }
+      static {
+        this.attribute("user", { default: "guest" });
+      }
       declare user: string;
     }
     CurrentWithDefault.reset();
@@ -2380,7 +2998,9 @@ describe("CurrentAttributesTest", () => {
 
   it("read attribute with default callable", () => {
     class CurrentCallable extends CurrentAttributes {
-      static { this.attribute("counter", { default: () => 0 }); }
+      static {
+        this.attribute("counter", { default: () => 0 });
+      }
       declare counter: number;
     }
     CurrentCallable.reset();
@@ -2392,9 +3012,15 @@ describe("CurrentAttributesTest", () => {
 
   it("read overwritten attribute method", () => {
     class CurrentOverride extends CurrentAttributes {
-      static { this.attribute("user"); }
+      static {
+        this.attribute("user");
+      }
       get user(): string | undefined {
-        return (this as unknown as { _attributes: Map<string, unknown> })._attributes.get("user") as string | undefined ?? "default_user";
+        return (
+          ((this as unknown as { _attributes: Map<string, unknown> })._attributes.get("user") as
+            | string
+            | undefined) ?? "default_user"
+        );
       }
       set user(v: string | undefined) {
         (this as unknown as { _attributes: Map<string, unknown> })._attributes.set("user", v);
@@ -2407,10 +3033,16 @@ describe("CurrentAttributesTest", () => {
 
   it("set attribute via overwritten method", () => {
     class CurrentOverrideSet extends CurrentAttributes {
-      static { this.attribute("user"); }
+      static {
+        this.attribute("user");
+      }
       private _prefixed: string | undefined;
-      get user(): string | undefined { return this._prefixed; }
-      set user(v: string | undefined) { this._prefixed = v ? `User: ${v}` : undefined; }
+      get user(): string | undefined {
+        return this._prefixed;
+      }
+      set user(v: string | undefined) {
+        this._prefixed = v ? `User: ${v}` : undefined;
+      }
     }
     CurrentOverrideSet.reset();
     const inst = CurrentOverrideSet.instance();
@@ -2420,7 +3052,9 @@ describe("CurrentAttributesTest", () => {
 
   it("set auxiliary class via overwritten method", () => {
     class CurrentAux extends CurrentAttributes {
-      static { this.attribute("user"); }
+      static {
+        this.attribute("user");
+      }
       declare user: { name: string } | undefined;
     }
     CurrentAux.reset();
@@ -2429,8 +3063,12 @@ describe("CurrentAttributesTest", () => {
     expect(inst.user?.name).toBe("david");
   });
 
-  it.skip("resets auxiliary classes via callback", () => { /* callback infrastructure needed */ });
-  it.skip("set auxiliary class based on current attributes via before callback", () => { /* callback infrastructure */ });
+  it.skip("resets auxiliary classes via callback", () => {
+    /* callback infrastructure needed */
+  });
+  it.skip("set auxiliary class based on current attributes via before callback", () => {
+    /* callback infrastructure */
+  });
 
   it("set attribute only via scope", () => {
     const inst = Current.instance();
@@ -2483,11 +3121,15 @@ describe("CurrentAttributesTest", () => {
 
   it("CurrentAttributes defaults do not leak between classes", () => {
     class CurrentA extends CurrentAttributes {
-      static { this.attribute("user", { default: "A" }); }
+      static {
+        this.attribute("user", { default: "A" });
+      }
       declare user: string;
     }
     class CurrentB extends CurrentAttributes {
-      static { this.attribute("user", { default: "B" }); }
+      static {
+        this.attribute("user", { default: "B" });
+      }
       declare user: string;
     }
     CurrentA.reset();
@@ -2496,8 +3138,12 @@ describe("CurrentAttributesTest", () => {
     expect(CurrentB.instance().user).toBe("B");
   });
 
-  it.skip("CurrentAttributes use fiber-local variables", () => { /* fiber/async context not applicable in JS */ });
-  it.skip("CurrentAttributes can use thread-local variables", () => { /* thread-local not applicable in JS */ });
+  it.skip("CurrentAttributes use fiber-local variables", () => {
+    /* fiber/async context not applicable in JS */
+  });
+  it.skip("CurrentAttributes can use thread-local variables", () => {
+    /* thread-local not applicable in JS */
+  });
 
   it("CurrentAttributes doesn't populate #attributes when not using defaults", () => {
     const inst = Current.instance();
@@ -2506,60 +3152,147 @@ describe("CurrentAttributesTest", () => {
     expect(inst.attributes).toHaveProperty("user", "david");
   });
 
-  it.skip("CurrentAttributes restricted attribute names", () => { /* Ruby reserved name enforcement */ });
-  it.skip("method_added hook doesn't reach the instance. Fix for #54646", () => { /* Ruby-specific */ });
+  it.skip("CurrentAttributes restricted attribute names", () => {
+    /* Ruby reserved name enforcement */
+  });
+  it.skip("method_added hook doesn't reach the instance. Fix for #54646", () => {
+    /* Ruby-specific */
+  });
 });
 
 describe("ShareLockTest", () => {
-  it.skip("reentrancy", () => { /* fixture-dependent */ });
-  it.skip("sharing doesnt block", () => { /* fixture-dependent */ });
-  it.skip("sharing blocks exclusive", () => { /* fixture-dependent */ });
-  it.skip("exclusive blocks sharing", () => { /* fixture-dependent */ });
-  it.skip("multiple exclusives are able to progress", () => { /* fixture-dependent */ });
-  it.skip("sharing is upgradeable to exclusive", () => { /* fixture-dependent */ });
-  it.skip("exclusive upgrade waits for other sharers to leave", () => { /* fixture-dependent */ });
-  it.skip("exclusive matching purpose", () => { /* fixture-dependent */ });
-  it.skip("killed thread loses lock", () => { /* fixture-dependent */ });
-  it.skip("exclusive conflicting purpose", () => { /* fixture-dependent */ });
-  it.skip("exclusive ordering", () => { /* fixture-dependent */ });
-  it.skip("new share attempts block on waiting exclusive", () => { /* fixture-dependent */ });
-  it.skip("share remains reentrant ignoring a waiting exclusive", () => { /* fixture-dependent */ });
-  it.skip("compatible exclusives cooperate to both proceed", () => { /* fixture-dependent */ });
-  it.skip("manual yield", () => { /* fixture-dependent */ });
-  it.skip("manual incompatible yield", () => { /* fixture-dependent */ });
-  it.skip("manual recursive yield", () => { /* fixture-dependent */ });
-  it.skip("manual recursive yield cannot expand outer compatible", () => { /* fixture-dependent */ });
-  it.skip("manual recursive yield restores previous compatible", () => { /* fixture-dependent */ });
-  it.skip("in shared section incompatible non upgrading threads cannot preempt upgrading threads", () => { /* fixture-dependent */ });
+  it.skip("reentrancy", () => {
+    /* fixture-dependent */
+  });
+  it.skip("sharing doesnt block", () => {
+    /* fixture-dependent */
+  });
+  it.skip("sharing blocks exclusive", () => {
+    /* fixture-dependent */
+  });
+  it.skip("exclusive blocks sharing", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multiple exclusives are able to progress", () => {
+    /* fixture-dependent */
+  });
+  it.skip("sharing is upgradeable to exclusive", () => {
+    /* fixture-dependent */
+  });
+  it.skip("exclusive upgrade waits for other sharers to leave", () => {
+    /* fixture-dependent */
+  });
+  it.skip("exclusive matching purpose", () => {
+    /* fixture-dependent */
+  });
+  it.skip("killed thread loses lock", () => {
+    /* fixture-dependent */
+  });
+  it.skip("exclusive conflicting purpose", () => {
+    /* fixture-dependent */
+  });
+  it.skip("exclusive ordering", () => {
+    /* fixture-dependent */
+  });
+  it.skip("new share attempts block on waiting exclusive", () => {
+    /* fixture-dependent */
+  });
+  it.skip("share remains reentrant ignoring a waiting exclusive", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compatible exclusives cooperate to both proceed", () => {
+    /* fixture-dependent */
+  });
+  it.skip("manual yield", () => {
+    /* fixture-dependent */
+  });
+  it.skip("manual incompatible yield", () => {
+    /* fixture-dependent */
+  });
+  it.skip("manual recursive yield", () => {
+    /* fixture-dependent */
+  });
+  it.skip("manual recursive yield cannot expand outer compatible", () => {
+    /* fixture-dependent */
+  });
+  it.skip("manual recursive yield restores previous compatible", () => {
+    /* fixture-dependent */
+  });
+  it.skip("in shared section incompatible non upgrading threads cannot preempt upgrading threads", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("XMLMiniEngineTest", () => {
-  it.skip("file from xml", () => { /* fixture-dependent */ });
-  it.skip("exception thrown on expansion attack", () => { /* fixture-dependent */ });
-  it.skip("setting backend", () => { /* fixture-dependent */ });
-  it.skip("blank returns empty hash", () => { /* fixture-dependent */ });
-  it.skip("parse from frozen string", () => { /* fixture-dependent */ });
-  it.skip("array type makes an array", () => { /* fixture-dependent */ });
-  it.skip("one node document as hash", () => { /* fixture-dependent */ });
-  it.skip("one node with attributes document as hash", () => { /* fixture-dependent */ });
-  it.skip("products node with book node as hash", () => { /* fixture-dependent */ });
-  it.skip("products node with two book nodes as hash", () => { /* fixture-dependent */ });
-  it.skip("single node with content as hash", () => { /* fixture-dependent */ });
-  it.skip("children with children", () => { /* fixture-dependent */ });
-  it.skip("children with text", () => { /* fixture-dependent */ });
-  it.skip("children with non adjacent text", () => { /* fixture-dependent */ });
-  it.skip("parse from io", () => { /* fixture-dependent */ });
-  it.skip("children with simple cdata", () => { /* fixture-dependent */ });
-  it.skip("children with multiple cdata", () => { /* fixture-dependent */ });
-  it.skip("children with text and cdata", () => { /* fixture-dependent */ });
-  it.skip("children with blank text", () => { /* fixture-dependent */ });
-  it.skip("children with blank text and attribute", () => { /* fixture-dependent */ });
+  it.skip("file from xml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("exception thrown on expansion attack", () => {
+    /* fixture-dependent */
+  });
+  it.skip("setting backend", () => {
+    /* fixture-dependent */
+  });
+  it.skip("blank returns empty hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("parse from frozen string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("array type makes an array", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one node document as hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one node with attributes document as hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("products node with book node as hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("products node with two book nodes as hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("single node with content as hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with children", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with text", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with non adjacent text", () => {
+    /* fixture-dependent */
+  });
+  it.skip("parse from io", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with simple cdata", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with multiple cdata", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with text and cdata", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with blank text", () => {
+    /* fixture-dependent */
+  });
+  it.skip("children with blank text and attribute", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("ModuleAttributeAccessorPerThreadTest", () => {
-  it.skip("is shared between fibers", () => { /* fiber/async context not applicable */ });
-  it.skip("is not shared between fibers if isolation level is fiber", () => { /* fiber/async context not applicable */ });
+  it.skip("is shared between fibers", () => {
+    /* fiber/async context not applicable */
+  });
+  it.skip("is not shared between fibers if isolation level is fiber", () => {
+    /* fiber/async context not applicable */
+  });
 
   it("default value", () => {
     class M {}
@@ -2575,7 +3308,9 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     expect((Parent as unknown as Record<string, unknown>).shared).toBe(42);
   });
 
-  it.skip("default value is accessible from other threads", () => { /* threads not applicable */ });
+  it.skip("default value is accessible from other threads", () => {
+    /* threads not applicable */
+  });
 
   it("nonfrozen default value is duped and frozen", () => {
     const defaultArr = [1, 2, 3];
@@ -2637,7 +3372,9 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     expect(Object.getOwnPropertyDescriptor(proto, "z")).toBeUndefined();
   });
 
-  it.skip("values should not bleed between threads", () => { /* threads not applicable */ });
+  it.skip("values should not bleed between threads", () => {
+    /* threads not applicable */
+  });
 
   it("should raise name error if attribute name is invalid", () => {
     class M {}
@@ -2759,44 +3496,114 @@ describe("StringAccessTest", () => {
 });
 
 describe("ToTagTest", () => {
-  it.skip("#to_tag accepts a callable object and passes options with the builder", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts a callable object and passes options and tag name", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts an object responding to #to_xml and passes the options, where :root is key", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts arbitrary objects responding to #to_str", () => { /* fixture-dependent */ });
-  it.skip("#to_tag should use the type value in the options hash", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts symbol types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts boolean types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts float types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts decimal types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts date types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts datetime types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts time types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts ActiveSupport::TimeWithZone types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts duration types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts array types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag accepts hash types", () => { /* fixture-dependent */ });
-  it.skip("#to_tag should not add type when skip types option is set", () => { /* fixture-dependent */ });
-  it.skip("#to_tag should dasherize the space when passed a string with spaces as a key", () => { /* fixture-dependent */ });
-  it.skip("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => { /* fixture-dependent */ });
+  it.skip("#to_tag accepts a callable object and passes options with the builder", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts a callable object and passes options and tag name", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts an object responding to #to_xml and passes the options, where :root is key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts arbitrary objects responding to #to_str", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag should use the type value in the options hash", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts symbol types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts boolean types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts float types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts decimal types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts date types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts datetime types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts time types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts ActiveSupport::TimeWithZone types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts duration types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts array types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag accepts hash types", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag should not add type when skip types option is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag should dasherize the space when passed a string with spaces as a key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("NumberHelperI18nTest", () => {
-  it.skip("number to i18n currency", () => { /* fixture-dependent */ });
-  it.skip("number to currency with empty i18n store", () => { /* fixture-dependent */ });
-  it.skip("locale default format has precedence over helper defaults", () => { /* fixture-dependent */ });
-  it.skip("number to currency without currency negative format", () => { /* fixture-dependent */ });
-  it.skip("number with i18n precision", () => { /* fixture-dependent */ });
-  it.skip("number with i18n round mode", () => { /* fixture-dependent */ });
-  it.skip("number with i18n precision and empty i18n store", () => { /* fixture-dependent */ });
-  it.skip("number with i18n delimiter", () => { /* fixture-dependent */ });
-  it.skip("number with i18n delimiter and empty i18n store", () => { /* fixture-dependent */ });
-  it.skip("number to i18n percentage", () => { /* fixture-dependent */ });
-  it.skip("number to i18n percentage and empty i18n store", () => { /* fixture-dependent */ });
-  it.skip("number to i18n human size", () => { /* fixture-dependent */ });
-  it.skip("number to i18n human size with empty i18n store", () => { /* fixture-dependent */ });
-  it.skip("number to human with default translation scope", () => { /* fixture-dependent */ });
-  it.skip("number to human with empty i18n store", () => { /* fixture-dependent */ });
-  it.skip("number to human with custom translation scope", () => { /* fixture-dependent */ });
+  it.skip("number to i18n currency", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to currency with empty i18n store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("locale default format has precedence over helper defaults", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to currency without currency negative format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number with i18n precision", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number with i18n round mode", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number with i18n precision and empty i18n store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number with i18n delimiter", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number with i18n delimiter and empty i18n store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to i18n percentage", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to i18n percentage and empty i18n store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to i18n human size", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to i18n human size with empty i18n store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to human with default translation scope", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to human with empty i18n store", () => {
+    /* fixture-dependent */
+  });
+  it.skip("number to human with custom translation scope", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("TransliterateTest", () => {
@@ -2813,8 +3620,12 @@ describe("TransliterateTest", () => {
     expect(transliterate("Ö")).toBe("O");
   });
 
-  it.skip("transliterate should work with custom i18n rules and uncomposed utf8", () => { /* i18n-dependent */ });
-  it.skip("transliterate respects the locale argument", () => { /* i18n-dependent */ });
+  it.skip("transliterate should work with custom i18n rules and uncomposed utf8", () => {
+    /* i18n-dependent */
+  });
+  it.skip("transliterate respects the locale argument", () => {
+    /* i18n-dependent */
+  });
 
   it("transliterate should allow a custom replacement char", () => {
     expect(transliterate("hello 日本語 world", "*")).toBe("hello *** world");
@@ -2842,11 +3653,21 @@ describe("TransliterateTest", () => {
     expect(transliterate("hello")).toBe("hello");
   });
 
-  it.skip("transliterate handles strings with valid gb18030 encodings", () => { /* encoding-specific */ });
-  it.skip("transliterate handles strings with incompatible encodings", () => { /* encoding-specific */ });
-  it.skip("transliterate handles strings with invalid utf8 bytes", () => { /* encoding-specific */ });
-  it.skip("transliterate handles strings with invalid us ascii bytes", () => { /* encoding-specific */ });
-  it.skip("transliterate handles strings with invalid gb18030 bytes", () => { /* encoding-specific */ });
+  it.skip("transliterate handles strings with valid gb18030 encodings", () => {
+    /* encoding-specific */
+  });
+  it.skip("transliterate handles strings with incompatible encodings", () => {
+    /* encoding-specific */
+  });
+  it.skip("transliterate handles strings with invalid utf8 bytes", () => {
+    /* encoding-specific */
+  });
+  it.skip("transliterate handles strings with invalid us ascii bytes", () => {
+    /* encoding-specific */
+  });
+  it.skip("transliterate handles strings with invalid gb18030 bytes", () => {
+    /* encoding-specific */
+  });
 
   it("transliterate returns a copy of ascii strings", () => {
     const original = "hello";
@@ -2860,22 +3681,41 @@ describe("TransliterateTest", () => {
 describe("ConcernTest", () => {
   it("module is included normally", () => {
     class Base {}
-    const m = concern({ instanceMethods: { greet() { return "hello"; } } });
+    const m = concern({
+      instanceMethods: {
+        greet() {
+          return "hello";
+        },
+      },
+    });
     includeConcern(Base, m);
     expect(new (Base as any)().greet()).toBe("hello");
   });
   it("module is prepended normally", () => {
     class Base {
-      greet() { return "base"; }
+      greet() {
+        return "base";
+      }
     }
-    const m = concern({ prepend: true, instanceMethods: { greet() { return "prepended"; } } });
+    const m = concern({
+      prepend: true,
+      instanceMethods: {
+        greet() {
+          return "prepended";
+        },
+      },
+    });
     includeConcern(Base, m);
     expect(new (Base as any)().greet()).toBe("prepended");
   });
   it("class methods are extended when prepended", () => {
     class Base {}
     const m = concern({
-      classMethods: { myClassMethod() { return "class-method"; } },
+      classMethods: {
+        myClassMethod() {
+          return "class-method";
+        },
+      },
     });
     includeConcern(Base, m);
     expect((Base as any).myClassMethod()).toBe("class-method");
@@ -2883,7 +3723,13 @@ describe("ConcernTest", () => {
   it("class methods are extended only on expected objects", () => {
     class A {}
     class B {}
-    const m = concern({ classMethods: { cm() { return "cm"; } } });
+    const m = concern({
+      classMethods: {
+        cm() {
+          return "cm";
+        },
+      },
+    });
     includeConcern(A, m);
     expect((A as any).cm()).toBe("cm");
     expect((B as any).cm).toBeUndefined();
@@ -2893,7 +3739,9 @@ describe("ConcernTest", () => {
     class Base {}
     const m = concern({
       prepend: true,
-      included: () => { log.push("included"); },
+      included: () => {
+        log.push("included");
+      },
     });
     includeConcern(Base, m);
     // When prepend is true, included block still runs in our implementation
@@ -2904,7 +3752,9 @@ describe("ConcernTest", () => {
     const log: string[] = [];
     class Base {}
     const m = concern({
-      included: () => { log.push("included"); },
+      included: () => {
+        log.push("included");
+      },
     });
     includeConcern(Base, m);
     expect(log).toContain("included");
@@ -2913,14 +3763,31 @@ describe("ConcernTest", () => {
     // In TS we don't have a separate prepended block, just included
     const log: string[] = [];
     class Base {}
-    const m = concern({ included: (klass) => { log.push("ran"); } });
+    const m = concern({
+      included: (klass) => {
+        log.push("ran");
+      },
+    });
     includeConcern(Base, m);
     expect(log.length).toBeGreaterThanOrEqual(0); // just verify no error
   });
   it("modules dependencies are met", () => {
     class Base {}
-    const dep = concern({ instanceMethods: { dep() { return "dep"; } } });
-    const m = concern({ dependencies: [dep], instanceMethods: { main() { return "main"; } } });
+    const dep = concern({
+      instanceMethods: {
+        dep() {
+          return "dep";
+        },
+      },
+    });
+    const m = concern({
+      dependencies: [dep],
+      instanceMethods: {
+        main() {
+          return "main";
+        },
+      },
+    });
     includeConcern(Base, m);
     const inst = new (Base as any)();
     expect(inst.dep()).toBe("dep");
@@ -2928,8 +3795,20 @@ describe("ConcernTest", () => {
   });
   it("dependencies with multiple modules", () => {
     class Base {}
-    const dep1 = concern({ instanceMethods: { d1() { return 1; } } });
-    const dep2 = concern({ instanceMethods: { d2() { return 2; } } });
+    const dep1 = concern({
+      instanceMethods: {
+        d1() {
+          return 1;
+        },
+      },
+    });
+    const dep2 = concern({
+      instanceMethods: {
+        d2() {
+          return 2;
+        },
+      },
+    });
     const m = concern({ dependencies: [dep1, dep2] });
     includeConcern(Base, m);
     const inst = new (Base as any)();
@@ -2938,7 +3817,13 @@ describe("ConcernTest", () => {
   });
   it("dependencies with multiple modules when prepended", () => {
     class Base {}
-    const dep = concern({ instanceMethods: { depMethod() { return "dep"; } } });
+    const dep = concern({
+      instanceMethods: {
+        depMethod() {
+          return "dep";
+        },
+      },
+    });
     const m = concern({ dependencies: [dep], prepend: true });
     includeConcern(Base, m);
     expect(new (Base as any)().depMethod()).toBe("dep");
@@ -2947,21 +3832,38 @@ describe("ConcernTest", () => {
     // Our implementation is idempotent (no raise), just verify no duplicate effects
     const log: string[] = [];
     class Base {}
-    const m = concern({ included: () => { log.push("inc"); } });
+    const m = concern({
+      included: () => {
+        log.push("inc");
+      },
+    });
     includeConcern(Base, m);
     includeConcern(Base, m); // second call should be no-op
     expect(log.length).toBe(1);
   });
   it("raise on multiple prepended calls", () => {
     class Base {}
-    const m = concern({ prepend: true, instanceMethods: { x() { return 1; } } });
+    const m = concern({
+      prepend: true,
+      instanceMethods: {
+        x() {
+          return 1;
+        },
+      },
+    });
     includeConcern(Base, m);
     includeConcern(Base, m); // second call is no-op
     expect(hasConcern(Base, m)).toBe(true);
   });
   it("no raise on same included or prepended call", () => {
     class Base {}
-    const m = concern({ instanceMethods: { foo() { return "foo"; } } });
+    const m = concern({
+      instanceMethods: {
+        foo() {
+          return "foo";
+        },
+      },
+    });
     expect(() => {
       includeConcern(Base, m);
       includeConcern(Base, m);
@@ -2969,12 +3871,16 @@ describe("ConcernTest", () => {
   });
   it("prepended and included methods", () => {
     class Base {
-      original() { return "original"; }
+      original() {
+        return "original";
+      }
     }
     const m = concern({
       prepend: true,
       instanceMethods: {
-        prepended() { return "prepended"; },
+        prepended() {
+          return "prepended";
+        },
       },
     });
     includeConcern(Base, m);
@@ -2985,8 +3891,16 @@ describe("ConcernTest", () => {
   it("prepended and included class methods", () => {
     class Base {}
     const m = concern({
-      classMethods: { classMethod() { return "class"; } },
-      instanceMethods: { instMethod() { return "inst"; } },
+      classMethods: {
+        classMethod() {
+          return "class";
+        },
+      },
+      instanceMethods: {
+        instMethod() {
+          return "inst";
+        },
+      },
     });
     includeConcern(Base, m);
     expect((Base as any).classMethod()).toBe("class");
@@ -2995,25 +3909,52 @@ describe("ConcernTest", () => {
 });
 
 describe("EncryptedFileTest", () => {
-  it.skip("reading content by env key", () => { /* fixture-dependent */ });
-  it.skip("reading content by key file", () => { /* fixture-dependent */ });
-  it.skip("change content by key file", () => { /* fixture-dependent */ });
-  it.skip("change sets restricted permissions", () => { /* fixture-dependent */ });
-  it.skip("raise MissingKeyError when key is missing", () => { /* fixture-dependent */ });
-  it.skip("raise MissingKeyError when env key is blank", () => { /* fixture-dependent */ });
-  it.skip("key can be added after MissingKeyError raised", () => { /* fixture-dependent */ });
-  it.skip("key? is true when key file exists", () => { /* fixture-dependent */ });
-  it.skip("key? is true when env key is present", () => { /* fixture-dependent */ });
-  it.skip("key? is false and does not raise when the key is missing", () => { /* fixture-dependent */ });
-  it.skip("raise InvalidKeyLengthError when key is too short", () => { /* fixture-dependent */ });
-  it.skip("raise InvalidKeyLengthError when key is too long", () => { /* fixture-dependent */ });
-  it.skip("respects existing content_path symlink", () => { /* fixture-dependent */ });
-  it.skip("creates new content_path symlink if it's dead", () => { /* fixture-dependent */ });
-  it.skip("can read encrypted file after changing default_serializer", () => { /* fixture-dependent */ });
+  it.skip("reading content by env key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("reading content by key file", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change content by key file", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change sets restricted permissions", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raise MissingKeyError when key is missing", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raise MissingKeyError when env key is blank", () => {
+    /* fixture-dependent */
+  });
+  it.skip("key can be added after MissingKeyError raised", () => {
+    /* fixture-dependent */
+  });
+  it.skip("key? is true when key file exists", () => {
+    /* fixture-dependent */
+  });
+  it.skip("key? is true when env key is present", () => {
+    /* fixture-dependent */
+  });
+  it.skip("key? is false and does not raise when the key is missing", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raise InvalidKeyLengthError when key is too short", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raise InvalidKeyLengthError when key is too long", () => {
+    /* fixture-dependent */
+  });
+  it.skip("respects existing content_path symlink", () => {
+    /* fixture-dependent */
+  });
+  it.skip("creates new content_path symlink if it's dead", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can read encrypted file after changing default_serializer", () => {
+    /* fixture-dependent */
+  });
 });
-
-
-
 
 describe("ModuleAttributeAccessorTest", () => {
   it("should use mattr default", () => {
@@ -3059,7 +4000,9 @@ describe("ModuleAttributeAccessorTest", () => {
     mattrAccessor(MyModule, "x", { default: "val", instanceWriter: false });
     const inst = new (MyModule as any)();
     expect(inst.x).toBe("val");
-    expect(() => { inst.x = "new"; }).toThrow();
+    expect(() => {
+      inst.x = "new";
+    }).toThrow();
   });
 
   it("should not create instance reader", () => {
@@ -3084,7 +4027,12 @@ describe("ModuleAttributeAccessorTest", () => {
   it("should use default value if block passed", () => {
     class MyModule {}
     let calls = 0;
-    mattrAccessor(MyModule, "x", { default: () => { calls++; return "computed"; } });
+    mattrAccessor(MyModule, "x", {
+      default: () => {
+        calls++;
+        return "computed";
+      },
+    });
     expect((MyModule as any).x).toBe("computed");
     expect(calls).toBe(1);
   });
@@ -3092,7 +4040,12 @@ describe("ModuleAttributeAccessorTest", () => {
   it("method invocation should not invoke the default block", () => {
     class MyModule {}
     let calls = 0;
-    mattrAccessor(MyModule, "x", { default: () => { calls++; return "computed"; } });
+    mattrAccessor(MyModule, "x", {
+      default: () => {
+        calls++;
+        return "computed";
+      },
+    });
     // First access calls the block
     (MyModule as any).x;
     const callsAfterFirst = calls;
@@ -3104,14 +4057,18 @@ describe("ModuleAttributeAccessorTest", () => {
   it("declaring multiple attributes at once invokes the block multiple times", () => {
     class MyModule {}
     let callCount = 0;
-    const makeDefault = () => { callCount++; return "val"; };
+    const makeDefault = () => {
+      callCount++;
+      return "val";
+    };
     mattrAccessor(MyModule, "a", "b", "c", { default: makeDefault });
     expect(callCount).toBe(3);
   });
 
-  it.skip("declaring attributes on singleton errors", () => { /* Ruby-specific: singleton class */ });
+  it.skip("declaring attributes on singleton errors", () => {
+    /* Ruby-specific: singleton class */
+  });
 });
-
 
 describe("OptionMergerTest", () => {
   // withOptions creates a helper that deep-merges default options into calls
@@ -3123,10 +4080,19 @@ describe("OptionMergerTest", () => {
     };
   }
 
-  function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  function deepMerge(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>,
+  ): Record<string, unknown> {
     const result = { ...target };
     for (const [k, v] of Object.entries(source)) {
-      if (v !== null && typeof v === "object" && !Array.isArray(v) && typeof result[k] === "object" && result[k] !== null) {
+      if (
+        v !== null &&
+        typeof v === "object" &&
+        !Array.isArray(v) &&
+        typeof result[k] === "object" &&
+        result[k] !== null
+      ) {
         result[k] = deepMerge(result[k] as Record<string, unknown>, v as Record<string, unknown>);
       } else {
         result[k] = v;
@@ -3165,7 +4131,9 @@ describe("OptionMergerTest", () => {
 
   it("nested method with options containing hashes merge", () => {
     const m = withOptions({ style: { color: "red" } });
-    expect((m as any).merge({ style: { size: "big" } })).toEqual({ style: { color: "red", size: "big" } });
+    expect((m as any).merge({ style: { size: "big" } })).toEqual({
+      style: { color: "red", size: "big" },
+    });
   });
 
   it("nested method with options containing hashes overwrite", () => {
@@ -3213,19 +4181,45 @@ describe("OptionMergerTest", () => {
 });
 
 describe("StringConversionsTest", () => {
-  it.skip("string to time", () => { /* fixture-dependent */ });
-  it.skip("timestamp string to time", () => { /* fixture-dependent */ });
-  it.skip("string to time utc offset", () => { /* fixture-dependent */ });
-  it.skip("partial string to time", () => { /* fixture-dependent */ });
-  it.skip("standard time string to time when current time is standard time", () => { /* fixture-dependent */ });
-  it.skip("standard time string to time when current time is daylight savings", () => { /* fixture-dependent */ });
-  it.skip("daylight savings string to time when current time is standard time", () => { /* fixture-dependent */ });
-  it.skip("daylight savings string to time when current time is daylight savings", () => { /* fixture-dependent */ });
-  it.skip("partial string to time when current time is standard time", () => { /* fixture-dependent */ });
-  it.skip("partial string to time when current time is daylight savings", () => { /* fixture-dependent */ });
-  it.skip("string to datetime", () => { /* fixture-dependent */ });
-  it.skip("partial string to datetime", () => { /* fixture-dependent */ });
-  it.skip("string to date", () => { /* fixture-dependent */ });
+  it.skip("string to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("timestamp string to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to time utc offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("partial string to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("standard time string to time when current time is standard time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("standard time string to time when current time is daylight savings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings string to time when current time is standard time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings string to time when current time is daylight savings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("partial string to time when current time is standard time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("partial string to time when current time is daylight savings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("partial string to datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string to date", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("NullStoreTest", () => {
@@ -3306,11 +4300,15 @@ describe("ToSentenceTest", () => {
   });
 
   it("to sentence with words connector", () => {
-    expect(toSentence(["one", "two", "three"], { wordsConnector: " - " })).toBe("one - two, and three");
+    expect(toSentence(["one", "two", "three"], { wordsConnector: " - " })).toBe(
+      "one - two, and three",
+    );
   });
 
   it("to sentence with last word connector", () => {
-    expect(toSentence(["one", "two", "three"], { lastWordConnector: " or " })).toBe("one, two or three");
+    expect(toSentence(["one", "two", "three"], { lastWordConnector: " or " })).toBe(
+      "one, two or three",
+    );
   });
 
   it("two elements", () => {
@@ -3360,48 +4358,120 @@ describe("ToSentenceTest", () => {
 });
 
 describe("ToXmlTest", () => {
-  it.skip("to xml with hash elements", () => { /* fixture-dependent */ });
-  it.skip("to xml with non hash elements", () => { /* fixture-dependent */ });
-  it.skip("to xml with non hash different type elements", () => { /* fixture-dependent */ });
-  it.skip("to xml with dedicated name", () => { /* fixture-dependent */ });
-  it.skip("to xml with options", () => { /* fixture-dependent */ });
-  it.skip("to xml with indent set", () => { /* fixture-dependent */ });
-  it.skip("to xml with dasherize false", () => { /* fixture-dependent */ });
-  it.skip("to xml with dasherize true", () => { /* fixture-dependent */ });
-  it.skip("to xml with instruct", () => { /* fixture-dependent */ });
-  it.skip("to xml with block", () => { /* fixture-dependent */ });
-  it.skip("to xml with empty", () => { /* fixture-dependent */ });
-  it.skip("to xml dups options", () => { /* fixture-dependent */ });
+  it.skip("to xml with hash elements", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with non hash elements", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with non hash different type elements", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with dedicated name", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with options", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with indent set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with dasherize false", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with dasherize true", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with instruct", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with block", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml with empty", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to xml dups options", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ERBUtilTest", () => {
-  it.skip("template output", () => { /* fixture-dependent */ });
-  it.skip("multi tag", () => { /* fixture-dependent */ });
-  it.skip("multi line", () => { /* fixture-dependent */ });
-  it.skip("starts with newline", () => { /* fixture-dependent */ });
-  it.skip("newline inside tag", () => { /* fixture-dependent */ });
-  it.skip("start", () => { /* fixture-dependent */ });
-  it.skip("mid", () => { /* fixture-dependent */ });
-  it.skip("mid start", () => { /* fixture-dependent */ });
-  it.skip("no end", () => { /* fixture-dependent */ });
-  it.skip("text end", () => { /* fixture-dependent */ });
-  it.skip("multibyte characters start", () => { /* fixture-dependent */ });
-  it.skip("multibyte characters end", () => { /* fixture-dependent */ });
+  it.skip("template output", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multi tag", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multi line", () => {
+    /* fixture-dependent */
+  });
+  it.skip("starts with newline", () => {
+    /* fixture-dependent */
+  });
+  it.skip("newline inside tag", () => {
+    /* fixture-dependent */
+  });
+  it.skip("start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("mid", () => {
+    /* fixture-dependent */
+  });
+  it.skip("mid start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("no end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("text end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multibyte characters start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multibyte characters end", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("EncryptedConfigurationTest", () => {
-  it.skip("reading configuration by env key", () => { /* fixture-dependent */ });
-  it.skip("reading configuration by key file", () => { /* fixture-dependent */ });
-  it.skip("reading comment-only configuration", () => { /* fixture-dependent */ });
-  it.skip("writing with element assignment and reading with element reference", () => { /* fixture-dependent */ });
-  it.skip("writing with dynamic accessor and reading with element reference", () => { /* fixture-dependent */ });
-  it.skip("change configuration by key file", () => { /* fixture-dependent */ });
-  it.skip("raises helpful error when loading invalid content", () => { /* fixture-dependent */ });
-  it.skip("raises helpful error when validating invalid content", () => { /* fixture-dependent */ });
-  it.skip("raises helpful error when loading invalid content with unsupported keys", () => { /* fixture-dependent */ });
-  it.skip("raises helpful error when validating invalid content with unsupported keys", () => { /* fixture-dependent */ });
-  it.skip("raises key error when accessing config via bang method", () => { /* fixture-dependent */ });
-  it.skip("inspect does not show unencrypted attributes", () => { /* fixture-dependent */ });
+  it.skip("reading configuration by env key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("reading configuration by key file", () => {
+    /* fixture-dependent */
+  });
+  it.skip("reading comment-only configuration", () => {
+    /* fixture-dependent */
+  });
+  it.skip("writing with element assignment and reading with element reference", () => {
+    /* fixture-dependent */
+  });
+  it.skip("writing with dynamic accessor and reading with element reference", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change configuration by key file", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises helpful error when loading invalid content", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises helpful error when validating invalid content", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises helpful error when loading invalid content with unsupported keys", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises helpful error when validating invalid content with unsupported keys", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises key error when accessing config via bang method", () => {
+    /* fixture-dependent */
+  });
+  it.skip("inspect does not show unencrypted attributes", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ExecutorTest", () => {
@@ -3414,7 +4484,7 @@ describe("ExecutorTest", () => {
     }
 
     wrap<T>(fn: () => T): T {
-      const states = this.hooks.map(h => h.run());
+      const states = this.hooks.map((h) => h.run());
       try {
         return fn();
       } finally {
@@ -3430,13 +4500,24 @@ describe("ExecutorTest", () => {
       run: () => null,
       complete: () => {},
     });
-    expect(() => executor.wrap(() => { throw new Error("test error"); })).toThrow("test error");
+    expect(() =>
+      executor.wrap(() => {
+        throw new Error("test error");
+      }),
+    ).toThrow("test error");
   });
 
   it("wrap invokes callbacks", () => {
     const executor = new Executor();
     const log: string[] = [];
-    executor.register({ run: () => { log.push("run"); }, complete: () => { log.push("complete"); } });
+    executor.register({
+      run: () => {
+        log.push("run");
+      },
+      complete: () => {
+        log.push("complete");
+      },
+    });
     executor.wrap(() => {});
     expect(log).toEqual(["run", "complete"]);
   });
@@ -3445,8 +4526,13 @@ describe("ExecutorTest", () => {
     const executor = new Executor();
     let shared = 0;
     executor.register({
-      run: () => { shared = 1; return shared; },
-      complete: (state) => { shared = (state as number) + 1; },
+      run: () => {
+        shared = 1;
+        return shared;
+      },
+      complete: (state) => {
+        shared = (state as number) + 1;
+      },
     });
     executor.wrap(() => {});
     expect(shared).toBe(2);
@@ -3465,7 +4551,11 @@ describe("ExecutorTest", () => {
     const executor = new Executor();
     const log: string[] = [];
     executor.register({ run: () => log.push("start"), complete: () => log.push("end") });
-    expect(() => executor.wrap(() => { throw new Error("boom"); })).toThrow();
+    expect(() =>
+      executor.wrap(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow();
     expect(log).toEqual(["start", "end"]);
   });
 
@@ -3497,7 +4587,14 @@ describe("ExecutorTest", () => {
   it("exception skips uninvoked hook", () => {
     const executor = new Executor();
     let completed = false;
-    executor.register({ run: () => { throw new Error("hook failed"); }, complete: () => { completed = true; } });
+    executor.register({
+      run: () => {
+        throw new Error("hook failed");
+      },
+      complete: () => {
+        completed = true;
+      },
+    });
     expect(() => executor.wrap(() => {})).toThrow();
     expect(completed).toBe(false);
   });
@@ -3505,8 +4602,17 @@ describe("ExecutorTest", () => {
   it("exception unwinds invoked hook", () => {
     const executor = new Executor();
     let completedA = false;
-    executor.register({ run: () => {}, complete: () => { completedA = true; } });
-    expect(() => executor.wrap(() => { throw new Error("work failed"); })).toThrow();
+    executor.register({
+      run: () => {},
+      complete: () => {
+        completedA = true;
+      },
+    });
+    expect(() =>
+      executor.wrap(() => {
+        throw new Error("work failed");
+      }),
+    ).toThrow();
     expect(completedA).toBe(true);
   });
 
@@ -3531,10 +4637,12 @@ describe("ExecutorTest", () => {
   });
 });
 
-
 describe("RenameKeyTest", () => {
   // renameKey: transform an underscore_key with dasherize/camelize options
-  function renameKey(key: string, options: { dasherize?: boolean; camelize?: boolean | "lower" | "upper" } = {}): string {
+  function renameKey(
+    key: string,
+    options: { dasherize?: boolean; camelize?: boolean | "lower" | "upper" } = {},
+  ): string {
     let result = key;
     if (options.camelize === true || options.camelize === "upper") {
       result = camelize(result, true);
@@ -3591,20 +4699,43 @@ describe("RenameKeyTest", () => {
 });
 
 describe("ParsingTest", () => {
-  it.skip("symbol", () => { /* fixture-dependent */ });
-  it.skip("date", () => { /* fixture-dependent */ });
-  it.skip("datetime", () => { /* fixture-dependent */ });
-  it.skip("duration", () => { /* fixture-dependent */ });
-  it.skip("integer", () => { /* fixture-dependent */ });
-  it.skip("float", () => { /* fixture-dependent */ });
-  it.skip("decimal", () => { /* fixture-dependent */ });
-  it.skip("boolean", () => { /* fixture-dependent */ });
-  it.skip("string", () => { /* fixture-dependent */ });
-  it.skip("yaml", () => { /* fixture-dependent */ });
-  it.skip("hexBinary", () => { /* fixture-dependent */ });
-  it.skip("base64Binary and binary", () => { /* fixture-dependent */ });
+  it.skip("symbol", () => {
+    /* fixture-dependent */
+  });
+  it.skip("date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("duration", () => {
+    /* fixture-dependent */
+  });
+  it.skip("integer", () => {
+    /* fixture-dependent */
+  });
+  it.skip("float", () => {
+    /* fixture-dependent */
+  });
+  it.skip("decimal", () => {
+    /* fixture-dependent */
+  });
+  it.skip("boolean", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yaml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("hexBinary", () => {
+    /* fixture-dependent */
+  });
+  it.skip("base64Binary and binary", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("CacheStoreSettingTest", () => {
   it("memory store gets created if no arguments passed to lookup store method", () => {
@@ -3675,18 +4806,37 @@ describe("CacheStoreSettingTest", () => {
   });
 });
 
-
 describe("RedisCacheStoreCommonBehaviorTest", () => {
-  it.skip("fetch multi uses redis mget", () => { /* fixture-dependent */ });
-  it.skip("fetch multi with namespace", () => { /* fixture-dependent */ });
-  it.skip("write expires at", () => { /* fixture-dependent */ });
-  it.skip("write with unless exist", () => { /* fixture-dependent */ });
-  it.skip("increment ttl", () => { /* fixture-dependent */ });
-  it.skip("increment expires in", () => { /* fixture-dependent */ });
-  it.skip("decrement ttl", () => { /* fixture-dependent */ });
-  it.skip("decrement expires in", () => { /* fixture-dependent */ });
-  it.skip("fetch caches nil", () => { /* fixture-dependent */ });
-  it.skip("skip_nil is passed to ActiveSupport::Cache", () => { /* fixture-dependent */ });
+  it.skip("fetch multi uses redis mget", () => {
+    /* fixture-dependent */
+  });
+  it.skip("fetch multi with namespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("write expires at", () => {
+    /* fixture-dependent */
+  });
+  it.skip("write with unless exist", () => {
+    /* fixture-dependent */
+  });
+  it.skip("increment ttl", () => {
+    /* fixture-dependent */
+  });
+  it.skip("increment expires in", () => {
+    /* fixture-dependent */
+  });
+  it.skip("decrement ttl", () => {
+    /* fixture-dependent */
+  });
+  it.skip("decrement expires in", () => {
+    /* fixture-dependent */
+  });
+  it.skip("fetch caches nil", () => {
+    /* fixture-dependent */
+  });
+  it.skip("skip_nil is passed to ActiveSupport::Cache", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ConfigurableActiveSupport", () => {
@@ -3728,12 +4878,15 @@ describe("ConfigurableActiveSupport", () => {
   });
 });
 
-
 describe("CacheCoderTest", () => {
   // Simple coder that serializes/deserializes values
   const coder = {
-    dump(value: unknown): string { return JSON.stringify(value); },
-    load(str: string): unknown { return JSON.parse(str); },
+    dump(value: unknown): string {
+      return JSON.stringify(value);
+    },
+    load(str: string): unknown {
+      return JSON.parse(str);
+    },
   };
 
   it("roundtrips entry", () => {
@@ -3824,30 +4977,66 @@ describe("CacheCoderTest", () => {
 });
 
 describe("RequireDependencyTest", () => {
-  it.skip("require_dependency looks autoload paths up", () => { /* fixture-dependent */ });
-  it.skip("require_dependency looks autoload paths up (idempotent)", () => { /* fixture-dependent */ });
-  it.skip("require_dependency handles absolute paths correctly", () => { /* fixture-dependent */ });
-  it.skip("require_dependency handles absolute paths correctly (idempotent)", () => { /* fixture-dependent */ });
-  it.skip("require_dependency supports arguments that respond to to_path", () => { /* fixture-dependent */ });
-  it.skip("require_dependency supports arguments that respond to to_path (idempotent)", () => { /* fixture-dependent */ });
-  it.skip("require_dependency fallback to Kernel#require", () => { /* fixture-dependent */ });
-  it.skip("require_dependency fallback to Kernel#require (idempotent)", () => { /* fixture-dependent */ });
-  it.skip("require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path", () => { /* fixture-dependent */ });
-  it.skip("require_dependency raises LoadError if the given argument is not found", () => { /* fixture-dependent */ });
+  it.skip("require_dependency looks autoload paths up", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency looks autoload paths up (idempotent)", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency handles absolute paths correctly", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency handles absolute paths correctly (idempotent)", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency supports arguments that respond to to_path", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency supports arguments that respond to to_path (idempotent)", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency fallback to Kernel#require", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency fallback to Kernel#require (idempotent)", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path", () => {
+    /* fixture-dependent */
+  });
+  it.skip("require_dependency raises LoadError if the given argument is not found", () => {
+    /* fixture-dependent */
+  });
 });
 
-
-
 describe("InitializationTest", () => {
-  it.skip("omitted URL uses Redis client with default settings", () => { /* fixture-dependent */ });
-  it.skip("no URLs uses Redis client with default settings", () => { /* fixture-dependent */ });
-  it.skip("singular URL uses Redis client", () => { /* fixture-dependent */ });
-  it.skip("one URL uses Redis client", () => { /* fixture-dependent */ });
-  it.skip("multiple URLs uses Redis::Distributed client", () => { /* fixture-dependent */ });
-  it.skip("block argument uses yielded client", () => { /* fixture-dependent */ });
-  it.skip("instance of Redis uses given instance", () => { /* fixture-dependent */ });
-  it.skip("validate pool arguments", () => { /* fixture-dependent */ });
-  it.skip("instantiating the store doesn't connect to Redis", () => { /* fixture-dependent */ });
+  it.skip("omitted URL uses Redis client with default settings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("no URLs uses Redis client with default settings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("singular URL uses Redis client", () => {
+    /* fixture-dependent */
+  });
+  it.skip("one URL uses Redis client", () => {
+    /* fixture-dependent */
+  });
+  it.skip("multiple URLs uses Redis::Distributed client", () => {
+    /* fixture-dependent */
+  });
+  it.skip("block argument uses yielded client", () => {
+    /* fixture-dependent */
+  });
+  it.skip("instance of Redis uses given instance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("validate pool arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("instantiating the store doesn't connect to Redis", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("SubscriberTest", () => {
@@ -3920,7 +5109,9 @@ describe("SubscriberTest", () => {
 
   it("supports publish event", () => {
     const events: { name: string; payload: Record<string, unknown> }[] = [];
-    const sub = Notifications.subscribe("publish.test", (e) => events.push({ name: e.name, payload: e.payload }));
+    const sub = Notifications.subscribe("publish.test", (e) =>
+      events.push({ name: e.name, payload: e.payload }),
+    );
     Notifications.instrument("publish.test", { message: "hello" });
     Notifications.unsubscribe(sub);
     expect(events[0].name).toBe("publish.test");
@@ -3937,22 +5128,42 @@ describe("SubscriberTest", () => {
 });
 
 describe("MessagesSerializerWithFallbackTest", () => {
-  it.skip(":marshal serializer dumps objects using Marshal format", () => { /* fixture-dependent */ });
-  it.skip(":json serializer dumps objects using JSON format", () => { /* fixture-dependent */ });
-  it.skip(":message_pack serializer dumps objects using MessagePack format", () => { /* fixture-dependent */ });
-  it.skip("every serializer can load every non-Marshal format", () => { /* fixture-dependent */ });
-  it.skip("only :marshal and :*_allow_marshal serializers can load Marshal format", () => { /* fixture-dependent */ });
-  it.skip(":json serializer recognizes regular JSON", () => { /* fixture-dependent */ });
-  it.skip(":json serializer can load irregular JSON", () => { /* fixture-dependent */ });
-  it.skip("notifies when serializer falls back to loading an alternate format", () => { /* fixture-dependent */ });
-  it.skip("raises on invalid format name", () => { /* fixture-dependent */ });
+  it.skip(":marshal serializer dumps objects using Marshal format", () => {
+    /* fixture-dependent */
+  });
+  it.skip(":json serializer dumps objects using JSON format", () => {
+    /* fixture-dependent */
+  });
+  it.skip(":message_pack serializer dumps objects using MessagePack format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("every serializer can load every non-Marshal format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("only :marshal and :*_allow_marshal serializers can load Marshal format", () => {
+    /* fixture-dependent */
+  });
+  it.skip(":json serializer recognizes regular JSON", () => {
+    /* fixture-dependent */
+  });
+  it.skip(":json serializer can load irregular JSON", () => {
+    /* fixture-dependent */
+  });
+  it.skip("notifies when serializer falls back to loading an alternate format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises on invalid format name", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("RescuableTest", () => {
   it("rescue from with method", () => {
     const handled: Error[] = [];
     const target = {
-      handleError(e: Error) { handled.push(e); }
+      handleError(e: Error) {
+        handled.push(e);
+      },
     };
     rescueFrom(target, Error, { with: "handleError" });
     const err = new Error("oops");
@@ -3994,7 +5205,6 @@ describe("RescuableTest", () => {
     expect(handleRescue(target, new RangeError("range"))).toBe(false);
   });
 });
-
 
 describe("ParameterFilterTest", () => {
   it("process parameter filter", () => {
@@ -4050,13 +5260,27 @@ describe("ParameterFilterTest", () => {
 });
 
 describe("ForkTrackerTest", () => {
-  it.skip("object fork", () => { /* fixture-dependent */ });
-  it.skip("object fork without block", () => { /* fixture-dependent */ });
-  it.skip("process fork", () => { /* fixture-dependent */ });
-  it.skip("process fork without block", () => { /* fixture-dependent */ });
-  it.skip("kernel fork", () => { /* fixture-dependent */ });
-  it.skip("kernel fork without block", () => { /* fixture-dependent */ });
-  it.skip("basic object with kernel fork", () => { /* fixture-dependent */ });
+  it.skip("object fork", () => {
+    /* fixture-dependent */
+  });
+  it.skip("object fork without block", () => {
+    /* fixture-dependent */
+  });
+  it.skip("process fork", () => {
+    /* fixture-dependent */
+  });
+  it.skip("process fork without block", () => {
+    /* fixture-dependent */
+  });
+  it.skip("kernel fork", () => {
+    /* fixture-dependent */
+  });
+  it.skip("kernel fork without block", () => {
+    /* fixture-dependent */
+  });
+  it.skip("basic object with kernel fork", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("AtomicWriteTest", () => {
@@ -4077,7 +5301,9 @@ describe("AtomicWriteTest", () => {
   });
 
   it("atomic write doesnt write when block raises", () => {
-    const result = atomicWrite("/tmp/test.txt", () => { throw new Error("fail"); });
+    const result = atomicWrite("/tmp/test.txt", () => {
+      throw new Error("fail");
+    });
     expect(result).toBeUndefined();
   });
 
@@ -4116,7 +5342,6 @@ describe("AtomicWriteTest", () => {
   });
 });
 
-
 describe("StringIndentTest", () => {
   it("does not indent strings that only contain newlines (edge cases)", () => {
     expect(indent("\n\n", 2)).toBe("\n\n");
@@ -4145,7 +5370,7 @@ describe("MethodWrappersTest", () => {
   // Helper: wraps a method on an object to emit a deprecation warning before calling it
   function deprecateMethod(obj: Record<string, unknown>, name: string, message?: string) {
     const original = obj[name] as Function;
-    obj[name] = function(...args: unknown[]) {
+    obj[name] = function (...args: unknown[]) {
       console.warn(message ?? `${name} is deprecated`);
       return original.apply(this, args);
     };
@@ -4155,18 +5380,26 @@ describe("MethodWrappersTest", () => {
     const warnings: string[] = [];
     const orig = console.warn;
     console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
-    const obj: Record<string, unknown> = { old_method() { return "result"; } };
+    const obj: Record<string, unknown> = {
+      old_method() {
+        return "result";
+      },
+    };
     deprecateMethod(obj, "old_method");
     (obj.old_method as () => string)();
     console.warn = orig;
-    expect(warnings.some(w => w.includes("old_method"))).toBe(true);
+    expect(warnings.some((w) => w.includes("old_method"))).toBe(true);
   });
 
   it("deprecate methods warning default", () => {
     const warnings: string[] = [];
     const orig = console.warn;
     console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
-    const obj: Record<string, unknown> = { foo() { return 1; } };
+    const obj: Record<string, unknown> = {
+      foo() {
+        return 1;
+      },
+    };
     deprecateMethod(obj, "foo");
     (obj.foo as () => number)();
     console.warn = orig;
@@ -4175,9 +5408,13 @@ describe("MethodWrappersTest", () => {
 
   it("deprecate methods warning with optional deprecator", () => {
     const collected: string[] = [];
-    const obj: Record<string, unknown> = { bar() { return 2; } };
+    const obj: Record<string, unknown> = {
+      bar() {
+        return 2;
+      },
+    };
     const original = obj.bar as Function;
-    obj.bar = function() {
+    obj.bar = function () {
       collected.push("bar is deprecated, use baz");
       return original.call(this);
     };
@@ -4187,12 +5424,14 @@ describe("MethodWrappersTest", () => {
 
   it("deprecate methods protected method", () => {
     class MyClass {
-      protected_method() { return "protected"; }
+      protected_method() {
+        return "protected";
+      }
     }
     const proto = MyClass.prototype as unknown as Record<string, unknown>;
     const orig = proto.protected_method as Function;
     const warnings: string[] = [];
-    proto.protected_method = function() {
+    proto.protected_method = function () {
       warnings.push("protected_method deprecated");
       return orig.call(this);
     };
@@ -4203,7 +5442,9 @@ describe("MethodWrappersTest", () => {
 
   it("deprecate methods private method", () => {
     class MyClass {
-      private_method() { return "private"; }
+      private_method() {
+        return "private";
+      }
     }
     const proto = MyClass.prototype as unknown as Record<string, unknown>;
     deprecateMethod(proto, "private_method");
@@ -4218,7 +5459,9 @@ describe("MethodWrappersTest", () => {
 
   it("deprecate class method", () => {
     class MyClass {
-      static class_method() { return "class"; }
+      static class_method() {
+        return "class";
+      }
     }
     const cls = MyClass as unknown as Record<string, unknown>;
     deprecateMethod(cls, "class_method");
@@ -4231,10 +5474,14 @@ describe("MethodWrappersTest", () => {
   });
 
   it("deprecate method when class extends module", () => {
-    class Base { shared() { return "base"; } }
+    class Base {
+      shared() {
+        return "base";
+      }
+    }
     class Child extends Base {}
     const proto = Child.prototype as unknown as Record<string, unknown>;
-    proto.shared = function() {
+    proto.shared = function () {
       console.warn("shared is deprecated");
       return Base.prototype.shared.call(this);
     };
@@ -4248,12 +5495,24 @@ describe("MethodWrappersTest", () => {
 });
 
 describe("CacheSerializerWithFallbackTest", () => {
-  it.skip(" serializer can load  dump", () => { /* fixture-dependent */ });
-  it.skip(" serializer handles unrecognized payloads gracefully", () => { /* fixture-dependent */ });
-  it.skip(" serializer logs unrecognized payloads", () => { /* fixture-dependent */ });
-  it.skip(" serializer can compress entries", () => { /* fixture-dependent */ });
-  it.skip(":message_pack serializer handles missing class gracefully", () => { /* fixture-dependent */ });
-  it.skip("raises on invalid format name", () => { /* fixture-dependent */ });
+  it.skip(" serializer can load  dump", () => {
+    /* fixture-dependent */
+  });
+  it.skip(" serializer handles unrecognized payloads gracefully", () => {
+    /* fixture-dependent */
+  });
+  it.skip(" serializer logs unrecognized payloads", () => {
+    /* fixture-dependent */
+  });
+  it.skip(" serializer can compress entries", () => {
+    /* fixture-dependent */
+  });
+  it.skip(":message_pack serializer handles missing class gracefully", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises on invalid format name", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
@@ -4262,47 +5521,51 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
     const filters: Array<(line: string) => string> = [];
     const silencers: Array<(line: string) => boolean> = [];
     return {
-      addFilter(fn: (line: string) => string) { filters.push(fn); },
-      addSilencer(fn: (line: string) => boolean) { silencers.push(fn); },
+      addFilter(fn: (line: string) => string) {
+        filters.push(fn);
+      },
+      addSilencer(fn: (line: string) => boolean) {
+        silencers.push(fn);
+      },
       clean(lines: string[]): string[] {
         return lines
-          .map(line => filters.reduce((l, f) => f(l), line))
-          .filter(line => !silencers.some(s => s(line)));
+          .map((line) => filters.reduce((l, f) => f(l), line))
+          .filter((line) => !silencers.some((s) => s(line)));
       },
     };
   }
 
   it("should format installed gems correctly", () => {
     const cleaner = makeBacktraceCleaner();
-    cleaner.addFilter(line => line.replace("/gems/some-gem-1.0/lib/", "[gem] "));
+    cleaner.addFilter((line) => line.replace("/gems/some-gem-1.0/lib/", "[gem] "));
     const bt = ["/gems/some-gem-1.0/lib/foo.rb:10"];
     expect(cleaner.clean(bt)).toEqual(["[gem] foo.rb:10"]);
   });
 
   it("should format installed gems not in Gem.default_dir correctly", () => {
     const cleaner = makeBacktraceCleaner();
-    cleaner.addFilter(line => line.replace(/\/path\/to\/gems\/[^/]+\//, ""));
+    cleaner.addFilter((line) => line.replace(/\/path\/to\/gems\/[^/]+\//, ""));
     const bt = ["/path/to/gems/mygem-2.0/lib/mygem.rb"];
     expect(cleaner.clean(bt)).toEqual(["lib/mygem.rb"]);
   });
 
   it("should format gems installed by bundler", () => {
     const cleaner = makeBacktraceCleaner();
-    cleaner.addFilter(line => line.replace(/\/bundler\/gems\/[^/]+\//, ""));
+    cleaner.addFilter((line) => line.replace(/\/bundler\/gems\/[^/]+\//, ""));
     const bt = ["/bundler/gems/foo-abc123/lib/foo.rb"];
     expect(cleaner.clean(bt)).toEqual(["lib/foo.rb"]);
   });
 
   it("should silence gems from the backtrace", () => {
     const cleaner = makeBacktraceCleaner();
-    cleaner.addSilencer(line => line.includes("/gems/"));
+    cleaner.addSilencer((line) => line.includes("/gems/"));
     const bt = ["/gems/rack-1.0/lib/rack.rb", "/app/controllers/foo.rb"];
     expect(cleaner.clean(bt)).toEqual(["/app/controllers/foo.rb"]);
   });
 
   it("should silence stdlib", () => {
     const cleaner = makeBacktraceCleaner();
-    cleaner.addSilencer(line => line.startsWith("/usr/lib/ruby/"));
+    cleaner.addSilencer((line) => line.startsWith("/usr/lib/ruby/"));
     const bt = ["/usr/lib/ruby/json.rb", "/app/lib/my_code.rb"];
     expect(cleaner.clean(bt)).toEqual(["/app/lib/my_code.rb"]);
   });
@@ -4310,28 +5573,43 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
   it("should preserve lines that have a subpath matching a gem path", () => {
     const cleaner = makeBacktraceCleaner();
     // Only silence exact gem paths, not subpaths in app code
-    cleaner.addSilencer(line => /\/gems\/[^/]+\//.test(line) && !line.startsWith("/app/"));
-    const bt = [
-      "/gems/rack-1.0/lib/rack.rb",
-      "/app/lib/uses_gems/code.rb",
-    ];
+    cleaner.addSilencer((line) => /\/gems\/[^/]+\//.test(line) && !line.startsWith("/app/"));
+    const bt = ["/gems/rack-1.0/lib/rack.rb", "/app/lib/uses_gems/code.rb"];
     expect(cleaner.clean(bt)).toEqual(["/app/lib/uses_gems/code.rb"]);
   });
 });
 
 describe("TaggedLoggingWithoutBlockTest", () => {
-  it.skip("shares tags across threads", () => { /* fixture-dependent */ });
-  it.skip("keeps formatter singleton class methods", () => { /* fixture-dependent */ });
-  it.skip("accepts non-String objects", () => { /* fixture-dependent */ });
+  it.skip("shares tags across threads", () => {
+    /* fixture-dependent */
+  });
+  it.skip("keeps formatter singleton class methods", () => {
+    /* fixture-dependent */
+  });
+  it.skip("accepts non-String objects", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ClassTest", () => {
-  it.skip("descendants", () => { /* fixture-dependent */ });
-  it.skip("subclasses", () => { /* fixture-dependent */ });
-  it.skip("descendants excludes singleton classes", () => { /* fixture-dependent */ });
-  it.skip("subclasses excludes singleton classes", () => { /* fixture-dependent */ });
-  it.skip("subclasses exclude reloaded classes", () => { /* fixture-dependent */ });
-  it.skip("descendants exclude reloaded classes", () => { /* fixture-dependent */ });
+  it.skip("descendants", () => {
+    /* fixture-dependent */
+  });
+  it.skip("subclasses", () => {
+    /* fixture-dependent */
+  });
+  it.skip("descendants excludes singleton classes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("subclasses excludes singleton classes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("subclasses exclude reloaded classes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("descendants exclude reloaded classes", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("MessageVerifierMetadataTest", () => {
@@ -4373,20 +5651,31 @@ describe("MessageVerifierMetadataTest", () => {
   });
 });
 
-
 describe("TestAutoloadModule", () => {
-  it.skip("the autoload module works like normal autoload", () => { /* fixture-dependent */ });
-  it.skip("when specifying an :eager constant it still works like normal autoload by default", () => { /* fixture-dependent */ });
-  it.skip("the location of autoloaded constants defaults to :name.underscore", () => { /* fixture-dependent */ });
-  it.skip("the location of :eager autoloaded constants defaults to :name.underscore", () => { /* fixture-dependent */ });
-  it.skip("a directory for a block of autoloads can be specified", () => { /* fixture-dependent */ });
-  it.skip("a path for a block of autoloads can be specified", () => { /* fixture-dependent */ });
+  it.skip("the autoload module works like normal autoload", () => {
+    /* fixture-dependent */
+  });
+  it.skip("when specifying an :eager constant it still works like normal autoload by default", () => {
+    /* fixture-dependent */
+  });
+  it.skip("the location of autoloaded constants defaults to :name.underscore", () => {
+    /* fixture-dependent */
+  });
+  it.skip("the location of :eager autoloaded constants defaults to :name.underscore", () => {
+    /* fixture-dependent */
+  });
+  it.skip("a directory for a block of autoloads can be specified", () => {
+    /* fixture-dependent */
+  });
+  it.skip("a path for a block of autoloads can be specified", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("IntrospectionTest", () => {
   // Helper to create a function with a specific name property
   function namedFn(name: string): Function {
-    const f = function() {};
+    const f = function () {};
     Object.defineProperty(f, "name", { value: name, configurable: true });
     return f;
   }
@@ -4432,12 +5721,24 @@ describe("IntrospectionTest", () => {
 });
 
 describe("ProxyWrappersTest", () => {
-  it.skip("deprecated object proxy doesnt wrap falsy objects", () => { /* fixture-dependent */ });
-  it.skip("deprecated instance variable proxy doesnt wrap falsy objects", () => { /* fixture-dependent */ });
-  it.skip("deprecated constant proxy doesnt wrap falsy objects", () => { /* fixture-dependent */ });
-  it.skip("including proxy module", () => { /* fixture-dependent */ });
-  it.skip("prepending proxy module", () => { /* fixture-dependent */ });
-  it.skip("extending proxy module", () => { /* fixture-dependent */ });
+  it.skip("deprecated object proxy doesnt wrap falsy objects", () => {
+    /* fixture-dependent */
+  });
+  it.skip("deprecated instance variable proxy doesnt wrap falsy objects", () => {
+    /* fixture-dependent */
+  });
+  it.skip("deprecated constant proxy doesnt wrap falsy objects", () => {
+    /* fixture-dependent */
+  });
+  it.skip("including proxy module", () => {
+    /* fixture-dependent */
+  });
+  it.skip("prepending proxy module", () => {
+    /* fixture-dependent */
+  });
+  it.skip("extending proxy module", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("BenchmarkableTest", () => {
@@ -4497,32 +5798,67 @@ describe("BenchmarkableTest", () => {
   });
 });
 
-
 describe("KeyGeneratorTest", () => {
-  it.skip("Generating a key of the default length", () => { /* fixture-dependent */ });
-  it.skip("Generating a key of an alternative length", () => { /* fixture-dependent */ });
-  it.skip("Expected results", () => { /* fixture-dependent */ });
-  it.skip("With custom hash digest class", () => { /* fixture-dependent */ });
-  it.skip("Raises if given a non digest instance", () => { /* fixture-dependent */ });
-  it.skip("inspect does not show secrets", () => { /* fixture-dependent */ });
+  it.skip("Generating a key of the default length", () => {
+    /* fixture-dependent */
+  });
+  it.skip("Generating a key of an alternative length", () => {
+    /* fixture-dependent */
+  });
+  it.skip("Expected results", () => {
+    /* fixture-dependent */
+  });
+  it.skip("With custom hash digest class", () => {
+    /* fixture-dependent */
+  });
+  it.skip("Raises if given a non digest instance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("inspect does not show secrets", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("SecureRandomTest", () => {
-  it.skip("base58", () => { /* fixture-dependent */ });
-  it.skip("base58 with length", () => { /* fixture-dependent */ });
-  it.skip("base58 with nil", () => { /* fixture-dependent */ });
-  it.skip("base36", () => { /* fixture-dependent */ });
-  it.skip("base36 with length", () => { /* fixture-dependent */ });
-  it.skip("base36 with nil", () => { /* fixture-dependent */ });
+  it.skip("base58", () => {
+    /* fixture-dependent */
+  });
+  it.skip("base58 with length", () => {
+    /* fixture-dependent */
+  });
+  it.skip("base58 with nil", () => {
+    /* fixture-dependent */
+  });
+  it.skip("base36", () => {
+    /* fixture-dependent */
+  });
+  it.skip("base36 with length", () => {
+    /* fixture-dependent */
+  });
+  it.skip("base36 with nil", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("TimeExtMarshalingTest", () => {
-  it.skip("marshalling with utc instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling with local instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling with frozen utc instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling with frozen local instance", () => { /* fixture-dependent */ });
-  it.skip("marshalling preserves fractional seconds", () => { /* fixture-dependent */ });
-  it.skip("last quarter on 31st", () => { /* fixture-dependent */ });
+  it.skip("marshalling with utc instance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("marshalling with local instance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("marshalling with frozen utc instance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("marshalling with frozen local instance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("marshalling preserves fractional seconds", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last quarter on 31st", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ReloaderTest", () => {
@@ -4535,8 +5871,12 @@ describe("ReloaderTest", () => {
       this.checkFn = checkFn;
     }
 
-    onPrepare(fn: () => void) { this.prepareCallbacks.push(fn); }
-    prependOnPrepare(fn: () => void) { this.prepareCallbacks.unshift(fn); }
+    onPrepare(fn: () => void) {
+      this.prepareCallbacks.push(fn);
+    }
+    prependOnPrepare(fn: () => void) {
+      this.prepareCallbacks.unshift(fn);
+    }
 
     reload(): boolean {
       if (!this.checkFn()) return false;
@@ -4549,7 +5889,9 @@ describe("ReloaderTest", () => {
   it("prepare callback", () => {
     const reloader = new Reloader();
     let prepared = false;
-    reloader.onPrepare(() => { prepared = true; });
+    reloader.onPrepare(() => {
+      prepared = true;
+    });
     reloader.reload();
     expect(prepared).toBe(true);
   });
@@ -4567,7 +5909,9 @@ describe("ReloaderTest", () => {
     let shouldReload = false;
     const reloader = new Reloader(() => shouldReload);
     let prepared = false;
-    reloader.onPrepare(() => { prepared = true; });
+    reloader.onPrepare(() => {
+      prepared = true;
+    });
     reloader.reload();
     expect(prepared).toBe(false);
     shouldReload = true;
@@ -4605,13 +5949,22 @@ describe("ReloaderTest", () => {
 });
 
 describe("ConstantLookupTest", () => {
-  it.skip("find bar from foo", () => { /* fixture-dependent */ });
-  it.skip("find module", () => { /* fixture-dependent */ });
-  it.skip("returns nil when cant find foo", () => { /* fixture-dependent */ });
-  it.skip("returns nil when cant find module", () => { /* fixture-dependent */ });
-  it.skip("does not shallow ordinary exceptions", () => { /* fixture-dependent */ });
+  it.skip("find bar from foo", () => {
+    /* fixture-dependent */
+  });
+  it.skip("find module", () => {
+    /* fixture-dependent */
+  });
+  it.skip("returns nil when cant find foo", () => {
+    /* fixture-dependent */
+  });
+  it.skip("returns nil when cant find module", () => {
+    /* fixture-dependent */
+  });
+  it.skip("does not shallow ordinary exceptions", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("DigestUUIDExt", () => {
   // UUID namespace constants (RFC 4122)
@@ -4653,7 +6006,6 @@ describe("DigestUUIDExt", () => {
     }).toThrow(TypeError);
   });
 });
-
 
 describe("SecureCompareRotatorTest", () => {
   // Secure compare with rotation: checks current credential first, then rotated ones
@@ -4707,18 +6059,30 @@ describe("SecureCompareRotatorTest", () => {
 
   it("#secure_compare! calls the on_rotation proc that given in constructor", () => {
     let called = false;
-    const rotator = new SecureCompareRotator("new", ["legacy"], () => { called = true; });
+    const rotator = new SecureCompareRotator("new", ["legacy"], () => {
+      called = true;
+    });
     rotator.secureCompare("legacy");
     expect(called).toBe(true);
   });
 });
 
 describe("AttrInternalTest", () => {
-  it.skip("reader", () => { /* fixture-dependent */ });
-  it.skip("writer", () => { /* fixture-dependent */ });
-  it.skip("accessor", () => { /* fixture-dependent */ });
-  it.skip("invalid naming format", () => { /* fixture-dependent */ });
-  it.skip("naming format", () => { /* fixture-dependent */ });
+  it.skip("reader", () => {
+    /* fixture-dependent */
+  });
+  it.skip("writer", () => {
+    /* fixture-dependent */
+  });
+  it.skip("accessor", () => {
+    /* fixture-dependent */
+  });
+  it.skip("invalid naming format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("naming format", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("KernelTest", () => {
@@ -4726,7 +6090,9 @@ describe("KernelTest", () => {
     // In JS we can suppress console.warn
     const original = console.warn;
     const captured: string[] = [];
-    console.warn = (...args: unknown[]) => { captured.push(args.join(" ")); };
+    console.warn = (...args: unknown[]) => {
+      captured.push(args.join(" "));
+    };
     console.warn("test warning");
     console.warn = original;
     expect(captured).toContain("test warning");
@@ -4736,7 +6102,9 @@ describe("KernelTest", () => {
     // Silencing does not affect non-warning output
     const original = console.log;
     let called = false;
-    console.log = () => { called = true; };
+    console.log = () => {
+      called = true;
+    };
     console.log("info");
     console.log = original;
     expect(called).toBe(true);
@@ -4759,7 +6127,9 @@ describe("KernelTest", () => {
   it("class eval", () => {
     // Dynamic class method access
     class Foo {
-      greet() { return "hello"; }
+      greet() {
+        return "hello";
+      }
     }
     const inst = new Foo();
     const method = "greet";
@@ -4768,11 +6138,21 @@ describe("KernelTest", () => {
 });
 
 describe("EventedFileUpdateCheckerTest", () => {
-  it.skip("notifies forked processes", () => { /* fixture-dependent */ });
-  it.skip("can be garbage collected", () => { /* fixture-dependent */ });
-  it.skip("should detect changes through symlink", () => { /* fixture-dependent */ });
-  it.skip("updated should become true when nonexistent directory is added later", () => { /* fixture-dependent */ });
-  it.skip("does not stop other checkers when nonexistent directory is added later", () => { /* fixture-dependent */ });
+  it.skip("notifies forked processes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can be garbage collected", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should detect changes through symlink", () => {
+    /* fixture-dependent */
+  });
+  it.skip("updated should become true when nonexistent directory is added later", () => {
+    /* fixture-dependent */
+  });
+  it.skip("does not stop other checkers when nonexistent directory is added later", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ObjectInstanceVariableTest", () => {
@@ -4798,18 +6178,32 @@ describe("ObjectInstanceVariableTest", () => {
 
   it("instance exec passes arguments to block", () => {
     const obj = { x: 10 };
-    function instanceExec<T extends object, R>(o: T, fn: (this: T, ...args: unknown[]) => R, ...args: unknown[]): R {
+    function instanceExec<T extends object, R>(
+      o: T,
+      fn: (this: T, ...args: unknown[]) => R,
+      ...args: unknown[]
+    ): R {
       return fn.apply(o, args);
     }
-    const result = instanceExec(obj, function(this: typeof obj, n: unknown) { return this.x + (n as number); }, 5);
+    const result = instanceExec(
+      obj,
+      function (this: typeof obj, n: unknown) {
+        return this.x + (n as number);
+      },
+      5,
+    );
     expect(result).toBe(15);
   });
 
   it("instance exec with frozen obj", () => {
     const obj = Object.freeze({ x: 10 });
     expect(() => {
-      function instanceExec<T, R>(o: T, fn: (this: T) => R): R { return fn.call(o); }
-      const r = instanceExec(obj, function(this: typeof obj) { return this.x; });
+      function instanceExec<T, R>(o: T, fn: (this: T) => R): R {
+        return fn.call(o);
+      }
+      const r = instanceExec(obj, function (this: typeof obj) {
+        return this.x;
+      });
       expect(r).toBe(10);
     }).not.toThrow();
   });
@@ -4817,112 +6211,216 @@ describe("ObjectInstanceVariableTest", () => {
   it("instance exec nested", () => {
     const outer = { x: 1 };
     const inner = { x: 2 };
-    function instanceExec<T extends object, R>(o: T, fn: (this: T) => R): R { return fn.call(o); }
-    const result = instanceExec(outer, function(this: typeof outer) {
-      return instanceExec(inner, function(this: typeof inner) {
-        return this.x;
-      }) + this.x;
+    function instanceExec<T extends object, R>(o: T, fn: (this: T) => R): R {
+      return fn.call(o);
+    }
+    const result = instanceExec(outer, function (this: typeof outer) {
+      return (
+        instanceExec(inner, function (this: typeof inner) {
+          return this.x;
+        }) + this.x
+      );
     });
     expect(result).toBe(3);
   });
 });
 
-
 describe("MessagePackCacheSerializerTest", () => {
-  it.skip("uses #to_msgpack_ext and ::from_msgpack_ext to roundtrip unregistered objects", () => { /* fixture-dependent */ });
-  it.skip("uses #as_json and ::json_create to roundtrip unregistered objects", () => { /* fixture-dependent */ });
-  it.skip("raises error when unable to serialize an unregistered object", () => { /* fixture-dependent */ });
-  it.skip("raises error when serializing an unregistered object with an anonymous class", () => { /* fixture-dependent */ });
-  it.skip("handles missing class gracefully", () => { /* fixture-dependent */ });
+  it.skip("uses #to_msgpack_ext and ::from_msgpack_ext to roundtrip unregistered objects", () => {
+    /* fixture-dependent */
+  });
+  it.skip("uses #as_json and ::json_create to roundtrip unregistered objects", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises error when unable to serialize an unregistered object", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises error when serializing an unregistered object with an anonymous class", () => {
+    /* fixture-dependent */
+  });
+  it.skip("handles missing class gracefully", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CacheStoreNamespaceTest", () => {
-  it.skip("static namespace", () => { /* fixture-dependent */ });
-  it.skip("proc namespace", () => { /* fixture-dependent */ });
-  it.skip("delete matched key start", () => { /* fixture-dependent */ });
-  it.skip("delete matched key", () => { /* fixture-dependent */ });
+  it.skip("static namespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("proc namespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("delete matched key start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("delete matched key", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("SecurityUtilsTest", () => {
-  it.skip("secure compare should perform string comparison", () => { /* fixture-dependent */ });
-  it.skip("secure compare return false on bytesize mismatch", () => { /* fixture-dependent */ });
-  it.skip("fixed length secure compare should perform string comparison", () => { /* fixture-dependent */ });
-  it.skip("fixed length secure compare raise on length mismatch", () => { /* fixture-dependent */ });
+  it.skip("secure compare should perform string comparison", () => {
+    /* fixture-dependent */
+  });
+  it.skip("secure compare return false on bytesize mismatch", () => {
+    /* fixture-dependent */
+  });
+  it.skip("fixed length secure compare should perform string comparison", () => {
+    /* fixture-dependent */
+  });
+  it.skip("fixed length secure compare raise on length mismatch", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("DescendantsTrackerTest", () => {
-  it.skip(".descendants", () => { /* fixture-dependent */ });
-  it.skip(".descendants with garbage collected classes", () => { /* fixture-dependent */ });
-  it.skip(".subclasses", () => { /* fixture-dependent */ });
-  it.skip(".clear(classes) deletes the given classes only", () => { /* fixture-dependent */ });
+  it.skip(".descendants", () => {
+    /* fixture-dependent */
+  });
+  it.skip(".descendants with garbage collected classes", () => {
+    /* fixture-dependent */
+  });
+  it.skip(".subclasses", () => {
+    /* fixture-dependent */
+  });
+  it.skip(".clear(classes) deletes the given classes only", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("MessageEncryptorsTest", () => {
-  it.skip("can override secret generator", () => { /* fixture-dependent */ });
-  it.skip("supports arbitrary secret generator kwargs", () => { /* fixture-dependent */ });
-  it.skip("supports arbitrary secret generator kwargs when using #rotate block", () => { /* fixture-dependent */ });
-  it.skip("supports separate secrets for encryption and signing", () => { /* fixture-dependent */ });
+  it.skip("can override secret generator", () => {
+    /* fixture-dependent */
+  });
+  it.skip("supports arbitrary secret generator kwargs", () => {
+    /* fixture-dependent */
+  });
+  it.skip("supports arbitrary secret generator kwargs when using #rotate block", () => {
+    /* fixture-dependent */
+  });
+  it.skip("supports separate secrets for encryption and signing", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ExecutionContextTest", () => {
-  it.skip("#set restore the modified keys when the block exits", () => { /* fixture-dependent */ });
-  it.skip("#set coerce keys to symbol", () => { /* fixture-dependent */ });
-  it.skip("#[]= coerce keys to symbol", () => { /* fixture-dependent */ });
-  it.skip("#to_h returns a copy of the context", () => { /* fixture-dependent */ });
+  it.skip("#set restore the modified keys when the block exits", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#set coerce keys to symbol", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#[]= coerce keys to symbol", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#to_h returns a copy of the context", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("MiddlewareTest", () => {
-  it.skip("local cache cleared on close", () => { /* fixture-dependent */ });
-  it.skip("local cache cleared and response should be present on invalid parameters error", () => { /* fixture-dependent */ });
-  it.skip("local cache cleared on exception", () => { /* fixture-dependent */ });
-  it.skip("local cache cleared on throw", () => { /* fixture-dependent */ });
+  it.skip("local cache cleared on close", () => {
+    /* fixture-dependent */
+  });
+  it.skip("local cache cleared and response should be present on invalid parameters error", () => {
+    /* fixture-dependent */
+  });
+  it.skip("local cache cleared on exception", () => {
+    /* fixture-dependent */
+  });
+  it.skip("local cache cleared on throw", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("GzipTest", () => {
-  it.skip("compress should decompress to the same value", () => { /* fixture-dependent */ });
-  it.skip("compress should return a binary string", () => { /* fixture-dependent */ });
-  it.skip("compress should return gzipped string by compression level", () => { /* fixture-dependent */ });
-  it.skip("decompress checks crc", () => { /* fixture-dependent */ });
+  it.skip("compress should decompress to the same value", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compress should return a binary string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compress should return gzipped string by compression level", () => {
+    /* fixture-dependent */
+  });
+  it.skip("decompress checks crc", () => {
+    /* fixture-dependent */
+  });
 });
 
-
-
 describe("CacheStoreLoggerTest", () => {
-  it.skip("logging", () => { /* fixture-dependent */ });
-  it.skip("log with string namespace", () => { /* fixture-dependent */ });
-  it.skip("log with proc namespace", () => { /* fixture-dependent */ });
-  it.skip("mute logging", () => { /* fixture-dependent */ });
+  it.skip("logging", () => {
+    /* fixture-dependent */
+  });
+  it.skip("log with string namespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("log with proc namespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("mute logging", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("DateExtBehaviorTest", () => {
-  it.skip("date acts like date", () => { /* fixture-dependent */ });
-  it.skip("blank?", () => { /* fixture-dependent */ });
-  it.skip("freeze doesnt clobber memoized instance methods", () => { /* fixture-dependent */ });
-  it.skip("can freeze twice", () => { /* fixture-dependent */ });
+  it.skip("date acts like date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("blank?", () => {
+    /* fixture-dependent */
+  });
+  it.skip("freeze doesnt clobber memoized instance methods", () => {
+    /* fixture-dependent */
+  });
+  it.skip("can freeze twice", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("ActionableErrorTest", () => {
-  it.skip("returns all action of an actionable error", () => { /* fixture-dependent */ });
-  it.skip("returns no actions for non-actionable errors", () => { /* fixture-dependent */ });
-  it.skip("dispatches actions from error and name", () => { /* fixture-dependent */ });
-  it.skip("cannot dispatch missing actions", () => { /* fixture-dependent */ });
+  it.skip("returns all action of an actionable error", () => {
+    /* fixture-dependent */
+  });
+  it.skip("returns no actions for non-actionable errors", () => {
+    /* fixture-dependent */
+  });
+  it.skip("dispatches actions from error and name", () => {
+    /* fixture-dependent */
+  });
+  it.skip("cannot dispatch missing actions", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("TestLoadError", () => {
-  it.skip("with require", () => { /* fixture-dependent */ });
-  it.skip("with load", () => { /* fixture-dependent */ });
-  it.skip("path", () => { /* fixture-dependent */ });
-  it.skip("is missing with nil path", () => { /* fixture-dependent */ });
+  it.skip("with require", () => {
+    /* fixture-dependent */
+  });
+  it.skip("with load", () => {
+    /* fixture-dependent */
+  });
+  it.skip("path", () => {
+    /* fixture-dependent */
+  });
+  it.skip("is missing with nil path", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("TestJSONDecoding", () => {
-  it.skip("JSON decodes ", () => { /* fixture-dependent */ });
-  it.skip("JSON decodes time JSON with time parsing disabled", () => { /* fixture-dependent */ });
-  it.skip("failed json decoding", () => { /* fixture-dependent */ });
-  it.skip("cannot pass unsupported options", () => { /* fixture-dependent */ });
+  it.skip("JSON decodes ", () => {
+    /* fixture-dependent */
+  });
+  it.skip("JSON decodes time JSON with time parsing disabled", () => {
+    /* fixture-dependent */
+  });
+  it.skip("failed json decoding", () => {
+    /* fixture-dependent */
+  });
+  it.skip("cannot pass unsupported options", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CachingKeyGeneratorTest", () => {
@@ -4994,11 +6492,16 @@ describe("BacktraceCleanerFilterTest", () => {
 });
 
 describe("MessageEncryptorRotatorTest", () => {
-  it.skip("rotate cipher", () => { /* fixture-dependent */ });
-  it.skip("rotate verifier secret when using non-authenticated encryption", () => { /* fixture-dependent */ });
-  it.skip("rotate verifier digest when using non-authenticated encryption", () => { /* fixture-dependent */ });
+  it.skip("rotate cipher", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rotate verifier secret when using non-authenticated encryption", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rotate verifier digest when using non-authenticated encryption", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("BacktraceCleanerSilencerTest", () => {
   it("backtrace should not contain lines that match the silencer", () => {
@@ -5025,20 +6528,24 @@ describe("BacktraceCleanerSilencerTest", () => {
   });
 });
 
-
 describe("DigestTest", () => {
-  it.skip("with default hash digest class", () => { /* fixture-dependent */ });
-  it.skip("with custom hash digest class", () => { /* fixture-dependent */ });
-  it.skip("should raise argument error if custom digest is missing hexdigest method", () => { /* fixture-dependent */ });
+  it.skip("with default hash digest class", () => {
+    /* fixture-dependent */
+  });
+  it.skip("with custom hash digest class", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should raise argument error if custom digest is missing hexdigest method", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("CleanLoggerTest", () => {
   it("format message", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
     logger.info("Hello World");
-    expect(lines.some(l => l.includes("Hello World"))).toBe(true);
+    expect(lines.some((l) => l.includes("Hello World"))).toBe(true);
   });
 
   it("datetime format", () => {
@@ -5054,15 +6561,20 @@ describe("CleanLoggerTest", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
     logger.info(String(42));
-    expect(lines.some(l => l.includes("42"))).toBe(true);
+    expect(lines.some((l) => l.includes("42"))).toBe(true);
   });
 });
 
-
 describe("REXMLEngineTest", () => {
-  it.skip("default is rexml", () => { /* fixture-dependent */ });
-  it.skip("parse from empty string", () => { /* fixture-dependent */ });
-  it.skip("parse from frozen string", () => { /* fixture-dependent */ });
+  it.skip("default is rexml", () => {
+    /* fixture-dependent */
+  });
+  it.skip("parse from empty string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("parse from frozen string", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("IntegerExtTest", () => {
@@ -5102,33 +6614,63 @@ describe("IntegerExtTest", () => {
 });
 
 describe("ClearTest", () => {
-  it.skip("clear all cache key", () => { /* fixture-dependent */ });
-  it.skip("only clear namespace cache key", () => { /* fixture-dependent */ });
-  it.skip("clear all cache key with Redis::Distributed", () => { /* fixture-dependent */ });
+  it.skip("clear all cache key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("only clear namespace cache key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("clear all cache key with Redis::Distributed", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("BenchmarkTest", () => {
-  it.skip("realtime", () => { /* fixture-dependent */ });
-  it.skip("realtime millisecond", () => { /* fixture-dependent */ });
-  it.skip("is deprecated", () => { /* fixture-dependent */ });
+  it.skip("realtime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("realtime millisecond", () => {
+    /* fixture-dependent */
+  });
+  it.skip("is deprecated", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("JDOMEngineTest", () => {
-  it.skip("not allowed to expand entities to files", () => { /* fixture-dependent */ });
-  it.skip("not allowed to expand parameter entities to files", () => { /* fixture-dependent */ });
-  it.skip("not allowed to load external doctypes", () => { /* fixture-dependent */ });
+  it.skip("not allowed to expand entities to files", () => {
+    /* fixture-dependent */
+  });
+  it.skip("not allowed to expand parameter entities to files", () => {
+    /* fixture-dependent */
+  });
+  it.skip("not allowed to load external doctypes", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ConfigurationFileTest", () => {
-  it.skip("backtrace contains YAML path", () => { /* fixture-dependent */ });
-  it.skip("backtrace contains YAML path (when Pathname given)", () => { /* fixture-dependent */ });
-  it.skip("load raw YAML", () => { /* fixture-dependent */ });
+  it.skip("backtrace contains YAML path", () => {
+    /* fixture-dependent */
+  });
+  it.skip("backtrace contains YAML path (when Pathname given)", () => {
+    /* fixture-dependent */
+  });
+  it.skip("load raw YAML", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("IsolatedExecutionStateTest", () => {
-  it.skip("#[] when isolation level is :fiber", () => { /* fixture-dependent */ });
-  it.skip("#[] when isolation level is :thread", () => { /* fixture-dependent */ });
-  it.skip("changing the isolation level clear the old store", () => { /* fixture-dependent */ });
+  it.skip("#[] when isolation level is :fiber", () => {
+    /* fixture-dependent */
+  });
+  it.skip("#[] when isolation level is :thread", () => {
+    /* fixture-dependent */
+  });
+  it.skip("changing the isolation level clear the old store", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("JsonCherryPickTest", () => {
@@ -5151,21 +6693,36 @@ describe("JsonCherryPickTest", () => {
 });
 
 describe("MessageVerifiersTest", () => {
-  it.skip("can override secret generator", () => { /* fixture-dependent */ });
-  it.skip("supports arbitrary secret generator kwargs", () => { /* fixture-dependent */ });
-  it.skip("supports arbitrary secret generator kwargs when using #rotate block", () => { /* fixture-dependent */ });
+  it.skip("can override secret generator", () => {
+    /* fixture-dependent */
+  });
+  it.skip("supports arbitrary secret generator kwargs", () => {
+    /* fixture-dependent */
+  });
+  it.skip("supports arbitrary secret generator kwargs when using #rotate block", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CoreExtStringMultibyteTest", () => {
-  it.skip("core ext adds mb chars", () => { /* fixture-dependent */ });
-  it.skip("string should recognize utf8 strings", () => { /* fixture-dependent */ });
-  it.skip("mb chars returns instance of proxy class", () => { /* fixture-dependent */ });
+  it.skip("core ext adds mb chars", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string should recognize utf8 strings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("mb chars returns instance of proxy class", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("RemoveMethodTest", () => {
   it("remove method from an object", () => {
-    class Foo { greet() { return "hello"; } }
+    class Foo {
+      greet() {
+        return "hello";
+      }
+    }
     const proto = Foo.prototype as unknown as Record<string, unknown>;
     expect(typeof proto.greet).toBe("function");
     delete proto.greet;
@@ -5173,20 +6730,27 @@ describe("RemoveMethodTest", () => {
   });
 
   it("remove singleton method from an object", () => {
-    const obj = { greet() { return "hello"; } } as Record<string, unknown>;
+    const obj = {
+      greet() {
+        return "hello";
+      },
+    } as Record<string, unknown>;
     expect(typeof obj.greet).toBe("function");
     delete obj.greet;
     expect(obj.greet).toBeUndefined();
   });
 
   it("redefine method in an object", () => {
-    const obj = { greet() { return "hello"; } };
+    const obj = {
+      greet() {
+        return "hello";
+      },
+    };
     expect(obj.greet()).toBe("hello");
     obj.greet = () => "world";
     expect(obj.greet()).toBe("world");
   });
 });
-
 
 describe("ModuleConcernTest", () => {
   it("concern creates a module extended with active support concern", () => {
@@ -5204,7 +6768,9 @@ describe("ModuleConcernTest", () => {
   it("using class methods blocks instead of ClassMethods module", () => {
     const Trackable = concern({
       classMethods: {
-        track(event: string) { return `tracked: ${event}`; },
+        track(event: string) {
+          return `tracked: ${event}`;
+        },
       },
     });
     const Host: Record<string, unknown> = {};
@@ -5215,7 +6781,9 @@ describe("ModuleConcernTest", () => {
   it("using class methods blocks instead of ClassMethods module prepend", () => {
     const Serializable = concern({
       classMethods: {
-        serialize() { return "{}"; },
+        serialize() {
+          return "{}";
+        },
       },
     });
     const Host: Record<string, unknown> = {};
@@ -5223,8 +6791,6 @@ describe("ModuleConcernTest", () => {
     expect((Host.serialize as () => string)()).toBe("{}");
   });
 });
-
-
 
 describe("NameErrorTest", () => {
   it("name error should set missing name", () => {
@@ -5268,7 +6834,7 @@ describe("AnonymousTest", () => {
     // Anonymous functions/classes in JS have no name or empty name
     const anon = class {};
     expect(anon.name).toBe("anon");
-    const fn = function() {};
+    const fn = function () {};
     expect(fn.name).toBe("fn");
     // Arrow functions have their variable name
     const arrow = () => {};
@@ -5284,28 +6850,39 @@ describe("AnonymousTest", () => {
 });
 
 describe("CacheEntryTest", () => {
-  it.skip("expired", () => { /* fixture-dependent */ });
-  it.skip("initialize with expires at", () => { /* fixture-dependent */ });
+  it.skip("expired", () => {
+    /* fixture-dependent */
+  });
+  it.skip("initialize with expires at", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("MessagesRotationConfiguration", () => {
-  it.skip("signed configurations", () => { /* fixture-dependent */ });
-  it.skip("encrypted configurations", () => { /* fixture-dependent */ });
+  it.skip("signed configurations", () => {
+    /* fixture-dependent */
+  });
+  it.skip("encrypted configurations", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("ConnectionPoolBehaviorTest", () => {
-  it.skip("pool options work", () => { /* fixture-dependent */ });
-  it.skip("connection pooling by default", () => { /* fixture-dependent */ });
+  it.skip("pool options work", () => {
+    /* fixture-dependent */
+  });
+  it.skip("connection pooling by default", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("KernelSuppressTest", () => {
   function suppress<T extends new (...a: any[]) => Error>(...types: T[]) {
     return (fn: () => void) => {
-      try { fn(); } catch (e) {
-        if (types.some(t => e instanceof t)) return;
+      try {
+        fn();
+      } catch (e) {
+        if (types.some((t) => e instanceof t)) return;
         throw e;
       }
     };
@@ -5314,13 +6891,21 @@ describe("KernelSuppressTest", () => {
   it("reraise", () => {
     const suppresser = suppress(TypeError);
     // A non-suppressed error should rethrow
-    expect(() => suppresser(() => { throw new RangeError("boom"); })).toThrow(RangeError);
+    expect(() =>
+      suppresser(() => {
+        throw new RangeError("boom");
+      }),
+    ).toThrow(RangeError);
   });
 
   it("suppression", () => {
     const suppresser = suppress(Error);
     // A suppressed error should be swallowed
-    expect(() => suppresser(() => { throw new Error("suppressed"); })).not.toThrow();
+    expect(() =>
+      suppresser(() => {
+        throw new Error("suppressed");
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -5334,8 +6919,8 @@ describe("LoggerSilenceTest", () => {
       logger.info("also suppressed");
       logger.error("shown");
     });
-    expect(lines.some(l => l.includes("shown"))).toBe(true);
-    expect(lines.filter(l => l.includes("suppressed")).length).toBe(0);
+    expect(lines.some((l) => l.includes("shown"))).toBe(true);
+    expect(lines.filter((l) => l.includes("suppressed")).length).toBe(0);
   });
 
   it("#debug? is true when setting the temporary level to Logger::DEBUG", () => {
@@ -5372,8 +6957,12 @@ describe("BacktraceCleanerMultipleSilencersTest", () => {
 });
 
 describe("WithBackendTest", () => {
-  it.skip("#with_backend should switch backend and then switch back", () => { /* fixture-dependent */ });
-  it.skip("backend switch inside #with_backend block", () => { /* fixture-dependent */ });
+  it.skip("#with_backend should switch backend and then switch back", () => {
+    /* fixture-dependent */
+  });
+  it.skip("backend switch inside #with_backend block", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ModuleConcerningTest", () => {
@@ -5411,7 +7000,9 @@ describe("JsonGemEncodingTest", () => {
   it("custom to_json (toJSON override)", () => {
     const obj = {
       value: 42,
-      toJSON() { return { encoded: this.value }; }
+      toJSON() {
+        return { encoded: this.value };
+      },
     };
     const parsed = JSON.parse(JSON.stringify(obj));
     expect(parsed).toEqual({ encoded: 42 });
@@ -5419,29 +7010,48 @@ describe("JsonGemEncodingTest", () => {
 });
 
 describe("ThreadSafetyTest", () => {
-  it.skip("#with_backend should be thread-safe", () => { /* fixture-dependent */ });
-  it.skip("nested #with_backend should be thread-safe", () => { /* fixture-dependent */ });
+  it.skip("#with_backend should be thread-safe", () => {
+    /* fixture-dependent */
+  });
+  it.skip("nested #with_backend should be thread-safe", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("EnvironmentInquirerTest", () => {
-  it.skip("local predicate", () => { /* fixture-dependent */ });
-  it.skip("prevent local from being used as an actual environment name", () => { /* fixture-dependent */ });
+  it.skip("local predicate", () => {
+    /* fixture-dependent */
+  });
+  it.skip("prevent local from being used as an actual environment name", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("FileFixturesTest", () => {
-  it.skip("#file_fixture returns Pathname to file fixture", () => { /* fixture-dependent */ });
-  it.skip("raises an exception when the fixture file does not exist", () => { /* fixture-dependent */ });
+  it.skip("#file_fixture returns Pathname to file fixture", () => {
+    /* fixture-dependent */
+  });
+  it.skip("raises an exception when the fixture file does not exist", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("AttributeAliasingTest", () => {
   it("attribute alias", () => {
     class Person {
       private _name = "";
-      get name() { return this._name; }
-      set name(v: string) { this._name = v; }
-      get alias_name() { return this._name; }
-      set alias_name(v: string) { this._name = v; }
+      get name() {
+        return this._name;
+      }
+      set name(v: string) {
+        this._name = v;
+      }
+      get alias_name() {
+        return this._name;
+      }
+      set alias_name(v: string) {
+        this._name = v;
+      }
     }
     const p = new Person();
     p.name = "david";
@@ -5453,17 +7063,24 @@ describe("AttributeAliasingTest", () => {
   it("aliasing to uppercase attributes", () => {
     class Config {
       private _URL = "";
-      get URL() { return this._URL; }
-      set URL(v: string) { this._URL = v; }
-      get url() { return this._URL; }
-      set url(v: string) { this._URL = v; }
+      get URL() {
+        return this._URL;
+      }
+      set URL(v: string) {
+        this._URL = v;
+      }
+      get url() {
+        return this._URL;
+      }
+      set url(v: string) {
+        this._URL = v;
+      }
     }
     const c = new Config();
     c.URL = "https://example.com";
     expect(c.url).toBe("https://example.com");
   });
 });
-
 
 describe("SymbolStartsEndsWithTest", () => {
   it("starts ends with alias", () => {
@@ -5477,23 +7094,22 @@ describe("SymbolStartsEndsWithTest", () => {
   });
 });
 
-
-
-
-
-
 describe("KernelConcernTest", () => {
-  it.skip("may be defined at toplevel", () => { /* fixture-dependent */ });
+  it.skip("may be defined at toplevel", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("MessagePackSerializerTest", () => {
-  it.skip("raises friendly error when dumping an unsupported object", () => { /* fixture-dependent */ });
+  it.skip("raises friendly error when dumping an unsupported object", () => {
+    /* fixture-dependent */
+  });
 });
 
-
-
 describe("MultibyteProxyText", () => {
-  it.skip("custom multibyte encoder", () => { /* fixture-dependent */ });
+  it.skip("custom multibyte encoder", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("BigDecimalTest", () => {
@@ -5523,30 +7139,35 @@ describe("RegexpExtAccessTests", () => {
   });
 });
 
-
-
 describe("AfterTeardownAssertionTest", () => {
-  it.skip("teardown raise but all after teardown method are called", () => { /* fixture-dependent */ });
+  it.skip("teardown raise but all after teardown method are called", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("PathnameExistenceTest", () => {
-  it.skip("existence", () => { /* fixture-dependent */ });
+  it.skip("existence", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("ThreadLoadInterlockAwareMonitorTest", () => {
-  it.skip("lock owned by thread", () => { /* fixture-dependent */ });
+  it.skip("lock owned by thread", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("FileFixturesPathnameDirectoryTest", () => {
-  it.skip("#file_fixture_path returns Pathname to file fixture", () => { /* fixture-dependent */ });
+  it.skip("#file_fixture_path returns Pathname to file fixture", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("MessageVerifierRotatorTest", () => {
-  it.skip("rotate digest", () => { /* fixture-dependent */ });
+  it.skip("rotate digest", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("BacktraceCleanerFilterAndSilencerTest", () => {
   it("backtrace should not silence lines that has first had their silence hook filtered out", () => {
@@ -5555,14 +7176,14 @@ describe("BacktraceCleanerFilterAndSilencerTest", () => {
     const silencers: Array<(line: string) => boolean> = [];
     function clean(lines: string[]) {
       return lines
-        .map(line => filters.reduce((l, f) => f(l), line))
-        .filter(line => !silencers.some(s => s(line)));
+        .map((line) => filters.reduce((l, f) => f(l), line))
+        .filter((line) => !silencers.some((s) => s(line)));
     }
 
     // Filter strips the gem path prefix
-    filters.push(line => line.replace("/gems/rack-1.0", ""));
+    filters.push((line) => line.replace("/gems/rack-1.0", ""));
     // Silencer would silence lines with /gems/ — but after filter, the prefix is gone
-    silencers.push(line => line.includes("/gems/"));
+    silencers.push((line) => line.includes("/gems/"));
 
     const bt = ["/gems/rack-1.0/lib/rack.rb"];
     // After filter: "/lib/rack.rb" → does not include "/gems/" → NOT silenced
@@ -5571,7 +7192,9 @@ describe("BacktraceCleanerFilterAndSilencerTest", () => {
 });
 
 describe("PathnameBlankTest", () => {
-  it.skip("blank", () => { /* fixture-dependent */ });
+  it.skip("blank", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CallbackFalseTerminatorTest", () => {
@@ -5580,16 +7203,19 @@ describe("CallbackFalseTerminatorTest", () => {
     const log: string[] = [];
     const proto = {};
     defineCallbacks(proto, "action", { terminator: false });
-    setCallback(proto, "action", "before", () => { log.push("cb1"); return false; });
-    setCallback(proto, "action", "before", () => { log.push("cb2"); });
+    setCallback(proto, "action", "before", () => {
+      log.push("cb1");
+      return false;
+    });
+    setCallback(proto, "action", "before", () => {
+      log.push("cb2");
+    });
     runCallbacks(proto, "action", () => log.push("main"));
     expect(log).toContain("cb1");
     expect(log).toContain("cb2");
     expect(log).toContain("main");
   });
 });
-
-
 
 describe("StringBehaviorTest", () => {
   it("acts like string", () => {
@@ -5601,14 +7227,16 @@ describe("StringBehaviorTest", () => {
   });
 });
 
-
 describe("LookupTest", () => {
-  it.skip("may be looked up as :redis_cache_store", () => { /* fixture-dependent */ });
+  it.skip("may be looked up as :redis_cache_store", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("AfterTeardownTest", () => {
-  it.skip("teardown raise but all after teardown method are called", () => { /* fixture-dependent */ });
+  it.skip("teardown raise but all after teardown method are called", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("IndifferentTransformValuesTest", () => {
@@ -5625,203 +7253,582 @@ describe("IndifferentTransformValuesTest", () => {
 });
 
 describe("TimeExtCalculationsTest", () => {
-  it.skip("seconds since midnight at daylight savings time start", () => { /* fixture-dependent */ });
-  it.skip("seconds since midnight at daylight savings time end", () => { /* fixture-dependent */ });
-  it.skip("seconds until end of day at daylight savings time start", () => { /* fixture-dependent */ });
-  it.skip("seconds until end of day at daylight savings time end", () => { /* fixture-dependent */ });
-  it.skip("sec fraction", () => { /* fixture-dependent */ });
-  it.skip("floor", () => { /* fixture-dependent */ });
-  it.skip("ceil", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings backward start", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings backward end", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings backward start 1day", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings backward end 1day", () => { /* fixture-dependent */ });
-  it.skip("since with instance of time deprecated", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings forward start", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings forward start 1day", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings forward start tomorrow", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings backward start yesterday", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings forward end", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings forward end 1day", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings forward end tomorrow", () => { /* fixture-dependent */ });
-  it.skip("daylight savings time crossings backward end yesterday", () => { /* fixture-dependent */ });
-  it.skip("change", () => { /* fixture-dependent */ });
-  it.skip("utc change", () => { /* fixture-dependent */ });
-  it.skip("offset change", () => { /* fixture-dependent */ });
-  it.skip("change offset", () => { /* fixture-dependent */ });
-  it.skip("change preserves offset for local times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("change preserves offset for zoned times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("change preserves fractional seconds on zoned time", () => { /* fixture-dependent */ });
-  it.skip("change preserves fractional hour offset for local times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("change preserves fractional hour offset for zoned times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("utc advance", () => { /* fixture-dependent */ });
-  it.skip("offset advance", () => { /* fixture-dependent */ });
-  it.skip("advance with nsec", () => { /* fixture-dependent */ });
-  it.skip("advance gregorian proleptic", () => { /* fixture-dependent */ });
-  it.skip("advance preserves offset for local times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("advance preserves offset for zoned times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("advance preserves fractional hour offset for local times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("advance preserves fractional hour offset for zoned times around end of dst", () => { /* fixture-dependent */ });
-  it.skip("last week", () => { /* fixture-dependent */ });
-  it.skip("next week near daylight start", () => { /* fixture-dependent */ });
-  it.skip("next week near daylight end", () => { /* fixture-dependent */ });
-  it.skip("to fs", () => { /* fixture-dependent */ });
-  it.skip("to fs custom date format", () => { /* fixture-dependent */ });
-  it.skip("rfc3339 with fractional seconds", () => { /* fixture-dependent */ });
-  it.skip("to date", () => { /* fixture-dependent */ });
-  it.skip("to datetime", () => { /* fixture-dependent */ });
-  it.skip("to time", () => { /* fixture-dependent */ });
-  it.skip("fp inaccuracy ticket 1836", () => { /* fixture-dependent */ });
-  it.skip("days in month with year", () => { /* fixture-dependent */ });
-  it.skip("days in month feb in common year without year arg", () => { /* fixture-dependent */ });
-  it.skip("days in month feb in leap year without year arg", () => { /* fixture-dependent */ });
-  it.skip("days in year with year", () => { /* fixture-dependent */ });
-  it.skip("days in year in common year without year arg", () => { /* fixture-dependent */ });
-  it.skip("days in year in leap year without year arg", () => { /* fixture-dependent */ });
-  it.skip("xmlschema is available", () => { /* fixture-dependent */ });
-  it.skip("today with time local", () => { /* fixture-dependent */ });
-  it.skip("today with time utc", () => { /* fixture-dependent */ });
-  it.skip("yesterday with time local", () => { /* fixture-dependent */ });
-  it.skip("yesterday with time utc", () => { /* fixture-dependent */ });
-  it.skip("prev day with time utc", () => { /* fixture-dependent */ });
-  it.skip("tomorrow with time local", () => { /* fixture-dependent */ });
-  it.skip("tomorrow with time utc", () => { /* fixture-dependent */ });
-  it.skip("next day with time utc", () => { /* fixture-dependent */ });
-  it.skip("past with time current as time local", () => { /* fixture-dependent */ });
-  it.skip("past with time current as time with zone", () => { /* fixture-dependent */ });
-  it.skip("future with time current as time local", () => { /* fixture-dependent */ });
-  it.skip("future with time current as time with zone", () => { /* fixture-dependent */ });
-  it.skip("acts like time", () => { /* fixture-dependent */ });
-  it.skip("formatted offset with utc", () => { /* fixture-dependent */ });
-  it.skip("formatted offset with local", () => { /* fixture-dependent */ });
-  it.skip("compare with time", () => { /* fixture-dependent */ });
-  it.skip("compare with datetime", () => { /* fixture-dependent */ });
-  it.skip("compare with time with zone", () => { /* fixture-dependent */ });
-  it.skip("compare with string", () => { /* fixture-dependent */ });
-  it.skip("at with datetime", () => { /* fixture-dependent */ });
-  it.skip("at with datetime returns local time", () => { /* fixture-dependent */ });
-  it.skip("at with time with zone", () => { /* fixture-dependent */ });
-  it.skip("at with in option", () => { /* fixture-dependent */ });
-  it.skip("at with time with zone returns local time", () => { /* fixture-dependent */ });
-  it.skip("at with time microsecond precision", () => { /* fixture-dependent */ });
-  it.skip("at with utc time", () => { /* fixture-dependent */ });
-  it.skip("at with local time", () => { /* fixture-dependent */ });
-  it.skip("eql?", () => { /* fixture-dependent */ });
-  it.skip("minus with time with zone", () => { /* fixture-dependent */ });
-  it.skip("minus with datetime", () => { /* fixture-dependent */ });
-  it.skip("time created with local constructor cannot represent times during hour skipped by dst", () => { /* fixture-dependent */ });
-  it.skip("case equality", () => { /* fixture-dependent */ });
-  it.skip("all day with timezone", () => { /* fixture-dependent */ });
-  it.skip("rfc3339 parse", () => { /* fixture-dependent */ });
+  it.skip("seconds since midnight at daylight savings time start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("seconds since midnight at daylight savings time end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("seconds until end of day at daylight savings time start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("seconds until end of day at daylight savings time end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("sec fraction", () => {
+    /* fixture-dependent */
+  });
+  it.skip("floor", () => {
+    /* fixture-dependent */
+  });
+  it.skip("ceil", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings backward start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings backward end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings backward start 1day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings backward end 1day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("since with instance of time deprecated", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings forward start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings forward start 1day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings forward start tomorrow", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings backward start yesterday", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings forward end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings forward end 1day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings forward end tomorrow", () => {
+    /* fixture-dependent */
+  });
+  it.skip("daylight savings time crossings backward end yesterday", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change", () => {
+    /* fixture-dependent */
+  });
+  it.skip("utc change", () => {
+    /* fixture-dependent */
+  });
+  it.skip("offset change", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change preserves offset for local times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change preserves offset for zoned times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change preserves fractional seconds on zoned time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change preserves fractional hour offset for local times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change preserves fractional hour offset for zoned times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("utc advance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("offset advance", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance with nsec", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance gregorian proleptic", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance preserves offset for local times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance preserves offset for zoned times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance preserves fractional hour offset for local times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance preserves fractional hour offset for zoned times around end of dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last week", () => {
+    /* fixture-dependent */
+  });
+  it.skip("next week near daylight start", () => {
+    /* fixture-dependent */
+  });
+  it.skip("next week near daylight end", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to fs", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to fs custom date format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rfc3339 with fractional seconds", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("fp inaccuracy ticket 1836", () => {
+    /* fixture-dependent */
+  });
+  it.skip("days in month with year", () => {
+    /* fixture-dependent */
+  });
+  it.skip("days in month feb in common year without year arg", () => {
+    /* fixture-dependent */
+  });
+  it.skip("days in month feb in leap year without year arg", () => {
+    /* fixture-dependent */
+  });
+  it.skip("days in year with year", () => {
+    /* fixture-dependent */
+  });
+  it.skip("days in year in common year without year arg", () => {
+    /* fixture-dependent */
+  });
+  it.skip("days in year in leap year without year arg", () => {
+    /* fixture-dependent */
+  });
+  it.skip("xmlschema is available", () => {
+    /* fixture-dependent */
+  });
+  it.skip("today with time local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("today with time utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday with time local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday with time utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("prev day with time utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow with time local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow with time utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("next day with time utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("past with time current as time local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("past with time current as time with zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("future with time current as time local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("future with time current as time with zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("acts like time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("formatted offset with utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("formatted offset with local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with time with zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with datetime returns local time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with time with zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with in option", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with time with zone returns local time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with time microsecond precision", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with utc time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("at with local time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eql?", () => {
+    /* fixture-dependent */
+  });
+  it.skip("minus with time with zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("minus with datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("time created with local constructor cannot represent times during hour skipped by dst", () => {
+    /* fixture-dependent */
+  });
+  it.skip("case equality", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all day with timezone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rfc3339 parse", () => {
+    /* fixture-dependent */
+  });
 });
 
-
 describe("DateTimeExtCalculationsTest", () => {
-  it.skip("to fs", () => { /* fixture-dependent */ });
-  it.skip("readable inspect", () => { /* fixture-dependent */ });
-  it.skip("to fs with custom date format", () => { /* fixture-dependent */ });
-  it.skip("localtime", () => { /* fixture-dependent */ });
-  it.skip("getlocal", () => { /* fixture-dependent */ });
-  it.skip("to date", () => { /* fixture-dependent */ });
-  it.skip("to datetime", () => { /* fixture-dependent */ });
-  it.skip("to time", () => { /* fixture-dependent */ });
-  it.skip("to time preserves fractional seconds", () => { /* fixture-dependent */ });
-  it.skip("civil from format", () => { /* fixture-dependent */ });
-  it.skip("middle of day", () => { /* fixture-dependent */ });
-  it.skip("beginning of minute", () => { /* fixture-dependent */ });
-  it.skip("end of minute", () => { /* fixture-dependent */ });
-  it.skip("end of month", () => { /* fixture-dependent */ });
-  it.skip("change", () => { /* fixture-dependent */ });
-  it.skip("advance partial days", () => { /* fixture-dependent */ });
-  it.skip("advanced processes first the date deltas and then the time deltas", () => { /* fixture-dependent */ });
-  it.skip("last week", () => { /* fixture-dependent */ });
-  it.skip("date time should have correct last week for leap year", () => { /* fixture-dependent */ });
-  it.skip("last quarter on 31st", () => { /* fixture-dependent */ });
-  it.skip("xmlschema", () => { /* fixture-dependent */ });
-  it.skip("today with offset", () => { /* fixture-dependent */ });
-  it.skip("today without offset", () => { /* fixture-dependent */ });
-  it.skip("yesterday with offset", () => { /* fixture-dependent */ });
-  it.skip("yesterday without offset", () => { /* fixture-dependent */ });
-  it.skip("prev day without offset", () => { /* fixture-dependent */ });
-  it.skip("tomorrow with offset", () => { /* fixture-dependent */ });
-  it.skip("tomorrow without offset", () => { /* fixture-dependent */ });
-  it.skip("next day without offset", () => { /* fixture-dependent */ });
-  it.skip("past with offset", () => { /* fixture-dependent */ });
-  it.skip("past without offset", () => { /* fixture-dependent */ });
-  it.skip("future with offset", () => { /* fixture-dependent */ });
-  it.skip("future without offset", () => { /* fixture-dependent */ });
-  it.skip("current returns date today when zone is not set", () => { /* fixture-dependent */ });
-  it.skip("current returns time zone today when zone is set", () => { /* fixture-dependent */ });
-  it.skip("current without time zone", () => { /* fixture-dependent */ });
-  it.skip("current with time zone", () => { /* fixture-dependent */ });
-  it.skip("acts like date", () => { /* fixture-dependent */ });
-  it.skip("acts like time", () => { /* fixture-dependent */ });
-  it.skip("blank?", () => { /* fixture-dependent */ });
-  it.skip("utc?", () => { /* fixture-dependent */ });
-  it.skip("utc offset", () => { /* fixture-dependent */ });
-  it.skip("utc", () => { /* fixture-dependent */ });
-  it.skip("formatted offset with utc", () => { /* fixture-dependent */ });
-  it.skip("formatted offset with local", () => { /* fixture-dependent */ });
-  it.skip("compare with time", () => { /* fixture-dependent */ });
-  it.skip("compare with datetime", () => { /* fixture-dependent */ });
-  it.skip("compare with time with zone", () => { /* fixture-dependent */ });
-  it.skip("compare with string", () => { /* fixture-dependent */ });
-  it.skip("compare with integer", () => { /* fixture-dependent */ });
-  it.skip("compare with float", () => { /* fixture-dependent */ });
-  it.skip("compare with rational", () => { /* fixture-dependent */ });
-  it.skip("to f", () => { /* fixture-dependent */ });
-  it.skip("to i", () => { /* fixture-dependent */ });
-  it.skip("usec", () => { /* fixture-dependent */ });
-  it.skip("nsec", () => { /* fixture-dependent */ });
-  it.skip("subsec", () => { /* fixture-dependent */ });
+  it.skip("to fs", () => {
+    /* fixture-dependent */
+  });
+  it.skip("readable inspect", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to fs with custom date format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("localtime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("getlocal", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to time preserves fractional seconds", () => {
+    /* fixture-dependent */
+  });
+  it.skip("civil from format", () => {
+    /* fixture-dependent */
+  });
+  it.skip("middle of day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("beginning of minute", () => {
+    /* fixture-dependent */
+  });
+  it.skip("end of minute", () => {
+    /* fixture-dependent */
+  });
+  it.skip("end of month", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance partial days", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advanced processes first the date deltas and then the time deltas", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last week", () => {
+    /* fixture-dependent */
+  });
+  it.skip("date time should have correct last week for leap year", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last quarter on 31st", () => {
+    /* fixture-dependent */
+  });
+  it.skip("xmlschema", () => {
+    /* fixture-dependent */
+  });
+  it.skip("today with offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("today without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday with offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("prev day without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow with offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("next day without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("past with offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("past without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("future with offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("future without offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("current returns date today when zone is not set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("current returns time zone today when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("current without time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("current with time zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("acts like date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("acts like time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("blank?", () => {
+    /* fixture-dependent */
+  });
+  it.skip("utc?", () => {
+    /* fixture-dependent */
+  });
+  it.skip("utc offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("formatted offset with utc", () => {
+    /* fixture-dependent */
+  });
+  it.skip("formatted offset with local", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with time with zone", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with integer", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with float", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare with rational", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to f", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to i", () => {
+    /* fixture-dependent */
+  });
+  it.skip("usec", () => {
+    /* fixture-dependent */
+  });
+  it.skip("nsec", () => {
+    /* fixture-dependent */
+  });
+  it.skip("subsec", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("DateExtCalculationsTest", () => {
-  it.skip("yesterday in calendar reform", () => { /* fixture-dependent */ });
-  it.skip("tomorrow in calendar reform", () => { /* fixture-dependent */ });
-  it.skip("to fs", () => { /* fixture-dependent */ });
-  it.skip("to fs with single digit day", () => { /* fixture-dependent */ });
-  it.skip("readable inspect", () => { /* fixture-dependent */ });
-  it.skip("to time", () => { /* fixture-dependent */ });
-  it.skip("compare to time", () => { /* fixture-dependent */ });
-  it.skip("to datetime", () => { /* fixture-dependent */ });
-  it.skip("to date", () => { /* fixture-dependent */ });
-  it.skip("change", () => { /* fixture-dependent */ });
-  it.skip("sunday", () => { /* fixture-dependent */ });
-  it.skip("last year in calendar reform", () => { /* fixture-dependent */ });
-  it.skip("advance does first years and then days", () => { /* fixture-dependent */ });
-  it.skip("advance does first months and then days", () => { /* fixture-dependent */ });
-  it.skip("advance in calendar reform", () => { /* fixture-dependent */ });
-  it.skip("last week", () => { /* fixture-dependent */ });
-  it.skip("last quarter on 31st", () => { /* fixture-dependent */ });
-  it.skip("yesterday constructor", () => { /* fixture-dependent */ });
-  it.skip("yesterday constructor when zone is not set", () => { /* fixture-dependent */ });
-  it.skip("yesterday constructor when zone is set", () => { /* fixture-dependent */ });
-  it.skip("tomorrow constructor", () => { /* fixture-dependent */ });
-  it.skip("tomorrow constructor when zone is not set", () => { /* fixture-dependent */ });
-  it.skip("tomorrow constructor when zone is set", () => { /* fixture-dependent */ });
-  it.skip("since", () => { /* fixture-dependent */ });
-  it.skip("since when zone is set", () => { /* fixture-dependent */ });
-  it.skip("ago", () => { /* fixture-dependent */ });
-  it.skip("ago when zone is set", () => { /* fixture-dependent */ });
-  it.skip("beginning of day", () => { /* fixture-dependent */ });
-  it.skip("middle of day", () => { /* fixture-dependent */ });
-  it.skip("beginning of day when zone is set", () => { /* fixture-dependent */ });
-  it.skip("end of day", () => { /* fixture-dependent */ });
-  it.skip("end of day when zone is set", () => { /* fixture-dependent */ });
-  it.skip("all day", () => { /* fixture-dependent */ });
-  it.skip("all day when zone is set", () => { /* fixture-dependent */ });
-  it.skip("all week", () => { /* fixture-dependent */ });
-  it.skip("all month", () => { /* fixture-dependent */ });
-  it.skip("all quarter", () => { /* fixture-dependent */ });
-  it.skip("all year", () => { /* fixture-dependent */ });
-  it.skip("xmlschema", () => { /* fixture-dependent */ });
-  it.skip("xmlschema when zone is set", () => { /* fixture-dependent */ });
-  it.skip("past", () => { /* fixture-dependent */ });
-  it.skip("future", () => { /* fixture-dependent */ });
-  it.skip("current returns date today when zone not set", () => { /* fixture-dependent */ });
-  it.skip("current returns time zone today when zone is set", () => { /* fixture-dependent */ });
-  it.skip("date advance should not change passed options hash", () => { /* fixture-dependent */ });
+  it.skip("yesterday in calendar reform", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow in calendar reform", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to fs", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to fs with single digit day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("readable inspect", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("compare to time", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to datetime", () => {
+    /* fixture-dependent */
+  });
+  it.skip("to date", () => {
+    /* fixture-dependent */
+  });
+  it.skip("change", () => {
+    /* fixture-dependent */
+  });
+  it.skip("sunday", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last year in calendar reform", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance does first years and then days", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance does first months and then days", () => {
+    /* fixture-dependent */
+  });
+  it.skip("advance in calendar reform", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last week", () => {
+    /* fixture-dependent */
+  });
+  it.skip("last quarter on 31st", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday constructor", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday constructor when zone is not set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("yesterday constructor when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow constructor", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow constructor when zone is not set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tomorrow constructor when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("since", () => {
+    /* fixture-dependent */
+  });
+  it.skip("since when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("ago", () => {
+    /* fixture-dependent */
+  });
+  it.skip("ago when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("beginning of day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("middle of day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("beginning of day when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("end of day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("end of day when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all day", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all day when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all week", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all month", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all quarter", () => {
+    /* fixture-dependent */
+  });
+  it.skip("all year", () => {
+    /* fixture-dependent */
+  });
+  it.skip("xmlschema", () => {
+    /* fixture-dependent */
+  });
+  it.skip("xmlschema when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("past", () => {
+    /* fixture-dependent */
+  });
+  it.skip("future", () => {
+    /* fixture-dependent */
+  });
+  it.skip("current returns date today when zone not set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("current returns time zone today when zone is set", () => {
+    /* fixture-dependent */
+  });
+  it.skip("date advance should not change passed options hash", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CacheKeyTest", () => {
@@ -5833,7 +7840,7 @@ describe("CacheKeyTest", () => {
     } else if (typeof key === "boolean") {
       base = String(key);
     } else if (Array.isArray(key)) {
-      base = key.map(k => expandCacheKey(k)).join("/");
+      base = key.map((k) => expandCacheKey(k)).join("/");
     } else if (typeof key === "object" && key !== null && "cacheKey" in key) {
       base = (key as { cacheKey(): string }).cacheKey();
     } else {
@@ -5868,12 +7875,20 @@ describe("CacheKeyTest", () => {
   });
 
   it("expand cache key respond to cache key", () => {
-    const obj = { cacheKey() { return "custom/key"; } };
+    const obj = {
+      cacheKey() {
+        return "custom/key";
+      },
+    };
     expect(expandCacheKey(obj)).toBe("custom/key");
   });
 
   it("expand cache key array with something that responds to cache key", () => {
-    const obj = { cacheKey() { return "obj-1"; } };
+    const obj = {
+      cacheKey() {
+        return "obj-1";
+      },
+    };
     expect(expandCacheKey([obj, "extra"])).toBe("obj-1/extra");
   });
 
@@ -5962,17 +7977,11 @@ describe("WithTest", () => {
   });
 });
 
-;
-
-
-
-
 describe("CallbackTerminatorTest", () => {
-  it.skip("termination invokes hook", () => { /* fixture-dependent */ });
+  it.skip("termination invokes hook", () => {
+    /* fixture-dependent */
+  });
 });
-
-
-
 
 describe("ExcludingDuplicatesCallbackTest", () => {
   it("excludes duplicates in one call", () => {
@@ -5989,11 +7998,6 @@ describe("ExcludingDuplicatesCallbackTest", () => {
     expect(log.length).toBeGreaterThanOrEqual(1);
   });
 });
-
-
-
-
-
 
 describe("ResetCallbackTest", () => {
   it("reset impacts subclasses", () => {
@@ -6032,15 +8036,12 @@ describe("RunSpecificCallbackTest", () => {
   });
 });
 
-
-
 describe("StringExcludeTest", () => {
   it("inverse of #include", () => {
     expect(exclude("hello world" as any, "world" as any)).toBe(false);
     expect(exclude("hello world" as any, "xyz" as any)).toBe(true);
   });
 });
-
 
 describe("TaggedLoggingTest", () => {
   function makeOutput() {
@@ -6054,7 +8055,7 @@ describe("TaggedLoggingTest", () => {
     const tagged = taggedLogging(logger);
     tagged.pushTags("TAG");
     tagged.info("hello");
-    expect(output.lines.some(l => l.includes("[TAG]") && l.includes("hello"))).toBe(true);
+    expect(output.lines.some((l) => l.includes("[TAG]") && l.includes("hello"))).toBe(true);
   });
 
   it("provides access to the logger instance", () => {
@@ -6089,9 +8090,9 @@ describe("TaggedLoggingTest", () => {
     t2.pushTags("B");
     t1.info("msg1");
     t2.info("msg2");
-    expect(out1.lines.some(l => l.includes("[A]"))).toBe(true);
-    expect(out1.lines.some(l => l.includes("[B]"))).toBe(false);
-    expect(out2.lines.some(l => l.includes("[B]"))).toBe(true);
+    expect(out1.lines.some((l) => l.includes("[A]"))).toBe(true);
+    expect(out1.lines.some((l) => l.includes("[B]"))).toBe(false);
+    expect(out2.lines.some((l) => l.includes("[B]"))).toBe(true);
   });
 
   it("cleans up the taggings on flush", () => {
@@ -6110,7 +8111,7 @@ describe("TaggedLoggingTest", () => {
     const tagged = taggedLogging(logger);
     tagged.pushTags("X");
     tagged.info("test");
-    expect(output.lines.some(l => l.includes("[X]") && l.includes("test"))).toBe(true);
+    expect(output.lines.some((l) => l.includes("[X]") && l.includes("test"))).toBe(true);
   });
 });
 
@@ -6151,8 +8152,8 @@ describe("TaggedLoggingWithoutBlockTest", () => {
     const l2 = new Logger(out2);
     const broadcast = new BroadcastLogger(l1, l2);
     broadcast.info("broadcast message");
-    expect(out1.lines.some(l => l.includes("broadcast message"))).toBe(true);
-    expect(out2.lines.some(l => l.includes("broadcast message"))).toBe(true);
+    expect(out1.lines.some((l) => l.includes("broadcast message"))).toBe(true);
+    expect(out2.lines.some((l) => l.includes("broadcast message"))).toBe(true);
   });
 
   it("accepts non-String objects as tags (converts to string)", () => {
@@ -6166,86 +8167,191 @@ describe("TaggedLoggingWithoutBlockTest", () => {
   });
 });
 
-
-
-
-
-
-
-
 describe("RawTest", () => {
-  it.skip("does not compress values read with \\\"raw\\\" enabled", () => { /* fixture-dependent */ });
+  it.skip('does not compress values read with \\"raw\\" enabled', () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("ShareLockTest", () => {
-  it.skip("happy path", () => { /* fixture-dependent */ });
-  it.skip("detects stuck thread", () => { /* fixture-dependent */ });
-  it.skip("detects free thread", () => { /* fixture-dependent */ });
-  it.skip("detects already released", () => { /* fixture-dependent */ });
-  it.skip("detects remains latched", () => { /* fixture-dependent */ });
+  it.skip("happy path", () => {
+    /* fixture-dependent */
+  });
+  it.skip("detects stuck thread", () => {
+    /* fixture-dependent */
+  });
+  it.skip("detects free thread", () => {
+    /* fixture-dependent */
+  });
+  it.skip("detects already released", () => {
+    /* fixture-dependent */
+  });
+  it.skip("detects remains latched", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("entering with blocking", () => {
-  it.skip("entering with blocking", () => { /* fixture-dependent */ });
+  it.skip("entering with blocking", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("entering with no blocking", () => {
-  it.skip("entering with no blocking", () => { /* fixture-dependent */ });
+  it.skip("entering with no blocking", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("without assertions", () => {
-  it.skip("without assertions", () => { /* fixture-dependent */ });
+  it.skip("without assertions", () => {
+    /* fixture-dependent */
+  });
 });
 
-
-
 describe("MultibyteCharsUTF8BehaviorTest", () => {
-  it.skip("split should return an array of chars instances", () => { /* fixture-dependent */ });
-  it.skip("tidy bytes bang should return self", () => { /* fixture-dependent */ });
-  it.skip("tidy bytes bang should change wrapped string", () => { /* fixture-dependent */ });
-  it.skip("unicode string should have utf8 encoding", () => { /* fixture-dependent */ });
-  it.skip("identity", () => { /* fixture-dependent */ });
-  it.skip("string methods are chainable", () => { /* fixture-dependent */ });
-  it.skip("should be equal to the wrapped string", () => { /* fixture-dependent */ });
-  it.skip("should not be equal to an other string", () => { /* fixture-dependent */ });
-  it.skip("sortability", () => { /* fixture-dependent */ });
-  it.skip("should return character offset for regexp matches", () => { /* fixture-dependent */ });
-  it.skip("match should return boolean for regexp match", () => { /* fixture-dependent */ });
-  it.skip("should use character offsets for insert offsets", () => { /* fixture-dependent */ });
-  it.skip("insert should be destructive", () => { /* fixture-dependent */ });
-  it.skip("should know if one includes the other", () => { /* fixture-dependent */ });
-  it.skip("include raises when nil is passed", () => { /* fixture-dependent */ });
-  it.skip("index should return character offset", () => { /* fixture-dependent */ });
-  it.skip("rindex should return character offset", () => { /* fixture-dependent */ });
-  it.skip("indexed insert should take character offsets", () => { /* fixture-dependent */ });
-  it.skip("indexed insert should raise on index overflow", () => { /* fixture-dependent */ });
-  it.skip("indexed insert should raise on range overflow", () => { /* fixture-dependent */ });
-  it.skip("rjust should raise argument errors on bad arguments", () => { /* fixture-dependent */ });
-  it.skip("rjust should count characters instead of bytes", () => { /* fixture-dependent */ });
-  it.skip("ljust should raise argument errors on bad arguments", () => { /* fixture-dependent */ });
-  it.skip("ljust should count characters instead of bytes", () => { /* fixture-dependent */ });
-  it.skip("center should raise argument errors on bad arguments", () => { /* fixture-dependent */ });
-  it.skip("center should count characters instead of bytes", () => { /* fixture-dependent */ });
-  it.skip("lstrip strips whitespace from the left of the string", () => { /* fixture-dependent */ });
-  it.skip("rstrip strips whitespace from the right of the string", () => { /* fixture-dependent */ });
-  it.skip("strip strips whitespace", () => { /* fixture-dependent */ });
-  it.skip("stripping whitespace leaves whitespace within the string intact", () => { /* fixture-dependent */ });
-  it.skip("size returns characters instead of bytes", () => { /* fixture-dependent */ });
-  it.skip("reverse reverses characters", () => { /* fixture-dependent */ });
-  it.skip("reverse should work with normalized strings", () => { /* fixture-dependent */ });
-  it.skip("slice should take character offsets", () => { /* fixture-dependent */ });
-  it.skip("slice bang returns sliced out substring", () => { /* fixture-dependent */ });
-  it.skip("slice bang returns nil on out of bound arguments", () => { /* fixture-dependent */ });
-  it.skip("slice bang removes the slice from the receiver", () => { /* fixture-dependent */ });
-  it.skip("slice bang returns nil and does not modify receiver if out of bounds", () => { /* fixture-dependent */ });
-  it.skip("slice should throw exceptions on invalid arguments", () => { /* fixture-dependent */ });
-  it.skip("ord should return unicode value for first character", () => { /* fixture-dependent */ });
-  it.skip("upcase should upcase ascii characters", () => { /* fixture-dependent */ });
-  it.skip("downcase should downcase ascii characters", () => { /* fixture-dependent */ });
-  it.skip("swapcase should swap ascii characters", () => { /* fixture-dependent */ });
-  it.skip("capitalize should work on ascii characters", () => { /* fixture-dependent */ });
-  it.skip("titleize should work on ascii characters", () => { /* fixture-dependent */ });
-  it.skip("respond to knows which methods the proxy responds to", () => { /* fixture-dependent */ });
-  it.skip("method works for proxyed methods", () => { /* fixture-dependent */ });
-  it.skip("acts like string", () => { /* fixture-dependent */ });
+  it.skip("split should return an array of chars instances", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tidy bytes bang should return self", () => {
+    /* fixture-dependent */
+  });
+  it.skip("tidy bytes bang should change wrapped string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("unicode string should have utf8 encoding", () => {
+    /* fixture-dependent */
+  });
+  it.skip("identity", () => {
+    /* fixture-dependent */
+  });
+  it.skip("string methods are chainable", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should be equal to the wrapped string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should not be equal to an other string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("sortability", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should return character offset for regexp matches", () => {
+    /* fixture-dependent */
+  });
+  it.skip("match should return boolean for regexp match", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should use character offsets for insert offsets", () => {
+    /* fixture-dependent */
+  });
+  it.skip("insert should be destructive", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should know if one includes the other", () => {
+    /* fixture-dependent */
+  });
+  it.skip("include raises when nil is passed", () => {
+    /* fixture-dependent */
+  });
+  it.skip("index should return character offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rindex should return character offset", () => {
+    /* fixture-dependent */
+  });
+  it.skip("indexed insert should take character offsets", () => {
+    /* fixture-dependent */
+  });
+  it.skip("indexed insert should raise on index overflow", () => {
+    /* fixture-dependent */
+  });
+  it.skip("indexed insert should raise on range overflow", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rjust should raise argument errors on bad arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rjust should count characters instead of bytes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("ljust should raise argument errors on bad arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("ljust should count characters instead of bytes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("center should raise argument errors on bad arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("center should count characters instead of bytes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("lstrip strips whitespace from the left of the string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("rstrip strips whitespace from the right of the string", () => {
+    /* fixture-dependent */
+  });
+  it.skip("strip strips whitespace", () => {
+    /* fixture-dependent */
+  });
+  it.skip("stripping whitespace leaves whitespace within the string intact", () => {
+    /* fixture-dependent */
+  });
+  it.skip("size returns characters instead of bytes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("reverse reverses characters", () => {
+    /* fixture-dependent */
+  });
+  it.skip("reverse should work with normalized strings", () => {
+    /* fixture-dependent */
+  });
+  it.skip("slice should take character offsets", () => {
+    /* fixture-dependent */
+  });
+  it.skip("slice bang returns sliced out substring", () => {
+    /* fixture-dependent */
+  });
+  it.skip("slice bang returns nil on out of bound arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("slice bang removes the slice from the receiver", () => {
+    /* fixture-dependent */
+  });
+  it.skip("slice bang returns nil and does not modify receiver if out of bounds", () => {
+    /* fixture-dependent */
+  });
+  it.skip("slice should throw exceptions on invalid arguments", () => {
+    /* fixture-dependent */
+  });
+  it.skip("ord should return unicode value for first character", () => {
+    /* fixture-dependent */
+  });
+  it.skip("upcase should upcase ascii characters", () => {
+    /* fixture-dependent */
+  });
+  it.skip("downcase should downcase ascii characters", () => {
+    /* fixture-dependent */
+  });
+  it.skip("swapcase should swap ascii characters", () => {
+    /* fixture-dependent */
+  });
+  it.skip("capitalize should work on ascii characters", () => {
+    /* fixture-dependent */
+  });
+  it.skip("titleize should work on ascii characters", () => {
+    /* fixture-dependent */
+  });
+  it.skip("respond to knows which methods the proxy responds to", () => {
+    /* fixture-dependent */
+  });
+  it.skip("method works for proxyed methods", () => {
+    /* fixture-dependent */
+  });
+  it.skip("acts like string", () => {
+    /* fixture-dependent */
+  });
 });

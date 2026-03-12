@@ -4,9 +4,7 @@ export {
   TemplateHandlerRegistry,
 } from "./template-handler.js";
 
-export {
-  type Template,
-} from "./template.js";
+export { type Template } from "./template.js";
 
 export {
   type TemplateResolver,
@@ -14,10 +12,7 @@ export {
   InMemoryResolver,
 } from "./template-resolver.js";
 
-export {
-  LookupContext,
-  MissingTemplate,
-} from "./lookup-context.js";
+export { LookupContext, MissingTemplate } from "./lookup-context.js";
 
 export {
   Renderer,
@@ -25,6 +20,4 @@ export {
   type RenderOptions as RendererOptions,
 } from "./renderer.js";
 
-export {
-  EjsHandler,
-} from "./ejs-handler.js";
+export { EjsHandler } from "./ejs-handler.js";

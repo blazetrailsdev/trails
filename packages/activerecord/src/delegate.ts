@@ -15,7 +15,7 @@ import type { AssociationDefinition } from "./associations.js";
 export function delegate(
   modelClass: typeof Base,
   methods: string[],
-  options: { to: string; prefix?: boolean | string }
+  options: { to: string; prefix?: boolean | string },
 ): void {
   const assocName = options.to;
 

@@ -12,7 +12,15 @@ function validEnv(overrides: Record<string, any> = {}): Record<string, any> {
     PATH_INFO: "/",
     SCRIPT_NAME: "",
     "rack.url_scheme": "http",
-    "rack.input": { read() { return ""; }, gets() { return null; }, each() {} },
+    "rack.input": {
+      read() {
+        return "";
+      },
+      gets() {
+        return null;
+      },
+      each() {},
+    },
     "rack.errors": { puts() {}, write() {}, flush() {} },
     ...overrides,
   };
@@ -27,7 +35,9 @@ describe("Rack::Lint", () => {
   });
 
   it("notice fatal errors", async () => {
-    const app = new Lint(async () => { throw new Error("fatal"); });
+    const app = new Lint(async () => {
+      throw new Error("fatal");
+    });
     await expect(app.call(validEnv())).rejects.toThrow("fatal");
   });
 
@@ -116,7 +126,15 @@ describe("Rack::Lint", () => {
   });
 
   it("responds to to_path", async () => {
-    const body = { toPath() { return "/tmp/file"; }, forEach(cb: any) { cb("data"); }, close() {} };
+    const body = {
+      toPath() {
+        return "/tmp/file";
+      },
+      forEach(cb: any) {
+        cb("data");
+      },
+      close() {},
+    };
     const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
     const [, , b] = await app.call(validEnv());
     expect(b).toBeDefined();
@@ -125,8 +143,12 @@ describe("Rack::Lint", () => {
   it("handles body.to_path returning nil", async () => {
     // A body with to_path that returns null should still work
     const body = {
-      forEach(cb: any) { cb("ok"); },
-      toPath() { return null; },
+      forEach(cb: any) {
+        cb("ok");
+      },
+      toPath() {
+        return null;
+      },
     };
     const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
     const [status, , b] = await app.call(validEnv());
@@ -148,7 +170,14 @@ describe("Rack::Lint", () => {
 
   it("can call close", async () => {
     let closed = false;
-    const body = { forEach(cb: any) { cb("ok"); }, close() { closed = true; } };
+    const body = {
+      forEach(cb: any) {
+        cb("ok");
+      },
+      close() {
+        closed = true;
+      },
+    };
     const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
     const [, , b] = await app.call(validEnv());
     if (b && typeof b.close === "function") b.close();
@@ -222,7 +251,11 @@ describe("Rack::Lint", () => {
 
   it("notices when the response headers don't have a valid rack.hijack callback", async () => {
     // Response rack.hijack should be callable if present
-    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.hijack": "not-callable" }, ["OK"]]);
+    const app = new Lint(async () => [
+      200,
+      { "content-type": "text/plain", "rack.hijack": "not-callable" },
+      ["OK"],
+    ]);
     const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) });
     // Our lint focuses on env validation; response header hijack is less strict
     const [status] = await app.call(env);
@@ -232,7 +265,14 @@ describe("Rack::Lint", () => {
   it("notices when the response headers has a rack.hijack callback with hijacking being supported", async () => {
     // When hijacking is supported, normal responses should still work
     const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-    const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => ({ read() { return ""; } }) });
+    const env = validEnv({
+      "rack.hijack?": true,
+      "rack.hijack": () => ({
+        read() {
+          return "";
+        },
+      }),
+    });
     const [status] = await app.call(env);
     expect(status).toBe(200);
   });
@@ -244,17 +284,29 @@ describe("Rack::Lint", () => {
   });
 
   it("notices when the response protocol is not an array of strings", async () => {
-    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": "h2" }, ["OK"]]);
+    const app = new Lint(async () => [
+      200,
+      { "content-type": "text/plain", "rack.protocol": "h2" },
+      ["OK"],
+    ]);
     await expect(app.call(validEnv())).rejects.toThrow(LintError);
   });
 
   it("notices when the response protocol is specified in the response but not in the request", async () => {
-    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": ["h2"] as any }, ["OK"]]);
+    const app = new Lint(async () => [
+      200,
+      { "content-type": "text/plain", "rack.protocol": ["h2"] as any },
+      ["OK"],
+    ]);
     await expect(app.call(validEnv())).rejects.toThrow(LintError);
   });
 
   it("pass valid rack.protocol", async () => {
-    const app = new Lint(async () => [200, { "content-type": "text/plain", "rack.protocol": ["h2"] as any }, ["OK"]]);
+    const app = new Lint(async () => [
+      200,
+      { "content-type": "text/plain", "rack.protocol": ["h2"] as any },
+      ["OK"],
+    ]);
     const env = validEnv({ "rack.protocol": ["h2"] });
     const [status] = await app.call(env);
     expect(status).toBe(200);

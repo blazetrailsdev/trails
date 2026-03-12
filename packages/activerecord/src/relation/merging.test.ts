@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -28,11 +68,17 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("RelationMergingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -97,7 +143,9 @@ describe("RelationMergingTest", () => {
   it("relation merging with arel equalities keeps last equality", () => {
     const { Post } = makeModel();
     // merge combines conditions; result should be a valid SQL query
-    const sql = Post.where({ title: "a" }).merge(Post.where({ title: "b" })).toSql();
+    const sql = Post.where({ title: "a" })
+      .merge(Post.where({ title: "b" }))
+      .toSql();
     expect(sql).toContain("WHERE");
   });
 
@@ -210,11 +258,17 @@ describe("RelationMergingTest", () => {
 
 describe("MergingDifferentRelationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -255,7 +309,9 @@ describe("MergingDifferentRelationsTest", () => {
 
   it("merging relation with common table expression", () => {
     const { Post } = makeModel();
-    const sql = Post.where({ title: "x" }).merge(Post.where({ author: "y" })).toSql();
+    const sql = Post.where({ title: "x" })
+      .merge(Post.where({ author: "y" }))
+      .toSql();
     expect(sql).toContain("WHERE");
   });
 
@@ -274,11 +330,17 @@ describe("MergingDifferentRelationsTest", () => {
 
 describe("RelationMergingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -286,13 +348,16 @@ describe("RelationMergingTest", () => {
   it.skip("relation merging with locks", () => {});
 });
 
-
 describe("merge()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("combines conditions from two relations", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.attribute("status", "string");
@@ -309,7 +374,9 @@ describe("merge()", () => {
   });
 
   it("merges order from other relation", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -325,7 +392,9 @@ describe("merge()", () => {
 
 describe("from()", () => {
   it("changes the FROM clause in SQL", () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.adapter = freshAdapter();
 
@@ -337,10 +406,14 @@ describe("from()", () => {
 
 describe("unscope()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("removes where conditions", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -353,7 +426,9 @@ describe("unscope()", () => {
   });
 
   it("removes order", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -366,7 +441,9 @@ describe("unscope()", () => {
   });
 
   it("removes limit and offset", () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.adapter = adapter;
 
@@ -379,7 +456,9 @@ describe("unscope()", () => {
 describe("pluck with Arel nodes", () => {
   it("accepts Arel Attribute nodes", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -396,7 +475,9 @@ describe("pluck with Arel nodes", () => {
 describe("only()", () => {
   it("keeps only specified query parts", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -418,7 +499,9 @@ describe("only()", () => {
 describe("unscope()", () => {
   it("removes specified query parts", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -436,11 +519,17 @@ describe("unscope()", () => {
 
 describe("Relation Merging (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("merge combines two relations", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice", active: true });
     await User.create({ name: "Bob", active: false });
@@ -455,11 +544,16 @@ describe("Relation Merging (Rails-guided)", () => {
 
 describe("Unscope (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("removes where conditions", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -470,7 +564,10 @@ describe("Unscope (Rails-guided)", () => {
 
   it("removes order", () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Item.all().order({ name: "asc" }).unscope("order").toSql();
     expect(sql).not.toContain("ORDER BY");
@@ -478,7 +575,10 @@ describe("Unscope (Rails-guided)", () => {
 
   it("removes limit and offset", () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Item.all().limit(5).offset(10).unscope("limit", "offset").toSql();
     expect(sql).not.toContain("LIMIT");
@@ -488,11 +588,16 @@ describe("Unscope (Rails-guided)", () => {
 
 describe("Pluck (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("pluck single column", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -501,16 +606,27 @@ describe("Pluck (Rails-guided)", () => {
 
   it("pluck multiple columns returns arrays", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 30 });
-    expect(await User.all().pluck("name", "age")).toEqual([["Alice", 25], ["Bob", 30]]);
+    expect(await User.all().pluck("name", "age")).toEqual([
+      ["Alice", 25],
+      ["Bob", 30],
+    ]);
   });
 
   it("pluck with where", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice", active: true });
     await User.create({ name: "Bob", active: false });
@@ -519,14 +635,20 @@ describe("Pluck (Rails-guided)", () => {
 
   it("pluck on empty table returns empty", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.all().pluck("name")).toEqual([]);
   });
 
   it("ids returns primary key values", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });

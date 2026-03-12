@@ -48,7 +48,7 @@ export class MessageEncryptor {
   constructor(
     secret: string | Buffer,
     signSecretOrOptions?: string | Buffer | MessageEncryptorOptions,
-    options?: MessageEncryptorOptions
+    options?: MessageEncryptorOptions,
   ) {
     let signSecret: string | Buffer | undefined;
     let opts: MessageEncryptorOptions = {};
@@ -68,14 +68,10 @@ export class MessageEncryptor {
     this.digest = opts.digest ?? "sha1";
     this.serializer = opts.serializer ?? JSONSerializer;
 
-    this.secret =
-      typeof secret === "string" ? Buffer.from(secret) : secret;
+    this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
 
     if (signSecret) {
-      this.signSecret =
-        typeof signSecret === "string"
-          ? Buffer.from(signSecret)
-          : signSecret;
+      this.signSecret = typeof signSecret === "string" ? Buffer.from(signSecret) : signSecret;
     } else {
       this.signSecret = this.secret;
     }
@@ -114,10 +110,7 @@ export class MessageEncryptor {
     const iv = randomBytes(ivLength);
 
     const cipher = createCipheriv(this.cipher, key, iv);
-    const encrypted = Buffer.concat([
-      cipher.update(plaintext, "utf8"),
-      cipher.final(),
-    ]);
+    const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
 
     const encryptedB64 = encrypted.toString("base64");
     const ivB64 = iv.toString("base64");
@@ -146,10 +139,7 @@ export class MessageEncryptor {
 
     try {
       const decipher = createDecipheriv(this.cipher, key, iv);
-      const decrypted = Buffer.concat([
-        decipher.update(encryptedBuf),
-        decipher.final(),
-      ]);
+      const decrypted = Buffer.concat([decipher.update(encryptedBuf), decipher.final()]);
       return decrypted.toString("utf8");
     } catch {
       throw new InvalidMessage("Decryption failed");

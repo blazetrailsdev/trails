@@ -51,10 +51,7 @@ export class ErrorReporter {
   }
 
   /** disable — temporarily disables a subscriber while running fn. */
-  disable<T>(
-    subscriber: ErrorSubscriber | ErrorSubscriber[],
-    fn: () => T
-  ): T {
+  disable<T>(subscriber: ErrorSubscriber | ErrorSubscriber[], fn: () => T): T {
     const disabled = Array.isArray(subscriber) ? subscriber : [subscriber];
     const original = [...this.subscribers];
     this.subscribers = this.subscribers.filter((s) => !disabled.includes(s));
@@ -77,7 +74,7 @@ export class ErrorReporter {
   handle<T>(
     errorClassesOrFn: Array<new (...a: any[]) => Error> | (() => T),
     optionsOrFn?: HandleOptions | (() => T),
-    fn?: () => T
+    fn?: () => T,
   ): T | undefined {
     let errorClasses: Array<new (...a: any[]) => Error>;
     let options: HandleOptions;
@@ -126,7 +123,7 @@ export class ErrorReporter {
   record<T>(
     errorClassesOrFn: Array<new (...a: any[]) => Error> | (() => T),
     optionsOrFn?: RecordOptions | (() => T),
-    fn?: () => T
+    fn?: () => T,
   ): T {
     let errorClasses: Array<new (...a: any[]) => Error>;
     let options: RecordOptions;
@@ -186,7 +183,7 @@ export class ErrorReporter {
       severity?: ErrorSeverity;
       context?: ErrorContext;
       source?: string;
-    } = {}
+    } = {},
   ): void {
     // Don't report the same error twice
     if (this.reportedErrors.has(error)) return;
@@ -205,9 +202,7 @@ export class ErrorReporter {
         subscriber.report(reportedError);
       } catch (subscriberError) {
         if (this.logger) {
-          this.logger.error(
-            `ErrorReporter subscriber raised: ${subscriberError}`
-          );
+          this.logger.error(`ErrorReporter subscriber raised: ${subscriberError}`);
         } else {
           throw subscriberError;
         }

@@ -132,12 +132,16 @@ describe("Concern", () => {
 
   it("prepend: false does not save _super_ method", () => {
     class User {
-      greet() { return "hello"; }
+      greet() {
+        return "hello";
+      }
     }
 
     const Override = concern({
       instanceMethods: {
-        greet() { return "overridden"; },
+        greet() {
+          return "overridden";
+        },
       },
     });
 
@@ -150,16 +154,22 @@ describe("Concern", () => {
   it("can include multiple concerns each providing different methods", () => {
     const Serializable = concern({
       instanceMethods: {
-        serialize() { return JSON.stringify({ type: "User" }); },
+        serialize() {
+          return JSON.stringify({ type: "User" });
+        },
       },
     });
 
     const Auditable = concern({
       instanceMethods: {
-        auditLog() { return "audit"; },
+        auditLog() {
+          return "audit";
+        },
       },
       classMethods: {
-        auditedFields() { return ["name", "email"]; },
+        auditedFields() {
+          return ["name", "email"];
+        },
       },
     });
 

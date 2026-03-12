@@ -21,11 +21,7 @@ import type { TemplateHandler, RenderContext } from "./template-handler.js";
 export class EjsHandler implements TemplateHandler {
   readonly extensions = ["ejs"];
 
-  render(
-    source: string,
-    locals: Record<string, unknown>,
-    context: RenderContext
-  ): string {
+  render(source: string, locals: Record<string, unknown>, context: RenderContext): string {
     return renderEjs(source, { ...locals, ...contextLocals(context) });
   }
 }
@@ -45,10 +41,7 @@ function contextLocals(context: RenderContext): Record<string, unknown> {
 /**
  * Minimal EJS renderer. No external dependency needed.
  */
-function renderEjs(
-  template: string,
-  data: Record<string, unknown>
-): string {
+function renderEjs(template: string, data: Record<string, unknown>): string {
   const compiled = compileEjs(template);
   return compiled(data);
 }

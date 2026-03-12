@@ -14,6 +14,7 @@ Add it as a workspace dependency of `activemodel` and `activerecord`.
 Currently duplicated in `base.ts`, `associations.ts`, and `naming.ts`.
 
 ### Methods to implement
+
 - `pluralize(word)` — `"user"` → `"users"`
 - `singularize(word)` — `"users"` → `"user"`
 - `camelize(term)` — `"active_record"` → `"ActiveRecord"`
@@ -31,6 +32,7 @@ Currently duplicated in `base.ts`, `associations.ts`, and `naming.ts`.
 - `ordinal(number)` / `ordinalize(number)` — `1` → `"st"` / `"1st"`
 
 ### Inflection rules
+
 - Default English inflection rules (matching Rails defaults)
 - `ActiveSupport::Inflector.inflections` API for custom rules
 - Irregulars: `"person"` ↔ `"people"`, `"child"` ↔ `"children"`, etc.
@@ -38,11 +40,13 @@ Currently duplicated in `base.ts`, `associations.ts`, and `naming.ts`.
 - Acronyms: `"HTML"`, `"API"`, `"REST"`, etc.
 
 ### Migration path
+
 - Replace inline `pluralize`/`singularize`/etc. in `base.ts` and
   `associations.ts` with imports from `@rails-ts/activesupport`
 - Replace inline inflection in `naming.ts`
 
 ### Key Rails reference
+
 - `activesupport/lib/active_support/inflector/`
 - `activesupport/test/inflector_test.rb` (~150 tests)
 - `activesupport/test/inflector_test_cases.rb` (test fixtures)
@@ -50,12 +54,15 @@ Currently duplicated in `base.ts`, `associations.ts`, and `naming.ts`.
 ## String extensions
 
 ### `blank?` / `present?`
+
 In TS, these become utility functions or a wrapper:
+
 - `isBlank(value)` — `null`, `undefined`, `""`, `"  "` → `true`
 - `isPresent(value)` — opposite of `isBlank`
 - `presence(value)` — returns value if present, else `undefined`
 
 ### String manipulation
+
 - `truncate(string, length, options)` — with `:omission`
 - `truncateWords(string, count, options)`
 - `squish(string)` — strip + collapse whitespace
@@ -63,4 +70,5 @@ In TS, these become utility functions or a wrapper:
 - `safeConstantize(string)` — returns undefined instead of throwing
 
 ### Key Rails reference
+
 - `activesupport/test/core_ext/string_ext_test.rb`

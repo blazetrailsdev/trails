@@ -88,7 +88,10 @@ describe("ActionDispatch::Static", () => {
 
   it("serves file with same name before index in directory", async () => {
     const mw = new Static(dynamicApp, { root: tmpDir });
-    const [status, _, body] = await mw.call({ PATH_INFO: "/subdir/page.html", REQUEST_METHOD: "GET" });
+    const [status, _, body] = await mw.call({
+      PATH_INFO: "/subdir/page.html",
+      REQUEST_METHOD: "GET",
+    });
     expect(status).toBe(200);
     expect(await bodyToString(body)).toContain("page");
   });

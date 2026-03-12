@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Table, sql, star, SelectManager, InsertManager, UpdateManager, DeleteManager, Nodes, Visitors, Collectors } from "./index.js";
+import {
+  Table,
+  sql,
+  star,
+  SelectManager,
+  InsertManager,
+  UpdateManager,
+  DeleteManager,
+  Nodes,
+  Visitors,
+  Collectors,
+} from "./index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -33,7 +44,7 @@ describe("Arel", () => {
       mgr.order(users.get("created_at").asc());
       mgr.take(10);
       expect(mgr.toSql()).toBe(
-        'DELETE FROM "users" WHERE "users"."active" = FALSE ORDER BY "users"."created_at" ASC LIMIT 10'
+        'DELETE FROM "users" WHERE "users"."active" = FALSE ORDER BY "users"."created_at" ASC LIMIT 10',
       );
     });
 

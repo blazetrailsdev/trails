@@ -1,4 +1,10 @@
-import { REQUEST_METHOD, POST, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS, RACK_INPUT } from "./constants.js";
+import {
+  REQUEST_METHOD,
+  POST,
+  RACK_METHODOVERRIDE_ORIGINAL_METHOD,
+  RACK_ERRORS,
+  RACK_INPUT,
+} from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { parseNestedQuery } from "./utils.js";
 
@@ -53,7 +59,8 @@ export class MethodOverride {
     try {
       const input = env[RACK_INPUT];
       if (!input) return null;
-      const body = typeof input.read === "function" ? input.read() : typeof input === "string" ? input : "";
+      const body =
+        typeof input.read === "function" ? input.read() : typeof input === "string" ? input : "";
       if (typeof body !== "string") return null;
 
       if (isMultipart) {
@@ -78,9 +85,11 @@ export class MethodOverride {
       return params[METHOD_OVERRIDE_PARAM_KEY] || null;
     } catch (e: any) {
       const errors = env[RACK_ERRORS];
-      const msg = e.message?.includes("too deep") ? "Invalid or incomplete POST params" :
-                  e.message?.includes("Invalid") ? "Invalid or incomplete POST params" :
-                  "Bad request content body";
+      const msg = e.message?.includes("too deep")
+        ? "Invalid or incomplete POST params"
+        : e.message?.includes("Invalid")
+          ? "Invalid or incomplete POST params"
+          : "Bad request content body";
       if (errors && typeof errors.puts === "function") {
         errors.puts(msg);
       } else if (errors && typeof errors.write === "function") {

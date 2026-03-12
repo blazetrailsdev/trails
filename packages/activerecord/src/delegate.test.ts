@@ -18,12 +18,24 @@ describe("Delegate (Rails-guided)", () => {
   // Rails: test "delegate to association"
   it("delegates attribute reads to a belongs_to association", async () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("city", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("city", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Author);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author");
     delegate(Post, ["name", "city"], { to: "author" });
@@ -38,12 +50,22 @@ describe("Delegate (Rails-guided)", () => {
   // Rails: test "delegate with prefix"
   it("delegate with prefix: true prefixes method names", async () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Author);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author");
     delegate(Post, ["name"], { to: "author", prefix: true });
@@ -57,12 +79,22 @@ describe("Delegate (Rails-guided)", () => {
   // Rails: test "delegate returns null when association is nil"
   it("returns null when the association target is nil", async () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Author);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author");
     delegate(Post, ["name"], { to: "author" });

@@ -158,7 +158,9 @@ describe("ActionController::Base rendering", () => {
       }
     }
     const c = new DoubleController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
   });
 
   it("renderToString does not commit the response", async () => {
@@ -223,7 +225,9 @@ describe("ActionController::Base redirecting", () => {
       }
     }
     const c = new DoubleRedirectController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
   });
 
   it("redirectBack uses referer", async () => {
@@ -274,15 +278,23 @@ describe("ActionController::Base flash", () => {
 // ==========================================================================
 describe("ActionController::Base rescue_from", () => {
   it("rescues from a specific error class", async () => {
-    class CustomError extends Error { name = "CustomError"; }
+    class CustomError extends Error {
+      name = "CustomError";
+    }
     class RescueController extends Base {
-      async index() { throw new CustomError("boom"); }
+      async index() {
+        throw new CustomError("boom");
+      }
     }
     let rescued = false;
     class RescueController2 extends Base {
-      async index() { throw new CustomError("boom"); }
+      async index() {
+        throw new CustomError("boom");
+      }
     }
-    RescueController2.rescueFrom(CustomError, () => { rescued = true; });
+    RescueController2.rescueFrom(CustomError, () => {
+      rescued = true;
+    });
 
     const c = new RescueController2();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -290,10 +302,16 @@ describe("ActionController::Base rescue_from", () => {
   });
 
   it("does not rescue unregistered errors", async () => {
-    class SpecificError extends Error { name = "SpecificError"; }
-    class OtherError extends Error { name = "OtherError"; }
+    class SpecificError extends Error {
+      name = "SpecificError";
+    }
+    class OtherError extends Error {
+      name = "OtherError";
+    }
     class NoRescueController extends Base {
-      async index() { throw new OtherError("nope"); }
+      async index() {
+        throw new OtherError("nope");
+      }
     }
     NoRescueController.rescueFrom(SpecificError, () => {});
 
@@ -302,12 +320,18 @@ describe("ActionController::Base rescue_from", () => {
   });
 
   it("child inherits rescue handlers", async () => {
-    class AppError extends Error { name = "AppError"; }
+    class AppError extends Error {
+      name = "AppError";
+    }
     class ParentRescue extends Base {
-      async index() { throw new AppError("parent"); }
+      async index() {
+        throw new AppError("parent");
+      }
     }
     let handled = false;
-    ParentRescue.rescueFrom(AppError, () => { handled = true; });
+    ParentRescue.rescueFrom(AppError, () => {
+      handled = true;
+    });
 
     class ChildRescue extends ParentRescue {}
 
@@ -488,7 +512,9 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiDoubleController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
   });
 
   it("redirectTo sets location and empty body", async () => {
@@ -523,7 +549,9 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiDoubleRedController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(DoubleRenderError);
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
   });
 });
 

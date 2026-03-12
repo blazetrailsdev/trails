@@ -36,10 +36,7 @@ export function tryCall<T extends object>(
  * Block form — pass a callback that receives the object.
  * Returns undefined if obj is null/undefined.
  */
-export function tryWith<T, R>(
-  obj: T | null | undefined,
-  fn: (obj: T) => R,
-): R | undefined {
+export function tryWith<T, R>(obj: T | null | undefined, fn: (obj: T) => R): R | undefined {
   if (obj == null) return undefined;
   return fn(obj);
 }

@@ -3,7 +3,9 @@ import { CookieStore, CookieOverflow, type SessionData } from "./cookie-store.js
 
 const SECRET = "a]ekdlFa9/4|BjRU*OJ-3o5qK!Z+]WI2"; // 32+ chars
 
-function makeStore(opts: Partial<Parameters<typeof CookieStore.prototype.save>[0]> & Record<string, unknown> = {}) {
+function makeStore(
+  opts: Partial<Parameters<typeof CookieStore.prototype.save>[0]> & Record<string, unknown> = {},
+) {
   return new CookieStore({ secret: SECRET, ...opts });
 }
 

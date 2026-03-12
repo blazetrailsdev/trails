@@ -1,5 +1,37 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Relation, Range, transaction, savepoint, CollectionProxy, association, MigrationRunner, defineEnum, readEnumValue, enableSti, hasSecurePassword, store, loadHabtm, delegate, RecordNotFound, RecordInvalid, StaleObjectError, ReadOnlyRecord, SoleRecordExceeded, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, acceptsNestedAttributesFor, assignNestedAttributes, hasSecureToken, composedOf, serialize, registerModel } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  savepoint,
+  CollectionProxy,
+  association,
+  MigrationRunner,
+  defineEnum,
+  readEnumValue,
+  enableSti,
+  hasSecurePassword,
+  store,
+  loadHabtm,
+  delegate,
+  RecordNotFound,
+  RecordInvalid,
+  StaleObjectError,
+  ReadOnlyRecord,
+  SoleRecordExceeded,
+  StrictLoadingViolationError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  hasSecureToken,
+  composedOf,
+  serialize,
+  registerModel,
+} from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration, TableDefinition, Schema } from "./migration.js";
@@ -19,7 +51,6 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 // -- Phase 2000: Core --
-
 
 describe("encrypts()", () => {
   it("encrypts and decrypts attributes transparently", async () => {

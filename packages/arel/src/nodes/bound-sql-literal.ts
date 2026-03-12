@@ -17,7 +17,7 @@ export class BoundSqlLiteral extends Node {
   constructor(
     sql: string,
     positionalBinds: unknown[] = [],
-    namedBinds: Record<string, unknown> = {}
+    namedBinds: Record<string, unknown> = {},
   ) {
     super();
     this.sql = sql;
@@ -62,7 +62,7 @@ export class BoundSqlLiteral extends Node {
       const count = segments.length - 1;
       if (this.positionalBinds.length !== count) {
         throw new Error(
-          `Wrong number of bind variables (${this.positionalBinds.length} for ${count})`
+          `Wrong number of bind variables (${this.positionalBinds.length} for ${count})`,
         );
       }
       for (let i = 0; i < segments.length; i++) {

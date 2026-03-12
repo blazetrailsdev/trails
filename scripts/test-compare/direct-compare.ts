@@ -41,9 +41,7 @@ function normalize(s: string): string {
 
 function main() {
   const args = process.argv.slice(2);
-  const filterPkg = args.includes("--package")
-    ? args[args.indexOf("--package") + 1]
-    : null;
+  const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
   const showMissing = args.includes("--missing");
   const jsonOutput = args.includes("--json");
 
@@ -135,18 +133,20 @@ function main() {
   // Print table
   for (const pkg of results) {
     console.log(`\n${"=".repeat(70)}`);
-    console.log(`  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRuby} tests (${pkg.percent}%)`);
+    console.log(
+      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRuby} tests (${pkg.percent}%)`,
+    );
     console.log(`${"=".repeat(70)}\n`);
 
     console.log(
-      `  ${"File".padEnd(50)} ${"Match".padStart(7)} ${"Total".padStart(7)} ${"  %".padStart(6)}`
+      `  ${"File".padEnd(50)} ${"Match".padStart(7)} ${"Total".padStart(7)} ${"  %".padStart(6)}`,
     );
     console.log(`  ${"-".repeat(50)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(6)}`);
 
     for (const f of pkg.files) {
       const bar = f.percent === 100 ? " ✓" : "";
       console.log(
-        `  ${f.rubyFile.padEnd(50)} ${String(f.matchedCount).padStart(7)} ${String(f.total).padStart(7)} ${(f.percent + "%").padStart(6)}${bar}`
+        `  ${f.rubyFile.padEnd(50)} ${String(f.matchedCount).padStart(7)} ${String(f.total).padStart(7)} ${(f.percent + "%").padStart(6)}${bar}`,
       );
 
       if (showMissing && f.missing.length > 0) {

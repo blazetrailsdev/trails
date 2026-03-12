@@ -35,11 +35,21 @@ class RackLogger {
     this.output = output;
   }
 
-  debug(msg: string): void { this.log("DEBUG", msg); }
-  info(msg: string): void { this.log("INFO", msg); }
-  warn(msg: string): void { this.log("WARN", msg); }
-  error(msg: string): void { this.log("ERROR", msg); }
-  fatal(msg: string): void { this.log("FATAL", msg); }
+  debug(msg: string): void {
+    this.log("DEBUG", msg);
+  }
+  info(msg: string): void {
+    this.log("INFO", msg);
+  }
+  warn(msg: string): void {
+    this.log("WARN", msg);
+  }
+  error(msg: string): void {
+    this.log("ERROR", msg);
+  }
+  fatal(msg: string): void {
+    this.log("FATAL", msg);
+  }
 
   private log(level: string, msg: string): void {
     if (this.output) {

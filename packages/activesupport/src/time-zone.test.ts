@@ -54,9 +54,9 @@ describe("TimeZoneTest", () => {
   it("from integer to map", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)");
     const offset = eastern.utcOffset;
-    const zones = TimeZone.all().filter(z => z.utcOffset === offset);
+    const zones = TimeZone.all().filter((z) => z.utcOffset === offset);
     expect(zones.length).toBeGreaterThan(0);
-    expect(zones.some(z => z.name === "Eastern Time (US & Canada)")).toBe(true);
+    expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
   });
 
   it.skip("from duration to map", () => {});
@@ -350,8 +350,8 @@ describe("TimeZoneTest", () => {
     const zones = TimeZone.all();
     expect(zones.length).toBeGreaterThan(100);
     // Verify we get a reasonable set of zones
-    expect(zones.some(z => z.name === "UTC")).toBe(true);
-    expect(zones.some(z => z.name === "Eastern Time (US & Canada)")).toBe(true);
+    expect(zones.some((z) => z.name === "UTC")).toBe(true);
+    expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
   });
 
   it.skip("all uninfluenced by time zone lookups delegated to tzinfo", () => {});

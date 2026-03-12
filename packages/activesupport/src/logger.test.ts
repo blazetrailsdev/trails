@@ -66,11 +66,20 @@ describe("LoggerTest", () => {
   it("should not evaluate block if message wont be logged", () => {
     logger.level = Logger.INFO;
     let evaluated = false;
-    logger.add(Logger.DEBUG, (() => { evaluated = true; return "x"; })());
+    logger.add(
+      Logger.DEBUG,
+      (() => {
+        evaluated = true;
+        return "x";
+      })(),
+    );
     // Message was evaluated above in the call expression (JS eagerness).
     // Better test: use log() with a lambda
     evaluated = false;
-    logger.log(Logger.DEBUG, () => { evaluated = true; return "x"; });
+    logger.log(Logger.DEBUG, () => {
+      evaluated = true;
+      return "x";
+    });
     expect(evaluated).toBe(false);
   });
 
@@ -314,8 +323,12 @@ describe("BroadcastLoggerTest", () => {
     let closed2 = false;
     const l1 = new Logger({ write: () => {} });
     const l2 = new Logger({ write: () => {} });
-    l1.close = () => { closed1 = true; };
-    l2.close = () => { closed2 = true; };
+    l1.close = () => {
+      closed1 = true;
+    };
+    l2.close = () => {
+      closed2 = true;
+    };
     const bl = new BroadcastLogger(l1, l2);
     bl.close();
     expect(closed1).toBe(true);

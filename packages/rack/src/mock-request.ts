@@ -1,35 +1,75 @@
 import {
-  REQUEST_METHOD, SERVER_NAME, SERVER_PORT, SERVER_PROTOCOL,
-  QUERY_STRING, PATH_INFO, RACK_URL_SCHEME, HTTPS, SCRIPT_NAME,
-  RACK_ERRORS, RACK_INPUT, GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS,
+  REQUEST_METHOD,
+  SERVER_NAME,
+  SERVER_PORT,
+  SERVER_PROTOCOL,
+  QUERY_STRING,
+  PATH_INFO,
+  RACK_URL_SCHEME,
+  HTTPS,
+  SCRIPT_NAME,
+  RACK_ERRORS,
+  RACK_INPUT,
+  GET,
+  POST,
+  PUT,
+  PATCH,
+  DELETE,
+  HEAD,
+  OPTIONS,
 } from "./constants.js";
 import { MockResponse } from "./mock-response.js";
 import { buildNestedQuery, parseNestedQuery } from "./utils.js";
 
 export class FatalWarning extends Error {
-  constructor(message: string) { super(message); this.name = "FatalWarning"; }
+  constructor(message: string) {
+    super(message);
+    this.name = "FatalWarning";
+  }
 }
 
 class FatalWarner {
-  puts(warning: string): void { throw new FatalWarning(warning); }
-  write(warning: string): void { throw new FatalWarning(warning); }
+  puts(warning: string): void {
+    throw new FatalWarning(warning);
+  }
+  write(warning: string): void {
+    throw new FatalWarning(warning);
+  }
   flush(): void {}
-  string(): string { return ""; }
+  string(): string {
+    return "";
+  }
 }
 
 class StringIO {
   private _data: string;
   private _closed = false;
-  constructor(data = "") { this._data = data; }
-  read(): string { return this._data; }
-  write(s: string): void { this._data += s; }
-  string(): string { return this._data; }
-  get size(): number { return Buffer.byteLength(this._data); }
-  close(): void { this._closed = true; }
-  get closed(): boolean { return this._closed; }
+  constructor(data = "") {
+    this._data = data;
+  }
+  read(): string {
+    return this._data;
+  }
+  write(s: string): void {
+    this._data += s;
+  }
+  string(): string {
+    return this._data;
+  }
+  get size(): number {
+    return Buffer.byteLength(this._data);
+  }
+  close(): void {
+    this._closed = true;
+  }
+  get closed(): boolean {
+    return this._closed;
+  }
 }
 
-export type RackApp = (env: Record<string, any>) => [number, Record<string, string>, any] | Promise<[number, Record<string, string>, any]>;
+export type RackApp = (
+  env: Record<string, any>,
+) => [number, Record<string, string>, any] | Promise<[number, Record<string, string>, any]>;
 
 export class MockRequest {
   private app: RackApp;

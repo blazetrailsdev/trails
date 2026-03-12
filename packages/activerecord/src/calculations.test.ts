@@ -3,7 +3,43 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { delegate,  Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  delegate,
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +52,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -38,7 +79,10 @@ describe("CalculationsTest", () => {
 
   it("should return nil as average", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const avg = await Account.all().average("credit_limit");
     expect(avg).toBeNull();
@@ -46,7 +90,10 @@ describe("CalculationsTest", () => {
 
   it("should group by field", async () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 1 });
@@ -57,7 +104,11 @@ describe("CalculationsTest", () => {
 
   it("should group by summed field", async () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ firm_id: 1, credit_limit: 100 });
     await Account.create({ firm_id: 1, credit_limit: 200 });
@@ -67,7 +118,10 @@ describe("CalculationsTest", () => {
 
   it("pluck", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -77,7 +131,10 @@ describe("CalculationsTest", () => {
 
   it("ids", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const ids = await Account.all().ids();
@@ -86,7 +143,10 @@ describe("CalculationsTest", () => {
 
   it("ids on relation", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -96,7 +156,10 @@ describe("CalculationsTest", () => {
 
   it("ids with scope", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -106,7 +169,10 @@ describe("CalculationsTest", () => {
 
   it("count with distinct", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 50 });
@@ -116,7 +182,10 @@ describe("CalculationsTest", () => {
 
   it("pick one", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const val = await Account.all().pick("credit_limit");
@@ -125,7 +194,10 @@ describe("CalculationsTest", () => {
 
   it("pick two", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const val = await Account.all().pick("credit_limit");
     expect(val).toBeNull();
@@ -133,7 +205,10 @@ describe("CalculationsTest", () => {
 
   it("count should shortcut with limit zero", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.all().count();
@@ -142,7 +217,10 @@ describe("CalculationsTest", () => {
 
   it("limit should apply before count", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -152,7 +230,10 @@ describe("CalculationsTest", () => {
 
   it("count with reverse order", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.order("credit_limit").count();
@@ -161,7 +242,10 @@ describe("CalculationsTest", () => {
 
   it("no queries for empty relation on average", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const avg = await Account.all().none().average("credit_limit");
     expect(avg).toBeNull();
@@ -169,7 +253,10 @@ describe("CalculationsTest", () => {
 
   it("should calculate against given relation", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -179,7 +266,10 @@ describe("CalculationsTest", () => {
 
   it("should sum scoped field with from", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -189,7 +279,10 @@ describe("CalculationsTest", () => {
 
   it("limit is kept", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.all().limit(5).toSql();
     expect(sql).toContain("LIMIT");
@@ -197,7 +290,10 @@ describe("CalculationsTest", () => {
 
   it("offset is kept", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.all().offset(10).toSql();
     expect(sql).toContain("OFFSET");
@@ -205,7 +301,10 @@ describe("CalculationsTest", () => {
 
   it("limit with offset is kept", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.all().limit(5).offset(10).toSql();
     expect(sql).toContain("LIMIT");
@@ -214,7 +313,10 @@ describe("CalculationsTest", () => {
 
   it("no limit no offset", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.all().toSql();
     expect(sql).not.toContain("LIMIT");
@@ -223,7 +325,10 @@ describe("CalculationsTest", () => {
 
   it("should limit calculation", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Account.create({ credit_limit: i * 10 });
     const result = await Account.all().limit(3).count();
@@ -232,7 +337,10 @@ describe("CalculationsTest", () => {
 
   it("should limit calculation with offset", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Account.create({ credit_limit: i * 10 });
     const result = await Account.all().limit(3).offset(1).count();
@@ -241,7 +349,10 @@ describe("CalculationsTest", () => {
 
   it("no order by when counting all", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     // count should not include ORDER BY
     const sql = Account.all().toSql();
@@ -250,7 +361,10 @@ describe("CalculationsTest", () => {
 
   it("apply distinct in count", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const rel = Account.all().distinct();
     expect(rel.toSql()).toContain("DISTINCT");
@@ -258,7 +372,10 @@ describe("CalculationsTest", () => {
 
   it("distinct count all with custom select and order", () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.select("credit_limit").distinct().order("credit_limit").toSql();
     expect(sql).toContain("DISTINCT");
@@ -266,7 +383,10 @@ describe("CalculationsTest", () => {
 
   it("should group by arel attribute", async () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 2 });
@@ -276,7 +396,11 @@ describe("CalculationsTest", () => {
 
   it("should group by summed field having condition", async () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ firm_id: 1, credit_limit: 100 });
     await Account.create({ firm_id: 1, credit_limit: 200 });
@@ -286,7 +410,10 @@ describe("CalculationsTest", () => {
 
   it("should return decimal average if db returns such", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -296,7 +423,10 @@ describe("CalculationsTest", () => {
 
   it("order should apply before count", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.order("credit_limit").count();
@@ -315,7 +445,10 @@ describe("CalculationsTest", () => {
 
   it("should sum arel attribute", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const sum = await Account.all().sum("credit_limit");
@@ -324,7 +457,10 @@ describe("CalculationsTest", () => {
 
   it("should average arel attribute", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -334,7 +470,10 @@ describe("CalculationsTest", () => {
 
   it("should return zero if sum conditions return nothing", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sum = await Account.where({ credit_limit: 99999 }).sum("credit_limit");
     expect(sum).toBe(0);
@@ -342,7 +481,11 @@ describe("CalculationsTest", () => {
 
   it("should group by summed field with conditions and having", () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.group("firm_id").having("SUM(credit_limit) > 0").toSql();
     expect(sql).toContain("HAVING");
@@ -350,7 +493,10 @@ describe("CalculationsTest", () => {
 
   it("count for a composite primary key model", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.all().count();
@@ -359,7 +505,10 @@ describe("CalculationsTest", () => {
 
   it("should not overshadow enumerable sum", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const sum = await Account.all().sum("credit_limit");
@@ -368,7 +517,10 @@ describe("CalculationsTest", () => {
 
   it("group by count for a composite primary key model", async () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 1 });
@@ -378,7 +530,11 @@ describe("CalculationsTest", () => {
 
   it("should group by multiple fields", () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Account.group("firm_id").toSql();
     expect(sql).toContain("GROUP BY");
@@ -386,7 +542,10 @@ describe("CalculationsTest", () => {
 
   it("limit should apply before count arel attribute", async () => {
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.all().limit(1).count();
@@ -395,7 +554,10 @@ describe("CalculationsTest", () => {
 
   it("should calculate grouped with longer field", async () => {
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     await Account.create({ firm_id: 1 });
     const result = await Account.group("firm_id").count();
@@ -410,9 +572,15 @@ describe("CalculationsTest", () => {
   it("should generate valid sql with joins and group", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
-    const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id").group("firm_id").toSql();
+    const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id")
+      .group("firm_id")
+      .toSql();
     expect(sql).toContain("GROUP BY");
     expect(sql).toContain("INNER JOIN");
   });
@@ -420,7 +588,11 @@ describe("CalculationsTest", () => {
   it("should order by grouped field", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").order("firm_id").toSql();
     expect(sql).toContain("GROUP BY");
@@ -430,7 +602,11 @@ describe("CalculationsTest", () => {
   it("should order by calculation", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").order("SUM(credit_limit) DESC").toSql();
     expect(sql).toContain("ORDER BY");
@@ -440,7 +616,10 @@ describe("CalculationsTest", () => {
   it("distinct count with order and limit and offset", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.distinct().order("credit_limit").limit(5).offset(2).toSql();
     expect(sql).toContain("DISTINCT");
@@ -451,7 +630,11 @@ describe("CalculationsTest", () => {
   it("distinct count with group by and order and limit", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.distinct().group("firm_id").order("firm_id").limit(5).toSql();
     expect(sql).toContain("DISTINCT");
@@ -462,7 +645,10 @@ describe("CalculationsTest", () => {
   it("should sum expression", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -473,7 +659,10 @@ describe("CalculationsTest", () => {
   it("sum expression returns zero when no records to sum", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sum = await Account.where({ credit_limit: -1 }).sum("credit_limit");
     expect(sum).toBe(0);
@@ -482,7 +671,10 @@ describe("CalculationsTest", () => {
   it("count with where and order", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -493,7 +685,10 @@ describe("CalculationsTest", () => {
   it("count with empty in", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.where({ credit_limit: [] }).count();
@@ -503,7 +698,10 @@ describe("CalculationsTest", () => {
   it("count with from option", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.all().from('"accounts"').count();
@@ -513,7 +711,10 @@ describe("CalculationsTest", () => {
   it("sum with from option", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const sum = await Account.all().from('"accounts"').sum("credit_limit");
@@ -523,7 +724,10 @@ describe("CalculationsTest", () => {
   it("average with from option", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -534,7 +738,10 @@ describe("CalculationsTest", () => {
   it("minimum with from option", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -545,7 +752,10 @@ describe("CalculationsTest", () => {
   it("maximum with from option", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -556,7 +766,10 @@ describe("CalculationsTest", () => {
   it("should count scoped select", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.select("credit_limit").count();
@@ -566,7 +779,10 @@ describe("CalculationsTest", () => {
   it("count with no parameters isnt deprecated", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const count = await Account.count();
@@ -576,7 +792,10 @@ describe("CalculationsTest", () => {
   it("should sum with qualified name on loaded", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 75 });
     const sum = await Account.all().sum("credit_limit");
@@ -586,7 +805,10 @@ describe("CalculationsTest", () => {
   it("should count with group by qualified name on loaded", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 1 });
@@ -598,7 +820,10 @@ describe("CalculationsTest", () => {
   it("should calculate with invalid field", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     // Should generate SQL even for non-existent columns (runtime error from DB)
     const sql = Account.where({ credit_limit: 50 }).toSql();
@@ -609,7 +834,10 @@ describe("CalculationsTest", () => {
     const adp = freshAdapter();
     class Account extends Base {
       static tableName = "block_accounts";
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -620,7 +848,11 @@ describe("CalculationsTest", () => {
   it("should group by summed field through association and having", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").having("SUM(credit_limit) > 10").toSql();
     expect(sql).toContain("GROUP BY");
@@ -631,7 +863,10 @@ describe("CalculationsTest", () => {
   it("should count field in joined table", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id").toSql();
     expect(sql).toContain("INNER JOIN");
@@ -640,9 +875,14 @@ describe("CalculationsTest", () => {
   it("should count field in joined table with group by", () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
-    const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id").group("firm_id").toSql();
+    const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id")
+      .group("firm_id")
+      .toSql();
     expect(sql).toContain("GROUP BY");
     expect(sql).toContain("INNER JOIN");
   });
@@ -655,7 +895,10 @@ describe("CalculationsTestExtra", () => {
   it("should resolve aliased attributes", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 42 });
     const result = await Account.all().pluck("credit_limit");
@@ -665,7 +908,10 @@ describe("CalculationsTestExtra", () => {
   it("sum should return valid values for decimals", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("balance", "float"); this.adapter = adp; }
+      static {
+        this.attribute("balance", "float");
+        this.adapter = adp;
+      }
     }
     await Account.create({ balance: 1.5 });
     await Account.create({ balance: 2.5 });
@@ -676,7 +922,10 @@ describe("CalculationsTestExtra", () => {
   it("should group by fields with table alias", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 2 });
@@ -687,7 +936,10 @@ describe("CalculationsTestExtra", () => {
   it("should calculate grouped with invalid field", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     // group by with no records returns empty object
     const result = await Account.group("firm_id").count();
@@ -697,7 +949,10 @@ describe("CalculationsTestExtra", () => {
   it("should not perform joined include by default", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Post.all().toSql();
     expect(sql).not.toContain("JOIN");
@@ -706,7 +961,10 @@ describe("CalculationsTestExtra", () => {
   it("should count scoped select with options", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -717,7 +975,10 @@ describe("CalculationsTestExtra", () => {
   it("should count manual with count all", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -728,7 +989,10 @@ describe("CalculationsTestExtra", () => {
   it("count with too many parameters raises", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     // count() with no args should work fine
     await Account.create({ credit_limit: 1 });
@@ -739,7 +1003,10 @@ describe("CalculationsTestExtra", () => {
   it("maximum with not auto table name prefix if column included", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 10 });
     await Account.create({ credit_limit: 99 });
@@ -750,7 +1017,10 @@ describe("CalculationsTestExtra", () => {
   it("minimum with not auto table name prefix if column included", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 10 });
     await Account.create({ credit_limit: 99 });
@@ -761,7 +1031,10 @@ describe("CalculationsTestExtra", () => {
   it("sum with not auto table name prefix if column included", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 30 });
     await Account.create({ credit_limit: 70 });
@@ -772,7 +1045,11 @@ describe("CalculationsTestExtra", () => {
   it("sum with grouped calculation", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1, credit_limit: 100 });
     await Account.create({ firm_id: 1, credit_limit: 200 });
@@ -784,7 +1061,10 @@ describe("CalculationsTestExtra", () => {
   it("distinct is honored when used with count operation after group", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 1 });
@@ -795,7 +1075,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with empty in", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     // empty where-in should return empty
     const result = await Account.where({ credit_limit: [] }).pluck("credit_limit");
@@ -805,7 +1088,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck type cast", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 42 });
     const result = await Account.all().pluck("credit_limit");
@@ -816,7 +1102,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck and distinct", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 50 });
@@ -827,7 +1116,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck in relation", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
@@ -838,7 +1130,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with qualified column name", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 77 });
     const result = await Account.all().pluck("credit_limit");
@@ -848,7 +1143,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with selection clause", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 33 });
     const result = await Account.select("credit_limit").pluck("credit_limit");
@@ -858,7 +1156,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck replaces select clause", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 11 });
     // pluck on a select relation still returns correct values
@@ -869,7 +1170,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck loaded relation", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 55 });
     const rel = Account.all();
@@ -882,7 +1186,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck loaded relation multiple columns", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 20 });
     const rel = Account.all();
@@ -894,7 +1201,10 @@ describe("CalculationsTestExtra", () => {
   it("pick delegate to all", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 88 });
     const val = await Account.all().pick("credit_limit");
@@ -904,7 +1214,10 @@ describe("CalculationsTestExtra", () => {
   it("pick loaded relation", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 99 });
     const rel = Account.all();
@@ -916,7 +1229,10 @@ describe("CalculationsTestExtra", () => {
   it("pick loaded relation multiple columns", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 7 });
     const val = await Account.all().pick("credit_limit");
@@ -926,7 +1242,10 @@ describe("CalculationsTestExtra", () => {
   it("group by with order by virtual count attribute", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 2 });
@@ -938,7 +1257,10 @@ describe("CalculationsTestExtra", () => {
   it("group by with limit", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1 });
     await Account.create({ firm_id: 2 });
@@ -949,7 +1271,10 @@ describe("CalculationsTestExtra", () => {
   it("group by with offset", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").offset(1).toSql();
     expect(sql).toContain("OFFSET");
@@ -958,7 +1283,10 @@ describe("CalculationsTestExtra", () => {
   it("group by with limit and offset", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").limit(1).offset(1).toSql();
     expect(sql).toContain("LIMIT");
@@ -968,7 +1296,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with line endings", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     await Account.create({ name: "line\nend" });
     const result = await Account.all().pluck("name");
@@ -978,7 +1309,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with reserved words", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     await Account.create({ name: "select" });
     const result = await Account.all().pluck("name");
@@ -988,7 +1322,10 @@ describe("CalculationsTestExtra", () => {
   it("ids on loaded relation with scope", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 10 });
     await Account.create({ credit_limit: 20 });
@@ -1001,7 +1338,10 @@ describe("CalculationsTestExtra", () => {
   it("ids with join", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     const ids = await Account.all().ids();
@@ -1011,7 +1351,10 @@ describe("CalculationsTestExtra", () => {
   it("ids with includes", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     const ids = await Account.all().ids();
@@ -1021,7 +1364,10 @@ describe("CalculationsTestExtra", () => {
   it("ids with includes limit and empty result", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const ids = await Account.all().ids();
     expect(ids).toEqual([]);
@@ -1030,7 +1376,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with includes limit and empty result", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const result = await Account.all().pluck("credit_limit");
     expect(result).toEqual([]);
@@ -1039,7 +1388,10 @@ describe("CalculationsTestExtra", () => {
   it("sum uses enumerable version when block is given", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 10 });
     await Account.create({ credit_limit: 20 });
@@ -1051,7 +1403,10 @@ describe("CalculationsTestExtra", () => {
   it("count with block and column name raises an error", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     // count() should return a number
@@ -1062,7 +1417,10 @@ describe("CalculationsTestExtra", () => {
   it("minimum and maximum on non numeric type", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     await Account.create({ credit_limit: 95 });
@@ -1075,7 +1433,11 @@ describe("CalculationsTestExtra", () => {
   it("select avg with group by as virtual attribute with sql", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1, credit_limit: 100 });
     await Account.create({ firm_id: 2, credit_limit: 200 });
@@ -1086,7 +1448,11 @@ describe("CalculationsTestExtra", () => {
   it("select avg with group by as virtual attribute with ar", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ firm_id: 1, credit_limit: 150 });
     const result = await Account.group("firm_id").average("credit_limit");
@@ -1096,7 +1462,10 @@ describe("CalculationsTestExtra", () => {
   it("async pluck none relation", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50 });
     const result = await Account.none().pluck("credit_limit");
@@ -1106,7 +1475,10 @@ describe("CalculationsTestExtra", () => {
   it("from option with table different than class", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.from("accounts").toSql();
     expect(sql).toContain("accounts");
@@ -1115,7 +1487,10 @@ describe("CalculationsTestExtra", () => {
   it("should return decimal average if db returns such", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 1 });
     await Account.create({ credit_limit: 2 });
@@ -1126,7 +1501,10 @@ describe("CalculationsTestExtra", () => {
   it("calculation with polymorphic relation", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 10 });
     const count = await Account.all().count();
@@ -1136,7 +1514,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck columns with same name", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     const result = await Account.all().pluck("credit_limit");
@@ -1146,7 +1527,10 @@ describe("CalculationsTestExtra", () => {
   it("pluck with join", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     const result = await Account.all().pluck("credit_limit");
@@ -1156,7 +1540,11 @@ describe("CalculationsTestExtra", () => {
   it("pluck with multiple columns and selection clause", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 50, firm_id: 1 });
     const result = await Account.all().pluck("credit_limit", "firm_id");
@@ -1167,7 +1555,10 @@ describe("CalculationsTestExtra", () => {
   it("count with aliased attribute", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     await Account.create({ credit_limit: 5 });
     const count = await Account.all().count();
@@ -1177,7 +1568,11 @@ describe("CalculationsTestExtra", () => {
   it("having with strong parameters", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").having("SUM(credit_limit) > 0").toSql();
     expect(sql).toContain("HAVING");
@@ -1186,7 +1581,10 @@ describe("CalculationsTestExtra", () => {
   it("group alias is properly quoted", async () => {
     const adp = freshAdapter();
     class Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
     }
     const sql = Account.group("firm_id").toSql();
     expect(sql).toContain("GROUP BY");
@@ -1200,7 +1598,10 @@ describe("CalculationsTest", () => {
   it("pluck loaded relation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "alpha" });
     await Post.create({ title: "beta" });
@@ -1214,7 +1615,10 @@ describe("CalculationsTest", () => {
   it("pick loaded relation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "first" });
     const title = await Post.all().pick("title");
@@ -1224,7 +1628,11 @@ describe("CalculationsTest", () => {
   it("pick loaded relation multiple columns", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "first", score: 42 });
     const result = await Post.all().pick("title", "score");
@@ -1236,7 +1644,10 @@ describe("CalculationsTest", () => {
   it("ids async on loaded relation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -1248,7 +1659,10 @@ describe("CalculationsTest", () => {
   it("should count manual select with count all", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "x" });
     await Post.create({ title: "y" });
@@ -1259,7 +1673,10 @@ describe("CalculationsTest", () => {
   it("pluck with qualified name on loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "hello" });
     const results = await Post.all().pluck("title");
@@ -1269,7 +1686,11 @@ describe("CalculationsTest", () => {
   it("group by attribute with custom type", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("category", "string"); this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("category", "string");
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ category: "A", score: 1 });
     await Post.create({ category: "A", score: 2 });
@@ -1281,7 +1702,10 @@ describe("CalculationsTest", () => {
   it("aggregate attribute on enum type", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("status", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("status", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ status: 0 });
     await Post.create({ status: 1 });
@@ -1292,7 +1716,10 @@ describe("CalculationsTest", () => {
   it("pluck columns with same name", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "dup" });
     const results = await Post.all().pluck("title");
@@ -1302,10 +1729,16 @@ describe("CalculationsTest", () => {
 
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   function makeModel() {
     class Account extends Base {
-      static { this.attribute("name", "string"); this.attribute("credits", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("credits", "integer");
+        this.adapter = adapter;
+      }
     }
     return { Account };
   }
@@ -1977,13 +2410,16 @@ describe("CalculationsTest", () => {
   });
 });
 
-
 describe("grouped calculations", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("group().count() returns hash of counts", async () => {
-    class Order extends Base { static _tableName = "orders"; }
+    class Order extends Base {
+      static _tableName = "orders";
+    }
     Order.attribute("id", "integer");
     Order.attribute("status", "string");
     Order.attribute("total", "integer");
@@ -2000,7 +2436,9 @@ describe("grouped calculations", () => {
   });
 
   it("group().sum() returns hash of sums", async () => {
-    class Order extends Base { static _tableName = "orders"; }
+    class Order extends Base {
+      static _tableName = "orders";
+    }
     Order.attribute("id", "integer");
     Order.attribute("status", "string");
     Order.attribute("total", "integer");
@@ -2017,10 +2455,14 @@ describe("grouped calculations", () => {
 
 describe("calculate()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("delegates to the appropriate aggregate method", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("price", "integer");
     Item.adapter = adapter;
@@ -2040,7 +2482,9 @@ describe("calculate()", () => {
 describe("incrementCounter / decrementCounter", () => {
   it("increments a counter column by primary key", async () => {
     const adapter = freshAdapter();
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("comments_count", "integer", { default: 0 });
     Post.adapter = adapter;
@@ -2054,7 +2498,9 @@ describe("incrementCounter / decrementCounter", () => {
 
   it("decrements a counter column by primary key", async () => {
     const adapter = freshAdapter();
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("comments_count", "integer", { default: 0 });
     Post.adapter = adapter;
@@ -2070,7 +2516,9 @@ describe("incrementCounter / decrementCounter", () => {
 describe("updateCounters", () => {
   it("updates multiple counters for a record", async () => {
     const adapter = freshAdapter();
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("likes_count", "integer", { default: 0 });
     Post.attribute("comments_count", "integer", { default: 0 });
@@ -2131,7 +2579,11 @@ describe("Calculations (Rails-guided)", () => {
 
   it("count with column excludes nulls", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ name: "A", email: "a@b.com" });
     await Item.create({ name: "B" });
@@ -2178,7 +2630,6 @@ describe("Calculations (Rails-guided)", () => {
     expect(await Order.all().calculate("maximum", "amount")).toBe(30);
   });
 });
-
 
 describe("Calculations (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -2335,7 +2786,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "group count"
   it("group().count() returns counts keyed by group value", async () => {
     class Order extends Base {
-      static { this._tableName = "orders"; this.attribute("id", "integer"); this.attribute("status", "string"); this.attribute("total", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "orders";
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.attribute("total", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await Order.create({ status: "new", total: 100 });
@@ -2352,7 +2809,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "group sum"
   it("group().sum() returns sums keyed by group value", async () => {
     class Order extends Base {
-      static { this._tableName = "orders"; this.attribute("id", "integer"); this.attribute("status", "string"); this.attribute("total", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "orders";
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.attribute("total", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await Order.create({ status: "new", total: 100 });
@@ -2366,7 +2829,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "group maximum"
   it("group().maximum() returns max values keyed by group value", async () => {
     class Order extends Base {
-      static { this._tableName = "orders"; this.attribute("id", "integer"); this.attribute("status", "string"); this.attribute("total", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "orders";
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.attribute("total", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await Order.create({ status: "new", total: 100 });
@@ -2380,7 +2849,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "group minimum"
   it("group().minimum() returns min values keyed by group value", async () => {
     class Order extends Base {
-      static { this._tableName = "orders"; this.attribute("id", "integer"); this.attribute("status", "string"); this.attribute("total", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "orders";
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.attribute("total", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await Order.create({ status: "new", total: 100 });
@@ -2398,7 +2873,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find with readonly option"
   it("readonly() marks loaded records as frozen/readonly", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -2409,7 +2889,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "readonly record cannot be saved"
   it("readonly record raises ReadOnlyRecord on save", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -2421,7 +2906,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "readonly record cannot be destroyed"
   it("readonly record raises ReadOnlyRecord on destroy", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -2436,7 +2926,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "sole"
   it("sole() returns the only matching record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Unique" });
@@ -2447,7 +2942,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "sole when no records"
   it("sole() raises RecordNotFound when no records found", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await expect(Topic.all().where({ title: "Nothing" }).sole()).rejects.toThrow(RecordNotFound);
@@ -2456,12 +2956,19 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "sole when more than one record"
   it("sole() raises SoleRecordExceeded when more than one record found", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Duplicate" });
     await Topic.create({ title: "Duplicate" });
-    await expect(Topic.all().where({ title: "Duplicate" }).sole()).rejects.toThrow(SoleRecordExceeded);
+    await expect(Topic.all().where({ title: "Duplicate" }).sole()).rejects.toThrow(
+      SoleRecordExceeded,
+    );
   });
 
   // =====================================================================
@@ -2471,7 +2978,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "take"
   it("take() returns a record without implicit ordering", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -2483,7 +2995,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "take with limit"
   it("take(n) returns an array of n records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -2496,7 +3013,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "take!"
   it("takeBang() raises RecordNotFound when empty", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await expect(Topic.all().takeBang()).rejects.toThrow(RecordNotFound);
@@ -2509,7 +3030,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "annotate adds comment to the query"
   it("annotate() appends SQL comment to generated query", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
     const sql = Topic.all().annotate("this is a test annotation").toSql();
@@ -2519,13 +3044,14 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "annotate is chainable"
   it("annotate() is chainable and preserves multiple comments", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
-    const sql = Topic.all()
-      .annotate("first annotation")
-      .annotate("second annotation")
-      .toSql();
+    const sql = Topic.all().annotate("first annotation").annotate("second annotation").toSql();
     expect(sql).toContain("/* first annotation */");
     expect(sql).toContain("/* second annotation */");
   });
@@ -2533,7 +3059,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "annotate works with where"
   it("annotate() works alongside where clauses", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Hello" });
@@ -2548,7 +3079,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "merge conditions"
   it("merge() combines where conditions from two relations", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Post.create({ title: "A", status: "published" });
@@ -2566,7 +3103,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "merge with scope"
   it("merge() works with named scopes", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     Post.scope("published", (rel: any) => rel.where({ status: "published" }));
 
@@ -2582,7 +3125,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "merge with ordering"
   it("merge() adopts ordering from the merged relation", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Post.create({ title: "B" });
@@ -2600,7 +3148,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "from"
   it("from() overrides the FROM clause in SQL generation", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
     const sql = Topic.all().from('"archived_topics"').toSql();
@@ -2611,7 +3163,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "from with subquery"
   it("from() works with subquery strings", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const subquery = '(SELECT * FROM "topics" WHERE "topics"."title" = \'Hello\') AS "filtered"';
@@ -2628,12 +3185,23 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "strict loading on a relation"
   it("strictLoading() on Relation marks loaded records for strict loading", async () => {
     class Author extends Base {
-      static { this._tableName = "sl_authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "sl_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("SlAuthor", Author);
 
     class Book extends Base {
-      static { this._tableName = "sl_books"; this.attribute("id", "integer"); this.attribute("sl_author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "sl_books";
+        this.attribute("id", "integer");
+        this.attribute("sl_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Book, "slAuthor", { className: "SlAuthor" });
 
@@ -2642,18 +3210,30 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
     const books = await Book.all().strictLoading().toArray();
     expect(books[0].isStrictLoading()).toBe(true);
-    await expect(loadBelongsTo(books[0], "slAuthor", { className: "SlAuthor" })).rejects.toThrow(StrictLoadingViolationError);
+    await expect(loadBelongsTo(books[0], "slAuthor", { className: "SlAuthor" })).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 
   // Rails: test "strict_loading!"
   it("strictLoadingBang() on a record enables strict loading", async () => {
     class Author extends Base {
-      static { this._tableName = "sl2_authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "sl2_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("Sl2Author", Author);
 
     class Book extends Base {
-      static { this._tableName = "sl2_books"; this.attribute("id", "integer"); this.attribute("sl2_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "sl2_books";
+        this.attribute("id", "integer");
+        this.attribute("sl2_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Book, "sl2Author", { className: "Sl2Author" });
 
@@ -2662,18 +3242,30 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
     const book = (await Book.all().first()) as Base;
     book.strictLoadingBang();
-    await expect(loadBelongsTo(book, "sl2Author", { className: "Sl2Author" })).rejects.toThrow(StrictLoadingViolationError);
+    await expect(loadBelongsTo(book, "sl2Author", { className: "Sl2Author" })).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 
   // Rails: test "strict_loading doesn't raise if association is preloaded"
   it("strict_loading allows access to preloaded associations", async () => {
     class Author extends Base {
-      static { this._tableName = "sl3_authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "sl3_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("Sl3Author", Author);
 
     class Book extends Base {
-      static { this._tableName = "sl3_books"; this.attribute("id", "integer"); this.attribute("sl3_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "sl3_books";
+        this.attribute("id", "integer");
+        this.attribute("sl3_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Book, "sl3Author", { className: "Sl3Author" });
     registerModel("Sl3Book", Book);
@@ -2696,7 +3288,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_sole_by"
   it("findSoleBy() returns the sole matching record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Sole Topic" });
@@ -2707,7 +3304,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_sole_by raises when not found"
   it("findSoleBy() raises RecordNotFound when none found", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await expect(Topic.findSoleBy({ title: "Nothing" })).rejects.toThrow(RecordNotFound);
@@ -2716,7 +3318,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_sole_by raises when multiple found"
   it("findSoleBy() raises SoleRecordExceeded when multiple found", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Dup" });
@@ -2731,7 +3338,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "create_with"
   it("createWith() applies default attrs when creating via findOrCreateBy", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.all()
@@ -2744,7 +3357,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "create_with does not affect existing record lookup"
   it("createWith() does not affect existing record lookup", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Existing", status: "draft" });
@@ -2761,7 +3380,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "unscope where"
   it("unscope(:where) removes all where conditions", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -2774,7 +3398,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "unscope order"
   it("unscope(:order) removes ordering", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const sql = Topic.all().order({ title: "asc" }).unscope("order").toSql();
@@ -2784,10 +3413,19 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "unscope multiple"
   it("unscope() can remove multiple parts at once", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
-    const sql = Topic.all().limit(5).offset(10).order("id").unscope("limit", "offset", "order").toSql();
+    const sql = Topic.all()
+      .limit(5)
+      .offset(10)
+      .order("id")
+      .unscope("limit", "offset", "order")
+      .toSql();
     expect(sql).not.toContain("LIMIT");
     expect(sql).not.toContain("OFFSET");
     expect(sql).not.toContain("ORDER");
@@ -2800,7 +3438,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "dup"
   it("dup() creates an unsaved copy with no primary key", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "Original" });
@@ -2813,7 +3456,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "dup can be saved"
   it("dup() copy can be saved as a new record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const original = await Topic.create({ title: "Original" });
@@ -2830,10 +3478,22 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "becomes"
   it("becomes() transforms record to another class", async () => {
     class Vehicle extends Base {
-      static { this._tableName = "vehicles"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "vehicles";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
     }
     class Car extends Base {
-      static { this._tableName = "vehicles"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "vehicles";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
     }
 
     const vehicle = await Vehicle.create({ name: "Tesla", type: "Car" });
@@ -2851,7 +3511,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "has_attribute?"
   it("hasAttribute() returns true for defined attributes", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = new Topic({ title: "Test" });
@@ -2863,7 +3528,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attribute_names"
   it("attributeNames() returns all attribute names", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
 
     expect(Topic.attributeNames()).toEqual(["id", "title", "body"]);
@@ -2876,7 +3547,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "exists? with conditions hash"
   it("exists(conditions) checks with hash conditions", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Found" });
@@ -2887,7 +3563,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "exists? with primary key"
   it("exists(id) checks by primary key", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "Found" });
@@ -2902,7 +3583,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "calculate"
   it("calculate() dispatches to the correct aggregate method", async () => {
     class Order extends Base {
-      static { this._tableName = "orders"; this.attribute("id", "integer"); this.attribute("total", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "orders";
+        this.attribute("id", "integer");
+        this.attribute("total", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await Order.create({ total: 100 });
@@ -2922,14 +3608,22 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "extending"
   it("extending() adds custom methods to a relation", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("published", "boolean"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adapter;
+      }
     }
 
     await Post.create({ title: "Draft", published: false });
     await Post.create({ title: "Live", published: true });
 
     const myScope = {
-      publishedOnly() { return (this as any).where({ published: true }); }
+      publishedOnly() {
+        return (this as any).where({ published: true });
+      },
     };
 
     const posts = await Post.all().extending(myScope).publishedOnly().toArray();
@@ -2940,13 +3634,22 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "extending with multiple modules"
   it("extending() can add multiple method sets", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Post.create({ title: "Hello" });
     await Post.create({ title: "World" });
 
-    const mod1 = { titled(t: string) { return (this as any).where({ title: t }); } };
+    const mod1 = {
+      titled(t: string) {
+        return (this as any).where({ title: t });
+      },
+    };
 
     const posts = await Post.all().extending(mod1).titled("Hello").toArray();
     expect(posts).toHaveLength(1);
@@ -2959,7 +3662,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "enum bang setter persists"
   it("enum bang setter persists the value", async () => {
     class Conversation extends Base {
-      static { this._tableName = "conversations"; this.attribute("id", "integer"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "conversations";
+        this.attribute("id", "integer");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
 
@@ -2974,7 +3682,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "enum generates not-scopes"
   it("enum generates not-scope (e.g., notArchived)", async () => {
     class Conversation extends Base {
-      static { this._tableName = "conversations"; this.attribute("id", "integer"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "conversations";
+        this.attribute("id", "integer");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
 
@@ -2989,7 +3702,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "enum scopes"
   it("enum generates scopes for each value", async () => {
     class Conversation extends Base {
-      static { this._tableName = "conversations"; this.attribute("id", "integer"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "conversations";
+        this.attribute("id", "integer");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
 
@@ -3009,7 +3727,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "saved_changes"
   it("savedChanges returns changes from the last save", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "First" });
@@ -3024,7 +3747,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "saved_change_to_attribute?"
   it("savedChangeToAttribute() checks if attribute was changed in last save", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "First", body: "Content" });
@@ -3041,7 +3770,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "destroy_by"
   it("destroyBy destroys matching records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Keep" });
@@ -3058,7 +3792,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "delete_by"
   it("deleteBy deletes matching records without callbacks", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Keep" });
@@ -3073,7 +3812,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "update_all class method"
   it("static updateAll updates all records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ status: "draft" });
@@ -3091,7 +3835,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "in_order_of"
   it("inOrderOf() generates CASE-based ordering", () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     const sql = Topic.all().inOrderOf("status", ["published", "draft", "archived"]).toSql();
@@ -3109,7 +3858,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "touch_all"
   it("touchAll updates timestamps on matching records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({});
@@ -3122,7 +3876,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "touch_all with named timestamps"
   it("touchAll can touch named timestamp columns", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("updated_at", "datetime"); this.attribute("checked_at", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("updated_at", "datetime");
+        this.attribute("checked_at", "datetime");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({});
@@ -3137,7 +3897,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "update class method"
   it("static update(id, attrs) finds and updates a record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "Old" });
@@ -3152,7 +3917,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "destroy_all class method"
   it("static destroyAll destroys all records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -3170,12 +3940,21 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "where.associated"
   it("whereAssociated filters for records with a present FK", async () => {
     class Author extends Base {
-      static { this._tableName = "rg_wa_authors"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_wa_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("RgWaAuthor", Author);
 
     class Post extends Base {
-      static { this._tableName = "rg_wa_posts"; this.attribute("id", "integer"); this.attribute("rg_wa_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_wa_posts";
+        this.attribute("id", "integer");
+        this.attribute("rg_wa_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "rgWaAuthor", { className: "RgWaAuthor" });
 
@@ -3190,12 +3969,21 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "where.missing"
   it("whereMissing filters for records with a null FK", async () => {
     class Author extends Base {
-      static { this._tableName = "rg_wm_authors"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_wm_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("RgWmAuthor", Author);
 
     class Post extends Base {
-      static { this._tableName = "rg_wm_posts"; this.attribute("id", "integer"); this.attribute("rg_wm_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_wm_posts";
+        this.attribute("id", "integer");
+        this.attribute("rg_wm_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "rgWmAuthor", { className: "RgWmAuthor" });
 
@@ -3215,7 +4003,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "second"
   it("second returns the second record ordered by PK", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -3230,7 +4023,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "third"
   it("third returns the third record ordered by PK", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -3244,7 +4042,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "fourth"
   it("fourth returns the fourth record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     for (const t of ["A", "B", "C", "D", "E"]) {
@@ -3257,7 +4060,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "fifth"
   it("fifth returns the fifth record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     for (const t of ["A", "B", "C", "D", "E"]) {
@@ -3270,7 +4078,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "second_to_last"
   it("secondToLast returns the second-to-last record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -3284,7 +4097,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "third_to_last"
   it("thirdToLast returns the third-to-last record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "First" });
@@ -3299,7 +4117,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "forty_two"
   it("fortyTwo returns the 42nd record", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     // Create 43 records
@@ -3317,16 +4140,20 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "select with block form"
   it("select with block filters loaded records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("approved", "boolean"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Approved", approved: true });
     await Topic.create({ title: "Not Approved", approved: false });
     await Topic.create({ title: "Also Approved", approved: true });
 
-    const approved = await Topic.all().select(
-      (t: any) => t.readAttribute("approved") === true
-    );
+    const approved = await Topic.all().select((t: any) => t.readAttribute("approved") === true);
     expect(approved).toHaveLength(2);
     expect(approved.every((t: any) => t.readAttribute("approved") === true)).toBe(true);
   });
@@ -3338,7 +4165,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_each should execute the query in batches"
   it("findEach processes all records in batches", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     for (let i = 0; i < 10; i++) {
@@ -3355,7 +4187,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_in_batches should return batches"
   it("findInBatches returns batch arrays", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     for (let i = 0; i < 10; i++) {
@@ -3376,14 +4213,23 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "regroup replaces group columns"
   it("regroup replaces existing GROUP BY", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("category", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("category", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ category: "tech", status: "active" });
     await Topic.create({ category: "tech", status: "archived" });
     await Topic.create({ category: "sports", status: "active" });
 
-    const counts = await Topic.all().group("category").regroup("status").count() as Record<string, number>;
+    const counts = (await Topic.all().group("category").regroup("status").count()) as Record<
+      string,
+      number
+    >;
     expect(counts["active"]).toBe(2);
     expect(counts["archived"]).toBe(1);
   });
@@ -3395,7 +4241,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "excluding with records"
   it("excluding removes specific records by PK", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const first = await Topic.create({ title: "First" });
@@ -3410,7 +4261,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "without is an alias"
   it("without is an alias for excluding", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const t1 = await Topic.create({ title: "A" });
@@ -3429,7 +4285,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "loaded?"
   it("isLoaded tracks whether records have been fetched", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "Test" });
@@ -3444,7 +4305,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "size"
   it("size returns count efficiently", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -3455,7 +4321,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "empty?"
   it("isEmpty checks for empty result", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     expect(await Topic.all().isEmpty()).toBe(true);
@@ -3466,7 +4337,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "any?"
   it("isAny checks for any matching records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     expect(await Topic.all().isAny()).toBe(false);
@@ -3477,7 +4353,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "many?"
   it("isMany returns true for 2+ records", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -3493,7 +4374,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "inspect"
   it("inspect returns a human-readable representation", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "Hello" });
@@ -3510,7 +4396,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "scoping sets current_scope"
   it("scoping sets and restores currentScope", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const scope = Topic.all().where({ title: "Active" });
@@ -3528,7 +4419,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "load loads the records"
   it("load eagerly loads records and returns relation", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -3547,7 +4443,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "read_attribute_before_type_cast returns the raw value"
   it("readAttributeBeforeTypeCast returns raw uncast value", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("written_on", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
     }
 
     const topic = new Topic({ written_on: "2024-01-15" });
@@ -3564,7 +4465,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "length loads records and returns count"
   it("length loads and returns record count", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ title: "A" });
@@ -3581,7 +4487,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "slice returns a hash of the given keys"
   it("slice returns a subset of attributes", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("content", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "Hello", content: "World" });
@@ -3593,7 +4505,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "values_at returns an array of attribute values"
   it("valuesAt returns values as an array", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("content", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
     }
 
     const topic = await Topic.create({ title: "Hello", content: "World" });
@@ -3607,7 +4525,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "should count distinct with column"
   it("distinct().count(column) uses COUNT(DISTINCT ...)", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("author_name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("author_name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Topic.create({ author_name: "Alice" });
@@ -3615,10 +4538,10 @@ describe("Grouped Calculations (Rails-guided)", () => {
     await Topic.create({ author_name: "Bob" });
     await Topic.create({ author_name: "Charlie" });
 
-    const total = await Topic.all().count() as number;
+    const total = (await Topic.all().count()) as number;
     expect(total).toBe(4);
 
-    const distinctCount = await Topic.all().distinct().count("author_name") as number;
+    const distinctCount = (await Topic.all().distinct().count("author_name")) as number;
     expect(distinctCount).toBe(3);
   });
 
@@ -3629,10 +4552,21 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "where with subquery relation"
   it("where with Relation value generates IN subquery SQL", async () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const alice = await Author.create({ name: "Alice" });
@@ -3652,7 +4586,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "enum prefix true"
   it("enum with prefix: true generates prefixed methods", async () => {
     class Conversation extends Base {
-      static { this._tableName = "conversations"; this.attribute("id", "integer"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "conversations";
+        this.attribute("id", "integer");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Conversation, "status", ["active", "archived"], { prefix: true });
 
@@ -3664,7 +4603,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "enum prefix string"
   it("enum with prefix string generates custom-prefixed methods", async () => {
     class Conversation extends Base {
-      static { this._tableName = "conversations"; this.attribute("id", "integer"); this.attribute("comments_status", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "conversations";
+        this.attribute("id", "integer");
+        this.attribute("comments_status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Conversation, "comments_status", ["open", "closed"], { prefix: "comments" });
 
@@ -3676,7 +4620,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "enum suffix true"
   it("enum with suffix: true generates suffixed methods", async () => {
     class Conversation extends Base {
-      static { this._tableName = "conversations"; this.attribute("id", "integer"); this.attribute("question_type", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "conversations";
+        this.attribute("id", "integer");
+        this.attribute("question_type", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Conversation, "question_type", ["multiple", "single"], { suffix: true });
 
@@ -3687,7 +4636,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "or with scopes"
   it("or combines two scoped relations", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     User.scope("active", (rel: any) => rel.where({ status: "active" }));
     User.scope("pending", (rel: any) => rel.where({ status: "pending" }));
@@ -3696,20 +4651,31 @@ describe("Grouped Calculations (Rails-guided)", () => {
     await User.create({ name: "B", status: "pending" });
     await User.create({ name: "C", status: "archived" });
 
-    const result = await (User as any).active().or((User as any).pending()).toArray();
+    const result = await (User as any)
+      .active()
+      .or((User as any).pending())
+      .toArray();
     expect(result.length).toBe(2);
   });
 
   // Rails: test "rewhere clears NOT conditions"
   it("rewhere replaces both where and whereNot for the same key", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ role: "admin" });
     await User.create({ role: "viewer" });
 
-    const result = await User.all().whereNot({ role: "admin" }).rewhere({ role: "admin" }).toArray();
+    const result = await User.all()
+      .whereNot({ role: "admin" })
+      .rewhere({ role: "admin" })
+      .toArray();
     expect(result.length).toBe(1);
     expect(result[0].readAttribute("role")).toBe("admin");
   });
@@ -3717,7 +4683,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "pluck with Arel attributes"
   it("pluck accepts Arel Attribute nodes", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -3730,7 +4701,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "previously_new_record?"
   it("previously_new_record? returns true after first save", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = new User({ name: "Alice" });
@@ -3748,7 +4724,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "frozen after destroy"
   it("record is frozen after destroy and prevents modification", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -3763,7 +4744,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "frozen after delete"
   it("record is frozen after delete", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -3774,7 +4760,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "destroyed_by_association"
   it("destroyed_by_association tracks which association triggered destroy", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     const post = await Post.create({ title: "Hello" });
@@ -3787,7 +4778,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "freeze manually"
   it("freeze prevents attribute modification", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = new User({ name: "Alice" });
@@ -3799,7 +4795,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "save(validate: false)"
   it("save(validate: false) skips validations", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
 
     const user = new User({ name: "" });
@@ -3811,7 +4813,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "create_or_find_by"
   it("createOrFindBy creates when none exists", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.createOrFindBy({ name: "Alice" });
@@ -3822,11 +4829,18 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "lock! reloads with FOR UPDATE"
   it("lockBang reloads the record", async () => {
     class Account extends Base {
-      static { this._tableName = "accounts"; this.attribute("id", "integer"); this.attribute("balance", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "accounts";
+        this.attribute("id", "integer");
+        this.attribute("balance", "integer");
+        this.adapter = adapter;
+      }
     }
 
     const account = await Account.create({ balance: 100 });
-    await adapter.executeMutation(`UPDATE "accounts" SET "balance" = 200 WHERE "id" = ${account.id}`);
+    await adapter.executeMutation(
+      `UPDATE "accounts" SET "balance" = 200 WHERE "id" = ${account.id}`,
+    );
 
     await account.lockBang();
     expect(account.readAttribute("balance")).toBe(200);
@@ -3835,7 +4849,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attribute_for_inspect"
   it("attributeForInspect formats values for display", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice", age: 30 });
@@ -3847,7 +4867,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attribute_for_inspect truncates long strings"
   it("attributeForInspect truncates strings over 50 characters", () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
 
     const post = new Post({ body: "x".repeat(100) });
@@ -3857,7 +4882,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "in_batches yields relations"
   it("inBatches yields Relation objects for each batch", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     for (let i = 0; i < 7; i++) {
@@ -3875,7 +4905,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "createOrFindBy on relation"
   it("createOrFindBy works on Relation", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.all().createOrFindBy({ name: "Alice", role: "admin" });
@@ -3886,7 +4922,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_by_sql"
   it("findBySql returns model instances from raw SQL", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -3901,7 +4942,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "increment_counter"
   it("incrementCounter increments a counter column", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("comments_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("comments_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
 
     const post = await Post.create({ comments_count: 3 });
@@ -3913,7 +4959,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "decrement_counter"
   it("decrementCounter decrements a counter column", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("comments_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("comments_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
 
     const post = await Post.create({ comments_count: 5 });
@@ -3925,7 +4976,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "update_counters"
   it("updateCounters updates multiple counters at once", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("likes_count", "integer", { default: 0 }); this.attribute("views_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("likes_count", "integer", { default: 0 });
+        this.attribute("views_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
 
     const post = await Post.create({ likes_count: 10, views_count: 100 });
@@ -3938,7 +4995,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "save(touch: false)"
   it("save(touch: false) skips updating timestamps", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
 
     const post = await Post.create({ title: "Hello" });
@@ -3952,7 +5015,14 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attr_readonly"
   it("attrReadonly prevents updating readonly attributes", async () => {
     class Product extends Base {
-      static { this._tableName = "products"; this.attribute("id", "integer"); this.attribute("sku", "string"); this.attribute("name", "string"); this.adapter = adapter; this.attrReadonly("sku"); }
+      static {
+        this._tableName = "products";
+        this.attribute("id", "integer");
+        this.attribute("sku", "string");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.attrReadonly("sku");
+      }
     }
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
@@ -3968,7 +5038,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "readonly_attributes"
   it("readonlyAttributes returns the list of readonly attributes", () => {
     class Product extends Base {
-      static { this._tableName = "products"; this.attribute("id", "integer"); this.attribute("sku", "string"); this.adapter = adapter; this.attrReadonly("sku"); }
+      static {
+        this._tableName = "products";
+        this.attribute("id", "integer");
+        this.attribute("sku", "string");
+        this.adapter = adapter;
+        this.attrReadonly("sku");
+      }
     }
     expect(Product.readonlyAttributes).toContain("sku");
   });
@@ -3976,7 +5052,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "willSaveChangeToAttribute"
   it("willSaveChangeToAttribute detects pending changes", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -3990,7 +5071,14 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "update_attribute"
   it("updateAttribute saves a single attribute skipping validations", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; this.validates("email", { presence: true }); }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+        this.validates("email", { presence: true });
+      }
     }
 
     const user = await User.create({ name: "Alice", email: "a@b.com" });
@@ -4002,7 +5090,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attribute_in_database"
   it("attributeInDatabase returns the value before unsaved changes", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4013,7 +5106,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attribute_before_last_save"
   it("attributeBeforeLastSave returns the value from before the last save", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4024,7 +5122,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "changed_attribute_names_to_save"
   it("changedAttributeNamesToSave lists attributes with pending changes", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice", age: 25 });
@@ -4036,7 +5140,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find_each with start and finish"
   it("findEach with start/finish limits the PK range", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     for (let i = 0; i < 10; i++) {
@@ -4053,7 +5162,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "column_names"
   it("columnNames returns list of attribute names", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     expect(User.columnNames()).toEqual(["id", "name", "email"]);
   });
@@ -4068,7 +5183,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "blank? / present?"
   it("isBlank and isPresent check for empty results", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     expect(await User.all().isBlank()).toBe(true);
@@ -4082,10 +5202,18 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "structurally_compatible?"
   it("structurallyCompatible checks if relations can be combined", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
     expect(User.all().structurallyCompatible(User.all())).toBe(true);
@@ -4095,7 +5223,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "changed_for_autosave?"
   it("isChangedForAutosave detects records needing save", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const newUser = new User({ name: "Alice" });
@@ -4111,7 +5244,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "exists?"
   it("exists? checks record existence by id, conditions, or no args", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     expect(await User.exists()).toBe(false);
@@ -4126,7 +5264,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "class-level aggregates"
   it("Base.count, minimum, maximum, sum, average delegate to Relation", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ age: 20 });
@@ -4142,7 +5285,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "pluck and ids class methods"
   it("Base.pluck and Base.ids return extracted values", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -4156,7 +5304,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "cache_key"
   it("cacheKey returns model/id for persisted records and model/new for new records", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
 
     const newUser = new User({ name: "Alice" });
@@ -4169,7 +5323,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "cache_key_with_version"
   it("cacheKeyWithVersion includes updated_at timestamp", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4180,7 +5340,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "scope_for_create"
   it("scopeForCreate returns equality where conditions for new record creation", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
 
     const scope = User.all().where({ role: "admin" }).scopeForCreate();
@@ -4190,7 +5356,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "where_values_hash"
   it("whereValuesHash returns a hash of equality conditions", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
 
     const hash = User.all().where({ name: "Alice", role: "admin" }).whereValuesHash();
@@ -4200,14 +5372,23 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "and"
   it("and() combines two relations with AND intersection", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice", role: "admin" });
     await User.create({ name: "Bob", role: "user" });
     await User.create({ name: "Charlie", role: "admin" });
 
-    const results = await User.all().where({ role: "admin" }).and(User.all().where({ name: "Alice" })).toArray();
+    const results = await User.all()
+      .where({ role: "admin" })
+      .and(User.all().where({ name: "Alice" }))
+      .toArray();
     expect(results.length).toBe(1);
     expect(results[0].readAttribute("name")).toBe("Alice");
   });
@@ -4215,7 +5396,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "reject"
   it("reject() filters out matching records", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -4228,7 +5414,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "compact_blank"
   it("compactBlank() filters out records with null column values", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice", email: "a@test.com" });
@@ -4242,16 +5434,26 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "sanitize_sql_array"
   it("sanitizeSqlArray safely quotes values", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
-    expect(User.sanitizeSqlArray("name = ? AND age > ?", "O'Brien", 25)).toBe("name = 'O''Brien' AND age > 25");
+    expect(User.sanitizeSqlArray("name = ? AND age > ?", "O'Brien", 25)).toBe(
+      "name = 'O''Brien' AND age > 25",
+    );
   });
 
   // Rails: test "sanitize_sql"
   it("sanitizeSql handles both string and array forms", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
     expect(User.sanitizeSql("raw SQL")).toBe("raw SQL");
@@ -4261,7 +5463,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "ignored_columns"
   it("ignoredColumns can be set and retrieved", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
 
     User.ignoredColumns = ["old_field", "deprecated_col"];
@@ -4271,7 +5477,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "new"
   it("Base.new() creates an unsaved record", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = User.new({ name: "Alice" });
@@ -4282,7 +5493,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "attribute_present?"
   it("attributePresent returns true for non-blank values", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4293,7 +5510,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "to_key"
   it("toKey returns [id] for persisted records, null for new", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const newUser = new User({ name: "Alice" });
@@ -4307,7 +5529,16 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("afterTouch fires after touch()", async () => {
     const log: string[] = [];
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("updated_at", "datetime"); this.afterTouch((r: any) => { log.push("touched"); }); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.afterTouch((r: any) => {
+          log.push("touched");
+        });
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4318,14 +5549,31 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "dependent restrict_with_exception"
   it("dependent restrictWithException raises on destroy with children", async () => {
     class RGComment extends Base {
-      static { this._tableName = "rg_comments"; this.attribute("id", "integer"); this.attribute("rg_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_comments";
+        this.attribute("id", "integer");
+        this.attribute("rg_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class RGPost extends Base {
       static _tableName = "rg_posts";
       static _associations: any[] = [
-        { type: "hasMany", name: "rgComments", options: { dependent: "restrictWithException", className: "RGComment", foreignKey: "rg_post_id" } },
+        {
+          type: "hasMany",
+          name: "rgComments",
+          options: {
+            dependent: "restrictWithException",
+            className: "RGComment",
+            foreignKey: "rg_post_id",
+          },
+        },
       ];
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(RGComment);
     registerModel(RGPost);
@@ -4339,10 +5587,21 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "belongs_to required"
   it("belongs_to required: true validates FK presence", async () => {
     class RGAuthor extends Base {
-      static { this._tableName = "rg_authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class RGBook extends Base {
-      static { this._tableName = "rg_books"; this.attribute("id", "integer"); this.attribute("rg_author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "rg_books";
+        this.attribute("id", "integer");
+        this.attribute("rg_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(RGAuthor);
     registerModel(RGBook);
@@ -4361,7 +5620,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "where with named binds"
   it("where replaces :name placeholders with quoted values", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice", age: 25 });
@@ -4375,7 +5640,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "only keeps specified relation parts"
   it("only() keeps only specified query components", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -4390,7 +5660,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "unscope removes specified relation parts"
   it("unscope() removes specified query components", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -4405,11 +5680,14 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "normalizes"
   it("normalizes trims and lowercases email before save", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
-    User.normalizes("email", (v: unknown) =>
-      typeof v === "string" ? v.trim().toLowerCase() : v
-    );
+    User.normalizes("email", (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : v));
 
     const user = await User.create({ email: "  ALICE@TEST.COM  " });
     expect(user.readAttribute("email")).toBe("alice@test.com");
@@ -4418,7 +5696,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "destroy(id)"
   it("Base.destroy(id) finds and destroys a record", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4430,7 +5713,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "find with multiple ids"
   it("find(id1, id2) returns array of records", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const u1 = await User.create({ name: "Alice" });
@@ -4443,7 +5731,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "update!(id, attrs)"
   it("Base.updateBang raises on validation failure", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.validates("name", { presence: true }); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.adapter = adapter;
+      }
     }
 
     const user = await User.create({ name: "Alice" });
@@ -4454,7 +5748,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "one?"
   it("isOne returns true when exactly one record matches", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -4466,7 +5765,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails: test "reload"
   it("relation reload() clears cache and re-queries", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await User.create({ name: "Alice" });
@@ -4485,7 +5789,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
     const adapter = createTestAdapter();
 
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
 
     const p = await Person.create({ name: "Alice", age: 25 });
@@ -4511,7 +5821,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("optimizerHints() adds hints to generated SQL", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().optimizerHints("MAX_EXECUTION_TIME(1000)").toSql();
     expect(sql).toMatch(/SELECT\s+\/\*\+\s+MAX_EXECUTION_TIME\(1000\)\s+\*\//);
@@ -4559,7 +5874,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("columnForAttribute() returns type info for attribute", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "Alice", age: 25 });
     const col = u.columnForAttribute("name");
@@ -4572,7 +5893,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("attributesBeforeTypeCast returns raw values", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ age: "42" });
     expect(u.attributesBeforeTypeCast.age).toBe("42");
@@ -4583,7 +5909,14 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("encrypts() transparently encrypts and decrypts attributes", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("ssn", "string"); this.adapter = adapter; this.encrypts("ssn"); }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("ssn", "string");
+        this.adapter = adapter;
+        this.encrypts("ssn");
+      }
     }
     const user = await User.create({ name: "Alice", ssn: "123-45-6789" });
     expect(user.readAttribute("ssn")).toBe("123-45-6789");
@@ -4605,9 +5938,15 @@ describe("Grouped Calculations (Rails-guided)", () => {
     const adapter = createTestAdapter();
     class Post extends Base {
       static {
-        this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter;
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
         this.scope("published", (rel: any) => rel.where({ status: "published" }), {
-          recentFirst: function (this: any) { return this.order("id", "desc"); },
+          recentFirst: function (this: any) {
+            return this.order("id", "desc");
+          },
         });
       }
     }
@@ -4618,7 +5957,9 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails guide: abstract_class — ApplicationRecord pattern
   it("abstract_class marks a class as abstract (ApplicationRecord pattern)", () => {
     class ApplicationRecord extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     class User extends ApplicationRecord {}
     expect(ApplicationRecord.abstractClass).toBe(true);
@@ -4630,7 +5971,10 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails guide: table_name_prefix / table_name_suffix
   it("table_name_prefix and table_name_suffix customize table names", () => {
     class Order extends Base {
-      static { this.tableNamePrefix = "shop_"; this.tableNameSuffix = "_records"; }
+      static {
+        this.tableNamePrefix = "shop_";
+        this.tableNameSuffix = "_records";
+      }
     }
     expect(Order.tableName).toBe("shop_orders_records");
   });
@@ -4638,7 +5982,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   // Rails guide: record_timestamps — control timestamp behavior
   it("recordTimestamps controls timestamp auto-updates", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = createTestAdapter(); }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = createTestAdapter();
+      }
     }
     expect(User.recordTimestamps).toBe(true);
     User.recordTimestamps = false;
@@ -4649,7 +5997,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("noTouching() suppresses touching during block", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     let suppressed = false;
     await User.noTouching(async () => {
@@ -4664,7 +6016,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     generatesTokenFor(User, "email_verify", {});
     const user = await User.create({ name: "Alice" });
@@ -4678,7 +6035,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("Relation.isReadonly reflects readonly state", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     expect(User.all().isReadonly).toBe(false);
     expect(User.all().readonly().isReadonly).toBe(true);
@@ -4732,8 +6093,15 @@ describe("Grouped Calculations (Rails-guided)", () => {
       }
     }
     const order: string[] = [];
-    User.beforeDestroy(() => { order.push("normal"); });
-    User.beforeDestroy(() => { order.push("prepended"); }, { prepend: true });
+    User.beforeDestroy(() => {
+      order.push("normal");
+    });
+    User.beforeDestroy(
+      () => {
+        order.push("prepended");
+      },
+      { prepend: true },
+    );
     const u = new User({});
     (User as any)._callbackChain.runBefore("destroy", u);
     expect(order[0]).toBe("prepended");
@@ -4743,7 +6111,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("suppress() prevents database writes", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.suppress(async () => {
       await User.create({ name: "Ghost" });
@@ -4756,7 +6129,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("withOptions applies shared options to multiple validates calls", () => {
     class User extends Base {
       static {
-        this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = createTestAdapter();
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = createTestAdapter();
       }
     }
     User.withOptions({ on: "update" }, (m: any) => {
@@ -4771,7 +6148,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("toXml() serializes model to XML", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "Alice", age: 30 });
     const xml = u.toXml();
@@ -4785,7 +6168,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("fromJson() sets attributes from JSON", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({});
     u.fromJson('{"name":"Alice"}');
@@ -4796,7 +6184,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("fromJson() supports include_root", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({});
     u.fromJson('{"user":{"name":"Bob"}}', true);
@@ -4807,7 +6200,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("isPersisted() returns false for new records, true after save", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "Alice" });
     expect(u.isPersisted()).toBe(false);
@@ -4819,7 +6217,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("attributeTypes returns type objects per column", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const types = User.attributeTypes;
     expect(types).toHaveProperty("id");
@@ -4830,7 +6233,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("logger defaults to null and can be set", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     expect(User.logger).toBe(null);
     const log = { info: () => {} };
@@ -4843,7 +6250,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("Relation#build creates unsaved record with scoped attributes", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
     const u = User.where({ role: "admin" }).build({ name: "Alice" });
     expect(u.readAttribute("role")).toBe("admin");
@@ -4855,7 +6268,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("Relation#create persists record with scoped attributes", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.where({ role: "admin" }).create({ name: "Bob" });
     expect(u.isPersisted()).toBe(true);
@@ -4866,7 +6285,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("Relation#spawn returns an independent copy", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = User.where({ name: "Alice" });
     const spawned = rel.spawn();
@@ -4877,7 +6301,13 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("invertWhere swaps where and whereNot", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice", active: true });
     await User.create({ name: "Bob", active: false });
@@ -4892,7 +6322,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("inspect() returns human-readable relation info", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const str = User.where({ name: "Alice" }).limit(5).inspect();
     expect(str).toContain("User");
@@ -4904,7 +6339,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("toModel() returns self", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     const u = new User({});
     expect(u.toModel()).toBe(u);
@@ -4915,7 +6354,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
     // Base extends Model, so should inherit
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     expect(User.i18nScope).toBe("activemodel");
   });
@@ -4924,7 +6367,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("attributePreviouslyChanged checks last save changes", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     u.writeAttribute("name", "Bob");
@@ -4937,10 +6385,21 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("CollectionProxy push adds records", async () => {
     const adapter = createTestAdapter();
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
@@ -4956,10 +6415,21 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("CollectionProxy isEmpty returns true when empty", async () => {
     const adapter = createTestAdapter();
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
@@ -4972,7 +6442,11 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("loadAsync returns the relation for chaining", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     const rel = User.where({ id: 1 }).loadAsync();
     expect(rel).toBeDefined();
@@ -4982,7 +6456,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("clone preserves id and persisted state", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     const c = u.clone();
@@ -4994,7 +6473,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("findEach supports order option", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.all().deleteAll();
     await User.create({ name: "A" });
@@ -5011,7 +6495,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("toGid returns a GlobalID-like URI", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     expect(u.toGid()).toContain("gid://User/");
@@ -5021,7 +6510,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("toSgid returns a base64-encoded GID", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     const sgid = u.toSgid();
@@ -5047,7 +6541,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("findByAttribute finds record by single column", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     const found = await User.findByAttribute("name", "Alice");
@@ -5076,7 +6575,12 @@ describe("Grouped Calculations (Rails-guided)", () => {
   it("extending accepts a function argument", () => {
     const adapter = createTestAdapter();
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = User.where({ name: "Alice" }).extending((r: any) => {
       r.greet = () => "hello";
@@ -5103,11 +6607,17 @@ describe("Grouped Calculations (Rails-guided)", () => {
 
 describe("Rails-guided: pick", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("pick returns single column value from first record", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 30 });
@@ -5116,7 +6626,10 @@ describe("Rails-guided: pick", () => {
 
   it("pick returns null when no records exist", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.all().pick("name")).toBe(null);
   });

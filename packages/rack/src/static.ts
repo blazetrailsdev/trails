@@ -83,7 +83,7 @@ export class Static {
   }
 
   private canServe(pathInfo: string): boolean {
-    return this.urls.some(url => pathInfo.startsWith(url));
+    return this.urls.some((url) => pathInfo.startsWith(url));
   }
 
   private acceptsGzip(env: Record<string, any>): boolean {

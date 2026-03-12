@@ -37,13 +37,19 @@ describe("ActionDispatch::Cookies", () => {
     const jar = CookieJar.parse("a=1; b=2");
     const entries: [string, string][] = [];
     jar.each((k, v) => entries.push([k, v]));
-    expect(entries).toEqual([["a", "1"], ["b", "2"]]);
+    expect(entries).toEqual([
+      ["a", "1"],
+      ["b", "2"],
+    ]);
   });
 
   it("enumerable", () => {
     const jar = CookieJar.parse("x=10; y=20");
     const entries = [...jar];
-    expect(entries).toEqual([["x", "10"], ["y", "20"]]);
+    expect(entries).toEqual([
+      ["x", "10"],
+      ["y", "20"],
+    ]);
   });
 
   it("key methods", () => {

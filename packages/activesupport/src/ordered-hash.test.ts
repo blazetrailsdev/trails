@@ -52,7 +52,10 @@ describe("OrderedHashTest", () => {
     const h = new OrderedHash<string, number>();
     h.set("a", 1);
     h.set("b", 2);
-    expect(h.toArray()).toEqual([["a", 1], ["b", 2]]);
+    expect(h.toArray()).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
   });
 
   it("has key", () => {
@@ -91,7 +94,10 @@ describe("OrderedHashTest", () => {
     h.set("y", 20);
     const entries: [string, number][] = [];
     for (const [k, v] of h) entries.push([k, v]);
-    expect(entries).toEqual([["x", 10], ["y", 20]]);
+    expect(entries).toEqual([
+      ["x", 10],
+      ["y", 20],
+    ]);
   });
 
   it("each with index", () => {
@@ -100,7 +106,9 @@ describe("OrderedHashTest", () => {
     h.set("b", 2);
     const indexed: [number, string, number][] = [];
     let i = 0;
-    for (const [k, v] of h) { indexed.push([i++, k, v]); }
+    for (const [k, v] of h) {
+      indexed.push([i++, k, v]);
+    }
     expect(indexed[0]).toEqual([0, "a", 1]);
     expect(indexed[1]).toEqual([1, "b", 2]);
   });
@@ -111,7 +119,10 @@ describe("OrderedHashTest", () => {
     h.set("q", 6);
     const pairs: [string, number][] = [];
     for (const pair of h.entries()) pairs.push(pair);
-    expect(pairs).toEqual([["p", 5], ["q", 6]]);
+    expect(pairs).toEqual([
+      ["p", 5],
+      ["q", 6],
+    ]);
   });
 
   it("find all", () => {
@@ -227,13 +238,19 @@ describe("OrderedHashTest", () => {
   });
 
   it("alternate initialization with splat", () => {
-    const h = OrderedHash.from([["a", 1], ["b", 2]]);
+    const h = OrderedHash.from([
+      ["a", 1],
+      ["b", 2],
+    ]);
     expect(h.get("a")).toBe(1);
     expect(h.get("b")).toBe(2);
   });
 
   it("alternate initialization with array", () => {
-    const h = OrderedHash.from([["x", 10], ["y", 20]]);
+    const h = OrderedHash.from([
+      ["x", 10],
+      ["y", 20],
+    ]);
     expect([...h.keys()]).toEqual(["x", "y"]);
   });
 
@@ -283,12 +300,28 @@ describe("OrderedHashTest", () => {
     expect(value).toBe(1);
   });
 
-  it.skip("each after yaml serialization", () => { /* YAML not applicable in JS */ });
-  it.skip("each when yielding to block with splat", () => { /* Ruby-specific block pattern */ });
-  it.skip("each pair when yielding to block with splat", () => { /* Ruby-specific */ });
-  it.skip("order after yaml serialization", () => { /* YAML */ });
-  it.skip("order after yaml serialization with nested arrays", () => { /* YAML */ });
-  it.skip("psych serialize", () => { /* YAML/Psych */ });
-  it.skip("psych serialize tag", () => { /* YAML */ });
-  it.skip("has yaml tag", () => { /* YAML */ });
+  it.skip("each after yaml serialization", () => {
+    /* YAML not applicable in JS */
+  });
+  it.skip("each when yielding to block with splat", () => {
+    /* Ruby-specific block pattern */
+  });
+  it.skip("each pair when yielding to block with splat", () => {
+    /* Ruby-specific */
+  });
+  it.skip("order after yaml serialization", () => {
+    /* YAML */
+  });
+  it.skip("order after yaml serialization with nested arrays", () => {
+    /* YAML */
+  });
+  it.skip("psych serialize", () => {
+    /* YAML/Psych */
+  });
+  it.skip("psych serialize tag", () => {
+    /* YAML */
+  });
+  it.skip("has yaml tag", () => {
+    /* YAML */
+  });
 });

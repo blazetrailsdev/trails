@@ -68,11 +68,7 @@ function extractParamNames(path: string): string[] {
  *   post_path(1)             — positional args mapped to params in order
  *   post_path({ id: 1 })     — explicit params hash
  */
-function createPathHelper(
-  routeSet: RouteSet,
-  routeName: string,
-  paramNames: string[],
-): PathHelper {
+function createPathHelper(routeSet: RouteSet, routeName: string, paramNames: string[]): PathHelper {
   return function (...args: any[]): string {
     const params = resolveArgs(paramNames, args);
     return routeSet.pathFor(routeName, params);
@@ -111,10 +107,7 @@ function createUrlHelper(
  * Resolve arguments into a params hash.
  * Supports positional args or a single hash argument.
  */
-function resolveArgs(
-  paramNames: string[],
-  args: any[],
-): Record<string, string | number> {
+function resolveArgs(paramNames: string[], args: any[]): Record<string, string | number> {
   if (args.length === 0) return {};
 
   // Single object argument => params hash
@@ -137,7 +130,10 @@ function resolveArgs(
 function resolveArgsWithOptions(
   paramNames: string[],
   args: any[],
-): { params: Record<string, string | number>; options: { host?: string; protocol?: string; onlyPath?: boolean } } {
+): {
+  params: Record<string, string | number>;
+  options: { host?: string; protocol?: string; onlyPath?: boolean };
+} {
   if (args.length === 0) return { params: {}, options: {} };
 
   const URL_OPTION_KEYS = new Set(["host", "protocol", "onlyPath", "only_path", "port", "anchor"]);

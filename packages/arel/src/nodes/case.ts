@@ -23,12 +23,18 @@ export class Case extends Node {
     const c = new Case(this.operand ?? undefined);
     (c as any).conditions = [...this.conditions];
     const whenNode = condition instanceof Node ? condition : new SqlLiteral(String(condition));
-    const thenNode = result instanceof Node ? result : new SqlLiteral(
-      result === null ? "NULL"
-        : typeof result === "number" ? String(result)
-        : typeof result === "string" ? `'${result.replace(/'/g, "''")}'`
-        : String(result)
-    );
+    const thenNode =
+      result instanceof Node
+        ? result
+        : new SqlLiteral(
+            result === null
+              ? "NULL"
+              : typeof result === "number"
+                ? String(result)
+                : typeof result === "string"
+                  ? `'${result.replace(/'/g, "''")}'`
+                  : String(result),
+          );
     c.conditions.push({ when: whenNode, then: thenNode });
     (c as any).defaultValue = this.defaultValue;
     return c;
@@ -37,12 +43,18 @@ export class Case extends Node {
   else(result: Node | unknown): Case {
     const c = new Case(this.operand ?? undefined);
     (c as any).conditions = [...this.conditions];
-    const elseNode = result instanceof Node ? result : new SqlLiteral(
-      result === null ? "NULL"
-        : typeof result === "number" ? String(result)
-        : typeof result === "string" ? `'${result.replace(/'/g, "''")}'`
-        : String(result)
-    );
+    const elseNode =
+      result instanceof Node
+        ? result
+        : new SqlLiteral(
+            result === null
+              ? "NULL"
+              : typeof result === "number"
+                ? String(result)
+                : typeof result === "string"
+                  ? `'${result.replace(/'/g, "''")}'`
+                  : String(result),
+          );
     (c as any).defaultValue = elseNode;
     return c;
   }

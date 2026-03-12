@@ -65,7 +65,8 @@ export class ExceptionWrapper {
     const firstTrace = this.traces[0];
     if (!firstTrace) return null;
     // Match patterns like "at Object.<anonymous> (/path/file.ts:10:5)"
-    const match = firstTrace.match(/\(([^:]+):(\d+):\d+\)/) ?? firstTrace.match(/at\s+([^:]+):(\d+):\d+/);
+    const match =
+      firstTrace.match(/\(([^:]+):(\d+):\d+\)/) ?? firstTrace.match(/at\s+([^:]+):(\d+):\d+/);
     if (!match) return null;
     return { file: match[1], line: parseInt(match[2], 10) };
   }

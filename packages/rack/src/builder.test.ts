@@ -22,7 +22,12 @@ describe("Rack::Builder", () => {
 
   it("raises if #run provided both app and block", () => {
     const builder = new Builder();
-    expect(() => (builder as any).run(async () => [200, {}, []], async () => [200, {}, []])).toThrow();
+    expect(() =>
+      (builder as any).run(
+        async () => [200, {}, []],
+        async () => [200, {}, []],
+      ),
+    ).toThrow();
   });
 
   it("supports mapping", async () => {
@@ -43,7 +48,9 @@ describe("Rack::Builder", () => {
   it("supports use when mapping", async () => {
     class TestMiddleware {
       private app: any;
-      constructor(app: any) { this.app = app; }
+      constructor(app: any) {
+        this.app = app;
+      }
       async call(env: any) {
         const [s, h, b] = await this.app(env);
         return [s, { ...h, "x-middleware": "yes" }, b];
@@ -64,7 +71,10 @@ describe("Rack::Builder", () => {
     let envRef: any;
     const builder = new Builder();
     builder.map("/foo", (b) => {
-      b.run(async (env) => { envRef = env; return [200, {}, ["ok"]]; });
+      b.run(async (env) => {
+        envRef = env;
+        return [200, {}, ["ok"]];
+      });
     });
     const app = builder.toApp();
     await new MockRequest(app).get("/foo");
@@ -90,7 +100,11 @@ describe("Rack::Builder", () => {
       private app: any;
       private key: string;
       private val: string;
-      constructor(app: any, key: string, val: string) { this.app = app; this.key = key; this.val = val; }
+      constructor(app: any, key: string, val: string) {
+        this.app = app;
+        this.key = key;
+        this.val = val;
+      }
       async call(env: any) {
         const [s, h, b] = await this.app(env);
         h[this.key] = this.val;
@@ -120,7 +134,9 @@ describe("Rack::Builder", () => {
     // In Ruby, use can take a block. In TS, we pass a class with a call method.
     class BlockMiddleware {
       private app: any;
-      constructor(app: any) { this.app = app; }
+      constructor(app: any) {
+        this.app = app;
+      }
       async call(env: any) {
         const [s, h, b] = await this.app(env);
         h["x-block"] = "used";
@@ -171,7 +187,9 @@ describe("Rack::Builder", () => {
     let warmedUp = false;
     const builder = new Builder();
     builder.run(async () => [200, {}, ["warm"]]);
-    builder.warmup(() => { warmedUp = true; });
+    builder.warmup(() => {
+      warmedUp = true;
+    });
     builder.toApp();
     expect(warmedUp).toBe(true);
   });
@@ -180,8 +198,13 @@ describe("Rack::Builder", () => {
     let count = 0;
     class Counter {
       private app: any;
-      constructor(app: any) { this.app = app; count++; }
-      async call(env: any) { return this.app(env); }
+      constructor(app: any) {
+        this.app = app;
+        count++;
+      }
+      async call(env: any) {
+        return this.app(env);
+      }
     }
     const builder = new Builder();
     builder.use(Counter);
@@ -193,7 +216,9 @@ describe("Rack::Builder", () => {
   it("allows use after run", async () => {
     class AddHeader {
       private app: any;
-      constructor(app: any) { this.app = app; }
+      constructor(app: any) {
+        this.app = app;
+      }
       async call(env: any) {
         const [s, h, b] = await this.app(env);
         h["x-added"] = "yes";

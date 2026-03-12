@@ -65,11 +65,19 @@ export class FlashHash {
 
   // --- Convenience ---
 
-  get alert(): unknown { return this.get("alert"); }
-  set alert(value: unknown) { this.set("alert", value); }
+  get alert(): unknown {
+    return this.get("alert");
+  }
+  set alert(value: unknown) {
+    this.set("alert", value);
+  }
 
-  get notice(): unknown { return this.get("notice"); }
-  set notice(value: unknown) { this.set("notice", value); }
+  get notice(): unknown {
+    return this.get("notice");
+  }
+  set notice(value: unknown) {
+    this.set("notice", value);
+  }
 
   // --- Lifecycle ---
 

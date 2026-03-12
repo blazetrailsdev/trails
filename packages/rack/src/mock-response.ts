@@ -18,7 +18,9 @@ export class MockCookie {
     this.secure = args.secure || false;
   }
 
-  toString(): string { return this.value.join("&"); }
+  toString(): string {
+    return this.value.join("&");
+  }
 }
 
 export class MockResponse extends Response {
@@ -50,7 +52,9 @@ export class MockResponse extends Response {
   }
 
   // Alias for bodyString for compat
-  getBody(): string { return this.bodyString; }
+  getBody(): string {
+    return this.bodyString;
+  }
 
   cookie(name: string): MockCookie | undefined {
     return this.cookies[name];

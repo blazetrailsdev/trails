@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -44,8 +84,12 @@ describe("CallbacksTest", () => {
       }
     }
     const log: string[] = [];
-    Topic.beforeCreate(function(this: any) { log.push("before_create"); });
-    Topic.afterCreate(function(this: any) { log.push("after_create"); });
+    Topic.beforeCreate(function (this: any) {
+      log.push("before_create");
+    });
+    Topic.afterCreate(function (this: any) {
+      log.push("after_create");
+    });
     await Topic.create({ title: "a" });
     expect(log).toContain("before_create");
     expect(log).toContain("after_create");
@@ -59,7 +103,9 @@ describe("CallbacksTest", () => {
       }
     }
     const log: string[] = [];
-    Topic.afterInitialize(function(this: any) { log.push("after_initialize"); });
+    Topic.afterInitialize(function (this: any) {
+      log.push("after_initialize");
+    });
     new Topic({ title: "a" });
     expect(log).toContain("after_initialize");
   });
@@ -73,7 +119,9 @@ describe("CallbacksTest", () => {
     }
     const created = await Topic.create({ title: "a" });
     const log: string[] = [];
-    Topic.afterFind(function(this: any) { log.push("after_find"); });
+    Topic.afterFind(function (this: any) {
+      log.push("after_find");
+    });
     await Topic.find(created.id);
     expect(log).toContain("after_find");
   });
@@ -87,7 +135,9 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterCreate((record: any) => { log.push("created:" + record.readAttribute("title")); });
+        this.afterCreate((record: any) => {
+          log.push("created:" + record.readAttribute("title"));
+        });
       }
     }
     await transaction(Topic, async () => {
@@ -106,7 +156,9 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterCreate((record: any) => { log.push("created:" + record.readAttribute("title")); });
+        this.afterCreate((record: any) => {
+          log.push("created:" + record.readAttribute("title"));
+        });
       }
     }
     await transaction(Topic, async () => {
@@ -119,12 +171,17 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("updated callback called on last to save of separate instances in a transaction", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
       await t2.update({ title: "b2" });
@@ -137,12 +194,17 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("updated callback called on first to save in transaction with old configuration", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
       await t2.update({ title: "b2" });
@@ -153,13 +215,20 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterDestroy((record: any) => {
+      log.push("destroyed:" + record.readAttribute("title"));
+    });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
       await t2.destroy();
@@ -168,18 +237,27 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
     expect(log).toContain("updated:a2");
   });
 
-  it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => { /* fixture-dependent */ });
+  it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => {
+    /* fixture-dependent */
+  });
 
   it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterDestroy((record: any) => {
+      log.push("destroyed:" + record.readAttribute("title"));
+    });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.destroy();
       await t2.update({ title: "b2" });
@@ -188,16 +266,23 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
     expect(log).toContain("updated:b2");
   });
 
-  it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => { /* fixture-dependent */ });
+  it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("save person", async () => {
     class Person extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Person.create({ name: "Alice" });
     expect(p.isPersisted()).toBe(true);
@@ -206,7 +291,10 @@ describe("CallbacksTest", () => {
 
   it("existing valid?", async () => {
     class Person extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Person.create({ name: "Bob" });
     const found = await Person.find(p.id);
@@ -241,19 +329,30 @@ describe("CallbacksTest", () => {
 
   it("inheritance of callbacks", async () => {
     class Animal extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const log: string[] = [];
-    Animal.beforeCreate(function(this: any) { log.push("before_create"); });
+    Animal.beforeCreate(function (this: any) {
+      log.push("before_create");
+    });
 
     class Dog extends Animal {}
     await Dog.create({ name: "Rex" });
     expect(log).toContain("before_create");
   });
 
-  it.skip("before save doesnt allow on option", () => { /* fixture-dependent */ });
-  it.skip("around save doesnt allow on option", () => { /* fixture-dependent */ });
-  it.skip("after save doesnt allow on option", () => { /* fixture-dependent */ });
+  it.skip("before save doesnt allow on option", () => {
+    /* fixture-dependent */
+  });
+  it.skip("around save doesnt allow on option", () => {
+    /* fixture-dependent */
+  });
+  it.skip("after save doesnt allow on option", () => {
+    /* fixture-dependent */
+  });
 
   it.skip("before validation returns false", () => {});
   it.skip("before destroy returns false", () => {});
@@ -283,14 +382,16 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
+        this.afterDestroy((record: any) => {
+          log.push("destroyed:" + record.readAttribute("title"));
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
     await transaction(Topic, async () => {
       await t1.destroy();
     });
-    expect(log.filter(l => l === "destroyed:a").length).toBe(1);
+    expect(log.filter((l) => l === "destroyed:a").length).toBe(1);
   });
 
   it("trigger once on multiple deletions", async () => {
@@ -300,7 +401,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
+        this.afterDestroy((record: any) => {
+          log.push("destroyed:" + record.readAttribute("title"));
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -317,7 +420,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
+        this.afterDestroy((record: any) => {
+          log.push("destroyed:" + record.readAttribute("title"));
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -338,7 +443,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy((record: any) => { log.push("destroyed"); });
+        this.afterDestroy((record: any) => {
+          log.push("destroyed");
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -346,7 +453,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
     const rollbackLog: string[] = [];
     try {
       await transaction(Topic, async (tx) => {
-        tx.afterRollback(() => { rollbackLog.push("rollback"); });
+        tx.afterRollback(() => {
+          rollbackLog.push("rollback");
+        });
         await t1.destroy();
         await t2.destroy();
         throw new Error("rollback");
@@ -362,8 +471,12 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterUpdate(function() { log.push("updated"); });
-        this.afterDestroy(function() { log.push("destroyed"); });
+        this.afterUpdate(function () {
+          log.push("updated");
+        });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -380,9 +493,15 @@ describe("CallbacksOnMultipleActionsTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.afterCreate(function() { log.push("created"); });
-        this.afterUpdate(function() { log.push("updated"); });
-        this.afterDestroy(function() { log.push("destroyed"); });
+        this.afterCreate(function () {
+          log.push("created");
+        });
+        this.afterUpdate(function () {
+          log.push("updated");
+        });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
       }
     }
     const p = await Post.create({ title: "a" });
@@ -394,8 +513,12 @@ describe("CallbacksOnMultipleActionsTest", () => {
     expect(log).toContain("destroyed");
   });
 
-  it.skip("before commit actions", () => { /* fixture-dependent */ });
-  it.skip("before commit update in same transaction", () => { /* fixture-dependent */ });
+  it.skip("before commit actions", () => {
+    /* fixture-dependent */
+  });
+  it.skip("before commit update in same transaction", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("CallbackOrderTest", () => {
@@ -406,9 +529,15 @@ describe("CallbackOrderTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.beforeCreate(function() { log.push("first"); });
-        this.beforeCreate(function() { log.push("second"); });
-        this.afterCreate(function() { log.push("after"); });
+        this.beforeCreate(function () {
+          log.push("first");
+        });
+        this.beforeCreate(function () {
+          log.push("second");
+        });
+        this.afterCreate(function () {
+          log.push("after");
+        });
       }
     }
     await Post.create({ title: "test" });
@@ -427,8 +556,10 @@ describe("CallbacksOnActionAndConditionTest", () => {
         this.attribute("title", "string");
         this.attribute("published", "boolean", { default: false });
         this.adapter = adapter;
-        this.beforeSave(function(record: any) {
-          if (record.readAttribute("published")) { log.push("published_save"); }
+        this.beforeSave(function (record: any) {
+          if (record.readAttribute("published")) {
+            log.push("published_save");
+          }
         });
       }
     }
@@ -447,8 +578,12 @@ describe("SetCallbackTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.beforeCreate(function() { log.push("before_create"); });
-        this.beforeSave(function() { log.push("before_save"); });
+        this.beforeCreate(function () {
+          log.push("before_create");
+        });
+        this.beforeSave(function () {
+          log.push("before_save");
+        });
       }
     }
     await Post.create({ title: "test" });
@@ -465,14 +600,16 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy(function() { log.push("destroyed"); });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
     await transaction(Topic, async () => {
       await t1.destroy();
     });
-    expect(log.filter(l => l === "destroyed").length).toBe(1);
+    expect(log.filter((l) => l === "destroyed").length).toBe(1);
   });
 
   it("trigger once on multiple deletions 2", async () => {
@@ -482,7 +619,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy(function() { log.push("destroyed"); });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -499,7 +638,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy(function() { log.push("destroyed"); });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -523,7 +664,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
     const rollbackLog: string[] = [];
     try {
       await transaction(Topic, async (tx) => {
-        tx.afterRollback(() => { rollbackLog.push("rollback"); });
+        tx.afterRollback(() => {
+          rollbackLog.push("rollback");
+        });
         await t1.destroy();
         throw new Error("rollback");
       });
@@ -538,7 +681,9 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterDestroy(function() { log.push("destroyed"); });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -555,7 +700,9 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterCreate((record: any) => { log.push("created:" + record.readAttribute("title")); });
+        this.afterCreate((record: any) => {
+          log.push("created:" + record.readAttribute("title"));
+        });
       }
     }
     await transaction(Topic, async () => {
@@ -572,7 +719,9 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.afterCreate((record: any) => { log.push("created:" + record.readAttribute("title")); });
+        this.afterCreate((record: any) => {
+          log.push("created:" + record.readAttribute("title"));
+        });
       }
     }
     await transaction(Topic, async () => {
@@ -585,12 +734,17 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("updated callback called on last to save of separate instances in a transaction 2", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
       await t2.update({ title: "b2" });
@@ -601,12 +755,17 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("updated callback called on first to save in transaction with old configuration 2", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
       await t2.update({ title: "b2" });
@@ -617,13 +776,20 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance 2", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterDestroy((record: any) => {
+      log.push("destroyed:" + record.readAttribute("title"));
+    });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
       await t2.destroy();
@@ -635,13 +801,20 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction 2", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
-    Topic.afterDestroy((record: any) => { log.push("destroyed:" + record.readAttribute("title")); });
-    Topic.afterUpdate((record: any) => { log.push("updated:" + record.readAttribute("title")); });
+    Topic.afterDestroy((record: any) => {
+      log.push("destroyed:" + record.readAttribute("title"));
+    });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
     await transaction(Topic, async () => {
       await t1.destroy();
       await t2.update({ title: "b2" });
@@ -649,9 +822,7 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
     expect(log).toContain("destroyed:a");
     expect(log).toContain("updated:b2");
   });
-
 });
-
 
 describe("Callbacks (extended)", () => {
   it("update", async () => {
@@ -662,8 +833,12 @@ describe("Callbacks (extended)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeCreate(() => { log.push("before_create"); });
-        this.beforeUpdate(() => { log.push("before_update"); });
+        this.beforeCreate(() => {
+          log.push("before_create");
+        });
+        this.beforeUpdate(() => {
+          log.push("before_update");
+        });
       }
     }
 
@@ -684,8 +859,12 @@ describe("Callbacks (extended)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterCreate(() => { log.push("after_create"); });
-        this.afterUpdate(() => { log.push("after_update"); });
+        this.afterCreate(() => {
+          log.push("after_create");
+        });
+        this.afterUpdate(() => {
+          log.push("after_update");
+        });
       }
     }
 
@@ -708,7 +887,9 @@ describe("Callbacks (extended)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterDestroy(() => { log.push("after_destroy"); });
+        this.afterDestroy(() => {
+          log.push("after_destroy");
+        });
       }
     }
 
@@ -733,17 +914,23 @@ describe("Callbacks (extended)", () => {
 
     // around callbacks work through runCallbacks (Model-level API)
     const t = new Tracked({ name: "test" });
-    t.runCallbacks("save", () => { log.push("action"); });
+    t.runCallbacks("save", () => {
+      log.push("action");
+    });
     expect(log).toEqual(["around_before", "action", "around_after"]);
   });
 });
 
 describe("after_initialize / after_find callbacks", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("fires after_initialize on new records", () => {
-    class Thing extends Base { static _tableName = "things"; }
+    class Thing extends Base {
+      static _tableName = "things";
+    }
     Thing.attribute("id", "integer");
     Thing.attribute("name", "string");
     Thing.attribute("status", "string");
@@ -760,7 +947,9 @@ describe("after_initialize / after_find callbacks", () => {
 
   it("fires after_find when loading from database", async () => {
     const log: string[] = [];
-    class Record extends Base { static _tableName = "records"; }
+    class Record extends Base {
+      static _tableName = "records";
+    }
     Record.attribute("id", "integer");
     Record.attribute("name", "string");
     Record.adapter = adapter;
@@ -777,18 +966,24 @@ describe("after_initialize / after_find callbacks", () => {
 
 describe("conditional callbacks", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("supports if: condition on callbacks", async () => {
     const log: string[] = [];
-    class Task extends Base { static _tableName = "tasks"; }
+    class Task extends Base {
+      static _tableName = "tasks";
+    }
     Task.attribute("id", "integer");
     Task.attribute("name", "string");
     Task.attribute("important", "boolean");
     Task.adapter = adapter;
     Task.beforeSave(
-      (r: any) => { log.push("important-save"); },
-      { if: (r: any) => r.readAttribute("important") === true }
+      (r: any) => {
+        log.push("important-save");
+      },
+      { if: (r: any) => r.readAttribute("important") === true },
     );
 
     await Task.create({ name: "normal", important: false });
@@ -800,14 +995,18 @@ describe("conditional callbacks", () => {
 
   it("supports unless: condition on callbacks", async () => {
     const log: string[] = [];
-    class Task extends Base { static _tableName = "tasks"; }
+    class Task extends Base {
+      static _tableName = "tasks";
+    }
     Task.attribute("id", "integer");
     Task.attribute("name", "string");
     Task.attribute("skip", "boolean");
     Task.adapter = adapter;
     Task.afterSave(
-      (r: any) => { log.push("saved"); },
-      { unless: (r: any) => r.readAttribute("skip") === true }
+      (r: any) => {
+        log.push("saved");
+      },
+      { unless: (r: any) => r.readAttribute("skip") === true },
     );
 
     await Task.create({ name: "regular" });
@@ -820,10 +1019,14 @@ describe("conditional callbacks", () => {
 
 describe("halt callback chain", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("halts save when before_save returns false", async () => {
-    class Blocked extends Base { static _tableName = "blocked"; }
+    class Blocked extends Base {
+      static _tableName = "blocked";
+    }
     Blocked.attribute("id", "integer");
     Blocked.attribute("name", "string");
     Blocked.adapter = adapter;
@@ -840,11 +1043,15 @@ describe("afterTouch callback", () => {
   it("fires after touch() is called", async () => {
     const adapter = freshAdapter();
     const touched: string[] = [];
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("updated_at", "datetime");
-    User.afterTouch((record: any) => { touched.push(record.readAttribute("name")); });
+    User.afterTouch((record: any) => {
+      touched.push(record.readAttribute("name"));
+    });
     User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
@@ -855,7 +1062,9 @@ describe("afterTouch callback", () => {
 
 describe("Callbacks (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("create callback order", async () => {
     const log: string[] = [];
@@ -863,10 +1072,18 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeSave(() => { log.push("before_save"); });
-        this.beforeCreate(() => { log.push("before_create"); });
-        this.afterCreate(() => { log.push("after_create"); });
-        this.afterSave(() => { log.push("after_save"); });
+        this.beforeSave(() => {
+          log.push("before_save");
+        });
+        this.beforeCreate(() => {
+          log.push("before_create");
+        });
+        this.afterCreate(() => {
+          log.push("after_create");
+        });
+        this.afterSave(() => {
+          log.push("after_save");
+        });
       }
     }
     await Tracked.create({ name: "test" });
@@ -879,10 +1096,18 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeSave(() => { log.push("before_save"); });
-        this.beforeUpdate(() => { log.push("before_update"); });
-        this.afterUpdate(() => { log.push("after_update"); });
-        this.afterSave(() => { log.push("after_save"); });
+        this.beforeSave(() => {
+          log.push("before_save");
+        });
+        this.beforeUpdate(() => {
+          log.push("before_update");
+        });
+        this.afterUpdate(() => {
+          log.push("after_update");
+        });
+        this.afterSave(() => {
+          log.push("after_save");
+        });
       }
     }
     const t = await Tracked.create({ name: "test" });
@@ -897,8 +1122,12 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeDestroy(() => { log.push("before_destroy"); });
-        this.afterDestroy(() => { log.push("after_destroy"); });
+        this.beforeDestroy(() => {
+          log.push("before_destroy");
+        });
+        this.afterDestroy(() => {
+          log.push("after_destroy");
+        });
       }
     }
     const t = await Tracked.create({ name: "test" });
@@ -912,8 +1141,12 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeDestroy(() => { log.push("before_destroy"); });
-        this.afterDestroy(() => { log.push("after_destroy"); });
+        this.beforeDestroy(() => {
+          log.push("before_destroy");
+        });
+        this.afterDestroy(() => {
+          log.push("after_destroy");
+        });
       }
     }
     const t = await Tracked.create({ name: "test" });
@@ -969,7 +1202,9 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeDestroy(() => { log.push("before_destroy_ran"); });
+        this.beforeDestroy(() => {
+          log.push("before_destroy_ran");
+        });
       }
     }
     const g = await Guarded.create({ name: "test" });
@@ -984,7 +1219,9 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterInitialize(() => { log.push("after_initialize"); });
+        this.afterInitialize(() => {
+          log.push("after_initialize");
+        });
       }
     }
     new Tracked({ name: "test" });
@@ -997,7 +1234,9 @@ describe("Callbacks (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterFind(() => { log.push("after_find"); });
+        this.afterFind(() => {
+          log.push("after_find");
+        });
       }
     }
     await Tracked.create({ name: "test" });
@@ -1019,11 +1258,12 @@ describe("Callbacks (Rails-guided)", () => {
       }
     }
     const t = new Tracked({ name: "test" });
-    t.runCallbacks("save", () => { log.push("action"); });
+    t.runCallbacks("save", () => {
+      log.push("action");
+    });
     expect(log).toEqual(["around_before", "action", "around_after"]);
   });
 });
-
 
 describe("Callbacks (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -1482,8 +1722,10 @@ describe("Conditional Callbacks (Rails-guided)", () => {
         this.attribute("discount_code", "string");
         this.adapter = adapter;
         this.beforeSave(
-          () => { log.push("apply_discount"); },
-          { if: (r: any) => r.readAttribute("discount_code") !== null }
+          () => {
+            log.push("apply_discount");
+          },
+          { if: (r: any) => r.readAttribute("discount_code") !== null },
         );
       }
     }
@@ -1506,8 +1748,10 @@ describe("Conditional Callbacks (Rails-guided)", () => {
         this.attribute("silent", "boolean");
         this.adapter = adapter;
         this.afterSave(
-          (r: any) => { notifications.push(`order:${r.readAttribute("total")}`); },
-          { unless: (r: any) => r.readAttribute("silent") === true }
+          (r: any) => {
+            notifications.push(`order:${r.readAttribute("total")}`);
+          },
+          { unless: (r: any) => r.readAttribute("silent") === true },
         );
       }
     }
@@ -1527,10 +1771,7 @@ describe("Conditional Callbacks (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("locked", "boolean");
         this.adapter = adapter;
-        this.beforeSave(
-          () => false,
-          { if: (r: any) => r.readAttribute("locked") === true }
-        );
+        this.beforeSave(() => false, { if: (r: any) => r.readAttribute("locked") === true });
       }
     }
 

@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,18 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("InheritanceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeHierarchy() {
     class Vehicle extends Base {
-      static { this.attribute("name", "string"); this.attribute("type", "string"); this.inheritanceColumn = "type"; this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+        this.adapter = adapter;
+      }
     }
     class Car extends Vehicle {}
     class Truck extends Vehicle {}
@@ -226,11 +273,18 @@ describe("InheritanceTest", () => {
 
 describe("InheritanceComputeTypeTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeHierarchy() {
     class Vehicle extends Base {
-      static { this.attribute("name", "string"); this.attribute("type", "string"); this.inheritanceColumn = "type"; this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+        this.adapter = adapter;
+      }
     }
     class Car extends Vehicle {}
     return { Vehicle, Car };
@@ -261,12 +315,16 @@ describe("InheritedTest", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeCreate(function() { log.push("parent_before"); });
+        this.beforeCreate(function () {
+          log.push("parent_before");
+        });
       }
     }
     class Child extends Parent {
       static {
-        this.beforeCreate(function() { log.push("child_before"); });
+        this.beforeCreate(function () {
+          log.push("child_before");
+        });
       }
     }
     await Child.create({ name: "test" });
@@ -282,12 +340,16 @@ describe("InheritedTest", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterCreate(function() { log.push("parent_after"); });
+        this.afterCreate(function () {
+          log.push("parent_after");
+        });
       }
     }
     class Child extends Parent {
       static {
-        this.afterCreate(function() { log.push("child_after"); });
+        this.afterCreate(function () {
+          log.push("child_after");
+        });
       }
     }
     await Child.create({ name: "test" });
@@ -330,14 +392,18 @@ describe("InheritanceAttributeTest", () => {
   it("inheritance new with subclass as default", async () => {
     const adapter = freshAdapter();
     class Vehicle extends Base {
-      static { this.attribute("name", "string"); this.attribute("type", "string"); this.inheritanceColumn = "type"; this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+        this.adapter = adapter;
+      }
     }
     class Car extends Vehicle {}
     const car = await Car.create({ name: "MyCar" });
     expect(car.readAttribute("type")).toBe("Car");
   });
 });
-
 
 describe("STI", () => {
   let adapter: DatabaseAdapter;
@@ -437,7 +503,6 @@ describe("STI", () => {
   });
 });
 
-
 describe("STI (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
@@ -448,7 +513,9 @@ describe("STI (Rails-guided)", () => {
   // Rails: test "subclass uses parent table"
   it("subclass inherits the base table name", () => {
     class Company extends Base {
-      static { this._tableName = "companies"; }
+      static {
+        this._tableName = "companies";
+      }
     }
     enableSti(Company);
     class Firm extends Company {}
@@ -461,7 +528,13 @@ describe("STI (Rails-guided)", () => {
   // Rails: test "save sets the type column"
   it("inheritance save", async () => {
     class Company extends Base {
-      static { this._tableName = "companies"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "companies";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
     }
     enableSti(Company);
 
@@ -476,7 +549,13 @@ describe("STI (Rails-guided)", () => {
   // Rails: test "find returns correct subclass"
   it("inheritance find", async () => {
     class Company extends Base {
-      static { this._tableName = "companies"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "companies";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
     }
     enableSti(Company);
 
@@ -500,7 +579,13 @@ describe("STI (Rails-guided)", () => {
   // Rails: test "subclass query only returns subclass records"
   it("inheritance condition", async () => {
     class Company extends Base {
-      static { this._tableName = "companies"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "companies";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
     }
     enableSti(Company);
 
@@ -525,7 +610,9 @@ describe("STI (Rails-guided)", () => {
 describe("abstract_class", () => {
   it("marks a class as abstract", () => {
     class ApplicationRecord extends Base {
-      static { this.abstractClass = true; }
+      static {
+        this.abstractClass = true;
+      }
     }
     expect(ApplicationRecord.abstractClass).toBe(true);
     expect(Base.abstractClass).toBe(false);

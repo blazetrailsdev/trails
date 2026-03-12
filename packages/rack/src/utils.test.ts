@@ -59,10 +59,12 @@ describe("Rack::Utils", () => {
 
   it("parse query strings correctly", () => {
     expect(Utils.parseQuery("foo=bar")).toEqual({ foo: "bar" });
-    expect(Utils.parseQuery("foo=\"bar\"")).toEqual({ foo: "\"bar\"" });
+    expect(Utils.parseQuery('foo="bar"')).toEqual({ foo: '"bar"' });
     expect(Utils.parseQuery("foo=bar&foo=quux")).toEqual({ foo: ["bar", "quux"] });
     expect(Utils.parseQuery("foo=1&bar=2")).toEqual({ foo: "1", bar: "2" });
-    expect(Utils.parseQuery("my+weird+field=q1%212%22%27w%245%267%2Fz8%29%3F")).toEqual({ "my weird field": "q1!2\"'w$5&7/z8)?" });
+    expect(Utils.parseQuery("my+weird+field=q1%212%22%27w%245%267%2Fz8%29%3F")).toEqual({
+      "my weird field": "q1!2\"'w$5&7/z8)?",
+    });
     expect(Utils.parseQuery("foo%3Dbaz=bar")).toEqual({ "foo=baz": "bar" });
     expect(Utils.parseQuery("=")).toEqual({ "": "" });
     expect(Utils.parseQuery("=value")).toEqual({ "": "value" });
@@ -105,33 +107,51 @@ describe("Rack::Utils", () => {
     expect(Utils.parseNestedQuery("foo")).toEqual({ foo: null });
     expect(Utils.parseNestedQuery("foo=")).toEqual({ foo: "" });
     expect(Utils.parseNestedQuery("foo=bar")).toEqual({ foo: "bar" });
-    expect(Utils.parseNestedQuery("foo=\"bar\"")).toEqual({ foo: "\"bar\"" });
+    expect(Utils.parseNestedQuery('foo="bar"')).toEqual({ foo: '"bar"' });
     expect(Utils.parseNestedQuery("foo=bar&foo=quux")).toEqual({ foo: "quux" });
     expect(Utils.parseNestedQuery("foo&foo=")).toEqual({ foo: "" });
     expect(Utils.parseNestedQuery("foo=1&bar=2")).toEqual({ foo: "1", bar: "2" });
     expect(Utils.parseNestedQuery("&foo=1&&bar=2")).toEqual({ foo: "1", bar: "2" });
     expect(Utils.parseNestedQuery("foo&bar=")).toEqual({ foo: null, bar: "" });
     expect(Utils.parseNestedQuery("foo=bar&baz=")).toEqual({ foo: "bar", baz: "" });
-    expect(Utils.parseNestedQuery("my+weird+field=q1%212%22%27w%245%267%2Fz8%29%3F")).toEqual({ "my weird field": "q1!2\"'w$5&7/z8)?" });
+    expect(Utils.parseNestedQuery("my+weird+field=q1%212%22%27w%245%267%2Fz8%29%3F")).toEqual({
+      "my weird field": "q1!2\"'w$5&7/z8)?",
+    });
 
     expect(Utils.parseNestedQuery("foo[]")).toEqual({ foo: [null] });
     expect(Utils.parseNestedQuery("foo[]=")).toEqual({ foo: [""] });
     expect(Utils.parseNestedQuery("foo[]=bar")).toEqual({ foo: ["bar"] });
     expect(Utils.parseNestedQuery("foo[]=bar&foo")).toEqual({ foo: null });
     expect(Utils.parseNestedQuery("foo[]=1&foo[]=2")).toEqual({ foo: ["1", "2"] });
-    expect(Utils.parseNestedQuery("foo=bar&baz[]=1&baz[]=2&baz[]=3")).toEqual({ foo: "bar", baz: ["1", "2", "3"] });
+    expect(Utils.parseNestedQuery("foo=bar&baz[]=1&baz[]=2&baz[]=3")).toEqual({
+      foo: "bar",
+      baz: ["1", "2", "3"],
+    });
 
     expect(Utils.parseNestedQuery("x[y][z]=1")).toEqual({ x: { y: { z: "1" } } });
     expect(Utils.parseNestedQuery("x[y][z][]=1")).toEqual({ x: { y: { z: ["1"] } } });
     expect(Utils.parseNestedQuery("x[y][z]=1&x[y][z]=2")).toEqual({ x: { y: { z: "2" } } });
-    expect(Utils.parseNestedQuery("x[y][z][]=1&x[y][z][]=2")).toEqual({ x: { y: { z: ["1", "2"] } } });
+    expect(Utils.parseNestedQuery("x[y][z][]=1&x[y][z][]=2")).toEqual({
+      x: { y: { z: ["1", "2"] } },
+    });
 
     expect(Utils.parseNestedQuery("x[y][][z]=1")).toEqual({ x: { y: [{ z: "1" }] } });
     expect(Utils.parseNestedQuery("x[y][][z][]=1")).toEqual({ x: { y: [{ z: ["1"] }] } });
-    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({ x: { y: [{ z: "1", w: "2" }] } });
+    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({
+      x: { y: [{ z: "1", w: "2" }] },
+    });
 
-    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][z]=2")).toEqual({ x: { y: [{ z: "1" }, { z: "2" }] } });
-    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=a&x[y][][z]=2&x[y][][w]=3")).toEqual({ x: { y: [{ z: "1", w: "a" }, { z: "2", w: "3" }] } });
+    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][z]=2")).toEqual({
+      x: { y: [{ z: "1" }, { z: "2" }] },
+    });
+    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=a&x[y][][z]=2&x[y][][w]=3")).toEqual({
+      x: {
+        y: [
+          { z: "1", w: "a" },
+          { z: "2", w: "3" },
+        ],
+      },
+    });
 
     // Type error edge cases - these match Ruby's behavior for conflicting types
     expect(() => Utils.parseNestedQuery("x[y]=1&x[]=1")).toThrow(Utils.ParameterTypeError);
@@ -152,7 +172,9 @@ describe("Rack::Utils", () => {
 
   it("only moves to a new array when the full key has been seen", () => {
     // Complex nested array/hash interactions
-    const result1 = Utils.parseNestedQuery("x[][id]=1&x[][y][a]=5&x[][y][b]=7&x[][z][id]=3&x[][z][w]=0&x[][id]=2&x[][y][a]=6&x[][y][b]=8&x[][z][id]=4&x[][z][w]=0");
+    const result1 = Utils.parseNestedQuery(
+      "x[][id]=1&x[][y][a]=5&x[][y][b]=7&x[][z][id]=3&x[][z][w]=0&x[][id]=2&x[][y][a]=6&x[][y][b]=8&x[][z][id]=4&x[][z][w]=0",
+    );
     expect(result1.x).toHaveLength(2);
     expect(result1.x[0].id).toBe("1");
     expect(result1.x[1].id).toBe("2");
@@ -160,7 +182,12 @@ describe("Rack::Utils", () => {
 
   it("handles unexpected use of [ and ] in parameter keys as normal characters", () => {
     // Basic bracket edge cases
-    expect(Utils.parseNestedQuery("[]=1&[a]=2&b[=3&c]=4")).toEqual({ "[]": "1", "[a]": "2", "b[": "3", "c]": "4" });
+    expect(Utils.parseNestedQuery("[]=1&[a]=2&b[=3&c]=4")).toEqual({
+      "[]": "1",
+      "[a]": "2",
+      "b[": "3",
+      "c]": "4",
+    });
     // Complex bracket edge cases with trailing chars after brackets
     const result = Utils.parseNestedQuery("g[h]=8");
     expect(result.g.h).toBe("8");
@@ -169,14 +196,19 @@ describe("Rack::Utils", () => {
   it("allow setting the params hash class to use for parsing query strings", () => {
     // JS doesn't have configurable param classes the same way, skip this Ruby-specific test
     // Just verify basic parsing still works
-    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({ x: { y: [{ z: "1", w: "2" }] } });
+    expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({
+      x: { y: [{ z: "1", w: "2" }] },
+    });
   });
 
   it("build query strings correctly", () => {
     assertSets("foo=bar", Utils.buildQuery({ foo: "bar" }));
     assertSets("foo=bar&foo=quux", Utils.buildQuery({ foo: ["bar", "quux"] }));
     assertSets("foo=1&bar=2", Utils.buildQuery({ foo: "1", bar: "2" }));
-    assertSets("my+weird+field=q1!2%22'w%245%267%2Fz8)%3F", Utils.buildQuery({ "my weird field": "q1!2\"'w$5&7/z8)?" }));
+    assertSets(
+      "my+weird+field=q1!2%22'w%245%267%2Fz8)%3F",
+      Utils.buildQuery({ "my weird field": "q1!2\"'w$5&7/z8)?" }),
+    );
   });
 
   it("build nested query strings correctly", () => {
@@ -240,16 +272,26 @@ describe("Rack::Utils", () => {
     expect(Utils.forwardedValues(";;;for=3.4.5.6,,")).toEqual({ for: ["3.4.5.6"] });
     expect(Utils.forwardedValues("for =  3.4.5.6")).toEqual({ for: ["3.4.5.6"] });
     expect(Utils.forwardedValues('for="3.4.5.6"')).toEqual({ for: ["3.4.5.6"] });
-    expect(Utils.forwardedValues("for=3.4.5.6;proto=https")).toEqual({ for: ["3.4.5.6"], proto: ["https"] });
-    expect(Utils.forwardedValues("for=3.4.5.6; proto=http, proto=https")).toEqual({ for: ["3.4.5.6"], proto: ["http", "https"] });
+    expect(Utils.forwardedValues("for=3.4.5.6;proto=https")).toEqual({
+      for: ["3.4.5.6"],
+      proto: ["https"],
+    });
+    expect(Utils.forwardedValues("for=3.4.5.6; proto=http, proto=https")).toEqual({
+      for: ["3.4.5.6"],
+      proto: ["http", "https"],
+    });
     expect(Utils.forwardedValues("for=3.4.5.6; foo=bar")).toBeNull();
   });
 
   it("select best quality match", () => {
     expect(Utils.bestQMatch("text/html", ["text/html"])).toBe("text/html");
     expect(Utils.bestQMatch("text/*;q=0.5,text/html;q=1.0", ["text/html"])).toBe("text/html");
-    expect(Utils.bestQMatch("text/*;q=0.5,text/plain;q=1.0", ["text/plain", "text/html"])).toBe("text/plain");
-    expect(Utils.bestQMatch("application/json", ["application/vnd.lotus-1-2-3", "application/json"])).toBe("application/json");
+    expect(Utils.bestQMatch("text/*;q=0.5,text/plain;q=1.0", ["text/plain", "text/html"])).toBe(
+      "text/plain",
+    );
+    expect(
+      Utils.bestQMatch("application/json", ["application/vnd.lotus-1-2-3", "application/json"]),
+    ).toBe("application/json");
     expect(Utils.bestQMatch("text/*", ["text/html", "text/plain"])).toBe("text/html");
     expect(Utils.bestQMatch("application/json", ["text/html", "text/plain"])).toBeNull();
   });
@@ -277,11 +319,43 @@ describe("Rack::Utils", () => {
     expect(Utils.selectBestEncoding([], [["x", 1]])).toBeNull();
     expect(Utils.selectBestEncoding(["identity"], [["identity", 0.0]])).toBeNull();
     expect(Utils.selectBestEncoding(["identity"], [["*", 0.0]])).toBeNull();
-    expect(Utils.selectBestEncoding(["identity"], [["compress", 1.0], ["gzip", 1.0]])).toBe("identity");
-    expect(Utils.selectBestEncoding(["compress", "gzip", "identity"], [["compress", 1.0], ["gzip", 1.0]])).toBe("compress");
-    expect(Utils.selectBestEncoding(["compress", "gzip", "identity"], [["compress", 0.5], ["gzip", 1.0]])).toBe("gzip");
+    expect(
+      Utils.selectBestEncoding(
+        ["identity"],
+        [
+          ["compress", 1.0],
+          ["gzip", 1.0],
+        ],
+      ),
+    ).toBe("identity");
+    expect(
+      Utils.selectBestEncoding(
+        ["compress", "gzip", "identity"],
+        [
+          ["compress", 1.0],
+          ["gzip", 1.0],
+        ],
+      ),
+    ).toBe("compress");
+    expect(
+      Utils.selectBestEncoding(
+        ["compress", "gzip", "identity"],
+        [
+          ["compress", 0.5],
+          ["gzip", 1.0],
+        ],
+      ),
+    ).toBe("gzip");
     expect(Utils.selectBestEncoding(["foo", "bar", "identity"], [["*", 1.0]])).toBe("foo");
-    expect(Utils.selectBestEncoding(["foo", "bar", "identity"], [["foo", 0], ["bar", 0]])).toBe("identity");
+    expect(
+      Utils.selectBestEncoding(
+        ["foo", "bar", "identity"],
+        [
+          ["foo", 0],
+          ["bar", 0],
+        ],
+      ),
+    ).toBe("identity");
   });
 
   it("should perform constant time string comparison", () => {
@@ -336,15 +410,30 @@ describe("Rack::Utils", () => {
   });
 });
 
-describe("Rack::Utils, \"cookies\"", () => {
+describe('Rack::Utils, "cookies"', () => {
   it("parses cookies", () => {
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "a=b; ; c=d" }))).toEqual({ a: "b", c: "d" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "zoo=m" }))).toEqual({ zoo: "m" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=%" }))).toEqual({ foo: "%" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar;foo=car" }))).toEqual({ foo: "bar" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar;quux=h&m" }))).toEqual({ foo: "bar", quux: "h&m" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar; quux=h&m" }))).toEqual({ foo: "bar", quux: "h&m" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar" }))).toEqual({ foo: "bar" });
+    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "a=b; ; c=d" }))).toEqual({
+      a: "b",
+      c: "d",
+    });
+    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "zoo=m" }))).toEqual({
+      zoo: "m",
+    });
+    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=%" }))).toEqual({
+      foo: "%",
+    });
+    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar;foo=car" }))).toEqual({
+      foo: "bar",
+    });
+    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar;quux=h&m" }))).toEqual(
+      { foo: "bar", quux: "h&m" },
+    );
+    expect(
+      Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar; quux=h&m" })),
+    ).toEqual({ foo: "bar", quux: "h&m" });
+    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar" }))).toEqual({
+      foo: "bar",
+    });
   });
 
   it("generates appropriate cookie header value", () => {
@@ -377,7 +466,9 @@ describe("Rack::Utils, \"cookies\"", () => {
   });
 
   it("sets partitioned cookie attribute", () => {
-    expect(Utils.setCookieHeader("name", { value: "value", partitioned: true })).toBe("name=value; partitioned");
+    expect(Utils.setCookieHeader("name", { value: "value", partitioned: true })).toBe(
+      "name=value; partitioned",
+    );
   });
 
   it("deletes cookies in header field", () => {
@@ -389,7 +480,9 @@ describe("Rack::Utils, \"cookies\"", () => {
   it("deletes cookies in header field with domain", () => {
     const header: string[] = [];
     const result = Utils.deleteSetCookieHeaderBang(header, "name", { domain: "mydomain.com" });
-    expect(result).toEqual(["name=; domain=mydomain.com; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"]);
+    expect(result).toEqual([
+      "name=; domain=mydomain.com; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    ]);
   });
 
   it("deletes cookies in header field with path", () => {
@@ -406,7 +499,7 @@ describe("Rack::Utils, \"cookies\"", () => {
   });
 });
 
-describe("Rack::Utils, \"get_byte_ranges\"", () => {
+describe('Rack::Utils, "get_byte_ranges"', () => {
   it("returns an empty list if the sum of the ranges is too large", () => {
     expect(Utils.byteRanges({ HTTP_RANGE: "bytes=0-20,0-500" }, 500)).toEqual([]);
   });
@@ -435,7 +528,10 @@ describe("Rack::Utils, \"get_byte_ranges\"", () => {
   });
 
   it("parse several byte ranges", () => {
-    expect(Utils.getByteRanges("bytes=500-600,601-999", 1000)).toEqual([[500, 600], [601, 999]]);
+    expect(Utils.getByteRanges("bytes=500-600,601-999", 1000)).toEqual([
+      [500, 600],
+      [601, 999],
+    ]);
   });
 
   it("truncate byte ranges", () => {
@@ -463,15 +559,22 @@ describe("Rack::Utils, \"get_byte_ranges\"", () => {
 describe("Rack::Utils::Context", () => {
   class ContextTest {
     app: any;
-    constructor(app: any) { this.app = app; }
-    call(env: any) { return this.context(env); }
-    context(env: any, app = this.app) { return app(env); }
+    constructor(app: any) {
+      this.app = app;
+    }
+    call(env: any) {
+      return this.context(env);
+    }
+    context(env: any, app = this.app) {
+      return app(env);
+    }
   }
 
   const testTarget1 = (e: any) => String(e) + " world";
   const testTarget2 = (e: any) => Number(e) + 2;
   const testTarget3 = (_e: any) => null;
-  const testTarget4 = async (_e: any) => [200, { "content-type": "text/plain", "content-length": "0" }, [""]] as any;
+  const testTarget4 = async (_e: any) =>
+    [200, { "content-type": "text/plain", "content-length": "0" }, [""]] as any;
   const testApp = new ContextTest(testTarget4);
 
   it("set context correctly", () => {

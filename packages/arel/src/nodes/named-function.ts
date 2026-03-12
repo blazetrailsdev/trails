@@ -13,12 +13,7 @@ export class NamedFunction extends Node {
   readonly distinct: boolean;
   readonly alias: Node | null;
 
-  constructor(
-    name: string,
-    expressions: Node[],
-    aliasName?: string,
-    distinct = false
-  ) {
+  constructor(name: string, expressions: Node[], aliasName?: string, distinct = false) {
     super();
     this.name = name;
     this.expressions = expressions;

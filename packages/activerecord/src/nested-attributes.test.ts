@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -50,7 +90,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NPirate0, "nTag0s", { className: "NTag0", foreignKey: "npirate0_id" });
+    Associations.hasMany.call(NPirate0, "nTag0s", {
+      className: "NTag0",
+      foreignKey: "npirate0_id",
+    });
     acceptsNestedAttributesFor(NPirate0, "nTag0s", {
       rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
     });
@@ -79,7 +122,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NPirate1, "nBird1s", { className: "NBird1", foreignKey: "npirate1_id" });
+    Associations.hasMany.call(NPirate1, "nBird1s", {
+      className: "NBird1",
+      foreignKey: "npirate1_id",
+    });
     acceptsNestedAttributesFor(NPirate1, "nBird1s", {
       rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
     });
@@ -109,7 +155,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NPirate2, "nShip2s", { className: "NShip2", foreignKey: "npirate2_id" });
+    Associations.hasMany.call(NPirate2, "nShip2s", {
+      className: "NShip2",
+      foreignKey: "npirate2_id",
+    });
     acceptsNestedAttributesFor(NPirate2, "nShip2s");
     registerModel(NShip2);
     registerModel(NPirate2);
@@ -170,7 +219,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NHuman4, "nInterest4s", { className: "NInterest4", foreignKey: "nhuman4_id" });
+    Associations.hasMany.call(NHuman4, "nInterest4s", {
+      className: "NInterest4",
+      foreignKey: "nhuman4_id",
+    });
     acceptsNestedAttributesFor(NHuman4, "nInterest4s");
     registerModel(NInterest4);
     registerModel(NHuman4);
@@ -199,7 +251,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NPost5, "nComment5s", { className: "NComment5", foreignKey: "npost5_id" });
+    Associations.hasMany.call(NPost5, "nComment5s", {
+      className: "NComment5",
+      foreignKey: "npost5_id",
+    });
     acceptsNestedAttributesFor(NPost5, "nComment5s");
     registerModel(NComment5);
     registerModel(NPost5);
@@ -227,7 +282,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticle6, "nTag6s", { className: "NTag6", foreignKey: "narticle6_id" });
+    Associations.hasMany.call(NArticle6, "nTag6s", {
+      className: "NTag6",
+      foreignKey: "narticle6_id",
+    });
     acceptsNestedAttributesFor(NArticle6, "nTag6s");
     registerModel(NTag6);
     registerModel(NArticle6);
@@ -256,7 +314,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticle7, "nTag7s", { className: "NTag7", foreignKey: "narticle7_id" });
+    Associations.hasMany.call(NArticle7, "nTag7s", {
+      className: "NTag7",
+      foreignKey: "narticle7_id",
+    });
     acceptsNestedAttributesFor(NArticle7, "nTag7s");
     registerModel(NTag7);
     registerModel(NArticle7);
@@ -291,7 +352,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticle8, "nTag8s", { className: "NTag8", foreignKey: "narticle8_id" });
+    Associations.hasMany.call(NArticle8, "nTag8s", {
+      className: "NTag8",
+      foreignKey: "narticle8_id",
+    });
     acceptsNestedAttributesFor(NArticle8, "nTag8s", { allowDestroy: true });
     registerModel(NTag8);
     registerModel(NArticle8);
@@ -320,7 +384,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticle9, "nTag9s", { className: "NTag9", foreignKey: "narticle9_id" });
+    Associations.hasMany.call(NArticle9, "nTag9s", {
+      className: "NTag9",
+      foreignKey: "narticle9_id",
+    });
     acceptsNestedAttributesFor(NArticle9, "nTag9s", { allowDestroy: true });
     registerModel(NTag9);
     registerModel(NArticle9);
@@ -349,7 +416,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleA, "nTagAs", { className: "NTagA", foreignKey: "narticleA_id" });
+    Associations.hasMany.call(NArticleA, "nTagAs", {
+      className: "NTagA",
+      foreignKey: "narticleA_id",
+    });
     acceptsNestedAttributesFor(NArticleA, "nTagAs", { allowDestroy: true });
     registerModel(NTagA);
     registerModel(NArticleA);
@@ -376,7 +446,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleB, "nTagBs", { className: "NTagB", foreignKey: "narticleB_id" });
+    Associations.hasMany.call(NArticleB, "nTagBs", {
+      className: "NTagB",
+      foreignKey: "narticleB_id",
+    });
     acceptsNestedAttributesFor(NArticleB, "nTagBs", {
       rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
     });
@@ -405,7 +478,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleC, "nTagCs", { className: "NTagC", foreignKey: "narticleC_id" });
+    Associations.hasMany.call(NArticleC, "nTagCs", {
+      className: "NTagC",
+      foreignKey: "narticleC_id",
+    });
     acceptsNestedAttributesFor(NArticleC, "nTagCs", { limit: 5 });
     registerModel(NTagC);
     registerModel(NArticleC);
@@ -432,7 +508,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleD, "nTagDs", { className: "NTagD", foreignKey: "narticleD_id" });
+    Associations.hasMany.call(NArticleD, "nTagDs", {
+      className: "NTagD",
+      foreignKey: "narticleD_id",
+    });
     acceptsNestedAttributesFor(NArticleD, "nTagDs", { limit: 2 });
     registerModel(NTagD);
     registerModel(NArticleD);
@@ -459,7 +538,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleE, "nTagEs", { className: "NTagE", foreignKey: "narticleE_id" });
+    Associations.hasMany.call(NArticleE, "nTagEs", {
+      className: "NTagE",
+      foreignKey: "narticleE_id",
+    });
     acceptsNestedAttributesFor(NArticleE, "nTagEs", { limit: 2 });
     registerModel(NTagE);
     registerModel(NArticleE);
@@ -487,7 +569,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleF, "nTagFs", { className: "NTagF", foreignKey: "narticleF_id" });
+    Associations.hasMany.call(NArticleF, "nTagFs", {
+      className: "NTagF",
+      foreignKey: "narticleF_id",
+    });
     acceptsNestedAttributesFor(NArticleF, "nTagFs", {
       allowDestroy: true,
       rejectIf: () => true,
@@ -519,7 +604,10 @@ describe("NestedAttributesTest", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(NArticleH, "nTagHs", { className: "NTagH", foreignKey: "narticleH_id" });
+    Associations.hasMany.call(NArticleH, "nTagHs", {
+      className: "NTagH",
+      foreignKey: "narticleH_id",
+    });
     acceptsNestedAttributesFor(NArticleH, "nTagHs");
     registerModel(NTagH);
     registerModel(NArticleH);
@@ -536,16 +624,33 @@ describe("NestedAttributesTest", () => {
 
   it("when great-grandchild changed via attributes, saving parent should save great-grandchild", async () => {
     class GGCReply extends Base {
-      static { this.attribute("text", "string"); this.attribute("ggc_comment_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("text", "string");
+        this.attribute("ggc_comment_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GGCComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("ggc_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("ggc_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GGCPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(GGCPost, "ggcComments", { className: "GGCComment", foreignKey: "ggc_post_id" });
-    Associations.hasMany.call(GGCComment, "ggcReplies", { className: "GGCReply", foreignKey: "ggc_comment_id" });
+    Associations.hasMany.call(GGCPost, "ggcComments", {
+      className: "GGCComment",
+      foreignKey: "ggc_post_id",
+    });
+    Associations.hasMany.call(GGCComment, "ggcReplies", {
+      className: "GGCReply",
+      foreignKey: "ggc_comment_id",
+    });
     registerModel(GGCReply);
     registerModel(GGCComment);
     registerModel(GGCPost);
@@ -566,16 +671,33 @@ describe("NestedAttributesTest", () => {
 
   it("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", async () => {
     class GGDReply extends Base {
-      static { this.attribute("text", "string"); this.attribute("ggd_comment_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("text", "string");
+        this.attribute("ggd_comment_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GGDComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("ggd_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("ggd_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GGDPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(GGDPost, "ggdComments", { className: "GGDComment", foreignKey: "ggd_post_id" });
-    Associations.hasMany.call(GGDComment, "ggdReplies", { className: "GGDReply", foreignKey: "ggd_comment_id" });
+    Associations.hasMany.call(GGDPost, "ggdComments", {
+      className: "GGDComment",
+      foreignKey: "ggd_post_id",
+    });
+    Associations.hasMany.call(GGDComment, "ggdReplies", {
+      className: "GGDReply",
+      foreignKey: "ggd_comment_id",
+    });
     registerModel(GGDReply);
     registerModel(GGDComment);
     registerModel(GGDPost);
@@ -595,16 +717,33 @@ describe("NestedAttributesTest", () => {
 
   it("when great-grandchild added via attributes, saving parent should create great-grandchild", async () => {
     class GGAReply extends Base {
-      static { this.attribute("text", "string"); this.attribute("gga_comment_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("text", "string");
+        this.attribute("gga_comment_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GGAComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("gga_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("gga_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GGAPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(GGAPost, "ggaComments", { className: "GGAComment", foreignKey: "gga_post_id" });
-    Associations.hasMany.call(GGAComment, "ggaReplies", { className: "GGAReply", foreignKey: "gga_comment_id" });
+    Associations.hasMany.call(GGAPost, "ggaComments", {
+      className: "GGAComment",
+      foreignKey: "gga_post_id",
+    });
+    Associations.hasMany.call(GGAComment, "ggaReplies", {
+      className: "GGAReply",
+      foreignKey: "gga_comment_id",
+    });
     registerModel(GGAReply);
     registerModel(GGAComment);
     registerModel(GGAPost);
@@ -625,16 +764,33 @@ describe("NestedAttributesTest", () => {
   it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {});
   it("when grandchild changed via attributes, saving parent should save grandchild", async () => {
     class GCTag extends Base {
-      static { this.attribute("name", "string"); this.attribute("gc_comment_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("gc_comment_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GCComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("gc_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("gc_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GCPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(GCPost, "gcComments", { className: "GCComment", foreignKey: "gc_post_id" });
-    Associations.hasMany.call(GCComment, "gcTags", { className: "GCTag", foreignKey: "gc_comment_id" });
+    Associations.hasMany.call(GCPost, "gcComments", {
+      className: "GCComment",
+      foreignKey: "gc_post_id",
+    });
+    Associations.hasMany.call(GCComment, "gcTags", {
+      className: "GCTag",
+      foreignKey: "gc_comment_id",
+    });
     registerModel(GCTag);
     registerModel(GCComment);
     registerModel(GCPost);
@@ -655,16 +811,33 @@ describe("NestedAttributesTest", () => {
 
   it("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", async () => {
     class GCDTag extends Base {
-      static { this.attribute("name", "string"); this.attribute("gc_d_comment_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("gc_d_comment_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GCDComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("gc_d_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("gc_d_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GCDPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(GCDPost, "gcdComments", { className: "GCDComment", foreignKey: "gc_d_post_id" });
-    Associations.hasMany.call(GCDComment, "gcdTags", { className: "GCDTag", foreignKey: "gc_d_comment_id" });
+    Associations.hasMany.call(GCDPost, "gcdComments", {
+      className: "GCDComment",
+      foreignKey: "gc_d_post_id",
+    });
+    Associations.hasMany.call(GCDComment, "gcdTags", {
+      className: "GCDTag",
+      foreignKey: "gc_d_comment_id",
+    });
     registerModel(GCDTag);
     registerModel(GCDComment);
     registerModel(GCDPost);
@@ -685,16 +858,33 @@ describe("NestedAttributesTest", () => {
 
   it("when grandchild added via attributes, saving parent should create grandchild", async () => {
     class GCTag2 extends Base {
-      static { this.attribute("name", "string"); this.attribute("gc_comment2_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("gc_comment2_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GCComment2 extends Base {
-      static { this.attribute("body", "string"); this.attribute("gc_post2_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("gc_post2_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class GCPost2 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(GCPost2, "gcComment2s", { className: "GCComment2", foreignKey: "gc_post2_id" });
-    Associations.hasMany.call(GCComment2, "gcTag2s", { className: "GCTag2", foreignKey: "gc_comment2_id" });
+    Associations.hasMany.call(GCPost2, "gcComment2s", {
+      className: "GCComment2",
+      foreignKey: "gc_post2_id",
+    });
+    Associations.hasMany.call(GCComment2, "gcTag2s", {
+      className: "GCTag2",
+      foreignKey: "gc_comment2_id",
+    });
     registerModel(GCTag2);
     registerModel(GCComment2);
     registerModel(GCPost2);
@@ -716,14 +906,29 @@ describe("NestedAttributesTest", () => {
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
-  function makeModels(opts: { allowDestroy?: boolean; rejectIf?: (attrs: Record<string, unknown>) => boolean; updateOnly?: boolean } = {}) {
+  function makeModels(
+    opts: {
+      allowDestroy?: boolean;
+      rejectIf?: (attrs: Record<string, unknown>) => boolean;
+      updateOnly?: boolean;
+    } = {},
+  ) {
     class Ship extends Base {
-      static { this.attribute("name", "string"); this.attribute("pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Pirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
     registerModel("Ship", Ship);
@@ -734,12 +939,22 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
   it("should raise argument error if trying to build polymorphic belongs to", () => {
     class PolyTarget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PolyOwner extends Base {
-      static { this.attribute("target_type", "string"); this.attribute("target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("target_type", "string");
+        this.attribute("target_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.belongsTo.call(PolyOwner, "target", { polymorphic: true, foreignKey: "target_id" });
+    Associations.belongsTo.call(PolyOwner, "target", {
+      polymorphic: true,
+      foreignKey: "target_id",
+    });
     registerModel("PolyTarget", PolyTarget);
     registerModel("PolyOwner", PolyOwner);
     expect(() => acceptsNestedAttributesFor(PolyOwner, "target")).toThrow(/polymorphic/);
@@ -829,7 +1044,9 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     expect(updated.readAttribute("name")).toBe("Updated");
   });
 
-  it.skip("should modify an existing record if there is a matching composite id", () => { /* composite keys not implemented */ });
+  it.skip("should modify an existing record if there is a matching composite id", () => {
+    /* composite keys not implemented */
+  });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
     const { Ship, Pirate } = makeModels({ allowDestroy: true });
@@ -969,14 +1186,29 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
-  function makeModels(opts: { allowDestroy?: boolean; rejectIf?: (attrs: Record<string, unknown>) => boolean; updateOnly?: boolean } = {}) {
+  function makeModels(
+    opts: {
+      allowDestroy?: boolean;
+      rejectIf?: (attrs: Record<string, unknown>) => boolean;
+      updateOnly?: boolean;
+    } = {},
+  ) {
     class Pirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
     class Ship extends Base {
-      static { this.attribute("name", "string"); this.attribute("pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Ship, "pirate", { className: "Pirate", foreignKey: "pirate_id" });
     registerModel("Pirate", Pirate);
@@ -1067,7 +1299,9 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     expect(updated.readAttribute("catchphrase")).toBe("StringKey");
   });
 
-  it.skip("should modify an existing record if there is a matching composite id", () => { /* composite keys not implemented */ });
+  it.skip("should modify an existing record if there is a matching composite id", () => {
+    /* composite keys not implemented */
+  });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
     const { Ship, Pirate } = makeModels({ allowDestroy: true });
@@ -1185,22 +1419,36 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
 describe("TestNestedAttributesInGeneral", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("base should have an empty nested attributes options", () => {
     class Plain extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const configs = (Plain as any)._nestedAttributeConfigs;
-    expect(configs === undefined || configs === null || (Array.isArray(configs) && configs.length === 0)).toBe(true);
+    expect(
+      configs === undefined || configs === null || (Array.isArray(configs) && configs.length === 0),
+    ).toBe(true);
   });
 
   it("should add a proc to nested attributes options", () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
@@ -1214,10 +1462,17 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("should not build a new record using reject all even if destroy is given", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
@@ -1232,15 +1487,24 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("should not build a new record if reject all blank returns false", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
     registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", { rejectIf: (attrs) => !attrs.body || attrs.body === "" });
+    acceptsNestedAttributesFor(Post, "comments", {
+      rejectIf: (attrs) => !attrs.body || attrs.body === "",
+    });
     const post = await Post.create({ title: "Test" });
     assignNestedAttributes(post, "comments", [{ body: "" }]);
     await post.save();
@@ -1250,18 +1514,31 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("should raise an ArgumentError for non existing associations", () => {
     class Plain extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(() => acceptsNestedAttributesFor(Plain, "nonExistent")).toThrow(/No association found/);
   });
   it("should raise an UnknownAttributeError for non existing nested attributes", async () => {
     class UAShip extends Base {
-      static { this.attribute("name", "string"); this.attribute("ua_pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("ua_pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class UAPirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasOne.call(UAPirate, "uaShip", { className: "UAShip", foreignKey: "ua_pirate_id" });
+    Associations.hasOne.call(UAPirate, "uaShip", {
+      className: "UAShip",
+      foreignKey: "ua_pirate_id",
+    });
     registerModel("UAShip", UAShip);
     registerModel("UAPirate", UAPirate);
     acceptsNestedAttributesFor(UAPirate, "uaShip");
@@ -1272,7 +1549,10 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("a model should respond to underscore destroy and return if it is marked for destruction", () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const item = new Item({ name: "test" });
     markForDestruction(item);
@@ -1281,10 +1561,17 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if method without arguments", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
@@ -1299,10 +1586,17 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if method with arguments", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
@@ -1318,10 +1612,17 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if with indifferent keys", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
@@ -1337,10 +1638,17 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if with a proc which returns true always for has one", async () => {
     class Ship extends Base {
-      static { this.attribute("name", "string"); this.attribute("pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Pirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
     registerModel("Ship", Ship);
@@ -1353,15 +1661,26 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(ships.length).toBe(0);
   });
 
-  it.skip("reuse already built new record", () => { /* needs association building support */ });
-  it.skip("do not allow assigning foreign key when reusing existing new record", () => { /* needs association building support */ });
+  it.skip("reuse already built new record", () => {
+    /* needs association building support */
+  });
+  it.skip("do not allow assigning foreign key when reusing existing new record", () => {
+    /* needs association building support */
+  });
 
   it("reject if with a proc which returns true always for has many", async () => {
     class Bird extends Base {
-      static { this.attribute("name", "string"); this.attribute("pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Pirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
     registerModel("Bird", Bird);
@@ -1376,10 +1695,17 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if with blank nested attributes id", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
     registerModel("Comment", Comment);
@@ -1392,15 +1718,27 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(comments.length).toBe(1);
   });
 
-  it.skip("first and array index zero methods return the same value when nested attributes are set to update existing record", () => { /* needs collection first() */ });
+  it.skip("first and array index zero methods return the same value when nested attributes are set to update existing record", () => {
+    /* needs collection first() */
+  });
   it("allows class to override setter and call super", async () => {
     class OvShip extends Base {
-      static { this.attribute("name", "string"); this.attribute("ov_pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("ov_pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class OvPirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(OvPirate, "ovShips", { className: "OvShip", foreignKey: "ov_pirate_id" });
+    Associations.hasMany.call(OvPirate, "ovShips", {
+      className: "OvShip",
+      foreignKey: "ov_pirate_id",
+    });
     registerModel("OvShip", OvShip);
     registerModel("OvPirate", OvPirate);
     acceptsNestedAttributesFor(OvPirate, "ovShips");
@@ -1416,12 +1754,22 @@ describe("TestNestedAttributesInGeneral", () => {
   });
   it("accepts nested attributes for can be overridden in subclasses", async () => {
     class SubBird extends Base {
-      static { this.attribute("name", "string"); this.attribute("sub_pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("sub_pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class SubPirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(SubPirate, "subBirds", { className: "SubBird", foreignKey: "sub_pirate_id" });
+    Associations.hasMany.call(SubPirate, "subBirds", {
+      className: "SubBird",
+      foreignKey: "sub_pirate_id",
+    });
     registerModel("SubBird", SubBird);
     registerModel("SubPirate", SubPirate);
     acceptsNestedAttributesFor(SubPirate, "subBirds", { rejectIf: () => true });
@@ -1435,9 +1783,14 @@ describe("TestNestedAttributesInGeneral", () => {
 
     // Subclass re-declares with different options (no reject)
     class SubSubPirate extends SubPirate {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(SubSubPirate, "subBirds", { className: "SubBird", foreignKey: "sub_pirate_id" });
+    Associations.hasMany.call(SubSubPirate, "subBirds", {
+      className: "SubBird",
+      foreignKey: "sub_pirate_id",
+    });
     registerModel("SubSubPirate", SubSubPirate);
     // Override: subclass has its own config array
     (SubSubPirate as any)._nestedAttributeConfigs = [];
@@ -1449,20 +1802,33 @@ describe("TestNestedAttributesInGeneral", () => {
     const birds = await SubBird.where({ sub_pirate_id: pirate.id }).toArray();
     expect(birds.length).toBe(1);
   });
-  it.skip("should not create duplicates with create with", () => { /* needs createWith support */ });
-  it.skip("updating models with cpk provided as strings", () => { /* composite keys not implemented */ });
+  it.skip("should not create duplicates with create with", () => {
+    /* needs createWith support */
+  });
+  it.skip("updating models with cpk provided as strings", () => {
+    /* composite keys not implemented */
+  });
 });
 
 describe("NestedAttributesWithCallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModels() {
     class Bird extends Base {
-      static { this.attribute("name", "string"); this.attribute("pirate_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Pirate extends Base {
-      static { this.attribute("catchphrase", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
     registerModel("Bird", Bird);
@@ -1556,7 +1922,13 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
   it("index in nested attributes order", async () => {
     const adapter = freshAdapter();
     class EITag extends Base {
-      static { this._tableName = "ei_tags"; this.attribute("name", "string"); this.attribute("ei_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "ei_tags";
+        this.attribute("name", "string");
+        this.attribute("ei_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     registerModel(EITag);
     // Validate that errors are indexed per child record
@@ -1573,13 +1945,28 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
   it("index unaffected by reject_if", async () => {
     const adapter = freshAdapter();
     class EIRTag extends Base {
-      static { this._tableName = "eir_tags"; this.attribute("name", "string"); this.attribute("eir_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "eir_tags";
+        this.attribute("name", "string");
+        this.attribute("eir_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class EIRArticle extends Base {
-      static { this._tableName = "eir_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "eir_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(EIRArticle, "eirTags", { className: "EIRTag", foreignKey: "eir_article_id" });
-    acceptsNestedAttributesFor(EIRArticle, "eirTags", { rejectIf: (attrs) => attrs.name === "reject" });
+    Associations.hasMany.call(EIRArticle, "eirTags", {
+      className: "EIRTag",
+      foreignKey: "eir_article_id",
+    });
+    acceptsNestedAttributesFor(EIRArticle, "eirTags", {
+      rejectIf: (attrs) => attrs.name === "reject",
+    });
     registerModel(EIRTag);
     registerModel(EIRArticle);
     const article = await EIRArticle.create({ title: "test" });
@@ -1593,15 +1980,25 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
 });
 
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
-  it.skip("should update existing records with non standard primary key", () => { /* test adapter auto-assigns 'id' not custom PK */ });
-  it.skip("attr accessor of child should be value provided during update", () => { /* test adapter auto-assigns 'id' not custom PK */ });
+  it.skip("should update existing records with non standard primary key", () => {
+    /* test adapter auto-assigns 'id' not custom PK */
+  });
+  it.skip("attr accessor of child should be value provided during update", () => {
+    /* test adapter auto-assigns 'id' not custom PK */
+  });
 });
 
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   it("index in nested_attributes_order order", async () => {
     const adapter = freshAdapter();
     class IENTag extends Base {
-      static { this._tableName = "ien_tags"; this.attribute("name", "string"); this.attribute("ien_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "ien_tags";
+        this.attribute("name", "string");
+        this.attribute("ien_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     registerModel(IENTag);
     // Verify validation errors work on individual records in nested attrs context
@@ -1614,13 +2011,27 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   it("index unaffected by reject_if", async () => {
     const adapter = freshAdapter();
     class IERTag extends Base {
-      static { this._tableName = "ier_tags"; this.attribute("name", "string"); this.attribute("ier_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "ier_tags";
+        this.attribute("name", "string");
+        this.attribute("ier_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class IERArticle extends Base {
-      static { this._tableName = "ier_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "ier_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(IERArticle, "ierTags", { className: "IERTag", foreignKey: "ier_article_id" });
-    acceptsNestedAttributesFor(IERArticle, "ierTags", { rejectIf: (attrs) => attrs.name === "skip" });
+    Associations.hasMany.call(IERArticle, "ierTags", {
+      className: "IERTag",
+      foreignKey: "ier_article_id",
+    });
+    acceptsNestedAttributesFor(IERArticle, "ierTags", {
+      rejectIf: (attrs) => attrs.name === "skip",
+    });
     registerModel(IERTag);
     registerModel(IERArticle);
     const article = await IERArticle.create({ title: "test" });
@@ -1635,12 +2046,24 @@ describe("AssociationsNestedErrorInAssociationOrderTest", () => {
   it("index in association order", async () => {
     const adapter = freshAdapter();
     class IAOTag extends Base {
-      static { this._tableName = "iao_tags"; this.attribute("name", "string"); this.attribute("iao_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "iao_tags";
+        this.attribute("name", "string");
+        this.attribute("iao_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class IAOArticle extends Base {
-      static { this._tableName = "iao_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "iao_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(IAOArticle, "iaoTags", { className: "IAOTag", foreignKey: "iao_article_id" });
+    Associations.hasMany.call(IAOArticle, "iaoTags", {
+      className: "IAOTag",
+      foreignKey: "iao_article_id",
+    });
     acceptsNestedAttributesFor(IAOArticle, "iaoTags");
     registerModel(IAOTag);
     registerModel(IAOArticle);
@@ -1659,18 +2082,32 @@ describe("TestNestedAttributesWithExtend", () => {
   it("extend affects nested attributes", async () => {
     const adapter = freshAdapter();
     class ExtTag extends Base {
-      static { this._tableName = "ext_tags"; this.attribute("name", "string"); this.attribute("ext_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "ext_tags";
+        this.attribute("name", "string");
+        this.attribute("ext_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class ExtArticle extends Base {
-      static { this._tableName = "ext_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "ext_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(ExtArticle, "extTags", { className: "ExtTag", foreignKey: "ext_article_id" });
+    Associations.hasMany.call(ExtArticle, "extTags", {
+      className: "ExtTag",
+      foreignKey: "ext_article_id",
+    });
     acceptsNestedAttributesFor(ExtArticle, "extTags");
     registerModel(ExtTag);
     registerModel(ExtArticle);
     // Verify nested attributes still work with an extended/subclassed article
     class ExtArticleSub extends ExtArticle {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     const article = await ExtArticleSub.create({ title: "extended" });
     assignNestedAttributes(article, "extTags", [{ name: "extended-tag" }]);
@@ -1685,24 +2122,48 @@ describe("TestNestedAttributesForDelegatedType", () => {
   it("should build a new record based on the delegated type", async () => {
     const adapter = freshAdapter();
     class DTComment extends Base {
-      static { this._tableName = "dt_comments"; this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "dt_comments";
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     class DTEntry extends Base {
-      static { this._tableName = "dt_entries"; this.attribute("entryable_type", "string"); this.attribute("entryable_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "dt_entries";
+        this.attribute("entryable_type", "string");
+        this.attribute("entryable_id", "integer");
+        this.adapter = adapter;
+      }
     }
     // Set up a has_one association to simulate delegated type behavior
-    Associations.hasOne.call(DTEntry, "dtComment", { className: "DTComment", foreignKey: "dt_entry_id" });
+    Associations.hasOne.call(DTEntry, "dtComment", {
+      className: "DTComment",
+      foreignKey: "dt_entry_id",
+    });
     registerModel(DTComment);
     registerModel(DTEntry);
     // Delegated type is essentially a polymorphic pattern; verify basic nested attrs work
     // with a simple has_one for now
     class DTComment2 extends Base {
-      static { this._tableName = "dt_comments2"; this.attribute("body", "string"); this.attribute("dt_entry2_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "dt_comments2";
+        this.attribute("body", "string");
+        this.attribute("dt_entry2_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class DTEntry2 extends Base {
-      static { this._tableName = "dt_entries2"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "dt_entries2";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasOne.call(DTEntry2, "dtComment2", { className: "DTComment2", foreignKey: "dt_entry2_id" });
+    Associations.hasOne.call(DTEntry2, "dtComment2", {
+      className: "DTComment2",
+      foreignKey: "dt_entry2_id",
+    });
     registerModel(DTComment2);
     registerModel(DTEntry2);
     acceptsNestedAttributesFor(DTEntry2, "dtComment2");
@@ -1719,12 +2180,24 @@ describe("assigning nested attributes target", () => {
   it("assigning nested attributes target", async () => {
     const adapter = freshAdapter();
     class ANTTag extends Base {
-      static { this._tableName = "ant_tags"; this.attribute("name", "string"); this.attribute("ant_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "ant_tags";
+        this.attribute("name", "string");
+        this.attribute("ant_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class ANTArticle extends Base {
-      static { this._tableName = "ant_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "ant_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(ANTArticle, "antTags", { className: "ANTTag", foreignKey: "ant_article_id" });
+    Associations.hasMany.call(ANTArticle, "antTags", {
+      className: "ANTTag",
+      foreignKey: "ant_article_id",
+    });
     acceptsNestedAttributesFor(ANTArticle, "antTags");
     registerModel(ANTTag);
     registerModel(ANTArticle);
@@ -1741,13 +2214,27 @@ describe("assigning nested attributes target with nil placeholder for rejected i
   it("assigning nested attributes target with nil placeholder for rejected item", async () => {
     const adapter = freshAdapter();
     class NilTag extends Base {
-      static { this._tableName = "nil_tags"; this.attribute("name", "string"); this.attribute("nil_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nil_tags";
+        this.attribute("name", "string");
+        this.attribute("nil_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NilArticle extends Base {
-      static { this._tableName = "nil_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nil_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NilArticle, "nilTags", { className: "NilTag", foreignKey: "nil_article_id" });
-    acceptsNestedAttributesFor(NilArticle, "nilTags", { rejectIf: (attrs) => !attrs.name || attrs.name === "" });
+    Associations.hasMany.call(NilArticle, "nilTags", {
+      className: "NilTag",
+      foreignKey: "nil_article_id",
+    });
+    acceptsNestedAttributesFor(NilArticle, "nilTags", {
+      rejectIf: (attrs) => !attrs.name || attrs.name === "",
+    });
     registerModel(NilTag);
     registerModel(NilArticle);
     const article = await NilArticle.create({ title: "test" });
@@ -1765,12 +2252,24 @@ describe("can use symbols as object identifier", () => {
     // but string keys should work as identifiers for nested attributes
     const adapter = freshAdapter();
     class NSymTag extends Base {
-      static { this._tableName = "nsym_tags"; this.attribute("name", "string"); this.attribute("nsym_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nsym_tags";
+        this.attribute("name", "string");
+        this.attribute("nsym_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NSymArticle extends Base {
-      static { this._tableName = "nsym_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nsym_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NSymArticle, "nsymTags", { className: "NSymTag", foreignKey: "nsym_article_id" });
+    Associations.hasMany.call(NSymArticle, "nsymTags", {
+      className: "NSymTag",
+      foreignKey: "nsym_article_id",
+    });
     acceptsNestedAttributesFor(NSymArticle, "nsymTags");
     registerModel(NSymTag);
     registerModel(NSymArticle);
@@ -1786,7 +2285,12 @@ describe("numeric column changes from zero to no empty string", () => {
   it("numeric column changes from zero to no empty string", async () => {
     const adapter = freshAdapter();
     class NumPost extends Base {
-      static { this._tableName = "num_posts"; this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "num_posts";
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adapter;
+      }
     }
     const post = await NumPost.create({ title: "test", score: 0 });
     expect(post.readAttribute("score")).toBe(0);
@@ -1802,12 +2306,25 @@ describe("should allow to bypass validations on the associated models on create"
   it("should allow to bypass validations on the associated models on create", async () => {
     const adapter = freshAdapter();
     class BVTag extends Base {
-      static { this._tableName = "bv_tags"; this.attribute("name", "string"); this.attribute("bv_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "bv_tags";
+        this.attribute("name", "string");
+        this.attribute("bv_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class BVArticle extends Base {
-      static { this._tableName = "bv_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "bv_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(BVArticle, "bvTags", { className: "BVTag", foreignKey: "bv_article_id" });
+    Associations.hasMany.call(BVArticle, "bvTags", {
+      className: "BVTag",
+      foreignKey: "bv_article_id",
+    });
     acceptsNestedAttributesFor(BVArticle, "bvTags");
     registerModel(BVTag);
     registerModel(BVArticle);
@@ -1824,12 +2341,25 @@ describe("should allow to bypass validations on the associated models on update"
   it("should allow to bypass validations on the associated models on update", async () => {
     const adapter = freshAdapter();
     class BVUTag extends Base {
-      static { this._tableName = "bvu_tags"; this.attribute("name", "string"); this.attribute("bvu_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "bvu_tags";
+        this.attribute("name", "string");
+        this.attribute("bvu_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class BVUArticle extends Base {
-      static { this._tableName = "bvu_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "bvu_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(BVUArticle, "bvuTags", { className: "BVUTag", foreignKey: "bvu_article_id" });
+    Associations.hasMany.call(BVUArticle, "bvuTags", {
+      className: "BVUTag",
+      foreignKey: "bvu_article_id",
+    });
     acceptsNestedAttributesFor(BVUArticle, "bvuTags");
     registerModel(BVUTag);
     registerModel(BVUArticle);
@@ -1846,12 +2376,24 @@ describe("should also work with a HashWithIndifferentAccess", () => {
   it("should also work with a HashWithIndifferentAccess", async () => {
     const adapter = freshAdapter();
     class HITag extends Base {
-      static { this._tableName = "hi_tags"; this.attribute("name", "string"); this.attribute("hi_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "hi_tags";
+        this.attribute("name", "string");
+        this.attribute("hi_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HIArticle extends Base {
-      static { this._tableName = "hi_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "hi_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(HIArticle, "hiTags", { className: "HITag", foreignKey: "hi_article_id" });
+    Associations.hasMany.call(HIArticle, "hiTags", {
+      className: "HITag",
+      foreignKey: "hi_article_id",
+    });
     acceptsNestedAttributesFor(HIArticle, "hiTags");
     registerModel(HITag);
     registerModel(HIArticle);
@@ -1869,12 +2411,24 @@ describe("should automatically build new associated models for each entry in a h
   it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
     const adapter = freshAdapter();
     class NBuildTag extends Base {
-      static { this._tableName = "nbuild_tags"; this.attribute("name", "string"); this.attribute("nbuild_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nbuild_tags";
+        this.attribute("name", "string");
+        this.attribute("nbuild_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NBuildArticle extends Base {
-      static { this._tableName = "nbuild_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nbuild_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NBuildArticle, "nbuildTags", { className: "NBuildTag", foreignKey: "nbuild_article_id" });
+    Associations.hasMany.call(NBuildArticle, "nbuildTags", {
+      className: "NBuildTag",
+      foreignKey: "nbuild_article_id",
+    });
     acceptsNestedAttributesFor(NBuildArticle, "nbuildTags");
     registerModel(NBuildTag);
     registerModel(NBuildArticle);
@@ -1893,12 +2447,24 @@ describe("should automatically save bang the associated models", () => {
   it("should automatically save bang the associated models", async () => {
     const adapter = freshAdapter();
     class ASB1Tag extends Base {
-      static { this._tableName = "asb1_tags"; this.attribute("name", "string"); this.attribute("asb1_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "asb1_tags";
+        this.attribute("name", "string");
+        this.attribute("asb1_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class ASB1Article extends Base {
-      static { this._tableName = "asb1_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "asb1_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(ASB1Article, "asb1Tags", { className: "ASB1Tag", foreignKey: "asb1_article_id" });
+    Associations.hasMany.call(ASB1Article, "asb1Tags", {
+      className: "ASB1Tag",
+      foreignKey: "asb1_article_id",
+    });
     acceptsNestedAttributesFor(ASB1Article, "asb1Tags");
     registerModel(ASB1Tag);
     registerModel(ASB1Article);
@@ -1915,12 +2481,24 @@ describe("should automatically save the associated models", () => {
   it("should automatically save the associated models", async () => {
     const adapter = freshAdapter();
     class NAutoTag extends Base {
-      static { this._tableName = "nauto_tags"; this.attribute("name", "string"); this.attribute("nauto_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nauto_tags";
+        this.attribute("name", "string");
+        this.attribute("nauto_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NAutoArticle extends Base {
-      static { this._tableName = "nauto_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nauto_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NAutoArticle, "nautoTags", { className: "NAutoTag", foreignKey: "nauto_article_id" });
+    Associations.hasMany.call(NAutoArticle, "nautoTags", {
+      className: "NAutoTag",
+      foreignKey: "nauto_article_id",
+    });
     acceptsNestedAttributesFor(NAutoArticle, "nautoTags");
     registerModel(NAutoTag);
     registerModel(NAutoArticle);
@@ -1938,12 +2516,25 @@ describe("should automatically validate the associated models", () => {
   it("should automatically validate the associated models", async () => {
     const adapter = freshAdapter();
     class AVTag extends Base {
-      static { this._tableName = "av_tags"; this.attribute("name", "string"); this.attribute("av_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "av_tags";
+        this.attribute("name", "string");
+        this.attribute("av_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class AVArticle extends Base {
-      static { this._tableName = "av_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "av_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(AVArticle, "avTags", { className: "AVTag", foreignKey: "av_article_id" });
+    Associations.hasMany.call(AVArticle, "avTags", {
+      className: "AVTag",
+      foreignKey: "av_article_id",
+    });
     acceptsNestedAttributesFor(AVArticle, "avTags");
     registerModel(AVTag);
     registerModel(AVArticle);
@@ -1957,12 +2548,25 @@ describe("should default invalid error from i18n", () => {
   it("should default invalid error from i18n", async () => {
     const adapter = freshAdapter();
     class DITag extends Base {
-      static { this._tableName = "di_tags"; this.attribute("name", "string"); this.attribute("di_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "di_tags";
+        this.attribute("name", "string");
+        this.attribute("di_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class DIArticle extends Base {
-      static { this._tableName = "di_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "di_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(DIArticle, "diTags", { className: "DITag", foreignKey: "di_article_id" });
+    Associations.hasMany.call(DIArticle, "diTags", {
+      className: "DITag",
+      foreignKey: "di_article_id",
+    });
     acceptsNestedAttributesFor(DIArticle, "diTags");
     registerModel(DITag);
     registerModel(DIArticle);
@@ -1978,12 +2582,25 @@ describe("should merge errors on the associated models onto the parent even if i
   it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
     const adapter = freshAdapter();
     class METag extends Base {
-      static { this._tableName = "me_tags"; this.attribute("name", "string"); this.attribute("me_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "me_tags";
+        this.attribute("name", "string");
+        this.attribute("me_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class MEArticle extends Base {
-      static { this._tableName = "me_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "me_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(MEArticle, "meTags", { className: "METag", foreignKey: "me_article_id" });
+    Associations.hasMany.call(MEArticle, "meTags", {
+      className: "METag",
+      foreignKey: "me_article_id",
+    });
     acceptsNestedAttributesFor(MEArticle, "meTags");
     registerModel(METag);
     registerModel(MEArticle);
@@ -1999,12 +2616,24 @@ describe("should not assign destroy key to a record", () => {
   it("should not assign destroy key to a record", async () => {
     const adapter = freshAdapter();
     class NADTag extends Base {
-      static { this._tableName = "nad_tags"; this.attribute("name", "string"); this.attribute("nad_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nad_tags";
+        this.attribute("name", "string");
+        this.attribute("nad_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NADArticle extends Base {
-      static { this._tableName = "nad_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nad_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NADArticle, "nadTags", { className: "NADTag", foreignKey: "nad_article_id" });
+    Associations.hasMany.call(NADArticle, "nadTags", {
+      className: "NADTag",
+      foreignKey: "nad_article_id",
+    });
     acceptsNestedAttributesFor(NADArticle, "nadTags");
     registerModel(NADTag);
     registerModel(NADArticle);
@@ -2022,12 +2651,24 @@ describe("should not destroy the associated model until the parent is saved", ()
   it("should not destroy the associated model until the parent is saved", async () => {
     const adapter = freshAdapter();
     class NDTag extends Base {
-      static { this._tableName = "nd_tags"; this.attribute("name", "string"); this.attribute("nd_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nd_tags";
+        this.attribute("name", "string");
+        this.attribute("nd_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NDArticle extends Base {
-      static { this._tableName = "nd_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nd_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NDArticle, "ndTags", { className: "NDTag", foreignKey: "nd_article_id" });
+    Associations.hasMany.call(NDArticle, "ndTags", {
+      className: "NDTag",
+      foreignKey: "nd_article_id",
+    });
     acceptsNestedAttributesFor(NDArticle, "ndTags", { allowDestroy: true });
     registerModel(NDTag);
     registerModel(NDArticle);
@@ -2047,12 +2688,24 @@ describe("should not load association when updating existing records", () => {
   it("should not load association when updating existing records", async () => {
     const adapter = freshAdapter();
     class NLUTag extends Base {
-      static { this._tableName = "nlu_tags"; this.attribute("name", "string"); this.attribute("nlu_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nlu_tags";
+        this.attribute("name", "string");
+        this.attribute("nlu_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NLUArticle extends Base {
-      static { this._tableName = "nlu_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nlu_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NLUArticle, "nluTags", { className: "NLUTag", foreignKey: "nlu_article_id" });
+    Associations.hasMany.call(NLUArticle, "nluTags", {
+      className: "NLUTag",
+      foreignKey: "nlu_article_id",
+    });
     acceptsNestedAttributesFor(NLUArticle, "nluTags");
     registerModel(NLUTag);
     registerModel(NLUArticle);
@@ -2070,12 +2723,24 @@ describe("should not load the associated models if they were not loaded yet", ()
   it("should not load the associated models if they were not loaded yet", async () => {
     const adapter = freshAdapter();
     class NLTag extends Base {
-      static { this._tableName = "nl_tags"; this.attribute("name", "string"); this.attribute("nl_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nl_tags";
+        this.attribute("name", "string");
+        this.attribute("nl_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NLArticle extends Base {
-      static { this._tableName = "nl_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nl_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NLArticle, "nlTags", { className: "NLTag", foreignKey: "nl_article_id" });
+    Associations.hasMany.call(NLArticle, "nlTags", {
+      className: "NLTag",
+      foreignKey: "nl_article_id",
+    });
     acceptsNestedAttributesFor(NLArticle, "nlTags");
     registerModel(NLTag);
     registerModel(NLArticle);
@@ -2087,11 +2752,15 @@ describe("should not load the associated models if they were not loaded yet", ()
 });
 
 describe("should not overwrite unsaved updates when loading association", () => {
-  it.skip("should not overwrite unsaved updates when loading association", () => { /* fixture-dependent */ });
+  it.skip("should not overwrite unsaved updates when loading association", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("should not remove scheduled destroys when loading association", () => {
-  it.skip("should not remove scheduled destroys when loading association", () => { /* fixture-dependent */ });
+  it.skip("should not remove scheduled destroys when loading association", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("should not save and return false if a callback cancelled saving in either create or update", () => {
@@ -2103,13 +2772,17 @@ describe("should not save and return false if a callback cancelled saving in eit
         this.attribute("name", "string");
         this.attribute("cb_article_id", "integer");
         this.adapter = adapter;
-        this.beforeSave(function(record: any) {
+        this.beforeSave(function (record: any) {
           if (record.readAttribute("name") === "cancel") return false;
         });
       }
     }
     class CBArticle extends Base {
-      static { this._tableName = "cb_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cb_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(CBTag);
     registerModel(CBArticle);
@@ -2124,12 +2797,24 @@ describe("should not update children when parent creation with no reason", () =>
   it("should not update children when parent creation with no reason", async () => {
     const adapter = freshAdapter();
     class NUCTag extends Base {
-      static { this._tableName = "nuc_tags"; this.attribute("name", "string"); this.attribute("nuc_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nuc_tags";
+        this.attribute("name", "string");
+        this.attribute("nuc_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NUCArticle extends Base {
-      static { this._tableName = "nuc_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nuc_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NUCArticle, "nucTags", { className: "NUCTag", foreignKey: "nuc_article_id" });
+    Associations.hasMany.call(NUCArticle, "nucTags", {
+      className: "NUCTag",
+      foreignKey: "nuc_article_id",
+    });
     acceptsNestedAttributesFor(NUCArticle, "nucTags");
     registerModel(NUCTag);
     registerModel(NUCArticle);
@@ -2155,9 +2840,16 @@ describe("should not use default invalid error on associated models", () => {
       }
     }
     class NDIArticle extends Base {
-      static { this._tableName = "ndi_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "ndi_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NDIArticle, "ndiTags", { className: "NDITag", foreignKey: "ndi_article_id" });
+    Associations.hasMany.call(NDIArticle, "ndiTags", {
+      className: "NDITag",
+      foreignKey: "ndi_article_id",
+    });
     acceptsNestedAttributesFor(NDIArticle, "ndiTags");
     registerModel(NDITag);
     registerModel(NDIArticle);
@@ -2172,19 +2864,33 @@ describe("should not use default invalid error on associated models", () => {
 });
 
 describe("should preserve order when not overwriting unsaved updates", () => {
-  it.skip("should preserve order when not overwriting unsaved updates", () => { /* fixture-dependent */ });
+  it.skip("should preserve order when not overwriting unsaved updates", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
   it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
     const adapter = freshAdapter();
     class RNFTag extends Base {
-      static { this._tableName = "rnf_tags"; this.attribute("name", "string"); this.attribute("rnf_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rnf_tags";
+        this.attribute("name", "string");
+        this.attribute("rnf_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class RNFArticle extends Base {
-      static { this._tableName = "rnf_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "rnf_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(RNFArticle, "rnfTags", { className: "RNFTag", foreignKey: "rnf_article_id" });
+    Associations.hasMany.call(RNFArticle, "rnfTags", {
+      className: "RNFTag",
+      foreignKey: "rnf_article_id",
+    });
     acceptsNestedAttributesFor(RNFArticle, "rnfTags");
     registerModel(RNFTag);
     registerModel(RNFArticle);
@@ -2199,12 +2905,24 @@ describe("should raise an UnknownAttributeError for non existing nested attribut
   it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
     const adapter = freshAdapter();
     class UAHMTag extends Base {
-      static { this._tableName = "uahm_tags"; this.attribute("name", "string"); this.attribute("uahm_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "uahm_tags";
+        this.attribute("name", "string");
+        this.attribute("uahm_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class UAHMArticle extends Base {
-      static { this._tableName = "uahm_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "uahm_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(UAHMArticle, "uahmTags", { className: "UAHMTag", foreignKey: "uahm_article_id" });
+    Associations.hasMany.call(UAHMArticle, "uahmTags", {
+      className: "UAHMTag",
+      foreignKey: "uahm_article_id",
+    });
     acceptsNestedAttributesFor(UAHMArticle, "uahmTags");
     registerModel(UAHMTag);
     registerModel(UAHMArticle);
@@ -2218,40 +2936,71 @@ describe("should raise an argument error if something else than a hash is passed
   it("should raise an argument error if something else than a hash is passed", () => {
     const adapter = freshAdapter();
     class RAETag extends Base {
-      static { this._tableName = "rae_tags"; this.attribute("name", "string"); this.attribute("rae_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rae_tags";
+        this.attribute("name", "string");
+        this.attribute("rae_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class RAEArticle extends Base {
-      static { this._tableName = "rae_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "rae_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(RAEArticle, "raeTags", { className: "RAETag", foreignKey: "rae_article_id" });
+    Associations.hasMany.call(RAEArticle, "raeTags", {
+      className: "RAETag",
+      foreignKey: "rae_article_id",
+    });
     acceptsNestedAttributesFor(RAEArticle, "raeTags");
     registerModel(RAETag);
     registerModel(RAEArticle);
     const article = new RAEArticle({ title: "test" });
-    expect(() => assignNestedAttributes(article, "raeTags", "not a hash" as any)).toThrow(/Hash or Array expected/);
+    expect(() => assignNestedAttributes(article, "raeTags", "not a hash" as any)).toThrow(
+      /Hash or Array expected/,
+    );
   });
 });
 
 describe("should refresh saved records when not overwriting unsaved updates", () => {
-  it.skip("should refresh saved records when not overwriting unsaved updates", () => { /* fixture-dependent */ });
+  it.skip("should refresh saved records when not overwriting unsaved updates", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("should rollback any changes if an exception occurred while saving", () => {
   it("should rollback any changes if an exception occurred while saving", async () => {
     const adapter = freshAdapter();
     class RBTag extends Base {
-      static { this._tableName = "rb_tags"; this.attribute("name", "string"); this.attribute("rb_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "rb_tags";
+        this.attribute("name", "string");
+        this.attribute("rb_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class RBArticle extends Base {
-      static { this._tableName = "rb_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "rb_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(RBArticle, "rbTags", { className: "RBTag", foreignKey: "rb_article_id" });
+    Associations.hasMany.call(RBArticle, "rbTags", {
+      className: "RBTag",
+      foreignKey: "rb_article_id",
+    });
     acceptsNestedAttributesFor(RBArticle, "rbTags");
     registerModel(RBTag);
     registerModel(RBArticle);
     const article = await RBArticle.create({ title: "rollback test" });
     // Assign nested attributes including one with an unknown attribute to trigger an error
-    assignNestedAttributes(article, "rbTags", [{ name: "good" }, { name: "bad", unknownCol: "boom" }]);
+    assignNestedAttributes(article, "rbTags", [
+      { name: "good" },
+      { name: "bad", unknownCol: "boom" },
+    ]);
     await expect(article.save()).rejects.toThrow(/unknown attribute/);
     // The first tag should NOT have been persisted due to the error
     const tags = await RBTag.where({ rb_article_id: article.id }).toArray();
@@ -2265,12 +3014,24 @@ describe("should save only one association on create", () => {
   it("should save only one association on create", async () => {
     const adapter = freshAdapter();
     class NSaveTag extends Base {
-      static { this._tableName = "nsave_tags"; this.attribute("name", "string"); this.attribute("nsave_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nsave_tags";
+        this.attribute("name", "string");
+        this.attribute("nsave_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NSaveArticle extends Base {
-      static { this._tableName = "nsave_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nsave_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NSaveArticle, "nsaveTags", { className: "NSaveTag", foreignKey: "nsave_article_id" });
+    Associations.hasMany.call(NSaveArticle, "nsaveTags", {
+      className: "NSaveTag",
+      foreignKey: "nsave_article_id",
+    });
     acceptsNestedAttributesFor(NSaveArticle, "nsaveTags");
     registerModel(NSaveTag);
     registerModel(NSaveArticle);
@@ -2287,17 +3048,33 @@ describe("should sort the hash by the keys before building new associated models
   it("should sort the hash by the keys before building new associated models", async () => {
     const adapter = freshAdapter();
     class NSHTag extends Base {
-      static { this._tableName = "nsh_tags"; this.attribute("name", "string"); this.attribute("nsh_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nsh_tags";
+        this.attribute("name", "string");
+        this.attribute("nsh_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NSHArticle extends Base {
-      static { this._tableName = "nsh_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nsh_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NSHArticle, "nshTags", { className: "NSHTag", foreignKey: "nsh_article_id" });
+    Associations.hasMany.call(NSHArticle, "nshTags", {
+      className: "NSHTag",
+      foreignKey: "nsh_article_id",
+    });
     acceptsNestedAttributesFor(NSHArticle, "nshTags");
     registerModel(NSHTag);
     registerModel(NSHArticle);
     const article = await NSHArticle.create({ title: "sort test" });
-    assignNestedAttributes(article, "nshTags", { "2": { name: "third" }, "0": { name: "first" }, "1": { name: "second" } });
+    assignNestedAttributes(article, "nshTags", {
+      "2": { name: "third" },
+      "0": { name: "first" },
+      "1": { name: "second" },
+    });
     await article.save();
     const tags = await NSHTag.where({ nsh_article_id: article.id }).toArray();
     expect(tags.length).toBe(3);
@@ -2311,12 +3088,25 @@ describe("should still raise an ActiveRecordRecord Invalid exception if we want 
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
     const adapter = freshAdapter();
     class RITag extends Base {
-      static { this._tableName = "ri_tags"; this.attribute("name", "string"); this.attribute("ri_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "ri_tags";
+        this.attribute("name", "string");
+        this.attribute("ri_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class RIArticle extends Base {
-      static { this._tableName = "ri_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "ri_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(RIArticle, "riTags", { className: "RITag", foreignKey: "ri_article_id" });
+    Associations.hasMany.call(RIArticle, "riTags", {
+      className: "RITag",
+      foreignKey: "ri_article_id",
+    });
     acceptsNestedAttributesFor(RIArticle, "riTags");
     registerModel(RITag);
     registerModel(RIArticle);
@@ -2330,12 +3120,24 @@ describe("should take a hash and assign the attributes to the associated models"
   it("should take a hash and assign the attributes to the associated models", async () => {
     const adapter = freshAdapter();
     class NHTag extends Base {
-      static { this._tableName = "nh_tags"; this.attribute("name", "string"); this.attribute("nh_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nh_tags";
+        this.attribute("name", "string");
+        this.attribute("nh_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NHArticle extends Base {
-      static { this._tableName = "nh_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nh_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NHArticle, "nhTags", { className: "NHTag", foreignKey: "nh_article_id" });
+    Associations.hasMany.call(NHArticle, "nhTags", {
+      className: "NHTag",
+      foreignKey: "nh_article_id",
+    });
     acceptsNestedAttributesFor(NHArticle, "nhTags");
     registerModel(NHTag);
     registerModel(NHArticle);
@@ -2349,19 +3151,33 @@ describe("should take a hash and assign the attributes to the associated models"
 });
 
 describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
-  it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => { /* fixture-dependent */ });
+  it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("should take an array and assign the attributes to the associated models", () => {
   it("should take an array and assign the attributes to the associated models", async () => {
     const adapter = freshAdapter();
     class NArrTag extends Base {
-      static { this._tableName = "narr_tags"; this.attribute("name", "string"); this.attribute("narr_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "narr_tags";
+        this.attribute("name", "string");
+        this.attribute("narr_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NArrArticle extends Base {
-      static { this._tableName = "narr_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "narr_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NArrArticle, "narrTags", { className: "NArrTag", foreignKey: "narr_article_id" });
+    Associations.hasMany.call(NArrArticle, "narrTags", {
+      className: "NArrTag",
+      foreignKey: "narr_article_id",
+    });
     acceptsNestedAttributesFor(NArrArticle, "narrTags");
     registerModel(NArrTag);
     registerModel(NArrArticle);
@@ -2377,12 +3193,25 @@ describe("should validation the associated models on create", () => {
   it("should validation the associated models on create", async () => {
     const adapter = freshAdapter();
     class VCTag extends Base {
-      static { this._tableName = "vc_tags"; this.attribute("name", "string"); this.attribute("vc_article_id", "integer"); this.adapter = adapter; this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "vc_tags";
+        this.attribute("name", "string");
+        this.attribute("vc_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
     }
     class VCArticle extends Base {
-      static { this._tableName = "vc_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "vc_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(VCArticle, "vcTags", { className: "VCTag", foreignKey: "vc_article_id" });
+    Associations.hasMany.call(VCArticle, "vcTags", {
+      className: "VCTag",
+      foreignKey: "vc_article_id",
+    });
     acceptsNestedAttributesFor(VCArticle, "vcTags");
     registerModel(VCTag);
     registerModel(VCArticle);
@@ -2396,12 +3225,24 @@ describe("should work with update as well", () => {
   it("should work with update as well", async () => {
     const adapter = freshAdapter();
     class NUpdTag extends Base {
-      static { this._tableName = "nupd_tags"; this.attribute("name", "string"); this.attribute("nupd_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "nupd_tags";
+        this.attribute("name", "string");
+        this.attribute("nupd_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NUpdArticle extends Base {
-      static { this._tableName = "nupd_articles"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "nupd_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(NUpdArticle, "nupdTags", { className: "NUpdTag", foreignKey: "nupd_article_id" });
+    Associations.hasMany.call(NUpdArticle, "nupdTags", {
+      className: "NUpdTag",
+      foreignKey: "nupd_article_id",
+    });
     acceptsNestedAttributesFor(NUpdArticle, "nupdTags");
     registerModel(NUpdTag);
     registerModel(NUpdArticle);
@@ -2416,23 +3257,30 @@ describe("should work with update as well", () => {
 });
 
 describe("validate presence of parent works with inverse of", () => {
-  it.skip("validate presence of parent works with inverse of", () => { /* fixture-dependent */ });
+  it.skip("validate presence of parent works with inverse of", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("acceptsNestedAttributesFor", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("creates child records through parent", async () => {
-    class Comment extends Base { static _tableName = "comments"; }
+    class Comment extends Base {
+      static _tableName = "comments";
+    }
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("post_id", "integer");
     Comment.adapter = adapter;
     registerModel(Comment);
 
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.adapter = adapter;
@@ -2453,14 +3301,18 @@ describe("acceptsNestedAttributesFor", () => {
   });
 
   it("destroys child records with _destroy flag", async () => {
-    class Tag extends Base { static _tableName = "tags"; }
+    class Tag extends Base {
+      static _tableName = "tags";
+    }
     Tag.attribute("id", "integer");
     Tag.attribute("name", "string");
     Tag.attribute("article_id", "integer");
     Tag.adapter = adapter;
     registerModel(Tag);
 
-    class Article extends Base { static _tableName = "articles"; }
+    class Article extends Base {
+      static _tableName = "articles";
+    }
     Article.attribute("id", "integer");
     Article.attribute("title", "string");
     Article.adapter = adapter;
@@ -2471,16 +3323,13 @@ describe("acceptsNestedAttributesFor", () => {
     const article = await Article.create({ title: "Test" });
     const tag = await Tag.create({ name: "ruby", article_id: article.id });
 
-    assignNestedAttributes(article, "tags", [
-      { id: tag.id, _destroy: true },
-    ]);
+    assignNestedAttributes(article, "tags", [{ id: tag.id, _destroy: true }]);
     await article.save();
 
     const remaining = await Tag.all().toArray();
     expect(remaining.length).toBe(0);
   });
 });
-
 
 describe("Nested Attributes (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -2492,12 +3341,23 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "create with nested attributes"
   it("creates associated records through nested attributes", async () => {
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments");
     acceptsNestedAttributesFor(Post, "comments");
@@ -2518,12 +3378,23 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "update with nested attributes"
   it("updates existing associated records", async () => {
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments");
     acceptsNestedAttributesFor(Post, "comments");
@@ -2532,9 +3403,7 @@ describe("Nested Attributes (Rails-guided)", () => {
     const post = await Post.create({ title: "Hello" });
     const comment = await Comment.create({ body: "Original", post_id: post.id });
 
-    assignNestedAttributes(post, "comments", [
-      { id: comment.id, body: "Updated body" },
-    ]);
+    assignNestedAttributes(post, "comments", [{ id: comment.id, body: "Updated body" }]);
     await post.save();
 
     await comment.reload();
@@ -2544,12 +3413,23 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "destroy with nested attributes"
   it("destroys associated records when _destroy is set and allowDestroy is true", async () => {
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments");
     acceptsNestedAttributesFor(Post, "comments", { allowDestroy: true });
@@ -2559,9 +3439,7 @@ describe("Nested Attributes (Rails-guided)", () => {
     const c1 = await Comment.create({ body: "Keep me", post_id: post.id });
     const c2 = await Comment.create({ body: "Delete me", post_id: post.id });
 
-    assignNestedAttributes(post, "comments", [
-      { id: c2.id, _destroy: true },
-    ]);
+    assignNestedAttributes(post, "comments", [{ id: c2.id, _destroy: true }]);
     await post.save();
 
     const remaining = await Comment.all().toArray();
@@ -2572,12 +3450,23 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "reject_if"
   it("rejects nested records matching rejectIf condition", async () => {
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments");
     acceptsNestedAttributesFor(Post, "comments", {

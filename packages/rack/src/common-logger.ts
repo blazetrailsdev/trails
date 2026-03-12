@@ -1,4 +1,11 @@
-import { REQUEST_METHOD, SCRIPT_NAME, PATH_INFO, QUERY_STRING, SERVER_PROTOCOL, CONTENT_LENGTH } from "./constants.js";
+import {
+  REQUEST_METHOD,
+  SCRIPT_NAME,
+  PATH_INFO,
+  QUERY_STRING,
+  SERVER_PROTOCOL,
+  CONTENT_LENGTH,
+} from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { forwardedValues } from "./utils.js";
 
@@ -31,7 +38,13 @@ export class CommonLogger {
     return response;
   }
 
-  private log(env: Record<string, any>, status: number, headers: Record<string, string>, elapsed: number, logger: any): void {
+  private log(
+    env: Record<string, any>,
+    status: number,
+    headers: Record<string, string>,
+    elapsed: number,
+    logger: any,
+  ): void {
     // Determine client IP
     let addr: string;
     if (env["HTTP_X_FORWARDED_FOR"]) {
@@ -53,7 +66,20 @@ export class CommonLogger {
     const time = elapsed.toFixed(4);
 
     const now = new Date();
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const pad = (n: number) => String(n).padStart(2, "0");
     const tz = now.getTimezoneOffset();
     const tzSign = tz <= 0 ? "+" : "-";
@@ -61,7 +87,10 @@ export class CommonLogger {
     const tzM = pad(Math.abs(tz) % 60);
     const timestamp = `${pad(now.getDate())}/${months[now.getMonth()]}/${now.getFullYear()}:${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${tzSign}${tzH}${tzM}`;
 
-    const msg = escapeNonPrintable(`${addr} - ${user} [${timestamp}] "${method} ${path}${qs} ${protocol}" ${status} ${length} ${time}`) + "\n";
+    const msg =
+      escapeNonPrintable(
+        `${addr} - ${user} [${timestamp}] "${method} ${path}${qs} ${protocol}" ${status} ${length} ${time}`,
+      ) + "\n";
 
     if (logger && typeof logger.write === "function") {
       logger.write(msg);

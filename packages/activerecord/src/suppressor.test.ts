@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -30,7 +70,10 @@ describe("SuppressorTest", () => {
   it("suppresses create", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Post.suppress(async () => {
       await Post.create({ title: "suppressed" });
@@ -41,7 +84,10 @@ describe("SuppressorTest", () => {
   it("suppresses update", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await Post.create({ title: "original" });
     await Post.suppress(async () => {
@@ -55,13 +101,16 @@ describe("SuppressorTest", () => {
   it("suppresses create in callback", async () => {
     const adapter = freshAdapter();
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.afterCreate(async function(this: any) {
+        this.afterCreate(async function (this: any) {
           await Comment.suppress(async () => {
             await Comment.create({ body: "auto-comment" });
           });
@@ -75,7 +124,10 @@ describe("SuppressorTest", () => {
   it("resumes saving after suppression complete", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Post.suppress(async () => {
       await Post.create({ title: "suppressed" });
@@ -103,7 +155,10 @@ describe("SuppressorTest", () => {
   it("suppresses when nested multiple times", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Post.suppress(async () => {
       await Post.suppress(async () => {
@@ -113,7 +168,6 @@ describe("SuppressorTest", () => {
     expect(await Post.count()).toBe(0);
   });
 });
-
 
 describe("suppress()", () => {
   it("prevents records from being persisted to database", async () => {

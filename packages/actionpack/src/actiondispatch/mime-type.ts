@@ -43,7 +43,12 @@ export class MimeType {
 
   // --- Registry ---
 
-  static register(string: string, symbol: string, synonyms: string[] = [], extensions: string[] = []): MimeType {
+  static register(
+    string: string,
+    symbol: string,
+    synonyms: string[] = [],
+    extensions: string[] = [],
+  ): MimeType {
     const type = new MimeType(string, symbol, synonyms);
     MimeType.registry.set(symbol, type);
     MimeType.registry.set(string, type);
@@ -102,7 +107,11 @@ export class MimeType {
         const match = p.match(/^q=([\d.]+)/);
         if (match) q = parseFloat(match[1]);
       }
-      return { mediaRange: mediaRange || "*/*", q, params: params.filter((p) => !p.startsWith("q=")) };
+      return {
+        mediaRange: mediaRange || "*/*",
+        q,
+        params: params.filter((p) => !p.startsWith("q=")),
+      };
     });
 
     entries.sort((a, b) => b.q - a.q);
@@ -122,9 +131,19 @@ export class MimeType {
 
   // --- Built-in types ---
 
-  static readonly HTML = MimeType.register("text/html", "html", ["application/xhtml+xml"], ["html", "htm"]);
+  static readonly HTML = MimeType.register(
+    "text/html",
+    "html",
+    ["application/xhtml+xml"],
+    ["html", "htm"],
+  );
   static readonly TEXT = MimeType.register("text/plain", "text", [], ["txt"]);
-  static readonly JS = MimeType.register("text/javascript", "js", ["application/javascript"], ["js"]);
+  static readonly JS = MimeType.register(
+    "text/javascript",
+    "js",
+    ["application/javascript"],
+    ["js"],
+  );
   static readonly CSS = MimeType.register("text/css", "css", [], ["css"]);
   static readonly ICS = MimeType.register("text/calendar", "ics", [], ["ics"]);
   static readonly CSV = MimeType.register("text/csv", "csv", [], ["csv"]);
@@ -142,10 +161,25 @@ export class MimeType {
   static readonly XML = MimeType.register("application/xml", "xml", ["text/xml"], ["xml"]);
   static readonly RSS = MimeType.register("application/rss+xml", "rss", [], ["rss"]);
   static readonly ATOM = MimeType.register("application/atom+xml", "atom", [], ["atom"]);
-  static readonly YAML = MimeType.register("application/x-yaml", "yaml", ["text/yaml"], ["yml", "yaml"]);
+  static readonly YAML = MimeType.register(
+    "application/x-yaml",
+    "yaml",
+    ["text/yaml"],
+    ["yml", "yaml"],
+  );
 
-  static readonly MULTIPART_FORM = MimeType.register("multipart/form-data", "multipart_form", [], []);
-  static readonly URL_ENCODED_FORM = MimeType.register("application/x-www-form-urlencoded", "url_encoded_form", [], []);
+  static readonly MULTIPART_FORM = MimeType.register(
+    "multipart/form-data",
+    "multipart_form",
+    [],
+    [],
+  );
+  static readonly URL_ENCODED_FORM = MimeType.register(
+    "application/x-www-form-urlencoded",
+    "url_encoded_form",
+    [],
+    [],
+  );
 
   static readonly JSON = MimeType.register("application/json", "json", ["text/x-json"], ["json"]);
   static readonly PDF = MimeType.register("application/pdf", "pdf", [], ["pdf"]);

@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -35,13 +75,24 @@ describe("ReflectionTest", () => {
 
   function makeModels() {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Book extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Chapter extends Base {
-      static { this.attribute("title", "string"); this.attribute("book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Book, "author", {});
     Associations.hasMany.call(Author, "books", {});
@@ -145,7 +196,10 @@ describe("ReflectionTest", () => {
 
   it("custom foreign key option on belongs to", () => {
     class Post extends Base {
-      static { this.attribute("writer_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("writer_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author", { foreignKey: "writer_id" });
     const ref = reflectOnAssociation(Post, "author");
@@ -154,7 +208,10 @@ describe("ReflectionTest", () => {
 
   it("custom class name option", () => {
     class Post extends Base {
-      static { this.attribute("writer_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("writer_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "writer", { className: "Author" });
     const ref = reflectOnAssociation(Post, "writer");
@@ -195,7 +252,10 @@ describe("ReflectionTest", () => {
 
   it("reflect on all associations returns empty for model without associations", () => {
     class Standalone extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const all = reflectOnAllAssociations(Standalone);
     expect(all).toEqual([]);
@@ -203,7 +263,10 @@ describe("ReflectionTest", () => {
 
   it("options are accessible on reflection", () => {
     class Post extends Base {
-      static { this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author", { counterCache: true, foreignKey: "author_id" });
     const ref = reflectOnAssociation(Post, "author");
@@ -213,7 +276,10 @@ describe("ReflectionTest", () => {
 
   it("has many foreign key with multi word model name", () => {
     class BlogPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(BlogPost, "comments", {});
     const ref = reflectOnAssociation(BlogPost, "comments");
@@ -222,7 +288,10 @@ describe("ReflectionTest", () => {
 
   it("class name singularization for ies ending", () => {
     class Library extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Library, "categories", {});
     const ref = reflectOnAssociation(Library, "categories");
@@ -251,10 +320,18 @@ describe("ReflectionTest", () => {
     expect(ref!.isHasMany()).toBe(false);
   });
 
-  it.skip("scope chain does not interfere with hmt with polymorphic case", () => { /* needs has_many :through */ });
-  it.skip("scope chain does not interfere with hmt with polymorphic case and subclass source", () => { /* needs has_many :through */ });
-  it.skip("scope chain does not interfere with hmt with polymorphic and subclass source 2", () => { /* needs has_many :through */ });
-  it.skip("scope chain of polymorphic association does not leak into other hmt associations", () => { /* needs has_many :through */ });
+  it.skip("scope chain does not interfere with hmt with polymorphic case", () => {
+    /* needs has_many :through */
+  });
+  it.skip("scope chain does not interfere with hmt with polymorphic case and subclass source", () => {
+    /* needs has_many :through */
+  });
+  it.skip("scope chain does not interfere with hmt with polymorphic and subclass source 2", () => {
+    /* needs has_many :through */
+  });
+  it.skip("scope chain of polymorphic association does not leak into other hmt associations", () => {
+    /* needs has_many :through */
+  });
 
   it("has many reflection", () => {
     const { Author } = makeModels();
@@ -295,8 +372,8 @@ describe("ReflectionTest", () => {
   it("automated reflection", () => {
     const { Author } = makeModels();
     const refs = reflectOnAllAssociations(Author);
-    expect(refs.some(r => r.name === "books")).toBe(true);
-    expect(refs.some(r => r.name === "profile")).toBe(true);
+    expect(refs.some((r) => r.name === "books")).toBe(true);
+    expect(refs.some((r) => r.name === "profile")).toBe(true);
   });
   it("reflection of all associations", () => {
     const { Author } = makeModels();
@@ -352,21 +429,24 @@ describe("ReflectionTest", () => {
   it.skip("automatic inverse does not suppress name error from incidental code", () => {});
 });
 
-
 describe("reflection", () => {
   it("returns columns for a model", () => {
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("email", "string");
 
     const cols = columns(User);
     expect(cols.length).toBe(3);
-    expect(cols.map(c => c.name)).toEqual(["id", "name", "email"]);
+    expect(cols.map((c) => c.name)).toEqual(["id", "name", "email"]);
   });
 
   it("returns column names for a model", () => {
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
 
@@ -374,10 +454,14 @@ describe("reflection", () => {
   });
 
   it("reflects on a specific association", () => {
-    class Author extends Base { static _tableName = "authors"; }
+    class Author extends Base {
+      static _tableName = "authors";
+    }
     Author.attribute("id", "integer");
 
-    class Book extends Base { static _tableName = "books"; }
+    class Book extends Base {
+      static _tableName = "books";
+    }
     Book.attribute("id", "integer");
     Book.attribute("author_id", "integer");
     Associations.belongsTo.call(Book, "author");
@@ -391,7 +475,9 @@ describe("reflection", () => {
 
   it("reflects on all associations", () => {
     const adapter = freshAdapter();
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("user_id", "integer");
     Post.adapter = adapter;
@@ -406,7 +492,6 @@ describe("reflection", () => {
     expect(belongsTos[0].name).toBe("user");
   });
 });
-
 
 describe("Reflection (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -430,7 +515,7 @@ describe("Reflection (Rails-guided)", () => {
 
     const cols = columns(Person);
     expect(cols.length).toBe(4);
-    expect(cols.map(c => c.name)).toEqual(["id", "name", "age", "active"]);
+    expect(cols.map((c) => c.name)).toEqual(["id", "name", "age", "active"]);
   });
 
   // Rails: test "column_names"
@@ -450,12 +535,21 @@ describe("Reflection (Rails-guided)", () => {
   // Rails: test "reflect_on_association"
   it("reflectOnAssociation returns metadata about a specific association", () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Author);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author");
     Associations.hasMany.call(Post, "comments");
@@ -476,7 +570,11 @@ describe("Reflection (Rails-guided)", () => {
   // Rails: test "reflect_on_all_associations"
   it("reflectOnAllAssociations returns all or filtered by macro", () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(User, "posts");
     Associations.hasMany.call(User, "comments");
@@ -496,7 +594,11 @@ describe("Reflection (Rails-guided)", () => {
   // Rails: test "reflect_on_association returns nil for unknown"
   it("reflectOnAssociation returns null for non-existent association", () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     expect(reflectOnAssociation(Person, "nonexistent")).toBeNull();
   });

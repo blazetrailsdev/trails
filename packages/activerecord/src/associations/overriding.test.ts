@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -45,7 +85,13 @@ describe("OverridingAssociationsTest", () => {
       }
     }
     const log1: string[] = [];
-    Associations.hasMany.call(OAParent, "oaChildren", { foreignKey: "oa_parent_id", className: "OAChild", afterAdd: () => { log1.push("parent"); } });
+    Associations.hasMany.call(OAParent, "oaChildren", {
+      foreignKey: "oa_parent_id",
+      className: "OAChild",
+      afterAdd: () => {
+        log1.push("parent");
+      },
+    });
     registerModel("OAParent", OAParent);
     registerModel("OAChild", OAChild);
 
@@ -56,7 +102,13 @@ describe("OverridingAssociationsTest", () => {
       }
     }
     const log2: string[] = [];
-    Associations.hasMany.call(OASubParent, "oaChildren", { foreignKey: "oa_parent_id", className: "OAChild", afterAdd: () => { log2.push("sub"); } });
+    Associations.hasMany.call(OASubParent, "oaChildren", {
+      foreignKey: "oa_parent_id",
+      className: "OAChild",
+      afterAdd: () => {
+        log2.push("sub");
+      },
+    });
     // Parent and sub should have separate association definitions
     const parentAssocs = (OAParent as any)._associations;
     const subAssocs = (OASubParent as any)._associations;
@@ -108,7 +160,10 @@ describe("OverridingAssociationsTest", () => {
     }
     registerModel("OAOwner", OAOwner);
     registerModel("OAPet", OAPet);
-    Associations.belongsTo.call(OAPet, "oaOwner", { foreignKey: "oa_owner_id", className: "OAOwner" });
+    Associations.belongsTo.call(OAPet, "oaOwner", {
+      foreignKey: "oa_owner_id",
+      className: "OAOwner",
+    });
     const assocs = (OAPet as any)._associations as any[];
     const btAssoc = assocs.find((a: any) => a.name === "oaOwner");
     expect(btAssoc).toBeDefined();
@@ -134,7 +189,10 @@ describe("OverridingAssociationsTest", () => {
     }
     registerModel("OAUser", OAUser);
     registerModel("OAProfile", OAProfile);
-    Associations.hasOne.call(OAUser, "oaProfile", { foreignKey: "oa_user_id", className: "OAProfile" });
+    Associations.hasOne.call(OAUser, "oaProfile", {
+      foreignKey: "oa_user_id",
+      className: "OAProfile",
+    });
     const assocs = (OAUser as any)._associations as any[];
     const hoAssoc = assocs.find((a: any) => a.name === "oaProfile");
     expect(hoAssoc).toBeDefined();
@@ -154,10 +212,18 @@ describe("OverridingAssociationsTest", () => {
     Associations.belongsTo.call(OABroken, "nonexistent", { foreignKey: "nonexistent_id" });
     registerModel("OABroken", OABroken);
     const record = await OABroken.create({ name: "test", nonexistent_id: 1 });
-    await expect(loadBelongsTo(record, "nonexistent", { foreignKey: "nonexistent_id" })).rejects.toThrow(/not found in registry/);
+    await expect(
+      loadBelongsTo(record, "nonexistent", { foreignKey: "nonexistent_id" }),
+    ).rejects.toThrow(/not found in registry/);
   });
 
-  it.skip("habtm association redefinition callbacks should differ and not inherited", () => { /* HABTM not fully implemented */ });
-  it.skip("habtm association redefinition reflections should differ and not inherited", () => { /* HABTM not fully implemented */ });
-  it.skip("requires symbol argument", () => { /* TypeScript uses strings, not symbols */ });
+  it.skip("habtm association redefinition callbacks should differ and not inherited", () => {
+    /* HABTM not fully implemented */
+  });
+  it.skip("habtm association redefinition reflections should differ and not inherited", () => {
+    /* HABTM not fully implemented */
+  });
+  it.skip("requires symbol argument", () => {
+    /* TypeScript uses strings, not symbols */
+  });
 });

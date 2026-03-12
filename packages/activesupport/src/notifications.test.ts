@@ -12,14 +12,18 @@ beforeEach(() => {
 describe("InstrumenterTest", () => {
   it("instrument", () => {
     let fired = false;
-    Notifications.subscribe("foo.bar", () => { fired = true; });
+    Notifications.subscribe("foo.bar", () => {
+      fired = true;
+    });
     Notifications.instrument("foo.bar", {});
     expect(fired).toBe(true);
   });
 
   it("instrument yields the payload for further modification", () => {
     let received: Record<string, unknown> = {};
-    Notifications.subscribe("foo", (e) => { received = e.payload; });
+    Notifications.subscribe("foo", (e) => {
+      received = e.payload;
+    });
     Notifications.instrument("foo", { key: "original" }, () => {});
     expect(received.key).toBe("original");
   });
@@ -70,7 +74,11 @@ describe("InstrumenterTest", () => {
   it("record with exception", () => {
     const events: Event[] = [];
     Notifications.subscribe("risky", (e) => events.push(e));
-    expect(() => Notifications.instrument("risky", {}, () => { throw new Error("boom"); })).toThrow("boom");
+    expect(() =>
+      Notifications.instrument("risky", {}, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
     expect(events).toHaveLength(1);
   });
 });
@@ -105,9 +113,15 @@ describe("EventedTest", () => {
     expect(names).toContain("beta");
   });
 
-  it.skip("listen start multiple exception consistency", () => { /* evented-specific */ });
-  it.skip("listen finish multiple exception consistency", () => { /* evented-specific */ });
-  it.skip("evented listener priority", () => { /* evented-specific */ });
+  it.skip("listen start multiple exception consistency", () => {
+    /* evented-specific */
+  });
+  it.skip("listen finish multiple exception consistency", () => {
+    /* evented-specific */
+  });
+  it.skip("evented listener priority", () => {
+    /* evented-specific */
+  });
 
   it("listen to regexp", () => {
     const names: string[] = [];
@@ -117,7 +131,9 @@ describe("EventedTest", () => {
     expect(names).toEqual(["sql.active_record"]);
   });
 
-  it.skip("listen to regexp with exclusions", () => { /* exclusion pattern not implemented */ });
+  it.skip("listen to regexp with exclusions", () => {
+    /* exclusion pattern not implemented */
+  });
 });
 
 describe("SubscribeEventObjectsTest", () => {
@@ -224,7 +240,9 @@ describe("SubscribedTest", () => {
     // Subscribe during an instrumented block — new subscriber fires on next event
     let innerFired = false;
     Notifications.instrument("outer", {}, () => {
-      Notifications.subscribe("inner", () => { innerFired = true; });
+      Notifications.subscribe("inner", () => {
+        innerFired = true;
+      });
       Notifications.instrument("inner");
     });
     expect(innerFired).toBe(true);
@@ -382,7 +400,9 @@ describe("InstrumentationTest", () => {
 
   it("nested events can be instrumented", () => {
     let outerEvent!: Event;
-    Notifications.subscribe("outer", (e) => { outerEvent = e; });
+    Notifications.subscribe("outer", (e) => {
+      outerEvent = e;
+    });
     Notifications.instrument("outer", {}, () => {
       Notifications.instrument("inner", {}, () => {});
     });
@@ -393,7 +413,11 @@ describe("InstrumentationTest", () => {
   it("instrument publishes when exception is raised", () => {
     const events: Event[] = [];
     Notifications.subscribe("boom", (e) => events.push(e));
-    expect(() => Notifications.instrument("boom", {}, () => { throw new Error("x"); })).toThrow();
+    expect(() =>
+      Notifications.instrument("boom", {}, () => {
+        throw new Error("x");
+      }),
+    ).toThrow();
     expect(events).toHaveLength(1);
   });
 
@@ -455,7 +479,9 @@ describe("ActiveSupport::Notifications", () => {
 
     it("passes payload to subscriber", () => {
       let received: Record<string, unknown> = {};
-      Notifications.subscribe("render", (e) => { received = e.payload; });
+      Notifications.subscribe("render", (e) => {
+        received = e.payload;
+      });
       Notifications.instrument("render", { view: "index", format: "html" });
       expect(received).toEqual({ view: "index", format: "html" });
     });
@@ -496,7 +522,9 @@ describe("ActiveSupport::Notifications", () => {
 
     it("records start and end times", () => {
       let event!: Event;
-      Notifications.subscribe("work", (e) => { event = e; });
+      Notifications.subscribe("work", (e) => {
+        event = e;
+      });
       Notifications.instrument("work", {}, () => {});
       expect(event.time).toBeInstanceOf(Date);
       expect(event.end).toBeInstanceOf(Date);
@@ -505,7 +533,9 @@ describe("ActiveSupport::Notifications", () => {
 
     it("duration reflects elapsed time", async () => {
       let event!: Event;
-      Notifications.subscribe("slow", (e) => { event = e; });
+      Notifications.subscribe("slow", (e) => {
+        event = e;
+      });
       await new Promise<void>((resolve) => {
         Notifications.instrument("slow", {}, () => {
           // just do synchronous work; duration > 0 after finish
@@ -519,15 +549,23 @@ describe("ActiveSupport::Notifications", () => {
       const events: Event[] = [];
       Notifications.subscribe("risky", (e) => events.push(e));
       expect(() => {
-        Notifications.instrument("risky", {}, () => { throw new Error("oops"); });
+        Notifications.instrument("risky", {}, () => {
+          throw new Error("oops");
+        });
       }).toThrow("oops");
       expect(events).toHaveLength(1);
     });
 
     it("propagates block exceptions after notifying", () => {
       let notified = false;
-      Notifications.subscribe("boom", () => { notified = true; });
-      expect(() => Notifications.instrument("boom", {}, () => { throw new Error("x"); })).toThrow();
+      Notifications.subscribe("boom", () => {
+        notified = true;
+      });
+      expect(() =>
+        Notifications.instrument("boom", {}, () => {
+          throw new Error("x");
+        }),
+      ).toThrow();
       expect(notified).toBe(true);
     });
   });
@@ -615,7 +653,9 @@ describe("ActiveSupport::Notifications", () => {
 
     it("tracks child events from nested instrument calls", () => {
       let outerEvent!: Event;
-      Notifications.subscribe("outer", (e) => { outerEvent = e; });
+      Notifications.subscribe("outer", (e) => {
+        outerEvent = e;
+      });
       Notifications.instrument("outer", {}, () => {
         Notifications.instrument("inner", {}, () => {});
       });
@@ -626,7 +666,9 @@ describe("ActiveSupport::Notifications", () => {
 
   describe("subscriber error isolation", () => {
     it("does not propagate errors from subscribers", () => {
-      Notifications.subscribe("safe", () => { throw new Error("subscriber boom"); });
+      Notifications.subscribe("safe", () => {
+        throw new Error("subscriber boom");
+      });
       const events: Event[] = [];
       Notifications.subscribe("safe", (e) => events.push(e));
       expect(() => Notifications.instrument("safe")).not.toThrow();

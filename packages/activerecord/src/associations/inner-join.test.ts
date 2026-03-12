@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -28,22 +68,37 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("InnerJoinAssociationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModels() {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author", {});
     Associations.hasMany.call(Author, "posts", {});
     Associations.hasMany.call(Post, "comments", {});
-    registerModel(Author); registerModel(Post); registerModel(Comment);
+    registerModel(Author);
+    registerModel(Post);
+    registerModel(Comment);
     return { Author, Post, Comment };
   }
 
@@ -57,7 +112,8 @@ describe("InnerJoinAssociationTest", () => {
   it("construct finder sql does not table name collide on duplicate associations", () => {
     const { Post } = makeModels();
     const sql = Post.joins("authors", "posts.author_id = authors.id")
-                    .joins("comments", "comments.post_id = posts.id").toSql();
+      .joins("comments", "comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("authors");
     expect(sql).toContain("comments");
@@ -66,7 +122,8 @@ describe("InnerJoinAssociationTest", () => {
   it("construct finder sql does not table name collide on duplicate associations with left outer joins", () => {
     const { Post } = makeModels();
     const sql = Post.joins("authors", "posts.author_id = authors.id")
-                    .leftOuterJoins("comments", "comments.post_id = posts.id").toSql();
+      .leftOuterJoins("comments", "comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("LEFT OUTER JOIN");
   });
@@ -87,7 +144,8 @@ describe("InnerJoinAssociationTest", () => {
   it("user supplied joins order should be preserved", () => {
     const { Post } = makeModels();
     const sql = Post.joins("authors", "posts.author_id = authors.id")
-                    .joins("comments", "comments.post_id = posts.id").toSql();
+      .joins("comments", "comments.post_id = posts.id")
+      .toSql();
     const authorsIdx = sql.indexOf("authors");
     const commentsIdx = sql.indexOf("comments");
     expect(authorsIdx).toBeLessThan(commentsIdx);
@@ -96,11 +154,14 @@ describe("InnerJoinAssociationTest", () => {
   it("deduplicate joins", () => {
     const { Post } = makeModels();
     const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id")
-                    .joins("INNER JOIN authors ON posts.author_id = authors.id").toSql();
+      .joins("INNER JOIN authors ON posts.author_id = authors.id")
+      .toSql();
     expect(sql).toContain("INNER JOIN authors");
   });
 
-  it.skip("eager load with arel joins", () => { /* needs eager loading with arel nodes */ });
+  it.skip("eager load with arel joins", () => {
+    /* needs eager loading with arel nodes */
+  });
 
   it("construct finder sql ignores empty joins hash", () => {
     const { Post } = makeModels();
@@ -118,7 +179,10 @@ describe("InnerJoinAssociationTest", () => {
 
   it("join conditions added to join clause", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id AND authors.name = 'test'").toSql();
+    const sql = Post.joins(
+      "authors",
+      "posts.author_id = authors.id AND authors.name = 'test'",
+    ).toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("authors.name");
   });
@@ -152,15 +216,14 @@ describe("InnerJoinAssociationTest", () => {
   it("find with implicit inner joins honors readonly with select", () => {
     const { Post } = makeModels();
     const rel = Post.joins("authors", "posts.author_id = authors.id")
-                    .select("posts.title")
-                    .readonly();
+      .select("posts.title")
+      .readonly();
     expect(rel.isReadonly).toBe(true);
   });
 
   it("find with implicit inner joins honors readonly false", () => {
     const { Post } = makeModels();
-    const rel = Post.joins("authors", "posts.author_id = authors.id")
-                    .readonly(false);
+    const rel = Post.joins("authors", "posts.author_id = authors.id").readonly(false);
     expect(rel.isReadonly).toBe(false);
   });
 
@@ -198,7 +261,12 @@ describe("InnerJoinAssociationTest", () => {
   it("find with sti join", async () => {
     const a = createTestAdapter();
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("type", "string"); this.attribute("post_id", "integer"); this.adapter = a; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("type", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = a;
+      }
     }
     enableSti(Comment);
     class SpecialComment extends Comment {}
@@ -206,10 +274,19 @@ describe("InnerJoinAssociationTest", () => {
     class SubSpecialComment extends SpecialComment {}
     registerSubclass(SubSpecialComment);
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = a; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = a;
+      }
     }
-    Associations.hasMany.call(Post, "specialComments", { className: "SpecialComment", foreignKey: "post_id" });
-    registerModel(Comment); registerModel(SpecialComment); registerModel(SubSpecialComment); registerModel(Post);
+    Associations.hasMany.call(Post, "specialComments", {
+      className: "SpecialComment",
+      foreignKey: "post_id",
+    });
+    registerModel(Comment);
+    registerModel(SpecialComment);
+    registerModel(SubSpecialComment);
+    registerModel(Post);
 
     const post = await Post.create({ title: "STI Post" });
     await Comment.create({ body: "regular", type: "Comment", post_id: post.id });
@@ -235,11 +312,15 @@ describe("InnerJoinAssociationTest", () => {
     expect(results[0].readAttribute("title")).toBe("P1");
   });
 
-  it.skip("find with conditions on through reflection", () => { /* needs has_many through join */ });
+  it.skip("find with conditions on through reflection", () => {
+    /* needs has_many through join */
+  });
 
   it("the default scope of the target is applied when joining associations", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id").where({ title: "test" }).toSql();
+    const sql = Post.joins("authors", "posts.author_id = authors.id")
+      .where({ title: "test" })
+      .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("WHERE");
   });
@@ -276,7 +357,8 @@ describe("InnerJoinAssociationTest", () => {
   it("inner joins includes all nested associations", () => {
     const { Author } = makeModels();
     const sql = Author.joins("posts", "posts.author_id = authors.id")
-                      .joins("comments", "comments.post_id = posts.id").toSql();
+      .joins("comments", "comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("posts");
     expect(sql).toContain("comments");

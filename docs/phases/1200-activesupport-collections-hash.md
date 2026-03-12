@@ -8,6 +8,7 @@ relies on throughout.
 Used extensively in params, serialization, and configuration.
 
 ### API to implement
+
 - `new HashWithIndifferentAccess(hash)` — wraps a plain object
 - String and symbol keys are interchangeable
 - `get(key)`, `set(key, value)`, `delete(key)`, `has(key)`
@@ -19,6 +20,7 @@ In TypeScript, this is probably best implemented as a `Map`-like class or a
 `Proxy` wrapper rather than mimicking Ruby's hash access.
 
 ### Key Rails reference
+
 - `activesupport/lib/active_support/hash_with_indifferent_access.rb`
 - `activesupport/test/hash_with_indifferent_access_test.rb`
 
@@ -35,6 +37,7 @@ Utility functions operating on plain objects:
 - `extractOptions(args)` — pop hash from end of args array (Rails convention)
 
 ### Key Rails reference
+
 - `activesupport/test/core_ext/hash_ext_test.rb`
 
 ## Array extensions
@@ -46,6 +49,7 @@ Utility functions operating on plain objects:
 - `inquiry(array)` — creates `StringInquirer`-like object
 
 ### Key Rails reference
+
 - `activesupport/test/core_ext/array/`
 
 ## Enumerable extensions
@@ -59,4 +63,5 @@ Utility functions operating on plain objects:
 - `compactBlank(collection)` — remove blank values
 
 ### Key Rails reference
+
 - `activesupport/test/core_ext/enumerable_test.rb`

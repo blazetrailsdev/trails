@@ -1,5 +1,37 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Relation, Range, transaction, savepoint, CollectionProxy, association, MigrationRunner, defineEnum, readEnumValue, enableSti, hasSecurePassword, store, loadHabtm, delegate, RecordNotFound, RecordInvalid, StaleObjectError, ReadOnlyRecord, SoleRecordExceeded, StrictLoadingViolationError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, acceptsNestedAttributesFor, assignNestedAttributes, hasSecureToken, composedOf, serialize, registerModel } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  savepoint,
+  CollectionProxy,
+  association,
+  MigrationRunner,
+  defineEnum,
+  readEnumValue,
+  enableSti,
+  hasSecurePassword,
+  store,
+  loadHabtm,
+  delegate,
+  RecordNotFound,
+  RecordInvalid,
+  StaleObjectError,
+  ReadOnlyRecord,
+  SoleRecordExceeded,
+  StrictLoadingViolationError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  hasSecureToken,
+  composedOf,
+  serialize,
+  registerModel,
+} from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration, TableDefinition, Schema } from "./migration.js";
@@ -19,7 +51,6 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 // -- Phase 2000: Core --
-
 
 describe("secure_password", () => {
   let adapter: DatabaseAdapter;
@@ -84,12 +115,11 @@ describe("secure_password", () => {
     (user as any).passwordConfirmation = "different";
     const saved = await user.save();
     expect(saved).toBe(false);
-    expect(user.errors.fullMessages.some((m: string) =>
-      m.includes("doesn't match Password")
-    )).toBe(true);
+    expect(user.errors.fullMessages.some((m: string) => m.includes("doesn't match Password"))).toBe(
+      true,
+    );
   });
 });
-
 
 describe("SecurePassword (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -101,7 +131,13 @@ describe("SecurePassword (Rails-guided)", () => {
   // Rails: test "authenticate with correct password"
   it("authenticate returns the user on success", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("password_digest", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecurePassword(User, { validations: false });
 
@@ -115,7 +151,12 @@ describe("SecurePassword (Rails-guided)", () => {
   // Rails: test "authenticate with wrong password"
   it("authenticate returns false on failure", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("password_digest", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecurePassword(User, { validations: false });
 
@@ -129,7 +170,12 @@ describe("SecurePassword (Rails-guided)", () => {
   // Rails: test "validates password presence on create"
   it("requires password on create when validations enabled", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("password_digest", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecurePassword(User);
 
@@ -141,7 +187,12 @@ describe("SecurePassword (Rails-guided)", () => {
   // Rails: test "password confirmation"
   it("validates password confirmation", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("password_digest", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecurePassword(User);
 

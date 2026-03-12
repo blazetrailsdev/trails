@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -98,9 +138,10 @@ describe("SerializationTest", () => {
     expect(hash.name).toBe("David");
   });
 
-  it.skip("find records by serialized attributes through join", () => { /* needs associations + serialized columns */ });
+  it.skip("find records by serialized attributes through join", () => {
+    /* needs associations + serialized columns */
+  });
 });
-
 
 describe("toXml() on Base", () => {
   it("serializes a record to XML", () => {
@@ -124,11 +165,20 @@ describe("serializableHash with include", () => {
   it("includes nested associations when preloaded", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const author = await Author.create({ name: "Alice" });
     // Simulate preloaded associations
-    const fakePost = { _attributes: new Map<string, string | number>([["title", "Hello"], ["id", 1]]) };
+    const fakePost = {
+      _attributes: new Map<string, string | number>([
+        ["title", "Hello"],
+        ["id", 1],
+      ]),
+    };
     (author as any)._preloadedAssociations = new Map([["posts", [fakePost]]]);
 
     const { serializableHash } = await import("@rails-ts/activemodel");
@@ -143,7 +193,11 @@ describe("fromJson on Base", () => {
   it("sets attributes from JSON", () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({});
     u.fromJson('{"name":"Alice"}');
@@ -153,7 +207,11 @@ describe("fromJson on Base", () => {
   it("supports includeRoot", () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({});
     u.fromJson('{"user":{"name":"Bob"}}', true);

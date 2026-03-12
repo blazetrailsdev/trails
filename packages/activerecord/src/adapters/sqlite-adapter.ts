@@ -27,10 +27,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   /**
    * Execute a SELECT query and return rows.
    */
-  async execute(
-    sql: string,
-    binds: unknown[] = []
-  ): Promise<Record<string, unknown>[]> {
+  async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
     const stmt = this.db.prepare(sql);
     return stmt.all(...binds) as Record<string, unknown>[];
   }
@@ -68,10 +65,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   /**
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    */
-  async executeMutation(
-    sql: string,
-    binds: unknown[] = []
-  ): Promise<number> {
+  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
     if (this._preventWrites) {
       throw new Error("Write query attempted while preventing writes");
     }

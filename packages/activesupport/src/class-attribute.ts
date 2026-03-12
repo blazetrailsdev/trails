@@ -32,7 +32,7 @@ function getStore(target: any): AttrStore {
 export function classAttribute(
   klass: any,
   name: string,
-  options: ClassAttributeOptions = {}
+  options: ClassAttributeOptions = {},
 ): void {
   const {
     instanceWriter = true,

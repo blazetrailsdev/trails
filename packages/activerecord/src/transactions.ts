@@ -67,7 +67,7 @@ let _savepointCounter = 0;
 
 export async function transaction<T>(
   modelClass: typeof Base,
-  fn: (tx: Transaction) => Promise<T>
+  fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
   const adapter = modelClass.adapter;
   const tx = new Transaction(adapter);
@@ -115,7 +115,7 @@ export async function transaction<T>(
 export async function savepoint<T>(
   modelClass: typeof Base,
   name: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   const adapter = modelClass.adapter;
 

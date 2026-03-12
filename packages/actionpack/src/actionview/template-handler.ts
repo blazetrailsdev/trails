@@ -56,7 +56,7 @@ export interface TemplateHandler {
   render(
     source: string,
     locals: Record<string, unknown>,
-    context: RenderContext
+    context: RenderContext,
   ): string | Promise<string>;
 }
 

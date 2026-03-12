@@ -95,7 +95,7 @@ describe("ModuleTest", () => {
 
   it("mattr_accessor — defines class-level getter/setter", () => {
     class MyClass {}
-    mattrAccessor(MyClass as unknown as { new(): unknown } & Record<string, unknown>, "setting");
+    mattrAccessor(MyClass as unknown as { new (): unknown } & Record<string, unknown>, "setting");
     const klass = MyClass as unknown as Record<string, unknown>;
     klass["setting"] = 42;
     expect(klass["setting"]).toBe(42);
@@ -105,7 +105,7 @@ describe("ModuleTest", () => {
 
   it("cattr_accessor — alias for mattrAccessor", () => {
     class Config {}
-    cattrAccessor(Config as unknown as { new(): unknown } & Record<string, unknown>, "value");
+    cattrAccessor(Config as unknown as { new (): unknown } & Record<string, unknown>, "value");
     const klass = Config as unknown as Record<string, unknown>;
     klass["value"] = 99;
     expect(klass["value"]).toBe(99);
@@ -118,7 +118,7 @@ describe("ModuleTest", () => {
     w.color = "red";
     expect(w.color).toBe("red");
     // Stored in _color_
-    expect(((w as unknown) as Record<string, unknown>)["_color_"]).toBe("red");
+    expect((w as unknown as Record<string, unknown>)["_color_"]).toBe("red");
   });
 
   it("attr_internal writer method — sets value via assignment method", () => {
@@ -153,11 +153,15 @@ describe("ModuleTest", () => {
   it("delegation to index get method", () => {
     class Container {
       data: Record<string, unknown> = { key: "value" };
-      get(key: string) { return this.data[key]; }
+      get(key: string) {
+        return this.data[key];
+      }
     }
     class Wrapper {
       container: Container;
-      constructor() { this.container = new Container(); }
+      constructor() {
+        this.container = new Container();
+      }
     }
     delegate(Wrapper.prototype, "get", { to: "container" });
     const w = new Wrapper() as Wrapper & Record<string, unknown>;
@@ -169,12 +173,18 @@ describe("ModuleTest", () => {
   it("delegation to index set method", () => {
     class Container {
       data: Record<string, unknown> = {};
-      set(key: string, val: unknown) { this.data[key] = val; }
-      get(key: string) { return this.data[key]; }
+      set(key: string, val: unknown) {
+        this.data[key] = val;
+      }
+      get(key: string) {
+        return this.data[key];
+      }
     }
     class Wrapper {
       container: Container;
-      constructor() { this.container = new Container(); }
+      constructor() {
+        this.container = new Container();
+      }
     }
     delegate(Wrapper.prototype, "set", "get", { to: "container" });
     const w = new Wrapper() as Wrapper & Record<string, unknown>;
@@ -212,7 +222,9 @@ describe("ModuleTest", () => {
 
   it("delegation to method that exists on nil when allowing nil", () => {
     class Greeter {
-      greet() { return "hello"; }
+      greet() {
+        return "hello";
+      }
     }
     class Host {
       greeter: Greeter | null = null;
@@ -240,7 +252,9 @@ describe("ModuleTest", () => {
 
   it("delegate missing to does not delegate to fake methods", () => {
     class Real {
-      exists() { return true; }
+      exists() {
+        return true;
+      }
     }
     class Host {
       real: Real = new Real();
@@ -334,7 +348,12 @@ describe("ModuleAttributeAccessorTest", () => {
   it("should use default value if block passed", () => {
     class MyModule {}
     let callCount = 0;
-    mattrAccessor(MyModule, "computed", { default: () => { callCount++; return "computed_val"; } });
+    mattrAccessor(MyModule, "computed", {
+      default: () => {
+        callCount++;
+        return "computed_val";
+      },
+    });
     expect((MyModule as any).computed).toBe("computed_val");
     expect(callCount).toBe(1); // block called once at definition
   });
@@ -342,7 +361,12 @@ describe("ModuleAttributeAccessorTest", () => {
   it("method invocation should not invoke the default block", () => {
     class MyModule {}
     let callCount = 0;
-    mattrAccessor(MyModule, "lazy", { default: () => { callCount++; return "result"; } });
+    mattrAccessor(MyModule, "lazy", {
+      default: () => {
+        callCount++;
+        return "result";
+      },
+    });
     // Reading multiple times does not re-invoke block
     expect((MyModule as any).lazy).toBe("result");
     expect((MyModule as any).lazy).toBe("result");
@@ -352,7 +376,10 @@ describe("ModuleAttributeAccessorTest", () => {
   it("declaring multiple attributes at once invokes the block multiple times", () => {
     class MyModule {}
     let callCount = 0;
-    const makeDefault = () => { callCount++; return "val"; };
+    const makeDefault = () => {
+      callCount++;
+      return "val";
+    };
     mattrAccessor(MyModule, "a", "b", "c", { default: makeDefault });
     expect(callCount).toBe(3);
   });
@@ -429,9 +456,24 @@ describe("KernelSuppressTest", () => {
 describe("ClassTest", () => {
   it("descendants", () => {
     class Vehicle {}
-    class Car extends Vehicle { constructor() { super(); registerSubclass(Vehicle, Car); } }
-    class Truck extends Vehicle { constructor() { super(); registerSubclass(Vehicle, Truck); } }
-    class SportsCar extends Car { constructor() { super(); registerSubclass(Car, SportsCar); } }
+    class Car extends Vehicle {
+      constructor() {
+        super();
+        registerSubclass(Vehicle, Car);
+      }
+    }
+    class Truck extends Vehicle {
+      constructor() {
+        super();
+        registerSubclass(Vehicle, Truck);
+      }
+    }
+    class SportsCar extends Car {
+      constructor() {
+        super();
+        registerSubclass(Car, SportsCar);
+      }
+    }
     // register manually (simulating class definition time registration)
     registerSubclass(Vehicle, Car);
     registerSubclass(Vehicle, Truck);
@@ -456,10 +498,18 @@ describe("ClassTest", () => {
     expect(subs).not.toContain(Poodle); // only direct children
   });
 
-  it.skip("descendants excludes singleton classes", () => { /* Ruby-specific */ });
-  it.skip("subclasses excludes singleton classes", () => { /* Ruby-specific */ });
-  it.skip("subclasses exclude reloaded classes", () => { /* Ruby-specific */ });
-  it.skip("descendants exclude reloaded classes", () => { /* Ruby-specific */ });
+  it.skip("descendants excludes singleton classes", () => {
+    /* Ruby-specific */
+  });
+  it.skip("subclasses excludes singleton classes", () => {
+    /* Ruby-specific */
+  });
+  it.skip("subclasses exclude reloaded classes", () => {
+    /* Ruby-specific */
+  });
+  it.skip("descendants exclude reloaded classes", () => {
+    /* Ruby-specific */
+  });
 });
 
 describe("ConfigurableActiveSupport", () => {
@@ -555,7 +605,11 @@ describe("RescuableTest", () => {
   it("rescue from with block with args", () => {
     class MyController {}
     let received: Error | null = null;
-    rescueFrom(MyController, Error, { with: (e: any) => { received = e; } });
+    rescueFrom(MyController, Error, {
+      with: (e: any) => {
+        received = e;
+      },
+    });
     const err = new Error("boom");
     handleRescue(MyController, err);
     expect(received).toBe(err);
@@ -578,8 +632,16 @@ describe("RescuableTest", () => {
     expect(handled).toBe(false);
   });
 
-  it.skip("rescue from error dispatchers with case operator", () => { /* Ruby-specific */ });
-  it.skip("children should inherit rescue definitions from parents and child rescue should be appended", () => { /* Ruby-specific */ });
-  it.skip("rescue falls back to exception cause", () => { /* Ruby-specific */ });
-  it.skip("rescue handles loops in exception cause chain", () => { /* Ruby-specific */ });
+  it.skip("rescue from error dispatchers with case operator", () => {
+    /* Ruby-specific */
+  });
+  it.skip("children should inherit rescue definitions from parents and child rescue should be appended", () => {
+    /* Ruby-specific */
+  });
+  it.skip("rescue falls back to exception cause", () => {
+    /* Ruby-specific */
+  });
+  it.skip("rescue handles loops in exception cause chain", () => {
+    /* Ruby-specific */
+  });
 });

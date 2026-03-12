@@ -129,7 +129,7 @@ const MAPPING: Record<string, string> = {
   Taipei: "Asia/Taipei",
   Perth: "Australia/Perth",
   Irkutsk: "Asia/Irkutsk",
-  "Ulaanbaatar": "Asia/Ulaanbaatar",
+  Ulaanbaatar: "Asia/Ulaanbaatar",
   Seoul: "Asia/Seoul",
   Osaka: "Asia/Tokyo",
   Sapporo: "Asia/Tokyo",
@@ -167,7 +167,7 @@ const zoneCache = new Map<string, TimeZone>();
  */
 function getZoneInfo(
   ianaName: string,
-  date: Date
+  date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
   // Use Intl to get the abbreviation
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -193,8 +193,7 @@ function getZoneInfo(
     hour12: false,
   });
   const localParts = localFormatter.formatToParts(roundedDate);
-  const get = (type: string) =>
-    parseInt(localParts.find((p) => p.type === type)?.value ?? "0", 10);
+  const get = (type: string) => parseInt(localParts.find((p) => p.type === type)?.value ?? "0", 10);
 
   const localYear = get("year");
   const localMonth = get("month");
@@ -211,7 +210,7 @@ function getZoneInfo(
     localDay,
     localHour,
     localMinute,
-    localSecond
+    localSecond,
   );
   const utcOffsetSeconds = Math.round((localAsUtc - roundedDate.getTime()) / 1000) || 0;
 
@@ -223,7 +222,7 @@ function getZoneInfo(
  */
 export function getLocalComponents(
   ianaName: string,
-  utcDate: Date
+  utcDate: Date,
 ): {
   year: number;
   month: number;
@@ -245,8 +244,7 @@ export function getLocalComponents(
     hour12: false,
   } as Intl.DateTimeFormatOptions);
   const parts = formatter.formatToParts(utcDate);
-  const get = (type: string) =>
-    parseInt(parts.find((p) => p.type === type)?.value ?? "0", 10);
+  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? "0", 10);
 
   let hour = get("hour");
   if (hour === 24) hour = 0;
@@ -323,7 +321,7 @@ export class TimeZone {
     hour = 0,
     minute = 0,
     second = 0,
-    millisecond = 0
+    millisecond = 0,
   ): TimeWithZone {
     // We need to find the UTC instant that corresponds to these local components.
     const wantedMs = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
@@ -377,7 +375,7 @@ export class TimeZone {
     if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
       // Try to extract date/time components directly
       const match = trimmed.match(
-        /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.(\d+))?)?)?$/
+        /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.(\d+))?)?)?$/,
       );
       if (match) {
         const y = parseInt(match[1], 10);

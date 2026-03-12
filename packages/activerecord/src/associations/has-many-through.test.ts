@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -33,17 +73,35 @@ describe("HasManyThroughTest", () => {
   function makeModels() {
     const adapter = freshAdapter();
     class HmtTag extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtTagging extends Base {
-      static { this.attribute("post_id", "integer"); this.attribute("tag_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("tag_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtPost as any)._associations = [
-      { type: "hasMany", name: "hmtTaggings", options: { className: "HmtTagging", foreignKey: "post_id" } },
-      { type: "hasMany", name: "hmtTags", options: { through: "hmtTaggings", className: "HmtTag", source: "tag" } },
+      {
+        type: "hasMany",
+        name: "hmtTaggings",
+        options: { className: "HmtTagging", foreignKey: "post_id" },
+      },
+      {
+        type: "hasMany",
+        name: "hmtTags",
+        options: { through: "hmtTaggings", className: "HmtTag", source: "tag" },
+      },
     ];
     registerModel("HmtTag", HmtTag);
     registerModel("HmtTagging", HmtTagging);
@@ -58,7 +116,9 @@ describe("HasManyThroughTest", () => {
     // Associate existing tag via join model
     await Tagging.create({ post_id: post.id, tag_id: tag.id });
     const tags = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings", className: "HmtTag", source: "tag",
+      through: "hmtTaggings",
+      className: "HmtTag",
+      source: "tag",
     });
     expect(tags).toHaveLength(1);
     expect(tags[0].readAttribute("name")).toBe("ruby");
@@ -72,7 +132,9 @@ describe("HasManyThroughTest", () => {
     await Tagging.create({ post_id: post.id, tag_id: t1.id });
     await Tagging.create({ post_id: post.id, tag_id: t2.id });
     const tags = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings", className: "HmtTag", source: "tag",
+      through: "hmtTaggings",
+      className: "HmtTag",
+      source: "tag",
     });
     const ids = tags.map((t) => t.id);
     expect(ids).toContain(t1.id);
@@ -86,7 +148,9 @@ describe("HasManyThroughTest", () => {
     await Tagging.create({ post_id: post.id, tag_id: t1.id });
 
     const before = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings", className: "HmtTag", source: "tag",
+      through: "hmtTaggings",
+      className: "HmtTag",
+      source: "tag",
     });
     expect(before).toHaveLength(1);
 
@@ -94,12 +158,13 @@ describe("HasManyThroughTest", () => {
     await Tagging.create({ post_id: post.id, tag_id: t2.id });
 
     const after = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings", className: "HmtTag", source: "tag",
+      through: "hmtTaggings",
+      className: "HmtTag",
+      source: "tag",
     });
     expect(after).toHaveLength(2);
   });
 });
-
 
 describe("Associations: has_many through", () => {
   it("loads through a join model", async () => {
@@ -128,7 +193,11 @@ describe("Associations: has_many through", () => {
     }
     (Post as any)._associations = [
       { type: "hasMany", name: "taggings", options: { className: "Tagging" } },
-      { type: "hasMany", name: "tags", options: { through: "taggings", className: "Tag", source: "tag" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { through: "taggings", className: "Tag", source: "tag" },
+      },
     ];
 
     registerModel(Post);

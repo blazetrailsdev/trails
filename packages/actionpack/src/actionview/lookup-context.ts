@@ -22,11 +22,11 @@ export class MissingTemplate extends Error {
     public readonly controller: string,
     public readonly action: string,
     public readonly format: string,
-    public readonly searchedPaths: string[]
+    public readonly searchedPaths: string[],
   ) {
     super(
       `Missing template ${controller}/${action} with format "${format}". ` +
-      `Searched in: ${searchedPaths.length > 0 ? searchedPaths.join(", ") : "(no resolvers)"}`
+        `Searched in: ${searchedPaths.length > 0 ? searchedPaths.join(", ") : "(no resolvers)"}`,
     );
     this.name = "MissingTemplate";
   }
@@ -64,11 +64,7 @@ export class LookupContext {
   /**
    * Find a template across all resolvers.
    */
-  findTemplate(
-    name: string,
-    prefix: string,
-    format: string
-  ): Template | null {
+  findTemplate(name: string, prefix: string, format: string): Template | null {
     const extensions = TemplateHandlerRegistry.extensions;
     if (extensions.length === 0) return null;
 
@@ -82,21 +78,14 @@ export class LookupContext {
   /**
    * Find a partial template. Partials are prefixed with underscore.
    */
-  findPartial(
-    name: string,
-    prefix: string,
-    format: string
-  ): Template | null {
+  findPartial(name: string, prefix: string, format: string): Template | null {
     return this.findTemplate(`_${name}`, prefix, format);
   }
 
   /**
    * Find a layout template.
    */
-  findLayout(
-    name: string,
-    format: string
-  ): Template | null {
+  findLayout(name: string, format: string): Template | null {
     const extensions = TemplateHandlerRegistry.extensions;
     if (extensions.length === 0) return null;
 
@@ -129,7 +118,7 @@ export class LookupContext {
     action: string,
     format: string,
     locals: Record<string, unknown> = {},
-    options: { layout?: string | false } = {}
+    options: { layout?: string | false } = {},
   ): Promise<string> {
     const template = this.findTemplate(action, controller, format);
     if (!template) {
@@ -174,7 +163,7 @@ export class LookupContext {
     name: string,
     prefix: string,
     format: string,
-    locals: Record<string, unknown> = {}
+    locals: Record<string, unknown> = {},
   ): Promise<string> {
     const template = this.findPartial(name, prefix, format);
     if (!template) {
@@ -205,7 +194,7 @@ export class LookupContext {
     prefix: string,
     format: string,
     collection: unknown[],
-    as?: string
+    as?: string,
   ): Promise<string> {
     const varName = as ?? partial;
     const parts: string[] = [];
@@ -228,13 +217,13 @@ export class LookupContext {
   async renderTemplate(
     template: Template,
     locals: Record<string, unknown>,
-    context: RenderContext
+    context: RenderContext,
   ): Promise<string> {
     const handler = TemplateHandlerRegistry.handlerForExtension(template.extension);
     if (!handler) {
       throw new Error(
         `No template handler registered for ".${template.extension}". ` +
-        `Register one with TemplateHandlerRegistry.register(handler).`
+          `Register one with TemplateHandlerRegistry.register(handler).`,
       );
     }
 

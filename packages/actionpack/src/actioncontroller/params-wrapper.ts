@@ -51,15 +51,12 @@ const EXCLUDE_PARAMETERS = new Set([
  */
 export function wrapParameters(
   key: string,
-  options: Omit<WrapParametersOptions, "name"> = {}
+  options: Omit<WrapParametersOptions, "name"> = {},
 ): ParamsWrapperConfig {
   return {
     key,
     include: options.include ? new Set(options.include) : null,
-    exclude: new Set([
-      ...EXCLUDE_PARAMETERS,
-      ...(options.exclude ?? []),
-    ]),
+    exclude: new Set([...EXCLUDE_PARAMETERS, ...(options.exclude ?? [])]),
     format: normalizeFormats(options.format),
   };
 }
@@ -88,7 +85,7 @@ function normalizeFormats(format?: string | string[]): Set<string> {
 export function applyParamsWrapper(
   params: Parameters,
   config: ParamsWrapperConfig,
-  requestFormat = "json"
+  requestFormat = "json",
 ): Parameters {
   // Only wrap for matching formats
   if (!config.format.has(requestFormat)) {
@@ -126,9 +123,7 @@ export function applyParamsWrapper(
  * "Admin::PostsController" → "post"
  */
 export function deriveWrapperKey(controllerName: string): string {
-  const name = controllerName
-    .replace(/Controller$/, "")
-    .replace(/.*[:/]/, ""); // Remove namespace
+  const name = controllerName.replace(/Controller$/, "").replace(/.*[:/]/, ""); // Remove namespace
   // Simple singularize: remove trailing 's'
   const singular = name.endsWith("s") ? name.slice(0, -1) : name;
   return singular.charAt(0).toLowerCase() + singular.slice(1);

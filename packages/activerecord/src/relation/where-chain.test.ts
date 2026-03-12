@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -29,10 +69,17 @@ function freshAdapter(): DatabaseAdapter {
 describe("WhereChainTest", () => {
   const adapter = freshAdapter();
   class Post extends Base {
-    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_id", "integer");
+      this.adapter = adapter;
+    }
   }
   class Author extends Base {
-    static { this.attribute("name", "string"); this.adapter = adapter; }
+    static {
+      this.attribute("name", "string");
+      this.adapter = adapter;
+    }
   }
   Associations.belongsTo.call(Post, "author", {});
   registerModel(Post);
@@ -43,61 +90,134 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("author_id");
     expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
   });
-  it.skip("associated merged with scope on association", () => { /* requires scoped associations */ });
-  it.skip("associated unscoped merged with scope on association", () => { /* requires scoped associations */ });
-  it.skip("associated unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
-  it.skip("associated unscoped merged joined extended early with scope on association", () => { /* fixture-dependent */ });
-  it.skip("associated unscoped merged joined extended late with scope on association", () => { /* fixture-dependent */ });
-  it.skip("associated ordered merged with scope on association", () => { /* fixture-dependent */ });
-  it.skip("associated ordered merged joined with scope on association", () => { /* fixture-dependent */ });
-  it.skip("associated with enum", () => { /* fixture-dependent */ });
-  it.skip("associated with enum ordered", () => { /* fixture-dependent */ });
-  it.skip("associated with enum unscoped", () => { /* fixture-dependent */ });
-  it.skip("associated with enum extended early", () => { /* fixture-dependent */ });
-  it.skip("associated with enum extended late", () => { /* fixture-dependent */ });
-  it.skip("associated with add joins before", () => { /* fixture-dependent */ });
-  it.skip("associated with add left joins before", () => { /* fixture-dependent */ });
-  it.skip("associated with add left outer joins before", () => { /* fixture-dependent */ });
-  it.skip("associated with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("associated merged with scope on association", () => {
+    /* requires scoped associations */
+  });
+  it.skip("associated unscoped merged with scope on association", () => {
+    /* requires scoped associations */
+  });
+  it.skip("associated unscoped merged joined with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated unscoped merged joined extended early with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated unscoped merged joined extended late with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated ordered merged with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated ordered merged joined with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with enum", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with enum ordered", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with enum unscoped", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with enum extended early", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with enum extended late", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with add joins before", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with add left joins before", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with add left outer joins before", () => {
+    /* fixture-dependent */
+  });
+  it.skip("associated with composite primary key", () => {
+    /* fixture-dependent */
+  });
   it("missing with child association", () => {
     const sql = Post.all().whereMissing("author").toSql();
     expect(sql).toContain("author_id");
     expect(sql).toContain("IS NULL");
   });
   it("missing with invalid association name", () => {
-    expect(() => Post.all().whereMissing("nonexistent")).toThrow(/Association named 'nonexistent' was not found/);
+    expect(() => Post.all().whereMissing("nonexistent")).toThrow(
+      /Association named 'nonexistent' was not found/,
+    );
   });
   it("missing with multiple association", () => {
     const adapter2 = freshAdapter();
     class Article extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.attribute("category_id", "integer"); this.adapter = adapter2; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter2;
+      }
     }
     class ArtAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter2; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
     }
     class ArtCategory extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter2; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter2;
+      }
     }
     Associations.belongsTo.call(Article, "artAuthor", { foreignKey: "author_id" });
     Associations.belongsTo.call(Article, "artCategory", { foreignKey: "category_id" });
-    registerModel(Article); registerModel(ArtAuthor); registerModel(ArtCategory);
+    registerModel(Article);
+    registerModel(ArtAuthor);
+    registerModel(ArtCategory);
     const sql = Article.all().whereMissing("artAuthor").toSql();
     expect(sql).toContain("author_id");
     expect(sql).toContain("IS NULL");
   });
-  it.skip("missing merged with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing unscoped merged with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing unscoped merged joined with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing ordered merged with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing ordered merged joined with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing unscoped merged joined extended early with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing unscoped merged joined extended late with scope on association", () => { /* fixture-dependent */ });
-  it.skip("missing with enum", () => { /* fixture-dependent */ });
-  it.skip("missing with enum ordered", () => { /* fixture-dependent */ });
-  it.skip("missing with enum unscoped", () => { /* fixture-dependent */ });
-  it.skip("missing with enum extended early", () => { /* fixture-dependent */ });
-  it.skip("missing with enum extended late", () => { /* fixture-dependent */ });
-  it.skip("missing with composite primary key", () => { /* fixture-dependent */ });
+  it.skip("missing merged with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing unscoped merged with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing unscoped merged joined with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing ordered merged with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing ordered merged joined with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing unscoped merged joined extended early with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing unscoped merged joined extended late with scope on association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing with enum", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing with enum ordered", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing with enum unscoped", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing with enum extended early", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing with enum extended late", () => {
+    /* fixture-dependent */
+  });
+  it.skip("missing with composite primary key", () => {
+    /* fixture-dependent */
+  });
 
   it("rewhere with alias condition", () => {
     const sql = Post.where({ title: "old" }).rewhere({ title: "new" }).toSql();
@@ -111,17 +231,23 @@ describe("WhereChainTest", () => {
   });
 
   it("rewhere with infinite upper bound range", () => {
-    const sql = Post.where({ author_id: new Range(1, 10) }).rewhere({ author_id: new Range(5, 20) }).toSql();
+    const sql = Post.where({ author_id: new Range(1, 10) })
+      .rewhere({ author_id: new Range(5, 20) })
+      .toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("20");
   });
   it("rewhere with infinite lower bound range", () => {
-    const sql = Post.where({ author_id: new Range(1, 100) }).rewhere({ author_id: new Range(10, 50) }).toSql();
+    const sql = Post.where({ author_id: new Range(1, 100) })
+      .rewhere({ author_id: new Range(10, 50) })
+      .toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("10");
   });
   it("rewhere with infinite range", () => {
-    const sql = Post.where({ author_id: new Range(1, 5) }).rewhere({ author_id: null }).toSql();
+    const sql = Post.where({ author_id: new Range(1, 5) })
+      .rewhere({ author_id: null })
+      .toSql();
     expect(sql).toContain("NULL");
     expect(sql).not.toContain("BETWEEN");
   });

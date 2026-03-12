@@ -1,4 +1,12 @@
-import { GeneratorBase, GeneratorOptions, classify, dasherize, tableize, parseColumns, underscore } from "./base.js";
+import {
+  GeneratorBase,
+  GeneratorOptions,
+  classify,
+  dasherize,
+  tableize,
+  parseColumns,
+  underscore,
+} from "./base.js";
 import { ModelGenerator } from "./model-generator.js";
 
 export class ScaffoldGenerator extends GeneratorBase {
@@ -21,21 +29,38 @@ export class ScaffoldGenerator extends GeneratorBase {
     const controllerClassName = classify(resourceName) + "Controller";
     const controllerFileName = dasherize(resourceName) + "-controller";
 
-    this.createFile(`src/app/controllers/${controllerFileName}.ts`, this.controllerSource(
-      controllerClassName, className, singular, resourceName
-    ));
+    this.createFile(
+      `src/app/controllers/${controllerFileName}.ts`,
+      this.controllerSource(controllerClassName, className, singular, resourceName),
+    );
 
     // Controller test
-    this.createFile(`test/controllers/${controllerFileName}.test.ts`, this.controllerTestSource(
-      controllerClassName, controllerFileName
-    ));
+    this.createFile(
+      `test/controllers/${controllerFileName}.test.ts`,
+      this.controllerTestSource(controllerClassName, controllerFileName),
+    );
 
     // EJS view templates
-    this.createFile(`src/app/views/${resourceName}/index.html.ejs`, this.indexView(resourceName, singular, columns));
-    this.createFile(`src/app/views/${resourceName}/show.html.ejs`, this.showView(singular, columns));
-    this.createFile(`src/app/views/${resourceName}/new.html.ejs`, this.newView(singular, resourceName, columns));
-    this.createFile(`src/app/views/${resourceName}/edit.html.ejs`, this.editView(singular, resourceName, columns));
-    this.createFile(`src/app/views/${resourceName}/_form.html.ejs`, this.formPartial(singular, columns));
+    this.createFile(
+      `src/app/views/${resourceName}/index.html.ejs`,
+      this.indexView(resourceName, singular, columns),
+    );
+    this.createFile(
+      `src/app/views/${resourceName}/show.html.ejs`,
+      this.showView(singular, columns),
+    );
+    this.createFile(
+      `src/app/views/${resourceName}/new.html.ejs`,
+      this.newView(singular, resourceName, columns),
+    );
+    this.createFile(
+      `src/app/views/${resourceName}/edit.html.ejs`,
+      this.editView(singular, resourceName, columns),
+    );
+    this.createFile(
+      `src/app/views/${resourceName}/_form.html.ejs`,
+      this.formPartial(singular, columns),
+    );
 
     // Create layout if it doesn't exist
     if (!this.fileExists("src/app/views/layouts/application.html.ejs")) {
@@ -134,9 +159,15 @@ describe("${className}", () => {
 `;
   }
 
-  private indexView(plural: string, singular: string, columns: Array<{ name: string; type: string }>): string {
+  private indexView(
+    plural: string,
+    singular: string,
+    columns: Array<{ name: string; type: string }>,
+  ): string {
     const tableHeaders = columns.map((c) => `        <th>${classify(c.name)}</th>`).join("\n");
-    const tableCells = columns.map((c) => `          <td><%= ${singular}.${c.name} %></td>`).join("\n");
+    const tableCells = columns
+      .map((c) => `          <td><%= ${singular}.${c.name} %></td>`)
+      .join("\n");
 
     return `<h1>${classify(plural)}</h1>
 
@@ -165,9 +196,9 @@ ${tableCells}
   }
 
   private showView(singular: string, columns: Array<{ name: string; type: string }>): string {
-    const fields = columns.map((c) =>
-      `<p><strong>${classify(c.name)}:</strong> <%= ${singular}.${c.name} %></p>`
-    ).join("\n");
+    const fields = columns
+      .map((c) => `<p><strong>${classify(c.name)}:</strong> <%= ${singular}.${c.name} %></p>`)
+      .join("\n");
 
     return `<h1>${classify(singular)}</h1>
 
@@ -181,7 +212,11 @@ ${fields}
 `;
   }
 
-  private newView(singular: string, plural: string, columns: Array<{ name: string; type: string }>): string {
+  private newView(
+    singular: string,
+    plural: string,
+    columns: Array<{ name: string; type: string }>,
+  ): string {
     return `<h1>New ${classify(singular)}</h1>
 
 <%- yield %>
@@ -190,7 +225,11 @@ ${fields}
 `;
   }
 
-  private editView(singular: string, plural: string, columns: Array<{ name: string; type: string }>): string {
+  private editView(
+    singular: string,
+    plural: string,
+    columns: Array<{ name: string; type: string }>,
+  ): string {
     return `<h1>Edit ${classify(singular)}</h1>
 
 <%- yield %>
@@ -207,12 +246,18 @@ ${fields}
     const fields = columns
       .filter((c) => c.type !== "references")
       .map((c) => {
-        const inputType = c.type === "boolean" ? "checkbox"
-          : c.type === "integer" || c.type === "float" || c.type === "decimal" ? "number"
-          : c.type === "text" ? "textarea"
-          : c.type === "date" ? "date"
-          : c.type === "datetime" || c.type === "timestamp" ? "datetime-local"
-          : "text";
+        const inputType =
+          c.type === "boolean"
+            ? "checkbox"
+            : c.type === "integer" || c.type === "float" || c.type === "decimal"
+              ? "number"
+              : c.type === "text"
+                ? "textarea"
+                : c.type === "date"
+                  ? "date"
+                  : c.type === "datetime" || c.type === "timestamp"
+                    ? "datetime-local"
+                    : "text";
 
         if (inputType === "textarea") {
           return `  <div>

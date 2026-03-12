@@ -3,9 +3,9 @@
  */
 
 export interface Range<T> {
-  begin: T | null;      // null = beginless
-  end: T | null;        // null = endless
-  excludeEnd: boolean;  // true = exclusive end (like ...) 
+  begin: T | null; // null = beginless
+  end: T | null; // null = endless
+  excludeEnd: boolean; // true = exclusive end (like ...)
 }
 
 export function makeRange<T>(begin: T | null, end: T | null, excludeEnd = false): Range<T> {
@@ -17,7 +17,7 @@ export function makeRange<T>(begin: T | null, end: T | null, excludeEnd = false)
  * Mirrors ActiveSupport Range#overlap?
  */
 export function overlap<T extends number | Date>(a: Range<T>, b: Range<T>): boolean {
-  const toNum = (v: T): number => v instanceof Date ? v.getTime() : (v as number);
+  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
 
   // a starts after b ends
   if (a.begin !== null && b.end !== null) {
@@ -42,7 +42,7 @@ export const overlaps = overlap; // alias
  * include? — returns true if range includes another range or value.
  */
 export function rangeIncludesValue<T extends number | Date>(range: Range<T>, value: T): boolean {
-  const toNum = (v: T): number => v instanceof Date ? v.getTime() : (v as number);
+  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
   const n = toNum(value);
 
   if (range.begin !== null && n < toNum(range.begin)) return false;
@@ -52,8 +52,11 @@ export function rangeIncludesValue<T extends number | Date>(range: Range<T>, val
   return true;
 }
 
-export function rangeIncludesRange<T extends number | Date>(outer: Range<T>, inner: Range<T>): boolean {
-  const toNum = (v: T): number => v instanceof Date ? v.getTime() : (v as number);
+export function rangeIncludesRange<T extends number | Date>(
+  outer: Range<T>,
+  inner: Range<T>,
+): boolean {
+  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
 
   // inner begin must be within outer
   if (inner.begin !== null) {

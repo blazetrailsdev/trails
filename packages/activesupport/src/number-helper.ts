@@ -66,10 +66,7 @@ function preciseRound(num: number, decimalPlaces: number): number {
   return Math.round((num + Number.EPSILON) * factor) / factor;
 }
 
-export function numberToPhone(
-  number: unknown,
-  options: NumberToPhoneOptions = {}
-): string {
+export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {}): string {
   if (!isNumeric(number)) return String(number);
   const { areaCode = false, delimiter = "-", extension, countryCode } = options;
   const str = String(number).replace(/\D/g, "");
@@ -84,7 +81,9 @@ export function numberToPhone(
     if (areaCode && area) {
       result = `(${area}) ${prefix}${delimiter}${line}`;
     } else {
-      result = area ? `${area}${delimiter}${prefix}${delimiter}${line}` : `${prefix}${delimiter}${line}`;
+      result = area
+        ? `${area}${delimiter}${prefix}${delimiter}${line}`
+        : `${prefix}${delimiter}${line}`;
     }
   } else {
     // More than 10 digits - area code takes everything before last 7
@@ -94,7 +93,9 @@ export function numberToPhone(
     if (areaCode && area) {
       result = `(${area}) ${prefix}${delimiter}${line}`;
     } else {
-      result = area ? `${area}${delimiter}${prefix}${delimiter}${line}` : `${prefix}${delimiter}${line}`;
+      result = area
+        ? `${area}${delimiter}${prefix}${delimiter}${line}`
+        : `${prefix}${delimiter}${line}`;
     }
   }
 
@@ -115,7 +116,7 @@ export function numberToPhone(
 
 export function numberWithDelimiter(
   number: unknown,
-  options: NumberWithDelimiterOptions = {}
+  options: NumberWithDelimiterOptions = {},
 ): string {
   if (!isNumeric(number)) return String(number);
   const { delimiter = ",", separator = "." } = options;
@@ -131,10 +132,7 @@ export function numberWithDelimiter(
   return delimited;
 }
 
-export function numberToRounded(
-  number: unknown,
-  options: NumberToRoundedOptions = {}
-): string {
+export function numberToRounded(number: unknown, options: NumberToRoundedOptions = {}): string {
   if (!isNumeric(number)) return String(number);
   const {
     precision = 3,
@@ -178,7 +176,9 @@ export function numberToRounded(
     if (Math.abs(num) >= 1e13) {
       const magnitude = Math.floor(Math.log10(Math.abs(num)));
       const coeff = num / Math.pow(10, magnitude);
-      let coeffStr = preciseRound(coeff, 2).toFixed(2).replace(/\.?0+$/, "");
+      let coeffStr = preciseRound(coeff, 2)
+        .toFixed(2)
+        .replace(/\.?0+$/, "");
       return `${coeffStr} x 10^${magnitude}`;
     }
     // Only strip trailing zeros after the decimal point
@@ -192,9 +192,7 @@ export function numberToRounded(
   const intPart = parts[0];
   const decPart = parts[1];
 
-  let result = delimiter
-    ? intPart.replace(/(\d)(?=(\d{3})+(?!\d))/g, `$1${delimiter}`)
-    : intPart;
+  let result = delimiter ? intPart.replace(/(\d)(?=(\d{3})+(?!\d))/g, `$1${delimiter}`) : intPart;
 
   if (decPart !== undefined) {
     result = `${result}${separator}${decPart}`;
@@ -202,10 +200,7 @@ export function numberToRounded(
   return result;
 }
 
-export function numberToCurrency(
-  number: unknown,
-  options: NumberToCurrencyOptions = {}
-): string {
+export function numberToCurrency(number: unknown, options: NumberToCurrencyOptions = {}): string {
   const {
     precision = 2,
     unit = "$",
@@ -235,7 +230,7 @@ export function numberToCurrency(
 
 export function numberToPercentage(
   number: unknown,
-  options: NumberToPercentageOptions = {}
+  options: NumberToPercentageOptions = {},
 ): string {
   if (!isNumeric(number)) return `${number}%`;
   const { format = "%n%", ...roundedOptions } = options;
@@ -245,10 +240,7 @@ export function numberToPercentage(
 
 const STORAGE_UNITS = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB"];
 
-export function numberToHumanSize(
-  number: unknown,
-  options: NumberToHumanSizeOptions = {}
-): string {
+export function numberToHumanSize(number: unknown, options: NumberToHumanSizeOptions = {}): string {
   if (!isNumeric(number)) return String(number);
   const {
     precision = 3,
@@ -292,10 +284,7 @@ const HUMAN_UNITS: Array<[number, string]> = [
   [1e3, "Thousand"],
 ];
 
-export function numberToHuman(
-  number: unknown,
-  options: NumberToHumanOptions = {}
-): string {
+export function numberToHuman(number: unknown, options: NumberToHumanOptions = {}): string {
   if (!isNumeric(number)) return String(number);
   const {
     precision = 3,
@@ -324,28 +313,58 @@ export function numberToHuman(
     for (const [threshold, key] of thresholds) {
       if (abs >= threshold && units[key] !== undefined) {
         const value = num / threshold;
-        const rounded = numberToRounded(value, { precision, separator, delimiter, significant, stripInsignificantZeros });
+        const rounded = numberToRounded(value, {
+          precision,
+          separator,
+          delimiter,
+          significant,
+          stripInsignificantZeros,
+        });
         return format.replace("%n", rounded).replace("%u", units[key]);
       }
     }
     // If no unit found
     if (units["unit"] !== undefined) {
-      const rounded = numberToRounded(num, { precision, separator, delimiter, significant, stripInsignificantZeros });
+      const rounded = numberToRounded(num, {
+        precision,
+        separator,
+        delimiter,
+        significant,
+        stripInsignificantZeros,
+      });
       return format.replace("%n", rounded).replace("%u", units["unit"]).trim();
     }
-    const rounded = numberToRounded(num, { precision, separator, delimiter, significant, stripInsignificantZeros });
+    const rounded = numberToRounded(num, {
+      precision,
+      separator,
+      delimiter,
+      significant,
+      stripInsignificantZeros,
+    });
     return rounded;
   }
 
   for (const [threshold, label] of HUMAN_UNITS) {
     if (abs >= threshold) {
       const value = num / threshold;
-      const rounded = numberToRounded(value, { precision, separator, delimiter, significant, stripInsignificantZeros });
+      const rounded = numberToRounded(value, {
+        precision,
+        separator,
+        delimiter,
+        significant,
+        stripInsignificantZeros,
+      });
       return format.replace("%n", rounded).replace("%u", label);
     }
   }
 
-  const rounded = numberToRounded(num, { precision, separator, delimiter, significant, stripInsignificantZeros });
+  const rounded = numberToRounded(num, {
+    precision,
+    separator,
+    delimiter,
+    significant,
+    stripInsignificantZeros,
+  });
   return rounded;
 }
 

@@ -60,7 +60,9 @@ describe("DeprecationTest", () => {
 
   it("silence ensures silencing is reverted after an error is raised", () => {
     expect(() => {
-      dep.silence(() => { throw new Error("oops"); });
+      dep.silence(() => {
+        throw new Error("oops");
+      });
     }).toThrow("oops");
 
     dep.behavior = "raise";
@@ -88,7 +90,9 @@ describe("DeprecationTest", () => {
 
   it("behavior as function callback", () => {
     const messages: string[] = [];
-    dep.behavior = (msg: unknown) => { messages.push(String(msg)); };
+    dep.behavior = (msg: unknown) => {
+      messages.push(String(msg));
+    };
     dep.warn("fubar");
     expect(messages.some((m) => m.includes("fubar"))).toBe(true);
   });

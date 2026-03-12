@@ -24,11 +24,7 @@ type Constructor<T = object> = new (...args: any[]) => T;
  */
 export interface AttributesStatic {
   _attributeDefinitions: Map<string, AttributeDefinition>;
-  attribute(
-    name: string,
-    typeName: string,
-    options?: { default?: unknown }
-  ): void;
+  attribute(name: string, typeName: string, options?: { default?: unknown }): void;
   attributeNames(): string[];
 }
 
@@ -44,11 +40,7 @@ export function Attributes<TBase extends Constructor>(Base: TBase) {
   class AttributesMixin extends Base implements AttributesInstance {
     static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
 
-    static attribute(
-      name: string,
-      typeName: string,
-      options?: { default?: unknown }
-    ): void {
+    static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
       const type = typeRegistry.lookup(typeName);
       const defaultValue = options?.default ?? null;
       this._attributeDefinitions.set(name, { name, type, defaultValue });
@@ -70,17 +62,14 @@ export function Attributes<TBase extends Constructor>(Base: TBase) {
       if (this.#initialized) return;
       this.#initialized = true;
       const ctor = this.constructor as any;
-      const defs: Map<string, AttributeDefinition> =
-        ctor._attributeDefinitions ?? new Map();
+      const defs: Map<string, AttributeDefinition> = ctor._attributeDefinitions ?? new Map();
 
       for (const [name, def] of defs) {
         if (name in initial) {
           this._attributes.set(name, def.type.cast(initial[name]));
         } else {
           const defVal =
-            typeof def.defaultValue === "function"
-              ? def.defaultValue()
-              : def.defaultValue;
+            typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
           this._attributes.set(name, defVal);
         }
       }

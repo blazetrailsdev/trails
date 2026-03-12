@@ -166,7 +166,11 @@ it("limit the allowed parameter depth when parsing parameters", () => {
 });
 
 it("not unify GET and POST when calling params", () => {
-  const req = makeReq("/?foo=get", { method: "POST", input: "foo=post", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/?foo=get", {
+    method: "POST",
+    input: "foo=post",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   expect(req.GET["foo"]).toBe("get");
   expect(req.POST["foo"]).toBe("post");
   // params merges POST over GET
@@ -180,7 +184,11 @@ it("use the query_parser's params_class for multipart params", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
   };
   const req = new Request(env);
   expect(typeof req.POST).toBe("object");
@@ -212,34 +220,57 @@ it("parse POST data when method is POST and no content-type given", () => {
 });
 
 it("parse POST data with explicit content type regardless of method", () => {
-  const req = makeReq("/", { method: "PUT", input: "foo=bar", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "PUT",
+    input: "foo=bar",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   expect(req.POST["foo"]).toBe("bar");
 });
 
 it("not parse POST data when media type is not form-data", () => {
-  const req = makeReq("/", { method: "POST", input: '{"foo":"bar"}', CONTENT_TYPE: "application/json" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: '{"foo":"bar"}',
+    CONTENT_TYPE: "application/json",
+  });
   expect(req.POST).toEqual({});
 });
 
 it("parse POST data on PUT when media type is form-data", () => {
-  const req = makeReq("/", { method: "PUT", input: "foo=bar", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "PUT",
+    input: "foo=bar",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   expect(req.POST["foo"]).toBe("bar");
 });
 
 it("safely accepts POST requests with empty body", () => {
-  const req = makeReq("/", { method: "POST", input: "", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: "",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   expect(req.POST).toEqual({});
 });
 
 it("clean up Safari's ajax POST body", () => {
-  const req = makeReq("/", { method: "POST", input: "\0", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: "\0",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   expect(req.POST).toEqual({});
 });
 
 it("limit POST body read to bytesize_limit when parsing url-encoded data", () => {
   const reads: any[] = [];
   const mockInput = {
-    read(len?: number) { reads.push(len); return "foo=bar"; },
+    read(len?: number) {
+      reads.push(len);
+      return "foo=bar";
+    },
   };
   const env = {
     ...makeEnv(),
@@ -252,7 +283,11 @@ it("limit POST body read to bytesize_limit when parsing url-encoded data", () =>
 });
 
 it("handle nil return from rack.input.read when parsing url-encoded data", () => {
-  const mockInput = { read() { return null; } };
+  const mockInput = {
+    read() {
+      return null;
+    },
+  };
   const env = {
     ...makeEnv(),
     REQUEST_METHOD: "POST",
@@ -275,7 +310,11 @@ it("truncate POST body at bytesize_limit when parsing url-encoded data", () => {
 });
 
 it("clean up Safari's ajax POST body with limited read", () => {
-  const mockInput = { read() { return "foo=bar\0"; } };
+  const mockInput = {
+    read() {
+      return "foo=bar\0";
+    },
+  };
   const env = {
     ...makeEnv(),
     REQUEST_METHOD: "POST",
@@ -288,22 +327,47 @@ it("clean up Safari's ajax POST body with limited read", () => {
 });
 
 it("return form_pairs for url-encoded POST data", () => {
-  const req = makeReq("/", { method: "POST", input: "foo=bar&baz=qux", CONTENT_TYPE: "application/x-www-form-urlencoded" });
-  expect(req.formPairs).toEqual([["foo", "bar"], ["baz", "qux"]]);
+  const req = makeReq("/", {
+    method: "POST",
+    input: "foo=bar&baz=qux",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
+  expect(req.formPairs).toEqual([
+    ["foo", "bar"],
+    ["baz", "qux"],
+  ]);
 });
 
 it("preserve duplicate keys in form_pairs", () => {
-  const req = makeReq("/", { method: "POST", input: "foo=1&foo=2", CONTENT_TYPE: "application/x-www-form-urlencoded" });
-  expect(req.formPairs).toEqual([["foo", "1"], ["foo", "2"]]);
+  const req = makeReq("/", {
+    method: "POST",
+    input: "foo=1&foo=2",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
+  expect(req.formPairs).toEqual([
+    ["foo", "1"],
+    ["foo", "2"],
+  ]);
 });
 
 it("handle empty values in form_pairs", () => {
-  const req = makeReq("/", { method: "POST", input: "foo=&bar=baz", CONTENT_TYPE: "application/x-www-form-urlencoded" });
-  expect(req.formPairs).toEqual([["foo", ""], ["bar", "baz"]]);
+  const req = makeReq("/", {
+    method: "POST",
+    input: "foo=&bar=baz",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
+  expect(req.formPairs).toEqual([
+    ["foo", ""],
+    ["bar", "baz"],
+  ]);
 });
 
 it("return empty array for form_pairs with no POST data", () => {
-  const req = makeReq("/", { method: "POST", input: "", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: "",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   expect(req.formPairs).toEqual([]);
 });
 
@@ -327,11 +391,18 @@ it("return form_pairs for multipart form data", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
   };
   const req = new Request(env);
   const pairs = req.formPairs;
-  expect(pairs).toEqual([["reply", "yes"], ["name", "John"]]);
+  expect(pairs).toEqual([
+    ["reply", "yes"],
+    ["name", "John"],
+  ]);
 });
 
 it("preserve duplicate keys in multipart form_pairs", () => {
@@ -340,7 +411,11 @@ it("preserve duplicate keys in multipart form_pairs", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
   };
   const req = new Request(env);
   // Note: our multipart parser merges duplicate keys, so the POST hash has only the last value
@@ -356,7 +431,11 @@ it("include file uploads in multipart form_pairs", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
   };
   const req = new Request(env);
   const pairs = req.formPairs;
@@ -372,7 +451,11 @@ it("return empty array for empty multipart form_pairs", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
   };
   const req = new Request(env);
   expect(req.formPairs).toEqual([]);
@@ -457,7 +540,11 @@ it("modify params hash if param is in GET", () => {
 });
 
 it("modify params hash if param is in POST", () => {
-  const req = makeReq("/", { method: "POST", input: "foo=bar", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: "foo=bar",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   req.POST["foo"] = "modified";
   expect(req.params["foo"]).toBe("modified");
 });
@@ -475,13 +562,21 @@ it("modify params hash by changing only GET", () => {
 });
 
 it("modify params hash by changing only POST", () => {
-  const req = makeReq("/", { method: "POST", input: "foo=bar", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: "foo=bar",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   req.POST["foo"] = "updated";
   expect(req.POST["foo"]).toBe("updated");
 });
 
 it("modify params hash, even if param is defined in both POST and GET", () => {
-  const req = makeReq("/?foo=get", { method: "POST", input: "foo=post", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/?foo=get", {
+    method: "POST",
+    input: "foo=post",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   req.POST["foo"] = "new_post";
   expect(req.params["foo"]).toBe("new_post");
 });
@@ -493,7 +588,11 @@ it("allow deleting from params hash if param is in GET", () => {
 });
 
 it("allow deleting from params hash if param is in POST", () => {
-  const req = makeReq("/", { method: "POST", input: "foo=bar", CONTENT_TYPE: "application/x-www-form-urlencoded" });
+  const req = makeReq("/", {
+    method: "POST",
+    input: "foo=bar",
+    CONTENT_TYPE: "application/x-www-form-urlencoded",
+  });
   req.deleteParam("foo");
   expect(req.POST["foo"]).toBeUndefined();
 });
@@ -555,7 +654,11 @@ it("returns the same error for invalid post inputs", () => {
   const env = {
     REQUEST_METHOD: "POST",
     PATH_INFO: "/foo",
-    "rack.input": { read() { return "invalid=bar&invalid[foo]=bar"; } },
+    "rack.input": {
+      read() {
+        return "invalid=bar&invalid[foo]=bar";
+      },
+    },
     CONTENT_TYPE: "application/x-www-form-urlencoded",
   };
   // Conflicting param types (string vs hash) should throw TypeError
@@ -569,7 +672,11 @@ it("parse with junk before boundary", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   // Junk before boundary should cause an error
@@ -583,7 +690,11 @@ it("not infinite loop with a malformed HTTP request", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   // Should either throw or return without infinite loop
@@ -600,7 +711,11 @@ it("parse multipart form data", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   expect(req.POST["reply"]).toBe("yes");
@@ -618,7 +733,11 @@ it("parse multipart delimiter-only boundary", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   expect(req.POST).toEqual({});
@@ -630,14 +749,20 @@ it("MultipartPartLimitError when request has too many multipart file parts if li
   const boundary = "AaB03x";
   const parts = [];
   for (let i = 0; i < 10; i++) {
-    parts.push(`--${boundary}\r\ncontent-disposition: form-data; name="f${i}"; filename="f${i}.txt"\r\ncontent-type: text/plain\r\n\r\ndata\r\n`);
+    parts.push(
+      `--${boundary}\r\ncontent-disposition: form-data; name="f${i}"; filename="f${i}.txt"\r\ncontent-type: text/plain\r\n\r\ndata\r\n`,
+    );
   }
   parts.push(`--${boundary}--\r\n`);
   const body = parts.join("");
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
     _multipart_file_limit: 5,
   };
   const req = new Request(env);
@@ -655,7 +780,11 @@ it("MultipartPartLimitError when request has too many multipart total parts if l
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
     _multipart_total_limit: 5,
   };
   const req = new Request(env);
@@ -666,14 +795,20 @@ it("closes tempfiles it created in the case of too many created", () => {
   const boundary = "AaB03x";
   const parts = [];
   for (let i = 0; i < 10; i++) {
-    parts.push(`--${boundary}\r\ncontent-disposition: form-data; name="f${i}"; filename="f${i}.txt"\r\ncontent-type: text/plain\r\n\r\ndata\r\n`);
+    parts.push(
+      `--${boundary}\r\ncontent-disposition: form-data; name="f${i}"; filename="f${i}.txt"\r\ncontent-type: text/plain\r\n\r\ndata\r\n`,
+    );
   }
   parts.push(`--${boundary}--\r\n`);
   const body = parts.join("");
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(body, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(body, "binary");
+      },
+    },
     _multipart_file_limit: 5,
   };
   const req = new Request(env);
@@ -688,7 +823,11 @@ it("parse big multipart form data", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   expect(req.POST["huge"].tempfile.read().length).toBe(32768);
@@ -702,7 +841,11 @@ it("record tempfiles from multipart form data in env[rack.tempfiles]", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   req.POST;
@@ -719,7 +862,11 @@ it("detect invalid multipart form data", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   // Should parse without crashing (incomplete data just yields empty results)
@@ -733,7 +880,11 @@ it("consistently raise EOFError on bad multipart form data", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   // Should consistently return the same result (cached)
@@ -748,7 +899,11 @@ it("correctly parse the part name from Content-Id header", () => {
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/related; boundary=${boundary}`,
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   expect(Object.keys(req.POST)).toEqual(["<soap-start>"]);
@@ -756,14 +911,22 @@ it("correctly parse the part name from Content-Id header", () => {
 
 it("not try to interpret binary as utf8", () => {
   const boundary = "AaB03x";
-  const binaryData = Buffer.from([0x36, 0xCF, 0x0A, 0xF8]);
+  const binaryData = Buffer.from([0x36, 0xcf, 0x0a, 0xf8]);
   const header = `--${boundary}\r\ncontent-disposition: form-data; name="fileupload"; filename="junk.a"\r\ncontent-type: application/octet-stream\r\n\r\n`;
   const footer = `\r\n--${boundary}--\r\n`;
-  const body = Buffer.concat([Buffer.from(header, "binary"), binaryData, Buffer.from(footer, "binary")]);
+  const body = Buffer.concat([
+    Buffer.from(header, "binary"),
+    binaryData,
+    Buffer.from(footer, "binary"),
+  ]);
   const env = {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-    "rack.input": { read() { return body; } },
+    "rack.input": {
+      read() {
+        return body;
+      },
+    },
   };
   const req = new Request(env);
   expect(req.POST["fileupload"].tempfile.read().length).toBe(4);
@@ -774,8 +937,16 @@ it("use form_hash when form_input is a Tempfile", () => {
   const env = {
     ...makeEnv(),
     "rack.request.form_hash": formHash,
-    "rack.request.form_input": { read() { return ""; } },
-    "rack.input": { read() { return ""; } },
+    "rack.request.form_input": {
+      read() {
+        return "";
+      },
+    },
+    "rack.input": {
+      read() {
+        return "";
+      },
+    },
   };
   const req = new Request(env);
   expect(req.POST).toBe(formHash);
@@ -788,7 +959,11 @@ it("conform to the Rack spec", () => {
     ...makeEnv(),
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
     CONTENT_LENGTH: String(input.length),
-    "rack.input": { read() { return Buffer.from(input, "binary"); } },
+    "rack.input": {
+      read() {
+        return Buffer.from(input, "binary");
+      },
+    },
   };
   const req = new Request(env);
   const file = req.POST["fileupload"];
@@ -800,13 +975,19 @@ it("conform to the Rack spec", () => {
 it("parse Accept-Encoding correctly", () => {
   const req = makeReq("/", { HTTP_ACCEPT_ENCODING: "gzip;q=1.0, deflate;q=0.5" });
   const ae = req.acceptEncoding;
-  expect(ae).toEqual([["gzip", 1.0], ["deflate", 0.5]]);
+  expect(ae).toEqual([
+    ["gzip", 1.0],
+    ["deflate", 0.5],
+  ]);
 });
 
 it("parse Accept-Language correctly", () => {
   const req = makeReq("/", { HTTP_ACCEPT_LANGUAGE: "en;q=0.9, fr;q=0.8" });
   const al = req.acceptLanguage;
-  expect(al).toEqual([["en", 0.9], ["fr", 0.8]]);
+  expect(al).toEqual([
+    ["en", 0.9],
+    ["fr", 0.8],
+  ]);
 });
 
 it("provide ip information", () => {

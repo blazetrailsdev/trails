@@ -17,7 +17,7 @@ export class AssociationReflection {
     name: string,
     macro: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
     options: Record<string, unknown>,
-    ownerClass: typeof Base
+    ownerClass: typeof Base,
   ) {
     this.name = name;
     this.macro = macro;
@@ -45,7 +45,8 @@ export class AssociationReflection {
       this.foreignKey = `${name}_id`;
     } else {
       const underscore = (n: string) =>
-        n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+        n
+          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
           .replace(/([a-z\d])([A-Z])/g, "$1_$2")
           .toLowerCase();
       this.foreignKey = `${underscore(ownerClass.name)}_id`;
@@ -76,7 +77,9 @@ export class AssociationReflection {
   get klass(): typeof Base {
     const resolved = modelRegistry.get(this.className);
     if (!resolved) {
-      throw new Error(`Could not find model '${this.className}' in model registry (for association '${this.name}')`);
+      throw new Error(
+        `Could not find model '${this.className}' in model registry (for association '${this.name}')`,
+      );
     }
     return resolved;
   }
@@ -106,7 +109,7 @@ export class ColumnReflection {
  */
 export function columns(modelClass: typeof Base): ColumnReflection[] {
   return Array.from(modelClass._attributeDefinitions.entries()).map(
-    ([name, def]) => new ColumnReflection(name, def.type.constructor.name, def.defaultValue)
+    ([name, def]) => new ColumnReflection(name, def.type.constructor.name, def.defaultValue),
   );
 }
 
@@ -126,7 +129,7 @@ export function columnNames(modelClass: typeof Base): string[] {
  */
 export function reflectOnAssociation(
   modelClass: typeof Base,
-  name: string
+  name: string,
 ): AssociationReflection | null {
   const associations: any[] = (modelClass as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === name);
@@ -136,7 +139,7 @@ export function reflectOnAssociation(
     assocDef.name,
     assocDef.type as any,
     assocDef.options,
-    modelClass
+    modelClass,
   );
 }
 
@@ -147,13 +150,13 @@ export function reflectOnAssociation(
  */
 export function reflectOnAllAssociations(
   modelClass: typeof Base,
-  macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany"
+  macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
 ): AssociationReflection[] {
   const associations: any[] = (modelClass as any)._associations ?? [];
   const filtered = macro ? associations.filter((a) => a.type === macro) : associations;
 
   return filtered.map(
     (assocDef) =>
-      new AssociationReflection(assocDef.name, assocDef.type as any, assocDef.options, modelClass)
+      new AssociationReflection(assocDef.name, assocDef.type as any, assocDef.options, modelClass),
   );
 }

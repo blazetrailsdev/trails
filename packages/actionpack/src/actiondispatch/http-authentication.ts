@@ -46,7 +46,7 @@ export const BasicAuth = {
   /** Authenticate using a callback. Returns true if authenticated. */
   authenticate(
     authHeader: string | undefined,
-    verify: (username: string, password: string) => boolean
+    verify: (username: string, password: string) => boolean,
   ): boolean {
     if (!authHeader) return false;
     const creds = BasicAuth.decode(authHeader);
@@ -125,7 +125,7 @@ export const TokenAuth = {
   /** Authenticate using a callback. Returns true if authenticated. */
   authenticate(
     authHeader: string | undefined,
-    verify: (token: string, options: Record<string, string>) => boolean
+    verify: (token: string, options: Record<string, string>) => boolean,
   ): boolean {
     if (!authHeader) return false;
     const creds = TokenAuth.decode(authHeader);
@@ -218,7 +218,7 @@ export const DigestAuth = {
     method: string,
     uri: string,
     ha1: string,
-    params: { nonce: string; nc: string; cnonce: string; qop?: string }
+    params: { nonce: string; nc: string; cnonce: string; qop?: string },
   ): string {
     const ha2 = createHash("md5").update(`${method}:${uri}`).digest("hex");
     let responseStr: string;
@@ -244,7 +244,7 @@ export const DigestAuth = {
   challengeResponse(
     realm: string,
     secret: string,
-    options: { qop?: string; opaque?: string } = {}
+    options: { qop?: string; opaque?: string } = {},
   ): [number, Record<string, string>, string] {
     const nonce = DigestAuth.generateNonce(secret);
     const opaque = options.opaque ?? randomBytes(16).toString("hex");

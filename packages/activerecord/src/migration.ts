@@ -1,7 +1,9 @@
 import type { DatabaseAdapter } from "./adapter.js";
 
 /** Detect adapter type from an adapter instance. */
-function detectAdapterName(adapter: DatabaseAdapter | null | undefined): "sqlite" | "postgres" | "mysql" | "memory" {
+function detectAdapterName(
+  adapter: DatabaseAdapter | null | undefined,
+): "sqlite" | "postgres" | "mysql" | "memory" {
   const name = adapter?.constructor?.name ?? "";
   if (name.includes("Postgres") || name === "SchemaAdapter") {
     if (process.env.PG_TEST_URL) return "postgres";
@@ -64,7 +66,10 @@ export class TableDefinition {
   private _id: boolean;
   private _adapterName: "sqlite" | "postgres" | "mysql" | "memory";
 
-  constructor(tableName: string, options: { id?: boolean; adapterName?: "sqlite" | "postgres" | "mysql" | "memory" } = {}) {
+  constructor(
+    tableName: string,
+    options: { id?: boolean; adapterName?: "sqlite" | "postgres" | "mysql" | "memory" } = {},
+  ) {
     this.tableName = tableName;
     this._adapterName = options.adapterName ?? "sqlite";
     this._id = options.id !== false;
@@ -142,7 +147,7 @@ export class TableDefinition {
     options: ColumnOptions & {
       polymorphic?: boolean;
       foreignKey?: boolean;
-    } = {}
+    } = {},
   ): this {
     this.integer(`${name}_id`, options);
     if (options.polymorphic) {
@@ -154,10 +159,7 @@ export class TableDefinition {
     return this;
   }
 
-  index(
-    columns: string[],
-    options: { unique?: boolean; name?: string } = {}
-  ): this {
+  index(columns: string[], options: { unique?: boolean; name?: string } = {}): this {
     this.indexes.push({
       columns,
       unique: options.unique ?? false,
@@ -196,9 +198,7 @@ export class TableDefinition {
           parts.push(this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL");
           break;
         case "decimal":
-          parts.push(
-            `DECIMAL(${col.options.precision ?? 10}, ${col.options.scale ?? 0})`
-          );
+          parts.push(`DECIMAL(${col.options.precision ?? 10}, ${col.options.scale ?? 0})`);
           break;
         case "boolean":
           parts.push(this._adapterName === "postgres" ? "BOOLEAN" : "BOOLEAN");
@@ -315,7 +315,7 @@ export abstract class Migration {
       // If no operations were recorded, migration is irreversible
       if (this._recordedOps.length === 0) {
         throw new Error(
-          `${this.constructor.name}#down is not implemented. This migration is irreversible.`
+          `${this.constructor.name}#down is not implemented. This migration is irreversible.`,
         );
       }
 
@@ -338,29 +338,23 @@ export abstract class Migration {
         break;
       case "removeColumn":
         throw new Error("Cannot reverse removeColumn without type info");
-      case "addIndex": {
-        const idxOpts: { column: string | string[]; name?: string } = {
-          column: op.args[1] as string | string[],
-        };
-        const origOpts = op.args[2] as { name?: string } | undefined;
-        if (origOpts?.name) idxOpts.name = origOpts.name;
-        await this.removeIndex(op.args[0] as string, idxOpts);
-      }
+      case "addIndex":
+        {
+          const idxOpts: { column: string | string[]; name?: string } = {
+            column: op.args[1] as string | string[],
+          };
+          const origOpts = op.args[2] as { name?: string } | undefined;
+          if (origOpts?.name) idxOpts.name = origOpts.name;
+          await this.removeIndex(op.args[0] as string, idxOpts);
+        }
         break;
       case "removeIndex":
         throw new Error("Cannot reverse removeIndex without column info");
       case "renameColumn":
-        await this.renameColumn(
-          op.args[0] as string,
-          op.args[2] as string,
-          op.args[1] as string
-        );
+        await this.renameColumn(op.args[0] as string, op.args[2] as string, op.args[1] as string);
         break;
       case "renameTable":
-        await this.renameTable(
-          op.args[1] as string,
-          op.args[0] as string
-        );
+        await this.renameTable(op.args[1] as string, op.args[0] as string);
         break;
       case "changeColumn":
         throw new Error("Cannot reverse changeColumn without previous type info");
@@ -376,10 +370,8 @@ export abstract class Migration {
    */
   async createTable(
     name: string,
-    optionsOrFn?:
-      | { id?: boolean }
-      | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void
+    optionsOrFn?: { id?: boolean } | ((t: TableDefinition) => void),
+    fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "createTable", args: [name, optionsOrFn, fn] });
@@ -402,12 +394,11 @@ export abstract class Migration {
 
     // Create indexes
     for (const idx of td.indexes) {
-      const indexName =
-        idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
+      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
       const unique = idx.unique ? "UNIQUE " : "";
       const cols = idx.columns.map((c) => `"${c}"`).join(", ");
       await this.adapter.executeMutation(
-        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${cols})`
+        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${cols})`,
       );
     }
   }
@@ -434,19 +425,18 @@ export abstract class Migration {
     tableName: string,
     columnName: string,
     type: ColumnType,
-    options: ColumnOptions = {}
+    options: ColumnOptions = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addColumn", args: [tableName, columnName, type, options] });
       return;
     }
     const sqlType = this._sqlType(type, options);
-    const nullable =
-      options.null === false ? " NOT NULL" : "";
+    const nullable = options.null === false ? " NOT NULL" : "";
     const defaultClause = this._defaultClause(options.default);
 
     await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`
+      `ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`,
     );
   }
 
@@ -460,9 +450,7 @@ export abstract class Migration {
       this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName] });
       return;
     }
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" DROP COLUMN "${columnName}"`
-    );
+    await this.adapter.executeMutation(`ALTER TABLE "${tableName}" DROP COLUMN "${columnName}"`);
   }
 
   /**
@@ -470,17 +458,13 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#rename_column
    */
-  async renameColumn(
-    tableName: string,
-    oldName: string,
-    newName: string
-  ): Promise<void> {
+  async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "renameColumn", args: [tableName, oldName, newName] });
       return;
     }
     await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" RENAME COLUMN "${oldName}" TO "${newName}"`
+      `ALTER TABLE "${tableName}" RENAME COLUMN "${oldName}" TO "${newName}"`,
     );
   }
 
@@ -492,19 +476,18 @@ export abstract class Migration {
   async addIndex(
     tableName: string,
     columns: string | string[],
-    options: { unique?: boolean; name?: string } = {}
+    options: { unique?: boolean; name?: string } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addIndex", args: [tableName, columns, options] });
       return;
     }
     const cols = Array.isArray(columns) ? columns : [columns];
-    const indexName =
-      options.name ?? `index_${tableName}_on_${cols.join("_")}`;
+    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_")}`;
     const unique = options.unique ? "UNIQUE " : "";
 
     await this.adapter.executeMutation(
-      `CREATE ${unique}INDEX "${indexName}" ON "${tableName}" (${cols.map((c) => `"${c}"`).join(", ")})`
+      `CREATE ${unique}INDEX "${indexName}" ON "${tableName}" (${cols.map((c) => `"${c}"`).join(", ")})`,
     );
   }
 
@@ -515,7 +498,7 @@ export abstract class Migration {
    */
   async removeIndex(
     tableName: string,
-    options: { column?: string | string[]; name?: string } = {}
+    options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "removeIndex", args: [tableName, options] });
@@ -525,9 +508,7 @@ export abstract class Migration {
     if (options.name) {
       indexName = options.name;
     } else if (options.column) {
-      const cols = Array.isArray(options.column)
-        ? options.column
-        : [options.column];
+      const cols = Array.isArray(options.column) ? options.column : [options.column];
       indexName = `index_${tableName}_on_${cols.join("_")}`;
     } else {
       throw new Error("Must specify either name or column for remove_index");
@@ -550,10 +531,13 @@ export abstract class Migration {
     tableName: string,
     columnName: string,
     type: ColumnType,
-    options: ColumnOptions = {}
+    options: ColumnOptions = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "changeColumn", args: [tableName, columnName, type, options] });
+      this._recordedOps.push({
+        method: "changeColumn",
+        args: [tableName, columnName, type, options],
+      });
       return;
     }
     const sqlType = this._sqlType(type, options);
@@ -562,11 +546,11 @@ export abstract class Migration {
 
     if (this._adapterName === "mysql") {
       await this.adapter.executeMutation(
-        `ALTER TABLE "${tableName}" MODIFY COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`
+        `ALTER TABLE "${tableName}" MODIFY COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`,
       );
     } else {
       await this.adapter.executeMutation(
-        `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" TYPE ${sqlType}${nullable}${defaultClause}`
+        `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" TYPE ${sqlType}${nullable}${defaultClause}`,
       );
     }
   }
@@ -581,9 +565,7 @@ export abstract class Migration {
       this._recordedOps.push({ method: "renameTable", args: [oldName, newName] });
       return;
     }
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${oldName}" RENAME TO "${newName}"`
-    );
+    await this.adapter.executeMutation(`ALTER TABLE "${oldName}" RENAME TO "${newName}"`);
   }
 
   /**
@@ -593,7 +575,7 @@ export abstract class Migration {
    */
   async tableExists(tableName: string): Promise<boolean> {
     const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`,
     );
     return rows.length > 0;
   }
@@ -604,9 +586,7 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#column_exists?
    */
   async columnExists(tableName: string, columnName: string): Promise<boolean> {
-    const rows = await this.adapter.execute(
-      `PRAGMA table_info("${tableName}")`
-    );
+    const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
     return rows.some((row: any) => row.name === columnName);
   }
 
@@ -618,18 +598,22 @@ export abstract class Migration {
   async changeColumnDefault(
     tableName: string,
     columnName: string,
-    options: { from?: unknown; to: unknown } | unknown
+    options: { from?: unknown; to: unknown } | unknown,
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "changeColumnDefault", args: [tableName, columnName, options] });
+      this._recordedOps.push({
+        method: "changeColumnDefault",
+        args: [tableName, columnName, options],
+      });
       return;
     }
-    const defaultVal = typeof options === "object" && options !== null && "to" in (options as any)
-      ? (options as any).to
-      : options;
+    const defaultVal =
+      typeof options === "object" && options !== null && "to" in (options as any)
+        ? (options as any).to
+        : options;
     const clause = this._defaultClause(defaultVal);
     await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" SET${clause || " DEFAULT NULL"}`
+      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" SET${clause || " DEFAULT NULL"}`,
     );
   }
 
@@ -642,15 +626,18 @@ export abstract class Migration {
     tableName: string,
     columnName: string,
     allowNull: boolean,
-    _defaultValue?: unknown
+    _defaultValue?: unknown,
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "changeColumnNull", args: [tableName, columnName, allowNull, _defaultValue] });
+      this._recordedOps.push({
+        method: "changeColumnNull",
+        args: [tableName, columnName, allowNull, _defaultValue],
+      });
       return;
     }
     const constraint = allowNull ? "DROP NOT NULL" : "SET NOT NULL";
     await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" ${constraint}`
+      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" ${constraint}`,
     );
   }
 
@@ -662,7 +649,12 @@ export abstract class Migration {
   async addReference(
     tableName: string,
     refName: string,
-    options: ColumnOptions & { polymorphic?: boolean; foreignKey?: boolean; type?: ColumnType; index?: boolean } = {}
+    options: ColumnOptions & {
+      polymorphic?: boolean;
+      foreignKey?: boolean;
+      type?: ColumnType;
+      index?: boolean;
+    } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addReference", args: [tableName, refName, options] });
@@ -687,7 +679,7 @@ export abstract class Migration {
   async removeReference(
     tableName: string,
     refName: string,
-    options: { polymorphic?: boolean } = {}
+    options: { polymorphic?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "removeReference", args: [tableName, refName, options] });
@@ -707,7 +699,7 @@ export abstract class Migration {
   async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: { column?: string; primaryKey?: string; name?: string } = {}
+    options: { column?: string; primaryKey?: string; name?: string } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addForeignKey", args: [fromTable, toTable, options] });
@@ -717,7 +709,7 @@ export abstract class Migration {
     const pk = options.primaryKey ?? "id";
     const name = options.name ?? `fk_${fromTable}_${column}`;
     await this.adapter.executeMutation(
-      `ALTER TABLE "${fromTable}" ADD CONSTRAINT "${name}" FOREIGN KEY ("${column}") REFERENCES "${toTable}" ("${pk}")`
+      `ALTER TABLE "${fromTable}" ADD CONSTRAINT "${name}" FOREIGN KEY ("${column}") REFERENCES "${toTable}" ("${pk}")`,
     );
   }
 
@@ -728,7 +720,7 @@ export abstract class Migration {
    */
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | { column?: string; name?: string }
+    toTableOrOptions?: string | { column?: string; name?: string },
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "removeForeignKey", args: [fromTable, toTableOrOptions] });
@@ -745,9 +737,7 @@ export abstract class Migration {
     } else {
       throw new Error("removeForeignKey requires a target table or options");
     }
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${fromTable}" DROP CONSTRAINT "${name}"`
-    );
+    await this.adapter.executeMutation(`ALTER TABLE "${fromTable}" DROP CONSTRAINT "${name}"`);
   }
 
   /**
@@ -788,7 +778,7 @@ export abstract class Migration {
     table1: string,
     table2: string,
     options?: { tableName?: string } | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void
+    fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     let opts: { tableName?: string } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
@@ -814,7 +804,7 @@ export abstract class Migration {
   async dropJoinTable(
     table1: string,
     table2: string,
-    options?: { tableName?: string }
+    options?: { tableName?: string },
   ): Promise<void> {
     const tableName = options?.tableName ?? [table1, table2].sort().join("_");
     await this.dropTable(tableName);
@@ -827,7 +817,7 @@ export abstract class Migration {
    */
   async changeTable(
     tableName: string,
-    fn?: (t: ChangeTableProxy) => void | Promise<void>
+    fn?: (t: ChangeTableProxy) => void | Promise<void>,
   ): Promise<void> {
     const proxy = new ChangeTableProxy(tableName, this);
     if (fn) await fn(proxy);
@@ -838,18 +828,12 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#rename_index
    */
-  async renameIndex(
-    _tableName: string,
-    oldName: string,
-    newName: string
-  ): Promise<void> {
+  async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "renameIndex", args: [_tableName, oldName, newName] });
       return;
     }
-    await this.adapter.executeMutation(
-      `ALTER INDEX "${oldName}" RENAME TO "${newName}"`
-    );
+    await this.adapter.executeMutation(`ALTER INDEX "${oldName}" RENAME TO "${newName}"`);
   }
 
   /**
@@ -878,7 +862,10 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#add_columns (via change_table)
    */
-  async addColumns(tableName: string, ...columns: Array<{ name: string; type: ColumnType; options?: ColumnOptions }>): Promise<void> {
+  async addColumns(
+    tableName: string,
+    ...columns: Array<{ name: string; type: ColumnType; options?: ColumnOptions }>
+  ): Promise<void> {
     for (const col of columns) {
       await this.addColumn(tableName, col.name, col.type, col.options ?? {});
     }
@@ -889,7 +876,9 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#columns
    */
-  async columns(tableName: string): Promise<Array<{ name: string; type: string; null: boolean; default: unknown }>> {
+  async columns(
+    tableName: string,
+  ): Promise<Array<{ name: string; type: string; null: boolean; default: unknown }>> {
     const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
     return rows.map((row: any) => ({
       name: row.name,
@@ -904,7 +893,9 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#indexes
    */
-  async indexes(tableName: string): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
+  async indexes(
+    tableName: string,
+  ): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
     const rows = await this.adapter.execute(`PRAGMA index_list("${tableName}")`);
     const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
     for (const row of rows as any[]) {
@@ -934,7 +925,9 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#foreign_keys
    */
-  async foreignKeys(tableName: string): Promise<Array<{ from: string; to: string; column: string; primaryKey: string }>> {
+  async foreignKeys(
+    tableName: string,
+  ): Promise<Array<{ from: string; to: string; column: string; primaryKey: string }>> {
     const rows = await this.adapter.execute(`PRAGMA foreign_key_list("${tableName}")`);
     return (rows as any[]).map((row: any) => ({
       from: tableName,
@@ -951,7 +944,7 @@ export abstract class Migration {
    */
   async tables(): Promise<string[]> {
     const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
+      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
     );
     return (rows as any[]).map((r: any) => r.name);
   }
@@ -963,7 +956,7 @@ export abstract class Migration {
    */
   async views(): Promise<string[]> {
     const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`
+      `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`,
     );
     return (rows as any[]).map((r: any) => r.name);
   }
@@ -1005,7 +998,12 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#reversible
    */
-  async reversible(fn?: (dir: { up: (f: () => Promise<void>) => void; down: (f: () => Promise<void>) => void }) => void): Promise<void> {
+  async reversible(
+    fn?: (dir: {
+      up: (f: () => Promise<void>) => void;
+      down: (f: () => Promise<void>) => void;
+    }) => void,
+  ): Promise<void> {
     if (!fn) return;
     const upFns: Array<() => Promise<void>> = [];
     const downFns: Array<() => Promise<void>> = [];
@@ -1059,7 +1057,7 @@ export abstract class Migration {
    */
   async isViewExists(viewName: string): Promise<boolean> {
     const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='view' AND name='${viewName}'`
+      `SELECT name FROM sqlite_master WHERE type='view' AND name='${viewName}'`,
     );
     return rows.length > 0;
   }
@@ -1072,18 +1070,14 @@ export abstract class Migration {
   async isIndexExists(
     tableName: string,
     columnName: string | string[],
-    _options?: { unique?: boolean; name?: string }
+    _options?: { unique?: boolean; name?: string },
   ): Promise<boolean> {
-    const indexList = await this.adapter.execute(
-      `PRAGMA index_list("${tableName}")`
-    );
+    const indexList = await this.adapter.execute(`PRAGMA index_list("${tableName}")`);
     const targetCols = Array.isArray(columnName) ? columnName : [columnName];
     for (const idx of indexList as any[]) {
       if (_options?.name && idx.name !== _options.name) continue;
       if (_options?.unique !== undefined && (idx.unique === 1) !== _options.unique) continue;
-      const colInfo = await this.adapter.execute(
-        `PRAGMA index_info("${idx.name}")`
-      );
+      const colInfo = await this.adapter.execute(`PRAGMA index_info("${idx.name}")`);
       const indexCols = (colInfo as any[]).map((c: any) => c.name);
       if (
         targetCols.length === indexCols.length &&
@@ -1154,8 +1148,7 @@ export abstract class Migration {
   private _defaultClause(defaultValue: unknown): string {
     if (defaultValue === undefined) return "";
     if (defaultValue === null) return " DEFAULT NULL";
-    if (typeof defaultValue === "boolean")
-      return ` DEFAULT ${defaultValue ? "TRUE" : "FALSE"}`;
+    if (typeof defaultValue === "boolean") return ` DEFAULT ${defaultValue ? "TRUE" : "FALSE"}`;
     if (typeof defaultValue === "number") return ` DEFAULT ${defaultValue}`;
     return ` DEFAULT '${String(defaultValue).replace(/'/g, "''")}'`;
   }
@@ -1167,7 +1160,10 @@ export abstract class Migration {
  * Mirrors: ActiveRecord::ConnectionAdapters::Table
  */
 class ChangeTableProxy {
-  constructor(private _tableName: string, private _migration: Migration) {}
+  constructor(
+    private _tableName: string,
+    private _migration: Migration,
+  ) {}
 
   async string(name: string, options: ColumnOptions = {}): Promise<void> {
     await (this._migration as any).addColumn(this._tableName, name, "string", options);
@@ -1199,13 +1195,19 @@ class ChangeTableProxy {
   async rename(oldName: string, newName: string): Promise<void> {
     await (this._migration as any).renameColumn(this._tableName, oldName, newName);
   }
-  async index(columns: string | string[], options?: { unique?: boolean; name?: string }): Promise<void> {
+  async index(
+    columns: string | string[],
+    options?: { unique?: boolean; name?: string },
+  ): Promise<void> {
     await (this._migration as any).addIndex(this._tableName, columns, options);
   }
   async removeIndex(options: { column?: string | string[]; name?: string }): Promise<void> {
     await (this._migration as any).removeIndex(this._tableName, options);
   }
-  async references(name: string, options?: ColumnOptions & { polymorphic?: boolean; foreignKey?: boolean }): Promise<void> {
+  async references(
+    name: string,
+    options?: ColumnOptions & { polymorphic?: boolean; foreignKey?: boolean },
+  ): Promise<void> {
     await (this._migration as any).addReference(this._tableName, name, options);
   }
   async timestamps(options?: ColumnOptions): Promise<void> {
@@ -1221,7 +1223,7 @@ class ChangeTableProxy {
 export class Schema {
   static async define(
     adapter: DatabaseAdapter,
-    fn: (schema: Schema) => Promise<void>
+    fn: (schema: Schema) => Promise<void>,
   ): Promise<void> {
     const schema = new Schema(adapter);
     await fn(schema);
@@ -1237,10 +1239,7 @@ export class Schema {
     return detectAdapterName(this.adapter);
   }
 
-  async createTable(
-    name: string,
-    fn?: (t: TableDefinition) => void
-  ): Promise<void> {
+  async createTable(name: string, fn?: (t: TableDefinition) => void): Promise<void> {
     const td = new TableDefinition(name, { adapterName: this._adapterName });
     if (fn) fn(td);
     await this.adapter.executeMutation(td.toSql());
@@ -1270,7 +1269,7 @@ export class MigrationContext {
   async createTable(
     name: string,
     options?: { primaryKey?: string | false; force?: boolean; id?: boolean },
-    fn?: (t: TableDefinition) => void
+    fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (options?.force) {
       await this.dropTable(name).catch(() => {});
@@ -1296,20 +1295,31 @@ export class MigrationContext {
   private _mapType(type: string): string {
     const an = this._adapterName;
     switch (type.toLowerCase()) {
-      case "string": return `VARCHAR(255)`;
-      case "text": return "TEXT";
-      case "integer": return "INTEGER";
-      case "float": return an === "postgres" ? "DOUBLE PRECISION" : "REAL";
-      case "decimal": return "DECIMAL(10, 0)";
-      case "boolean": return "BOOLEAN";
-      case "date": return "DATE";
-      case "datetime": case "timestamp": return an === "postgres" ? "TIMESTAMP" : "DATETIME";
-      case "binary": return an === "postgres" ? "BYTEA" : "BLOB";
+      case "string":
+        return `VARCHAR(255)`;
+      case "text":
+        return "TEXT";
+      case "integer":
+        return "INTEGER";
+      case "float":
+        return an === "postgres" ? "DOUBLE PRECISION" : "REAL";
+      case "decimal":
+        return "DECIMAL(10, 0)";
+      case "boolean":
+        return "BOOLEAN";
+      case "date":
+        return "DATE";
+      case "datetime":
+      case "timestamp":
+        return an === "postgres" ? "TIMESTAMP" : "DATETIME";
+      case "binary":
+        return an === "postgres" ? "BYTEA" : "BLOB";
       case "primary_key":
         if (an === "postgres") return "SERIAL PRIMARY KEY";
         if (an === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
         return "INTEGER PRIMARY KEY AUTOINCREMENT";
-      default: return type.toUpperCase();
+      default:
+        return type.toUpperCase();
     }
   }
 
@@ -1317,7 +1327,7 @@ export class MigrationContext {
     table: string,
     column: string,
     type: string,
-    _options?: ColumnOptions & { ifNotExists?: boolean }
+    _options?: ColumnOptions & { ifNotExists?: boolean },
   ): Promise<void> {
     const ifNotExists = _options?.ifNotExists ?? false;
     if (this._columns.has(table) && this._columns.get(table)!.has(column)) {
@@ -1327,7 +1337,7 @@ export class MigrationContext {
       return;
     }
     await this.adapter.executeMutation(
-      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type)}`
+      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type)}`,
     );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
@@ -1335,17 +1345,13 @@ export class MigrationContext {
 
   async removeColumn(table: string, ...columns: string[]): Promise<void> {
     for (const column of columns) {
-      await this.adapter.executeMutation(
-        `ALTER TABLE "${table}" DROP COLUMN "${column}"`
-      );
+      await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${column}"`);
       this._columns.get(table)?.delete(column);
     }
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${table}" RENAME COLUMN "${from}" TO "${to}"`
-    );
+    await this.adapter.executeMutation(`ALTER TABLE "${table}" RENAME COLUMN "${from}" TO "${to}"`);
     const cols = this._columns.get(table);
     if (cols) {
       cols.delete(from);
@@ -1357,15 +1363,15 @@ export class MigrationContext {
     table: string,
     column: string,
     type: string,
-    _options?: ColumnOptions
+    _options?: ColumnOptions,
   ): Promise<void> {
     if (this._adapterName === "mysql") {
       await this.adapter.executeMutation(
-        `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type)}`
+        `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type)}`,
       );
     } else {
       await this.adapter.executeMutation(
-        `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`
+        `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`,
       );
     }
   }
@@ -1373,16 +1379,15 @@ export class MigrationContext {
   async addIndex(
     table: string,
     columns: string | string[],
-    options?: { unique?: boolean; name?: string }
+    options?: { unique?: boolean; name?: string },
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const unique = options?.unique ?? false;
-    const indexName =
-      options?.name ?? `index_${table}_on_${cols.join("_and_")}`;
+    const indexName = options?.name ?? `index_${table}_on_${cols.join("_and_")}`;
     const uniqueStr = unique ? "UNIQUE " : "";
     const colsStr = cols.map((c) => `"${c}"`).join(", ");
     await this.adapter.executeMutation(
-      `CREATE ${uniqueStr}INDEX "${indexName}" ON "${table}" (${colsStr})`
+      `CREATE ${uniqueStr}INDEX "${indexName}" ON "${table}" (${colsStr})`,
     );
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({ columns: cols, unique, name: indexName });
@@ -1390,7 +1395,7 @@ export class MigrationContext {
 
   async removeIndex(
     table: string,
-    options: { column?: string | string[]; name?: string }
+    options: { column?: string | string[]; name?: string },
   ): Promise<void> {
     let indexName = options.name;
     if (!indexName && options.column) {
@@ -1408,7 +1413,7 @@ export class MigrationContext {
       if (tableIndexes) {
         this._indexes.set(
           table,
-          tableIndexes.filter((i) => i.name !== indexName)
+          tableIndexes.filter((i) => i.name !== indexName),
         );
       }
     }
@@ -1417,9 +1422,7 @@ export class MigrationContext {
   async renameTable(from: string, to: string): Promise<void> {
     const fullFrom = `${this.tableNamePrefix}${from}${this.tableNameSuffix}`;
     const fullTo = `${this.tableNamePrefix}${to}${this.tableNameSuffix}`;
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${fullFrom}" RENAME TO "${fullTo}"`
-    );
+    await this.adapter.executeMutation(`ALTER TABLE "${fullFrom}" RENAME TO "${fullTo}"`);
     this._tables.delete(fullFrom);
     this._tables.add(fullTo);
     const cols = this._columns.get(fullFrom);
@@ -1438,11 +1441,13 @@ export class MigrationContext {
     fn: (dir: {
       up: (cb: () => void | Promise<void>) => void;
       down: (cb: () => void | Promise<void>) => void;
-    }) => void
+    }) => void,
   ): Promise<void> {
     let upFn: (() => void | Promise<void>) | null = null;
     fn({
-      up: (cb) => { upFn = cb; },
+      up: (cb) => {
+        upFn = cb;
+      },
       down: () => {},
     });
     if (upFn) await (upFn as any)();
@@ -1463,8 +1468,6 @@ export class MigrationContext {
   }
 
   indexExists(table: string, column: string): boolean {
-    return (
-      this._indexes.get(table)?.some((i) => i.columns.includes(column)) ?? false
-    );
+    return this._indexes.get(table)?.some((i) => i.columns.includes(column)) ?? false;
   }
 }

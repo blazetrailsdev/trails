@@ -4,7 +4,11 @@ import { MockRequest } from "./mock-request.js";
 
 describe("Rack::MethodOverride", () => {
   const echoApp = async (env: Record<string, any>) => {
-    return [200, { "content-type": "text/plain" }, [env["REQUEST_METHOD"]]] as [number, Record<string, string>, any];
+    return [200, { "content-type": "text/plain" }, [env["REQUEST_METHOD"]]] as [
+      number,
+      Record<string, string>,
+      any,
+    ];
   };
 
   function makeApp(app = echoApp) {

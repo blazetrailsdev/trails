@@ -7,7 +7,11 @@ describe("CLI", () => {
     const program = createProgram();
     program.exitOverride();
     let output = "";
-    program.configureOutput({ writeOut: (str) => { output = str; } });
+    program.configureOutput({
+      writeOut: (str) => {
+        output = str;
+      },
+    });
     try {
       program.parse(["node", "rails-ts", "--version"]);
     } catch (e: any) {

@@ -4,7 +4,11 @@ import { ParameterFilter } from "./parameter-filter.js";
 describe("ParameterFilterTest", () => {
   it("process parameter filter", () => {
     const f = new ParameterFilter(["password", "credit_card"]);
-    const result = f.filter({ username: "alice", password: "secret", credit_card: "4111111111111111" });
+    const result = f.filter({
+      username: "alice",
+      password: "secret",
+      credit_card: "4111111111111111",
+    });
     expect(result.username).toBe("alice");
     expect(result.password).toBe("[FILTERED]");
     expect(result.credit_card).toBe("[FILTERED]");

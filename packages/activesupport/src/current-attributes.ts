@@ -48,16 +48,21 @@ export abstract class CurrentAttributes {
     if (!Object.prototype.hasOwnProperty.call(ctor, "_definitions")) {
       ctor._definitions = new Map(ctor._definitions);
     }
-    const options: AttributeDefinition = (rest.length === 1 && typeof rest[0] === "object" && rest[0] !== null)
-      ? rest[0] as AttributeDefinition
-      : {};
+    const options: AttributeDefinition =
+      rest.length === 1 && typeof rest[0] === "object" && rest[0] !== null
+        ? (rest[0] as AttributeDefinition)
+        : {};
     ctor._definitions.set(name, options);
     // Define accessor on the prototype
     const proto = ctor.prototype as unknown as Record<string, unknown>;
     if (!(name in proto)) {
       Object.defineProperty(proto, name, {
-        get(this: CurrentAttributes) { return this._get(name); },
-        set(this: CurrentAttributes, v: unknown) { this._set(name, v); },
+        get(this: CurrentAttributes) {
+          return this._get(name);
+        },
+        set(this: CurrentAttributes, v: unknown) {
+          this._set(name, v);
+        },
         configurable: true,
       });
     }
@@ -107,7 +112,8 @@ export abstract class CurrentAttributes {
     if (this._attributes.has(name)) return this._attributes.get(name);
     const def = ctor._definitions.get(name);
     if (def && def.default !== undefined) {
-      const val = typeof def.default === "function" ? (def.default as () => unknown)() : def.default;
+      const val =
+        typeof def.default === "function" ? (def.default as () => unknown)() : def.default;
       this._attributes.set(name, val);
       return val;
     }

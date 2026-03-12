@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, enableSti, registerSubclass, registerModel, SubclassNotFound, findStiClass } from "./index.js";
+import {
+  Base,
+  enableSti,
+  registerSubclass,
+  registerModel,
+  SubclassNotFound,
+  findStiClass,
+} from "./index.js";
 import { getStiBase, isStiSubclass } from "./sti.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -30,10 +37,14 @@ describe("InheritanceTest", () => {
       }
     }
     class Circle extends Shape {
-      static { registerSubclass(Circle); }
+      static {
+        registerSubclass(Circle);
+      }
     }
     class Rectangle extends Shape {
-      static { registerSubclass(Rectangle); }
+      static {
+        registerSubclass(Rectangle);
+      }
     }
 
     expect(Shape.subclasses).toContain(Circle);
@@ -51,13 +62,19 @@ describe("InheritanceTest", () => {
       }
     }
     class Mammal extends Animal {
-      static { registerSubclass(Mammal); }
+      static {
+        registerSubclass(Mammal);
+      }
     }
     class Dog extends Mammal {
-      static { registerSubclass(Dog); }
+      static {
+        registerSubclass(Dog);
+      }
     }
     class Cat extends Mammal {
-      static { registerSubclass(Cat); }
+      static {
+        registerSubclass(Cat);
+      }
     }
 
     const desc = Animal.descendants;
@@ -87,10 +104,14 @@ describe("InheritanceTest", () => {
       }
     }
     class SpecialPost extends Post {
-      static { registerSubclass(SpecialPost); }
+      static {
+        registerSubclass(SpecialPost);
+      }
     }
     class StiPost extends Post {
-      static { registerSubclass(StiPost); }
+      static {
+        registerSubclass(StiPost);
+      }
     }
 
     expect(Post.baseClass).toBe(Post);
@@ -432,10 +453,14 @@ describe("InheritanceTest", () => {
       }
     }
     class Car extends Vehicle {
-      static { registerSubclass(Car); }
+      static {
+        registerSubclass(Car);
+      }
     }
     class Truck extends Vehicle {
-      static { registerSubclass(Truck); }
+      static {
+        registerSubclass(Truck);
+      }
     }
 
     expect(Car.tableName).toBe("vehicles");
@@ -717,7 +742,9 @@ describe("InheritanceTest", () => {
       }
     }
     class LooseDescendant extends LoosePerson {
-      static { registerSubclass(LooseDescendant); }
+      static {
+        registerSubclass(LooseDescendant);
+      }
     }
 
     expect(Base.abstractClass).toBe(false);
@@ -741,7 +768,9 @@ describe("InheritanceTest", () => {
       }
     }
     class SpecialSubscriber extends Subscriber {
-      static { registerSubclass(SpecialSubscriber); }
+      static {
+        registerSubclass(SpecialSubscriber);
+      }
     }
 
     expect(SpecialSubscriber.primaryKey).toBe("nick");
@@ -785,7 +814,11 @@ describe("InheritanceTest", () => {
       }
     }
     class Firm extends Company {
-      static { this.adapter = adapter; registerModel(Firm); registerSubclass(Firm); }
+      static {
+        this.adapter = adapter;
+        registerModel(Firm);
+        registerSubclass(Firm);
+      }
     }
 
     const firm = new Company({ type: "Firm" });
@@ -832,7 +865,9 @@ describe("InheritanceTest", () => {
       }
     }
     class Account extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     registerModel(Company);
     registerModel(Account);
@@ -857,10 +892,18 @@ describe("InheritanceTest", () => {
       }
     }
     class Client extends Company {
-      static { this.adapter = adapter; registerModel(Client); registerSubclass(Client); }
+      static {
+        this.adapter = adapter;
+        registerModel(Client);
+        registerSubclass(Client);
+      }
     }
     class VerySpecialClient extends Client {
-      static { this.adapter = adapter; registerModel(VerySpecialClient); registerSubclass(VerySpecialClient); }
+      static {
+        this.adapter = adapter;
+        registerModel(VerySpecialClient);
+        registerSubclass(VerySpecialClient);
+      }
     }
     registerModel(Company);
 
@@ -910,7 +953,11 @@ describe("InheritanceTest", () => {
       }
     }
     class Cabbage extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cabbage);
+        registerSubclass(Cabbage);
+      }
     }
     registerModel(Vegetable);
 
@@ -944,10 +991,18 @@ describe("InheritanceTest", () => {
       }
     }
     class Cucumber extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cucumber); registerSubclass(Cucumber); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cucumber);
+        registerSubclass(Cucumber);
+      }
     }
     class Cabbage extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cabbage);
+        registerSubclass(Cabbage);
+      }
     }
     registerModel(Vegetable);
 
@@ -975,10 +1030,18 @@ describe("InheritanceTest", () => {
       }
     }
     class Firm extends Company {
-      static { this.adapter = adapter; registerModel(Firm); registerSubclass(Firm); }
+      static {
+        this.adapter = adapter;
+        registerModel(Firm);
+        registerSubclass(Firm);
+      }
     }
     class Client extends Company {
-      static { this.adapter = adapter; registerModel(Client); registerSubclass(Client); }
+      static {
+        this.adapter = adapter;
+        registerModel(Client);
+        registerSubclass(Client);
+      }
     }
     registerModel(Company);
 
@@ -1013,10 +1076,18 @@ describe("InheritanceTest", () => {
       }
     }
     class Cucumber extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cucumber); registerSubclass(Cucumber); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cucumber);
+        registerSubclass(Cucumber);
+      }
     }
     class Cabbage extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cabbage);
+        registerSubclass(Cabbage);
+      }
     }
     registerModel(Vegetable);
 
@@ -1049,10 +1120,18 @@ describe("InheritanceTest", () => {
       }
     }
     class Cucumber extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cucumber); registerSubclass(Cucumber); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cucumber);
+        registerSubclass(Cucumber);
+      }
     }
     class Cabbage extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cabbage);
+        registerSubclass(Cabbage);
+      }
     }
     registerModel(Vegetable);
 
@@ -1082,10 +1161,14 @@ describe("InheritanceTest", () => {
       }
     }
     class StiPost extends Post {
-      static { registerSubclass(StiPost); }
+      static {
+        registerSubclass(StiPost);
+      }
     }
     class SubStiPost extends StiPost {
-      static { registerSubclass(SubStiPost); }
+      static {
+        registerSubclass(SubStiPost);
+      }
     }
 
     // Post is the STI base — it descends from Base directly
@@ -1112,13 +1195,19 @@ describe("InheritanceTest", () => {
       }
     }
     class SpecialPost extends Post {
-      static { registerSubclass(SpecialPost); }
+      static {
+        registerSubclass(SpecialPost);
+      }
     }
     class StiPost extends Post {
-      static { registerSubclass(StiPost); }
+      static {
+        registerSubclass(StiPost);
+      }
     }
     class SubStiPost extends StiPost {
-      static { registerSubclass(SubStiPost); }
+      static {
+        registerSubclass(SubStiPost);
+      }
     }
 
     expect(getStiBase(Post)).toBe(Post);
@@ -1144,13 +1233,25 @@ describe("InheritanceTest", () => {
       }
     }
     class Cabbage extends Vegetable {
-      static { this.adapter = adapter; registerModel(Cabbage); registerSubclass(Cabbage); }
+      static {
+        this.adapter = adapter;
+        registerModel(Cabbage);
+        registerSubclass(Cabbage);
+      }
     }
     class GreenCabbage extends Cabbage {
-      static { this.adapter = adapter; registerModel(GreenCabbage); registerSubclass(GreenCabbage); }
+      static {
+        this.adapter = adapter;
+        registerModel(GreenCabbage);
+        registerSubclass(GreenCabbage);
+      }
     }
     class KingCole extends GreenCabbage {
-      static { this.adapter = adapter; registerModel(KingCole); registerSubclass(KingCole); }
+      static {
+        this.adapter = adapter;
+        registerModel(KingCole);
+        registerSubclass(KingCole);
+      }
     }
     registerModel(Vegetable);
 
@@ -1222,7 +1323,11 @@ describe("InheritanceTest", () => {
       }
     }
     class SpecialSubscriber extends Subscriber {
-      static { this.adapter = adapter; registerModel(SpecialSubscriber); registerSubclass(SpecialSubscriber); }
+      static {
+        this.adapter = adapter;
+        registerModel(SpecialSubscriber);
+        registerSubclass(SpecialSubscriber);
+      }
     }
     registerModel(Subscriber);
 

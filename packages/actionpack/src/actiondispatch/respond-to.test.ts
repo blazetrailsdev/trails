@@ -11,7 +11,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html content");
         format.xml(() => "xml content");
       },
-      { accept: "text/html" }
+      { accept: "text/html" },
     );
     expect(result).toBe("html content");
   });
@@ -22,7 +22,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.xml(() => "xml");
       },
-      { accept: "*/*" }
+      { accept: "*/*" },
     );
     // Returns first registered format
     expect(result).toBe("html");
@@ -34,7 +34,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.xml(() => "xml");
       },
-      { accept: "application/xml" }
+      { accept: "application/xml" },
     );
     expect(result).toBe("xml");
   });
@@ -45,7 +45,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.js(() => "js");
       },
-      { accept: "text/javascript" }
+      { accept: "text/javascript" },
     );
     expect(result).toBe("js");
   });
@@ -56,7 +56,7 @@ describe("RespondToControllerTest", () => {
         format.json(() => "json");
         format.yaml(() => "yaml");
       },
-      { accept: "application/json" }
+      { accept: "application/json" },
     );
     expect(result).toBe("json");
   });
@@ -67,7 +67,7 @@ describe("RespondToControllerTest", () => {
         format.json(() => "json");
         format.yaml(() => "yaml");
       },
-      { accept: "*/*" }
+      { accept: "*/*" },
     );
     expect(result).toBe("json");
   });
@@ -78,7 +78,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.json(() => "json");
       },
-      {} // no accept header, returns first
+      {}, // no accept header, returns first
     );
     expect(result).toBe("html");
   });
@@ -89,7 +89,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.atom(() => "atom");
       },
-      { accept: "application/atom+xml" }
+      { accept: "application/atom+xml" },
     );
     expect(result).toBe("atom");
   });
@@ -100,7 +100,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.rss(() => "rss");
       },
-      { accept: "application/rss+xml" }
+      { accept: "application/rss+xml" },
     );
     expect(result).toBe("rss");
   });
@@ -111,7 +111,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.any(() => "any");
       },
-      { accept: "application/json" }
+      { accept: "application/json" },
     );
     expect(result).toBe("any");
   });
@@ -121,7 +121,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.any(() => "any");
       },
-      { accept: "*/*" }
+      { accept: "*/*" },
     );
     expect(result).toBe("any");
   });
@@ -131,7 +131,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.any(() => "any");
       },
-      { format: "json" }
+      { format: "json" },
     );
     expect(result).toBe("any");
   });
@@ -141,7 +141,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.any(() => "any");
       },
-      { format: "html" }
+      { format: "html" },
     );
     expect(result).toBe("any");
   });
@@ -151,7 +151,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.any(() => "any");
       },
-      { accept: "text/javascript" }
+      { accept: "text/javascript" },
     );
     expect(result).toBe("any");
   });
@@ -161,7 +161,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.any(() => "any");
       },
-      { accept: "application/xml" }
+      { accept: "application/xml" },
     );
     expect(result).toBe("any");
   });
@@ -172,7 +172,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.json(() => "json");
       },
-      { format: "json" }
+      { format: "json" },
     );
     expect(result).toBe("json");
   });
@@ -183,7 +183,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.json(() => "json");
       },
-      { format: "json", accept: "text/html" }
+      { format: "json", accept: "text/html" },
     );
     expect(result).toBe("json");
   });
@@ -194,8 +194,8 @@ describe("RespondToControllerTest", () => {
         (format) => {
           format.html(() => "html");
         },
-        { format: "json" }
-      )
+        { format: "json" },
+      ),
     ).toThrow(UnknownFormat);
   });
 
@@ -204,7 +204,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.on("custom", () => "custom");
       },
-      { format: "custom" }
+      { format: "custom" },
     );
     expect(result).toBe("custom");
   });
@@ -214,7 +214,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.on("custom");
       },
-      { format: "custom" }
+      { format: "custom" },
     );
     expect(result).toBeUndefined();
   });
@@ -225,7 +225,7 @@ describe("RespondToControllerTest", () => {
         format.js(() => "js");
         format.any(() => "any");
       },
-      { accept: "text/html" }
+      { accept: "text/html" },
     );
     expect(result).toBe("any");
   });
@@ -281,7 +281,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.text(() => "plain text");
       },
-      { format: "text" }
+      { format: "text" },
     );
     expect(result).toBe("plain text");
   });
@@ -291,7 +291,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.csv(() => "a,b,c");
       },
-      { format: "csv" }
+      { format: "csv" },
     );
     expect(result).toBe("a,b,c");
   });
@@ -301,7 +301,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.pdf(() => "pdf-data");
       },
-      { format: "pdf" }
+      { format: "pdf" },
     );
     expect(result).toBe("pdf-data");
   });
@@ -313,7 +313,7 @@ describe("RespondToControllerTest", () => {
         format.json(() => "json");
         format.xml(() => "xml");
       },
-      { accept: "application/xml, text/html;q=0.9, application/json;q=0.8" }
+      { accept: "application/xml, text/html;q=0.9, application/json;q=0.8" },
     );
     expect(result).toBe("xml");
   });
@@ -327,7 +327,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.html();
       },
-      { format: "html" }
+      { format: "html" },
     );
     expect(result).toBeUndefined();
   });
@@ -338,7 +338,7 @@ describe("RespondToControllerTest", () => {
         format.html(() => "html");
         format.js(() => "js");
       },
-      { accept: "text/javascript, text/html" }
+      { accept: "text/javascript, text/html" },
     );
     expect(result).toBe("js");
   });
@@ -349,7 +349,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.xml(() => "xml content");
       },
-      { accept: "text/xml" }
+      { accept: "text/xml" },
     );
     expect(result).toBe("xml content");
   });
@@ -360,7 +360,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.html(() => "html content");
       },
-      { accept: "application/xhtml+xml" }
+      { accept: "application/xhtml+xml" },
     );
     expect(result).toBe("html content");
   });
@@ -371,7 +371,7 @@ describe("RespondToControllerTest", () => {
         format.js(() => "js");
         format.html(() => "html");
       },
-      { accept: "text/html" }
+      { accept: "text/html" },
     );
     expect(result).toBe("html");
   });
@@ -381,7 +381,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.js(() => "js1");
       },
-      { accept: "text/javascript" }
+      { accept: "text/javascript" },
     );
     expect(result).toBe("js1");
   });
@@ -391,7 +391,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.any(() => "fallback");
       },
-      { format: "unknown_format" }
+      { format: "unknown_format" },
     );
     expect(result).toBe("fallback");
   });
@@ -402,7 +402,7 @@ describe("RespondToControllerTest", () => {
       (format) => {
         format.html(() => "html");
       },
-      { accept: "text/html" }
+      { accept: "text/html" },
     );
     expect(result).toBe("html");
   });
@@ -415,9 +415,8 @@ describe("RespondToControllerTest", () => {
         format.json(() => "json");
       },
       {
-        accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      }
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
     );
     expect(result).toBe("html");
   });

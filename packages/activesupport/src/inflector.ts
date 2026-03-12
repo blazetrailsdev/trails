@@ -5,10 +5,7 @@
 
 import { Inflections } from "./inflections.js";
 
-function applyInflections(
-  word: string,
-  rules: { rule: RegExp; replacement: string }[]
-): string {
+function applyInflections(word: string, rules: { rule: RegExp; replacement: string }[]): string {
   if (!word || word.length === 0) return word;
 
   const inflections = Inflections.instance("en");
@@ -33,10 +30,7 @@ export function singularize(word: string): string {
   return applyInflections(word, Inflections.instance("en").singulars);
 }
 
-export function camelize(
-  term: string,
-  uppercaseFirstLetter: boolean = true
-): string {
+export function camelize(term: string, uppercaseFirstLetter: boolean = true): string {
   const inflections = Inflections.instance("en");
   let result = term;
 
@@ -50,7 +44,7 @@ export function camelize(
   } else {
     result = result.replace(
       new RegExp(`^(?:${inflections.acronymRegex.source}(?=\\b|[A-Z_])|\\w)`),
-      (match) => match.toLowerCase()
+      (match) => match.toLowerCase(),
     );
   }
 
@@ -73,13 +67,10 @@ export function underscore(camelCasedWord: string): string {
 
   if (inflections.acronyms.size > 0) {
     word = word.replace(
-      new RegExp(
-        `(?:([A-Za-z\\d])|^)(${inflections.acronymRegex.source})(?=\\b|[^a-z])`,
-        "g"
-      ),
+      new RegExp(`(?:([A-Za-z\\d])|^)(${inflections.acronymRegex.source})(?=\\b|[^a-z])`, "g"),
       (_match, pre, acronym) => {
         return (pre ? pre + "_" : "") + acronym.toLowerCase();
-      }
+      },
     );
   }
 
@@ -93,7 +84,7 @@ export function underscore(camelCasedWord: string): string {
 
 export function humanize(
   lowerCaseAndUnderscoredWord: string,
-  options: { capitalize?: boolean } = {}
+  options: { capitalize?: boolean } = {},
 ): string {
   const { capitalize: cap = true } = options;
   const inflections = Inflections.instance("en");
@@ -132,10 +123,7 @@ export function humanize(
 }
 
 export function titleize(word: string): string {
-  return humanize(underscore(word)).replace(
-    /\b(?<![''`])[a-z]/g,
-    (match) => match.toUpperCase()
-  );
+  return humanize(underscore(word)).replace(/\b(?<![''`])[a-z]/g, (match) => match.toUpperCase());
 }
 
 export function tableize(className: string): string {
@@ -168,19 +156,13 @@ export function deconstantize(path: string): string {
   return "";
 }
 
-export function foreignKey(
-  className: string,
-  separateWithUnderscore: boolean = true
-): string {
-  return (
-    underscore(demodulize(className)) +
-    (separateWithUnderscore ? "_id" : "id")
-  );
+export function foreignKey(className: string, separateWithUnderscore: boolean = true): string {
+  return underscore(demodulize(className)) + (separateWithUnderscore ? "_id" : "id");
 }
 
 export function parameterize(
   str: string,
-  options: { separator?: string; preserveCase?: boolean } = {}
+  options: { separator?: string; preserveCase?: boolean } = {},
 ): string {
   const { separator = "-", preserveCase = false } = options;
 
@@ -195,9 +177,7 @@ export function parameterize(
       .map((w, i) => {
         if (!preserveCase) {
           // lowercase first word entirely, capitalise first char of rest
-          return i === 0
-            ? w.toLowerCase()
-            : w[0].toUpperCase() + w.slice(1).toLowerCase();
+          return i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase();
         }
         return w;
       })

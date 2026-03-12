@@ -4,17 +4,12 @@ import type { Base } from "./base.js";
  * Tracks stored attributes per model class.
  * Maps model class -> { storeName -> accessor keys[] }
  */
-const _storedAttributes = new WeakMap<
-  typeof Base,
-  Record<string, string[]>
->();
+const _storedAttributes = new WeakMap<typeof Base, Record<string, string[]>>();
 
 /**
  * Returns the stored attributes registry for a model class.
  */
-export function storedAttributes(
-  modelClass: typeof Base
-): Record<string, string[]> {
+export function storedAttributes(modelClass: typeof Base): Record<string, string[]> {
   return _storedAttributes.get(modelClass) ?? {};
 }
 
@@ -42,7 +37,7 @@ export function store(
     accessors: string[];
     prefix?: boolean | string;
     suffix?: boolean | string;
-  }
+  },
 ): void {
   const { accessors, prefix, suffix } = options;
 

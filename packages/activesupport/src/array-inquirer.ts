@@ -18,7 +18,7 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
         if (prop in target || typeof prop === "symbol") {
           const val = (target as any)[prop];
           if (typeof val === "function") {
-            return function(this: unknown, ...args: unknown[]) {
+            return function (this: unknown, ...args: unknown[]) {
               return val.apply(target, args);
             };
           }
@@ -45,12 +45,16 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
   }
 
   /** inquiry — alias that returns self (matches Rails API) */
-  inquiry(): this { return this._proxy; }
+  inquiry(): this {
+    return this._proxy;
+  }
 }
 
 /**
  * Factory — mirrors Rails' Array#inquiry core ext.
  */
-export function arrayInquiry<T extends string | symbol>(items: T[]): ArrayInquirer<T> & Record<string, () => boolean> {
+export function arrayInquiry<T extends string | symbol>(
+  items: T[],
+): ArrayInquirer<T> & Record<string, () => boolean> {
   return new ArrayInquirer<T>(...items) as any;
 }

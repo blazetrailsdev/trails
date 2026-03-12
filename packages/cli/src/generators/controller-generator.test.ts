@@ -25,7 +25,10 @@ describe("ControllerGenerator", () => {
     const gen = makeGen();
     const files = gen.run("Posts", ["index", "show", "create"]);
     expect(files).toContain("src/app/controllers/posts-controller.ts");
-    const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/posts-controller.ts"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(tmpDir, "src/app/controllers/posts-controller.ts"),
+      "utf-8",
+    );
     expect(content).toContain("class PostsController extends ActionController.Base");
     expect(content).toContain("async index()");
     expect(content).toContain("async show()");
@@ -35,7 +38,10 @@ describe("ControllerGenerator", () => {
   it("creates test file with action stubs", () => {
     const gen = makeGen();
     gen.run("Posts", ["index", "show"]);
-    const content = fs.readFileSync(path.join(tmpDir, "test/controllers/posts-controller.test.ts"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(tmpDir, "test/controllers/posts-controller.test.ts"),
+      "utf-8",
+    );
     expect(content).toContain('describe("PostsController"');
     expect(content).toContain('"index"');
     expect(content).toContain('"show"');
@@ -44,14 +50,20 @@ describe("ControllerGenerator", () => {
   it("creates controller with no actions", () => {
     const gen = makeGen();
     gen.run("Application", []);
-    const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/application-controller.ts"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(tmpDir, "src/app/controllers/application-controller.ts"),
+      "utf-8",
+    );
     expect(content).toContain("class ApplicationController extends ActionController.Base");
   });
 
   it("handles Controller suffix in name", () => {
     const gen = makeGen();
     gen.run("PostsController", ["index"]);
-    const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/posts-controller.ts"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(tmpDir, "src/app/controllers/posts-controller.ts"),
+      "utf-8",
+    );
     expect(content).toContain("class PostsController extends ActionController.Base");
   });
 

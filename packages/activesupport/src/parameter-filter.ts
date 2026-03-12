@@ -14,10 +14,7 @@ export class ParameterFilter {
   private readonly filters: Filter[];
   private readonly mask: string;
 
-  constructor(
-    filters: Filter[] = [],
-    { mask = "[FILTERED]" }: ParameterFilterOptions = {}
-  ) {
+  constructor(filters: Filter[] = [], { mask = "[FILTERED]" }: ParameterFilterOptions = {}) {
     this.filters = filters;
     this.mask = mask;
   }

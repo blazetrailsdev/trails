@@ -56,13 +56,22 @@ export class Directory {
     }
 
     const html = this.generateListing(decodedPath, scriptName, resolved, entries);
-    return [200, {
-      [CONTENT_TYPE]: "text/html; charset=utf-8",
-      [CONTENT_LENGTH]: String(Buffer.byteLength(html)),
-    }, [html]];
+    return [
+      200,
+      {
+        [CONTENT_TYPE]: "text/html; charset=utf-8",
+        [CONTENT_LENGTH]: String(Buffer.byteLength(html)),
+      },
+      [html],
+    ];
   }
 
-  private generateListing(reqPath: string, scriptName: string, dirPath: string, entries: fs.Dirent[]): string {
+  private generateListing(
+    reqPath: string,
+    scriptName: string,
+    dirPath: string,
+    entries: fs.Dirent[],
+  ): string {
     const escapedScript = this.escapeHtml(scriptName);
     const escapedPath = this.escapeHtml(reqPath);
     let body = `<html><head><title>Directory: ${escapedPath}</title>`;
@@ -100,6 +109,11 @@ export class Directory {
   }
 
   private escapeHtml(s: string): string {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 }

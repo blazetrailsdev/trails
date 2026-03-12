@@ -20,9 +20,7 @@ const enumRegistry = new WeakMap<typeof Base, Map<string, EnumDefinition>>();
 /**
  * Get enum definitions for a model class.
  */
-export function getEnumDefinitions(
-  modelClass: typeof Base
-): Map<string, EnumDefinition> {
+export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDefinition> {
   if (!enumRegistry.has(modelClass)) {
     enumRegistry.set(modelClass, new Map());
   }
@@ -48,7 +46,7 @@ export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
   valuesInput: string[] | Record<string, number>,
-  options?: { prefix?: boolean | string; suffix?: boolean | string }
+  options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
   const mapping = new Map<string, number>();
   const reverseMapping = new Map<number, string>();
@@ -70,16 +68,18 @@ export function defineEnum(
   defs.set(attribute, def);
 
   // Compute prefix/suffix for method names
-  const prefixStr = options?.prefix === true
-    ? attribute
-    : typeof options?.prefix === "string"
-      ? options.prefix
-      : "";
-  const suffixStr = options?.suffix === true
-    ? attribute
-    : typeof options?.suffix === "string"
-      ? options.suffix
-      : "";
+  const prefixStr =
+    options?.prefix === true
+      ? attribute
+      : typeof options?.prefix === "string"
+        ? options.prefix
+        : "";
+  const suffixStr =
+    options?.suffix === true
+      ? attribute
+      : typeof options?.suffix === "string"
+        ? options.suffix
+        : "";
 
   const methodName = (name: string) => {
     if (prefixStr && suffixStr) return `${prefixStr}_${name}_${suffixStr}`;
@@ -161,7 +161,7 @@ export function readEnumValue(record: Base, attribute: string): string | null {
 export function castEnumValue(
   modelClass: typeof Base,
   attribute: string,
-  value: unknown
+  value: unknown,
 ): number | null {
   const defs = getEnumDefinitions(modelClass);
   const def = defs.get(attribute);

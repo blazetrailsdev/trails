@@ -65,6 +65,8 @@ export const RACK_REQUEST_TRUSTED_PROXY = "rack.request.trusted_proxy";
 export const RACK_METHODOVERRIDE_ORIGINAL_METHOD = "rack.methodoverride.original_method";
 
 // Status codes with no entity body
-export const STATUS_WITH_NO_ENTITY_BODY: Record<number, boolean> = Object.fromEntries(
-  [...Array.from({ length: 100 }, (_, i) => [100 + i, true]), [204, true], [304, true]]
-);
+export const STATUS_WITH_NO_ENTITY_BODY: Record<number, boolean> = Object.fromEntries([
+  ...Array.from({ length: 100 }, (_, i) => [100 + i, true]),
+  [204, true],
+  [304, true],
+]);

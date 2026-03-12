@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -29,11 +69,17 @@ function freshAdapter(): DatabaseAdapter {
 describe("ActiveRecord::Relation", () => {
   describe("WhereClauseTest", () => {
     let adapter: DatabaseAdapter;
-    beforeEach(() => { adapter = freshAdapter(); });
+    beforeEach(() => {
+      adapter = freshAdapter();
+    });
 
     function makeModel() {
       class Post extends Base {
-        static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+        static {
+          this.attribute("title", "string");
+          this.attribute("author", "string");
+          this.adapter = adapter;
+        }
       }
       return { Post };
     }
@@ -61,7 +107,9 @@ describe("ActiveRecord::Relation", () => {
 
     it("merge keeps the right side, when two equality clauses reference the same column", () => {
       const { Post } = makeModel();
-      const sql = Post.where({ title: "a" }).merge(Post.where({ title: "b" })).toSql();
+      const sql = Post.where({ title: "a" })
+        .merge(Post.where({ title: "b" }))
+        .toSql();
       expect(sql).toContain("WHERE");
     });
 
@@ -109,7 +157,9 @@ describe("ActiveRecord::Relation", () => {
 
     it("except jumps over unhandled binds (like with OR) correctly", () => {
       const { Post } = makeModel();
-      const sql = Post.where({ title: "a" }).or(Post.where({ title: "b" })).toSql();
+      const sql = Post.where({ title: "a" })
+        .or(Post.where({ title: "b" }))
+        .toSql();
       expect(sql).toContain("OR");
     });
 
@@ -133,13 +183,18 @@ describe("ActiveRecord::Relation", () => {
 
     it("or joins the two clauses using OR", () => {
       const { Post } = makeModel();
-      const sql = Post.where({ title: "a" }).or(Post.where({ title: "b" })).toSql();
+      const sql = Post.where({ title: "a" })
+        .or(Post.where({ title: "b" }))
+        .toSql();
       expect(sql).toContain("OR");
     });
 
     it("or places common conditions before the OR", () => {
       const { Post } = makeModel();
-      const sql = Post.where({ author: "alice" }).where({ title: "a" }).or(Post.where({ author: "alice" }).where({ title: "b" })).toSql();
+      const sql = Post.where({ author: "alice" })
+        .where({ title: "a" })
+        .or(Post.where({ author: "alice" }).where({ title: "b" }))
+        .toSql();
       expect(sql).toContain("OR");
     });
 
@@ -172,7 +227,11 @@ describe("not respond to arel method", () => {
   it("not respond to arel method", () => {
     const adapter = freshAdapter();
     class ArelPost extends Base {
-      static { this._tableName = "arel_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "arel_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Base instances should not expose an arel method directly
     const post = new ArelPost({ title: "test" });
@@ -183,7 +242,9 @@ describe("not respond to arel method", () => {
 describe("isBlank / isPresent", () => {
   it("isBlank returns true when no records exist", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;

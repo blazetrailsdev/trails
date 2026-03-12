@@ -54,7 +54,9 @@ describe("Rack::Sendfile", () => {
   it("closes body when x-sendfile used", async () => {
     const body = sendfileBody();
     let closed = false;
-    body.close = () => { closed = true; };
+    body.close = () => {
+      closed = true;
+    };
     const app = sendfileApp(body, [], "X-Sendfile");
     const res = await new MockRequest((env) => app.call(env)).get("/");
     expect(res.status).toBe(200);
@@ -131,12 +133,16 @@ describe("Rack::Sendfile", () => {
         [`${dir2}/`, "/wibble/"],
       ];
 
-      let res = await new MockRequest((env) => sendfileApp(body1, mappings, "X-Accel-Redirect").call(env)).get("/");
+      let res = await new MockRequest((env) =>
+        sendfileApp(body1, mappings, "X-Accel-Redirect").call(env),
+      ).get("/");
       expect(res.status).toBe(200);
       expect(res.bodyString).toBe("");
       expect(res.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
 
-      res = await new MockRequest((env) => sendfileApp(body2, mappings, "X-Accel-Redirect").call(env)).get("/");
+      res = await new MockRequest((env) =>
+        sendfileApp(body2, mappings, "X-Accel-Redirect").call(env),
+      ).get("/");
       expect(res.status).toBe(200);
       expect(res.bodyString).toBe("");
       expect(res.headers["x-accel-redirect"]).toBe("/wibble/rack_sendfile");
@@ -167,14 +173,14 @@ describe("Rack::Sendfile", () => {
       const headers = { HTTP_X_ACCEL_MAPPING: `${dir1}/=/foo/bar/, ${dir2}/=/wibble/` };
 
       let res = await new MockRequest((env) =>
-        new Sendfile(simpleApp(body1), "X-Accel-Redirect", []).call(env)
+        new Sendfile(simpleApp(body1), "X-Accel-Redirect", []).call(env),
       ).get("/", headers);
       expect(res.status).toBe(200);
       expect(res.bodyString).toBe("");
       expect(res.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
 
       res = await new MockRequest((env) =>
-        new Sendfile(simpleApp(body2), "X-Accel-Redirect", []).call(env)
+        new Sendfile(simpleApp(body2), "X-Accel-Redirect", []).call(env),
       ).get("/", headers);
       expect(res.status).toBe(200);
       expect(res.bodyString).toBe("");
@@ -182,7 +188,7 @@ describe("Rack::Sendfile", () => {
 
       // Third body has no mapping match - falls through to path itself
       res = await new MockRequest((env) =>
-        new Sendfile(simpleApp(body3), "X-Accel-Redirect", []).call(env)
+        new Sendfile(simpleApp(body3), "X-Accel-Redirect", []).call(env),
       ).get("/", headers);
       expect(res.status).toBe(200);
       expect(res.bodyString).toBe("");

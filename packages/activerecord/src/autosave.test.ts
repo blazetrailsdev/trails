@@ -3,17 +3,10 @@
  * Mirrors: activerecord/test/cases/autosave_association_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Base,
-  registerModel,
-} from "./index.js";
+import { Base, registerModel } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import {
-  markForDestruction,
-  isMarkedForDestruction,
-  isDestroyable,
-} from "./autosave.js";
+import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
 import { Associations } from "./associations.js";
 
 function freshAdapter(): DatabaseAdapter {
@@ -33,7 +26,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
   it("markForDestruction and isMarkedForDestruction", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); }
+      static {
+        this.attribute("title", "string");
+      }
     }
     Post.adapter = adapter;
     const post = new Post({ title: "Hello" });
@@ -44,7 +39,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
   it("isDestroyable returns false for new records", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); }
+      static {
+        this.attribute("title", "string");
+      }
     }
     Post.adapter = adapter;
     const post = new Post({ title: "Hello" });
@@ -54,7 +51,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
   it("isDestroyable returns true for persisted records marked for destruction", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); }
+      static {
+        this.attribute("title", "string");
+      }
     }
     Post.adapter = adapter;
     const post = await Post.create({ title: "Hello" });
@@ -108,7 +107,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     registerModel("Book", Book);
 
     // Set up autosave
-    Object.defineProperty(Author, "_associations", { value: [], writable: true, configurable: true });
+    Object.defineProperty(Author, "_associations", {
+      value: [],
+      writable: true,
+      configurable: true,
+    });
     (Author as any)._associations = [
       { type: "hasMany", name: "books", options: { autosave: true } },
     ];
@@ -188,7 +191,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
     const company2 = new Company({ name: "Corp" });
     (Company as any)._associations = [
-      { type: "hasOne", name: "strictAccount", options: { autosave: true, className: "StrictAccount" } },
+      {
+        type: "hasOne",
+        name: "strictAccount",
+        options: { autosave: true, className: "StrictAccount" },
+      },
     ];
 
     const badAccount = new StrictAccount({});
@@ -408,9 +415,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     registerModel("Ship", Ship);
     registerModel("Part", Part);
 
-    (Ship as any)._associations = [
-      { type: "hasMany", name: "parts", options: { autosave: true } },
-    ];
+    (Ship as any)._associations = [{ type: "hasMany", name: "parts", options: { autosave: true } }];
   });
 
   it("should destroy the associated models when marked for destruction", async () => {

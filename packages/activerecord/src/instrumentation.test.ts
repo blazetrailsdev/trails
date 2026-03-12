@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -27,7 +67,9 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("InstrumentationTest", () => {
-  afterEach(() => { Notifications.unsubscribeAll(); });
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
 
   it("instrument returns block result", () => {
     const result = Notifications.instrument("test.event", {}, () => 42);
@@ -36,7 +78,9 @@ describe("InstrumentationTest", () => {
 
   it("instrument yields the payload for further modification", () => {
     let captured: Record<string, unknown> = {};
-    Notifications.subscribe("test.payload", (event) => { captured = { ...event.payload }; });
+    Notifications.subscribe("test.payload", (event) => {
+      captured = { ...event.payload };
+    });
     const payload: Record<string, unknown> = { key: "value" };
     Notifications.instrument("test.payload", payload, () => {
       payload.extra = "added";
@@ -47,7 +91,9 @@ describe("InstrumentationTest", () => {
 
   it("instrumenter exposes its id", () => {
     let eventId: string | undefined;
-    Notifications.subscribe("test.id", (event) => { eventId = event.transactionId; });
+    Notifications.subscribe("test.id", (event) => {
+      eventId = event.transactionId;
+    });
     Notifications.instrument("test.id", {});
     expect(typeof eventId).toBe("string");
     expect(eventId!.length).toBeGreaterThan(0);
@@ -60,7 +106,9 @@ describe("InstrumentationTest", () => {
       expect(event.children.length).toBe(1);
       expect(event.children[0].name).toBe("inner");
     });
-    Notifications.subscribe("inner", (event) => { events.push("inner"); });
+    Notifications.subscribe("inner", (event) => {
+      events.push("inner");
+    });
     Notifications.instrument("outer", {}, () => {
       Notifications.instrument("inner", {}, () => {});
     });
@@ -70,16 +118,22 @@ describe("InstrumentationTest", () => {
 
   it("instrument publishes when exception is raised", () => {
     let published = false;
-    Notifications.subscribe("test.error", () => { published = true; });
+    Notifications.subscribe("test.error", () => {
+      published = true;
+    });
     expect(() => {
-      Notifications.instrument("test.error", {}, () => { throw new Error("boom"); });
+      Notifications.instrument("test.error", {}, () => {
+        throw new Error("boom");
+      });
     }).toThrow("boom");
     expect(published).toBe(true);
   });
 
   it("event is pushed even without block", () => {
     let published = false;
-    Notifications.subscribe("test.noblock", () => { published = true; });
+    Notifications.subscribe("test.noblock", () => {
+      published = true;
+    });
     Notifications.instrument("test.noblock", { data: 1 });
     expect(published).toBe(true);
   });

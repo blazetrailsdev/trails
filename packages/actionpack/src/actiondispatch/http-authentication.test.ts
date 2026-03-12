@@ -108,11 +108,11 @@ describe("ActionController::HttpAuthentication::Token", () => {
   });
 
   it("decode missing token", () => {
-    expect(TokenAuth.decode("Token nonce=\"abc\"")).toBeNull();
+    expect(TokenAuth.decode('Token nonce="abc"')).toBeNull();
   });
 
   it("has token credentials", () => {
-    expect(TokenAuth.hasTokenCredentials("Token token=\"abc\"")).toBe(true);
+    expect(TokenAuth.hasTokenCredentials('Token token="abc"')).toBe(true);
     expect(TokenAuth.hasTokenCredentials("Basic xyz")).toBe(false);
     expect(TokenAuth.hasTokenCredentials(undefined)).toBe(false);
   });
@@ -191,7 +191,8 @@ describe("ActionController::HttpAuthentication::Digest", () => {
   });
 
   it("decode digest header", () => {
-    const header = 'Digest username="admin", realm="testrealm", nonce="abc123", uri="/path", nc=00000001, cnonce="xyz", qop=auth, response="deadbeef"';
+    const header =
+      'Digest username="admin", realm="testrealm", nonce="abc123", uri="/path", nc=00000001, cnonce="xyz", qop=auth, response="deadbeef"';
     const params = DigestAuth.decode(header);
     expect(params?.username).toBe("admin");
     expect(params?.realm).toBe("testrealm");

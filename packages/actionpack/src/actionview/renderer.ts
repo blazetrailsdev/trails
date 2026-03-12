@@ -24,7 +24,7 @@ export class Renderer {
   constructor(
     lookupContext: LookupContext,
     controllerName: string,
-    defaults: RendererDefaults = {}
+    defaults: RendererDefaults = {},
   ) {
     this.lookupContext = lookupContext;
     this.controllerName = controllerName;
@@ -37,11 +37,9 @@ export class Renderer {
    */
   static for(
     controllerClass: { name: string; lookupContext?: LookupContext },
-    defaults: RendererDefaults = {}
+    defaults: RendererDefaults = {},
   ): Renderer {
-    const name = controllerClass.name
-      .replace(/Controller$/, "")
-      .toLowerCase();
+    const name = controllerClass.name.replace(/Controller$/, "").toLowerCase();
 
     const ctx = controllerClass.lookupContext ?? new LookupContext();
     return new Renderer(ctx, name, defaults);
@@ -57,7 +55,7 @@ export class Renderer {
   async render(
     action: string,
     locals: Record<string, unknown> = {},
-    options: RenderOptions = {}
+    options: RenderOptions = {},
   ): Promise<string> {
     const format = options.format ?? this.defaults.format ?? "html";
     const layout = options.layout !== undefined ? options.layout : this.defaults.layout;
@@ -67,7 +65,7 @@ export class Renderer {
       action,
       format,
       { ...this.defaults.locals, ...locals },
-      { layout }
+      { layout },
     );
   }
 
@@ -81,15 +79,13 @@ export class Renderer {
   async renderPartial(
     partial: string,
     locals: Record<string, unknown> = {},
-    options: { format?: string } = {}
+    options: { format?: string } = {},
   ): Promise<string> {
     const format = options.format ?? this.defaults.format ?? "html";
-    return this.lookupContext.renderPartial(
-      partial,
-      this.controllerName,
-      format,
-      { ...this.defaults.locals, ...locals }
-    );
+    return this.lookupContext.renderPartial(partial, this.controllerName, format, {
+      ...this.defaults.locals,
+      ...locals,
+    });
   }
 
   /**

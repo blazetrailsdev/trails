@@ -19,7 +19,7 @@ export function sum<T>(collection: T[], fn?: (item: T) => number): number {
  */
 export function indexBy<T, K extends string | number>(
   collection: T[],
-  fn: (item: T) => K
+  fn: (item: T) => K,
 ): Record<K, T> {
   const result = {} as Record<K, T>;
   for (const item of collection) {
@@ -33,7 +33,7 @@ export function indexBy<T, K extends string | number>(
  */
 export function groupBy<T, K extends string | number>(
   collection: T[],
-  fn: (item: T) => K
+  fn: (item: T) => K,
 ): Record<K, T[]> {
   const result = {} as Record<K, T[]>;
   for (const item of collection) {
@@ -115,10 +115,7 @@ export function tally<T extends string | number>(collection: T[]): Record<string
 /**
  * filterMap — map and remove null/undefined results.
  */
-export function filterMap<T, U>(
-  collection: T[],
-  fn: (item: T) => U | null | undefined
-): U[] {
+export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | undefined): U[] {
   const result: U[] = [];
   for (const item of collection) {
     const mapped = fn(item);
@@ -191,7 +188,7 @@ export function inOrderOf<T>(
   collection: T[],
   fn: (item: T) => unknown,
   series: unknown[],
-  options: { filter?: boolean } = {}
+  options: { filter?: boolean } = {},
 ): T[] {
   const filter = options.filter !== false;
   const seriesMap = new Map<unknown, T[]>();
@@ -262,7 +259,7 @@ export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
  */
 export function isIn<T>(
   value: T,
-  collection: T[] | Set<T> | string | Record<string, unknown>
+  collection: T[] | Set<T> | string | Record<string, unknown>,
 ): boolean {
   if (Array.isArray(collection)) return collection.includes(value);
   if (collection instanceof Set) return collection.has(value);
@@ -279,7 +276,7 @@ export function isIn<T>(
  */
 export function presenceIn<T>(
   value: T,
-  collection: T[] | Set<T> | string | Record<string, unknown>
+  collection: T[] | Set<T> | string | Record<string, unknown>,
 ): T | null {
   return isIn(value, collection) ? value : null;
 }

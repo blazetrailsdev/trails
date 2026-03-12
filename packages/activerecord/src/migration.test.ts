@@ -4,7 +4,7 @@
  *          activerecord/test/cases/invertible_migration_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { MigrationContext , MigrationRunner} from "./index.js";
+import { MigrationContext, MigrationRunner } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration, TableDefinition, Schema } from "./migration.js";
@@ -41,7 +41,9 @@ describe("MigrationTest", () => {
 
   it("create table with force: true drops and recreates", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("things", {}, (t) => { t.string("color"); });
+    await ctx.createTable("things", {}, (t) => {
+      t.string("color");
+    });
     expect(ctx.tableExists("things")).toBe(true);
 
     await ctx.createTable("things", { force: true }, (t) => {
@@ -63,7 +65,9 @@ describe("MigrationTest", () => {
 
   it("add column", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("name"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
 
     await ctx.addColumn("users", "email", "string");
     expect(ctx.columnExists("users", "email")).toBe(true);
@@ -83,7 +87,9 @@ describe("MigrationTest", () => {
 
   it("rename column", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("old_name"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("old_name");
+    });
 
     await ctx.renameColumn("users", "old_name", "new_name");
     expect(ctx.columnExists("users", "old_name")).toBe(false);
@@ -92,7 +98,9 @@ describe("MigrationTest", () => {
 
   it("add index", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("email"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+    });
 
     await ctx.addIndex("users", "email", { unique: true });
     expect(ctx.indexExists("users", "email")).toBe(true);
@@ -112,7 +120,9 @@ describe("MigrationTest", () => {
 
   it("remove index by column name", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("email"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+    });
     await ctx.addIndex("users", "email");
     expect(ctx.indexExists("users", "email")).toBe(true);
 
@@ -122,7 +132,9 @@ describe("MigrationTest", () => {
 
   it("remove index by name", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("email"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+    });
     await ctx.addIndex("users", "email", { name: "idx_users_email" });
 
     await ctx.removeIndex("users", { name: "idx_users_email" });
@@ -131,7 +143,9 @@ describe("MigrationTest", () => {
 
   it("rename table", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("old_name", {}, (t) => { t.string("value"); });
+    await ctx.createTable("old_name", {}, (t) => {
+      t.string("value");
+    });
     expect(ctx.tableExists("old_name")).toBe(true);
 
     await ctx.renameTable("old_name", "new_name");
@@ -147,7 +161,9 @@ describe("MigrationTest", () => {
 
   it("columnExists returns false for non-existent column", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("name"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
     expect(ctx.columnExists("users", "nonexistent")).toBe(false);
   });
 
@@ -157,8 +173,12 @@ describe("MigrationTest", () => {
     let downCalled = false;
 
     await ctx.reversible((dir) => {
-      dir.up(async () => { upCalled = true; });
-      dir.down(async () => { downCalled = true; });
+      dir.up(async () => {
+        upCalled = true;
+      });
+      dir.down(async () => {
+        downCalled = true;
+      });
     });
 
     expect(upCalled).toBe(true);
@@ -194,17 +214,19 @@ describe("MigrationTest", () => {
 
   it("add column with if not exists not set", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("name"); });
-    await expect(
-      ctx.addColumn("users", "name", "string")
-    ).rejects.toThrow(/already exists/);
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    await expect(ctx.addColumn("users", "name", "string")).rejects.toThrow(/already exists/);
   });
 
   it("rename table with prefix and suffix", async () => {
     const { ctx } = freshContext();
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
-    await ctx.createTable("pre_old_suf", {}, (t) => { t.string("value"); });
+    await ctx.createTable("pre_old_suf", {}, (t) => {
+      t.string("value");
+    });
 
     await ctx.renameTable("old", "new");
     expect(ctx.tableExists("pre_old_suf")).toBe(false);
@@ -220,7 +242,9 @@ describe("MigrationTest", () => {
 
   it("add and remove index", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => { t.string("email"); });
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+    });
 
     await ctx.addIndex("users", "email");
     expect(ctx.indexExists("users", "email")).toBe(true);
@@ -248,7 +272,9 @@ describe("InvertibleMigrationTest", () => {
 
   it("migrate down drops table", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("horses", {}, (t) => { t.string("name"); });
+    await ctx.createTable("horses", {}, (t) => {
+      t.string("name");
+    });
     expect(ctx.tableExists("horses")).toBe(true);
 
     await ctx.dropTable("horses");
@@ -260,8 +286,12 @@ describe("InvertibleMigrationTest", () => {
     const log: string[] = [];
 
     await ctx.reversible((dir) => {
-      dir.up(async () => { log.push("up"); });
-      dir.down(async () => { log.push("down"); });
+      dir.up(async () => {
+        log.push("up");
+      });
+      dir.down(async () => {
+        log.push("down");
+      });
     });
 
     expect(log).toEqual(["up"]);
@@ -270,7 +300,9 @@ describe("InvertibleMigrationTest", () => {
   it("revert executes the migration function", async () => {
     const { ctx } = freshContext();
     let called = false;
-    await ctx.revert(async () => { called = true; });
+    await ctx.revert(async () => {
+      called = true;
+    });
     expect(called).toBe(true);
   });
 
@@ -286,12 +318,10 @@ describe("InvertibleMigrationTest", () => {
   });
 });
 
-
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
-
 
 describe("Migrations", () => {
   describe("TableDefinition", () => {
@@ -383,7 +413,7 @@ describe("Migrations", () => {
 
       // Verify table exists by inserting data
       await adapter.executeMutation(
-        `INSERT INTO "users" ("name", "email") VALUES ('Dean', 'dean@test.com')`
+        `INSERT INTO "users" ("name", "email") VALUES ('Dean', 'dean@test.com')`,
       );
       const rows = await adapter.execute(`SELECT * FROM "users"`);
       expect(rows).toHaveLength(1);
@@ -402,7 +432,7 @@ describe("Migrations", () => {
       });
 
       await adapter.executeMutation(
-        `INSERT INTO "posts" ("title", "body") VALUES ('Hello', 'World')`
+        `INSERT INTO "posts" ("title", "body") VALUES ('Hello', 'World')`,
       );
       const rows = await adapter.execute(`SELECT * FROM "posts"`);
       expect(rows).toHaveLength(1);
@@ -425,9 +455,7 @@ describe("Migration DDL (extended)", () => {
     const m = new AddAge();
     await m.run(adapter, "up");
     // Should be able to insert with the new column
-    await adapter.executeMutation(
-      `INSERT INTO "users" ("name", "age") VALUES ('Dean', 30)`
-    );
+    await adapter.executeMutation(`INSERT INTO "users" ("name", "age") VALUES ('Dean', 30)`);
     const rows = await adapter.execute(`SELECT * FROM "users"`);
     expect(rows).toHaveLength(1);
   });
@@ -530,14 +558,26 @@ describe("MigrationRunner", () => {
 
     class M1 extends Migration {
       static version = "001";
-      async up() { await this.createTable("users", (t) => { t.string("name"); }); }
-      async down() { await this.dropTable("users"); }
+      async up() {
+        await this.createTable("users", (t) => {
+          t.string("name");
+        });
+      }
+      async down() {
+        await this.dropTable("users");
+      }
     }
 
     class M2 extends Migration {
       static version = "002";
-      async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
-      async down() { await this.dropTable("posts"); }
+      async up() {
+        await this.createTable("posts", (t) => {
+          t.string("title");
+        });
+      }
+      async down() {
+        await this.dropTable("posts");
+      }
     }
 
     const runner = new MigrationRunner(adapter, [new M1(), new M2()]);
@@ -555,8 +595,14 @@ describe("MigrationRunner", () => {
 
     class M1 extends Migration {
       static version = "001";
-      async up() { await this.createTable("items", (t) => { t.string("name"); }); }
-      async down() { await this.dropTable("items"); }
+      async up() {
+        await this.createTable("items", (t) => {
+          t.string("name");
+        });
+      }
+      async down() {
+        await this.dropTable("items");
+      }
     }
 
     const runner = new MigrationRunner(adapter, [new M1()]);
@@ -573,14 +619,26 @@ describe("MigrationRunner", () => {
 
     class M1 extends Migration {
       static version = "001";
-      async up() { await this.createTable("t1", (t) => { t.string("a"); }); }
-      async down() { await this.dropTable("t1"); }
+      async up() {
+        await this.createTable("t1", (t) => {
+          t.string("a");
+        });
+      }
+      async down() {
+        await this.dropTable("t1");
+      }
     }
 
     class M2 extends Migration {
       static version = "002";
-      async up() { await this.createTable("t2", (t) => { t.string("b"); }); }
-      async down() { await this.dropTable("t2"); }
+      async up() {
+        await this.createTable("t2", (t) => {
+          t.string("b");
+        });
+      }
+      async down() {
+        await this.dropTable("t2");
+      }
     }
 
     const runner = new MigrationRunner(adapter, [new M1(), new M2()]);
@@ -598,8 +656,14 @@ describe("MigrationRunner", () => {
 
     class M1 extends Migration {
       static version = "001";
-      async up() { await this.createTable("x", (t) => { t.string("v"); }); }
-      async down() { await this.dropTable("x"); }
+      async up() {
+        await this.createTable("x", (t) => {
+          t.string("v");
+        });
+      }
+      async down() {
+        await this.dropTable("x");
+      }
     }
 
     const runner = new MigrationRunner(adapter, [new M1()]);
@@ -611,7 +675,9 @@ describe("MigrationRunner", () => {
 
 describe("Rails-guided: migrations", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("reversible migration change method auto-reverses", async () => {
     class CreateWidgets extends Migration {
@@ -624,7 +690,9 @@ describe("Rails-guided: migrations", () => {
     }
     const m = new CreateWidgets();
     await m.run(adapter, "up");
-    await adapter.executeMutation(`INSERT INTO "widgets" ("name", "quantity") VALUES ('Sprocket', 10)`);
+    await adapter.executeMutation(
+      `INSERT INTO "widgets" ("name", "quantity") VALUES ('Sprocket', 10)`,
+    );
     expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(1);
 
     await m.run(adapter, "down");
@@ -634,13 +702,25 @@ describe("Rails-guided: migrations", () => {
   it("MigrationRunner runs and rolls back", async () => {
     class CreateUsers extends Migration {
       static version = "20240101";
-      async up() { await this.createTable("users", (t) => { t.string("name"); }); }
-      async down() { await this.dropTable("users"); }
+      async up() {
+        await this.createTable("users", (t) => {
+          t.string("name");
+        });
+      }
+      async down() {
+        await this.dropTable("users");
+      }
     }
     class CreatePosts extends Migration {
       static version = "20240102";
-      async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
-      async down() { await this.dropTable("posts"); }
+      async up() {
+        await this.createTable("posts", (t) => {
+          t.string("title");
+        });
+      }
+      async down() {
+        await this.dropTable("posts");
+      }
     }
 
     const runner = new MigrationRunner(adapter, [new CreateUsers(), new CreatePosts()]);
@@ -658,8 +738,14 @@ describe("Rails-guided: migrations", () => {
   it("MigrationRunner.migrate is idempotent", async () => {
     class CreateItems extends Migration {
       static version = "20240201";
-      async up() { await this.createTable("items", (t) => { t.string("name"); }); }
-      async down() { await this.dropTable("items"); }
+      async up() {
+        await this.createTable("items", (t) => {
+          t.string("name");
+        });
+      }
+      async down() {
+        await this.dropTable("items");
+      }
     }
     const runner = new MigrationRunner(adapter, [new CreateItems()]);
     await runner.migrate();

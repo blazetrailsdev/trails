@@ -56,7 +56,9 @@ describe("ActionDispatch::ExceptionWrapper", () => {
   });
 
   it("custom exception status registration", () => {
-    class CustomNotFound extends Error { name = "CustomNotFound"; }
+    class CustomNotFound extends Error {
+      name = "CustomNotFound";
+    }
     ExceptionWrapper.registerStatus("CustomNotFound", 404);
     const wrapper = new ExceptionWrapper(new CustomNotFound("not here"));
     expect(wrapper.statusCode).toBe(404);
@@ -96,7 +98,11 @@ describe("ActionDispatch::ExceptionWrapper", () => {
   });
 
   it("registered NotFoundError maps to 404", () => {
-    class NotFoundError extends Error { get name() { return "NotFoundError"; } }
+    class NotFoundError extends Error {
+      get name() {
+        return "NotFoundError";
+      }
+    }
     ExceptionWrapper.registerStatus("NotFoundError", 404);
     const wrapper = new ExceptionWrapper(new NotFoundError("missing"));
     expect(wrapper.statusCode).toBe(404);

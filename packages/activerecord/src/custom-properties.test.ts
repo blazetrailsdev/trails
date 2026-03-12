@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -32,11 +72,17 @@ describe("CustomPropertiesTest", () => {
   it("overloading types", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("score", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "string");
+        this.adapter = adp;
+      }
     }
     // Override the type of score from string to integer
     class CustomPost extends (Post as any) {
-      static { this.attribute("score", "integer"); }
+      static {
+        this.attribute("score", "integer");
+      }
     }
     const p = new (CustomPost as any)({ title: "hi", score: "42" });
     expect(p.readAttribute("score")).toBe(42);
@@ -44,7 +90,11 @@ describe("CustomPropertiesTest", () => {
   it("overloaded properties save", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("priority", "integer", { default: 1 }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("priority", "integer", { default: 1 });
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "test" });
     expect(p.readAttribute("priority")).toBe(1);
@@ -56,7 +106,11 @@ describe("CustomPropertiesTest", () => {
 
   it("properties assigned in constructor", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("score", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const p = new Post({ title: "hello", score: 42 });
     expect(p.readAttribute("title")).toBe("hello");
@@ -66,7 +120,11 @@ describe("CustomPropertiesTest", () => {
   it(".type_for_attribute supports attribute aliases", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.aliasAttribute("heading", "title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.aliasAttribute("heading", "title");
+      }
     }
     const p = new Post({ title: "hello" });
     expect((p as any).heading).toBe("hello");
@@ -74,7 +132,11 @@ describe("CustomPropertiesTest", () => {
   it("overloaded properties with limit", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("short_title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("short_title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ short_title: "abcdefghij" });
     expect(p.readAttribute("short_title")).toBe("abcdefghij");
@@ -82,7 +144,10 @@ describe("CustomPropertiesTest", () => {
   it("overloaded default but keeping its own type", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("count", "integer", { default: 10 }); this.adapter = adp; }
+      static {
+        this.attribute("count", "integer", { default: 10 });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("count")).toBe(10);
@@ -91,10 +156,15 @@ describe("CustomPropertiesTest", () => {
   it("attributes with overridden types keep their type when a default value is configured separately", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     class CustomPost extends (Post as any) {
-      static { this.attribute("score", "integer", { default: 99 }); }
+      static {
+        this.attribute("score", "integer", { default: 99 });
+      }
     }
     const p = new (CustomPost as any)({});
     expect(p.readAttribute("score")).toBe(99);
@@ -103,7 +173,10 @@ describe("CustomPropertiesTest", () => {
   it("extra options are forwarded to the type caster constructor", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string", { default: "forwarded" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string", { default: "forwarded" });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("title")).toBe("forwarded");
@@ -111,7 +184,10 @@ describe("CustomPropertiesTest", () => {
   it("time zone aware attribute", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("created_at", "string"); this.adapter = adp; }
+      static {
+        this.attribute("created_at", "string");
+        this.adapter = adp;
+      }
     }
     const now = new Date().toISOString();
     const p = new Post({ created_at: now });
@@ -120,7 +196,10 @@ describe("CustomPropertiesTest", () => {
   it("nonexistent attribute", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "hi" });
     expect(p.readAttribute("nonexistent")).toBeNull();
@@ -129,7 +208,11 @@ describe("CustomPropertiesTest", () => {
   it("model with nonexistent attribute with default value can be saved", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("virtual_field", "string", { default: "computed" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("virtual_field", "string", { default: "computed" });
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "test" });
     expect(p.isPersisted()).toBe(true);
@@ -139,7 +222,11 @@ describe("CustomPropertiesTest", () => {
   it("changing defaults", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string", { default: "draft" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string", { default: "draft" });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("status")).toBe("draft");
@@ -148,7 +235,11 @@ describe("CustomPropertiesTest", () => {
   it("defaults are not touched on the columns", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string", { default: "active" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string", { default: "active" });
+        this.adapter = adp;
+      }
     }
     // The column itself should not have the default baked in; only instances get it
     const p = new Post({});
@@ -158,7 +249,11 @@ describe("CustomPropertiesTest", () => {
   it("children inherit custom properties", () => {
     const adp = freshAdapter();
     class Animal extends Base {
-      static { this.attribute("name", "string"); this.attribute("legs", "integer", { default: 4 }); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("legs", "integer", { default: 4 });
+        this.adapter = adp;
+      }
     }
     class Dog extends (Animal as any) {}
     const d = new (Dog as any)({ name: "Rex" });
@@ -169,10 +264,16 @@ describe("CustomPropertiesTest", () => {
   it("children can override parents", () => {
     const adp = freshAdapter();
     class Vehicle extends Base {
-      static { this.attribute("name", "string"); this.attribute("speed", "integer", { default: 60 }); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("speed", "integer", { default: 60 });
+        this.adapter = adp;
+      }
     }
     class Bicycle extends (Vehicle as any) {
-      static { this.attribute("speed", "integer", { default: 15 }); }
+      static {
+        this.attribute("speed", "integer", { default: 15 });
+      }
     }
     const b = new (Bicycle as any)({ name: "Trek" });
     expect(b.readAttribute("speed")).toBe(15);
@@ -181,11 +282,17 @@ describe("CustomPropertiesTest", () => {
   it("overloading properties does not attribute method order", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     // Overloading body with a default should not change attribute order
     class CustomPost extends (Post as any) {
-      static { this.attribute("body", "string", { default: "default body" }); }
+      static {
+        this.attribute("body", "string", { default: "default body" });
+      }
     }
     const p = new (CustomPost as any)({ title: "hi" });
     expect(p.readAttribute("title")).toBe("hi");
@@ -194,13 +301,19 @@ describe("CustomPropertiesTest", () => {
   it("caches are cleared", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("count", "integer", { default: 0 }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("count", "integer", { default: 0 });
+        this.adapter = adp;
+      }
     }
     const p1 = new Post({});
     expect(p1.readAttribute("count")).toBe(0);
     // Creating a new subclass with different defaults should not affect the parent
     class SpecialPost extends (Post as any) {
-      static { this.attribute("count", "integer", { default: 100 }); }
+      static {
+        this.attribute("count", "integer", { default: 100 });
+      }
     }
     const p2 = new (SpecialPost as any)({});
     expect(p2.readAttribute("count")).toBe(100);
@@ -212,7 +325,10 @@ describe("CustomPropertiesTest", () => {
   it("the given default value is cast from user", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("count", "integer", { default: 0 }); this.adapter = adp; }
+      static {
+        this.attribute("count", "integer", { default: 0 });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(typeof p.readAttribute("count")).toBe("number");
@@ -223,7 +339,15 @@ describe("CustomPropertiesTest", () => {
     const adp = freshAdapter();
     const calls: number[] = [];
     class Post extends Base {
-      static { this.attribute("token", "string", { default: () => { calls.push(1); return "generated"; } }); this.adapter = adp; }
+      static {
+        this.attribute("token", "string", {
+          default: () => {
+            calls.push(1);
+            return "generated";
+          },
+        });
+        this.adapter = adp;
+      }
     }
     const p1 = new Post({});
     const p2 = new Post({});
@@ -236,7 +360,10 @@ describe("CustomPropertiesTest", () => {
   it("procs for default values are evaluated even after column_defaults is called", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("seq", "integer", { default: () => Math.floor(Math.random() * 1000) }); this.adapter = adp; }
+      static {
+        this.attribute("seq", "integer", { default: () => Math.floor(Math.random() * 1000) });
+        this.adapter = adp;
+      }
     }
     // column_defaults evaluates the proc
     const defaults = Post.columnDefaults;
@@ -250,7 +377,15 @@ describe("CustomPropertiesTest", () => {
     const adp = freshAdapter();
     let callCount = 0;
     class Post extends Base {
-      static { this.attribute("token", "string", { default: () => { callCount++; return "tok_" + callCount; } }); this.adapter = adp; }
+      static {
+        this.attribute("token", "string", {
+          default: () => {
+            callCount++;
+            return "tok_" + callCount;
+          },
+        });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     const val1 = p.readAttribute("token");
@@ -262,7 +397,11 @@ describe("CustomPropertiesTest", () => {
   it("user provided defaults are persisted even if unchanged", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string", { default: "draft" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string", { default: "draft" });
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "test" });
     const reloaded = await Post.find(p.id);
@@ -273,17 +412,23 @@ describe("CustomPropertiesTest", () => {
   it("array types can be specified", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("tags", "string", { default: "[]" }); this.adapter = adp; }
+      static {
+        this.attribute("tags", "string", { default: "[]" });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("tags")).toBe("[]");
-    p.writeAttribute("tags", "[\"a\",\"b\"]");
-    expect(p.readAttribute("tags")).toBe("[\"a\",\"b\"]");
+    p.writeAttribute("tags", '["a","b"]');
+    expect(p.readAttribute("tags")).toBe('["a","b"]');
   });
   it("range types can be specified", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("price_range", "string", { default: "0-100" }); this.adapter = adp; }
+      static {
+        this.attribute("price_range", "string", { default: "0-100" });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("price_range")).toBe("0-100");
@@ -291,7 +436,10 @@ describe("CustomPropertiesTest", () => {
   it("attributes added after subclasses load are inherited", () => {
     const adp = freshAdapter();
     class Animal extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     class Dog extends (Animal as any) {}
     // Add attribute to parent after subclass is defined
@@ -303,7 +451,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes not backed by database columns are not dirty when unchanged", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("virtual", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("virtual", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "hello" });
     (p as any)._dirty.snapshot(p._attributes);
@@ -313,7 +465,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes not backed by database columns are always initialized", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("memo", "string", { default: "" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("memo", "string", { default: "" });
+        this.adapter = adp;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("memo")).toBe("");
@@ -322,7 +478,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes not backed by database columns return the default on models loaded from database", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("virtual_status", "string", { default: "pending" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("virtual_status", "string", { default: "pending" });
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "test" });
     const reloaded = await Post.find(p.id);
@@ -331,10 +491,15 @@ describe("CustomPropertiesTest", () => {
   it("attributes not backed by database columns keep their type when a default value is configured separately", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     class CustomPost extends (Post as any) {
-      static { this.attribute("score", "integer", { default: 42 }); }
+      static {
+        this.attribute("score", "integer", { default: 42 });
+      }
     }
     const p = new (CustomPost as any)({});
     expect(p.readAttribute("score")).toBe(42);
@@ -344,7 +509,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes not backed by database columns properly interact with mutation and dirty", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("note", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("note", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "hello" });
     (p as any)._dirty.snapshot(p._attributes);
@@ -356,7 +525,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes not backed by database columns appear in inspect", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("virtual_field", "string", { default: "v" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("virtual_field", "string", { default: "v" });
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "hi" });
     // The attribute is accessible
@@ -366,7 +539,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes do not require a type", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("metadata", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("metadata", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ metadata: "anything" });
     expect(p.readAttribute("metadata")).toBe("anything");
@@ -374,7 +551,11 @@ describe("CustomPropertiesTest", () => {
   it("attributes do not require a connection is established", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("cached", "string", { default: "yes" }); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("cached", "string", { default: "yes" });
+        this.adapter = adp;
+      }
     }
     // Can define and instantiate without any connection/query
     const p = new Post({});
@@ -384,7 +565,10 @@ describe("CustomPropertiesTest", () => {
     const adp = freshAdapter();
     // Using a type that doesn't have special casting should still work as pass-through
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "test" });
     expect(p.readAttribute("title")).toBe("test");
@@ -392,7 +576,10 @@ describe("CustomPropertiesTest", () => {
   it("immutable_strings_by_default changes schema inference for string columns", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "hello" });
     const val = p.readAttribute("title");
@@ -401,7 +588,10 @@ describe("CustomPropertiesTest", () => {
   it("immutable_strings_by_default retains limit information", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "hello" });
     expect(typeof p.readAttribute("title")).toBe("string");
@@ -409,7 +599,10 @@ describe("CustomPropertiesTest", () => {
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ name: "test" });
     expect(p.readAttribute("name")).toBe("test");
@@ -419,7 +612,10 @@ describe("CustomPropertiesTest", () => {
   it("serialize boolean for both string types", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("active", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("active", "integer");
+        this.adapter = adp;
+      }
     }
     const p1 = new Post({ active: 1 });
     expect(p1.readAttribute("active")).toBe(1);

@@ -57,11 +57,7 @@ export class Model {
 
   // -- Attributes (Phase 1000) --
 
-  static attribute(
-    name: string,
-    typeName: string,
-    options?: { default?: unknown }
-  ): void {
+  static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
     const type = typeRegistry.lookup(typeName);
     const defaultValue = options?.default ?? null;
     // Ensure subclass has its own copy
@@ -106,7 +102,10 @@ export class Model {
   }
 
   // -- Normalizations --
-  static _normalizations: Map<string, { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }> = new Map();
+  static _normalizations: Map<
+    string,
+    { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }
+  > = new Map();
 
   /**
    * Register a normalization function for one or more attributes.
@@ -233,10 +232,7 @@ export class Model {
    *     m.validates("email", { presence: true });
    *   });
    */
-  static withOptions(
-    defaults: Record<string, unknown>,
-    fn: (model: typeof Model) => void
-  ): void {
+  static withOptions(defaults: Record<string, unknown>, fn: (model: typeof Model) => void): void {
     // Create a proxy that merges defaults into validates() calls
     const proxy = new Proxy(this, {
       get(target: any, prop: string | symbol) {
@@ -253,10 +249,7 @@ export class Model {
 
   // -- Validations (Phase 1100) --
 
-  static validates(
-    attribute: string,
-    rules: Record<string, unknown>
-  ): void {
+  static validates(attribute: string, rules: Record<string, unknown>): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_validations")) {
       this._validations = [...this._validations];
     }
@@ -292,8 +285,7 @@ export class Model {
     }
 
     if (rules.numericality) {
-      const opts =
-        rules.numericality === true ? {} : (rules.numericality as any);
+      const opts = rules.numericality === true ? {} : (rules.numericality as any);
       push(new NumericalityValidator(opts));
     }
 
@@ -315,8 +307,7 @@ export class Model {
     }
 
     if (rules.confirmation) {
-      const opts =
-        rules.confirmation === true ? {} : (rules.confirmation as any);
+      const opts = rules.confirmation === true ? {} : (rules.confirmation as any);
       push(new ConfirmationValidator(opts));
     }
 
@@ -327,7 +318,7 @@ export class Model {
 
   static validate(
     methodOrFn: string | ((record: any) => void),
-    options: ConditionalOptions = {}
+    options: ConditionalOptions = {},
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_customValidations")) {
       this._customValidations = [...this._customValidations];
@@ -343,7 +334,7 @@ export class Model {
   static validatesEach(
     attributes: string[],
     fn: (record: any, attribute: string, value: unknown) => void,
-    options: ConditionalOptions = {}
+    options: ConditionalOptions = {},
   ): void {
     this.validate((record: any) => {
       for (const attr of attributes) {
@@ -361,13 +352,16 @@ export class Model {
    */
   static validatesWith(
     validatorClass: { new (options?: any): { validate(record: any): void } },
-    options: ConditionalOptions & { [key: string]: unknown } = {}
+    options: ConditionalOptions & { [key: string]: unknown } = {},
   ): void {
     const { if: ifOpt, unless: unlessOpt, on: onOpt, ...rest } = options;
     const validator = new validatorClass(rest);
-    this.validate((record: any) => {
-      validator.validate(record);
-    }, { if: ifOpt, unless: unlessOpt, on: onOpt });
+    this.validate(
+      (record: any) => {
+        validator.validate(record);
+      },
+      { if: ifOpt, unless: unlessOpt, on: onOpt },
+    );
   }
 
   /**
@@ -417,7 +411,10 @@ export class Model {
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_numericality_of
    */
-  static validatesNumericalityOf(attribute: string, options: Record<string, unknown> | boolean = {}): void {
+  static validatesNumericalityOf(
+    attribute: string,
+    options: Record<string, unknown> | boolean = {},
+  ): void {
     this.validates(attribute, { numericality: options === true ? {} : options });
   }
 
@@ -608,9 +605,7 @@ export class Model {
    * Mirrors: ActiveModel::Translation.human_attribute_name
    */
   static humanAttributeName(attr: string): string {
-    return attr
-      .replace(/_/g, " ")
-      .replace(/^\w/, (c) => c.toUpperCase());
+    return attr.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
   }
 
   /**
@@ -673,7 +668,9 @@ export class Model {
         const methodName = `${prefix}${name}`;
         if (!(this.prototype as any)[methodName]) {
           Object.defineProperty(this.prototype, methodName, {
-            value: function(this: Model) { return this.readAttribute(name); },
+            value: function (this: Model) {
+              return this.readAttribute(name);
+            },
             writable: true,
             configurable: true,
           });
@@ -683,7 +680,9 @@ export class Model {
         const methodName = `${name}${suffix}`;
         if (!(this.prototype as any)[methodName]) {
           Object.defineProperty(this.prototype, methodName, {
-            value: function(this: Model) { return this.readAttribute(name); },
+            value: function (this: Model) {
+              return this.readAttribute(name);
+            },
             writable: true,
             configurable: true,
           });
@@ -693,7 +692,9 @@ export class Model {
         const methodName = `${prefix}${name}${suffix}`;
         if (!(this.prototype as any)[methodName]) {
           Object.defineProperty(this.prototype, methodName, {
-            value: function(this: Model) { return this.readAttribute(name); },
+            value: function (this: Model) {
+              return this.readAttribute(name);
+            },
             writable: true,
             configurable: true,
           });
@@ -738,9 +739,7 @@ export class Model {
         this._attributes.set(name, castValue);
       } else {
         const defVal =
-          typeof def.defaultValue === "function"
-            ? def.defaultValue()
-            : def.defaultValue;
+          typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
         this._attributes.set(name, defVal);
       }
     }
@@ -890,19 +889,21 @@ export class Model {
       if (entry.on && entry.on !== effectiveContext) continue;
       // Check if/unless conditions
       if (entry.if !== undefined) {
-        const result = typeof entry.if === "function"
-          ? entry.if(this)
-          : typeof (this as any)[entry.if] === "function"
-            ? (this as any)[entry.if]()
-            : (this as any)[entry.if];
+        const result =
+          typeof entry.if === "function"
+            ? entry.if(this)
+            : typeof (this as any)[entry.if] === "function"
+              ? (this as any)[entry.if]()
+              : (this as any)[entry.if];
         if (!result) continue;
       }
       if (entry.unless !== undefined) {
-        const result = typeof entry.unless === "function"
-          ? entry.unless(this)
-          : typeof (this as any)[entry.unless] === "function"
-            ? (this as any)[entry.unless]()
-            : (this as any)[entry.unless];
+        const result =
+          typeof entry.unless === "function"
+            ? entry.unless(this)
+            : typeof (this as any)[entry.unless] === "function"
+              ? (this as any)[entry.unless]()
+              : (this as any)[entry.unless];
         if (result) continue;
       }
       const value = this._attributes.get(entry.attribute);
@@ -1156,9 +1157,10 @@ export class Model {
     const hash = this.serializableHash(options);
     const ctor = this.constructor as typeof Model;
     if (ctor.includeRootInJson) {
-      const root = typeof ctor.includeRootInJson === "string"
-        ? ctor.includeRootInJson
-        : ctor.modelName.element;
+      const root =
+        typeof ctor.includeRootInJson === "string"
+          ? ctor.includeRootInJson
+          : ctor.modelName.element;
       return { [root]: hash };
     }
     return hash;
@@ -1378,10 +1380,6 @@ export class Model {
   // -- Callbacks helper for subclasses --
 
   runCallbacks(event: string, block: () => void): boolean {
-    return (this.constructor as typeof Model)._callbackChain.run(
-      event,
-      this,
-      block
-    );
+    return (this.constructor as typeof Model)._callbackChain.run(event, this, block);
   }
 }

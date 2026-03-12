@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -39,10 +79,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
   it("counters are updated both in memory and in the database on create", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -58,10 +106,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_removing_association_updates_counter
   it("removing association updates counter", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -81,7 +137,11 @@ describe("CounterCacheTest", () => {
   // Rails: test_update_counter_with_initial_null_value
   it("update counter with initial null value", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer");
+        this.adapter = adapter;
+      }
     }
     const topic = await Topic.create({ title: "Test" });
     await Topic.incrementCounter("replies_count", topic.id);
@@ -92,7 +152,11 @@ describe("CounterCacheTest", () => {
   // Rails: test_increment_counter
   it("increment counter", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("views_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const topic = await Topic.create({ title: "Test" });
     await Topic.incrementCounter("views_count", topic.id);
@@ -103,7 +167,11 @@ describe("CounterCacheTest", () => {
   // Rails: test_decrement_counter
   it("decrement counter", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("views_count", "integer", { default: 5 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views_count", "integer", { default: 5 });
+        this.adapter = adapter;
+      }
     }
     const topic = await Topic.create({ title: "Test" });
     await Topic.decrementCounter("views_count", topic.id);
@@ -114,7 +182,11 @@ describe("CounterCacheTest", () => {
   // Rails: test_decrement_counter_by_specific_amount
   it("decrement counter by specific amount", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("views_count", "integer", { default: 10 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views_count", "integer", { default: 10 });
+        this.adapter = adapter;
+      }
     }
     const topic = await Topic.create({ title: "Test" });
     await Topic.decrementCounter("views_count", topic.id, 3);
@@ -125,10 +197,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_update_other_counters_on_parent_destroy
   it("update other counters on parent destroy", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -144,10 +224,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_update_counters_in_a_polymorphic_relationship
   it("update counters in a polymorphic relationship", async () => {
     class Container extends Base {
-      static { this.attribute("name", "string"); this.attribute("items_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("items_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Item extends Base {
-      static { this.attribute("name", "string"); this.attribute("container_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("container_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Item, "container", { counterCache: true });
     registerModel(Container);
@@ -163,10 +251,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_counter_caches_are_updated_in_memory_when_the_default_value_is_nil
   it("counter caches are updated in memory when the default value is nil", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer");
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -182,7 +278,12 @@ describe("CounterCacheTest", () => {
   // Rails: test_update_counters_doesnt_touch_timestamps_by_default
   it("update counters doesn't touch timestamps by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("views_count", "integer", { default: 0 }); this.attribute("updated_at", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views_count", "integer", { default: 0 });
+        this.attribute("updated_at", "string");
+        this.adapter = adapter;
+      }
     }
     const topic = await Topic.create({ title: "Test", updated_at: "2020-01-01" });
     const before = topic.readAttribute("updated_at");
@@ -194,10 +295,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_active_counter_cache
   it("active counter cache", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -213,10 +322,18 @@ describe("CounterCacheTest", () => {
   // Rails: test_inactive_counter_cache
   it("inactive counter cache", async () => {
     class Parent extends Base {
-      static { this.attribute("name", "string"); this.attribute("children_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("children_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Child extends Base {
-      static { this.attribute("name", "string"); this.attribute("parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     // No counterCache — inactive
     Associations.belongsTo.call(Child, "parent", {});
@@ -253,7 +370,11 @@ describe("CounterCacheTest", () => {
   // Rails: test_inactive_counter_cache
   it("update counter", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test" });
     await Topic.incrementCounter("replies_count", t.id);
@@ -266,10 +387,18 @@ describe("CounterCacheTest", () => {
   it.skip("reset counters with modular association", () => {});
   it("update counter caches on destroy", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -284,10 +413,18 @@ describe("CounterCacheTest", () => {
   });
   it("update counter caches on create", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -300,7 +437,11 @@ describe("CounterCacheTest", () => {
   it.skip("reset counter", () => {});
   it("update counter with positive value", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test" });
     await Topic.incrementCounter("replies_count", t.id, 5);
@@ -309,7 +450,11 @@ describe("CounterCacheTest", () => {
   });
   it("update counter with negative value", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 10 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 10 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test", replies_count: 10 });
     await Topic.decrementCounter("replies_count", t.id, 3);
@@ -318,7 +463,12 @@ describe("CounterCacheTest", () => {
   });
   it("update counter with multiple counters", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.attribute("views_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("views_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test" });
     await Topic.updateCounters(t.id, { replies_count: 2, views_count: 5 });
@@ -329,10 +479,18 @@ describe("CounterCacheTest", () => {
   it.skip("reset counter with custom column name", () => {});
   it("counter cache columns are updated in memory after create", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -344,10 +502,18 @@ describe("CounterCacheTest", () => {
   });
   it("counter cache columns are updated in memory after destroy", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -368,10 +534,18 @@ describe("CounterCacheTest", () => {
   it.skip("counter cache with belongs to association with class name", () => {});
   it("counter cache with belongs to association", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -390,10 +564,18 @@ describe("CounterCacheTest", () => {
   it.skip("reset counters with touch option touches the counter cache association", () => {});
   it("counter gets decremented when associated record is destroyed", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -411,7 +593,11 @@ describe("CounterCacheTest", () => {
   it.skip("counter cache of parent should be updated when a child is built and saved", () => {});
   it("counter cache should be incremented by one after creating record", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test" });
     await Topic.incrementCounter("replies_count", t.id);
@@ -420,7 +606,11 @@ describe("CounterCacheTest", () => {
   });
   it("counter cache should be decremented by one after destroying record", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 5 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 5 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test", replies_count: 5 });
     await Topic.decrementCounter("replies_count", t.id);
@@ -436,7 +626,11 @@ describe("CounterCacheTest", () => {
   it.skip("counter cache should be correct when concurrent inserts happen", () => {});
   it("increment counter by specific amount", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test" });
     await Topic.incrementCounter("replies_count", t.id, 10);
@@ -445,7 +639,13 @@ describe("CounterCacheTest", () => {
   });
   it("increment counter for cpk model", async () => {
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 0 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("items_count", "integer", { default: 0 });
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
     await CpkOrder.incrementCounter("items_count", [1, 1]);
@@ -454,11 +654,23 @@ describe("CounterCacheTest", () => {
   });
   it("increment counter for multiple cpk model records", async () => {
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 0 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("items_count", "integer", { default: 0 });
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     const o1 = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
     const o2 = await CpkOrder.create({ shop_id: 1, id: 2, items_count: 0 });
-    await CpkOrder.updateCounters([[1, 1], [1, 2]], { items_count: 5 });
+    await CpkOrder.updateCounters(
+      [
+        [1, 1],
+        [1, 2],
+      ],
+      { items_count: 5 },
+    );
     const r1 = await CpkOrder.find([1, 1]);
     const r2 = await CpkOrder.find([1, 2]);
     expect(r1.readAttribute("items_count")).toBe(5);
@@ -466,7 +678,13 @@ describe("CounterCacheTest", () => {
   });
   it("decrement counter for cpk model", async () => {
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 10 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("items_count", "integer", { default: 10 });
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
     await CpkOrder.decrementCounter("items_count", [1, 1]);
@@ -484,7 +702,11 @@ describe("CounterCacheTest", () => {
   it.skip("reset counters for cpk model", () => {});
   it("update counter for decrement", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 10 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 10 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test", replies_count: 10 });
     await Topic.decrementCounter("replies_count", t.id);
@@ -493,7 +715,11 @@ describe("CounterCacheTest", () => {
   });
   it("update counters of multiple records", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t1 = await Topic.create({ title: "one" });
     const t2 = await Topic.create({ title: "two" });
@@ -505,7 +731,12 @@ describe("CounterCacheTest", () => {
   });
   it("update multiple counters", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.attribute("views_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("views_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "test" });
     await Topic.updateCounters(t.id, { replies_count: 1, views_count: 10 });
@@ -515,7 +746,13 @@ describe("CounterCacheTest", () => {
   });
   it("update counter for decrement for cpk model", async () => {
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("items_count", "integer", { default: 10 }); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("items_count", "integer", { default: 10 });
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
     await CpkOrder.updateCounters([1, 1], { items_count: -3 });
@@ -548,7 +785,6 @@ describe("CounterCacheTest", () => {
   it.skip("decrement counters with touch: %i( updated_at written_on )", () => {});
   it.skip("counter_cache_column?", () => {});
 });
-
 
 describe("counter_cache", () => {
   let adapter: DatabaseAdapter;
@@ -620,7 +856,6 @@ describe("counter_cache", () => {
   });
 });
 
-
 describe("Counter Cache (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
@@ -631,12 +866,24 @@ describe("Counter Cache (Rails-guided)", () => {
   // Rails: test "increment counter cache on create"
   it("increment counter", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     registerModel(Topic);
 
     class Reply extends Base {
-      static { this._tableName = "replies"; this.attribute("id", "integer"); this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "replies";
+        this.attribute("id", "integer");
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Reply);
@@ -652,12 +899,22 @@ describe("Counter Cache (Rails-guided)", () => {
   // Rails: test "decrement counter cache on destroy"
   it("decrements the counter cache on destroy", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     registerModel(Topic);
 
     class Reply extends Base {
-      static { this._tableName = "replies"; this.attribute("id", "integer"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "replies";
+        this.attribute("id", "integer");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Reply);
@@ -675,12 +932,22 @@ describe("Counter Cache (Rails-guided)", () => {
   // Rails: test "custom counter cache column"
   it("supports a custom counter column name", async () => {
     class Topic extends Base {
-      static { this._tableName = "topics"; this.attribute("id", "integer"); this.attribute("num_replies", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("num_replies", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     registerModel(Topic);
 
     class Reply extends Base {
-      static { this._tableName = "replies"; this.attribute("id", "integer"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "replies";
+        this.attribute("id", "integer");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: "num_replies" });
     registerModel(Reply);

@@ -82,7 +82,9 @@ describe("ActionDispatch::ContentSecurityPolicy", () => {
   it("multiple sources", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("'self'", "https://cdn.example.com", "https://api.example.com");
-    expect(policy.build()).toBe("default-src 'self' https://cdn.example.com https://api.example.com");
+    expect(policy.build()).toBe(
+      "default-src 'self' https://cdn.example.com https://api.example.com",
+    );
   });
 
   it("multiple directives", () => {

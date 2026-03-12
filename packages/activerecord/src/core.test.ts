@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,17 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("CoreTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Topic };
   }
@@ -185,7 +231,9 @@ describe("CoreTest", () => {
 describe("frozen / isFrozen", () => {
   it("is not frozen by default", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -196,7 +244,9 @@ describe("frozen / isFrozen", () => {
 
   it("is frozen after destroy", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -208,7 +258,9 @@ describe("frozen / isFrozen", () => {
 
   it("is frozen after delete", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -220,7 +272,9 @@ describe("frozen / isFrozen", () => {
 
   it("prevents modification of frozen record", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -232,7 +286,9 @@ describe("frozen / isFrozen", () => {
 
   it("can be manually frozen", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -304,7 +360,10 @@ describe("Base.logger", () => {
   it("defaults to null", () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     expect(User.logger).toBe(null);
   });
@@ -312,7 +371,10 @@ describe("Base.logger", () => {
   it("can set and get a logger", () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     const myLogger = { debug: () => {}, info: () => {} };
     User.logger = myLogger;
@@ -324,7 +386,9 @@ describe("Base.logger", () => {
 describe("Base.new()", () => {
   it("creates an unsaved record instance", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -338,7 +402,9 @@ describe("Base.new()", () => {
 describe("toKey()", () => {
   it("returns [id] for persisted records", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -349,7 +415,9 @@ describe("toKey()", () => {
 
   it("returns null for new records", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.adapter = adapter;
 
@@ -360,22 +428,38 @@ describe("toKey()", () => {
 
 describe("Base features (Rails-guided) - core", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("toParam returns id as string", async () => {
-    class User extends Base { static { this.attribute("name", "string"); this.adapter = adapter; } }
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
     const u = await User.create({ name: "Dean" });
     expect(u.toParam()).toBe("1");
   });
 
   it("toParam returns null for new record", () => {
-    class User extends Base { static { this.attribute("name", "string"); } }
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
     const u = new User({ name: "Dean" });
     expect(u.toParam()).toBeNull();
   });
 
   it("inspect returns human-readable string", async () => {
-    class User extends Base { static { this.attribute("name", "string"); this.adapter = adapter; } }
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
     const u = await User.create({ name: "Alice" });
     const str = u.inspect();
     expect(str).toContain("#<User");
@@ -384,7 +468,11 @@ describe("Base features (Rails-guided) - core", () => {
 
   it("slice returns subset of attributes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });
     const sliced = u.slice("name", "email");
@@ -394,14 +482,22 @@ describe("Base features (Rails-guided) - core", () => {
 
   it("valuesAt returns attribute values as array", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });
     expect(u.valuesAt("name", "email")).toEqual(["Alice", "a@b.com"]);
   });
 
   it("adapter throws when not configured", () => {
-    class NoAdapter extends Base { static { this.attribute("name", "string"); } }
+    class NoAdapter extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
     expect(() => NoAdapter.adapter).toThrow("No adapter configured");
   });
 
@@ -421,7 +517,11 @@ describe("Base features (Rails-guided) - core", () => {
   });
 
   it("custom table name", () => {
-    class User extends Base { static { this.tableName = "people"; } }
+    class User extends Base {
+      static {
+        this.tableName = "people";
+      }
+    }
     expect(User.tableName).toBe("people");
   });
 });
@@ -429,14 +529,18 @@ describe("Base features (Rails-guided) - core", () => {
 describe("table_name_prefix and table_name_suffix", () => {
   it("table name guesses with prefixes and suffixes", () => {
     class User extends Base {
-      static { this.tableNamePrefix = "app_"; }
+      static {
+        this.tableNamePrefix = "app_";
+      }
     }
     expect(User.tableName).toBe("app_users");
   });
 
   it("applies suffix to inferred table name", () => {
     class User extends Base {
-      static { this.tableNameSuffix = "_v2"; }
+      static {
+        this.tableNameSuffix = "_v2";
+      }
     }
     expect(User.tableName).toBe("users_v2");
   });
@@ -475,21 +579,27 @@ describe("Base (extended)", () => {
 
     it("allows explicit table name override", () => {
       class User extends Base {
-        static { this.tableName = "legacy_users"; }
+        static {
+          this.tableName = "legacy_users";
+        }
       }
       expect(User.tableName).toBe("legacy_users");
     });
 
     it("supports tableNamePrefix", () => {
       class Widget extends Base {
-        static { this._tableNamePrefix = "app_"; }
+        static {
+          this._tableNamePrefix = "app_";
+        }
       }
       expect(Widget.tableName).toBe("app_widgets");
     });
 
     it("supports tableNameSuffix", () => {
       class Widget extends Base {
-        static { this._tableNameSuffix = "_v2"; }
+        static {
+          this._tableNameSuffix = "_v2";
+        }
       }
       expect(Widget.tableName).toBe("widgets_v2");
     });
@@ -530,14 +640,18 @@ describe("Base (extended)", () => {
 
     it("can be overridden to a custom key", () => {
       class Post extends Base {
-        static { this.primaryKey = "post_id"; }
+        static {
+          this.primaryKey = "post_id";
+        }
       }
       expect(Post.primaryKey).toBe("post_id");
     });
 
     it("subclass inherits parent primary key", () => {
       class Animal extends Base {
-        static { this.primaryKey = "uuid"; }
+        static {
+          this.primaryKey = "uuid";
+        }
       }
       class Dog extends Animal {}
       expect(Dog.primaryKey).toBe("uuid");
@@ -552,14 +666,18 @@ describe("Base (extended)", () => {
 
     it("can be set to true", () => {
       class ApplicationRecord extends Base {
-        static { this.abstractClass = true; }
+        static {
+          this.abstractClass = true;
+        }
       }
       expect(ApplicationRecord.abstractClass).toBe(true);
     });
 
     it("does not inherit to subclass", () => {
       class ApplicationRecord extends Base {
-        static { this.abstractClass = true; }
+        static {
+          this.abstractClass = true;
+        }
       }
       class User extends ApplicationRecord {}
       expect(User.abstractClass).toBe(false);
@@ -588,7 +706,9 @@ describe("Base (extended)", () => {
   describe("columnsHash", () => {
     it("returns column definitions keyed by name", () => {
       class Post extends Base {
-        static { this.attribute("title", "string"); }
+        static {
+          this.attribute("title", "string");
+        }
       }
       const hash = Post.columnsHash();
       expect(hash.title).toBeDefined();
@@ -631,7 +751,9 @@ describe("Base (extended)", () => {
   describe("hasAttributeDefinition", () => {
     it("returns true for defined attributes", () => {
       class Post extends Base {
-        static { this.attribute("title", "string"); }
+        static {
+          this.attribute("title", "string");
+        }
       }
       expect(Post.hasAttributeDefinition("title")).toBe(true);
     });
@@ -652,7 +774,9 @@ describe("Base (extended)", () => {
   describe("inheritance", () => {
     it("subclass inherits attributes from parent", () => {
       class Animal extends Base {
-        static { this.attribute("name", "string"); }
+        static {
+          this.attribute("name", "string");
+        }
       }
       class Dog extends Animal {}
       expect(Dog.columnNames()).toContain("name");
@@ -682,7 +806,9 @@ describe("Base (extended)", () => {
 
     it("can be disabled", () => {
       class Post extends Base {
-        static { this.recordTimestamps = false; }
+        static {
+          this.recordTimestamps = false;
+        }
       }
       expect(Post.recordTimestamps).toBe(false);
     });
@@ -696,7 +822,9 @@ describe("Base (extended)", () => {
 
     it("can be set", () => {
       class Post extends Base {
-        static { this.ignoredColumns = ["legacy_col"]; }
+        static {
+          this.ignoredColumns = ["legacy_col"];
+        }
       }
       expect(Post.ignoredColumns).toEqual(["legacy_col"]);
     });
@@ -722,7 +850,9 @@ describe("Base (extended)", () => {
   describe("new (static)", () => {
     it("instantiates a new unsaved record", () => {
       class User extends Base {
-        static { this.attribute("name", "string"); }
+        static {
+          this.attribute("name", "string");
+        }
       }
       const u = User.new({ name: "Alice" });
       expect(u.isNewRecord()).toBe(true);

@@ -59,7 +59,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
 
 function freshAdapter(): DatabaseAdapter {
@@ -74,11 +79,16 @@ describe("BelongsToAssociations", () => {
   let adapter: DatabaseAdapter;
 
   class Company extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   class Account extends Base {
-    static { this.attribute("company_id", "integer"); this.attribute("credit_limit", "integer"); }
+    static {
+      this.attribute("company_id", "integer");
+      this.attribute("credit_limit", "integer");
+    }
   }
 
   beforeEach(() => {
@@ -101,10 +111,17 @@ describe("BelongsToAssociations", () => {
   // Rails: test_belongs_to_with_primary_key
   it("test_belongs_to_with_primary_key", async () => {
     class Firm extends Base {
-      static { this.attribute("name", "string"); this.attribute("uuid", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("uuid", "string");
+        this.adapter = adapter;
+      }
     }
     class Client extends Base {
-      static { this.attribute("firm_uuid", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_uuid", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Firm);
     registerModel(Client);
@@ -136,7 +153,10 @@ describe("BelongsToAssociations", () => {
   // Rails: test_belongs_to_with_custom_foreign_key
   it("test_belongs_to_with_custom_foreign_key", async () => {
     class Sponsor extends Base {
-      static { this.attribute("sponsor_club_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("sponsor_club_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Sponsor);
     const company = await Company.create({ name: "Club" });
@@ -151,7 +171,10 @@ describe("BelongsToAssociations", () => {
   // Rails: test_polymorphic_belongs_to
   it("test_polymorphic_belongs_to", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class Comment extends Base {
       static {
@@ -192,7 +215,9 @@ describe("BelongsToAssociations", () => {
   // Rails: test_belongs_to_counter_cache (definition only)
   it("test_belongs_to_registers_counter_cache_option", () => {
     class Reply extends Base {
-      static { this.attribute("topic_id", "integer"); }
+      static {
+        this.attribute("topic_id", "integer");
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     const assoc = (Reply as any)._associations.find((a: any) => a.name === "topic");
@@ -202,7 +227,9 @@ describe("BelongsToAssociations", () => {
   // Rails: test_belongs_to_touch_option
   it("test_belongs_to_registers_touch_option", () => {
     class Reply extends Base {
-      static { this.attribute("topic_id", "integer"); }
+      static {
+        this.attribute("topic_id", "integer");
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { touch: true });
     const assoc = (Reply as any)._associations.find((a: any) => a.name === "topic");
@@ -212,7 +239,9 @@ describe("BelongsToAssociations", () => {
   // Rails: test_belongs_to_required_validates_foreign_key
   it("test_belongs_to_required_validates_foreign_key", () => {
     class Subscriber extends Base {
-      static { this.attribute("company_id", "integer"); }
+      static {
+        this.attribute("company_id", "integer");
+      }
     }
     Associations.belongsTo.call(Subscriber, "company", { required: true });
     const assoc = (Subscriber as any)._associations.find((a: any) => a.name === "company");
@@ -222,7 +251,9 @@ describe("BelongsToAssociations", () => {
   // Rails: test_optional_false_is_same_as_required
   it("test_optional_false_is_same_as_required", () => {
     class Subscriber extends Base {
-      static { this.attribute("company_id", "integer"); }
+      static {
+        this.attribute("company_id", "integer");
+      }
     }
     Associations.belongsTo.call(Subscriber, "company", { optional: false });
     const assoc = (Subscriber as any)._associations.find((a: any) => a.name === "company");
@@ -232,10 +263,16 @@ describe("BelongsToAssociations", () => {
   // Rails: test_belongs_to_inverse_of caching
   it("test_belongs_to_with_inverse_of_caches_parent", async () => {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Book extends Base {
-      static { this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Author);
     registerModel(Book);
@@ -259,11 +296,16 @@ describe("HasOneAssociations", () => {
   let adapter: DatabaseAdapter;
 
   class Firm extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   class AccountDetail extends Base {
-    static { this.attribute("firm_id", "integer"); this.attribute("credit_limit", "integer"); }
+    static {
+      this.attribute("firm_id", "integer");
+      this.attribute("credit_limit", "integer");
+    }
   }
 
   beforeEach(() => {
@@ -293,7 +335,11 @@ describe("HasOneAssociations", () => {
   // Rails: test_has_one_with_custom_foreign_key
   it("test_has_one_with_custom_foreign_key", async () => {
     class Profile extends Base {
-      static { this.attribute("owner_id", "integer"); this.attribute("bio", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("owner_id", "integer");
+        this.attribute("bio", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Profile);
     const firm = await Firm.create({ name: "Corp" });
@@ -325,7 +371,10 @@ describe("HasOneAssociations", () => {
   // Rails: test_has_one_inverse_of
   it("test_has_one_with_inverse_of_caches_owner", async () => {
     class Profile extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Profile);
     const firm = await Firm.create({ name: "Corp" });
@@ -355,11 +404,16 @@ describe("HasManyAssociations", () => {
   let adapter: DatabaseAdapter;
 
   class Author extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   class Post extends Base {
-    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); }
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_id", "integer");
+    }
   }
 
   beforeEach(() => {
@@ -389,7 +443,11 @@ describe("HasManyAssociations", () => {
   // Rails: test_has_many_with_custom_foreign_key
   it("test_has_many_with_custom_foreign_key", async () => {
     class Article extends Base {
-      static { this.attribute("writer_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("writer_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Article);
     const author = await Author.create({ name: "Writer" });
@@ -401,12 +459,19 @@ describe("HasManyAssociations", () => {
   // Rails: test_has_many_with_custom_class_name
   it("test_has_many_with_custom_class_name", async () => {
     class BlogEntry extends Base {
-      static { this.attribute("author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(BlogEntry);
     const author = await Author.create({ name: "Writer" });
     await BlogEntry.create({ title: "B1", author_id: author.id });
-    const entries = await loadHasMany(author, "writings", { className: "BlogEntry", foreignKey: "author_id" });
+    const entries = await loadHasMany(author, "writings", {
+      className: "BlogEntry",
+      foreignKey: "author_id",
+    });
     expect(entries).toHaveLength(1);
   });
 
@@ -478,15 +543,22 @@ describe("HasManyThroughAssociations", () => {
   let adapter: DatabaseAdapter;
 
   class Doctor extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   class Appointment extends Base {
-    static { this.attribute("doctor_id", "integer"); this.attribute("patient_id", "integer"); }
+    static {
+      this.attribute("doctor_id", "integer");
+      this.attribute("patient_id", "integer");
+    }
   }
 
   class Patient extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   beforeEach(() => {
@@ -500,7 +572,11 @@ describe("HasManyThroughAssociations", () => {
 
     (Doctor as any)._associations = [
       { type: "hasMany", name: "appointments", options: { className: "Appointment" } },
-      { type: "hasMany", name: "patients", options: { through: "appointments", className: "Patient", source: "patient" } },
+      {
+        type: "hasMany",
+        name: "patients",
+        options: { through: "appointments", className: "Patient", source: "patient" },
+      },
     ];
   });
 
@@ -513,7 +589,9 @@ describe("HasManyThroughAssociations", () => {
     await Appointment.create({ doctor_id: doc.id, patient_id: p2.id });
 
     const patients = await loadHasManyThrough(doc, "patients", {
-      through: "appointments", className: "Patient", source: "patient",
+      through: "appointments",
+      className: "Patient",
+      source: "patient",
     });
     expect(patients).toHaveLength(2);
   });
@@ -522,7 +600,9 @@ describe("HasManyThroughAssociations", () => {
   it("test_has_many_through_with_no_records", async () => {
     const doc = await Doctor.create({ name: "Dr. Empty" });
     const patients = await loadHasManyThrough(doc, "patients", {
-      through: "appointments", className: "Patient", source: "patient",
+      through: "appointments",
+      className: "Patient",
+      source: "patient",
     });
     expect(patients).toEqual([]);
   });
@@ -530,14 +610,17 @@ describe("HasManyThroughAssociations", () => {
   // Rails: test_has_many_through_missing_through_association
   it("test_has_many_through_raises_when_through_association_missing", async () => {
     class Orphan extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (Orphan as any)._associations = [];
     registerModel(Orphan);
 
     const orphan = await Orphan.create({ name: "Lost" });
     await expect(
-      loadHasManyThrough(orphan, "things", { through: "nonexistent", className: "Patient" })
+      loadHasManyThrough(orphan, "things", { through: "nonexistent", className: "Patient" }),
     ).rejects.toThrow('Through association "nonexistent" not found');
   });
 
@@ -551,7 +634,9 @@ describe("HasManyThroughAssociations", () => {
     await Appointment.create({ doctor_id: doc2.id, patient_id: p2.id });
 
     const patients1 = await loadHasManyThrough(doc1, "patients", {
-      through: "appointments", className: "Patient", source: "patient",
+      through: "appointments",
+      className: "Patient",
+      source: "patient",
     });
     expect(patients1).toHaveLength(1);
     expect(patients1[0].readAttribute("name")).toBe("Alice");
@@ -566,11 +651,16 @@ describe("CollectionProxy", () => {
   let adapter: DatabaseAdapter;
 
   class Team extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   class Player extends Base {
-    static { this.attribute("name", "string"); this.attribute("team_id", "integer"); }
+    static {
+      this.attribute("name", "string");
+      this.attribute("team_id", "integer");
+    }
   }
 
   beforeEach(() => {
@@ -755,13 +845,24 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_destroy
   it("test_dependent_destroy_has_many", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Post as any)._associations = [
-      { type: "hasMany", name: "comments", options: { dependent: "destroy", className: "Comment", foreignKey: "post_id" } },
+      {
+        type: "hasMany",
+        name: "comments",
+        options: { dependent: "destroy", className: "Comment", foreignKey: "post_id" },
+      },
     ];
     registerModel(Post);
     registerModel(Comment);
@@ -777,13 +878,24 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_delete_all
   it("test_dependent_delete_has_many", async () => {
     class Tag extends Base {
-      static { this.attribute("name", "string"); this.attribute("item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (Item as any)._associations = [
-      { type: "hasMany", name: "tags", options: { dependent: "delete", className: "Tag", foreignKey: "item_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { dependent: "delete", className: "Tag", foreignKey: "item_id" },
+      },
     ];
     registerModel(Item);
     registerModel(Tag);
@@ -797,13 +909,24 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_nullify
   it("test_dependent_nullify_has_many", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Post as any)._associations = [
-      { type: "hasMany", name: "comments", options: { dependent: "nullify", className: "Comment", foreignKey: "post_id" } },
+      {
+        type: "hasMany",
+        name: "comments",
+        options: { dependent: "nullify", className: "Comment", foreignKey: "post_id" },
+      },
     ];
     registerModel(Post);
     registerModel(Comment);
@@ -819,13 +942,28 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_restrict_with_exception
   it("test_dependent_restrict_with_exception_has_many", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Post as any)._associations = [
-      { type: "hasMany", name: "comments", options: { dependent: "restrictWithException", className: "Comment", foreignKey: "post_id" } },
+      {
+        type: "hasMany",
+        name: "comments",
+        options: {
+          dependent: "restrictWithException",
+          className: "Comment",
+          foreignKey: "post_id",
+        },
+      },
     ];
     registerModel(Post);
     registerModel(Comment);
@@ -838,13 +976,28 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_restrict_with_exception_no_children
   it("test_dependent_restrict_with_exception_passes_with_no_children", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Post as any)._associations = [
-      { type: "hasMany", name: "comments", options: { dependent: "restrictWithException", className: "Comment", foreignKey: "post_id" } },
+      {
+        type: "hasMany",
+        name: "comments",
+        options: {
+          dependent: "restrictWithException",
+          className: "Comment",
+          foreignKey: "post_id",
+        },
+      },
     ];
     registerModel(Post);
     registerModel(Comment);
@@ -856,13 +1009,24 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_destroy_has_one
   it("test_dependent_destroy_has_one", async () => {
     class Profile extends Base {
-      static { this.attribute("user_id", "integer"); this.attribute("bio", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("user_id", "integer");
+        this.attribute("bio", "string");
+        this.adapter = adapter;
+      }
     }
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (User as any)._associations = [
-      { type: "hasOne", name: "profile", options: { dependent: "destroy", className: "Profile", foreignKey: "user_id" } },
+      {
+        type: "hasOne",
+        name: "profile",
+        options: { dependent: "destroy", className: "Profile", foreignKey: "user_id" },
+      },
     ];
     registerModel(User);
     registerModel(Profile);
@@ -876,13 +1040,24 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_nullify_has_one
   it("test_dependent_nullify_has_one", async () => {
     class Profile extends Base {
-      static { this.attribute("user_id", "integer"); this.attribute("bio", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("user_id", "integer");
+        this.attribute("bio", "string");
+        this.adapter = adapter;
+      }
     }
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (User as any)._associations = [
-      { type: "hasOne", name: "profile", options: { dependent: "nullify", className: "Profile", foreignKey: "user_id" } },
+      {
+        type: "hasOne",
+        name: "profile",
+        options: { dependent: "nullify", className: "Profile", foreignKey: "user_id" },
+      },
     ];
     registerModel(User);
     registerModel(Profile);
@@ -897,13 +1072,27 @@ describe("DependentAssociations", () => {
   // Rails: test_dependent_restrict_has_one
   it("test_dependent_restrict_with_exception_has_one", async () => {
     class Profile extends Base {
-      static { this.attribute("user_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("user_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (User as any)._associations = [
-      { type: "hasOne", name: "profile", options: { dependent: "restrictWithException", className: "Profile", foreignKey: "user_id" } },
+      {
+        type: "hasOne",
+        name: "profile",
+        options: {
+          dependent: "restrictWithException",
+          className: "Profile",
+          foreignKey: "user_id",
+        },
+      },
     ];
     registerModel(User);
     registerModel(Profile);
@@ -916,7 +1105,10 @@ describe("DependentAssociations", () => {
   // Rails: test_no_dependent_option_skips
   it("test_no_dependent_option_skips_processing", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Post as any)._associations = [
       { type: "hasMany", name: "comments", options: { className: "Comment" } },
@@ -936,15 +1128,23 @@ describe("StrictLoading", () => {
   let adapter: DatabaseAdapter;
 
   class Author extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
 
   class Book extends Base {
-    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); }
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_id", "integer");
+    }
   }
 
   class Profile extends Base {
-    static { this.attribute("bio", "string"); this.attribute("author_id", "integer"); }
+    static {
+      this.attribute("bio", "string");
+      this.attribute("author_id", "integer");
+    }
   }
 
   beforeEach(() => {
@@ -1015,7 +1215,9 @@ describe("AssociationDefinitions", () => {
   // Rails: test_belongs_to_macro_is_stored
   it("test_belongsTo_stores_definition", () => {
     class Post extends Base {
-      static { this.attribute("author_id", "integer"); }
+      static {
+        this.attribute("author_id", "integer");
+      }
     }
     Associations.belongsTo.call(Post, "author", {});
     const defs = (Post as any)._associations;
@@ -1027,7 +1229,11 @@ describe("AssociationDefinitions", () => {
     class User extends Base {}
     Associations.hasOne.call(User, "profile", { dependent: "destroy" });
     const defs = (User as any)._associations;
-    expect(defs).toContainEqual({ type: "hasOne", name: "profile", options: { dependent: "destroy" } });
+    expect(defs).toContainEqual({
+      type: "hasOne",
+      name: "profile",
+      options: { dependent: "destroy" },
+    });
   });
 
   // Rails: test_has_many_macro_is_stored
@@ -1035,7 +1241,11 @@ describe("AssociationDefinitions", () => {
     class Author extends Base {}
     Associations.hasMany.call(Author, "books", { foreignKey: "writer_id" });
     const defs = (Author as any)._associations;
-    expect(defs).toContainEqual({ type: "hasMany", name: "books", options: { foreignKey: "writer_id" } });
+    expect(defs).toContainEqual({
+      type: "hasMany",
+      name: "books",
+      options: { foreignKey: "writer_id" },
+    });
   });
 
   // Rails: test_habtm_macro_is_stored
@@ -1043,7 +1253,11 @@ describe("AssociationDefinitions", () => {
     class Developer extends Base {}
     Associations.hasAndBelongsToMany.call(Developer, "projects", { joinTable: "dev_proj" });
     const defs = (Developer as any)._associations;
-    expect(defs).toContainEqual({ type: "hasAndBelongsToMany", name: "projects", options: { joinTable: "dev_proj" } });
+    expect(defs).toContainEqual({
+      type: "hasAndBelongsToMany",
+      name: "projects",
+      options: { joinTable: "dev_proj" },
+    });
   });
 
   // Rails: test_associations_are_inherited_but_independent
@@ -1076,7 +1290,10 @@ describe("AssociationReflection", () => {
   // Rails: test_reflect_on_association
   it("test_reflect_on_association", () => {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "books", {});
     Associations.belongsTo.call(Author, "publisher", {});
@@ -1090,7 +1307,9 @@ describe("AssociationReflection", () => {
   // Rails: test_reflect_on_association_not_found
   it("test_reflect_on_association_returns_null_for_missing", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     (Author as any)._associations = [];
     const reflection = reflectOnAssociation(Author, "nonexistent");
@@ -1100,7 +1319,9 @@ describe("AssociationReflection", () => {
   // Rails: test_reflect_on_all_associations
   it("test_reflect_on_all_associations", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "books", {});
     Associations.belongsTo.call(Author, "publisher", {});
@@ -1113,7 +1334,9 @@ describe("AssociationReflection", () => {
   // Rails: test_reflect_on_all_associations_with_macro_filter
   it("test_reflect_on_all_associations_filtered_by_macro", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "books", {});
     Associations.belongsTo.call(Author, "publisher", {});
@@ -1131,7 +1354,9 @@ describe("AssociationReflection", () => {
   // Rails: test_association_reflection_foreign_key
   it("test_reflection_derives_foreign_key", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "books", {});
     const reflection = reflectOnAssociation(Author, "books");
@@ -1141,7 +1366,9 @@ describe("AssociationReflection", () => {
   // Rails: test_belongs_to_reflection_foreign_key
   it("test_belongs_to_reflection_derives_foreign_key", () => {
     class Book extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Book, "author", {});
     const reflection = reflectOnAssociation(Book, "author");
@@ -1151,7 +1378,9 @@ describe("AssociationReflection", () => {
   // Rails: test_reflection_class_name
   it("test_reflection_derives_class_name", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "books", {});
     const reflection = reflectOnAssociation(Author, "books");
@@ -1161,7 +1390,9 @@ describe("AssociationReflection", () => {
   // Rails: test_reflection_custom_class_name
   it("test_reflection_uses_custom_class_name", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "writings", { className: "Article" });
     const reflection = reflectOnAssociation(Author, "writings");
@@ -1171,7 +1402,9 @@ describe("AssociationReflection", () => {
   // Rails: test_reflection_is_belongs_to / is_has_many etc.
   it("test_reflection_type_predicates", () => {
     class Author extends Base {
-      static { this.adapter = adapter; }
+      static {
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Author, "publisher", {});
     Associations.hasMany.call(Author, "books", {});
@@ -1204,17 +1437,23 @@ describe("HasAndBelongsToManyAssociations", () => {
   // Rails: test_habtm
   it("test_habtm_loads_through_join_table", async () => {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Project extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Developer);
     registerModel(Project);
 
     // Create the join table
     await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
     const dev = await Developer.create({ name: "David" });
@@ -1222,10 +1461,10 @@ describe("HasAndBelongsToManyAssociations", () => {
     const p2 = await Project.create({ name: "Basecamp" });
 
     await adapter.executeMutation(
-      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`
+      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
     );
     await adapter.executeMutation(
-      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`
+      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
     );
 
     const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
@@ -1235,13 +1474,16 @@ describe("HasAndBelongsToManyAssociations", () => {
   // Rails: test_habtm_empty
   it("test_habtm_returns_empty_when_no_join_rows", async () => {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Developer);
 
     // Create the join table
     await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
     const dev = await Developer.create({ name: "Solo" });
@@ -1252,7 +1494,10 @@ describe("HasAndBelongsToManyAssociations", () => {
   // Rails: test_habtm_unsaved_record
   it("test_habtm_returns_empty_for_unsaved_record", async () => {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Developer);
 
@@ -1264,7 +1509,10 @@ describe("HasAndBelongsToManyAssociations", () => {
   // Rails: test_habtm_preloaded_cache
   it("test_habtm_uses_preloaded_cache", async () => {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Developer);
 
@@ -1290,10 +1538,18 @@ describe("CounterCache", () => {
   // Rails: test_update_counter_cache_on_create
   it("test_update_counter_caches_increment", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -1310,10 +1566,18 @@ describe("CounterCache", () => {
   // Rails: test_update_counter_cache_on_destroy
   it("test_update_counter_caches_decrement", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("content", "string"); this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -1331,10 +1595,18 @@ describe("CounterCache", () => {
   // Rails: test_counter_cache_with_custom_column_name
   it("test_counter_cache_with_custom_column_name", async () => {
     class Category extends Base {
-      static { this.attribute("name", "string"); this.attribute("num_products", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("num_products", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Product extends Base {
-      static { this.attribute("name", "string"); this.attribute("category_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Product, "category", { counterCache: "num_products" });
     registerModel(Category);
@@ -1351,10 +1623,16 @@ describe("CounterCache", () => {
   // Rails: test_counter_cache_null_fk_skips
   it("test_counter_cache_skips_when_fk_is_null", async () => {
     class Topic extends Base {
-      static { this.attribute("replies_count", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
     class Reply extends Base {
-      static { this.attribute("topic_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
     registerModel(Topic);
@@ -1415,10 +1693,17 @@ describe("TouchBelongsToParents", () => {
   // Rails: test_touch_skips_when_fk_is_null
   it("test_touch_skips_when_fk_is_null", async () => {
     class Owner extends Base {
-      static { this.attribute("name", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     class Pet extends Base {
-      static { this.attribute("owner_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("owner_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Pet, "owner", { touch: true });
     registerModel(Owner);
@@ -1431,17 +1716,30 @@ describe("TouchBelongsToParents", () => {
 
 describe("Rails-guided: association features", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("dependent: destroy on has_many destroys all children", async () => {
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("article_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Article extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Article as any)._associations = [
-      { type: "hasMany", name: "comments", options: { dependent: "destroy", className: "Comment", foreignKey: "article_id" } },
+      {
+        type: "hasMany",
+        name: "comments",
+        options: { dependent: "destroy", className: "Comment", foreignKey: "article_id" },
+      },
     ];
     registerModel(Article);
     registerModel(Comment);
@@ -1456,13 +1754,24 @@ describe("Rails-guided: association features", () => {
 
   it("dependent: delete on has_many deletes all children without callbacks", async () => {
     class Tag extends Base {
-      static { this.attribute("name", "string"); this.attribute("category_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Category extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (Category as any)._associations = [
-      { type: "hasMany", name: "tags", options: { dependent: "delete", className: "Tag", foreignKey: "category_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { dependent: "delete", className: "Tag", foreignKey: "category_id" },
+      },
     ];
     registerModel(Category);
     registerModel(Tag);
@@ -1475,17 +1784,31 @@ describe("Rails-guided: association features", () => {
 
   it("has_many :through loads records via join model", async () => {
     class Skill extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Enrollment extends Base {
-      static { this.attribute("student_id", "integer"); this.attribute("skill_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("student_id", "integer");
+        this.attribute("skill_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Student extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (Student as any)._associations = [
       { type: "hasMany", name: "enrollments", options: { className: "Enrollment" } },
-      { type: "hasMany", name: "skills", options: { through: "enrollments", className: "Skill", source: "skill" } },
+      {
+        type: "hasMany",
+        name: "skills",
+        options: { through: "enrollments", className: "Skill", source: "skill" },
+      },
     ];
     registerModel(Student);
     registerModel(Enrollment);
@@ -1498,17 +1821,26 @@ describe("Rails-guided: association features", () => {
     await Enrollment.create({ student_id: student.id, skill_id: ts.id });
 
     const skills = await loadHasManyThrough(student, "skills", {
-      through: "enrollments", className: "Skill", source: "skill",
+      through: "enrollments",
+      className: "Skill",
+      source: "skill",
     });
     expect(skills).toHaveLength(2);
   });
 
   it("CollectionProxy build sets FK on new record", async () => {
     class Part extends Base {
-      static { this.attribute("name", "string"); this.attribute("machine_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("machine_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Machine extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (Machine as any)._associations = [
       { type: "hasMany", name: "parts", options: { className: "Part", foreignKey: "machine_id" } },
@@ -1525,13 +1857,24 @@ describe("Rails-guided: association features", () => {
 
   it("CollectionProxy create saves record with FK", async () => {
     class Entry extends Base {
-      static { this.attribute("content", "string"); this.attribute("journal_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("journal_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Journal extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (Journal as any)._associations = [
-      { type: "hasMany", name: "entries", options: { className: "Entry", foreignKey: "journal_id" } },
+      {
+        type: "hasMany",
+        name: "entries",
+        options: { className: "Entry", foreignKey: "journal_id" },
+      },
     ];
     registerModel(Journal);
     registerModel(Entry);
@@ -1545,10 +1888,17 @@ describe("Rails-guided: association features", () => {
 
   it("includes preloads hasMany and uses cache", async () => {
     class Song extends Base {
-      static { this.attribute("title", "string"); this.attribute("album_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("album_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Album extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (Album as any)._associations = [
       { type: "hasMany", name: "songs", options: { className: "Song", foreignKey: "album_id" } },
@@ -1564,7 +1914,10 @@ describe("Rails-guided: association features", () => {
     const cached = (albums[0] as any)._preloadedAssociations.get("songs");
     expect(cached).toHaveLength(2);
 
-    const songs = await loadHasMany(albums[0], "songs", { className: "Song", foreignKey: "album_id" });
+    const songs = await loadHasMany(albums[0], "songs", {
+      className: "Song",
+      foreignKey: "album_id",
+    });
     expect(songs).toHaveLength(2);
   });
 });
@@ -1573,12 +1926,24 @@ describe("AssociationsTest", () => {
   it("eager loading should not change count of children", async () => {
     const adapter = freshAdapter();
     class ELParent extends Base {
-      static { this._tableName = "el_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "el_parents";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class ELChild extends Base {
-      static { this._tableName = "el_children"; this.attribute("value", "string"); this.attribute("el_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "el_children";
+        this.attribute("value", "string");
+        this.attribute("el_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(ELParent, "elChildren", { foreignKey: "el_parent_id", className: "ELChild" });
+    Associations.hasMany.call(ELParent, "elChildren", {
+      foreignKey: "el_parent_id",
+      className: "ELChild",
+    });
     registerModel("ELParent", ELParent);
     registerModel("ELChild", ELChild);
     const parent = await ELParent.create({ name: "p1" });
@@ -1592,16 +1957,30 @@ describe("AssociationsTest", () => {
     const countAfter = (await ELChild.all().toArray()).length;
     expect(countAfter).toBe(countBefore);
   });
-  it.skip("subselect", () => { /* fixture-dependent */ });
+  it.skip("subselect", () => {
+    /* fixture-dependent */
+  });
   it("loading the association target should keep child records marked for destruction", async () => {
     const adapter = freshAdapter();
     class DPost extends Base {
-      static { this._tableName = "d_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "d_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class DComment extends Base {
-      static { this._tableName = "d_comments"; this.attribute("body", "string"); this.attribute("d_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "d_comments";
+        this.attribute("body", "string");
+        this.attribute("d_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(DPost, "dComments", { foreignKey: "d_post_id", className: "DComment" });
+    Associations.hasMany.call(DPost, "dComments", {
+      foreignKey: "d_post_id",
+      className: "DComment",
+    });
     registerModel("DPost", DPost);
     registerModel("DComment", DComment);
     const post = await DPost.create({ title: "test" });
@@ -1615,16 +1994,34 @@ describe("AssociationsTest", () => {
     // The original object is still marked
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
-  it.skip("loading the association target should load most recent attributes for child records marked for destruction", () => { /* fixture-dependent */ });
+  it.skip("loading the association target should load most recent attributes for child records marked for destruction", () => {
+    /* fixture-dependent */
+  });
   it("loading cpk association when persisted and in memory differ", async () => {
     const adapter = freshAdapter();
     class CpkOrder extends Base {
-      static { this._tableName = "cpk_orders"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("status", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkOrderItem extends Base {
-      static { this._tableName = "cpk_order_items"; this.attribute("cpk_order_shop_id", "integer"); this.attribute("cpk_order_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_order_items";
+        this.attribute("cpk_order_shop_id", "integer");
+        this.attribute("cpk_order_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CpkOrder, "cpkOrderItems", { foreignKey: ["cpk_order_shop_id", "cpk_order_id"], className: "CpkOrderItem" });
+    Associations.hasMany.call(CpkOrder, "cpkOrderItems", {
+      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
+      className: "CpkOrderItem",
+    });
     registerModel("CpkOrder", CpkOrder);
     registerModel("CpkOrderItem", CpkOrderItem);
     const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
@@ -1632,18 +2029,34 @@ describe("AssociationsTest", () => {
     // Change in memory but don't persist
     order.writeAttribute("status", "closed");
     // Loading association should still find items by persisted CPK
-    const items = await loadHasMany(order, "cpkOrderItems", { foreignKey: ["cpk_order_shop_id", "cpk_order_id"], className: "CpkOrderItem" });
+    const items = await loadHasMany(order, "cpkOrderItems", {
+      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
+      className: "CpkOrderItem",
+    });
     expect(items.length).toBe(1);
   });
   it("include with order works", async () => {
     const adapter = freshAdapter();
     class IOPost extends Base {
-      static { this._tableName = "io_posts"; this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "io_posts";
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adapter;
+      }
     }
     class IOComment extends Base {
-      static { this._tableName = "io_comments"; this.attribute("body", "string"); this.attribute("io_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "io_comments";
+        this.attribute("body", "string");
+        this.attribute("io_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(IOPost, "ioComments", { foreignKey: "io_post_id", className: "IOComment" });
+    Associations.hasMany.call(IOPost, "ioComments", {
+      foreignKey: "io_post_id",
+      className: "IOComment",
+    });
     registerModel("IOPost", IOPost);
     registerModel("IOComment", IOComment);
     await IOPost.create({ title: "B", score: 2 });
@@ -1656,12 +2069,24 @@ describe("AssociationsTest", () => {
   it("bad collection keys", async () => {
     const adapter = freshAdapter();
     class APost extends Base {
-      static { this._tableName = "a_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "a_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class AComment extends Base {
-      static { this._tableName = "a_comments"; this.attribute("body", "string"); this.attribute("a_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "a_comments";
+        this.attribute("body", "string");
+        this.attribute("a_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(APost, "aComments", { foreignKey: "a_post_id", className: "AComment" });
+    Associations.hasMany.call(APost, "aComments", {
+      foreignKey: "a_post_id",
+      className: "AComment",
+    });
     registerModel("APost", APost);
     registerModel("AComment", AComment);
     const post = await APost.create({ title: "test" });
@@ -1675,12 +2100,24 @@ describe("AssociationsTest", () => {
   it("should construct new finder sql after create", async () => {
     const adapter = freshAdapter();
     class BPost extends Base {
-      static { this._tableName = "b_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "b_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class BComment extends Base {
-      static { this._tableName = "b_comments"; this.attribute("body", "string"); this.attribute("b_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "b_comments";
+        this.attribute("body", "string");
+        this.attribute("b_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(BPost, "bComments", { foreignKey: "b_post_id", className: "BComment" });
+    Associations.hasMany.call(BPost, "bComments", {
+      foreignKey: "b_post_id",
+      className: "BComment",
+    });
     registerModel("BPost", BPost);
     registerModel("BComment", BComment);
     const post = await BPost.create({ title: "test" });
@@ -1697,12 +2134,24 @@ describe("AssociationsTest", () => {
   it("force reload", async () => {
     const adapter = freshAdapter();
     class CPost extends Base {
-      static { this._tableName = "c_posts"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "c_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class CComment extends Base {
-      static { this._tableName = "c_comments"; this.attribute("body", "string"); this.attribute("c_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "c_comments";
+        this.attribute("body", "string");
+        this.attribute("c_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CPost, "cComments", { foreignKey: "c_post_id", className: "CComment" });
+    Associations.hasMany.call(CPost, "cComments", {
+      foreignKey: "c_post_id",
+      className: "CComment",
+    });
     registerModel("CPost", CPost);
     registerModel("CComment", CComment);
     const post = await CPost.create({ title: "test" });
@@ -1715,23 +2164,48 @@ describe("AssociationsTest", () => {
     const reloaded = await proxy.toArray();
     expect(reloaded.length).toBe(1);
   });
-  it.skip("using limitable reflections helper", () => { /* fixture-dependent */ });
-  it.skip("association with references", () => { /* fixture-dependent */ });
-  it.skip("belongs to a model with composite foreign key finds associated record", () => { /* fixture-dependent */ });
+  it.skip("using limitable reflections helper", () => {
+    /* fixture-dependent */
+  });
+  it.skip("association with references", () => {
+    /* fixture-dependent */
+  });
+  it.skip("belongs to a model with composite foreign key finds associated record", () => {
+    /* fixture-dependent */
+  });
   it("belongs to a cpk model by id attribute", async () => {
     const adapter = freshAdapter();
     class CpkBook extends Base {
-      static { this._tableName = "cpk_books"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("title", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_books";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkChapter extends Base {
-      static { this._tableName = "cpk_chapters"; this.attribute("cpk_book_shop_id", "integer"); this.attribute("cpk_book_id", "integer"); this.attribute("number", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_chapters";
+        this.attribute("cpk_book_shop_id", "integer");
+        this.attribute("cpk_book_id", "integer");
+        this.attribute("number", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.belongsTo.call(CpkChapter, "cpkBook", { foreignKey: ["cpk_book_shop_id", "cpk_book_id"], className: "CpkBook" });
+    Associations.belongsTo.call(CpkChapter, "cpkBook", {
+      foreignKey: ["cpk_book_shop_id", "cpk_book_id"],
+      className: "CpkBook",
+    });
     registerModel("CpkBook", CpkBook);
     registerModel("CpkChapter", CpkChapter);
     const book = await CpkBook.create({ shop_id: 1, id: 10, title: "CPK Guide" });
     const chapter = await CpkChapter.create({ cpk_book_shop_id: 1, cpk_book_id: 10, number: 1 });
-    const loaded = await loadBelongsTo(chapter, "cpkBook", { foreignKey: ["cpk_book_shop_id", "cpk_book_id"], className: "CpkBook" });
+    const loaded = await loadBelongsTo(chapter, "cpkBook", {
+      foreignKey: ["cpk_book_shop_id", "cpk_book_id"],
+      className: "CpkBook",
+    });
     expect(loaded).not.toBeNull();
     expect(loaded!.readAttribute("title")).toBe("CPK Guide");
     expect(loaded!.id).toEqual([1, 10]);
@@ -1739,84 +2213,191 @@ describe("AssociationsTest", () => {
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
     const adapter = freshAdapter();
     class CpkAuthor extends Base {
-      static { this._tableName = "cpk_authors"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_authors";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkPost extends Base {
-      static { this._tableName = "cpk_posts"; this.attribute("cpk_author_region_id", "integer"); this.attribute("cpk_author_id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_posts";
+        this.attribute("cpk_author_region_id", "integer");
+        this.attribute("cpk_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.belongsTo.call(CpkPost, "cpkAuthor", { foreignKey: ["cpk_author_region_id", "cpk_author_id"], className: "CpkAuthor" });
+    Associations.belongsTo.call(CpkPost, "cpkAuthor", {
+      foreignKey: ["cpk_author_region_id", "cpk_author_id"],
+      className: "CpkAuthor",
+    });
     registerModel("CpkAuthor", CpkAuthor);
     registerModel("CpkPost", CpkPost);
     const author = await CpkAuthor.create({ region_id: 1, id: 5, name: "Alice" });
-    const post = await CpkPost.create({ cpk_author_region_id: 1, cpk_author_id: 5, title: "Hello" });
-    const loaded = await loadBelongsTo(post, "cpkAuthor", { foreignKey: ["cpk_author_region_id", "cpk_author_id"], className: "CpkAuthor" });
+    const post = await CpkPost.create({
+      cpk_author_region_id: 1,
+      cpk_author_id: 5,
+      title: "Hello",
+    });
+    const loaded = await loadBelongsTo(post, "cpkAuthor", {
+      foreignKey: ["cpk_author_region_id", "cpk_author_id"],
+      className: "CpkAuthor",
+    });
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toEqual([1, 5]);
   });
-  it.skip("querying by whole associated records using query constraints", () => { /* fixture-dependent */ });
-  it.skip("querying by single associated record works using query constraints", () => { /* fixture-dependent */ });
-  it.skip("querying by relation with composite key", () => { /* fixture-dependent */ });
-  it.skip("has many association with composite foreign key loads records", () => { /* fixture-dependent */ });
-  it.skip("has many association from a model with query constraints different from the association", () => { /* fixture-dependent */ });
-  it.skip("query constraints over three without defining explicit foreign key query constraints raises", () => { /* fixture-dependent */ });
-  it.skip("model with composite query constraints has many association sql", () => { /* fixture-dependent */ });
-  it.skip("belongs to association does not use parent query constraints if not configured to", () => { /* fixture-dependent */ });
-  it.skip("polymorphic belongs to uses parent query constraints", () => { /* fixture-dependent */ });
-  it.skip("preloads model with query constraints by explicitly configured fk and pk", () => { /* fixture-dependent */ });
-  it.skip("append composite foreign key has many association", () => { /* fixture-dependent */ });
-  it.skip("nullify composite foreign key has many association", () => { /* fixture-dependent */ });
-  it.skip("assign persisted composite foreign key belongs to association", () => { /* fixture-dependent */ });
-  it.skip("nullify composite foreign key belongs to association", () => { /* fixture-dependent */ });
-  it.skip("assign composite foreign key belongs to association", () => { /* fixture-dependent */ });
-  it.skip("query constraints that dont include the primary key raise with a single column", () => { /* fixture-dependent */ });
-  it.skip("query constraints that dont include the primary key raise with multiple columns", () => { /* fixture-dependent */ });
+  it.skip("querying by whole associated records using query constraints", () => {
+    /* fixture-dependent */
+  });
+  it.skip("querying by single associated record works using query constraints", () => {
+    /* fixture-dependent */
+  });
+  it.skip("querying by relation with composite key", () => {
+    /* fixture-dependent */
+  });
+  it.skip("has many association with composite foreign key loads records", () => {
+    /* fixture-dependent */
+  });
+  it.skip("has many association from a model with query constraints different from the association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("query constraints over three without defining explicit foreign key query constraints raises", () => {
+    /* fixture-dependent */
+  });
+  it.skip("model with composite query constraints has many association sql", () => {
+    /* fixture-dependent */
+  });
+  it.skip("belongs to association does not use parent query constraints if not configured to", () => {
+    /* fixture-dependent */
+  });
+  it.skip("polymorphic belongs to uses parent query constraints", () => {
+    /* fixture-dependent */
+  });
+  it.skip("preloads model with query constraints by explicitly configured fk and pk", () => {
+    /* fixture-dependent */
+  });
+  it.skip("append composite foreign key has many association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("nullify composite foreign key has many association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("assign persisted composite foreign key belongs to association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("nullify composite foreign key belongs to association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("assign composite foreign key belongs to association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("query constraints that dont include the primary key raise with a single column", () => {
+    /* fixture-dependent */
+  });
+  it.skip("query constraints that dont include the primary key raise with multiple columns", () => {
+    /* fixture-dependent */
+  });
   it("assign belongs to cpk model by id attribute", async () => {
     const adapter = freshAdapter();
     class CpkTarget extends Base {
-      static { this._tableName = "cpk_targets"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_targets";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkRef extends Base {
-      static { this._tableName = "cpk_refs"; this.attribute("cpk_target_shop_id", "integer"); this.attribute("cpk_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_refs";
+        this.attribute("cpk_target_shop_id", "integer");
+        this.attribute("cpk_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.belongsTo.call(CpkRef, "cpkTarget", { foreignKey: ["cpk_target_shop_id", "cpk_target_id"], className: "CpkTarget" });
+    Associations.belongsTo.call(CpkRef, "cpkTarget", {
+      foreignKey: ["cpk_target_shop_id", "cpk_target_id"],
+      className: "CpkTarget",
+    });
     registerModel("CpkTarget", CpkTarget);
     registerModel("CpkRef", CpkRef);
     const target = await CpkTarget.create({ shop_id: 2, id: 7, name: "test" });
     const ref = await CpkRef.create({ cpk_target_shop_id: 2, cpk_target_id: 7 });
-    const loaded = await loadBelongsTo(ref, "cpkTarget", { foreignKey: ["cpk_target_shop_id", "cpk_target_id"], className: "CpkTarget" });
+    const loaded = await loadBelongsTo(ref, "cpkTarget", {
+      foreignKey: ["cpk_target_shop_id", "cpk_target_id"],
+      className: "CpkTarget",
+    });
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toEqual([2, 7]);
   });
-  it.skip("append composite foreign key has many association with autosave", () => { /* fixture-dependent */ });
-  it.skip("assign composite foreign key belongs to association with autosave", () => { /* fixture-dependent */ });
-  it.skip("append composite has many through association", () => { /* fixture-dependent */ });
-  it.skip("append composite has many through association with autosave", () => { /* fixture-dependent */ });
-  it.skip("nullify composite has many through association", () => { /* fixture-dependent */ });
-  it.skip("using query constraints warns about changing behavior", () => { /* fixture-dependent */ });
+  it.skip("append composite foreign key has many association with autosave", () => {
+    /* fixture-dependent */
+  });
+  it.skip("assign composite foreign key belongs to association with autosave", () => {
+    /* fixture-dependent */
+  });
+  it.skip("append composite has many through association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("append composite has many through association with autosave", () => {
+    /* fixture-dependent */
+  });
+  it.skip("nullify composite has many through association", () => {
+    /* fixture-dependent */
+  });
+  it.skip("using query constraints warns about changing behavior", () => {
+    /* fixture-dependent */
+  });
 
-  it.skip("belongs to with explicit composite foreign key", () => { /* requires composite foreign key support */ });
+  it.skip("belongs to with explicit composite foreign key", () => {
+    /* requires composite foreign key support */
+  });
 
   it("cpk model has many records by id attribute", async () => {
     const adapter = freshAdapter();
     class CpkParent extends Base {
-      static { this._tableName = "cpk_parents"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_parents";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkChild extends Base {
-      static { this._tableName = "cpk_children"; this.attribute("cpk_parent_region_id", "integer"); this.attribute("cpk_parent_id", "integer"); this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_children";
+        this.attribute("cpk_parent_region_id", "integer");
+        this.attribute("cpk_parent_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CpkParent, "cpkChildren", { foreignKey: ["cpk_parent_region_id", "cpk_parent_id"], className: "CpkChild" });
+    Associations.hasMany.call(CpkParent, "cpkChildren", {
+      foreignKey: ["cpk_parent_region_id", "cpk_parent_id"],
+      className: "CpkChild",
+    });
     registerModel("CpkParent", CpkParent);
     registerModel("CpkChild", CpkChild);
     const parent = await CpkParent.create({ region_id: 1, id: 1, name: "P" });
     await CpkChild.create({ cpk_parent_region_id: 1, cpk_parent_id: 1, label: "A" });
     await CpkChild.create({ cpk_parent_region_id: 1, cpk_parent_id: 1, label: "B" });
     await CpkChild.create({ cpk_parent_region_id: 2, cpk_parent_id: 1, label: "C" }); // different region
-    const children = await loadHasMany(parent, "cpkChildren", { foreignKey: ["cpk_parent_region_id", "cpk_parent_id"], className: "CpkChild" });
+    const children = await loadHasMany(parent, "cpkChildren", {
+      foreignKey: ["cpk_parent_region_id", "cpk_parent_id"],
+      className: "CpkChild",
+    });
     expect(children.length).toBe(2);
     expect(children.map((c) => c.readAttribute("label")).sort()).toEqual(["A", "B"]);
   });
 });
-
 
 describe("Associations", () => {
   let adapter: DatabaseAdapter;
@@ -1927,7 +2508,11 @@ describe("Associations: dependent", () => {
       }
     }
     (Post as any)._associations = [
-      { type: "hasMany", name: "comments", options: { dependent: "destroy", className: "Comment" } },
+      {
+        type: "hasMany",
+        name: "comments",
+        options: { dependent: "destroy", className: "Comment" },
+      },
     ];
 
     registerModel(Post);
@@ -1960,7 +2545,11 @@ describe("Associations: dependent", () => {
       }
     }
     (Thread as any)._associations = [
-      { type: "hasMany", name: "replies", options: { dependent: "nullify", className: "Reply", foreignKey: "thread_id" } },
+      {
+        type: "hasMany",
+        name: "replies",
+        options: { dependent: "nullify", className: "Reply", foreignKey: "thread_id" },
+      },
     ];
 
     registerModel(Thread);
@@ -2029,7 +2618,11 @@ describe("CollectionProxy", () => {
       }
     }
     (Invoice as any)._associations = [
-      { type: "hasMany", name: "lineItems", options: { className: "LineItem", foreignKey: "invoice_id" } },
+      {
+        type: "hasMany",
+        name: "lineItems",
+        options: { className: "LineItem", foreignKey: "invoice_id" },
+      },
     ];
 
     registerModel(Invoice);
@@ -2142,8 +2735,16 @@ describe("Polymorphic Associations", () => {
 
     const article = await Article.create({ title: "Hello" });
     const photo = await Photo.create({ url: "pic.jpg" });
-    const c1 = await Comment.create({ body: "Nice!", commentable_id: article.id, commentable_type: "Article" });
-    const c2 = await Comment.create({ body: "Cool!", commentable_id: photo.id, commentable_type: "Photo" });
+    const c1 = await Comment.create({
+      body: "Nice!",
+      commentable_id: article.id,
+      commentable_type: "Article",
+    });
+    const c2 = await Comment.create({
+      body: "Cool!",
+      commentable_id: photo.id,
+      commentable_type: "Photo",
+    });
 
     const parent1 = await loadBelongsTo(c1, "commentable", { polymorphic: true });
     expect(parent1).toBeInstanceOf(Article);
@@ -2175,8 +2776,16 @@ describe("Polymorphic Associations", () => {
     registerModel(Comment);
 
     const article = await Article.create({ title: "Hello" });
-    await Comment.create({ body: "Nice!", commentable_id: article.id, commentable_type: "Article" });
-    await Comment.create({ body: "Cool!", commentable_id: article.id, commentable_type: "Article" });
+    await Comment.create({
+      body: "Nice!",
+      commentable_id: article.id,
+      commentable_type: "Article",
+    });
+    await Comment.create({
+      body: "Cool!",
+      commentable_id: article.id,
+      commentable_type: "Article",
+    });
     await Comment.create({ body: "Other", commentable_id: 999, commentable_type: "Photo" });
 
     const assocDef = (Article as any)._associations.find((a: any) => a.name === "comments");
@@ -2187,10 +2796,14 @@ describe("Polymorphic Associations", () => {
 
 describe("association scopes", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("applies scope to has_many association", async () => {
-    class Comment extends Base { static _tableName = "comments"; }
+    class Comment extends Base {
+      static _tableName = "comments";
+    }
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("approved", "boolean");
@@ -2198,7 +2811,9 @@ describe("association scopes", () => {
     Comment.adapter = adapter;
     registerModel(Comment);
 
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.adapter = adapter;
@@ -2223,15 +2838,21 @@ describe("association scopes", () => {
 
 describe("whereAssociated / whereMissing", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("whereAssociated filters records WITH non-null FK", async () => {
-    class Author extends Base { static _tableName = "wa_authors"; }
+    class Author extends Base {
+      static _tableName = "wa_authors";
+    }
     Author.attribute("id", "integer");
     Author.adapter = adapter;
     registerModel("WaAuthor", Author);
 
-    class Book extends Base { static _tableName = "wa_books"; }
+    class Book extends Base {
+      static _tableName = "wa_books";
+    }
     Book.attribute("id", "integer");
     Book.attribute("wa_author_id", "integer");
     Book.adapter = adapter;
@@ -2246,12 +2867,16 @@ describe("whereAssociated / whereMissing", () => {
   });
 
   it("whereMissing filters records WITH null FK", async () => {
-    class Author extends Base { static _tableName = "wm_authors"; }
+    class Author extends Base {
+      static _tableName = "wm_authors";
+    }
     Author.attribute("id", "integer");
     Author.adapter = adapter;
     registerModel("WmAuthor", Author);
 
-    class Book extends Base { static _tableName = "wm_books"; }
+    class Book extends Base {
+      static _tableName = "wm_books";
+    }
     Book.attribute("id", "integer");
     Book.attribute("wm_author_id", "integer");
     Book.adapter = adapter;
@@ -2269,7 +2894,9 @@ describe("whereAssociated / whereMissing", () => {
 describe("destroyedByAssociation", () => {
   it("is null by default", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.adapter = adapter;
 
@@ -2279,7 +2906,9 @@ describe("destroyedByAssociation", () => {
 
   it("can be set and read", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.adapter = adapter;
 
@@ -2293,7 +2922,9 @@ describe("dependent: restrictWithException", () => {
   it("prevents deletion when associated records exist", async () => {
     const adapter = freshAdapter();
 
-    class DComment extends Base { static _tableName = "d_comments"; }
+    class DComment extends Base {
+      static _tableName = "d_comments";
+    }
     DComment.attribute("id", "integer");
     DComment.attribute("d_post_id", "integer");
     DComment.attribute("body", "string");
@@ -2302,7 +2933,15 @@ describe("dependent: restrictWithException", () => {
     class DPost extends Base {
       static _tableName = "d_posts";
       static _associations: any[] = [
-        { type: "hasMany", name: "dComments", options: { dependent: "restrictWithException", className: "DComment", foreignKey: "d_post_id" } },
+        {
+          type: "hasMany",
+          name: "dComments",
+          options: {
+            dependent: "restrictWithException",
+            className: "DComment",
+            foreignKey: "d_post_id",
+          },
+        },
       ];
     }
     DPost.attribute("id", "integer");
@@ -2315,13 +2954,17 @@ describe("dependent: restrictWithException", () => {
     const post = await DPost.create({ title: "Hello" });
     await DComment.create({ d_post_id: post.id, body: "Nice!" });
 
-    await expect(post.destroy()).rejects.toThrow("Cannot delete record because of dependent dComments");
+    await expect(post.destroy()).rejects.toThrow(
+      "Cannot delete record because of dependent dComments",
+    );
   });
 
   it("allows deletion when no associated records exist", async () => {
     const adapter = freshAdapter();
 
-    class DReview extends Base { static _tableName = "d_reviews"; }
+    class DReview extends Base {
+      static _tableName = "d_reviews";
+    }
     DReview.attribute("id", "integer");
     DReview.attribute("d_article_id", "integer");
     DReview.adapter = adapter;
@@ -2329,7 +2972,15 @@ describe("dependent: restrictWithException", () => {
     class DArticle extends Base {
       static _tableName = "d_articles";
       static _associations: any[] = [
-        { type: "hasMany", name: "dReviews", options: { dependent: "restrictWithException", className: "DReview", foreignKey: "d_article_id" } },
+        {
+          type: "hasMany",
+          name: "dReviews",
+          options: {
+            dependent: "restrictWithException",
+            className: "DReview",
+            foreignKey: "d_article_id",
+          },
+        },
       ];
     }
     DArticle.attribute("id", "integer");
@@ -2349,14 +3000,25 @@ describe("CollectionProxy enhancements", () => {
   it("push adds records to the collection", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+    ];
 
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "Hello" });
@@ -2368,14 +3030,25 @@ describe("CollectionProxy enhancements", () => {
   it("size returns count", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+    ];
 
     const author = await Author.create({ name: "Alice" });
     await Post.create({ title: "P1", author_id: author.id });
@@ -2386,14 +3059,25 @@ describe("CollectionProxy enhancements", () => {
   it("isEmpty returns true/false", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+    ];
 
     const author = await Author.create({ name: "Alice" });
     const proxy = association(author, "posts");
@@ -2405,14 +3089,25 @@ describe("CollectionProxy enhancements", () => {
   it("first and last return correct records", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+    ];
 
     const author = await Author.create({ name: "Alice" });
     await Post.create({ title: "First", author_id: author.id });
@@ -2428,14 +3123,25 @@ describe("CollectionProxy enhancements", () => {
   it("includes checks for record membership", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [{ type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } }];
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+    ];
 
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "Mine", author_id: author.id });
@@ -2450,13 +3156,21 @@ describe("Associations (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
   class Author extends Base {
-    static { this.attribute("name", "string"); }
+    static {
+      this.attribute("name", "string");
+    }
   }
   class Book extends Base {
-    static { this.attribute("title", "string"); this.attribute("author_id", "integer"); }
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_id", "integer");
+    }
   }
   class Profile extends Base {
-    static { this.attribute("bio", "string"); this.attribute("author_id", "integer"); }
+    static {
+      this.attribute("bio", "string");
+      this.attribute("author_id", "integer");
+    }
   }
 
   beforeEach(() => {
@@ -2502,7 +3216,11 @@ describe("Associations (Rails-guided)", () => {
 
   it("has_many with custom foreignKey", async () => {
     class Article extends Base {
-      static { this.attribute("title", "string"); this.attribute("writer_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("writer_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Article);
     const author = await Author.create({ name: "Custom" });
@@ -2517,7 +3235,6 @@ describe("Associations (Rails-guided)", () => {
     expect(books).toHaveLength(0);
   });
 });
-
 
 describe("Associations (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -2661,25 +3378,50 @@ describe("Polymorphic Associations (Rails-guided)", () => {
   // Rails: test "belongs_to polymorphic"
   it("loads the correct parent type via polymorphic belongs_to", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Post);
 
     class Image extends Base {
-      static { this._tableName = "images"; this.attribute("id", "integer"); this.attribute("url", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "images";
+        this.attribute("id", "integer");
+        this.attribute("url", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Image);
 
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
 
     const post = await Post.create({ title: "Hello" });
     const image = await Image.create({ url: "cat.jpg" });
 
-    const c1 = await Comment.create({ body: "Great post!", commentable_id: post.id, commentable_type: "Post" });
-    const c2 = await Comment.create({ body: "Nice pic!", commentable_id: image.id, commentable_type: "Image" });
+    const c1 = await Comment.create({
+      body: "Great post!",
+      commentable_id: post.id,
+      commentable_type: "Post",
+    });
+    const c2 = await Comment.create({
+      body: "Nice pic!",
+      commentable_id: image.id,
+      commentable_type: "Image",
+    });
 
     const parent1 = await loadBelongsTo(c1, "commentable", { polymorphic: true });
     expect(parent1!.readAttribute("title")).toBe("Hello");
@@ -2691,13 +3433,25 @@ describe("Polymorphic Associations (Rails-guided)", () => {
   // Rails: test "has_many :as"
   it("loads polymorphic children via has_many as:", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Post, "comments", { as: "commentable" });
     registerModel(Post);
 
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
@@ -2721,27 +3475,43 @@ describe("HABTM (Rails-guided)", () => {
   // Rails: test "has_and_belongs_to_many basic"
   it("loads records through a join table", async () => {
     class Developer extends Base {
-      static { this._tableName = "developers"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "developers";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasAndBelongsToMany.call(Developer, "projects", { joinTable: "developers_projects" });
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      joinTable: "developers_projects",
+    });
     registerModel(Developer);
 
     class Project extends Base {
-      static { this._tableName = "projects"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "projects";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Project);
 
     // Create the join table
     await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
     const dev = await Developer.create({ name: "David" });
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });
 
-    await adapter.executeMutation(`INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`);
-    await adapter.executeMutation(`INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`);
+    await adapter.executeMutation(
+      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
+    );
+    await adapter.executeMutation(
+      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
+    );
 
     const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
     expect(projects).toHaveLength(2);
@@ -2759,12 +3529,22 @@ describe("inverse_of (Rails-guided)", () => {
   // Rails: test "inverse_of on belongs_to sets parent reference"
   it("belongs_to with inverse_of caches the owner on the loaded record", async () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Author);
 
     class Book extends Base {
-      static { this._tableName = "books"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Book, "author", { inverseOf: "books" });
     registerModel(Book);
@@ -2780,12 +3560,23 @@ describe("inverse_of (Rails-guided)", () => {
   // Rails: test "inverse_of on has_many sets child reference"
   it("has_many with inverse_of caches the parent on each child", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Post);
 
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
@@ -2811,12 +3602,24 @@ describe("Association Scopes (Rails-guided)", () => {
   // Rails: test "has_many with scope"
   it("has_many applies a scope lambda to filter results", async () => {
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("approved", "boolean"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("approved", "boolean");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(Post);
 
@@ -2835,12 +3638,23 @@ describe("Association Scopes (Rails-guided)", () => {
   // Rails: test "has_many scope with ordering"
   it("has_many scope can include ordering", async () => {
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("position", "integer"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("position", "integer");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Comment);
 
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel(Post);
 
@@ -3214,9 +4028,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const reloaded = await TouchPost.find(post.id as number);
     // updated_at should be updated (not necessarily the same as before)
-    expect(reloaded.readAttribute("updated_at")).not.toBe(
-      new Date("2020-01-01").toISOString()
-    );
+    expect(reloaded.readAttribute("updated_at")).not.toBe(new Date("2020-01-01").toISOString());
   });
 
   // -------------------------------------------------------------------------
@@ -3589,10 +4401,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("id assignment", async () => {
     class IdFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class IdAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("IdFirm", IdFirm);
     registerModel("IdAccount", IdAccount);
@@ -3603,17 +4421,24 @@ describe("BelongsToAssociationsTest", () => {
     await account.save();
 
     const loaded = await loadBelongsTo(account, "idFirm", {
-      className: "IdFirm", foreignKey: "firm_id",
+      className: "IdFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded!.id).toBe(firm.id);
   });
 
   it("natural assignment to nil", async () => {
     class NilFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NilAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("NilFirm", NilFirm);
     registerModel("NilAccount", NilAccount);
@@ -3624,7 +4449,8 @@ describe("BelongsToAssociationsTest", () => {
     await account.save();
 
     const loaded = await loadBelongsTo(account, "nilFirm", {
-      className: "NilFirm", foreignKey: "firm_id",
+      className: "NilFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded).toBeNull();
   });
@@ -3635,10 +4461,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("creating the belonging object from new record", async () => {
     class CrNrFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class CrNrAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("CrNrFirm", CrNrFirm);
     registerModel("CrNrAccount", CrNrAccount);
@@ -3650,7 +4482,8 @@ describe("BelongsToAssociationsTest", () => {
 
     expect(account.isNewRecord()).toBe(false);
     const loaded = await loadBelongsTo(account, "crNrFirm", {
-      className: "CrNrFirm", foreignKey: "firm_id",
+      className: "CrNrFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
   });
@@ -3669,17 +4502,24 @@ describe("BelongsToAssociationsTest", () => {
 
   it("setting foreign key after nil target loaded", async () => {
     class FkNilFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class FkNilAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("FkNilFirm", FkNilFirm);
     registerModel("FkNilAccount", FkNilAccount);
 
     const account = await FkNilAccount.create({ firm_id: null });
     let loaded = await loadBelongsTo(account, "fkNilFirm", {
-      className: "FkNilFirm", foreignKey: "firm_id",
+      className: "FkNilFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded).toBeNull();
 
@@ -3688,7 +4528,8 @@ describe("BelongsToAssociationsTest", () => {
     await account.save();
 
     loaded = await loadBelongsTo(account, "fkNilFirm", {
-      className: "FkNilFirm", foreignKey: "firm_id",
+      className: "FkNilFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
   });
@@ -3699,10 +4540,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("association assignment sticks", async () => {
     class StkFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class StkAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("StkFirm", StkFirm);
     registerModel("StkAccount", StkAccount);
@@ -3715,7 +4562,8 @@ describe("BelongsToAssociationsTest", () => {
     await account.save();
 
     const loaded = await loadBelongsTo(account, "stkFirm", {
-      className: "StkFirm", foreignKey: "firm_id",
+      className: "StkFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded!.id).toBe(firmB.id);
   });
@@ -3726,7 +4574,10 @@ describe("BelongsToAssociationsTest", () => {
 
   it("polymorphic assignment updates foreign id field for new and saved records", async () => {
     class PolyOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PolyItem extends Base {
       static {
@@ -3745,14 +4596,18 @@ describe("BelongsToAssociationsTest", () => {
     await item.save();
 
     const loaded = await loadBelongsTo(item, "polyOwner", {
-      className: "PolyOwner", foreignKey: "owner_id",
+      className: "PolyOwner",
+      foreignKey: "owner_id",
     });
     expect(loaded!.id).toBe(owner.id);
   });
 
   it("polymorphic assignment with nil", async () => {
     class PolyNilOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PolyNilItem extends Base {
       static {
@@ -3766,7 +4621,8 @@ describe("BelongsToAssociationsTest", () => {
 
     const item = await PolyNilItem.create({ owner_id: null, owner_type: null });
     const loaded = await loadBelongsTo(item, "polyNilOwner", {
-      polymorphic: true, foreignKey: "owner_id",
+      polymorphic: true,
+      foreignKey: "owner_id",
     });
     expect(loaded).toBeNull();
   });
@@ -3777,10 +4633,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("save of record with loaded belongs to", async () => {
     class SlFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class SlAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("SlFirm", SlFirm);
     registerModel("SlAccount", SlAccount);
@@ -3790,7 +4652,8 @@ describe("BelongsToAssociationsTest", () => {
 
     // Reload firm, save account — should not error
     const loaded = await loadBelongsTo(account, "slFirm", {
-      className: "SlFirm", foreignKey: "firm_id",
+      className: "SlFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
     await account.save();
@@ -3803,10 +4666,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("should set foreign key on create association", async () => {
     class FkCrFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class FkCrAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("FkCrFirm", FkCrFirm);
     registerModel("FkCrAccount", FkCrAccount);
@@ -3821,10 +4690,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("should set foreign key on save", async () => {
     class FkSvFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class FkSvAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("FkSvFirm", FkSvFirm);
     registerModel("FkSvAccount", FkSvAccount);
@@ -3843,10 +4718,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("tracking change from nil to persisted record", async () => {
     class TcFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class TcAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("TcFirm", TcFirm);
     registerModel("TcAccount", TcAccount);
@@ -3860,10 +4741,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("tracking change from persisted record to nil", async () => {
     class Tc2Firm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Tc2Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Tc2Firm", Tc2Firm);
     registerModel("Tc2Account", Tc2Account);
@@ -3877,10 +4764,16 @@ describe("BelongsToAssociationsTest", () => {
 
   it("tracking change from one persisted record to another", async () => {
     class Tc3Firm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Tc3Account extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("Tc3Firm", Tc3Firm);
     registerModel("Tc3Account", Tc3Account);
@@ -3903,10 +4796,17 @@ describe("BelongsToAssociationsTest", () => {
 
   it("with condition", async () => {
     class WcFirm extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     class WcAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("WcFirm", WcFirm);
     registerModel("WcAccount", WcAccount);
@@ -3915,7 +4815,8 @@ describe("BelongsToAssociationsTest", () => {
     const account = await WcAccount.create({ firm_id: firm.id });
 
     const loaded = await loadBelongsTo(account, "wcFirm", {
-      className: "WcFirm", foreignKey: "firm_id",
+      className: "WcFirm",
+      foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
     expect(loaded!.readAttribute("active")).toBe(true);
@@ -3923,10 +4824,17 @@ describe("BelongsToAssociationsTest", () => {
 
   it("build with conditions", async () => {
     class BcFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class BcAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("BcFirm", BcFirm);
     registerModel("BcAccount", BcAccount);
@@ -3942,10 +4850,17 @@ describe("BelongsToAssociationsTest", () => {
 
   it("create with conditions", async () => {
     class CcFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class CcAccount extends Base {
-      static { this.attribute("firm_id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("CcFirm", CcFirm);
     registerModel("CcAccount", CcAccount);
@@ -4145,10 +5060,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "Existing", firm_id: firm.id });
 
     const proxy = association(firm, "clients");
-    await proxy.concat(
-      new Client({ name: "Natural Company" }),
-      new Client({ name: "Apple" })
-    );
+    await proxy.concat(new Client({ name: "Natural Company" }), new Client({ name: "Apple" }));
 
     const clients = await proxy.toArray();
     expect(clients.length).toBe(3);
@@ -4412,9 +5324,7 @@ describe("HasManyAssociationsTest", () => {
     const container = await Container.create({ name: "Box" });
     await Item.create({ name: "Thing", container_id: container.id });
 
-    await expect(processDependentAssociations(container)).rejects.toThrow(
-      DeleteRestrictionError
-    );
+    await expect(processDependentAssociations(container)).rejects.toThrow(DeleteRestrictionError);
   });
 
   it("restrict with exception when empty allows destroy", async () => {
@@ -4477,9 +5387,7 @@ describe("HasManyAssociationsTest", () => {
     const log = await Log.create({ name: "Audit" });
     await Entry.create({ name: "e1", log_id: log.id });
 
-    await expect(processDependentAssociations(log)).rejects.toThrow(
-      DeleteRestrictionError
-    );
+    await expect(processDependentAssociations(log)).rejects.toThrow(DeleteRestrictionError);
   });
 
   // -------------------------------------------------------------------------
@@ -4735,7 +5643,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "C", firm_id: firm.id });
 
     const proxy = association(firm, "clients");
-    const taken = await proxy.take(2) as Base[];
+    const taken = (await proxy.take(2)) as Base[];
     expect(taken.length).toBe(2);
   });
 
@@ -5048,7 +5956,7 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(2);
-    expect(remaining.map(r => r.readAttribute("name")).sort()).toEqual(["C", "D"]);
+    expect(remaining.map((r) => r.readAttribute("name")).sort()).toEqual(["C", "D"]);
   });
 
   // -------------------------------------------------------------------------
@@ -5113,7 +6021,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "B", firm_id: firm.id });
 
     const proxy = association(firm, "clients");
-    const found = await proxy.find(a.id as number) as Base;
+    const found = (await proxy.find(a.id as number)) as Base;
     expect(found.readAttribute("name")).toBe("A");
   });
 
@@ -5124,7 +6032,7 @@ describe("HasManyAssociationsTest", () => {
     const b = await Client.create({ name: "B", firm_id: firm.id });
 
     const proxy = association(firm, "clients");
-    const found = await proxy.find([a.id as number, b.id as number]) as Base[];
+    const found = (await proxy.find([a.id as number, b.id as number])) as Base[];
     expect(found.length).toBe(2);
   });
 
@@ -5143,7 +6051,7 @@ describe("HasManyAssociationsTest", () => {
 
     const members = await proxy.toArray();
     expect(members.length).toBe(2);
-    expect(members.every(m => m.readAttribute("firm_id") === firm.id)).toBe(true);
+    expect(members.every((m) => m.readAttribute("firm_id") === firm.id)).toBe(true);
   });
 
   it("assign ids ignoring blanks", async () => {

@@ -44,9 +44,7 @@ export function delegate(
         const delegatee = this[to];
         if (delegatee === null || delegatee === undefined) {
           if (allowNil) return undefined;
-          throw new Error(
-            `${methodName} delegated to ${to}, but ${to} is nil`
-          );
+          throw new Error(`${methodName} delegated to ${to}, but ${to} is nil`);
         }
         return (delegatee as Record<string, unknown>)[method];
       },
@@ -54,9 +52,7 @@ export function delegate(
         const delegatee = this[to];
         if (delegatee === null || delegatee === undefined) {
           if (allowNil) return;
-          throw new Error(
-            `${methodName} delegated to ${to}, but ${to} is nil`
-          );
+          throw new Error(`${methodName} delegated to ${to}, but ${to} is nil`);
         }
         (delegatee as Record<string, unknown>)[method] = value;
       },
@@ -96,10 +92,7 @@ function assertValidAttrName(name: string): void {
  * Also adds instance-level delegates by default (like Rails).
  * Supports: default, instanceWriter, instanceReader, instanceAccessor options.
  */
-export function mattrAccessor(
-  target: any,
-  ...namesAndOptions: (string | MattrOptions)[]
-): void {
+export function mattrAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
   const options: MattrOptions =
     typeof namesAndOptions[namesAndOptions.length - 1] === "object" &&
     namesAndOptions[namesAndOptions.length - 1] !== null
@@ -107,10 +100,8 @@ export function mattrAccessor(
       : {};
 
   const names = namesAndOptions as string[];
-  const addInstanceReader =
-    options.instanceAccessor !== false && options.instanceReader !== false;
-  const addInstanceWriter =
-    options.instanceAccessor !== false && options.instanceWriter !== false;
+  const addInstanceReader = options.instanceAccessor !== false && options.instanceReader !== false;
+  const addInstanceWriter = options.instanceAccessor !== false && options.instanceWriter !== false;
 
   for (const name of names) {
     assertValidAttrName(name);
@@ -118,8 +109,7 @@ export function mattrAccessor(
 
     // Resolve default value once at definition time
     const rawDefault = options.default;
-    const resolvedDefault =
-      typeof rawDefault === "function" ? rawDefault() : rawDefault;
+    const resolvedDefault = typeof rawDefault === "function" ? rawDefault() : rawDefault;
 
     if ("default" in options || typeof rawDefault === "function") {
       (target as Record<string, unknown>)[storageKey] = resolvedDefault;
@@ -143,21 +133,29 @@ export function mattrAccessor(
         Object.defineProperty(target.prototype, name, {
           configurable: true,
           enumerable: false,
-          get() { return (target as Record<string, unknown>)[name]; },
-          set(value: unknown) { (target as Record<string, unknown>)[name] = value; },
+          get() {
+            return (target as Record<string, unknown>)[name];
+          },
+          set(value: unknown) {
+            (target as Record<string, unknown>)[name] = value;
+          },
         });
       } else if (addInstanceReader) {
         Object.defineProperty(target.prototype, name, {
           configurable: true,
           enumerable: false,
-          get() { return (target as Record<string, unknown>)[name]; },
+          get() {
+            return (target as Record<string, unknown>)[name];
+          },
         });
       } else if (addInstanceWriter) {
         // Only writer — define a method, not a setter-only property (which would be odd)
         Object.defineProperty(target.prototype, `${name}=`, {
           configurable: true,
           enumerable: false,
-          value(value: unknown) { (target as Record<string, unknown>)[name] = value; },
+          value(value: unknown) {
+            (target as Record<string, unknown>)[name] = value;
+          },
         });
       }
     }
@@ -173,10 +171,7 @@ export const cattrAccessor = mattrAccessor;
  * configAccessor — defines inheritable configuration accessors (config_accessor in Rails).
  * Works like mattrAccessor but uses a separate config hash namespace.
  */
-export function configAccessor(
-  target: any,
-  ...namesAndOptions: (string | MattrOptions)[]
-): void {
+export function configAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
   mattrAccessor(target, ...namesAndOptions);
 }
 
@@ -297,16 +292,10 @@ function getRescueHandlers(target: object): RescueEntry[] {
  *   rescueFrom(MyClass, SomeError, { with: (e) => console.log(e) });
  *   rescueFrom(MyClass, SomeError, { with: "handleError" });
  */
-export function rescueFrom(
-  target: any,
-  ...errorClassesAndOptions: any[]
-): void {
+export function rescueFrom(target: any, ...errorClassesAndOptions: any[]): void {
   const lastArg = errorClassesAndOptions[errorClassesAndOptions.length - 1];
-  const hasOptions =
-    typeof lastArg === "object" && lastArg !== null && !lastArg.prototype;
-  const options: { with?: ErrorHandler } = hasOptions
-    ? errorClassesAndOptions.pop()
-    : {};
+  const hasOptions = typeof lastArg === "object" && lastArg !== null && !lastArg.prototype;
+  const options: { with?: ErrorHandler } = hasOptions ? errorClassesAndOptions.pop() : {};
   const errorClasses = errorClassesAndOptions as Array<new (...args: any[]) => Error>;
   const handler = options.with;
   if (!handler) throw new Error("rescueFrom requires a :with handler");

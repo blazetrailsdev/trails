@@ -7,7 +7,10 @@
 
 import { Metal } from "./metal.js";
 import { FlashHash } from "../actiondispatch/flash.js";
-import { RequestForgeryProtection, InvalidAuthenticityToken } from "../actiondispatch/request-forgery-protection.js";
+import {
+  RequestForgeryProtection,
+  InvalidAuthenticityToken,
+} from "../actiondispatch/request-forgery-protection.js";
 import { Collector, UnknownFormat } from "../actiondispatch/respond-to.js";
 import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
 import { LookupContext } from "../actionview/lookup-context.js";
@@ -61,14 +64,19 @@ export class Base extends Metal {
   static routeHelpers?: RouteHelpersMap;
 
   /** Rescue handlers (class-level, inherited). */
-  private static _rescueHandlers: Array<{ errorClass: new (...args: any[]) => Error; handler: RescueHandler }> = [];
+  private static _rescueHandlers: Array<{
+    errorClass: new (...args: any[]) => Error;
+    handler: RescueHandler;
+  }> = [];
 
   // --- Rendering ---
 
   /** Render a response. Supports json, plain, html, body, text, action, partial, collection. */
   render(options: RenderOptions = {}): void {
     if (this.performed) {
-      throw new DoubleRenderError("Render and/or redirect were called multiple times in this action.");
+      throw new DoubleRenderError(
+        "Render and/or redirect were called multiple times in this action.",
+      );
     }
 
     if (options.status) {
@@ -117,7 +125,9 @@ export class Base extends Metal {
   /** Async render — resolves pending template/partial renders. */
   async renderAsync(options: RenderOptions): Promise<void> {
     if (this.performed) {
-      throw new DoubleRenderError("Render and/or redirect were called multiple times in this action.");
+      throw new DoubleRenderError(
+        "Render and/or redirect were called multiple times in this action.",
+      );
     }
 
     if (options.status) {
@@ -128,7 +138,7 @@ export class Base extends Metal {
     if (!ctx) {
       throw new Error(
         "No lookupContext configured. Set YourController.lookupContext = new LookupContext() " +
-        "and register resolvers/handlers."
+          "and register resolvers/handlers.",
       );
     }
 
@@ -136,9 +146,12 @@ export class Base extends Metal {
     const format = this.request?.format ?? "html";
     const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
     const locals = { ...routeHelpers, ...options.locals };
-    const layout = options.layout === false ? false
-      : (typeof options.layout === "string" ? options.layout
-        : (this.constructor as typeof Base).layout);
+    const layout =
+      options.layout === false
+        ? false
+        : typeof options.layout === "string"
+          ? options.layout
+          : (this.constructor as typeof Base).layout;
 
     if (options.partial !== undefined) {
       if (options.collection !== undefined) {
@@ -148,25 +161,16 @@ export class Base extends Metal {
           controllerName,
           format,
           options.collection,
-          options.as
+          options.as,
         );
       } else {
-        this.body = await ctx.renderPartial(
-          options.partial,
-          controllerName,
-          format,
-          locals
-        );
+        this.body = await ctx.renderPartial(options.partial, controllerName, format, locals);
       }
     } else {
       const action = options.action ?? this.actionName;
-      this.body = await ctx.render(
-        controllerName,
-        action,
-        format,
-        locals,
-        { layout: layout === false ? false : (layout || undefined) }
-      );
+      this.body = await ctx.render(controllerName, action, format, locals, {
+        layout: layout === false ? false : layout || undefined,
+      });
     }
 
     this.contentType = options.contentType ?? "text/html; charset=utf-8";
@@ -175,9 +179,7 @@ export class Base extends Metal {
 
   /** Derive controller name from class name. */
   private _controllerName(): string {
-    return this.constructor.name
-      .replace(/Controller$/, "")
-      .toLowerCase();
+    return this.constructor.name.replace(/Controller$/, "").toLowerCase();
   }
 
   /** Render to string without committing the response. */
@@ -195,9 +197,14 @@ export class Base extends Metal {
   // --- Redirecting ---
 
   /** Redirect to a URL. */
-  redirectTo(url: string, options: { status?: number | string; allow_other_host?: boolean } = {}): void {
+  redirectTo(
+    url: string,
+    options: { status?: number | string; allow_other_host?: boolean } = {},
+  ): void {
     if (this.performed) {
-      throw new DoubleRenderError("Render and/or redirect were called multiple times in this action.");
+      throw new DoubleRenderError(
+        "Render and/or redirect were called multiple times in this action.",
+      );
     }
 
     const status = options.status ? Metal.resolveStatus(options.status) : 302;
@@ -209,7 +216,11 @@ export class Base extends Metal {
   }
 
   /** Redirect back to the referer or a fallback URL. */
-  redirectBack(options: { fallbackLocation: string; status?: number | string; allow_other_host?: boolean }): void {
+  redirectBack(options: {
+    fallbackLocation: string;
+    status?: number | string;
+    allow_other_host?: boolean;
+  }): void {
     const referer = this.request?.getHeader("referer");
     const url = referer ?? options.fallbackLocation;
     this.redirectTo(url, { status: options.status });
@@ -258,7 +269,9 @@ export class Base extends Metal {
   private static _csrfProtection: RequestForgeryProtection | null = null;
 
   /** Enable CSRF protection (class-level). */
-  static protectFromForgery(options: { with?: "exception" | "reset_session" | "null_session" } = {}): void {
+  static protectFromForgery(
+    options: { with?: "exception" | "reset_session" | "null_session" } = {},
+  ): void {
     this._csrfProtection = new RequestForgeryProtection({
       strategy: options.with ?? "exception",
     });
@@ -269,8 +282,10 @@ export class Base extends Metal {
     const csrf = (this.constructor as typeof Base)._csrfProtection;
     if (!csrf) return;
 
-    const token = this.params.get("authenticity_token") as string ??
-      this.request?.getHeader("x-csrf-token") ?? null;
+    const token =
+      (this.params.get("authenticity_token") as string) ??
+      this.request?.getHeader("x-csrf-token") ??
+      null;
 
     const result = csrf.verifyRequest({
       method: this.request?.method ?? "GET",
@@ -366,7 +381,10 @@ export class Base extends Metal {
   // --- Send File / Send Data ---
 
   /** Send file content. */
-  sendFile(filePath: string, options: { type?: string; disposition?: string; filename?: string } = {}): void {
+  sendFile(
+    filePath: string,
+    options: { type?: string; disposition?: string; filename?: string } = {},
+  ): void {
     const fs = require("fs");
     const path = require("path");
     const content = fs.readFileSync(filePath);
@@ -377,8 +395,7 @@ export class Base extends Metal {
     this.body = content.toString();
 
     if (options.disposition !== undefined && options.disposition !== null) {
-      this.setHeader("content-disposition",
-        `${options.disposition}; filename="${filename}"`);
+      this.setHeader("content-disposition", `${options.disposition}; filename="${filename}"`);
     } else {
       this.setHeader("content-disposition", `attachment; filename="${filename}"`);
     }
@@ -388,7 +405,10 @@ export class Base extends Metal {
   }
 
   /** Send raw data as a download. */
-  sendData(data: string | Buffer, options: { type?: string; disposition?: string; filename?: string } = {}): void {
+  sendData(
+    data: string | Buffer,
+    options: { type?: string; disposition?: string; filename?: string } = {},
+  ): void {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
     this.contentType = options.type ?? "application/octet-stream";
@@ -438,7 +458,10 @@ export class Base extends Metal {
 
     for (const k of hierarchy.reverse()) {
       if (Object.prototype.hasOwnProperty.call(k, "_rescueHandlers")) {
-        const handlers = (k as any)._rescueHandlers as Array<{ errorClass: new (...args: any[]) => Error; handler: RescueHandler }>;
+        const handlers = (k as any)._rescueHandlers as Array<{
+          errorClass: new (...args: any[]) => Error;
+          handler: RescueHandler;
+        }>;
         for (const { errorClass, handler } of handlers.reverse()) {
           if (error instanceof errorClass) return handler;
         }

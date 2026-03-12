@@ -31,7 +31,10 @@ describe("ReflectionTest", () => {
 
   it("human name", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Model human name should be derived from the class name
     expect(Post.name).toBe("Post");
@@ -39,7 +42,10 @@ describe("ReflectionTest", () => {
 
   it("column string type and limit", () => {
     class Article extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Article as any).columnsHash();
     expect(cols["title"]).toBeDefined();
@@ -48,7 +54,10 @@ describe("ReflectionTest", () => {
 
   it("column null not null", () => {
     class Article extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Article as any).columnsHash();
     expect(Object.keys(cols).length).toBeGreaterThan(0);
@@ -56,7 +65,10 @@ describe("ReflectionTest", () => {
 
   it("human name for column", () => {
     class Article extends Base {
-      static { this.attribute("body_text", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("body_text", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Article as any).columnsHash();
     expect(cols["body_text"]).toBeDefined();
@@ -65,7 +77,10 @@ describe("ReflectionTest", () => {
 
   it("integer columns", () => {
     class Article extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
     }
     const cols = (Article as any).columnsHash();
     expect(cols["views"]).toBeDefined();
@@ -74,7 +89,10 @@ describe("ReflectionTest", () => {
 
   it("non existent columns return null object", () => {
     class Article extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Article as any).columnsHash();
     const nonExistent = cols["does_not_exist"];
@@ -83,7 +101,10 @@ describe("ReflectionTest", () => {
 
   it("has many reflection", () => {
     class Comment extends Base {
-      static { this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -100,7 +121,10 @@ describe("ReflectionTest", () => {
 
   it("has one reflection", () => {
     class Profile extends Base {
-      static { this.attribute("user_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("user_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class User extends Base {
       static {
@@ -116,7 +140,10 @@ describe("ReflectionTest", () => {
 
   it("belongs to inferred foreign key from assoc name", () => {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -133,7 +160,10 @@ describe("ReflectionTest", () => {
 
   it("reflections should return keys as strings", () => {
     class Comment extends Base {
-      static { this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -149,7 +179,10 @@ describe("ReflectionTest", () => {
 
   it("has many through reflection", () => {
     class Tag extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PostTag extends Base {
       static {
@@ -173,7 +206,10 @@ describe("ReflectionTest", () => {
 
   it("type", () => {
     class Comment extends Base {
-      static { this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -188,7 +224,10 @@ describe("ReflectionTest", () => {
 
   it("collection association", () => {
     class Comment extends Base {
-      static { this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -203,7 +242,10 @@ describe("ReflectionTest", () => {
 
   it("foreign key", () => {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -218,7 +260,10 @@ describe("ReflectionTest", () => {
 
   it("foreign key is inferred from model name", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class Comment extends Base {
       static {
@@ -245,7 +290,10 @@ describe("ReflectionTest", () => {
 
   it("reflect on missing source assocation", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const reflection = reflectOnAssociation(Post, "does_not_exist");
     expect(reflection).toBeNull();
@@ -253,14 +301,20 @@ describe("ReflectionTest", () => {
 
   it("active record primary key", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(Post.primaryKey).toBe("id");
   });
 
   it("reflection klass not found with no class name option", () => {
     class Orphan extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Orphan, "ghosts", {});
     const ref = reflectOnAssociation(Orphan, "ghosts");
@@ -271,7 +325,10 @@ describe("ReflectionTest", () => {
 
   it("reflection klass not found with pointer to non existent class name", () => {
     class Orphan2 extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Orphan2, "items", { className: "NonExistentModel" });
     const ref = reflectOnAssociation(Orphan2, "items");
@@ -281,10 +338,16 @@ describe("ReflectionTest", () => {
 
   it("reflection klass requires ar subclass", () => {
     class Parent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Child extends Base {
-      static { this.attribute("parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Parent, "children", { className: "Child" });
     registerModel(Child);
@@ -300,14 +363,24 @@ describe("ReflectionTest", () => {
 
   it("aggregation reflection", () => {
     class Customer extends Base {
-      static { this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
     }
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
     const c = new Customer({ address_street: "123 Main", address_city: "Springfield" });
     const addr = (c as any).address;
@@ -322,9 +395,15 @@ describe("ReflectionTest", () => {
 
   it("has and belongs to many reflection", () => {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasAndBelongsToMany.call(Developer, "projects", { className: "Project", joinTable: "developer_projects" });
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+    });
     const ref = reflectOnAssociation(Developer, "projects");
     expect(ref).not.toBeNull();
     expect(ref!.macro).toBe("hasAndBelongsToMany");
@@ -348,7 +427,10 @@ describe("ReflectionTest", () => {
 
   it("association primary key uses explicit primary key option as first priority", () => {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Author, "books", { primaryKey: "custom_id" });
     const ref = reflectOnAssociation(Author, "books");
@@ -379,7 +461,10 @@ describe("MigrationTest", () => {
 
   it("create table raises if already exists", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Creating a record works fine
     const post = await Post.create({ title: "first" });
@@ -413,7 +498,10 @@ describe("MigrationTest", () => {
 
   it("instance based migration up", async () => {
     class Event extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const event = await Event.create({ name: "launch" });
     expect(event.id).toBeDefined();
@@ -422,7 +510,10 @@ describe("MigrationTest", () => {
 
   it("instance based migration down", async () => {
     class Event extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const event = await Event.create({ name: "launch" });
     await event.destroy();
@@ -433,7 +524,10 @@ describe("MigrationTest", () => {
   it("schema migrations table name", () => {
     // In our memory adapter, table naming is based on the model class name
     class SchemaVersion extends Base {
-      static { this.attribute("version", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("version", "string");
+        this.adapter = adapter;
+      }
     }
     expect(SchemaVersion.tableName).toBeDefined();
   });
@@ -447,7 +541,10 @@ describe("MigrationTest", () => {
   it("out of range integer limit should raise", () => {
     // When an integer value exceeds limits, it should be stored as-is in memory adapter
     class Counter extends Base {
-      static { this.attribute("count", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adapter;
+      }
     }
     const cols = Counter.columnsHash();
     expect(cols["count"]).toBeDefined();
@@ -466,7 +563,10 @@ describe("MigrationTest", () => {
 
   it("proper table name on migration", () => {
     class UserProfile extends Base {
-      static { this.attribute("bio", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("bio", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof UserProfile.tableName).toBe("string");
     expect(UserProfile.tableName.length).toBeGreaterThan(0);
@@ -485,7 +585,10 @@ describe("MigrationTest", () => {
 
   it("migration instance has connection", () => {
     class Article extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Adapter acts as the connection layer
     expect(Article.adapter).toBeDefined();
@@ -642,7 +745,10 @@ describe("MigrationTest", () => {
   it("out of range text limit should raise", () => {
     // In our memory adapter, large text columns are represented as strings without size limits
     class Article extends Base {
-      static { this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Article as any).columnsHash();
     expect(cols["body"]).toBeDefined();
@@ -652,7 +758,10 @@ describe("MigrationTest", () => {
   it("out of range binary limit should raise", () => {
     // In our memory adapter, binary data is represented as strings without size limits
     class Attachment extends Base {
-      static { this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Attachment as any).columnsHash();
     expect(cols["data"]).toBeDefined();
@@ -662,7 +771,10 @@ describe("MigrationTest", () => {
   it("invalid text size should raise", () => {
     // In our memory adapter, text columns don't enforce size limits; verify basic attribute definition
     class Post extends Base {
-      static { this.attribute("content", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
     }
     const cols = (Post as any).columnsHash();
     expect(cols["content"]).toBeDefined();

@@ -7,8 +7,12 @@ interface Mutex {
 
 class DefaultMutex implements Mutex {
   synchronized = false;
-  lock() { this.synchronized = true; }
-  unlock() { this.synchronized = false; }
+  lock() {
+    this.synchronized = true;
+  }
+  unlock() {
+    this.synchronized = false;
+  }
 }
 
 export class Lock {

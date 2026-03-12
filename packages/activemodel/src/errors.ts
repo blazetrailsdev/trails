@@ -77,7 +77,7 @@ export class Errors {
   add(
     attribute: string,
     type: string = "invalid",
-    options?: { message?: string | ((record: any) => string) } & Record<string, unknown>
+    options?: { message?: string | ((record: any) => string) } & Record<string, unknown>,
   ): void {
     let message: string;
     if (typeof options?.message === "function") {
@@ -85,16 +85,19 @@ export class Errors {
     } else {
       message = options?.message ?? this.defaultMessage(type, options);
     }
-    this._errors.push({ attribute, type, message, options: options ? { ...options, message: message } : undefined });
+    this._errors.push({
+      attribute,
+      type,
+      message,
+      options: options ? { ...options, message: message } : undefined,
+    });
   }
 
   /**
    * Get error messages for a specific attribute.
    */
   get(attribute: string): string[] {
-    return this._errors
-      .filter((e) => e.attribute === attribute)
-      .map((e) => e.message);
+    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.message);
   }
 
   /**
@@ -107,13 +110,9 @@ export class Errors {
   /**
    * Filter errors by attribute and/or type.
    */
-  where(
-    attribute: string,
-    type?: string
-  ): ErrorDetail[] {
+  where(attribute: string, type?: string): ErrorDetail[] {
     return this._errors.filter(
-      (e) =>
-        e.attribute === attribute && (type === undefined || e.type === type)
+      (e) => e.attribute === attribute && (type === undefined || e.type === type),
     );
   }
 
@@ -195,9 +194,7 @@ export class Errors {
     if (type === undefined) {
       return this._errors.some((e) => e.attribute === attribute);
     }
-    return this._errors.some(
-      (e) => e.attribute === attribute && e.type === type
-    );
+    return this._errors.some((e) => e.attribute === attribute && e.type === type);
   }
 
   /**
@@ -206,9 +203,7 @@ export class Errors {
    * Mirrors: ActiveModel::Errors#added?
    */
   added(attribute: string, type: string = "invalid", options?: Record<string, unknown>): boolean {
-    return this._errors.some(
-      (e) => e.attribute === attribute && e.type === type
-    );
+    return this._errors.some((e) => e.attribute === attribute && e.type === type);
   }
 
   /**
@@ -319,7 +314,11 @@ export class Errors {
    *
    * Mirrors: ActiveModel::Errors#generate_message
    */
-  generateMessage(attribute: string, type: string = "invalid", options?: Record<string, unknown>): string {
+  generateMessage(
+    attribute: string,
+    type: string = "invalid",
+    options?: Record<string, unknown>,
+  ): string {
     return this.defaultMessage(type, options);
   }
 
@@ -373,16 +372,13 @@ export class Errors {
    * Mirrors: ActiveModel::Errors#inspect
    */
   inspect(): string {
-    const details = this._errors.map(e => {
+    const details = this._errors.map((e) => {
       return `#<ActiveModel::Error attribute=${e.attribute}, type=${e.type}, message="${e.message}">`;
     });
     return `#<ActiveModel::Errors [${details.join(", ")}]>`;
   }
 
-  private defaultMessage(
-    type: string,
-    _options?: Record<string, unknown>
-  ): string {
+  private defaultMessage(type: string, _options?: Record<string, unknown>): string {
     const messages: Record<string, string> = {
       invalid: "is invalid",
       blank: "can't be blank",

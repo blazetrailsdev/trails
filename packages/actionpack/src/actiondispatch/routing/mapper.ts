@@ -12,7 +12,14 @@
  *   });
  */
 
-import { Route, type RouteOptions, type RouteConstraints, type ResourceAction, type RedirectFunction, type RedirectOptions } from "./route.js";
+import {
+  Route,
+  type RouteOptions,
+  type RouteConstraints,
+  type ResourceAction,
+  type RedirectFunction,
+  type RedirectOptions,
+} from "./route.js";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -53,13 +60,17 @@ export class Mapper {
     this.routes.push(
       new Route("GET", this.currentPrefix() + "/", controller, action, {
         name: this.prefixedName("root"),
-      })
+      }),
     );
   }
 
   // --- resources ---
 
-  resources(name: string, optionsOrCallback?: RouteOptions | MapperCallback, callback?: MapperCallback): void {
+  resources(
+    name: string,
+    optionsOrCallback?: RouteOptions | MapperCallback,
+    callback?: MapperCallback,
+  ): void {
     let options: RouteOptions = {};
     let cb: MapperCallback | undefined;
 
@@ -77,14 +88,21 @@ export class Mapper {
     const basePath = `${prefix}/${name}`;
     const singular = singularize(name);
     const namePrefix = this.currentNamePrefix();
-    const routeName = (suffix: string) =>
-      namePrefix ? `${namePrefix}_${suffix}` : suffix;
+    const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
     // For shallow routes, member routes use un-nested paths
     const shallowPath = shallow ? `/${name}` : basePath;
-    const shallowName = (suffix: string) => shallow ? suffix : routeName(suffix);
+    const shallowName = (suffix: string) => (shallow ? suffix : routeName(suffix));
 
-    const allowed = allowedActions(options, ["index", "show", "new", "create", "edit", "update", "destroy"]);
+    const allowed = allowedActions(options, [
+      "index",
+      "show",
+      "new",
+      "create",
+      "edit",
+      "update",
+      "destroy",
+    ]);
     const scopeConstraints = this.currentScopeConstraints();
     const constraints = scopeConstraints
       ? { ...scopeConstraints, ...options.constraints }
@@ -98,21 +116,19 @@ export class Mapper {
       this.routes.push(
         new Route("GET", basePath, controller, "index", {
           name: routeName(name),
-        })
+        }),
       );
     }
 
     if (allowed.has("create")) {
-      this.routes.push(
-        new Route("POST", basePath, controller, "create")
-      );
+      this.routes.push(new Route("POST", basePath, controller, "create"));
     }
 
     if (allowed.has("new")) {
       this.routes.push(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: routeName(`new_${singular}`),
-        })
+        }),
       );
     }
 
@@ -142,7 +158,7 @@ export class Mapper {
         new Route("GET", `${shallowPath}/:id`, controller, "show", {
           name: shallowName(singular),
           constraints,
-        })
+        }),
       );
     }
 
@@ -151,29 +167,33 @@ export class Mapper {
         new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
           name: shallowName(`edit_${singular}`),
           constraints,
-        })
+        }),
       );
     }
 
     if (allowed.has("update")) {
       this.routes.push(
-        new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints })
+        new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
       this.routes.push(
-        new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints })
+        new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
     }
 
     if (allowed.has("destroy")) {
       this.routes.push(
-        new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints })
+        new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints }),
       );
     }
   }
 
   // --- resource (singular) ---
 
-  resource(name: string, optionsOrCallback?: RouteOptions | MapperCallback, callback?: MapperCallback): void {
+  resource(
+    name: string,
+    optionsOrCallback?: RouteOptions | MapperCallback,
+    callback?: MapperCallback,
+  ): void {
     let options: RouteOptions = {};
     let cb: MapperCallback | undefined;
 
@@ -190,8 +210,7 @@ export class Mapper {
     const prefix = this.currentPrefix();
     const basePath = `${prefix}/${name}`;
     const namePrefix = this.currentNamePrefix();
-    const routeName = (suffix: string) =>
-      namePrefix ? `${namePrefix}_${suffix}` : suffix;
+    const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
     const allowed = allowedActions(options, ["show", "new", "create", "edit", "update", "destroy"]);
     const pathNames = options.pathNames ?? {};
@@ -202,21 +221,19 @@ export class Mapper {
       this.routes.push(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: routeName(`new_${name}`),
-        })
+        }),
       );
     }
 
     if (allowed.has("create")) {
-      this.routes.push(
-        new Route("POST", basePath, controller, "create")
-      );
+      this.routes.push(new Route("POST", basePath, controller, "create"));
     }
 
     if (allowed.has("show")) {
       this.routes.push(
         new Route("GET", basePath, controller, "show", {
           name: routeName(name),
-        })
+        }),
       );
     }
 
@@ -224,23 +241,17 @@ export class Mapper {
       this.routes.push(
         new Route("GET", `${basePath}/${editPath}`, controller, "edit", {
           name: routeName(`edit_${name}`),
-        })
+        }),
       );
     }
 
     if (allowed.has("update")) {
-      this.routes.push(
-        new Route("PUT", basePath, controller, "update")
-      );
-      this.routes.push(
-        new Route("PATCH", basePath, controller, "update")
-      );
+      this.routes.push(new Route("PUT", basePath, controller, "update"));
+      this.routes.push(new Route("PATCH", basePath, controller, "update"));
     }
 
     if (allowed.has("destroy")) {
-      this.routes.push(
-        new Route("DELETE", basePath, controller, "destroy")
-      );
+      this.routes.push(new Route("DELETE", basePath, controller, "destroy"));
     }
 
     if (cb) {
@@ -268,7 +279,11 @@ export class Mapper {
 
   // --- scope ---
 
-  scope(pathOrOptions: string | ScopeOptions, callbackOrOptions?: MapperCallback | ScopeOptions, callback?: MapperCallback): void {
+  scope(
+    pathOrOptions: string | ScopeOptions,
+    callbackOrOptions?: MapperCallback | ScopeOptions,
+    callback?: MapperCallback,
+  ): void {
     let path: string | undefined;
     let options: ScopeOptions = {};
     let cb: MapperCallback;
@@ -329,7 +344,10 @@ export class Mapper {
 
   // --- constraints block ---
 
-  constraints(constraintsOrCallback: RouteOptions["constraints"] | MapperCallback, callback?: MapperCallback): void {
+  constraints(
+    constraintsOrCallback: RouteOptions["constraints"] | MapperCallback,
+    callback?: MapperCallback,
+  ): void {
     if (typeof constraintsOrCallback === "function") {
       constraintsOrCallback(this);
     } else {
@@ -367,7 +385,9 @@ export class Mapper {
 
   match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
     const methods = options.via
-      ? Array.isArray(options.via) ? options.via : [options.via]
+      ? Array.isArray(options.via)
+        ? options.via
+        : [options.via]
       : ["ALL"];
 
     for (const method of methods) {
@@ -405,18 +425,14 @@ export class Mapper {
     }
     const name = options.as ?? options.name;
     const namePrefix = this.currentNamePrefix();
-    const fullName = name
-      ? namePrefix
-        ? `${namePrefix}_${name}`
-        : name
-      : undefined;
+    const fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
 
     this.routes.push(
       new Route(verb, fullPath, controller, action, {
         ...options,
         name: fullName,
         redirect: redirectTarget,
-      })
+      }),
     );
   }
 
@@ -435,16 +451,12 @@ export class Mapper {
   }
 
   private currentNamePrefix(): string | undefined {
-    const parts = this.scopeStack
-      .map((f) => f.namePrefix)
-      .filter(Boolean) as string[];
+    const parts = this.scopeStack.map((f) => f.namePrefix).filter(Boolean) as string[];
     return parts.length > 0 ? parts.join("_") : undefined;
   }
 
   private currentControllerPrefix(): string | undefined {
-    const parts = this.scopeStack
-      .map((f) => f.controller)
-      .filter(Boolean) as string[];
+    const parts = this.scopeStack.map((f) => f.controller).filter(Boolean) as string[];
     return parts.length > 0 ? parts.join("/") : undefined;
   }
 
@@ -511,9 +523,7 @@ function singularize(word: string): string {
 
 /** Naive pluralize. */
 function pluralize(word: string): string {
-  if (word.endsWith("y") && !/[aeiou]y$/.test(word))
-    return word.slice(0, -1) + "ies";
-  if (word.endsWith("s") || word.endsWith("x") || word.endsWith("z"))
-    return word + "es";
+  if (word.endsWith("y") && !/[aeiou]y$/.test(word)) return word.slice(0, -1) + "ies";
+  if (word.endsWith("s") || word.endsWith("x") || word.endsWith("z")) return word + "es";
   return word + "s";
 }

@@ -63,10 +63,30 @@ export class BooleanType extends Type<boolean> {
   readonly name = "boolean";
 
   private static readonly TRUE_VALUES = new Set([
-    true, 1, "1", "t", "T", "true", "TRUE", "on", "ON", "yes", "YES",
+    true,
+    1,
+    "1",
+    "t",
+    "T",
+    "true",
+    "TRUE",
+    "on",
+    "ON",
+    "yes",
+    "YES",
   ]);
   private static readonly FALSE_VALUES = new Set([
-    false, 0, "0", "f", "F", "false", "FALSE", "off", "OFF", "no", "NO",
+    false,
+    0,
+    "0",
+    "f",
+    "F",
+    "false",
+    "FALSE",
+    "off",
+    "OFF",
+    "no",
+    "NO",
   ]);
 
   cast(value: unknown): boolean | null {
@@ -128,7 +148,7 @@ export class BigIntegerType extends Type<bigint> {
   cast(value: unknown): bigint | null {
     if (value === null || value === undefined) return null;
     try {
-      return BigInt(typeof value === "string" ? value.trim() : value as any);
+      return BigInt(typeof value === "string" ? value.trim() : (value as any));
     } catch {
       return null;
     }

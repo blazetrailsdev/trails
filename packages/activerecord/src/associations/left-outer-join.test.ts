@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -28,29 +68,46 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("LeftOuterJoinAssociationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModels() {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Post, "author", {});
     Associations.hasMany.call(Author, "posts", {});
     Associations.hasMany.call(Post, "comments", {});
-    registerModel(Author); registerModel(Post); registerModel(Comment);
+    registerModel(Author);
+    registerModel(Post);
+    registerModel(Comment);
     return { Author, Post, Comment };
   }
 
   it("merging multiple left joins from different associations", () => {
     const { Post } = makeModels();
-    const sql = Post.all().leftOuterJoins("authors", "posts.author_id = authors.id")
-                    .leftOuterJoins("comments", "comments.post_id = posts.id").toSql();
+    const sql = Post.all()
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .leftOuterJoins("comments", "comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("authors");
     expect(sql).toContain("comments");
@@ -65,8 +122,10 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("construct finder sql does not table name collide on duplicate associations", () => {
     const { Post } = makeModels();
-    const sql = Post.all().leftOuterJoins("authors", "posts.author_id = authors.id")
-                    .leftOuterJoins("comments", "comments.post_id = posts.id").toSql();
+    const sql = Post.all()
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .leftOuterJoins("comments", "comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("authors");
     expect(sql).toContain("comments");
@@ -106,8 +165,10 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("left outer joins is deduped when same association is joined", () => {
     const { Post } = makeModels();
-    const sql = Post.all().leftOuterJoins("authors", "posts.author_id = authors.id")
-                    .leftOuterJoins("authors", "posts.author_id = authors.id").toSql();
+    const sql = Post.all()
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
   });
 
@@ -125,7 +186,9 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).not.toContain("JOIN");
   });
 
-  it.skip("left outer joins forbids to use string as argument", () => { /* Rails raises on string arg; our impl accepts strings */ });
+  it.skip("left outer joins forbids to use string as argument", () => {
+    /* Rails raises on string arg; our impl accepts strings */
+  });
 
   it("left outer joins with string join", () => {
     const { Post } = makeModels();
@@ -133,11 +196,15 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).toContain("LEFT OUTER JOIN");
   });
 
-  it.skip("left outer joins with arel join", () => { /* needs arel node support */ });
+  it.skip("left outer joins with arel join", () => {
+    /* needs arel node support */
+  });
 
   it("join conditions added to join clause", () => {
     const { Post } = makeModels();
-    const sql = Post.all().leftOuterJoins("authors", "posts.author_id = authors.id AND authors.name IS NOT NULL").toSql();
+    const sql = Post.all()
+      .leftOuterJoins("authors", "posts.author_id = authors.id AND authors.name IS NOT NULL")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("authors.name");
   });
@@ -145,16 +212,29 @@ describe("LeftOuterJoinAssociationTest", () => {
   it("find with sti join", async () => {
     const a = createTestAdapter();
     class LComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("type", "string"); this.attribute("post_id", "integer"); this.adapter = a; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("type", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = a;
+      }
     }
     enableSti(LComment);
     class LSpecialComment extends LComment {}
     registerSubclass(LSpecialComment);
     class LPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = a; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = a;
+      }
     }
-    Associations.hasMany.call(LPost, "lSpecialComments", { className: "LSpecialComment", foreignKey: "post_id" });
-    registerModel(LComment); registerModel(LSpecialComment); registerModel(LPost);
+    Associations.hasMany.call(LPost, "lSpecialComments", {
+      className: "LSpecialComment",
+      foreignKey: "post_id",
+    });
+    registerModel(LComment);
+    registerModel(LSpecialComment);
+    registerModel(LPost);
 
     const post = await LPost.create({ title: "STI Post" });
     await LComment.create({ body: "regular", type: "LComment", post_id: post.id });
@@ -167,22 +247,29 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("does not override select", () => {
     const { Post } = makeModels();
-    const sql = Post.select("posts.title").leftOuterJoins("authors", "posts.author_id = authors.id").toSql();
+    const sql = Post.select("posts.title")
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("title");
   });
 
   it("the default scope of the target is applied when joining associations", () => {
     const { Post } = makeModels();
-    const sql = Post.all().leftOuterJoins("authors", "posts.author_id = authors.id").where({ title: "test" }).toSql();
+    const sql = Post.all()
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .where({ title: "test" })
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("WHERE");
   });
 
   it("left outer joins includes all nested associations", () => {
     const { Author } = makeModels();
-    const sql = Author.all().leftOuterJoins("posts", "posts.author_id = authors.id")
-                      .leftOuterJoins("comments", "comments.post_id = posts.id").toSql();
+    const sql = Author.all()
+      .leftOuterJoins("posts", "posts.author_id = authors.id")
+      .leftOuterJoins("comments", "comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("posts");
     expect(sql).toContain("comments");

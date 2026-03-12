@@ -115,10 +115,7 @@ describe("except", () => {
 
 describe("deepTransformKeys", () => {
   it("transforms keys recursively", () => {
-    const result = deepTransformKeys(
-      { foo_bar: { baz_qux: 1 } },
-      (k) => k.toUpperCase()
-    );
+    const result = deepTransformKeys({ foo_bar: { baz_qux: 1 } }, (k) => k.toUpperCase());
     expect(result).toEqual({ FOO_BAR: { BAZ_QUX: 1 } });
   });
 
@@ -231,52 +228,44 @@ describe("reverseMerge", () => {
 describe("assertValidKeys", () => {
   it("passes when all keys are valid", () => {
     expect(() =>
-      assertValidKeys({ failure: "stuff", funny: "business" }, [
-        "failure",
-        "funny",
-      ])
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny"]),
     ).not.toThrow();
   });
 
   it("passes when not all valid keys are present", () => {
     expect(() =>
-      assertValidKeys({ failure: "stuff" }, ["failure", "funny", "sunny"])
+      assertValidKeys({ failure: "stuff" }, ["failure", "funny", "sunny"]),
     ).not.toThrow();
   });
 
   it("throws on unknown key", () => {
     expect(() =>
-      assertValidKeys({ failore: "stuff", funny: "business" }, [
-        "failure",
-        "funny",
-      ])
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
     ).toThrow(/Unknown key: failore/);
   });
 
   it("includes valid keys in error message", () => {
-    expect(() =>
-      assertValidKeys({ failore: "stuff" }, ["failure"])
-    ).toThrow(/Valid keys are: failure/);
+    expect(() => assertValidKeys({ failore: "stuff" }, ["failure"])).toThrow(
+      /Valid keys are: failure/,
+    );
   });
 });
 
 describe("deepTransformValues", () => {
   it("transforms flat values", () => {
-    expect(
-      deepTransformValues({ a: 1, b: 2 }, (v) => String(v))
-    ).toEqual({ a: "1", b: "2" });
+    expect(deepTransformValues({ a: 1, b: 2 }, (v) => String(v))).toEqual({ a: "1", b: "2" });
   });
 
   it("transforms values recursively", () => {
-    expect(
-      deepTransformValues({ a: { b: { c: 3 } } }, (v) => String(v))
-    ).toEqual({ a: { b: { c: "3" } } });
+    expect(deepTransformValues({ a: { b: { c: 3 } } }, (v) => String(v))).toEqual({
+      a: { b: { c: "3" } },
+    });
   });
 
   it("transforms values in arrays", () => {
-    expect(
-      deepTransformValues({ a: [{ b: 2 }, { c: 3 }, 4] }, (v) => String(v))
-    ).toEqual({ a: [{ b: "2" }, { c: "3" }, "4"] });
+    expect(deepTransformValues({ a: [{ b: 2 }, { c: 3 }, 4] }, (v) => String(v))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
   });
 
   it("does not mutate the original", () => {
@@ -401,14 +390,12 @@ describe("toSentence", () => {
       toSentence(["one", "two", "three"], {
         wordsConnector: " - ",
         lastWordConnector: " - and lastly - ",
-      })
+      }),
     ).toBe("one - two - and lastly - three");
   });
 
   it("supports custom two-word connector", () => {
-    expect(
-      toSentence(["one", "two"], { twoWordsConnector: " or " })
-    ).toBe("one or two");
+    expect(toSentence(["one", "two"], { twoWordsConnector: " or " })).toBe("one or two");
   });
 });
 
@@ -523,9 +510,7 @@ describe("inBatchesOf", () => {
 
 describe("compactBlank", () => {
   it("removes blank values", () => {
-    expect(compactBlank([1, null, "", "  ", undefined, 0, false, "a"])).toEqual([
-      1, 0, "a",
-    ]);
+    expect(compactBlank([1, null, "", "  ", undefined, 0, false, "a"])).toEqual([1, 0, "a"]);
   });
 
   it("keeps present values", () => {
@@ -627,11 +612,15 @@ describe("ToSentenceTest", () => {
   });
 
   it("to sentence with words connector", () => {
-    expect(toSentence(["one", "two", "three"], { wordsConnector: " + " })).toBe("one + two, and three");
+    expect(toSentence(["one", "two", "three"], { wordsConnector: " + " })).toBe(
+      "one + two, and three",
+    );
   });
 
   it("to sentence with last word connector", () => {
-    expect(toSentence(["one", "two", "three"], { lastWordConnector: " and also " })).toBe("one, two and also three");
+    expect(toSentence(["one", "two", "three"], { lastWordConnector: " and also " })).toBe(
+      "one, two and also three",
+    );
   });
 
   it("two elements", () => {
@@ -683,15 +672,24 @@ describe("ToSentenceTest", () => {
 
 describe("GroupingTest", () => {
   it("in groups of with perfect fit", () => {
-    expect(inGroupsOf([1, 2, 3, 4, 5, 6], 3)).toEqual([[1, 2, 3], [4, 5, 6]]);
+    expect(inGroupsOf([1, 2, 3, 4, 5, 6], 3)).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
   });
 
   it("in groups of with padding", () => {
-    expect(inGroupsOf([1, 2, 3, 4, 5], 3)).toEqual([[1, 2, 3], [4, 5, null]]);
+    expect(inGroupsOf([1, 2, 3, 4, 5], 3)).toEqual([
+      [1, 2, 3],
+      [4, 5, null],
+    ]);
   });
 
   it("in groups of pads with specified values", () => {
-    expect(inGroupsOf([1, 2, 3, 4, 5], 3, 0)).toEqual([[1, 2, 3], [4, 5, 0]]);
+    expect(inGroupsOf([1, 2, 3, 4, 5], 3, 0)).toEqual([
+      [1, 2, 3],
+      [4, 5, 0],
+    ]);
   });
 
   it("in groups of without padding", () => {
@@ -714,11 +712,19 @@ describe("GroupingTest", () => {
   });
 
   it("in groups with perfect fit", () => {
-    expect(inGroups([1, 2, 3, 4, 5, 6], 3)).toEqual([[1, 2], [3, 4], [5, 6]]);
+    expect(inGroups([1, 2, 3, 4, 5, 6], 3)).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ]);
   });
 
   it("in groups with padding", () => {
-    expect(inGroups([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([[1, 2, 3], [4, 5, null], [6, 7, null]]);
+    expect(inGroups([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([
+      [1, 2, 3],
+      [4, 5, null],
+      [6, 7, null],
+    ]);
   });
 
   it("in groups without padding", () => {
@@ -739,7 +745,10 @@ describe("SplitTest", () => {
   });
 
   it("split with argument", () => {
-    expect(splitArray([1, 2, 3, 4, 5], 3)).toEqual([[1, 2], [4, 5]]);
+    expect(splitArray([1, 2, 3, 4, 5], 3)).toEqual([
+      [1, 2],
+      [4, 5],
+    ]);
   });
 
   it("split with block", () => {
@@ -976,8 +985,12 @@ describe("InTest", () => {
     expect(outside >= start && outside <= end).toBe(false);
   });
 
-  it.skip("in module", () => { /* Ruby-specific Module#=== */ });
-  it.skip("no method catching", () => { /* Ruby-specific method_missing */ });
+  it.skip("in module", () => {
+    /* Ruby-specific Module#=== */
+  });
+  it.skip("no method catching", () => {
+    /* Ruby-specific method_missing */
+  });
 
   it("presence in", () => {
     expect(presenceIn(2, [1, 2, 3])).toBe(2);

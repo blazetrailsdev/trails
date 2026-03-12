@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -32,7 +72,13 @@ function freshAdapter(): DatabaseAdapter {
 describe("InsertAllTest", () => {
   function makeBook(adapter: DatabaseAdapter) {
     class Book extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     return Book;
   }
@@ -82,7 +128,7 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     await expect(
-      Book.upsertAll([{ title: "X" }], { onDuplicate: "skip", updateOnly: "title" } as any)
+      Book.upsertAll([{ title: "X" }], { onDuplicate: "skip", updateOnly: "title" } as any),
     ).rejects.toThrow();
   });
 
@@ -90,7 +136,9 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Original", author: "Smith" });
-    await Book.upsertAll([{ id: b.id, title: "Ignored", author: "Kept" }], { updateOnly: "author" } as any);
+    await Book.upsertAll([{ id: b.id, title: "Ignored", author: "Kept" }], {
+      updateOnly: "author",
+    } as any);
     const found = await Book.find(b.id);
     // author gets updated but title stays (updateOnly restricts to author)
     expect(found.readAttribute("author")).toBe("Kept");
@@ -100,7 +148,9 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Title", author: "Author", status: 0 });
-    await Book.upsertAll([{ id: b.id, title: "New Title", author: "New Author", status: 1 }], { updateOnly: ["title", "author"] } as any);
+    await Book.upsertAll([{ id: b.id, title: "New Title", author: "New Author", status: 1 }], {
+      updateOnly: ["title", "author"],
+    } as any);
     const found = await Book.find(b.id);
     expect(found.readAttribute("title")).toBe("New Title");
     expect(found.readAttribute("author")).toBe("New Author");
@@ -118,10 +168,15 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     defineEnum(Book, "status", { draft: 0, published: 1 });
-    await Book.insertAll([{ title: "Draft Book", status: 0 }, { title: "Published Book", status: 1 }]);
+    await Book.insertAll([
+      { title: "Draft Book", status: 0 },
+      { title: "Published Book", status: 1 },
+    ]);
     const all = await Book.all().toArray();
     expect(all).toHaveLength(2);
-    expect(all.find((b: any) => b.readAttribute("title") === "Draft Book")!.readAttribute("status")).toBe(0);
+    expect(
+      all.find((b: any) => b.readAttribute("title") === "Draft Book")!.readAttribute("status"),
+    ).toBe(0);
   });
 
   it("insert all on relation", async () => {
@@ -145,7 +200,9 @@ describe("InsertAllTest", () => {
   it("insert all create with", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
-    await Book.all().createWith({ author: "DefaultAuthor" }).insertAll([{ title: "Book1" }, { title: "Book2" }]);
+    await Book.all()
+      .createWith({ author: "DefaultAuthor" })
+      .insertAll([{ title: "Book1" }, { title: "Book2" }]);
     const all = await Book.where({ author: "DefaultAuthor" }).toArray();
     expect(all).toHaveLength(2);
   });
@@ -169,7 +226,9 @@ describe("InsertAllTest", () => {
   it("upsert all create with", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
-    await Book.all().createWith({ author: "Default" }).upsertAll([{ title: "New" }]);
+    await Book.all()
+      .createWith({ author: "Default" })
+      .upsertAll([{ title: "New" }]);
     const all = await Book.where({ author: "Default" }).toArray();
     expect(all).toHaveLength(1);
   });
@@ -188,7 +247,13 @@ describe("InsertAllTest", () => {
 describe("InsertAllTest", () => {
   function makeBook(adapter: DatabaseAdapter) {
     class Book extends Base {
-      static { this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     return Book;
   }
@@ -262,7 +327,13 @@ describe("InsertAllTest", () => {
   it("insert_all with composite primary key", async () => {
     const adapter = freshAdapter();
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     await CpkOrder.insertAll([
       { shop_id: 1, id: 1, name: "A" },
@@ -274,7 +345,13 @@ describe("InsertAllTest", () => {
   it("upsert_all with composite primary key", async () => {
     const adapter = freshAdapter();
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "original" }]);
     await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "updated" }]);
@@ -303,10 +380,18 @@ describe("InsertAllTest", () => {
   it("insert all and upsert all works with composite primary keys when unique by is provided", async () => {
     const adapter = freshAdapter();
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "first" }]);
-    await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "second" }], { uniqueBy: ["shop_id", "id"] });
+    await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "second" }], {
+      uniqueBy: ["shop_id", "id"],
+    });
     const count = await CpkOrder.count();
     expect(count).toBe(1);
     const record = await CpkOrder.find([1, 1]);
@@ -315,7 +400,13 @@ describe("InsertAllTest", () => {
   it("insert all and upsert all works with composite primary keys when unique by is not provided", async () => {
     const adapter = freshAdapter();
     class CpkOrder extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "first" }]);
     // Without uniqueBy, defaults to composite primary key
@@ -352,13 +443,16 @@ describe("InsertAllTest", () => {
   it.skip("insert all when table name contains database", () => {});
 });
 
-
 describe("insertAll / upsertAll", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("insert all", async () => {
-    class Product extends Base { static _tableName = "products"; }
+    class Product extends Base {
+      static _tableName = "products";
+    }
     Product.attribute("id", "integer");
     Product.attribute("name", "string");
     Product.attribute("price", "integer");
@@ -375,7 +469,9 @@ describe("insertAll / upsertAll", () => {
   });
 
   it("returns 0 for empty array", async () => {
-    class Product extends Base { static _tableName = "products"; }
+    class Product extends Base {
+      static _tableName = "products";
+    }
     Product.attribute("id", "integer");
     Product.adapter = adapter;
 
@@ -383,7 +479,6 @@ describe("insertAll / upsertAll", () => {
     expect(result).toBe(0);
   });
 });
-
 
 describe("insertAll / upsertAll (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -396,8 +491,18 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
   it("insert all", async () => {
     const log: string[] = [];
     class Book extends Base {
-      static { this._tableName = "books"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
-      static { this.beforeSave(() => { log.push("before_save"); }); }
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
+      static {
+        this.beforeSave(() => {
+          log.push("before_save");
+        });
+      }
     }
 
     await Book.insertAll([
@@ -414,7 +519,11 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
   // Rails: test "insert_all returns count"
   it("insert_all with empty array returns 0", async () => {
     class Book extends Base {
-      static { this._tableName = "books"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     expect(await Book.insertAll([])).toBe(0);
   });
@@ -422,7 +531,12 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
   // Rails: test "upsert_all inserts and updates"
   it("upsert_all inserts new records", async () => {
     class Book extends Base {
-      static { this._tableName = "books"; this.attribute("id", "integer"); this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Book.upsertAll([

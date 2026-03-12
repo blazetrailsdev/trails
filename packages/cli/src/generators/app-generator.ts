@@ -21,63 +21,85 @@ export class AppGenerator extends GeneratorBase {
     this.output("");
 
     // package.json
-    this.createFile("package.json", JSON.stringify({
-      name,
-      version: "0.1.0",
-      private: true,
-      type: "module",
-      scripts: {
-        build: "tsc",
-        test: "vitest run",
-        dev: "rails-ts server",
-        "db:migrate": "rails-ts db migrate",
-      },
-      dependencies: {
-        "@rails-ts/activerecord": "*",
-        "@rails-ts/activesupport": "*",
-        "@rails-ts/rack": "*",
-        "@rails-ts/actionpack": "*",
-        "@rails-ts/cli": "*",
-        ...this.dbDependency(options.database),
-      },
-      devDependencies: {
-        typescript: "^5.7.0",
-        vitest: "^3.0.0",
-      },
-    }, null, 2) + "\n");
+    this.createFile(
+      "package.json",
+      JSON.stringify(
+        {
+          name,
+          version: "0.1.0",
+          private: true,
+          type: "module",
+          scripts: {
+            build: "tsc",
+            test: "vitest run",
+            dev: "rails-ts server",
+            "db:migrate": "rails-ts db migrate",
+          },
+          dependencies: {
+            "@rails-ts/activerecord": "*",
+            "@rails-ts/activesupport": "*",
+            "@rails-ts/rack": "*",
+            "@rails-ts/actionpack": "*",
+            "@rails-ts/cli": "*",
+            ...this.dbDependency(options.database),
+          },
+          devDependencies: {
+            typescript: "^5.7.0",
+            vitest: "^3.0.0",
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
 
     // tsconfig.json
-    this.createFile("tsconfig.json", JSON.stringify({
-      compilerOptions: {
-        target: "ES2022",
-        module: "Node16",
-        moduleResolution: "Node16",
-        declaration: true,
-        strict: true,
-        esModuleInterop: true,
-        skipLibCheck: true,
-        outDir: "dist",
-        rootDir: "src",
-      },
-      include: ["src"],
-    }, null, 2) + "\n");
+    this.createFile(
+      "tsconfig.json",
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: "ES2022",
+            module: "Node16",
+            moduleResolution: "Node16",
+            declaration: true,
+            strict: true,
+            esModuleInterop: true,
+            skipLibCheck: true,
+            outDir: "dist",
+            rootDir: "src",
+          },
+          include: ["src"],
+        },
+        null,
+        2,
+      ) + "\n",
+    );
 
     // .gitignore
-    this.createFile(".gitignore", `node_modules/
+    this.createFile(
+      ".gitignore",
+      `node_modules/
 dist/
 *.js
 *.d.ts
 *.js.map
 .env
-`);
+`,
+    );
 
     // Application entry
-    this.createFile("src/app.ts", `// Rails-TS Application
+    this.createFile(
+      "src/app.ts",
+      `// Rails-TS Application
 export const APP_NAME = "${name}";
-`);
+`,
+    );
 
     // Server entry
-    this.createFile("src/server.ts", `import * as http from "node:http";
+    this.createFile(
+      "src/server.ts",
+      `import * as http from "node:http";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
@@ -90,10 +112,13 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(\`${name} listening on http://localhost:\${PORT}\`);
 });
-`);
+`,
+    );
 
     // Routes
-    this.createFile("src/config/routes.ts", `// Define your application routes here.
+    this.createFile(
+      "src/config/routes.ts",
+      `// Define your application routes here.
 // Example:
 //   router.resources("posts");
 //   router.get("/", "home#index");
@@ -101,24 +126,30 @@ server.listen(PORT, () => {
 export function drawRoutes(router: any): void {
   // routes
 }
-`);
+`,
+    );
 
     // Database config
     this.createFile("src/config/database.ts", this.dbConfig(name, options.database));
 
     // Application controller
-    this.createFile("src/app/controllers/application-controller.ts", `import { ActionController } from "@rails-ts/actionpack";
+    this.createFile(
+      "src/app/controllers/application-controller.ts",
+      `import { ActionController } from "@rails-ts/actionpack";
 
 export class ApplicationController extends ActionController.Base {
   // Base controller — all controllers inherit from this.
 }
-`);
+`,
+    );
 
     // Models directory placeholder
     this.createFile("src/app/models/.gitkeep", "");
 
     // Layout
-    this.createFile("src/app/views/layouts/application.html.ejs", `<!DOCTYPE html>
+    this.createFile(
+      "src/app/views/layouts/application.html.ejs",
+      `<!DOCTYPE html>
 <html>
 <head>
   <title>${name}</title>
@@ -143,21 +174,28 @@ export class ApplicationController extends ActionController.Base {
   <%- yield %>
 </body>
 </html>
-`);
+`,
+    );
 
     // Migrations directory
     this.createFile("db/migrations/.gitkeep", "");
 
     // Seeds
-    this.createFile("db/seeds.ts", `// Seed your database here.
+    this.createFile(
+      "db/seeds.ts",
+      `// Seed your database here.
 // Example:
 //   import { User } from "../src/app/models/user.js";
 //   await User.create({ name: "Admin", email: "admin@example.com" });
-`);
+`,
+    );
 
     // Test directory
-    this.createFile("test/setup.ts", `// Test setup — runs before all tests.
-`);
+    this.createFile(
+      "test/setup.ts",
+      `// Test setup — runs before all tests.
+`,
+    );
 
     this.output("");
 
@@ -190,9 +228,13 @@ export class ApplicationController extends ActionController.Base {
 
   private dbDependency(db: string): Record<string, string> {
     switch (db) {
-      case "postgres": return { pg: "^8.19.0" };
-      case "mysql": return { mysql2: "^3.18.0" };
-      case "sqlite": default: return { "better-sqlite3": "^12.6.0" };
+      case "postgres":
+        return { pg: "^8.19.0" };
+      case "mysql":
+        return { mysql2: "^3.18.0" };
+      case "sqlite":
+      default:
+        return { "better-sqlite3": "^12.6.0" };
     }
   }
 

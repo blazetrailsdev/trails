@@ -1149,7 +1149,10 @@ describe("ActionController::Parameters::Iteration", () => {
     const params = new Parameters({ a: "1", b: "2" });
     const collected: [string, unknown][] = [];
     params.each((k, v) => collected.push([k, v]));
-    expect(collected).toEqual([["a", "1"], ["b", "2"]]);
+    expect(collected).toEqual([
+      ["a", "1"],
+      ["b", "2"],
+    ]);
   });
 
   it("eachPair is alias for each", () => {

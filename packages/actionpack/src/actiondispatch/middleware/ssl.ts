@@ -74,7 +74,8 @@ export class SSL {
     }
 
     const scheme = (env["rack.url_scheme"] as string) || "http";
-    const isSSL = scheme === "https" ||
+    const isSSL =
+      scheme === "https" ||
       (env["HTTP_X_FORWARDED_PROTO"] as string)?.split(",")[0]?.trim() === "https";
 
     if (!isSSL && this.redirect) {
@@ -122,9 +123,12 @@ export class SSL {
   }
 
   private flagCookiesAsSecure(setCookie: string): string {
-    return setCookie.split("\n").map(cookie => {
-      if (cookie.toLowerCase().includes("; secure")) return cookie;
-      return cookie + "; secure";
-    }).join("\n");
+    return setCookie
+      .split("\n")
+      .map((cookie) => {
+        if (cookie.toLowerCase().includes("; secure")) return cookie;
+        return cookie + "; secure";
+      })
+      .join("\n");
   }
 }

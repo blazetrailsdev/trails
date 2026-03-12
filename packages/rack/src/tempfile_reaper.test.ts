@@ -5,7 +5,9 @@ import { RACK_TEMPFILES } from "./constants.js";
 
 class MockTempfile {
   closed = false;
-  "close!"() { this.closed = true; }
+  "close!"() {
+    this.closed = true;
+  }
 }
 
 describe("Rack::TempfileReaper", () => {
@@ -22,17 +24,19 @@ describe("Rack::TempfileReaper", () => {
   function callWithResponseFinished(app: any, e: Record<string, any>) {
     e["rack.response_finished"] = [] as any[];
     const promise = call(app, e);
-    return promise.then((resp) => {
-      for (const cb of e["rack.response_finished"]) {
-        cb(e, resp[0], resp[1], null);
-      }
-      return resp;
-    }).catch((err) => {
-      for (const cb of e["rack.response_finished"]) {
-        cb(e, null, null, err);
-      }
-      throw err;
-    });
+    return promise
+      .then((resp) => {
+        for (const cb of e["rack.response_finished"]) {
+          cb(e, resp[0], resp[1], null);
+        }
+        return resp;
+      })
+      .catch((err) => {
+        for (const cb of e["rack.response_finished"]) {
+          cb(e, null, null, err);
+        }
+        throw err;
+      });
   }
 
   it("do nothing (i.e. not bomb out) without env[rack.tempfiles]", async () => {
@@ -44,7 +48,10 @@ describe("Rack::TempfileReaper", () => {
 
   it("does nothing without env[rack.tempfiles] with rack.response_finished", async () => {
     env = makeEnv();
-    const response = await callWithResponseFinished(async () => [200, {}, ["Hello, World!"]] as any, env);
+    const response = await callWithResponseFinished(
+      async () => [200, {}, ["Hello, World!"]] as any,
+      env,
+    );
     expect(response[0]).toBe(200);
   });
 
@@ -53,7 +60,11 @@ describe("Rack::TempfileReaper", () => {
     const t1 = new MockTempfile();
     const t2 = new MockTempfile();
     env[RACK_TEMPFILES] = [t1, t2];
-    await expect(call(async () => { throw new Error("foo"); }, env)).rejects.toThrow("foo");
+    await expect(
+      call(async () => {
+        throw new Error("foo");
+      }, env),
+    ).rejects.toThrow("foo");
     expect(t1.closed).toBe(true);
     expect(t2.closed).toBe(true);
   });
@@ -63,7 +74,11 @@ describe("Rack::TempfileReaper", () => {
     const t1 = new MockTempfile();
     const t2 = new MockTempfile();
     env[RACK_TEMPFILES] = [t1, t2];
-    await expect(callWithResponseFinished(async () => { throw new Error("foo"); }, env)).rejects.toThrow("foo");
+    await expect(
+      callWithResponseFinished(async () => {
+        throw new Error("foo");
+      }, env),
+    ).rejects.toThrow("foo");
     expect(t1.closed).toBe(true);
     expect(t2.closed).toBe(true);
   });
@@ -73,7 +88,11 @@ describe("Rack::TempfileReaper", () => {
     const t1 = new MockTempfile();
     const t2 = new MockTempfile();
     env[RACK_TEMPFILES] = [t1, t2];
-    await expect(call(async () => { throw new TypeError("foo"); }, env)).rejects.toThrow("foo");
+    await expect(
+      call(async () => {
+        throw new TypeError("foo");
+      }, env),
+    ).rejects.toThrow("foo");
     expect(t1.closed).toBe(true);
     expect(t2.closed).toBe(true);
   });
@@ -143,17 +162,21 @@ describe("Rack::TempfileReaper", () => {
 
   it("handle missing rack.tempfiles on error", async () => {
     env = makeEnv();
-    await expect(call(async (e: any) => {
-      delete e[RACK_TEMPFILES];
-      throw new Error("Foo");
-    }, env)).rejects.toThrow("Foo");
+    await expect(
+      call(async (e: any) => {
+        delete e[RACK_TEMPFILES];
+        throw new Error("Foo");
+      }, env),
+    ).rejects.toThrow("Foo");
   });
 
   it("handle missing rack.tempfiles on error with rack.response_finished", async () => {
     env = makeEnv();
-    await expect(callWithResponseFinished(async (e: any) => {
-      delete e[RACK_TEMPFILES];
-      throw new Error("Foo");
-    }, env)).rejects.toThrow("Foo");
+    await expect(
+      callWithResponseFinished(async (e: any) => {
+        delete e[RACK_TEMPFILES];
+        throw new Error("Foo");
+      }, env),
+    ).rejects.toThrow("Foo");
   });
 });

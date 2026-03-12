@@ -21,7 +21,7 @@ import {
 
 describe("HashExtTest", () => {
   const strings = { a: 1, b: 2 };
-  const symbols = { a: 1, b: 2 };  // in TS keys are always strings
+  const symbols = { a: 1, b: 2 }; // in TS keys are always strings
   const mixed = { a: 1, b: 2 };
 
   it("deep_transform_keys — transforms all keys recursively", () => {
@@ -54,7 +54,9 @@ describe("HashExtTest", () => {
 
   it("deep_transform_values — arrays", () => {
     const obj = { a: [{ b: 2 }, { c: 3 }, 4] };
-    expect(deepTransformValues(obj, (v) => String(v))).toEqual({ a: [{ b: "2" }, { c: "3" }, "4"] });
+    expect(deepTransformValues(obj, (v) => String(v))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
   });
 
   it("deep_transform_values does not mutate original", () => {
@@ -95,26 +97,26 @@ describe("HashExtTest", () => {
 
   it("assert_valid_keys — passes for valid keys", () => {
     expect(() =>
-      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny"])
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny"]),
     ).not.toThrow();
   });
 
   it("assert_valid_keys — passes when not all valid keys present", () => {
     expect(() =>
-      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny", "sunny"])
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny", "sunny"]),
     ).not.toThrow();
   });
 
   it("assert_valid_keys — throws on unknown key", () => {
     expect(() =>
-      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"])
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
     ).toThrow(/Unknown key: failore/);
   });
 
   it("assert_valid_keys — includes valid keys in error message", () => {
-    expect(() =>
-      assertValidKeys({ failore: "stuff" }, ["failure"])
-    ).toThrow(/Valid keys are: failure/);
+    expect(() => assertValidKeys({ failore: "stuff" }, ["failure"])).toThrow(
+      /Valid keys are: failure/,
+    );
   });
 
   it("deep_merge — merges nested objects", () => {
@@ -273,7 +275,7 @@ describe("HashExtTest", () => {
 
   it("deep transform values", () => {
     const h = { a: 1, b: { c: 2 } };
-    const result = deepTransformValues(h, (v) => typeof v === "number" ? v * 2 : v);
+    const result = deepTransformValues(h, (v) => (typeof v === "number" ? v * 2 : v));
     expect((result as any).a).toBe(2);
     expect((result as any).b.c).toBe(4);
   });
@@ -286,66 +288,66 @@ describe("HashExtTest", () => {
 
   it("deep transform values!", () => {
     const h = { a: "hello" };
-    const result = deepTransformValues(h, (v) => typeof v === "string" ? v.toUpperCase() : v);
+    const result = deepTransformValues(h, (v) => (typeof v === "string" ? v.toUpperCase() : v));
     expect((result as any).a).toBe("HELLO");
   });
 
   it("deep transform values with bang mutates", () => {
     const h = { n: 5 };
-    const r = deepTransformValues(h, (v) => typeof v === "number" ? v + 1 : v);
+    const r = deepTransformValues(h, (v) => (typeof v === "number" ? v + 1 : v));
     expect((r as any).n).toBe(6);
   });
 
   it("symbolize keys", () => {
-    const h = { "a": 1, "b": 2 };
+    const h = { a: 1, b: 2 };
     const result = symbolizeKeys(h);
     expect(result.a).toBe(1);
     expect(result.b).toBe(2);
   });
 
   it("symbolize keys not mutates", () => {
-    const h = { "a": 1 };
+    const h = { a: 1 };
     symbolizeKeys(h);
-    expect(h).toEqual({ "a": 1 });
+    expect(h).toEqual({ a: 1 });
   });
 
   it("deep symbolize keys", () => {
-    const h = { "a": { "b": 1 } };
+    const h = { a: { b: 1 } };
     const result = deepSymbolizeKeys(h);
     expect((result as any).a.b).toBe(1);
   });
 
   it("deep symbolize keys not mutates", () => {
-    const h = { "a": { "b": 1 } };
+    const h = { a: { b: 1 } };
     deepSymbolizeKeys(h);
-    expect(h).toEqual({ "a": { "b": 1 } });
+    expect(h).toEqual({ a: { b: 1 } });
   });
 
   it("symbolize keys!", () => {
-    const h = { "key": "val" };
+    const h = { key: "val" };
     expect(symbolizeKeys(h).key).toBe("val");
   });
 
   it("symbolize keys with bang mutates", () => {
-    const h = { "x": 42 };
+    const h = { x: 42 };
     const r = symbolizeKeys(h);
     expect(r.x).toBe(42);
   });
 
   it("deep symbolize keys!", () => {
-    const h = { "a": { "b": { "c": 3 } } };
+    const h = { a: { b: { c: 3 } } };
     const r = deepSymbolizeKeys(h);
     expect((r as any).a.b.c).toBe(3);
   });
 
   it("deep symbolize keys with bang mutates", () => {
-    const h = { "nested": { "val": 1 } };
+    const h = { nested: { val: 1 } };
     const r = deepSymbolizeKeys(h);
     expect((r as any).nested.val).toBe(1);
   });
 
   it("symbolize keys preserves keys that cant be symbolized", () => {
-    const h = { "valid": 1, "also-valid": 2 };
+    const h = { valid: 1, "also-valid": 2 };
     const r = symbolizeKeys(h);
     expect(r["valid"]).toBe(1);
     expect(r["also-valid"]).toBe(2);

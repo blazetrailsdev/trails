@@ -8,10 +8,16 @@ describe("AbstractController::Callbacks", () => {
   it("basic callbacks work", async () => {
     const log: string[] = [];
     class TestController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    TestController.beforeAction(() => { log.push("before"); });
-    TestController.afterAction(() => { log.push("after"); });
+    TestController.beforeAction(() => {
+      log.push("before");
+    });
+    TestController.afterAction(() => {
+      log.push("after");
+    });
 
     const c = new TestController();
     await c.processAction("index");
@@ -21,9 +27,14 @@ describe("AbstractController::Callbacks", () => {
   it("before action can halt chain", async () => {
     const log: string[] = [];
     class HaltController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    HaltController.beforeAction(() => { log.push("before"); return false; });
+    HaltController.beforeAction(() => {
+      log.push("before");
+      return false;
+    });
 
     const c = new HaltController();
     await c.processAction("index");
@@ -33,7 +44,9 @@ describe("AbstractController::Callbacks", () => {
   it("around action wraps execution", async () => {
     const log: string[] = [];
     class AroundController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
     AroundController.aroundAction(async (_c, next) => {
       log.push("around-before");
@@ -49,9 +62,13 @@ describe("AbstractController::Callbacks", () => {
   it("non yielding around actions do not raise", async () => {
     const log: string[] = [];
     class NoYieldController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    NoYieldController.aroundAction(async () => { log.push("around-noyield"); });
+    NoYieldController.aroundAction(async () => {
+      log.push("around-noyield");
+    });
 
     const c = new NoYieldController();
     await c.processAction("index");
@@ -61,10 +78,16 @@ describe("AbstractController::Callbacks", () => {
   it("after actions are not run if around action does not yield", async () => {
     const log: string[] = [];
     class NoYieldAfterController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    NoYieldAfterController.aroundAction(async () => { log.push("around"); });
-    NoYieldAfterController.afterAction(() => { log.push("after"); });
+    NoYieldAfterController.aroundAction(async () => {
+      log.push("around");
+    });
+    NoYieldAfterController.afterAction(() => {
+      log.push("after");
+    });
 
     const c = new NoYieldAfterController();
     await c.processAction("index");
@@ -74,14 +97,22 @@ describe("AbstractController::Callbacks", () => {
   it("added action to inheritance graph", async () => {
     const log: string[] = [];
     class Parent extends AbstractController {
-      async index() { log.push("parent-action"); }
+      async index() {
+        log.push("parent-action");
+      }
     }
-    Parent.beforeAction(() => { log.push("parent-before"); });
+    Parent.beforeAction(() => {
+      log.push("parent-before");
+    });
 
     class Child extends Parent {
-      async index() { log.push("child-action"); }
+      async index() {
+        log.push("child-action");
+      }
     }
-    Child.beforeAction(() => { log.push("child-before"); });
+    Child.beforeAction(() => {
+      log.push("child-before");
+    });
 
     const c = new Child();
     await c.processAction("index");
@@ -91,10 +122,19 @@ describe("AbstractController::Callbacks", () => {
   it("prepending action", async () => {
     const log: string[] = [];
     class PrependController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    PrependController.beforeAction(() => { log.push("first"); });
-    PrependController.beforeAction(() => { log.push("prepended"); }, { prepend: true });
+    PrependController.beforeAction(() => {
+      log.push("first");
+    });
+    PrependController.beforeAction(
+      () => {
+        log.push("prepended");
+      },
+      { prepend: true },
+    );
 
     const c = new PrependController();
     await c.processAction("index");
@@ -104,10 +144,19 @@ describe("AbstractController::Callbacks", () => {
   it("running actions with only condition", async () => {
     const log: string[] = [];
     class OnlyController extends AbstractController {
-      async index() { log.push("index"); }
-      async show() { log.push("show"); }
+      async index() {
+        log.push("index");
+      }
+      async show() {
+        log.push("show");
+      }
     }
-    OnlyController.beforeAction(() => { log.push("before"); }, { only: ["index"] });
+    OnlyController.beforeAction(
+      () => {
+        log.push("before");
+      },
+      { only: ["index"] },
+    );
 
     const c1 = new OnlyController();
     await c1.processAction("index");
@@ -122,10 +171,19 @@ describe("AbstractController::Callbacks", () => {
   it("running except condition actions", async () => {
     const log: string[] = [];
     class ExceptController extends AbstractController {
-      async index() { log.push("index"); }
-      async show() { log.push("show"); }
+      async index() {
+        log.push("index");
+      }
+      async show() {
+        log.push("show");
+      }
     }
-    ExceptController.beforeAction(() => { log.push("before"); }, { except: ["show"] });
+    ExceptController.beforeAction(
+      () => {
+        log.push("before");
+      },
+      { except: ["show"] },
+    );
 
     const c1 = new ExceptController();
     await c1.processAction("index");
@@ -141,11 +199,15 @@ describe("AbstractController::Callbacks", () => {
     const log: string[] = [];
     class IfController extends AbstractController {
       shouldRun = true;
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
     IfController.beforeAction(
-      () => { log.push("conditional"); },
-      { if: (c) => (c as IfController).shouldRun }
+      () => {
+        log.push("conditional");
+      },
+      { if: (c) => (c as IfController).shouldRun },
     );
 
     const c1 = new IfController();
@@ -164,11 +226,15 @@ describe("AbstractController::Callbacks", () => {
     const log: string[] = [];
     class UnlessController extends AbstractController {
       skipIt = false;
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
     UnlessController.beforeAction(
-      () => { log.push("conditional"); },
-      { unless: (c) => (c as UnlessController).skipIt }
+      () => {
+        log.push("conditional");
+      },
+      { unless: (c) => (c as UnlessController).skipIt },
     );
 
     const c1 = new UnlessController();
@@ -185,9 +251,13 @@ describe("AbstractController::Callbacks", () => {
 
   it("skip before action", async () => {
     const log: string[] = [];
-    const beforeFn = () => { log.push("before"); };
+    const beforeFn = () => {
+      log.push("before");
+    };
     class SkipParent extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
     SkipParent.beforeAction(beforeFn);
 
@@ -202,12 +272,22 @@ describe("AbstractController::Callbacks", () => {
   it("multiple before and after actions", async () => {
     const log: string[] = [];
     class MultiController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    MultiController.beforeAction(() => { log.push("b1"); });
-    MultiController.beforeAction(() => { log.push("b2"); });
-    MultiController.afterAction(() => { log.push("a1"); });
-    MultiController.afterAction(() => { log.push("a2"); });
+    MultiController.beforeAction(() => {
+      log.push("b1");
+    });
+    MultiController.beforeAction(() => {
+      log.push("b2");
+    });
+    MultiController.afterAction(() => {
+      log.push("a1");
+    });
+    MultiController.afterAction(() => {
+      log.push("a2");
+    });
 
     const c = new MultiController();
     await c.processAction("index");
@@ -217,10 +297,16 @@ describe("AbstractController::Callbacks", () => {
   it("before after class action", async () => {
     const log: string[] = [];
     class ClassActionController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    ClassActionController.beforeAction(() => { log.push("before"); });
-    ClassActionController.afterAction(() => { log.push("after"); });
+    ClassActionController.beforeAction(() => {
+      log.push("before");
+    });
+    ClassActionController.afterAction(() => {
+      log.push("after");
+    });
 
     const c = new ClassActionController();
     await c.processAction("index");
@@ -230,7 +316,9 @@ describe("AbstractController::Callbacks", () => {
   it("having properties in around action", async () => {
     const log: string[] = [];
     class PropsAroundController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
     PropsAroundController.aroundAction(async (controller, next) => {
       log.push(`before-${controller.actionName}`);
@@ -246,18 +334,23 @@ describe("AbstractController::Callbacks", () => {
   it("prepending and appending around action", async () => {
     const log: string[] = [];
     class PrependAroundController extends AbstractController {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
     PrependAroundController.aroundAction(async (_c, next) => {
       log.push("first-around-before");
       await next();
       log.push("first-around-after");
     });
-    PrependAroundController.aroundAction(async (_c, next) => {
-      log.push("prepended-around-before");
-      await next();
-      log.push("prepended-around-after");
-    }, { prepend: true });
+    PrependAroundController.aroundAction(
+      async (_c, next) => {
+        log.push("prepended-around-before");
+        await next();
+        log.push("prepended-around-after");
+      },
+      { prepend: true },
+    );
 
     const c = new PrependAroundController();
     await c.processAction("index");

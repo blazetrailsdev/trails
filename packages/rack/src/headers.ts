@@ -225,7 +225,10 @@ export class Headers {
 
   // --- Mutation ---
 
-  merge(other: Record<string, string> | Headers, fn?: (key: string, oldVal: string, newVal: string) => string): Headers {
+  merge(
+    other: Record<string, string> | Headers,
+    fn?: (key: string, oldVal: string, newVal: string) => string,
+  ): Headers {
     const result = this.dup();
     const entries = other instanceof Headers ? other.toArray() : Object.entries(other);
     for (const [k, v] of entries) {
@@ -239,7 +242,10 @@ export class Headers {
     return result;
   }
 
-  mergeInPlace(other: Record<string, string> | Headers, fn?: (key: string, oldVal: string, newVal: string) => string): Headers {
+  mergeInPlace(
+    other: Record<string, string> | Headers,
+    fn?: (key: string, oldVal: string, newVal: string) => string,
+  ): Headers {
     const entries = other instanceof Headers ? other.toArray() : Object.entries(other);
     for (const [k, v] of entries) {
       const lk = this._key(k);
@@ -252,7 +258,10 @@ export class Headers {
     return this;
   }
 
-  update(other: Record<string, string> | Headers, fn?: (key: string, oldVal: string, newVal: string) => string): Headers {
+  update(
+    other: Record<string, string> | Headers,
+    fn?: (key: string, oldVal: string, newVal: string) => string,
+  ): Headers {
     return this.mergeInPlace(other, fn);
   }
 

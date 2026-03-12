@@ -51,10 +51,7 @@ export class PostgresAdapter implements DatabaseAdapter {
   /**
    * Execute a SELECT query and return rows.
    */
-  async execute(
-    sql: string,
-    binds: unknown[] = [],
-  ): Promise<Record<string, unknown>[]> {
+  async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
     const client = await this.getClient();
     try {
       const result = await client.query(this.rewriteBinds(sql), binds);
@@ -71,10 +68,7 @@ export class PostgresAdapter implements DatabaseAdapter {
    * of the first returned row is treated as the inserted ID. Otherwise, the
    * `rowCount` is returned.
    */
-  async executeMutation(
-    sql: string,
-    binds: unknown[] = [],
-  ): Promise<number> {
+  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
     const client = await this.getClient();
     try {
       const pgSql = this.rewriteBinds(sql);

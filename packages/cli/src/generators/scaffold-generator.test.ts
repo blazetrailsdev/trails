@@ -41,7 +41,10 @@ describe("ScaffoldGenerator", () => {
   it("generates CRUD actions in controller with rendering", () => {
     const gen = makeGen();
     gen.run("Post", ["title:string"]);
-    const content = fs.readFileSync(path.join(tmpDir, "src/app/controllers/posts-controller.ts"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(tmpDir, "src/app/controllers/posts-controller.ts"),
+      "utf-8",
+    );
     expect(content).toContain("async index()");
     expect(content).toContain("async show()");
     expect(content).toContain("async create()");
@@ -90,6 +93,8 @@ describe("ScaffoldGenerator", () => {
     const gen2 = new ScaffoldGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
     gen2.run("Comment", ["body:text"]);
     // Layout should exist but only be created once
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/layouts/application.html.ejs"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "src/app/views/layouts/application.html.ejs"))).toBe(
+      true,
+    );
   });
 });

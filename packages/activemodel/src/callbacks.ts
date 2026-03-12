@@ -32,7 +32,7 @@ export class CallbackChain {
     timing: CallbackTiming,
     event: CallbackEvent,
     fn: CallbackFn | AroundCallbackFn,
-    conditions?: CallbackConditions
+    conditions?: CallbackConditions,
   ): void {
     const entry = { timing, event, fn, conditions };
     if (conditions?.prepend) {
@@ -69,7 +69,7 @@ export class CallbackChain {
 
     // Around callbacks wrap the block
     const arounds = this.callbacks.filter(
-      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record)
+      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
     );
 
     let chain = block;
@@ -89,9 +89,7 @@ export class CallbackChain {
    * Returns false if a callback halts the chain.
    */
   runBefore(event: CallbackEvent, record: any): boolean {
-    const befores = this.callbacks.filter(
-      (c) => c.timing === "before" && c.event === event
-    );
+    const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
     for (const cb of befores) {
       if (!this._shouldRun(cb, record)) continue;
       const result = (cb.fn as CallbackFn)(record);
@@ -104,9 +102,7 @@ export class CallbackChain {
    * Run only after callbacks for an event.
    */
   runAfter(event: CallbackEvent, record: any): void {
-    const afters = this.callbacks.filter(
-      (c) => c.timing === "after" && c.event === event
-    );
+    const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
     for (const cb of afters) {
       if (!this._shouldRun(cb, record)) continue;
       (cb.fn as CallbackFn)(record);

@@ -61,9 +61,7 @@ export class MessageVerifier {
     if (options.expiresAt) {
       payload._expiresAt = options.expiresAt.toISOString();
     } else if (options.expiresIn !== undefined) {
-      payload._expiresAt = new Date(
-        Date.now() + options.expiresIn * 1000
-      ).toISOString();
+      payload._expiresAt = new Date(Date.now() + options.expiresIn * 1000).toISOString();
     }
 
     if (options.purpose) {
@@ -154,11 +152,7 @@ export class MessageVerifier {
 
   private encode(buf: Buffer): string {
     if (this.urlSafe) {
-      return buf
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=/g, "");
+      return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
     }
     return buf.toString("base64");
   }

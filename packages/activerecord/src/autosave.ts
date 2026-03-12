@@ -51,19 +51,13 @@ export async function autosaveAssociations(record: Base): Promise<boolean> {
   return true;
 }
 
-async function autosaveAssociation(
-  record: Base,
-  assoc: AssociationDefinition
-): Promise<boolean> {
-  const cachedAssociations: Map<string, unknown> | undefined =
-    (record as any)._cachedAssociations;
-  const preloadedAssociations: Map<string, unknown> | undefined =
-    (record as any)._preloadedAssociations;
+async function autosaveAssociation(record: Base, assoc: AssociationDefinition): Promise<boolean> {
+  const cachedAssociations: Map<string, unknown> | undefined = (record as any)._cachedAssociations;
+  const preloadedAssociations: Map<string, unknown> | undefined = (record as any)
+    ._preloadedAssociations;
 
   // Only autosave if the association is already loaded/cached
-  const isLoaded =
-    cachedAssociations?.has(assoc.name) ||
-    preloadedAssociations?.has(assoc.name);
+  const isLoaded = cachedAssociations?.has(assoc.name) || preloadedAssociations?.has(assoc.name);
 
   if (!isLoaded) return true;
 
@@ -78,10 +72,7 @@ async function autosaveAssociation(
   return true;
 }
 
-async function autosaveHasMany(
-  record: Base,
-  assoc: AssociationDefinition
-): Promise<boolean> {
+async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const cached =
     (record as any)._cachedAssociations?.get(assoc.name) ??
     (record as any)._preloadedAssociations?.get(assoc.name);
@@ -99,8 +90,7 @@ async function autosaveHasMany(
     if (child.isNewRecord() || child.changed) {
       // Set FK if not set
       const ctor = record.constructor as typeof Base;
-      const foreignKey =
-        assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+      const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
       const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
       const pkValue = record.readAttribute(primaryKey as string);
       if (pkValue !== null && pkValue !== undefined) {
@@ -119,10 +109,7 @@ async function autosaveHasMany(
   return true;
 }
 
-async function autosaveHasOne(
-  record: Base,
-  assoc: AssociationDefinition
-): Promise<boolean> {
+async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const child =
     (record as any)._cachedAssociations?.get(assoc.name) ??
     (record as any)._preloadedAssociations?.get(assoc.name);
@@ -139,8 +126,7 @@ async function autosaveHasOne(
 
   if (childRecord.isNewRecord() || childRecord.changed) {
     const ctor = record.constructor as typeof Base;
-    const foreignKey =
-      assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
     const pkValue = record.readAttribute(primaryKey as string);
     if (pkValue !== null && pkValue !== undefined) {
@@ -157,10 +143,7 @@ async function autosaveHasOne(
   return true;
 }
 
-async function autosaveBelongsTo(
-  record: Base,
-  assoc: AssociationDefinition
-): Promise<boolean> {
+async function autosaveBelongsTo(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const associated =
     (record as any)._cachedAssociations?.get(assoc.name) ??
     (record as any)._preloadedAssociations?.get(assoc.name);
@@ -183,8 +166,7 @@ async function autosaveBelongsTo(
     }
 
     // Update FK on owner after saving the associated record
-    const foreignKey =
-      assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
+    const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
     const primaryKey = assoc.options.primaryKey ?? "id";
     const pkValue = assocRecord.readAttribute(primaryKey as string);
     if (pkValue !== null && pkValue !== undefined) {
@@ -208,7 +190,9 @@ function propagateErrors(parent: Base, child: Base, assocName: string): void {
   });
 
   // Copy each child error to parent
-  const errorMessages = (Array.isArray(childErrors.fullMessages) ? childErrors.fullMessages : []) as string[];
+  const errorMessages = (
+    Array.isArray(childErrors.fullMessages) ? childErrors.fullMessages : []
+  ) as string[];
   for (const msg of errorMessages) {
     parentErrors.add("base", "invalid", { message: msg });
   }

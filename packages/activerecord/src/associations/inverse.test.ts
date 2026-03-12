@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -28,14 +68,22 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("InverseAssociationTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("should allow for inverse of options in associations", () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Face extends Base {
-      static { this.attribute("man_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.hasOne.call(Man, "face", { inverseOf: "man" });
     const assocs = (Man as any)._associations;
@@ -45,7 +93,10 @@ describe("InverseAssociationTests", () => {
 
   it("should be able to ask a reflection if it has an inverse", () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
     Associations.hasOne.call(Man, "face", {});
@@ -58,7 +109,10 @@ describe("InverseAssociationTests", () => {
 
   it("inverse of method should supply the actual reflection instance it is the inverse of", () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
     const assocs = (Man as any)._associations;
@@ -68,7 +122,10 @@ describe("InverseAssociationTests", () => {
 
   it("associations with no inverse of should return nil", () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Man, "interests", {});
     const assocs = (Man as any)._associations;
@@ -78,7 +135,11 @@ describe("InverseAssociationTests", () => {
 
   it("polymorphic associations dont attempt to find inverse of", () => {
     class Comment extends Base {
-      static { this.attribute("commentable_id", "integer"); this.attribute("commentable_type", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
     const assocs = (Comment as any)._associations;
@@ -89,14 +150,22 @@ describe("InverseAssociationTests", () => {
 
   it("this inverse stuff", async () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Interest extends Base {
-      static { this.attribute("topic", "string"); this.attribute("man_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("topic", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
     Associations.belongsTo.call(Interest, "man", { inverseOf: "interests" });
-    registerModel(Man); registerModel(Interest);
+    registerModel(Man);
+    registerModel(Interest);
     const m = await Man.create({ name: "Gordon" });
     await Interest.create({ topic: "stamps", man_id: m.id });
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
@@ -106,19 +175,24 @@ describe("InverseAssociationTests", () => {
   });
 });
 
-
 describe("inverse_of", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("sets inverse reference on loaded belongs_to", async () => {
-    class Author extends Base { static _tableName = "authors"; }
+    class Author extends Base {
+      static _tableName = "authors";
+    }
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
     Author.adapter = adapter;
     registerModel(Author);
 
-    class Book extends Base { static _tableName = "books"; }
+    class Book extends Base {
+      static _tableName = "books";
+    }
     Book.attribute("id", "integer");
     Book.attribute("title", "string");
     Book.attribute("author_id", "integer");
@@ -135,14 +209,18 @@ describe("inverse_of", () => {
   });
 
   it("sets inverse reference on loaded has_many children", async () => {
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.adapter = adapter;
     Associations.hasMany.call(Post, "comments", { inverseOf: "post" });
     registerModel(Post);
 
-    class Comment extends Base { static _tableName = "comments"; }
+    class Comment extends Base {
+      static _tableName = "comments";
+    }
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("post_id", "integer");

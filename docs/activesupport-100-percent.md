@@ -10,53 +10,53 @@ The compare script (`npm run test:compare`) extracts test names from both Rails 
 
 ### Complete (100% pass rate) — 318 tests across 12 files
 
-| File | Tests | | File | Tests |
-|---|---|---|---|---|
-| duration | 79 | | notifications | 37 |
-| callbacks | 54 | | logger | 31 |
-| ordered-options | 28 | | try | 23 |
-| number-helper | 21 | | lazy-load-hooks | 15 |
-| key-generator | 10 | | parameter-filter | 8 |
-| array-inquirer | 7 | | string-inquirer | 5 |
+| File            | Tests |     | File             | Tests |
+| --------------- | ----- | --- | ---------------- | ----- |
+| duration        | 79    |     | notifications    | 37    |
+| callbacks       | 54    |     | logger           | 31    |
+| ordered-options | 28    |     | try              | 23    |
+| number-helper   | 21    |     | lazy-load-hooks  | 15    |
+| key-generator   | 10    |     | parameter-filter | 8     |
+| array-inquirer  | 7     |     | string-inquirer  | 5     |
 
 ### Partial progress
 
-| File | Passing / Total | Stubs |
-|---|---|---|
-| time_ext | 66 / 119 | 53 |
-| hash_ext | 49 / 93 | 44 |
-| deprecation | 46 / 80 | 34 |
-| range_ext | 43 / 47 | 4 |
-| ordered-hash | 34 / 42 | 8 |
-| error-reporter | 29 / 32 | 3 |
-| safe-buffer | 19 / 41 | 22 |
-| string_ext | 126 / 148 | 22 stubs remaining |
-| inflector | 55 / 56 | 1 missing |
-| concern | 2 / 17 | 15 |
+| File           | Passing / Total | Stubs              |
+| -------------- | --------------- | ------------------ |
+| time_ext       | 66 / 119        | 53                 |
+| hash_ext       | 49 / 93         | 44                 |
+| deprecation    | 46 / 80         | 34                 |
+| range_ext      | 43 / 47         | 4                  |
+| ordered-hash   | 34 / 42         | 8                  |
+| error-reporter | 29 / 32         | 3                  |
+| safe-buffer    | 19 / 41         | 22                 |
+| string_ext     | 126 / 148       | 22 stubs remaining |
+| inflector      | 55 / 56         | 1 missing          |
+| concern        | 2 / 17          | 15                 |
 
 ### Needs work (0% — stubs only)
 
-| File | Stubs | Notes |
-|---|---|---|
-| time_with_zone | 179 | Implementation exists (203 TS tests), needs name matching |
-| time_zone | 108 | Implementation exists, needs name matching |
-| hash_with_indifferent_access | 93 | HWIA edge cases |
-| multibyte_chars | 76 | Unicode/multibyte handling |
-| date_time_ext | 68 | DateTime extensions |
-| test_case | 62 | Test framework utilities |
-| date_ext | 56 | Date extensions |
-| module | 53 | Module extensions |
-| xml_mini | 47 | XML serialization |
-| json/encoding | 46 | JSON encoding edge cases |
-| broadcast_logger | 37 | Multi-destination logging |
-| cache/mem_cache_store | 35 | Memcached cache store |
-| numeric_ext | 33 | Numeric extensions |
-| enumerable | 29 | Enumerable extensions |
-| tagged_logging | 29 | Tagged logging |
-| cache/redis_cache_store | 28 | Redis cache store |
-| time_travel | 27 | Time travel helpers |
-| array/conversions | 25 | Array conversion helpers |
-| share_lock | 25 | Thread-safe locking |
+| File                         | Stubs | Notes                                                     |
+| ---------------------------- | ----- | --------------------------------------------------------- |
+| time_with_zone               | 179   | Implementation exists (203 TS tests), needs name matching |
+| time_zone                    | 108   | Implementation exists, needs name matching                |
+| hash_with_indifferent_access | 93    | HWIA edge cases                                           |
+| multibyte_chars              | 76    | Unicode/multibyte handling                                |
+| date_time_ext                | 68    | DateTime extensions                                       |
+| test_case                    | 62    | Test framework utilities                                  |
+| date_ext                     | 56    | Date extensions                                           |
+| module                       | 53    | Module extensions                                         |
+| xml_mini                     | 47    | XML serialization                                         |
+| json/encoding                | 46    | JSON encoding edge cases                                  |
+| broadcast_logger             | 37    | Multi-destination logging                                 |
+| cache/mem_cache_store        | 35    | Memcached cache store                                     |
+| numeric_ext                  | 33    | Numeric extensions                                        |
+| enumerable                   | 29    | Enumerable extensions                                     |
+| tagged_logging               | 29    | Tagged logging                                            |
+| cache/redis_cache_store      | 28    | Redis cache store                                         |
+| time_travel                  | 27    | Time travel helpers                                       |
+| array/conversions            | 25    | Array conversion helpers                                  |
+| share_lock                   | 25    | Thread-safe locking                                       |
 
 Plus 60+ smaller files with < 25 stubs each.
 

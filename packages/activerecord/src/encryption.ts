@@ -33,10 +33,7 @@ export const defaultEncryptor: Encryptor = {
  * Registry of encrypted attribute names per model class,
  * keyed by a class identifier.
  */
-const encryptedAttributes = new WeakMap<
-  object,
-  Map<string, Encryptor>
->();
+const encryptedAttributes = new WeakMap<object, Map<string, Encryptor>>();
 
 /**
  * Declare one or more attributes as encrypted on a model class.
@@ -45,10 +42,7 @@ const encryptedAttributes = new WeakMap<
  *   encrypts("ssn", "email");
  *   encrypts("secret", { encryptor: myEncryptor });
  */
-export function encrypts(
-  klass: any,
-  ...args: Array<string | { encryptor?: Encryptor }>
-): void {
+export function encrypts(klass: any, ...args: Array<string | { encryptor?: Encryptor }>): void {
   let enc: Encryptor = defaultEncryptor;
   const names: string[] = [];
 
@@ -72,10 +66,7 @@ export function encrypts(
 /**
  * Get the encryptor for a given attribute on a class, if encrypted.
  */
-export function getEncryptor(
-  klass: any,
-  attr: string
-): Encryptor | undefined {
+export function getEncryptor(klass: any, attr: string): Encryptor | undefined {
   // Walk prototype chain
   let current = klass;
   while (current) {

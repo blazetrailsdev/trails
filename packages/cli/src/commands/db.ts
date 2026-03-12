@@ -18,7 +18,8 @@ export function dbCommand(): Command {
         return;
       }
 
-      const files = fs.readdirSync(migrationsDir)
+      const files = fs
+        .readdirSync(migrationsDir)
         .filter((f) => f.endsWith(".ts"))
         .sort();
 
@@ -54,7 +55,8 @@ export function dbCommand(): Command {
         return;
       }
 
-      const files = fs.readdirSync(migrationsDir)
+      const files = fs
+        .readdirSync(migrationsDir)
         .filter((f) => f.endsWith(".ts"))
         .sort()
         .reverse();
@@ -118,7 +120,8 @@ export function dbCommand(): Command {
         return;
       }
 
-      const files = fs.readdirSync(migrationsDir)
+      const files = fs
+        .readdirSync(migrationsDir)
         .filter((f) => f.endsWith(".ts"))
         .sort();
 

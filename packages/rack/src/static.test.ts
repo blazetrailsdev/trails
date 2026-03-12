@@ -6,7 +6,8 @@ import * as path from "path";
 import * as os from "os";
 
 let tmpDir: string;
-const fallbackApp = async () => [200, { "content-type": "text/plain" }, ["fallback"]] as [number, Record<string, string>, any];
+const fallbackApp = async () =>
+  [200, { "content-type": "text/plain" }, ["fallback"]] as [number, Record<string, string>, any];
 
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rack-static-"));
@@ -148,14 +149,19 @@ describe("Rack::Static", () => {
   });
 
   it("supports serving fixed cache-control (legacy option)", async () => {
-    const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir, cache_control: "public, max-age=600" });
+    const app = new Static(fallbackApp, {
+      urls: ["/static"],
+      root: tmpDir,
+      cache_control: "public, max-age=600",
+    });
     const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
     expect(res.headers["cache-control"]).toBe("public, max-age=600");
   });
 
   it("supports header rule :all", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       header_rules: [[":all", { "x-all": "yes" }]],
     });
     const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
@@ -164,7 +170,8 @@ describe("Rack::Static", () => {
 
   it("supports header rule :fonts", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       header_rules: [[":fonts", { "access-control-allow-origin": "*" }]],
     });
     const res = await new MockRequest((env) => app.call(env)).get("/static/font.woff2");
@@ -173,7 +180,8 @@ describe("Rack::Static", () => {
 
   it("supports file extension header rules provided as an Array", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       header_rules: [[[".txt"], { "x-ext": "txt" }]],
     });
     const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
@@ -182,7 +190,8 @@ describe("Rack::Static", () => {
 
   it("supports folder rules provided as a String", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       header_rules: [["/static/sub", { "x-folder": "sub" }]],
     });
     const res = await new MockRequest((env) => app.call(env)).get("/static/sub/page.html");
@@ -191,7 +200,8 @@ describe("Rack::Static", () => {
 
   it("supports folder header rules provided as a String not starting with a slash", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       header_rules: [["static/sub", { "x-folder": "sub2" }]],
     });
     const res = await new MockRequest((env) => app.call(env)).get("/static/sub/page.html");
@@ -200,7 +210,8 @@ describe("Rack::Static", () => {
 
   it("supports flexible header rules provided as Regexp", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       header_rules: [[/\.txt$/, { "x-regex": "matched" }]],
     });
     const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
@@ -209,7 +220,8 @@ describe("Rack::Static", () => {
 
   it("prioritizes header rules over fixed cache-control setting (legacy option)", async () => {
     const app = new Static(fallbackApp, {
-      urls: ["/static"], root: tmpDir,
+      urls: ["/static"],
+      root: tmpDir,
       cache_control: "public",
       header_rules: [[":all", { "cache-control": "private" }]],
     });

@@ -50,7 +50,11 @@ describe("Rack::Events", () => {
     (body as any).close();
 
     expect(events.map(([o, m]) => m)).toEqual([
-      "on_start", "call", "on_commit", "on_send", "on_finish",
+      "on_start",
+      "call",
+      "on_commit",
+      "on_send",
+      "on_finish",
     ]);
   });
 
@@ -97,7 +101,11 @@ describe("Rack::Events", () => {
     (body as any).close();
 
     expect(events.map(([_, m]) => m)).toEqual([
-      "on_start", "call", "on_commit", "on_send", "on_finish",
+      "on_start",
+      "call",
+      "on_commit",
+      "on_send",
+      "on_finish",
     ]);
   });
 
@@ -131,8 +139,6 @@ describe("Rack::Events", () => {
 
     await expect(e.call({})).rejects.toThrow("boom");
 
-    expect(events.map(([_, m]) => m)).toEqual([
-      "on_start", "on_error", "on_finish",
-    ]);
+    expect(events.map(([_, m]) => m)).toEqual(["on_start", "on_error", "on_finish"]);
   });
 });

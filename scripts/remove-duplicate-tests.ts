@@ -27,7 +27,7 @@ interface TestCase {
 
 interface TestRange {
   startLine: number; // 1-indexed
-  endLine: number;   // 1-indexed, inclusive
+  endLine: number; // 1-indexed, inclusive
 }
 
 /**
@@ -50,10 +50,13 @@ function findTestRange(sourceFile: typescript.SourceFile, targetLine: number): T
       if (ts_api.isIdentifier(expr) && (expr.text === "it" || expr.text === "test")) {
         isTest = true;
       }
-      if (ts_api.isPropertyAccessExpression(expr) &&
-          ts_api.isIdentifier(expr.expression) &&
-          (expr.expression.text === "it" || expr.expression.text === "test") &&
-          ts_api.isIdentifier(expr.name) && expr.name.text === "skip") {
+      if (
+        ts_api.isPropertyAccessExpression(expr) &&
+        ts_api.isIdentifier(expr.expression) &&
+        (expr.expression.text === "it" || expr.expression.text === "test") &&
+        ts_api.isIdentifier(expr.name) &&
+        expr.name.text === "skip"
+      ) {
         isTest = true;
       }
 
@@ -108,9 +111,15 @@ for (const [absFile, tests] of byFile) {
     let best = group[0];
     for (let i = 1; i < group.length; i++) {
       const c = group[i];
-      if (!c.pending && best.pending) { best = c; continue; }
+      if (!c.pending && best.pending) {
+        best = c;
+        continue;
+      }
       if (c.pending && !best.pending) continue;
-      if (c.assertions.length > best.assertions.length) { best = c; continue; }
+      if (c.assertions.length > best.assertions.length) {
+        best = c;
+        continue;
+      }
     }
 
     for (const tc of group) {
@@ -122,7 +131,9 @@ for (const [absFile, tests] of byFile) {
   if (toRemoveLines.length === 0) continue;
   totalFiles++;
 
-  console.log(`${path.relative(process.cwd(), absFile)}: removing ${toRemoveLines.length} duplicate tests`);
+  console.log(
+    `${path.relative(process.cwd(), absFile)}: removing ${toRemoveLines.length} duplicate tests`,
+  );
 
   if (dryRun) {
     totalRemoved += toRemoveLines.length;
@@ -178,7 +189,8 @@ for (const [absFile, tests] of byFile) {
         const isDescribe =
           (ts_api.isIdentifier(expr) && expr.text === "describe") ||
           (ts_api.isPropertyAccessExpression(expr) &&
-           ts_api.isIdentifier(expr.expression) && expr.expression.text === "describe");
+            ts_api.isIdentifier(expr.expression) &&
+            expr.expression.text === "describe");
 
         if (isDescribe && node.arguments.length >= 2) {
           const callback = node.arguments[1];
@@ -186,16 +198,25 @@ for (const [absFile, tests] of byFile) {
             const body = callback.body;
             if (ts_api.isBlock(body)) {
               // Check if body contains only empty statements, beforeEach/afterEach, or other non-test code
-              const hasTests = body.statements.some(stmt => {
+              const hasTests = body.statements.some((stmt) => {
                 if (!ts_api.isExpressionStatement(stmt)) return false;
                 const expr = stmt.expression;
                 if (!ts_api.isCallExpression(expr)) return false;
                 const callee = expr.expression;
                 if (ts_api.isIdentifier(callee)) {
-                  return callee.text === "it" || callee.text === "test" || callee.text === "describe";
+                  return (
+                    callee.text === "it" || callee.text === "test" || callee.text === "describe"
+                  );
                 }
-                if (ts_api.isPropertyAccessExpression(callee) && ts_api.isIdentifier(callee.expression)) {
-                  return (callee.expression.text === "it" || callee.expression.text === "test" || callee.expression.text === "describe");
+                if (
+                  ts_api.isPropertyAccessExpression(callee) &&
+                  ts_api.isIdentifier(callee.expression)
+                ) {
+                  return (
+                    callee.expression.text === "it" ||
+                    callee.expression.text === "test" ||
+                    callee.expression.text === "describe"
+                  );
                 }
                 return false;
               });
@@ -211,7 +232,7 @@ for (const [absFile, tests] of byFile) {
       }
 
       let found: TestRange | null = null;
-      ts_api.forEachChild(node, child => {
+      ts_api.forEachChild(node, (child) => {
         if (!found) found = findEmptyDescribe(child);
       });
       return found;

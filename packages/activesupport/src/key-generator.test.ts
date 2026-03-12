@@ -160,10 +160,7 @@ describe("BacktraceCleanerSilencerTest", () => {
   it("backtrace should not contain lines that match the silencer", () => {
     const cleaner = new BacktraceCleaner();
     cleaner.addSilencer((line) => line.includes("gems/"));
-    const cleaned = cleaner.clean([
-      "/app/models/user.rb",
-      "/gems/activesupport/lib/foo.rb",
-    ]);
+    const cleaned = cleaner.clean(["/app/models/user.rb", "/gems/activesupport/lib/foo.rb"]);
     expect(cleaned).toHaveLength(1);
     expect(cleaned[0]).toBe("/app/models/user.rb");
   });
@@ -201,10 +198,7 @@ describe("BacktraceCleanerMultipleSilencersTest", () => {
   it("backtrace should only contain lines that match the silencers", () => {
     const cleaner = new BacktraceCleaner();
     cleaner.addSilencer((line) => !line.includes("/app/"));
-    const cleaned = cleaner.clean([
-      "/app/models/user.rb",
-      "/gems/active/foo.rb",
-    ]);
+    const cleaned = cleaner.clean(["/app/models/user.rb", "/gems/active/foo.rb"]);
     expect(cleaned).toEqual(["/app/models/user.rb"]);
   });
 });

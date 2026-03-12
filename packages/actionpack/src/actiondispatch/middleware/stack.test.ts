@@ -7,27 +7,44 @@ type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
 class FooMiddleware {
   private app: RackApp;
-  constructor(app: RackApp) { this.app = app; }
-  async call(env: RackEnv): Promise<RackResponse> { return this.app(env); }
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
 }
 
 class BarMiddleware {
   private app: RackApp;
-  constructor(app: RackApp) { this.app = app; }
-  async call(env: RackEnv): Promise<RackResponse> { return this.app(env); }
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
 }
 
 class BazMiddleware {
   private app: RackApp;
-  constructor(app: RackApp) { this.app = app; }
-  async call(env: RackEnv): Promise<RackResponse> { return this.app(env); }
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
 }
 
 class QuxMiddleware {
   private app: RackApp;
   private prefix: string;
-  constructor(app: RackApp, prefix: string) { this.app = app; this.prefix = prefix; }
-  async call(env: RackEnv): Promise<RackResponse> { return this.app(env); }
+  constructor(app: RackApp, prefix: string) {
+    this.app = app;
+    this.prefix = prefix;
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
 }
 
 describe("ActionDispatch::MiddlewareStack", () => {

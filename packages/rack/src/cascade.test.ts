@@ -74,7 +74,11 @@ describe("Rack::Cascade", () => {
 
   it("close the body on cascade", async () => {
     let closed = false;
-    const body = { close() { closed = true; } };
+    const body = {
+      close() {
+        closed = true;
+      },
+    };
     const closerApp = async () => [404, {}, body] as any;
     const cascade = new Cascade([closerApp, okApp], [404]);
     await new MockRequest((env) => cascade.call(env)).get("/foo");

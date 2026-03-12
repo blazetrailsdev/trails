@@ -13,6 +13,8 @@
     "@rails-ts/arel": "0.1.0",
     "@rails-ts/activemodel": "0.1.0"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "MIT"
 }
