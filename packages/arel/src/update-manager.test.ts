@@ -128,6 +128,9 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain("FALSE");
     });
 
+    it.todo("handles limit properly", () => {});
+    it.todo("takes a list of lists", () => {});
+
     it("chains", () => {
       const mgr = new UpdateManager();
       mgr.table(users);

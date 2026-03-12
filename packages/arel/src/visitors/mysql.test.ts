@@ -36,6 +36,12 @@ describe("Arel", () => {
       expect(visitor.compile(node)).toContain("IN");
     });
 
+    it.todo("should handle nil", () => {});
+    it.todo("should handle nulls first", () => {});
+    it.todo("should handle nulls last", () => {});
+    it.todo("should handle nulls first reversed", () => {});
+    it.todo("should handle nulls last reversed", () => {});
+
     it.todo("defaults limit to 18446744073709551615", () => {});
     it.todo("uses DUAL for empty from", () => {});
     it.todo("defaults to FOR UPDATE when locking", () => {});
