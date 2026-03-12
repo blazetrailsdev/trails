@@ -30,8 +30,23 @@ describe("Arel", () => {
       expect(a.direction).toBe(b.direction);
     });
 
-    it.todo("clone", () => {});
+    it("clone", () => {
+      const core = new Nodes.SelectCore();
+      core.projections.push(users.get("id"));
+      core.wheres.push(users.get("id").eq(1));
+      const cloned = core.clone();
+      expect(cloned).not.toBe(core);
+      expect(cloned.projections).toEqual(core.projections);
+      expect(cloned.projections).not.toBe(core.projections);
+      expect(cloned.wheres).toEqual(core.wheres);
+      expect(cloned.wheres).not.toBe(core.wheres);
+    });
 
-    it.todo("set quantifier", () => {});
+    it("set quantifier", () => {
+      const mgr = new SelectManager(users);
+      mgr.project(star).distinct();
+      expect((mgr.ast.cores[0] as Nodes.SelectCore).setQuantifier).toBeInstanceOf(Nodes.Distinct);
+      expect(mgr.toSql()).toContain("SELECT DISTINCT");
+    });
   });
 });

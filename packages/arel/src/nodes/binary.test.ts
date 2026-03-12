@@ -18,8 +18,16 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("binary", () => {
-    it.todo("generates a hash based on its value", () => {});
+    it("generates a hash based on its value", () => {
+      const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
+      const b = new Nodes.Equality(users.get("id"), new Nodes.Quoted(2));
+      expect(a.hash()).not.toBe(b.hash());
+    });
 
-    it.todo("generates a hash specific to its class", () => {});
+    it("generates a hash specific to its class", () => {
+      const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
+      const b = new Nodes.NotEqual(users.get("id"), new Nodes.Quoted(1));
+      expect(a.hash()).not.toBe(b.hash());
+    });
   });
 });

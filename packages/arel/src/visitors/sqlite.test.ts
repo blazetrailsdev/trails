@@ -24,14 +24,37 @@ describe("Arel", () => {
       expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
     });
 
-    it.todo("defaults limit to -1", () => {});
+    it("defaults limit to -1", () => {
+      const mgr = users.project(star).skip(5);
+      const sql = new Visitors.SQLite().compile(mgr.ast);
+      expect(sql).toContain("LIMIT -1");
+      expect(sql).toContain("OFFSET 5");
+    });
 
-    it.todo("does not support locking", () => {});
+    it("does not support locking", () => {
+      const mgr = users.project(star).lock();
+      const sql = new Visitors.SQLite().compile(mgr.ast);
+      expect(sql).not.toContain("FOR UPDATE");
+    });
 
-    it.todo("does not support boolean", () => {});
+    it("does not support boolean", () => {
+      const visitor = new Visitors.SQLite();
+      expect(visitor.compile(new Nodes.True())).toBe("1");
+      expect(visitor.compile(new Nodes.False())).toBe("0");
+      expect(visitor.compile(users.get("active").eq(true))).toBe('"users"."active" = 1');
+    });
 
-    it.todo("should construct a valid generic SQL statement", () => {});
+    it("should construct a valid generic SQL statement", () => {
+      const mgr = users.project(users.get("id"));
+      const sql = new Visitors.SQLite().compile(mgr.ast);
+      expect(sql).toContain("SELECT");
+      expect(sql).toContain("FROM");
+    });
 
-    it.todo("should handle column names on both sides", () => {});
+    it("should handle column names on both sides", () => {
+      const node = users.get("id").eq(posts.get("user_id"));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toBe('"users"."id" = "posts"."user_id"');
+    });
   });
 });

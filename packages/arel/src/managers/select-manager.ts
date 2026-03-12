@@ -4,7 +4,7 @@ import { SelectCore } from "../nodes/select-core.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { Attribute } from "../nodes/attribute.js";
 import { Distinct } from "../nodes/distinct.js";
-import { Offset, Limit, Lock, On } from "../nodes/unary.js";
+import { Offset, Limit, Lock, On, DistinctOn } from "../nodes/unary.js";
 import {
   InnerJoin,
   OuterJoin,
@@ -401,7 +401,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#distinct_on
    */
   distinctOn(value: Node): this {
-    this.core.setQuantifier = value;
+    this.core.setQuantifier = new DistinctOn(value);
     return this;
   }
 
@@ -516,8 +516,19 @@ export class SelectManager {
   /**
    * Factory: create a join node.
    */
-  createJoin(to: Node, constraint?: Node, klass?: typeof InnerJoin): InnerJoin {
-    return new InnerJoin(to, constraint ? new On(constraint) : null);
+  createJoin(
+    to: Node,
+    constraint?: Node,
+    klass?:
+      | typeof InnerJoin
+      | typeof OuterJoin
+      | typeof RightOuterJoin
+      | typeof FullOuterJoin
+      | typeof CrossJoin
+      | typeof StringJoin,
+  ): Node {
+    const JoinKlass = klass ?? InnerJoin;
+    return new JoinKlass(to, constraint ? new On(constraint) : null) as any;
   }
 
   /**

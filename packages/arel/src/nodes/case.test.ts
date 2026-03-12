@@ -41,8 +41,28 @@ describe("Arel", () => {
       expect(aliased).toBeInstanceOf(Nodes.As);
     });
 
-    it.todo("sets default case from second argument", () => {});
+    it("sets default case from second argument", () => {
+      const caseNode = new Nodes.Case(users.get("status"));
+      const withDefault = caseNode.else("unknown");
+      expect(withDefault.defaultValue).not.toBeNull();
+      expect(new Visitors.ToSql().compile(withDefault)).toContain("ELSE");
+    });
 
-    it.todo("clones case, conditions and default", () => {});
+    it("clones case, conditions and default", () => {
+      const base = new Nodes.Case(users.get("status"));
+      const c1 = base.when("active", "A");
+      const c2 = c1.else("Z");
+
+      // Immutability-ish: each call returns a new Case instance.
+      expect(c1).not.toBe(base);
+      expect(c2).not.toBe(c1);
+
+      // Previous instances are not mutated.
+      expect(base.conditions.length).toBe(0);
+      expect(c1.conditions.length).toBe(1);
+      expect(c1.defaultValue).toBeNull();
+      expect(c2.conditions.length).toBe(1);
+      expect(c2.defaultValue).not.toBeNull();
+    });
   });
 });

@@ -1279,10 +1279,22 @@ describe("Arel", () => {
       expect(sql).toContain("UNION");
     });
 
-    it.todo("should generate the proper SQL", () => {});
+    it("should generate the proper SQL", () => {
+      const node = users.get("tags").contains("foo");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe('"users"."tags" @> \'foo\'');
+    });
 
-    it.todo("should generate proper SQL", () => {});
+    it("should generate proper SQL", () => {
+      const node = users.get("tags").overlaps("bar");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe('"users"."tags" && \'bar\'');
+    });
 
-    it.todo("should create an Overlaps node", () => {});
+    it("should create an Overlaps node", () => {
+      const node = users.get("tags").overlaps("bar");
+      expect(node).toBeInstanceOf(Nodes.InfixOperation);
+      expect((node as Nodes.InfixOperation).operator).toBe("&&");
+    });
   });
 });

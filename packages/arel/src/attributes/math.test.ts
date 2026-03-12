@@ -36,8 +36,16 @@ describe("Arel", () => {
       expect(visitor.compile(attr)).toBe('"users"."age"');
     });
 
-    it.todo("average should be compatible with ", () => {});
+    it("average should be compatible with ", () => {
+      const avg = users.get("age").average();
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(avg)).toBe('AVG("users"."age")');
+    });
 
-    it.todo("count should be compatible with ", () => {});
+    it("count should be compatible with ", () => {
+      const count = users.get("age").count();
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(count)).toBe('COUNT("users"."age")');
+    });
   });
 });

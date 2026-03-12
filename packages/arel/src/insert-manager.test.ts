@@ -207,10 +207,24 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain("FALSE");
     });
 
-    it.todo("inserts time", () => {});
+    it("inserts time", () => {
+      const mgr = new InsertManager(users);
+      const at = new Date(2020, 0, 2, 12, 34, 56);
+      mgr.insert([[users.get("created_at"), at]]);
+      expect(mgr.toSql()).toContain("2020-01-02");
+    });
 
-    it.todo("defaults the table", () => {});
+    it("defaults the table", () => {
+      const mgr = new InsertManager(users);
+      mgr.insert([[users.get("name"), "dean"]]);
+      expect(mgr.toSql()).toContain('INSERT INTO "users"');
+    });
 
-    it.todo("is chainable", () => {});
+    it("is chainable", () => {
+      const mgr = new InsertManager();
+      expect(mgr.into(users)).toBe(mgr);
+      expect(mgr.insert([[users.get("name"), "dean"]])).toBe(mgr);
+      expect(mgr.toSql()).toContain("INSERT");
+    });
   });
 });

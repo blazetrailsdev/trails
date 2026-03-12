@@ -222,8 +222,17 @@ describe("Arel", () => {
       expect(attr.name).toBe("id");
     });
 
-    it.todo("should create a node that proxies to a table", () => {});
+    it("should create a node that proxies to a table", () => {
+      const aliased = users.as("u");
+      expect(aliased).toBeInstanceOf(Nodes.TableAlias);
+      expect(aliased.relation).toBe(users);
+      const sql = new Visitors.ToSql().compile(aliased.get("id") as any);
+      expect(sql).toBe('"u"."id"');
+    });
 
-    it.todo("should have a name", () => {});
+    it("should have a name", () => {
+      const t = new Table("widgets");
+      expect(t.name).toBe("widgets");
+    });
   });
 });

@@ -89,8 +89,16 @@ describe("Arel", () => {
       expect(on).toBeInstanceOf(Nodes.On);
     });
 
-    it.todo("create true", () => {});
+    it("create true", () => {
+      const t = users.createTrue();
+      expect(t).toBeInstanceOf(Nodes.True);
+      expect(new Visitors.ToSql().compile(t)).toBe("TRUE");
+    });
 
-    it.todo("create false", () => {});
+    it("create false", () => {
+      const f = users.createFalse();
+      expect(f).toBeInstanceOf(Nodes.False);
+      expect(new Visitors.ToSql().compile(f)).toBe("FALSE");
+    });
   });
 });
