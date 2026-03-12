@@ -200,7 +200,7 @@ describe("Arel", () => {
       expect(manager.columns.length).toBe(2);
     });
 
-    it("should handle false", () => {
+    it("inserts false", () => {
       const mgr = new InsertManager();
       mgr.into(users);
       mgr.insert([[users.get("active"), false]]);

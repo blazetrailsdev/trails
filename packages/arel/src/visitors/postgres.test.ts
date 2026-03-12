@@ -63,7 +63,18 @@ describe("Arel", () => {
     it.todo("should know how to generate parenthesis when supplied with many Dimensions", () => {});
     it.todo("should construct a valid generic SQL statement", () => {});
     it.todo("should handle column names on both sides", () => {});
-    it.todo("should handle Contains", () => {});
-    it.todo("should handle Overlaps", () => {});
+    it("should handle Contains", () => {
+      const visitor = new Visitors.ToSql();
+      const products = new Table("products");
+      const node = products.get("metadata").contains('{"foo":"bar"}');
+      expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{"foo":"bar"}'`);
+    });
+
+    it("should handle Overlaps", () => {
+      const visitor = new Visitors.ToSql();
+      const products = new Table("products");
+      const node = products.get("tags").overlaps("{foo,bar,baz}");
+      expect(visitor.compile(node)).toBe(`"products"."tags" && '{foo,bar,baz}'`);
+    });
   });
 });

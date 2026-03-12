@@ -31,7 +31,7 @@ describe("Arel", () => {
       expect(mgr.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = 1');
     });
 
-    it("chaining returns the manager", () => {
+    it("chains", () => {
       const mgr = new DeleteManager();
       expect(mgr.from(users)).toBe(mgr);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);

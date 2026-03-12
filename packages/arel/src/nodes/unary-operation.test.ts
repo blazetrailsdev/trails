@@ -51,5 +51,13 @@ describe("Arel", () => {
       const b = new Nodes.UnaryOperation("-", users.get("id"));
       expect(a).not.toEqual(b);
     });
+
+    it("operation ordering", () => {
+      const node = new Nodes.UnaryOperation("-", users.get("age"));
+      const ordering = node.desc();
+      expect(ordering).toBeInstanceOf(Nodes.Descending);
+      expect(ordering.expr).toBe(node);
+      expect(ordering.isDescending()).toBe(true);
+    });
   });
 });

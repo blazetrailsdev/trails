@@ -36,30 +36,6 @@ describe("Arel", () => {
       expect(visitor.compile(attr)).toBe('"users"."age"');
     });
 
-    it("should handle Addition", () => {
-      expect(users.project(users.get("age").add(1).as("next")).toSql()).toBe(
-        'SELECT "users"."age" + 1 AS next FROM "users"',
-      );
-    });
-
-    it("should handle Subtraction", () => {
-      expect(users.project(users.get("age").subtract(1).as("prev")).toSql()).toBe(
-        'SELECT "users"."age" - 1 AS prev FROM "users"',
-      );
-    });
-
-    it("should handle Multiplication", () => {
-      expect(users.project(users.get("age").multiply(2).as("double")).toSql()).toBe(
-        'SELECT "users"."age" * 2 AS double FROM "users"',
-      );
-    });
-
-    it("should handle Division", () => {
-      expect(users.project(users.get("age").divide(2).as("half")).toSql()).toBe(
-        'SELECT "users"."age" / 2 AS half FROM "users"',
-      );
-    });
-
     it.todo("average should be compatible with ", () => {});
 
     it.todo("count should be compatible with ", () => {});

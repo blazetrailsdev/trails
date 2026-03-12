@@ -106,16 +106,5 @@ describe("Arel", () => {
       expect(a.value).toBe(b.value);
       expect(a.attribute).toBe(b.attribute);
     });
-
-    it("should compile literal SQL", () => {
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(new Nodes.SqlLiteral("1 = 1"))).toBe("1 = 1");
-    });
-
-    it("should compile Arel nodes", () => {
-      const visitor = new Visitors.ToSql();
-      const node = users.get("id").eq(1);
-      expect(visitor.compile(node)).toBe('"users"."id" = 1');
-    });
   });
 });

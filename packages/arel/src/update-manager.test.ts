@@ -19,8 +19,12 @@ describe("Arel", () => {
 
   describe("update-manager", () => {
     it("should not quote sql literals", () => {
-      const node = new Nodes.SqlLiteral("NOW()");
-      expect(visitor.compile(node)).toBe("NOW()");
+      const um = new UpdateManager();
+      um.table(users);
+      um.set([[users.get("name"), new Nodes.SqlLiteral("NOW()")]]);
+      const sql = um.toSql();
+      expect(sql).toContain("NOW()");
+      expect(sql).not.toContain("'NOW()'");
     });
 
     it("sets having", () => {
@@ -121,11 +125,31 @@ describe("Arel", () => {
       expect(manager.wheres.length).toBe(1);
     });
 
-    it("should handle false", () => {
+    it("updates with false", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       mgr.set([[users.get("active"), false]]);
       expect(mgr.toSql()).toContain("FALSE");
+    });
+
+    it("handles limit properly", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.take(10);
+      um.set([[users.get("name"), null]]);
+      expect(um.toSql()).toContain("LIMIT 10");
+    });
+
+    it("takes a list of lists", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.set([
+        [users.get("id"), 1],
+        [users.get("name"), "hello"],
+      ]);
+      const sql = um.toSql();
+      expect(sql).toContain('"users"."id" = 1');
+      expect(sql).toContain('"users"."name" =');
     });
 
     it("chains", () => {

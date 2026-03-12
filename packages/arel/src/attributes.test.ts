@@ -30,5 +30,11 @@ describe("Arel", () => {
       const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
       expect(c1.name).toBe(c2.name);
     });
+
+    it("is not equal with different ivars", () => {
+      const a = new Nodes.NamedFunction("COUNT", [users.get("id")]);
+      const b = new Nodes.NamedFunction("COUNT", [users.get("name")]);
+      expect(a).not.toEqual(b);
+    });
   });
 });
