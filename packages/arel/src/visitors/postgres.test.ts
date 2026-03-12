@@ -65,14 +65,16 @@ describe("Arel", () => {
     it.todo("should handle column names on both sides", () => {});
     it("should handle Contains", () => {
       const visitor = new Visitors.ToSql();
-      const node = users.get("tags").contains("foo");
-      expect(visitor.compile(node)).toContain("@>");
+      const products = new Table("products");
+      const node = products.get("metadata").contains('{"foo":"bar"}');
+      expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{\"foo\":\"bar\"}'`);
     });
 
     it("should handle Overlaps", () => {
       const visitor = new Visitors.ToSql();
-      const node = users.get("tags").overlaps("bar");
-      expect(visitor.compile(node)).toContain("&&");
+      const products = new Table("products");
+      const node = products.get("tags").overlaps("{foo,bar,baz}");
+      expect(visitor.compile(node)).toBe(`"products"."tags" && '{foo,bar,baz}'`);
     });
   });
 });

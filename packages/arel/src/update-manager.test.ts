@@ -21,8 +21,10 @@ describe("Arel", () => {
     it("should not quote sql literals", () => {
       const um = new UpdateManager();
       um.table(users);
-      um.set([[users.get("name"), new Nodes.BindParam()]]);
-      expect(um.toSql()).toContain("?");
+      um.set([[users.get("name"), new Nodes.SqlLiteral("NOW()")]]);
+      const sql = um.toSql();
+      expect(sql).toContain("NOW()");
+      expect(sql).not.toContain("'NOW()'");
     });
 
     it("sets having", () => {
