@@ -31,6 +31,7 @@ import { Regexp as RegexpNode, NotRegexp } from "./regexp.js";
 import { IsDistinctFrom, IsNotDistinctFrom } from "./distinct-from.js";
 import { Case } from "./case.js";
 import { InfixOperation } from "./infix-operation.js";
+import { Over, NamedWindow, Window } from "./window.js";
 
 function buildQuoted(value: unknown): Node {
   if (value instanceof Node) return value;
@@ -440,6 +441,18 @@ export class Attribute extends Node {
    */
   overlaps(other: unknown): InfixOperation {
     return new InfixOperation("&&", this, buildQuoted(other));
+  }
+
+  /**
+   * Apply a window to this expression.
+   *
+   * Mirrors: `OVER` support on Arel expressions.
+   */
+  over(window?: Window | NamedWindow | string | null): Over {
+    if (!window) return new Over(this, null);
+    if (typeof window === "string") return new Over(this, new SqlLiteral(window));
+    if (window instanceof NamedWindow) return new Over(this, new SqlLiteral(`"${window.name}"`));
+    return new Over(this, window);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
