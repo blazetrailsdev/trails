@@ -105,21 +105,51 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCFullYear()).toBe(2036);
   });
 
-  it.skip("time helper travel to with time zone", () => { /* TimeZone not implemented */ });
-  it.skip("time helper travel to with different system and application time zones", () => { /* TimeZone */ });
-  it.skip("time helper travel to with string for time zone", () => { /* TimeZone */ });
-  it.skip("time helper travel to with string and milliseconds", () => { /* string parsing */ });
-  it.skip("time helper travel to with separate class", () => { /* Ruby-specific */ });
-  it.skip("time helper travel to with usec", () => { /* microseconds */ });
-  it.skip("time helper with usec true", () => { /* microseconds */ });
-  it.skip("time helper travel to with datetime and usec", () => { /* microseconds */ });
-  it.skip("time helper travel to with datetime and usec true", () => { /* microseconds */ });
-  it.skip("time helper travel to with string and usec", () => { /* microseconds */ });
-  it.skip("time helper travel to with string and usec true", () => { /* microseconds */ });
-  it.skip("time helper freeze time with usec true", () => { /* microseconds */ });
-  it.skip("time helper travel with subsequent block", () => { /* complex nesting */ });
-  it.skip("travel to will reset the usec to avoid mysql rounding", () => { /* DB-specific */ });
-  it.skip("time helper travel with time subclass", () => { /* Ruby Time subclass */ });
+  it.skip("time helper travel to with time zone", () => {
+    /* TimeZone not implemented */
+  });
+  it.skip("time helper travel to with different system and application time zones", () => {
+    /* TimeZone */
+  });
+  it.skip("time helper travel to with string for time zone", () => {
+    /* TimeZone */
+  });
+  it.skip("time helper travel to with string and milliseconds", () => {
+    /* string parsing */
+  });
+  it.skip("time helper travel to with separate class", () => {
+    /* Ruby-specific */
+  });
+  it.skip("time helper travel to with usec", () => {
+    /* microseconds */
+  });
+  it.skip("time helper with usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with datetime and usec", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with datetime and usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with string and usec", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel to with string and usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper freeze time with usec true", () => {
+    /* microseconds */
+  });
+  it.skip("time helper travel with subsequent block", () => {
+    /* complex nesting */
+  });
+  it.skip("travel to will reset the usec to avoid mysql rounding", () => {
+    /* DB-specific */
+  });
+  it.skip("time helper travel with time subclass", () => {
+    /* Ruby Time subclass */
+  });
 });
 
 describe("MethodCallAssertionsTest", () => {
@@ -202,14 +232,22 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of with defaults to expect once", () => {
-    class MyService { doWork() { return "done"; } }
+    class MyService {
+      doWork() {
+        return "done";
+      }
+    }
     assertCalledOnInstanceOf(MyService, "doWork", {}, () => {
       new MyService().doWork();
     });
   });
 
   it("assert called on instance of more than once", () => {
-    class MyService { doWork() { return "done"; } }
+    class MyService {
+      doWork() {
+        return "done";
+      }
+    }
     assertCalledOnInstanceOf(MyService, "doWork", { times: 2 }, () => {
       new MyService().doWork();
       new MyService().doWork();
@@ -217,7 +255,11 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of with arguments", () => {
-    class Greeter { greet(name: string) { return `Hello ${name}`; } }
+    class Greeter {
+      greet(name: string) {
+        return `Hello ${name}`;
+      }
+    }
     const records = assertCalledOnInstanceOf(Greeter, "greet", { with: ["Charlie"] }, () => {
       new Greeter().greet("Charlie");
     });
@@ -225,7 +267,11 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of returns", () => {
-    class Fetcher { fetch() { return "real"; } }
+    class Fetcher {
+      fetch() {
+        return "real";
+      }
+    }
     const records = assertCalledOnInstanceOf(Fetcher, "fetch", { returns: "mocked" }, () => {
       const result = new Fetcher().fetch();
       expect(result).toBe("mocked");
@@ -234,7 +280,11 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of failure", () => {
-    class MyService { doWork() { return "done"; } }
+    class MyService {
+      doWork() {
+        return "done";
+      }
+    }
     expect(() => {
       assertCalledOnInstanceOf(MyService, "doWork", {}, () => {
         // Don't call it
@@ -243,7 +293,11 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of with message", () => {
-    class Widget { render() { return "html"; } }
+    class Widget {
+      render() {
+        return "html";
+      }
+    }
     expect(() => {
       assertCalledOnInstanceOf(Widget, "render", { times: 2 }, () => {
         new Widget().render(); // only once
@@ -268,14 +322,22 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert not called on instance of", () => {
-    class MyService { doWork() { return "done"; } }
+    class MyService {
+      doWork() {
+        return "done";
+      }
+    }
     assertNotCalledOnInstanceOf(MyService, "doWork", () => {
       // Don't call it
     });
   });
 
   it("assert not called on instance of failure", () => {
-    class MyService { doWork() { return "done"; } }
+    class MyService {
+      doWork() {
+        return "done";
+      }
+    }
     expect(() => {
       assertNotCalledOnInstanceOf(MyService, "doWork", () => {
         new MyService().doWork(); // shouldn't be called
@@ -283,9 +345,19 @@ describe("MethodCallAssertionsTest", () => {
     }).toThrow();
   });
 
-  it.skip("assert called on instance of nesting", () => { /* complex nesting */ });
-  it.skip("assert not called on instance of nesting", () => { /* complex nesting */ });
-  it.skip("stub any instance", () => { /* Ruby-specific stub_any_instance */ });
-  it.skip("stub any instance with instance", () => { /* Ruby-specific */ });
-  it.skip("assert changes when assertions are included", () => { /* assert_changes */ });
+  it.skip("assert called on instance of nesting", () => {
+    /* complex nesting */
+  });
+  it.skip("assert not called on instance of nesting", () => {
+    /* complex nesting */
+  });
+  it.skip("stub any instance", () => {
+    /* Ruby-specific stub_any_instance */
+  });
+  it.skip("stub any instance with instance", () => {
+    /* Ruby-specific */
+  });
+  it.skip("assert changes when assertions are included", () => {
+    /* assert_changes */
+  });
 });

@@ -142,7 +142,7 @@ describe("RangeTest", () => {
 
   it("exclusive end should not include identical with inclusive end", () => {
     const outer = makeRange(1, 10, true); // exclusive
-    const inner = makeRange(1, 10);       // inclusive
+    const inner = makeRange(1, 10); // inclusive
     expect(rangeIncludesRange(outer, inner)).toBe(false);
   });
 
@@ -288,8 +288,16 @@ describe("RangeTest", () => {
     expect(typeof result).toBe("string");
   });
 
-  it.skip("each on time with zone", () => { /* TimeWithZone not implemented */ });
-  it.skip("step on time with zone", () => { /* TimeWithZone not implemented */ });
-  it.skip("cover on time with zone", () => { /* TimeWithZone not implemented */ });
-  it.skip("case equals on time with zone", () => { /* TimeWithZone not implemented */ });
+  it.skip("each on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
+  it.skip("step on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
+  it.skip("cover on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
+  it.skip("case equals on time with zone", () => {
+    /* TimeWithZone not implemented */
+  });
 });

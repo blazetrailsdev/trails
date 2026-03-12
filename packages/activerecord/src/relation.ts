@@ -45,7 +45,10 @@ export class Relation<T extends Base> {
   private _havingClauses: string[] = [];
   private _isNone = false;
   private _lockValue: string | null = null;
-  private _setOperation: { type: "union" | "unionAll" | "intersect" | "except"; other: Relation<T> } | null = null;
+  private _setOperation: {
+    type: "union" | "unionAll" | "intersect" | "except";
+    other: Relation<T>;
+  } | null = null;
   private _joinClauses: Array<{ type: "inner" | "left"; table: string; on: string }> = [];
   private _rawJoins: string[] = [];
   private _includesAssociations: string[] = [];
@@ -87,28 +90,39 @@ export class Relation<T extends Base> {
       let sql = conditionsOrSql;
 
       // Check for named binds: where("age > :min AND age < :max", { min: 18, max: 65 })
-      if (binds.length === 1 && typeof binds[0] === "object" && binds[0] !== null && !Array.isArray(binds[0])) {
+      if (
+        binds.length === 1 &&
+        typeof binds[0] === "object" &&
+        binds[0] !== null &&
+        !Array.isArray(binds[0])
+      ) {
         const namedBinds = binds[0] as Record<string, unknown>;
         for (const [name, value] of Object.entries(namedBinds)) {
-          const replacement = value === null
-            ? "NULL"
-            : typeof value === "number"
-              ? String(value)
-              : typeof value === "boolean"
-                ? value ? "TRUE" : "FALSE"
-                : `'${String(value).replace(/'/g, "''")}'`;
+          const replacement =
+            value === null
+              ? "NULL"
+              : typeof value === "number"
+                ? String(value)
+                : typeof value === "boolean"
+                  ? value
+                    ? "TRUE"
+                    : "FALSE"
+                  : `'${String(value).replace(/'/g, "''")}'`;
           sql = sql.replace(new RegExp(`:${name}\\b`, "g"), replacement);
         }
       } else {
         // Positional ? placeholders
         for (const bind of binds) {
-          const replacement = bind === null
-            ? "NULL"
-            : typeof bind === "number"
-              ? String(bind)
-              : typeof bind === "boolean"
-                ? bind ? "TRUE" : "FALSE"
-                : `'${String(bind).replace(/'/g, "''")}'`;
+          const replacement =
+            bind === null
+              ? "NULL"
+              : typeof bind === "number"
+                ? String(bind)
+                : typeof bind === "boolean"
+                  ? bind
+                    ? "TRUE"
+                    : "FALSE"
+                  : `'${String(bind).replace(/'/g, "''")}'`;
           sql = sql.replace("?", replacement);
         }
       }
@@ -141,21 +155,25 @@ export class Relation<T extends Base> {
     const rel = this._clone();
     // Remove existing clauses for the keys being rewritten
     const keysToReplace = new Set(Object.keys(conditions));
-    rel._whereClauses = rel._whereClauses.map((clause) => {
-      const filtered: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(clause)) {
-        if (!keysToReplace.has(k)) filtered[k] = v;
-      }
-      return filtered;
-    }).filter((c) => Object.keys(c).length > 0);
+    rel._whereClauses = rel._whereClauses
+      .map((clause) => {
+        const filtered: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(clause)) {
+          if (!keysToReplace.has(k)) filtered[k] = v;
+        }
+        return filtered;
+      })
+      .filter((c) => Object.keys(c).length > 0);
     // Also remove NOT clauses for the same keys
-    rel._whereNotClauses = rel._whereNotClauses.map((clause) => {
-      const filtered: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(clause)) {
-        if (!keysToReplace.has(k)) filtered[k] = v;
-      }
-      return filtered;
-    }).filter((c) => Object.keys(c).length > 0);
+    rel._whereNotClauses = rel._whereNotClauses
+      .map((clause) => {
+        const filtered: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(clause)) {
+          if (!keysToReplace.has(k)) filtered[k] = v;
+        }
+        return filtered;
+      })
+      .filter((c) => Object.keys(c).length > 0);
     rel._whereClauses.push(conditions);
     return rel;
   }
@@ -173,11 +191,17 @@ export class Relation<T extends Base> {
       const assocDef = associations.find((a: any) => a.name === assocName);
 
       if (!assocDef) {
-        throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
+        throw new Error(
+          `Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`,
+        );
       }
 
       if (assocDef.type === "belongsTo") {
-        const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+        const _underscore = (n: string) =>
+          n
+            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+            .toLowerCase();
         const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
         rel = rel.whereNot({ [foreignKey]: null });
       }
@@ -198,11 +222,17 @@ export class Relation<T extends Base> {
       const assocDef = associations.find((a: any) => a.name === assocName);
 
       if (!assocDef) {
-        throw new Error(`Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`);
+        throw new Error(
+          `Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`,
+        );
       }
 
       if (assocDef.type === "belongsTo") {
-        const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+        const _underscore = (n: string) =>
+          n
+            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+            .toLowerCase();
         const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
         rel = rel.where({ [foreignKey]: null });
       }
@@ -315,9 +345,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#order
    */
-  order(
-    ...args: Array<string | Record<string, "asc" | "desc">>
-  ): Relation<T> {
+  order(...args: Array<string | Record<string, "asc" | "desc">>): Relation<T> {
     const rel = this._clone();
     let i = 0;
     while (i < args.length) {
@@ -471,9 +499,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reorder
    */
-  reorder(
-    ...args: Array<string | Record<string, "asc" | "desc">>
-  ): Relation<T> {
+  reorder(...args: Array<string | Record<string, "asc" | "desc">>): Relation<T> {
     const rel = this._clone();
     rel._orderClauses = [];
     for (const arg of args) {
@@ -507,10 +533,7 @@ export class Relation<T extends Base> {
         return [clause, "desc" as const];
       }
       const [col, dir] = clause;
-      return [col, dir === "asc" ? "desc" : "asc"] as [
-        string,
-        "asc" | "desc",
-      ];
+      return [col, dir === "asc" ? "desc" : "asc"] as [string, "asc" | "desc"];
     });
     return rel;
   }
@@ -523,12 +546,17 @@ export class Relation<T extends Base> {
   inOrderOf(column: string, values: unknown[]): Relation<T> {
     const rel = this._clone();
     // Generate a CASE WHEN ... expression for ordering
-    const cases = values.map((v, i) => {
-      const quoted = v === null ? "NULL"
-        : typeof v === "number" ? String(v)
-        : `'${String(v).replace(/'/g, "''")}'`;
-      return `WHEN "${column}" = ${quoted} THEN ${i}`;
-    }).join(" ");
+    const cases = values
+      .map((v, i) => {
+        const quoted =
+          v === null
+            ? "NULL"
+            : typeof v === "number"
+              ? String(v)
+              : `'${String(v).replace(/'/g, "''")}'`;
+        return `WHEN "${column}" = ${quoted} THEN ${i}`;
+      })
+      .join(" ");
     const caseExpr = `CASE ${cases} ELSE ${values.length} END`;
     // Use raw SQL order — push as a string that the order manager treats as raw
     rel._orderClauses = [];
@@ -561,10 +589,14 @@ export class Relation<T extends Base> {
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (this._whereClauses.length > 0) {
-      parts.push(`.where(${JSON.stringify(this._whereClauses.length === 1 ? this._whereClauses[0] : this._whereClauses)})`);
+      parts.push(
+        `.where(${JSON.stringify(this._whereClauses.length === 1 ? this._whereClauses[0] : this._whereClauses)})`,
+      );
     }
     if (this._whereNotClauses.length > 0) {
-      parts.push(`.whereNot(${JSON.stringify(this._whereNotClauses.length === 1 ? this._whereNotClauses[0] : this._whereNotClauses)})`);
+      parts.push(
+        `.whereNot(${JSON.stringify(this._whereNotClauses.length === 1 ? this._whereNotClauses[0] : this._whereNotClauses)})`,
+      );
     }
     if (this._orderClauses.length > 0) {
       parts.push(`.order(${JSON.stringify(this._orderClauses)})`);
@@ -739,7 +771,21 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#unscope
    */
-  unscope(...types: Array<"where" | "order" | "limit" | "offset" | "group" | "having" | "select" | "distinct" | "lock" | "readonly" | "from">): Relation<T> {
+  unscope(
+    ...types: Array<
+      | "where"
+      | "order"
+      | "limit"
+      | "offset"
+      | "group"
+      | "having"
+      | "select"
+      | "distinct"
+      | "lock"
+      | "readonly"
+      | "from"
+    >
+  ): Relation<T> {
     const rel = this._clone();
     for (const type of types) {
       switch (type) {
@@ -788,9 +834,45 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::SpawnMethods#only
    */
-  only(...types: Array<"where" | "order" | "limit" | "offset" | "group" | "having" | "select" | "distinct" | "lock" | "readonly" | "from">): Relation<T> {
-    const allTypes: Array<"where" | "order" | "limit" | "offset" | "group" | "having" | "select" | "distinct" | "lock" | "readonly" | "from"> = [
-      "where", "order", "limit", "offset", "group", "having", "select", "distinct", "lock", "readonly", "from",
+  only(
+    ...types: Array<
+      | "where"
+      | "order"
+      | "limit"
+      | "offset"
+      | "group"
+      | "having"
+      | "select"
+      | "distinct"
+      | "lock"
+      | "readonly"
+      | "from"
+    >
+  ): Relation<T> {
+    const allTypes: Array<
+      | "where"
+      | "order"
+      | "limit"
+      | "offset"
+      | "group"
+      | "having"
+      | "select"
+      | "distinct"
+      | "lock"
+      | "readonly"
+      | "from"
+    > = [
+      "where",
+      "order",
+      "limit",
+      "offset",
+      "group",
+      "having",
+      "select",
+      "distinct",
+      "lock",
+      "readonly",
+      "from",
     ];
     const toRemove = allTypes.filter((t) => !types.includes(t));
     return this.unscope(...toRemove);
@@ -925,15 +1007,19 @@ export class Relation<T extends Base> {
     if (!assocDef) return null;
 
     const _underscore = (n: string) =>
-      n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+      n
+        .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
         .replace(/([a-z\d])([A-Z])/g, "$1_$2")
         .toLowerCase();
-    const _camelize = (n: string) =>
-      n.replace(/(^|_)(.)/g, (_m, _p1, p2) => p2.toUpperCase());
+    const _camelize = (n: string) => n.replace(/(^|_)(.)/g, (_m, _p1, p2) => p2.toUpperCase());
     const _singularize = (n: string) =>
-      n.endsWith("ies") ? n.slice(0, -3) + "y" :
-      n.endsWith("ses") ? n.slice(0, -2) :
-      n.endsWith("s") ? n.slice(0, -1) : n;
+      n.endsWith("ies")
+        ? n.slice(0, -3) + "y"
+        : n.endsWith("ses")
+          ? n.slice(0, -2)
+          : n.endsWith("s")
+            ? n.slice(0, -1)
+            : n;
 
     const sourceTable = modelClass.tableName;
     const sourcePk = modelClass.primaryKey ?? "id";
@@ -950,7 +1036,10 @@ export class Relation<T extends Base> {
       // STI type condition on target
       const inheritanceCol = getInheritanceColumn(targetModel);
       if (inheritanceCol && isStiSubclass(targetModel)) {
-        const stiNames = [targetModel.name, ...(targetModel.descendants ?? []).map((d: any) => d.name)];
+        const stiNames = [
+          targetModel.name,
+          ...(targetModel.descendants ?? []).map((d: any) => d.name),
+        ];
         const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
         onClause += ` AND "${targetTable}"."${inheritanceCol}" IN (${inList})`;
       }
@@ -959,7 +1048,8 @@ export class Relation<T extends Base> {
     }
 
     if (assocDef.type === "hasOne" || assocDef.type === "hasMany") {
-      const className = assocDef.options.className ??
+      const className =
+        assocDef.options.className ??
         _camelize(assocDef.type === "hasMany" ? _singularize(name) : name);
       const targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
@@ -977,7 +1067,10 @@ export class Relation<T extends Base> {
       // STI type condition on target
       const inheritanceCol = getInheritanceColumn(targetModel);
       if (inheritanceCol && isStiSubclass(targetModel)) {
-        const stiNames = [targetModel.name, ...(targetModel.descendants ?? []).map((d: any) => d.name)];
+        const stiNames = [
+          targetModel.name,
+          ...(targetModel.descendants ?? []).map((d: any) => d.name),
+        ];
         const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
         onClause += ` AND "${targetTable}"."${inheritanceCol}" IN (${inList})`;
       }
@@ -1071,7 +1164,7 @@ export class Relation<T extends Base> {
    */
   loadAsync(): Relation<T> {
     // Start loading in background; result is cached when accessed
-    this.toArray().then(records => {
+    this.toArray().then((records) => {
       this._loaded = true;
       this._records = records;
     });
@@ -1262,9 +1355,7 @@ export class Relation<T extends Base> {
 
     const sql = this._toSql();
     const rows = await this._modelClass.adapter.execute(sql);
-    this._records = rows.map(
-      (row) => this._modelClass._instantiate(row) as T
-    );
+    this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
     this._loaded = true;
 
     // Apply readonly and strict_loading flags to loaded records
@@ -1508,7 +1599,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#pick
    */
-  async pick(...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>): Promise<unknown> {
+  async pick(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown> {
     const values = await this.limit(1).pluck(...columns);
     return values[0] ?? null;
   }
@@ -1629,12 +1722,9 @@ export class Relation<T extends Base> {
   private async _groupedAggregate(fn: string, column: string): Promise<Record<string, number>> {
     const table = this._modelClass.arelTable;
     const groupCol = this._groupColumns[0]; // Support single group column
-    const aggExpr = column === "*"
-      ? `${fn}(*) AS val`
-      : `${fn}("${table.name}"."${column}") AS val`;
-    const manager = table.project(
-      `"${table.name}"."${groupCol}" AS group_key, ${aggExpr}`
-    );
+    const aggExpr =
+      column === "*" ? `${fn}(*) AS val` : `${fn}("${table.name}"."${column}") AS val`;
+    const manager = table.project(`"${table.name}"."${groupCol}" AS group_key, ${aggExpr}`);
     this._applyWheresToManager(manager, table);
     manager.group(groupCol);
 
@@ -1653,9 +1743,7 @@ export class Relation<T extends Base> {
 
   private async _aggregate(fn: string, column: string): Promise<number | null> {
     const table = this._modelClass.arelTable;
-    const manager = table.project(
-      `${fn}("${table.name}"."${column}") AS val`
-    );
+    const manager = table.project(`${fn}("${table.name}"."${column}") AS val`);
     this._applyWheresToManager(manager, table);
 
     const sql = manager.toSql();
@@ -1691,44 +1779,61 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#async_count
    */
-  asyncCount(column?: string) { return this.count(column); }
+  asyncCount(column?: string) {
+    return this.count(column);
+  }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_sum
    */
-  asyncSum(column?: string) { return this.sum(column); }
+  asyncSum(column?: string) {
+    return this.sum(column);
+  }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_minimum
    */
-  asyncMinimum(column: string) { return this.minimum(column); }
+  asyncMinimum(column: string) {
+    return this.minimum(column);
+  }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_maximum
    */
-  asyncMaximum(column: string) { return this.maximum(column); }
+  asyncMaximum(column: string) {
+    return this.maximum(column);
+  }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_average
    */
-  asyncAverage(column: string) { return this.average(column); }
+  asyncAverage(column: string) {
+    return this.average(column);
+  }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_pluck
    */
-  asyncPluck(...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>) { return this.pluck(...columns); }
+  asyncPluck(...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>) {
+    return this.pluck(...columns);
+  }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_ids
    */
-  asyncIds() { return this.ids(); }
+  asyncIds() {
+    return this.ids();
+  }
 
   /**
    * Generic calculation method.
    *
    * Mirrors: ActiveRecord::Relation#calculate
    */
-  async calculate(operation: "count" | "sum" | "average" | "minimum" | "maximum", column: string): Promise<number | null | Record<string, number>> {
+  async calculate(
+    operation: "count" | "sum" | "average" | "minimum" | "maximum",
+    column: string,
+  ): Promise<number | null | Record<string, number>> {
     switch (operation) {
       case "count":
         return this.count(column);
@@ -1750,13 +1855,13 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#pluck
    */
-  async pluck(...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>): Promise<unknown[]> {
+  async pluck(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]> {
     if (this._isNone) return [];
 
     const table = this._modelClass.arelTable;
-    const projections = columns.map((c) =>
-      typeof c === "string" ? table.get(c) : c
-    );
+    const projections = columns.map((c) => (typeof c === "string" ? table.get(c) : c));
     // Extract column names for result mapping
     const columnNames = columns.map((c) => {
       if (typeof c === "string") return c;
@@ -1903,11 +2008,16 @@ export class Relation<T extends Base> {
    */
   async findOrCreateBy(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<T> {
     const records = await this.where(conditions).limit(1).toArray();
     if (records.length > 0) return records[0];
-    return this._modelClass.create({ ...this._createWithAttrs, ...this._scopeAttributes(), ...conditions, ...extra }) as Promise<T>;
+    return this._modelClass.create({
+      ...this._createWithAttrs,
+      ...this._scopeAttributes(),
+      ...conditions,
+      ...extra,
+    }) as Promise<T>;
   }
 
   /**
@@ -1917,11 +2027,15 @@ export class Relation<T extends Base> {
    */
   async findOrInitializeBy(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<T> {
     const records = await this.where(conditions).limit(1).toArray();
     if (records.length > 0) return records[0];
-    return new (this._modelClass as any)({ ...this._scopeAttributes(), ...conditions, ...extra }) as T;
+    return new (this._modelClass as any)({
+      ...this._scopeAttributes(),
+      ...conditions,
+      ...extra,
+    }) as T;
   }
 
   /**
@@ -1931,10 +2045,15 @@ export class Relation<T extends Base> {
    */
   async createOrFindBy(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<T> {
     try {
-      return await this._modelClass.create({ ...this._createWithAttrs, ...this._scopeAttributes(), ...conditions, ...extra }) as T;
+      return (await this._modelClass.create({
+        ...this._createWithAttrs,
+        ...this._scopeAttributes(),
+        ...conditions,
+        ...extra,
+      })) as T;
     } catch {
       const records = await this.where(conditions).limit(1).toArray();
       if (records.length > 0) return records[0];
@@ -1983,7 +2102,7 @@ export class Relation<T extends Base> {
    */
   async insertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[] }
+    options?: { uniqueBy?: string | string[] },
   ): Promise<number> {
     if (records.length === 0) return 0;
 
@@ -2015,7 +2134,7 @@ export class Relation<T extends Base> {
       if (process.env.MYSQL_TEST_URL) {
         sql = `INSERT IGNORE INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
       } else {
-        sql += ` ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")}) DO NOTHING`;
+        sql += ` ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")}) DO NOTHING`;
       }
     }
 
@@ -2029,7 +2148,11 @@ export class Relation<T extends Base> {
    */
   async upsertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[]; updateOnly?: string | string[]; onDuplicate?: unknown }
+    options?: {
+      uniqueBy?: string | string[];
+      updateOnly?: string | string[];
+      onDuplicate?: unknown;
+    },
   ): Promise<number> {
     if (options?.onDuplicate !== undefined && options?.updateOnly !== undefined) {
       throw new Error("Cannot use both onDuplicate and updateOnly");
@@ -2060,8 +2183,12 @@ export class Relation<T extends Base> {
 
     const pk = this._modelClass.primaryKey;
     const uniqueCols = options?.uniqueBy
-      ? (Array.isArray(options.uniqueBy) ? options.uniqueBy : [options.uniqueBy])
-      : (Array.isArray(pk) ? pk : [pk]);
+      ? Array.isArray(options.uniqueBy)
+        ? options.uniqueBy
+        : [options.uniqueBy]
+      : Array.isArray(pk)
+        ? pk
+        : [pk];
 
     let sql: string;
     const isMysql = !!process.env.MYSQL_TEST_URL;
@@ -2070,7 +2197,7 @@ export class Relation<T extends Base> {
       if (isMysql) {
         sql = `INSERT IGNORE INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
       } else {
-        const conflictTarget = `ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")})`;
+        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
         sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO NOTHING`;
       }
     } else {
@@ -2084,15 +2211,17 @@ export class Relation<T extends Base> {
       }
 
       if (isMysql) {
-        const updateClause = updateCols.length > 0
-          ? updateCols.map((c) => `"${c}" = VALUES("${c}")`).join(", ")
-          : `"${columns[0]}" = VALUES("${columns[0]}")`;
+        const updateClause =
+          updateCols.length > 0
+            ? updateCols.map((c) => `"${c}" = VALUES("${c}")`).join(", ")
+            : `"${columns[0]}" = VALUES("${columns[0]}")`;
         sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON DUPLICATE KEY UPDATE ${updateClause}`;
       } else {
-        const conflictTarget = `ON CONFLICT (${uniqueCols.map(c => `"${c}"`).join(", ")})`;
-        const updateClause = updateCols.length > 0
-          ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
-          : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
+        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
+        const updateClause =
+          updateCols.length > 0
+            ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
+            : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
         sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${updateClause}`;
       }
     }
@@ -2197,9 +2326,10 @@ export class Relation<T extends Base> {
     const records = await this.toArray();
     const result: Record<string, T[]> = {};
     for (const record of records) {
-      const key = typeof keyOrFn === "string"
-        ? String(record.readAttribute(keyOrFn))
-        : String(keyOrFn(record));
+      const key =
+        typeof keyOrFn === "string"
+          ? String(record.readAttribute(keyOrFn))
+          : String(keyOrFn(record));
       if (!result[key]) result[key] = [];
       result[key].push(record);
     }
@@ -2215,9 +2345,10 @@ export class Relation<T extends Base> {
     const records = await this.toArray();
     const result: Record<string, T> = {};
     for (const record of records) {
-      const key = typeof keyOrFn === "string"
-        ? String(record.readAttribute(keyOrFn))
-        : String(keyOrFn(record));
+      const key =
+        typeof keyOrFn === "string"
+          ? String(record.readAttribute(keyOrFn))
+          : String(keyOrFn(record));
       result[key] = record;
     }
     return result;
@@ -2242,7 +2373,17 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#find_in_batches
    */
-  async *findInBatches({ batchSize = 1000, start, finish, order }: { batchSize?: number; start?: unknown; finish?: unknown; order?: "asc" | "desc" } = {}): AsyncGenerator<T[]> {
+  async *findInBatches({
+    batchSize = 1000,
+    start,
+    finish,
+    order,
+  }: {
+    batchSize?: number;
+    start?: unknown;
+    finish?: unknown;
+    order?: "asc" | "desc";
+  } = {}): AsyncGenerator<T[]> {
     let currentOffset = this._offsetValue ?? 0;
     const pk = this._modelClass.primaryKey;
 
@@ -2254,7 +2395,7 @@ export class Relation<T extends Base> {
 
       // Ensure deterministic ordering; support custom order direction (Rails 7.1)
       if (rel._orderClauses.length === 0) {
-        rel._orderClauses.push(order ? [pk as string, order] : pk as string);
+        rel._orderClauses.push(order ? [pk as string, order] : (pk as string));
       }
 
       // Apply start/finish range constraints
@@ -2264,7 +2405,9 @@ export class Relation<T extends Base> {
       }
       if (finish !== undefined) {
         const finishQuoted = typeof finish === "number" ? String(finish) : `'${finish}'`;
-        rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${pk}" <= ${finishQuoted}`);
+        rel._whereRawClauses.push(
+          `"${this._modelClass.arelTable.name}"."${pk}" <= ${finishQuoted}`,
+        );
       }
 
       const batch = await rel.toArray();
@@ -2282,7 +2425,17 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#find_each
    */
-  async *findEach({ batchSize = 1000, start, finish, order }: { batchSize?: number; start?: unknown; finish?: unknown; order?: "asc" | "desc" } = {}): AsyncGenerator<T> {
+  async *findEach({
+    batchSize = 1000,
+    start,
+    finish,
+    order,
+  }: {
+    batchSize?: number;
+    start?: unknown;
+    finish?: unknown;
+    order?: "asc" | "desc";
+  } = {}): AsyncGenerator<T> {
     for await (const batch of this.findInBatches({ batchSize, start, finish, order })) {
       for (const record of batch) {
         yield record;
@@ -2420,10 +2573,7 @@ export class Relation<T extends Base> {
 
     // Replace FROM clause if from() was used
     if (this._fromClause) {
-      sql = sql.replace(
-        /FROM\s+"[^"]+"/,
-        `FROM ${this._fromClause}`
-      );
+      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause}`);
     }
 
     // Insert optimizer hints after SELECT
@@ -2452,7 +2602,7 @@ export class Relation<T extends Base> {
   private _buildWhereNodes(
     table: Table,
     whereClauses: Array<Record<string, unknown>>,
-    whereNotClauses: Array<Record<string, unknown>>
+    whereNotClauses: Array<Record<string, unknown>>,
   ): Nodes.Node[] {
     const nodes: Nodes.Node[] = [];
     for (const clause of whereClauses) {
@@ -2495,10 +2645,7 @@ export class Relation<T extends Base> {
     return new Nodes.And(nodes);
   }
 
-  private _applyWheresToManager(
-    manager: SelectManager,
-    table: Table
-  ): void {
+  private _applyWheresToManager(manager: SelectManager, table: Table): void {
     if (this._orRelations.length > 0) {
       // Collect all branches: this relation's wheres + each OR relation's wheres
       const allBranches: (Nodes.Node | null)[] = [
@@ -2506,7 +2653,9 @@ export class Relation<T extends Base> {
       ];
       for (const orRel of this._orRelations) {
         allBranches.push(
-          this._combineNodes(this._buildWhereNodes(table, orRel._whereClauses, orRel._whereNotClauses))
+          this._combineNodes(
+            this._buildWhereNodes(table, orRel._whereClauses, orRel._whereNotClauses),
+          ),
         );
       }
       const nonNull = allBranches.filter((n): n is Nodes.Node => n !== null);
@@ -2554,10 +2703,7 @@ export class Relation<T extends Base> {
     }
   }
 
-  private _applyOrderToManager(
-    manager: SelectManager,
-    table: Table
-  ): void {
+  private _applyOrderToManager(manager: SelectManager, table: Table): void {
     // Raw order clauses (from inOrderOf)
     for (const rawClause of this._rawOrderClauses) {
       manager.order(new Nodes.SqlLiteral(rawClause));
@@ -2579,9 +2725,7 @@ export class Relation<T extends Base> {
         }
       } else {
         const [col, dir] = clause;
-        manager.order(
-          dir === "desc" ? table.get(col).desc() : table.get(col).asc()
-        );
+        manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
       }
     }
   }
@@ -2593,17 +2737,23 @@ export class Relation<T extends Base> {
         if (value === null) {
           conditions.push(`"${table.name}"."${key}" IS NULL`);
         } else if (value instanceof Range) {
-          const begin = typeof value.begin === "number" ? String(value.begin) : `'${String(value.begin).replace(/'/g, "''")}'`;
-          const end = typeof value.end === "number" ? String(value.end) : `'${String(value.end).replace(/'/g, "''")}'`;
+          const begin =
+            typeof value.begin === "number"
+              ? String(value.begin)
+              : `'${String(value.begin).replace(/'/g, "''")}'`;
+          const end =
+            typeof value.end === "number"
+              ? String(value.end)
+              : `'${String(value.end).replace(/'/g, "''")}'`;
           if (value.excludeEnd) {
-            conditions.push(`"${table.name}"."${key}" >= ${begin} AND "${table.name}"."${key}" < ${end}`);
+            conditions.push(
+              `"${table.name}"."${key}" >= ${begin} AND "${table.name}"."${key}" < ${end}`,
+            );
           } else {
             conditions.push(`"${table.name}"."${key}" BETWEEN ${begin} AND ${end}`);
           }
         } else if (typeof value === "boolean") {
-          conditions.push(
-            `"${table.name}"."${key}" = ${value ? "TRUE" : "FALSE"}`
-          );
+          conditions.push(`"${table.name}"."${key}" = ${value ? "TRUE" : "FALSE"}`);
         } else if (typeof value === "number") {
           conditions.push(`"${table.name}"."${key}" = ${value}`);
         } else if (Array.isArray(value)) {
@@ -2616,9 +2766,7 @@ export class Relation<T extends Base> {
             .join(", ");
           conditions.push(`"${table.name}"."${key}" IN (${vals})`);
         } else {
-          conditions.push(
-            `"${table.name}"."${key}" = '${String(value).replace(/'/g, "''")}'`
-          );
+          conditions.push(`"${table.name}"."${key}" = '${String(value).replace(/'/g, "''")}'`);
         }
       }
     }
@@ -2627,13 +2775,17 @@ export class Relation<T extends Base> {
         if (value === null) {
           conditions.push(`"${table.name}"."${key}" IS NOT NULL`);
         } else if (value instanceof Range) {
-          const begin = typeof value.begin === "number" ? String(value.begin) : `'${String(value.begin).replace(/'/g, "''")}'`;
-          const end = typeof value.end === "number" ? String(value.end) : `'${String(value.end).replace(/'/g, "''")}'`;
+          const begin =
+            typeof value.begin === "number"
+              ? String(value.begin)
+              : `'${String(value.begin).replace(/'/g, "''")}'`;
+          const end =
+            typeof value.end === "number"
+              ? String(value.end)
+              : `'${String(value.end).replace(/'/g, "''")}'`;
           conditions.push(`NOT ("${table.name}"."${key}" BETWEEN ${begin} AND ${end})`);
         } else if (typeof value === "boolean") {
-          conditions.push(
-            `"${table.name}"."${key}" != ${value ? "TRUE" : "FALSE"}`
-          );
+          conditions.push(`"${table.name}"."${key}" != ${value ? "TRUE" : "FALSE"}`);
         } else if (typeof value === "number") {
           conditions.push(`"${table.name}"."${key}" != ${value}`);
         } else if (Array.isArray(value)) {
@@ -2646,9 +2798,7 @@ export class Relation<T extends Base> {
             .join(", ");
           conditions.push(`"${table.name}"."${key}" NOT IN (${vals})`);
         } else {
-          conditions.push(
-            `"${table.name}"."${key}" != '${String(value).replace(/'/g, "''")}'`
-          );
+          conditions.push(`"${table.name}"."${key}" != '${String(value).replace(/'/g, "''")}'`);
         }
       }
     }
@@ -2667,11 +2817,19 @@ export class Relation<T extends Base> {
       const assocDef = associations.find((a: any) => a.name === assocName);
       if (!assocDef) continue;
 
-      const { loadBelongsTo: _lb, loadHasMany: _lm, loadHasOne: _lo, modelRegistry: _mr } =
-        await import("./associations.js");
+      const {
+        loadBelongsTo: _lb,
+        loadHasMany: _lm,
+        loadHasOne: _lo,
+        modelRegistry: _mr,
+      } = await import("./associations.js");
 
       if (assocDef.type === "belongsTo") {
-        const _underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+        const _underscore = (n: string) =>
+          n
+            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+            .toLowerCase();
         const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
         const primaryKey = assocDef.options.primaryKey ?? "id";
 
@@ -2690,45 +2848,63 @@ export class Relation<T extends Base> {
           for (const [typeName, typeRecords] of byType) {
             const targetModel = _mr.get(typeName);
             if (!targetModel) continue;
-            const fkValues = [...new Set(typeRecords.map(r => r.readAttribute(foreignKey)).filter(v => v != null))];
+            const fkValues = [
+              ...new Set(
+                typeRecords.map((r) => r.readAttribute(foreignKey)).filter((v) => v != null),
+              ),
+            ];
             if (fkValues.length === 0) continue;
-            const related = await (targetModel as any).all().where({ [primaryKey]: fkValues }).toArray();
+            const related = await (targetModel as any)
+              .all()
+              .where({ [primaryKey]: fkValues })
+              .toArray();
             const relatedMap = new Map<unknown, any>();
             for (const r of related) relatedMap.set(r.readAttribute(primaryKey), r);
             allParents.set(typeName, relatedMap);
           }
           for (const record of records) {
-            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            if (!(record as any)._preloadedAssociations)
+              (record as any)._preloadedAssociations = new Map();
             const typeName = record.readAttribute(typeCol) as string | null;
-            const parent = typeName ? (allParents.get(typeName)?.get(record.readAttribute(foreignKey)) ?? null) : null;
+            const parent = typeName
+              ? (allParents.get(typeName)?.get(record.readAttribute(foreignKey)) ?? null)
+              : null;
             (record as any)._preloadedAssociations.set(assocName, parent);
             if (parent && assocDef.options.inverseOf) {
-              if (!(parent as any)._cachedAssociations) (parent as any)._cachedAssociations = new Map();
+              if (!(parent as any)._cachedAssociations)
+                (parent as any)._cachedAssociations = new Map();
               (parent as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
             }
           }
         } else {
-          const className = assocDef.options.className ??
-            assocName.charAt(0).toUpperCase() + assocName.slice(1);
+          const className =
+            assocDef.options.className ?? assocName.charAt(0).toUpperCase() + assocName.slice(1);
 
-          const fkValues = [...new Set(records.map(r => r.readAttribute(foreignKey)).filter(v => v != null))];
+          const fkValues = [
+            ...new Set(records.map((r) => r.readAttribute(foreignKey)).filter((v) => v != null)),
+          ];
           if (fkValues.length === 0) continue;
 
           const targetModel = _mr.get(className);
           if (!targetModel) continue;
 
-          const related = await (targetModel as any).all().where({ [primaryKey]: fkValues }).toArray();
+          const related = await (targetModel as any)
+            .all()
+            .where({ [primaryKey]: fkValues })
+            .toArray();
           const relatedMap = new Map<unknown, any>();
           for (const r of related) relatedMap.set(r.readAttribute(primaryKey), r);
 
           for (const record of records) {
-            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            if (!(record as any)._preloadedAssociations)
+              (record as any)._preloadedAssociations = new Map();
             const parent = relatedMap.get(record.readAttribute(foreignKey)) ?? null;
             (record as any)._preloadedAssociations.set(assocName, parent);
 
             // Set inverse association on parent
             if (parent && assocDef.options.inverseOf) {
-              if (!(parent as any)._cachedAssociations) (parent as any)._cachedAssociations = new Map();
+              if (!(parent as any)._cachedAssociations)
+                (parent as any)._cachedAssociations = new Map();
               (parent as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
             }
           }
@@ -2740,11 +2916,26 @@ export class Relation<T extends Base> {
           if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
           return w;
         };
-        const camelize = (n: string) => n.split("_").map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("");
-        const underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
+        const camelize = (n: string) =>
+          n
+            .split("_")
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join("");
+        const underscore = (n: string) =>
+          n
+            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+            .toLowerCase();
         const pluralize = (w: string) => {
           if (w.endsWith("y") && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + "ies";
-          if (w.endsWith("s") || w.endsWith("x") || w.endsWith("z") || w.endsWith("ch") || w.endsWith("sh")) return w + "es";
+          if (
+            w.endsWith("s") ||
+            w.endsWith("x") ||
+            w.endsWith("z") ||
+            w.endsWith("ch") ||
+            w.endsWith("sh")
+          )
+            return w + "es";
           return w + "s";
         };
 
@@ -2758,11 +2949,13 @@ export class Relation<T extends Base> {
 
         // Handle through associations
         if (assocDef.options.through) {
-          const throughAssocDef = associations.find((a: any) => a.name === assocDef.options.through);
+          const throughAssocDef = associations.find(
+            (a: any) => a.name === assocDef.options.through,
+          );
           if (!throughAssocDef) continue;
 
-          const throughClassName = throughAssocDef.options.className ??
-            camelize(singularize(throughAssocDef.name));
+          const throughClassName =
+            throughAssocDef.options.className ?? camelize(singularize(throughAssocDef.name));
           const throughModel = _mr.get(throughClassName);
           if (!throughModel) continue;
 
@@ -2771,12 +2964,18 @@ export class Relation<T extends Base> {
           const throughFk = throughAsName
             ? (throughAssocDef.options.foreignKey ?? `${underscore(throughAsName)}_id`)
             : (throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
-          const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
+          const pkValues = [
+            ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
+          ];
           if (pkValues.length === 0) continue;
 
           const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
-          if (throughAsName) throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
-          const throughRecords = await (throughModel as any).all().where(throughWhereConditions).toArray();
+          if (throughAsName)
+            throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
+          const throughRecords = await (throughModel as any)
+            .all()
+            .where(throughWhereConditions)
+            .toArray();
 
           const sourceName = assocDef.options.source ?? singularize(assocName);
           const targetModel = _mr.get(className);
@@ -2784,8 +2983,9 @@ export class Relation<T extends Base> {
 
           // Look up the source association on the through model (try singular and plural)
           const throughModelAssociations: any[] = (throughModel as any)._associations ?? [];
-          const sourceAssocDef = throughModelAssociations.find((a: any) => a.name === sourceName)
-            ?? throughModelAssociations.find((a: any) => a.name === pluralize(sourceName));
+          const sourceAssocDef =
+            throughModelAssociations.find((a: any) => a.name === sourceName) ??
+            throughModelAssociations.find((a: any) => a.name === pluralize(sourceName));
           const sourceType = sourceAssocDef?.type ?? "belongsTo";
 
           let targetRecords: any[];
@@ -2795,7 +2995,13 @@ export class Relation<T extends Base> {
           if (sourceType === "belongsTo") {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
             const targetFk = `${underscore(sourceName)}_id`;
-            const targetIds = [...new Set(throughRecords.map((r: any) => r.readAttribute(targetFk)).filter((v: any) => v != null))];
+            const targetIds = [
+              ...new Set(
+                throughRecords
+                  .map((r: any) => r.readAttribute(targetFk))
+                  .filter((v: any) => v != null),
+              ),
+            ];
             let targetRel = (targetModel as any).all().where({ id: targetIds });
             if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
             targetRecords = targetIds.length > 0 ? await targetRel.toArray() : [];
@@ -2811,9 +3017,14 @@ export class Relation<T extends Base> {
             const sourceFk = sourceAsName
               ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
               : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
-            const throughIds = [...new Set(throughRecords.map((r: any) => r.readAttribute("id")).filter((v: any) => v != null))];
+            const throughIds = [
+              ...new Set(
+                throughRecords.map((r: any) => r.readAttribute("id")).filter((v: any) => v != null),
+              ),
+            ];
             const sourceWhereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
-            if (sourceAsName) sourceWhereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
+            if (sourceAsName)
+              sourceWhereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
             let sourceRel = (targetModel as any).all().where(sourceWhereConditions);
             if (assocDef.options.scope) sourceRel = assocDef.options.scope(sourceRel);
             targetRecords = throughIds.length > 0 ? await sourceRel.toArray() : [];
@@ -2824,16 +3035,21 @@ export class Relation<T extends Base> {
           }
 
           for (const record of records) {
-            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            if (!(record as any)._preloadedAssociations)
+              (record as any)._preloadedAssociations = new Map();
             const pkVal = record.readAttribute(primaryKey);
-            const myThroughRecords = throughRecords.filter((tr: any) => tr.readAttribute(throughFk) == pkVal);
+            const myThroughRecords = throughRecords.filter(
+              (tr: any) => tr.readAttribute(throughFk) == pkVal,
+            );
             const myTargets = myThroughRecords.flatMap(getTargetsForThrough);
             (record as any)._preloadedAssociations.set(assocName, myTargets);
           }
           continue;
         }
 
-        const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
+        const pkValues = [
+          ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
+        ];
         if (pkValues.length === 0) continue;
 
         const targetModel = _mr.get(className);
@@ -2852,21 +3068,31 @@ export class Relation<T extends Base> {
         }
 
         for (const record of records) {
-          if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+          if (!(record as any)._preloadedAssociations)
+            (record as any)._preloadedAssociations = new Map();
           const children = relatedMap.get(record.readAttribute(primaryKey)) ?? [];
           (record as any)._preloadedAssociations.set(assocName, children);
 
           // Set inverse association on children
           if (assocDef.options.inverseOf) {
             for (const child of children) {
-              if (!(child as any)._cachedAssociations) (child as any)._cachedAssociations = new Map();
+              if (!(child as any)._cachedAssociations)
+                (child as any)._cachedAssociations = new Map();
               (child as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
             }
           }
         }
       } else if (assocDef.type === "hasOne") {
-        const underscore = (n: string) => n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
-        const camelize = (n: string) => n.split("_").map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+        const underscore = (n: string) =>
+          n
+            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+            .toLowerCase();
+        const camelize = (n: string) =>
+          n
+            .split("_")
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join("");
         const singularize = (w: string) => {
           if (w.endsWith("ies")) return w.slice(0, -3) + "y";
           if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
@@ -2880,10 +3106,13 @@ export class Relation<T extends Base> {
 
         // Handle has_one :through
         if (assocDef.options.through) {
-          const throughAssocDef = associations.find((a: any) => a.name === assocDef.options.through);
+          const throughAssocDef = associations.find(
+            (a: any) => a.name === assocDef.options.through,
+          );
           if (!throughAssocDef) continue;
 
-          const throughClassName = throughAssocDef.options.className ??
+          const throughClassName =
+            throughAssocDef.options.className ??
             (throughAssocDef.type === "hasMany"
               ? camelize(singularize(throughAssocDef.name))
               : camelize(throughAssocDef.name));
@@ -2894,12 +3123,18 @@ export class Relation<T extends Base> {
           const throughFk = throughAsName
             ? (throughAssocDef.options.foreignKey ?? `${underscore(throughAsName)}_id`)
             : (throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
-          const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
+          const pkValues = [
+            ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
+          ];
           if (pkValues.length === 0) continue;
 
           const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
-          if (throughAsName) throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
-          const throughRecords = await (throughModel as any).all().where(throughWhereConditions).toArray();
+          if (throughAsName)
+            throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
+          const throughRecords = await (throughModel as any)
+            .all()
+            .where(throughWhereConditions)
+            .toArray();
 
           const sourceName = assocDef.options.source ?? assocName;
           const targetModel = _mr.get(className);
@@ -2909,14 +3144,28 @@ export class Relation<T extends Base> {
           const throughModelAssociations: any[] = (throughModel as any)._associations ?? [];
           const pluralizeHot = (w: string) => {
             if (w.endsWith("y") && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + "ies";
-            if (w.endsWith("s") || w.endsWith("x") || w.endsWith("z") || w.endsWith("ch") || w.endsWith("sh")) return w + "es";
+            if (
+              w.endsWith("s") ||
+              w.endsWith("x") ||
+              w.endsWith("z") ||
+              w.endsWith("ch") ||
+              w.endsWith("sh")
+            )
+              return w + "es";
             return w + "s";
           };
-          const sourceAssocDef = throughModelAssociations.find((a: any) => a.name === sourceName)
-            ?? throughModelAssociations.find((a: any) => a.name === pluralizeHot(sourceName));
+          const sourceAssocDef =
+            throughModelAssociations.find((a: any) => a.name === sourceName) ??
+            throughModelAssociations.find((a: any) => a.name === pluralizeHot(sourceName));
 
           const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
-          const targetIds = [...new Set(throughRecords.map((r: any) => r.readAttribute(targetFk)).filter((v: any) => v != null))];
+          const targetIds = [
+            ...new Set(
+              throughRecords
+                .map((r: any) => r.readAttribute(targetFk))
+                .filter((v: any) => v != null),
+            ),
+          ];
           let hotTargetRel = (targetModel as any).all().where({ id: targetIds });
           if (assocDef.options.scope) hotTargetRel = assocDef.options.scope(hotTargetRel);
           const targetRecords = targetIds.length > 0 ? await hotTargetRel.toArray() : [];
@@ -2924,10 +3173,15 @@ export class Relation<T extends Base> {
           for (const r of targetRecords) targetMap.set(r.readAttribute("id"), r);
 
           for (const record of records) {
-            if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+            if (!(record as any)._preloadedAssociations)
+              (record as any)._preloadedAssociations = new Map();
             const pkVal = record.readAttribute(primaryKey);
-            const myThroughRecord = throughRecords.find((tr: any) => tr.readAttribute(throughFk) == pkVal);
-            const myTarget = myThroughRecord ? targetMap.get(myThroughRecord.readAttribute(targetFk)) ?? null : null;
+            const myThroughRecord = throughRecords.find(
+              (tr: any) => tr.readAttribute(throughFk) == pkVal,
+            );
+            const myTarget = myThroughRecord
+              ? (targetMap.get(myThroughRecord.readAttribute(targetFk)) ?? null)
+              : null;
             (record as any)._preloadedAssociations.set(assocName, myTarget);
           }
           continue;
@@ -2938,7 +3192,9 @@ export class Relation<T extends Base> {
           : (assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
         const hasOneTypeCol = hasOneAsName ? `${underscore(hasOneAsName)}_type` : null;
 
-        const pkValues = [...new Set(records.map(r => r.readAttribute(primaryKey)).filter(v => v != null))];
+        const pkValues = [
+          ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
+        ];
         if (pkValues.length === 0) continue;
 
         const targetModel = _mr.get(className);
@@ -2953,7 +3209,8 @@ export class Relation<T extends Base> {
         for (const r of related) relatedMap.set(r.readAttribute(foreignKey), r);
 
         for (const record of records) {
-          if (!(record as any)._preloadedAssociations) (record as any)._preloadedAssociations = new Map();
+          if (!(record as any)._preloadedAssociations)
+            (record as any)._preloadedAssociations = new Map();
           const child = relatedMap.get(record.readAttribute(primaryKey)) ?? null;
           (record as any)._preloadedAssociations.set(assocName, child);
 
@@ -2977,11 +3234,15 @@ export class Relation<T extends Base> {
   async find(...ids: unknown[]): Promise<T | T[]> {
     const pk = this._modelClass.primaryKey;
     if (ids.length === 1 && !Array.isArray(ids[0])) {
-      const records = await this.where({ [pk as string]: ids[0] }).limit(1).toArray();
+      const records = await this.where({ [pk as string]: ids[0] })
+        .limit(1)
+        .toArray();
       if (records.length === 0) {
         throw new RecordNotFound(
           `Couldn't find ${this._modelClass.name} with '${pk}'=${ids[0]}`,
-          this._modelClass.name, pk as string, ids[0]
+          this._modelClass.name,
+          pk as string,
+          ids[0],
         );
       }
       return records[0];
@@ -2990,14 +3251,18 @@ export class Relation<T extends Base> {
     if (flatIds.length === 0) {
       throw new RecordNotFound(
         `Couldn't find ${this._modelClass.name} with an empty list of ids`,
-        this._modelClass.name, pk as string, []
+        this._modelClass.name,
+        pk as string,
+        [],
       );
     }
     const records = await this.where({ [pk as string]: flatIds }).toArray();
     if (records.length !== flatIds.length) {
       throw new RecordNotFound(
         `Couldn't find all ${this._modelClass.name} with '${pk}': (${flatIds.join(", ")})`,
-        this._modelClass.name, pk as string, flatIds
+        this._modelClass.name,
+        pk as string,
+        flatIds,
       );
     }
     return records;
@@ -3042,11 +3307,16 @@ export class Relation<T extends Base> {
    */
   async findOrCreateByBang(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<T> {
     const records = await this.where(conditions).limit(1).toArray();
     if (records.length > 0) return records[0];
-    return this._modelClass.createBang({ ...this._createWithAttrs, ...this._scopeAttributes(), ...conditions, ...extra }) as Promise<T>;
+    return this._modelClass.createBang({
+      ...this._createWithAttrs,
+      ...this._scopeAttributes(),
+      ...conditions,
+      ...extra,
+    }) as Promise<T>;
   }
 
   /**
@@ -3056,10 +3326,15 @@ export class Relation<T extends Base> {
    */
   async createOrFindByBang(
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: Record<string, unknown>,
   ): Promise<T> {
     try {
-      return await this._modelClass.createBang({ ...this._createWithAttrs, ...this._scopeAttributes(), ...conditions, ...extra }) as T;
+      return (await this._modelClass.createBang({
+        ...this._createWithAttrs,
+        ...this._scopeAttributes(),
+        ...conditions,
+        ...extra,
+      })) as T;
     } catch {
       const records = await this.where(conditions).limit(1).toArray();
       if (records.length > 0) return records[0];
@@ -3074,7 +3349,8 @@ export class Relation<T extends Base> {
    */
   async secondBang(): Promise<T> {
     const record = await this.second();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3083,7 +3359,8 @@ export class Relation<T extends Base> {
    */
   async thirdBang(): Promise<T> {
     const record = await this.third();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3092,7 +3369,8 @@ export class Relation<T extends Base> {
    */
   async fourthBang(): Promise<T> {
     const record = await this.fourth();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3101,7 +3379,8 @@ export class Relation<T extends Base> {
    */
   async fifthBang(): Promise<T> {
     const record = await this.fifth();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3110,7 +3389,8 @@ export class Relation<T extends Base> {
    */
   async fortyTwoBang(): Promise<T> {
     const record = await this.fortyTwo();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3119,7 +3399,8 @@ export class Relation<T extends Base> {
    */
   async secondToLastBang(): Promise<T> {
     const record = await this.secondToLast();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3128,7 +3409,8 @@ export class Relation<T extends Base> {
    */
   async thirdToLastBang(): Promise<T> {
     const record = await this.thirdToLast();
-    if (!record) throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    if (!record)
+      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
     return record;
   }
 
@@ -3224,7 +3506,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = await this.find(id) as T;
+    const record = (await this.find(id)) as T;
     await record.update(attrs ?? {});
     return record;
   }
@@ -3243,7 +3525,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = await this.find(id) as T;
+    const record = (await this.find(id)) as T;
     await record.updateBang(attrs ?? {});
     return record;
   }
@@ -3253,7 +3535,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Base.insert
    */
-  async insert(attrs: Record<string, unknown>, options?: { uniqueBy?: string | string[] }): Promise<number> {
+  async insert(
+    attrs: Record<string, unknown>,
+    options?: { uniqueBy?: string | string[] },
+  ): Promise<number> {
     return this.insertAll([attrs], options);
   }
 
@@ -3280,7 +3565,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Base.upsert
    */
-  async upsert(attrs: Record<string, unknown>, options?: { uniqueBy?: string | string[] }): Promise<number> {
+  async upsert(
+    attrs: Record<string, unknown>,
+    options?: { uniqueBy?: string | string[] },
+  ): Promise<number> {
     return this.upsertAll([attrs], options);
   }
 
@@ -3313,7 +3601,7 @@ export class Relation<T extends Base> {
     const pk = this._modelClass.primaryKey;
     const quoted = typeof id === "number" ? String(id) : `'${String(id).replace(/'/g, "''")}'`;
     return this._modelClass.adapter.executeMutation(
-      `DELETE FROM "${table.name}" WHERE "${pk}" = ${quoted}`
+      `DELETE FROM "${table.name}" WHERE "${pk}" = ${quoted}`,
     );
   }
 
@@ -3323,7 +3611,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#destroy
    */
   async destroy(id: unknown): Promise<T> {
-    const record = await this.find(id) as T;
+    const record = (await this.find(id)) as T;
     await record.destroy();
     return record;
   }
@@ -3443,9 +3731,7 @@ export class Relation<T extends Base> {
     rel._rawOrderClauses = [...this._rawOrderClauses];
     rel._limitValue = this._limitValue;
     rel._offsetValue = this._offsetValue;
-    rel._selectColumns = this._selectColumns
-      ? [...this._selectColumns]
-      : null;
+    rel._selectColumns = this._selectColumns ? [...this._selectColumns] : null;
     rel._isDistinct = this._isDistinct;
     rel._distinctOnColumns = [...this._distinctOnColumns];
     rel._groupColumns = [...this._groupColumns];

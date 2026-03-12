@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Table, sql, star, SelectManager, InsertManager, UpdateManager, DeleteManager, Nodes, Visitors, Collectors } from "./index.js";
+import {
+  Table,
+  sql,
+  star,
+  SelectManager,
+  InsertManager,
+  UpdateManager,
+  DeleteManager,
+  Nodes,
+  Visitors,
+  Collectors,
+} from "./index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -73,7 +84,7 @@ describe("Arel", () => {
       ]);
       mgr.where(users.get("id").eq(1));
       expect(mgr.toSql()).toBe(
-        `UPDATE "users" SET "users"."name" = 'dean', "users"."age" = 31 WHERE "users"."id" = 1`
+        `UPDATE "users" SET "users"."name" = 'dean', "users"."age" = 31 WHERE "users"."id" = 1`,
       );
     });
 
@@ -99,7 +110,7 @@ describe("Arel", () => {
       mgr.order(users.get("name").asc());
       mgr.take(5);
       expect(mgr.toSql()).toBe(
-        `UPDATE "users" SET "users"."active" = FALSE WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`
+        `UPDATE "users" SET "users"."active" = FALSE WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
       );
     });
 

@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -28,7 +68,9 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("InverseHasManyTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModels() {
     class Man extends Base {
@@ -63,7 +105,9 @@ describe("InverseHasManyTests", () => {
     }
   });
 
-  it.skip("parent instance should be shared with every child on find for sti", () => { /* needs STI support */ });
+  it.skip("parent instance should be shared with every child on find for sti", () => {
+    /* needs STI support */
+  });
 
   it("parent instance should be shared with eager loaded children", async () => {
     const { Man, Interest } = makeModels();
@@ -105,9 +149,13 @@ describe("InverseHasManyTests", () => {
     expect(child.readAttribute("man_id")).toBe(m.id);
   });
 
-  it.skip("parent instance should be shared within create block of new child", () => { /* needs block-style create */ });
+  it.skip("parent instance should be shared within create block of new child", () => {
+    /* needs block-style create */
+  });
 
-  it.skip("parent instance should be shared within build block of new child", () => { /* needs block-style build */ });
+  it.skip("parent instance should be shared within build block of new child", () => {
+    /* needs block-style build */
+  });
 
   it("parent instance should be shared with poked in child", async () => {
     const { Man, Interest } = makeModels();
@@ -123,7 +171,11 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const i1 = await Interest.create({ topic: "stamps" });
     const i2 = await Interest.create({ topic: "coins" });
-    await setHasMany(m, "interests", [i1, i2], { inverseOf: "man", foreignKey: "man_id", className: "Interest" });
+    await setHasMany(m, "interests", [i1, i2], {
+      inverseOf: "man",
+      foreignKey: "man_id",
+      className: "Interest",
+    });
     expect((i1 as any)._cachedAssociations?.get("man")).toBe(m);
     expect((i2 as any)._cachedAssociations?.get("man")).toBe(m);
   });
@@ -171,7 +223,9 @@ describe("InverseHasManyTests", () => {
     expect((found as Base).readAttribute("topic")).toBe("boats");
   });
 
-  it.skip("find on child instance with id should not load all child records", () => { /* needs query counting */ });
+  it.skip("find on child instance with id should not load all child records", () => {
+    /* needs query counting */
+  });
 
   it("find on child instance with id should set inverse instances", async () => {
     const { Man, Interest } = makeModels();
@@ -197,17 +251,38 @@ describe("InverseHasManyTests", () => {
   it("inverse should be set on composite primary key child", async () => {
     const adapter = freshAdapter();
     class CpkMan extends Base {
-      static { this._tableName = "cpk_men"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_men";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkInterest extends Base {
-      static { this._tableName = "cpk_interests"; this.attribute("cpk_man_region_id", "integer"); this.attribute("cpk_man_id", "integer"); this.attribute("topic", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_interests";
+        this.attribute("cpk_man_region_id", "integer");
+        this.attribute("cpk_man_id", "integer");
+        this.attribute("topic", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CpkMan, "cpkInterests", { foreignKey: ["cpk_man_region_id", "cpk_man_id"], className: "CpkInterest", inverseOf: "cpkMan" });
+    Associations.hasMany.call(CpkMan, "cpkInterests", {
+      foreignKey: ["cpk_man_region_id", "cpk_man_id"],
+      className: "CpkInterest",
+      inverseOf: "cpkMan",
+    });
     registerModel("CpkMan", CpkMan);
     registerModel("CpkInterest", CpkInterest);
     const m = await CpkMan.create({ region_id: 1, id: 1, name: "Gordon" });
     await CpkInterest.create({ cpk_man_region_id: 1, cpk_man_id: 1, topic: "chess" });
-    const interests = await loadHasMany(m, "cpkInterests", { foreignKey: ["cpk_man_region_id", "cpk_man_id"], className: "CpkInterest", inverseOf: "cpkMan" });
+    const interests = await loadHasMany(m, "cpkInterests", {
+      foreignKey: ["cpk_man_region_id", "cpk_man_id"],
+      className: "CpkInterest",
+      inverseOf: "cpkMan",
+    });
     expect(interests.length).toBe(1);
     expect((interests[0] as any)._cachedAssociations?.get("cpkMan")).toBe(m);
   });
@@ -228,7 +303,9 @@ describe("InverseHasManyTests", () => {
     expect(Array.isArray(result) ? result.length : -1).toBe(0);
   });
 
-  it.skip("trying to use inverses that dont exist should raise an error", () => { /* needs inverse validation */ });
+  it.skip("trying to use inverses that dont exist should raise an error", () => {
+    /* needs inverse validation */
+  });
 
   it("child instance should point to parent without saving", async () => {
     const { Man } = makeModels();
@@ -239,8 +316,12 @@ describe("InverseHasManyTests", () => {
     expect(child.isNewRecord()).toBe(true);
   });
 
-  it.skip("inverse instance should be set before find callbacks are run", () => { /* needs callback integration */ });
-  it.skip("inverse instance should be set before initialize callbacks are run", () => { /* needs callback integration */ });
+  it.skip("inverse instance should be set before find callbacks are run", () => {
+    /* needs callback integration */
+  });
+  it.skip("inverse instance should be set before initialize callbacks are run", () => {
+    /* needs callback integration */
+  });
 
   it("inverse works when the association self references the same object", async () => {
     class Node extends Base {
@@ -250,36 +331,65 @@ describe("InverseHasManyTests", () => {
         this.adapter = adapter;
       }
     }
-    Associations.hasMany.call(Node, "children", { className: "Node", foreignKey: "node_id", inverseOf: "parent" });
-    Associations.belongsTo.call(Node, "parent", { className: "Node", foreignKey: "node_id", inverseOf: "children" });
+    Associations.hasMany.call(Node, "children", {
+      className: "Node",
+      foreignKey: "node_id",
+      inverseOf: "parent",
+    });
+    Associations.belongsTo.call(Node, "parent", {
+      className: "Node",
+      foreignKey: "node_id",
+      inverseOf: "children",
+    });
     registerModel(Node);
     const parent = await Node.create({ name: "root" });
     await Node.create({ name: "child1", node_id: parent.id });
-    const children = await loadHasMany(parent, "children", { className: "Node", foreignKey: "node_id", inverseOf: "parent" });
+    const children = await loadHasMany(parent, "children", {
+      className: "Node",
+      foreignKey: "node_id",
+      inverseOf: "parent",
+    });
     expect(children.length).toBe(1);
     expect((children[0] as any)._cachedAssociations?.get("parent")).toBe(parent);
   });
 
-  it.skip("changing the association id makes the inversed association target stale", () => { /* needs stale detection */ });
+  it.skip("changing the association id makes the inversed association target stale", () => {
+    /* needs stale detection */
+  });
 });
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Interest extends Base {
-      static { this.attribute("topic", "string"); this.attribute("man_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("topic", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Hobby extends Base {
-      static { this.attribute("name", "string"); this.attribute("man_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
     Associations.hasMany.call(Man, "hobbies", { inverseOf: "man" });
-    registerModel(Man); registerModel(Interest); registerModel(Hobby);
+    registerModel(Man);
+    registerModel(Interest);
+    registerModel(Hobby);
     const m = await Man.create({ name: "Gordon" });
     await Interest.create({ topic: "stamps", man_id: m.id });
     await Hobby.create({ name: "fishing", man_id: m.id });
@@ -291,13 +401,21 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 
   it("that we can create associations that have the same reciprocal name from different models", async () => {
     class Man extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Interest extends Base {
-      static { this.attribute("topic", "string"); this.attribute("man_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("topic", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
-    registerModel(Man); registerModel(Interest);
+    registerModel(Man);
+    registerModel(Interest);
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const child = await proxy.create({ topic: "music" });

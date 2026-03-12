@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -38,13 +78,24 @@ describe("EagerAssociationTest", () => {
 
   it("loading with one association", async () => {
     class CommentEager extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class PostEager extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (PostEager as any)._associations = [
-      { type: "hasMany", name: "commentEagers", options: { className: "CommentEager", foreignKey: "post_id" } },
+      {
+        type: "hasMany",
+        name: "commentEagers",
+        options: { className: "CommentEager", foreignKey: "post_id" },
+      },
     ];
     registerModel("CommentEager", CommentEager);
     registerModel("PostEager", PostEager);
@@ -61,13 +112,24 @@ describe("EagerAssociationTest", () => {
 
   it("associations loaded for all records", async () => {
     class TagEager extends Base {
-      static { this.attribute("name", "string"); this.attribute("article_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("article_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class ArticleEager extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (ArticleEager as any)._associations = [
-      { type: "hasMany", name: "tagEagers", options: { className: "TagEager", foreignKey: "article_eager_id" } },
+      {
+        type: "hasMany",
+        name: "tagEagers",
+        options: { className: "TagEager", foreignKey: "article_eager_id" },
+      },
     ];
     registerModel("TagEager", TagEager);
     registerModel("ArticleEager", ArticleEager);
@@ -86,7 +148,10 @@ describe("EagerAssociationTest", () => {
 
   it("loading with no associations", async () => {
     class WidgetEager extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await WidgetEager.create({ name: "w1" });
     const widgets = await WidgetEager.all().toArray();
@@ -95,17 +160,36 @@ describe("EagerAssociationTest", () => {
 
   it("loading with multiple associations", async () => {
     class ReplyEager extends Base {
-      static { this.attribute("body", "string"); this.attribute("topic_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("topic_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class AttachmentEager extends Base {
-      static { this.attribute("filename", "string"); this.attribute("topic_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("filename", "string");
+        this.attribute("topic_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class TopicEager extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (TopicEager as any)._associations = [
-      { type: "hasMany", name: "replyEagers", options: { className: "ReplyEager", foreignKey: "topic_eager_id" } },
-      { type: "hasMany", name: "attachmentEagers", options: { className: "AttachmentEager", foreignKey: "topic_eager_id" } },
+      {
+        type: "hasMany",
+        name: "replyEagers",
+        options: { className: "ReplyEager", foreignKey: "topic_eager_id" },
+      },
+      {
+        type: "hasMany",
+        name: "attachmentEagers",
+        options: { className: "AttachmentEager", foreignKey: "topic_eager_id" },
+      },
     ];
     registerModel("ReplyEager", ReplyEager);
     registerModel("AttachmentEager", AttachmentEager);
@@ -124,13 +208,24 @@ describe("EagerAssociationTest", () => {
 
   it("eager association loading with belongs to", async () => {
     class AuthorEager extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class BookEager extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (BookEager as any)._associations = [
-      { type: "belongsTo", name: "authorEager", options: { className: "AuthorEager", foreignKey: "author_eager_id" } },
+      {
+        type: "belongsTo",
+        name: "authorEager",
+        options: { className: "AuthorEager", foreignKey: "author_eager_id" },
+      },
     ];
     registerModel("AuthorEager", AuthorEager);
     registerModel("BookEager", BookEager);
@@ -147,19 +242,33 @@ describe("EagerAssociationTest", () => {
 
   it("preloading empty belongs to", async () => {
     class OwnerEager extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PetEager extends Base {
-      static { this.attribute("name", "string"); this.attribute("owner_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("owner_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (PetEager as any)._associations = [
-      { type: "belongsTo", name: "ownerEager", options: { className: "OwnerEager", foreignKey: "owner_eager_id" } },
+      {
+        type: "belongsTo",
+        name: "ownerEager",
+        options: { className: "OwnerEager", foreignKey: "owner_eager_id" },
+      },
     ];
     registerModel("OwnerEager", OwnerEager);
     registerModel("PetEager", PetEager);
 
     const owner = await OwnerEager.create({ name: "Alice" });
-    const ownedPet = await PetEager.create({ name: "Rex", owner_eager_id: owner.readAttribute("id") });
+    const ownedPet = await PetEager.create({
+      name: "Rex",
+      owner_eager_id: owner.readAttribute("id"),
+    });
     const strayPet = await PetEager.create({ name: "Stray", owner_eager_id: null });
 
     const pets = await PetEager.all().includes("ownerEager").toArray();
@@ -167,20 +276,33 @@ describe("EagerAssociationTest", () => {
     const rexPet = pets.find((p: any) => p.readAttribute("id") === ownedPet.readAttribute("id"))!;
     const stray = pets.find((p: any) => p.readAttribute("id") === strayPet.readAttribute("id"))!;
     // The owned pet should have the owner preloaded
-    expect((rexPet as any)._preloadedAssociations.get("ownerEager")?.readAttribute("name")).toBe("Alice");
+    expect((rexPet as any)._preloadedAssociations.get("ownerEager")?.readAttribute("name")).toBe(
+      "Alice",
+    );
     // The stray has no owner — maps to null
     expect((stray as any)._preloadedAssociations.get("ownerEager")).toBeNull();
   });
 
   it("loading with one association with non preload", async () => {
     class NoteEager extends Base {
-      static { this.attribute("content", "string"); this.attribute("notebook_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("content", "string");
+        this.attribute("notebook_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class NotebookEager extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (NotebookEager as any)._associations = [
-      { type: "hasMany", name: "noteEagers", options: { className: "NoteEager", foreignKey: "notebook_eager_id" } },
+      {
+        type: "hasMany",
+        name: "noteEagers",
+        options: { className: "NoteEager", foreignKey: "notebook_eager_id" },
+      },
     ];
     registerModel("NoteEager", NoteEager);
     registerModel("NotebookEager", NotebookEager);
@@ -195,13 +317,24 @@ describe("EagerAssociationTest", () => {
 
   it("eager with has one dependent does not destroy dependent", async () => {
     class ProfileEager extends Base {
-      static { this.attribute("bio", "string"); this.attribute("user_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("bio", "string");
+        this.attribute("user_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class UserEager extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (UserEager as any)._associations = [
-      { type: "hasOne", name: "profileEager", options: { className: "ProfileEager", foreignKey: "user_eager_id" } },
+      {
+        type: "hasOne",
+        name: "profileEager",
+        options: { className: "ProfileEager", foreignKey: "user_eager_id" },
+      },
     ];
     registerModel("ProfileEager", ProfileEager);
     registerModel("UserEager", UserEager);
@@ -221,13 +354,24 @@ describe("EagerAssociationTest", () => {
 
   it("preloading the same association twice works", async () => {
     class LabelEager extends Base {
-      static { this.attribute("name", "string"); this.attribute("item_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("item_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class ItemEager extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (ItemEager as any)._associations = [
-      { type: "hasMany", name: "labelEagers", options: { className: "LabelEager", foreignKey: "item_eager_id" } },
+      {
+        type: "hasMany",
+        name: "labelEagers",
+        options: { className: "LabelEager", foreignKey: "item_eager_id" },
+      },
     ];
     registerModel("LabelEager", LabelEager);
     registerModel("ItemEager", ItemEager);
@@ -243,13 +387,24 @@ describe("EagerAssociationTest", () => {
 
   it("including duplicate objects from has many", async () => {
     class ChildEager extends Base {
-      static { this.attribute("name", "string"); this.attribute("parent_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class ParentEager extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (ParentEager as any)._associations = [
-      { type: "hasMany", name: "childEagers", options: { className: "ChildEager", foreignKey: "parent_eager_id" } },
+      {
+        type: "hasMany",
+        name: "childEagers",
+        options: { className: "ChildEager", foreignKey: "parent_eager_id" },
+      },
     ];
     registerModel("ChildEager", ChildEager);
     registerModel("ParentEager", ParentEager);
@@ -267,13 +422,24 @@ describe("EagerAssociationTest", () => {
 
   it("preload belongs to uses exclusive scope", async () => {
     class CategoryEager extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class ProductEager extends Base {
-      static { this.attribute("name", "string"); this.attribute("category_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("category_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (ProductEager as any)._associations = [
-      { type: "belongsTo", name: "categoryEager", options: { className: "CategoryEager", foreignKey: "category_eager_id" } },
+      {
+        type: "belongsTo",
+        name: "categoryEager",
+        options: { className: "CategoryEager", foreignKey: "category_eager_id" },
+      },
     ];
     registerModel("CategoryEager", CategoryEager);
     registerModel("ProductEager", ProductEager);
@@ -289,13 +455,24 @@ describe("EagerAssociationTest", () => {
 
   it("deep preload", async () => {
     class CommentDeep extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_deep_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_deep_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class PostDeep extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (PostDeep as any)._associations = [
-      { type: "hasMany", name: "commentDeeps", options: { className: "CommentDeep", foreignKey: "post_deep_id" } },
+      {
+        type: "hasMany",
+        name: "commentDeeps",
+        options: { className: "CommentDeep", foreignKey: "post_deep_id" },
+      },
     ];
     registerModel("CommentDeep", CommentDeep);
     registerModel("PostDeep", PostDeep);
@@ -309,13 +486,24 @@ describe("EagerAssociationTest", () => {
 
   it("preload has many uses exclusive scope", async () => {
     class LineItemEager extends Base {
-      static { this.attribute("name", "string"); this.attribute("order_eager_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("order_eager_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class OrderEager extends Base {
-      static { this.attribute("number", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("number", "string");
+        this.adapter = adapter;
+      }
     }
     (OrderEager as any)._associations = [
-      { type: "hasMany", name: "lineItemEagers", options: { className: "LineItemEager", foreignKey: "order_eager_id" } },
+      {
+        type: "hasMany",
+        name: "lineItemEagers",
+        options: { className: "LineItemEager", foreignKey: "order_eager_id" },
+      },
     ];
     registerModel("LineItemEager", LineItemEager);
     registerModel("OrderEager", OrderEager);
@@ -338,10 +526,13 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
-  it.skip("preloading too many ids", () => { /* fixture-dependent */ });
-  it.skip("eager loading too many ids", () => { /* fixture-dependent */ });
+  it.skip("preloading too many ids", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager loading too many ids", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("Eager Loading", () => {
   it("includes preloads belongsTo associations", async () => {
@@ -396,7 +587,11 @@ describe("Eager Loading", () => {
       }
     }
     (Novel as any)._associations = [
-      { type: "hasMany", name: "chapters", options: { className: "Chapter", foreignKey: "novel_id" } },
+      {
+        type: "hasMany",
+        name: "chapters",
+        options: { className: "Chapter", foreignKey: "novel_id" },
+      },
     ];
 
     registerModel(Novel);

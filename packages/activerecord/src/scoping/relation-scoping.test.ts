@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -28,11 +68,17 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("RelationScopingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeDeveloper() {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.attribute("salary", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("salary", "integer");
+        this.adapter = adapter;
+      }
     }
     return Developer;
   }
@@ -284,10 +330,16 @@ describe("RelationScopingTest", () => {
 
   it("current scope does not pollute sibling subclasses", async () => {
     class Dev1 extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Dev2 extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await Dev1.create({ name: "Alice" });
     await Dev2.create({ name: "Bob" });
@@ -387,10 +439,16 @@ describe("RelationScopingTest", () => {
 
 describe("NestedRelationScopingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -448,13 +506,16 @@ describe("NestedRelationScopingTest", () => {
   });
 });
 
-
 describe("scoping()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("sets currentScope within the block", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -470,7 +531,9 @@ describe("scoping()", () => {
 describe("scopeForCreate / whereValuesHash", () => {
   it("scopeForCreate returns attributes for new records", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("role", "string");
@@ -482,7 +545,9 @@ describe("scopeForCreate / whereValuesHash", () => {
 
   it("whereValuesHash returns the where conditions", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("role", "string");
     User.adapter = adapter;
@@ -494,11 +559,16 @@ describe("scopeForCreate / whereValuesHash", () => {
 
 describe("Scoping block (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("scoping sets currentScope within the block", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const scope = User.where({ name: "Alice" });
     await User.scoping(scope, async () => {
@@ -510,11 +580,16 @@ describe("Scoping block (Rails-guided)", () => {
 
 describe("Static shorthands (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("Base.where is shorthand for Base.all().where()", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -524,7 +599,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.all returns all records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -533,7 +611,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.first returns the first record", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     const first = await User.first();
@@ -543,7 +624,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.last returns the last record", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -554,7 +638,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.count returns count", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     expect(await User.count()).toBe(1);
@@ -562,7 +649,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.exists returns boolean", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await User.exists()).toBe(false);
     await User.create({ name: "Alice" });
@@ -571,7 +661,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.pluck extracts column values", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -580,7 +673,10 @@ describe("Static shorthands (Rails-guided)", () => {
 
   it("Base.ids returns primary keys", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });

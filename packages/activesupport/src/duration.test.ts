@@ -7,7 +7,7 @@ describe("DurationTest", () => {
     expect(d instanceof Duration).toBe(true);
     expect(d instanceof Duration).toBe(true); // isA(Duration)
     expect(d instanceof Duration).toBe(true); // isKindOf Duration
-    expect(d instanceof Map).toBe(false);     // not a Hash
+    expect(d instanceof Map).toBe(false); // not a Hash
   });
 
   it("instance of", () => {
@@ -85,7 +85,9 @@ describe("DurationTest", () => {
     expect(Duration.months(1).plus(Duration.days(1)).inspect()).toBe("1 month and 1 day");
     expect(Duration.months(6).minus(Duration.days(2)).inspect()).toBe("6 months and -2 days");
     expect(Duration.seconds(10).inspect()).toBe("10 seconds");
-    expect(Duration.years(10).plus(Duration.months(2)).plus(Duration.days(1)).inspect()).toBe("10 years, 2 months, and 1 day");
+    expect(Duration.years(10).plus(Duration.months(2)).plus(Duration.days(1)).inspect()).toBe(
+      "10 years, 2 months, and 1 day",
+    );
     expect(Duration.days(7).inspect()).toBe("7 days");
     expect(Duration.weeks(1).inspect()).toBe("1 week");
     expect(Duration.weeks(2).inspect()).toBe("2 weeks");
@@ -94,7 +96,9 @@ describe("DurationTest", () => {
 
   it("inspect ignores locale", () => {
     // No I18n in TypeScript — just verify the format is always English
-    expect(Duration.years(10).plus(Duration.months(1)).plus(Duration.days(1)).inspect()).toBe("10 years, 1 month, and 1 day");
+    expect(Duration.years(10).plus(Duration.months(1)).plus(Duration.days(1)).inspect()).toBe(
+      "10 years, 1 month, and 1 day",
+    );
   });
 
   it("minus with duration does not break subtraction of date from date", () => {
@@ -200,7 +204,15 @@ describe("DurationTest", () => {
   it("time plus duration returns same time datatype", () => {
     // In TypeScript/JS all times are Date objects — just verify arithmetic works
     const now = new Date();
-    for (const unit of ["seconds", "minutes", "hours", "days", "weeks", "months", "years"] as const) {
+    for (const unit of [
+      "seconds",
+      "minutes",
+      "hours",
+      "days",
+      "weeks",
+      "months",
+      "years",
+    ] as const) {
       const dur = Duration[unit](1);
       const result = dur.since(now);
       expect(result instanceof Date).toBe(true);
@@ -213,8 +225,8 @@ describe("DurationTest", () => {
   });
 
   it("fractional weeks", () => {
-    expect(Duration.weeks(1.5).inSeconds()).toBeCloseTo((86400 * 7) * 1.5, 1);
-    expect(Duration.weeks(1.7).inSeconds()).toBeCloseTo((86400 * 7) * 1.7, 1);
+    expect(Duration.weeks(1.5).inSeconds()).toBeCloseTo(86400 * 7 * 1.5, 1);
+    expect(Duration.weeks(1.7).inSeconds()).toBeCloseTo(86400 * 7 * 1.7, 1);
   });
 
   it("fractional days", () => {
@@ -460,7 +472,9 @@ describe("DurationTest", () => {
     expect(Duration.seconds(1).iso8601()).toBe("PT1S");
     expect(Duration.minutes(0).iso8601()).toBe("PT0S");
     expect(Duration.years(1).plus(Duration.months(1)).iso8601()).toBe("P1Y1M");
-    expect(Duration.years(1).plus(Duration.months(1)).plus(Duration.days(1)).iso8601()).toBe("P1Y1M1D");
+    expect(Duration.years(1).plus(Duration.months(1)).plus(Duration.days(1)).iso8601()).toBe(
+      "P1Y1M1D",
+    );
   });
 
   it("iso8601 output precision", () => {
@@ -476,9 +490,7 @@ describe("DurationTest", () => {
     const reparsed = Duration.parse(d.iso8601());
     const now = new Date();
     // Both should produce roughly same result when applied to now
-    expect(
-      Math.abs(d.since(now).getTime() - reparsed.since(now).getTime())
-    ).toBeLessThan(1000);
+    expect(Math.abs(d.since(now).getTime() - reparsed.since(now).getTime())).toBeLessThan(1000);
   });
 
   it("iso8601 parsing across spring dst boundary", () => {
@@ -546,7 +558,9 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     expect(Math.round(Duration.minutes(1).inSeconds())).toBe(60);
     expect(Math.round(Duration.minutes(10).inSeconds())).toBe(600);
     expect(Math.round(Duration.hours(1).plus(Duration.minutes(15)).inSeconds())).toBe(4500);
-    expect(Math.round(Duration.days(2).plus(Duration.hours(4)).plus(Duration.minutes(30)).inSeconds())).toBe(189000);
+    expect(
+      Math.round(Duration.days(2).plus(Duration.hours(4)).plus(Duration.minutes(30)).inSeconds()),
+    ).toBe(189000);
   });
 
   it("irregular durations", () => {

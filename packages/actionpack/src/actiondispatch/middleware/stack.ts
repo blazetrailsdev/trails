@@ -7,7 +7,10 @@
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
-type MiddlewareFactory = new (app: RackApp, ...args: any[]) => { call(env: RackEnv): Promise<RackResponse> };
+type MiddlewareFactory = new (
+  app: RackApp,
+  ...args: any[]
+) => { call(env: RackEnv): Promise<RackResponse> };
 
 export interface MiddlewareEntry {
   klass: MiddlewareFactory;
@@ -30,7 +33,11 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.push({ klass, args });
   }
 
-  useWithBlock(klass: MiddlewareFactory, block: (app: RackApp) => RackApp, ...args: unknown[]): void {
+  useWithBlock(
+    klass: MiddlewareFactory,
+    block: (app: RackApp) => RackApp,
+    ...args: unknown[]
+  ): void {
     this.entries.push({ klass, args, block });
   }
 
@@ -51,7 +58,11 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(idx, 0, { klass, args });
   }
 
-  insertAfter(target: MiddlewareFactory | number, klass: MiddlewareFactory, ...args: unknown[]): void {
+  insertAfter(
+    target: MiddlewareFactory | number,
+    klass: MiddlewareFactory,
+    ...args: unknown[]
+  ): void {
     if (typeof target === "number") {
       this.entries.splice(target + 1, 0, { klass, args });
     } else {

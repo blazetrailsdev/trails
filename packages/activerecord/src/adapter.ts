@@ -68,9 +68,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     sql = sql.replace(/\/\*[^*]*\*\//g, "").trim();
 
     // Set operations: (left) UNION|INTERSECT|EXCEPT (right)
-    const setOpMatch = sql.match(
-      /^\((.+)\)\s+(UNION ALL|UNION|INTERSECT|EXCEPT)\s+\((.+)\)$/is
-    );
+    const setOpMatch = sql.match(/^\((.+)\)\s+(UNION ALL|UNION|INTERSECT|EXCEPT)\s+\((.+)\)$/is);
     if (setOpMatch) {
       const [, leftSql, op, rightSql] = setOpMatch;
       const leftRows = await this.execute(leftSql);
@@ -92,21 +90,24 @@ export class MemoryAdapter implements DatabaseAdapter {
         return result;
       }
       if (upperOp === "INTERSECT") {
-        const rightKeys = new Set(rightRows.map(r => JSON.stringify(r)));
-        return leftRows.filter(r => rightKeys.has(JSON.stringify(r)));
+        const rightKeys = new Set(rightRows.map((r) => JSON.stringify(r)));
+        return leftRows.filter((r) => rightKeys.has(JSON.stringify(r)));
       }
       if (upperOp === "EXCEPT") {
-        const rightKeys = new Set(rightRows.map(r => JSON.stringify(r)));
-        return leftRows.filter(r => !rightKeys.has(JSON.stringify(r)));
+        const rightKeys = new Set(rightRows.map((r) => JSON.stringify(r)));
+        return leftRows.filter((r) => !rightKeys.has(JSON.stringify(r)));
       }
     }
 
     // Strip trailing lock clause (FOR UPDATE, etc.) before parsing
-    let cleanedSql = sql.replace(/\s+FOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)(\s+.*)?$/i, "");
+    let cleanedSql = sql.replace(
+      /\s+FOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)(\s+.*)?$/i,
+      "",
+    );
 
     // Grouped aggregate queries: SELECT group_col, AGG(col) FROM ... GROUP BY col [LIMIT n] [OFFSET n]
     const groupAggMatch = cleanedSql.match(
-      /SELECT\s+"?\w+"?\."?(\w+)"?\s*AS\s+group_key\s*,\s*(COUNT|SUM|AVG|MIN|MAX)\((\*|"?\w+"?(?:\."?\w+"?)?)\)\s*AS\s+val\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?\s+GROUP\s+BY\s+"?\w+"?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i
+      /SELECT\s+"?\w+"?\."?(\w+)"?\s*AS\s+group_key\s*,\s*(COUNT|SUM|AVG|MIN|MAX)\((\*|"?\w+"?(?:\."?\w+"?)?)\)\s*AS\s+val\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?\s+GROUP\s+BY\s+"?\w+"?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i,
     );
     if (groupAggMatch) {
       const [, groupCol, fn, colExpr, tableName, where, limitStr, offsetStr] = groupAggMatch;
@@ -164,7 +165,7 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // Aggregate queries: COUNT(*), COUNT(col), COUNT(DISTINCT col), SUM, AVG, MIN, MAX
     const aggMatch = cleanedSql.match(
-      /SELECT\s+(COUNT|SUM|AVG|MIN|MAX)\((DISTINCT\s+)?(\*|"?\w+"?(?:\."?\w+"?)?)\)\s*(?:AS\s+\w+\s+)?FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?$/i
+      /SELECT\s+(COUNT|SUM|AVG|MIN|MAX)\((DISTINCT\s+)?(\*|"?\w+"?(?:\."?\w+"?)?)\)\s*(?:AS\s+\w+\s+)?FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?$/i,
     );
     if (aggMatch) {
       const [, fn, distinctFlag, colExpr, tableName, where] = aggMatch;
@@ -205,14 +206,15 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // Handle JOIN queries
     const joinMatch = cleanedSql.match(
-      /SELECT\s+(.+?)\s+FROM\s+"(\w+)"\s+((?:(?:INNER|LEFT\s+OUTER)\s+JOIN\s+.+?\s+ON\s+.+?\s*)+)(?:WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i
+      /SELECT\s+(.+?)\s+FROM\s+"(\w+)"\s+((?:(?:INNER|LEFT\s+OUTER)\s+JOIN\s+.+?\s+ON\s+.+?\s*)+)(?:WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i,
     );
     if (joinMatch) {
       const [, projections, tableName, joinsPart, where, orderBy, limit, offset] = joinMatch;
       let rows = [...(this.tables.get(tableName) ?? [])];
 
       // Parse and apply joins
-      const joinRegex = /(INNER|LEFT\s+OUTER)\s+JOIN\s+"(\w+)"\s+ON\s+(.+?)(?=\s+(?:INNER|LEFT\s+OUTER)\s+JOIN|\s+WHERE|\s+ORDER|\s+LIMIT|\s+OFFSET|$)/gi;
+      const joinRegex =
+        /(INNER|LEFT\s+OUTER)\s+JOIN\s+"(\w+)"\s+ON\s+(.+?)(?=\s+(?:INNER|LEFT\s+OUTER)\s+JOIN|\s+WHERE|\s+ORDER|\s+LIMIT|\s+OFFSET|$)/gi;
       let jm: RegExpExecArray | null;
       while ((jm = joinRegex.exec(joinsPart)) !== null) {
         const [, joinType, joinTable, onCondition] = jm;
@@ -267,12 +269,11 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // Simple SQL parser for SELECT queries against in-memory store
     const selectMatch = cleanedSql.match(
-      /SELECT\s+(DISTINCT\s+)?(.+?)\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i
+      /SELECT\s+(DISTINCT\s+)?(.+?)\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i,
     );
 
     if (selectMatch) {
-      const [, distinctFlag, projections, tableName, where, orderBy, limit, offset] =
-        selectMatch;
+      const [, distinctFlag, projections, tableName, where, orderBy, limit, offset] = selectMatch;
       const isDistinct = !!distinctFlag;
       let rows = [...(this.tables.get(tableName) ?? [])];
 
@@ -328,7 +329,7 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // INSERT (supports multi-row VALUES and ON CONFLICT)
     const insertMatch = sql.match(
-      /INSERT\s+INTO\s+"(\w+)"\s+\((.*?)\)\s+VALUES\s+(.+?)(?:\s+ON\s+CONFLICT\s*\((.+?)\)\s+(DO\s+NOTHING|DO\s+UPDATE\s+SET\s+.+))?$/is
+      /INSERT\s+INTO\s+"(\w+)"\s+\((.*?)\)\s+VALUES\s+(.+?)(?:\s+ON\s+CONFLICT\s*\((.+?)\)\s+(DO\s+NOTHING|DO\s+UPDATE\s+SET\s+.+))?$/is,
     );
     if (insertMatch) {
       const [, tableName, colStr, valuesSection, conflictCols, conflictAction] = insertMatch;
@@ -344,11 +345,18 @@ export class MemoryAdapter implements DatabaseAdapter {
       let current = "";
       for (const ch of valuesSection) {
         if (ch === "(") {
-          if (depth === 0) { current = ""; depth++; continue; }
+          if (depth === 0) {
+            current = "";
+            depth++;
+            continue;
+          }
           depth++;
         } else if (ch === ")") {
           depth--;
-          if (depth === 0) { valueTuples.push(current); continue; }
+          if (depth === 0) {
+            valueTuples.push(current);
+            continue;
+          }
         }
         if (depth > 0) current += ch;
       }
@@ -373,9 +381,9 @@ export class MemoryAdapter implements DatabaseAdapter {
         let conflicting: Record<string, unknown> | null = null;
         if (uniqueKeys) {
           const tableRows = this.tables.get(tableName)!;
-          conflicting = tableRows.find((existing) =>
-            uniqueKeys.every((k) => existing[k] === newRow[k])
-          ) ?? null;
+          conflicting =
+            tableRows.find((existing) => uniqueKeys.every((k) => existing[k] === newRow[k])) ??
+            null;
         }
 
         if (conflicting) {
@@ -396,11 +404,13 @@ export class MemoryAdapter implements DatabaseAdapter {
             const tableRows = this.tables.get(tableName)!;
             const pkConflict = tableRows.find((r) => r.id === newRow.id);
             if (pkConflict) {
-              throw new Error(`Duplicate key value violates unique constraint: id ${newRow.id} already exists in "${tableName}"`);
+              throw new Error(
+                `Duplicate key value violates unique constraint: id ${newRow.id} already exists in "${tableName}"`,
+              );
             }
           }
           // Insert new row
-          const id = newRow.id ?? ((this.autoIncrements.get(tableName) ?? 0) + 1);
+          const id = newRow.id ?? (this.autoIncrements.get(tableName) ?? 0) + 1;
           this.autoIncrements.set(tableName, Number(id));
           newRow.id = id;
           this.tables.get(tableName)!.push(newRow);
@@ -413,9 +423,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // UPDATE
-    const updateMatch = sql.match(
-      /UPDATE\s+"(\w+)"\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$/i
-    );
+    const updateMatch = sql.match(/UPDATE\s+"(\w+)"\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$/i);
     if (updateMatch) {
       const [, tableName, setStr, where] = updateMatch;
       const rows = this.tables.get(tableName) ?? [];
@@ -427,7 +435,9 @@ export class MemoryAdapter implements DatabaseAdapter {
           for (const [col, val] of assignments) {
             // Handle COALESCE("col", default) +/- N
             if (typeof val === "string") {
-              const coalesceMatch = val.match(/^COALESCE\("?(\w+)"?,\s*(-?\d+(?:\.\d+)?)\)\s*([+-])\s*(-?\d+(?:\.\d+)?)$/i);
+              const coalesceMatch = val.match(
+                /^COALESCE\("?(\w+)"?,\s*(-?\d+(?:\.\d+)?)\)\s*([+-])\s*(-?\d+(?:\.\d+)?)$/i,
+              );
               if (coalesceMatch && coalesceMatch[1] === col) {
                 const current = row[col] != null ? Number(row[col]) : Number(coalesceMatch[2]);
                 const op = coalesceMatch[3];
@@ -456,9 +466,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // CREATE TABLE (DDL)
-    const createTableMatch = sql.match(
-      /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"(\w+)"/i
-    );
+    const createTableMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+"(\w+)"/i);
     if (createTableMatch) {
       const [, tableName] = createTableMatch;
       if (!this.tables.has(tableName)) {
@@ -468,9 +476,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // DROP TABLE (DDL)
-    const dropTableMatch = sql.match(
-      /DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+"(\w+)"/i
-    );
+    const dropTableMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+"(\w+)"/i);
     if (dropTableMatch) {
       const [, tableName] = dropTableMatch;
       this.tables.delete(tableName);
@@ -479,21 +485,15 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // ALTER TABLE ADD COLUMN
-    const alterAddMatch = sql.match(
-      /ALTER\s+TABLE\s+"(\w+)"\s+ADD\s+COLUMN/i
-    );
+    const alterAddMatch = sql.match(/ALTER\s+TABLE\s+"(\w+)"\s+ADD\s+COLUMN/i);
     if (alterAddMatch) return 0;
 
     // ALTER TABLE DROP COLUMN
-    const alterDropMatch = sql.match(
-      /ALTER\s+TABLE\s+"(\w+)"\s+DROP\s+COLUMN/i
-    );
+    const alterDropMatch = sql.match(/ALTER\s+TABLE\s+"(\w+)"\s+DROP\s+COLUMN/i);
     if (alterDropMatch) return 0;
 
     // ALTER TABLE RENAME COLUMN
-    const alterRenameMatch = sql.match(
-      /ALTER\s+TABLE\s+"(\w+)"\s+RENAME\s+COLUMN/i
-    );
+    const alterRenameMatch = sql.match(/ALTER\s+TABLE\s+"(\w+)"\s+RENAME\s+COLUMN/i);
     if (alterRenameMatch) return 0;
 
     // CREATE INDEX
@@ -505,9 +505,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     if (dropIndexMatch) return 0;
 
     // DELETE
-    const deleteMatch = sql.match(
-      /DELETE\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+))?$/i
-    );
+    const deleteMatch = sql.match(/DELETE\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+))?$/i);
     if (deleteMatch) {
       const [, tableName, where] = deleteMatch;
       const rows = this.tables.get(tableName) ?? [];
@@ -519,7 +517,7 @@ export class MemoryAdapter implements DatabaseAdapter {
       const before = rows.length;
       this.tables.set(
         tableName,
-        rows.filter((row) => !this.evaluateWhere(row, where))
+        rows.filter((row) => !this.evaluateWhere(row, where)),
       );
       return before - (this.tables.get(tableName)?.length ?? 0);
     }
@@ -536,10 +534,7 @@ export class MemoryAdapter implements DatabaseAdapter {
 
   // -- Helpers --
 
-  private evaluateWhere(
-    row: Record<string, unknown>,
-    where: string
-  ): boolean {
+  private evaluateWhere(row: Record<string, unknown>, where: string): boolean {
     // Strip outer parentheses if present (from Grouping nodes)
     let cleaned = where.trim();
     if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
@@ -634,10 +629,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     return parts;
   }
 
-  private evaluateCondition(
-    row: Record<string, unknown>,
-    condition: string
-  ): boolean {
+  private evaluateCondition(row: Record<string, unknown>, condition: string): boolean {
     // Always-false (empty IN generates 1=0)
     if (condition.trim() === "1=0") return false;
 
@@ -656,7 +648,7 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // BETWEEN
     const betweenMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s+BETWEEN\s+(.+?)\s+AND\s+(.+)/i
+      /"?(\w+)"?(?:\."?(\w+)"?)?\s+BETWEEN\s+(.+?)\s+AND\s+(.+)/i,
     );
     if (betweenMatch) {
       const col = getCol(betweenMatch[1], betweenMatch[2]);
@@ -681,9 +673,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // NOT IN (...)
-    const notInMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s+NOT\s+IN\s+\((.+?)\)/i
-    );
+    const notInMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s+NOT\s+IN\s+\((.+?)\)/i);
     if (notInMatch) {
       const col = getCol(notInMatch[1], notInMatch[2]);
       const values = this.parseValues(notInMatch[3]);
@@ -691,9 +681,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // IN (...)
-    const inMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s+IN\s+\((.+?)\)/i
-    );
+    const inMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s+IN\s+\((.+?)\)/i);
     if (inMatch) {
       const col = getCol(inMatch[1], inMatch[2]);
       const values = this.parseValues(inMatch[3]);
@@ -701,9 +689,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column != value (check before = to avoid matching != as =)
-    const neqMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*!=\s*(.+)/
-    );
+    const neqMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*!=\s*(.+)/);
     if (neqMatch) {
       const col = getCol(neqMatch[1], neqMatch[2]);
       const val = this.parseSingleValue(neqMatch[3].trim());
@@ -711,9 +697,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column <> value
-    const neqMatch2 = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*<>\s*(.+)/
-    );
+    const neqMatch2 = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*<>\s*(.+)/);
     if (neqMatch2) {
       const col = getCol(neqMatch2[1], neqMatch2[2]);
       const val = this.parseSingleValue(neqMatch2[3].trim());
@@ -721,9 +705,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column = value
-    const eqMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*=\s*(.+)/
-    );
+    const eqMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*=\s*(.+)/);
     if (eqMatch) {
       const col = getCol(eqMatch[1], eqMatch[2]);
       const val = this.parseSingleValue(eqMatch[3].trim());
@@ -731,9 +713,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column >= value (must come before > to avoid false match)
-    const gteMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*>=\s*(.+)/
-    );
+    const gteMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*>=\s*(.+)/);
     if (gteMatch) {
       const col = getCol(gteMatch[1], gteMatch[2]);
       const val = this.parseSingleValue(gteMatch[3].trim());
@@ -741,9 +721,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column <= value (must come before < to avoid false match)
-    const lteMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*<=\s*(.+)/
-    );
+    const lteMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*<=\s*(.+)/);
     if (lteMatch) {
       const col = getCol(lteMatch[1], lteMatch[2]);
       const val = this.parseSingleValue(lteMatch[3].trim());
@@ -751,9 +729,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column > value
-    const gtMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*>\s*(.+)/
-    );
+    const gtMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*>\s*(.+)/);
     if (gtMatch) {
       const col = getCol(gtMatch[1], gtMatch[2]);
       const val = this.parseSingleValue(gtMatch[3].trim());
@@ -761,9 +737,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column < value
-    const ltMatch = condition.match(
-      /"?(\w+)"?(?:\."?(\w+)"?)?\s*<\s*(.+)/
-    );
+    const ltMatch = condition.match(/"?(\w+)"?(?:\."?(\w+)"?)?\s*<\s*(.+)/);
     if (ltMatch) {
       const col = getCol(ltMatch[1], ltMatch[2]);
       const val = this.parseSingleValue(ltMatch[3].trim());
@@ -837,30 +811,19 @@ export class MemoryAdapter implements DatabaseAdapter {
     for (const part of parts) {
       const eqIdx = part.indexOf("=");
       if (eqIdx === -1) continue;
-      const col = part
-        .slice(0, eqIdx)
-        .trim()
-        .replace(/"/g, "")
-        .split(".")
-        .pop()!;
+      const col = part.slice(0, eqIdx).trim().replace(/"/g, "").split(".").pop()!;
       const val = this.parseSingleValue(part.slice(eqIdx + 1).trim());
       results.push([col, val]);
     }
     return results;
   }
 
-  private applyOrder(
-    rows: Record<string, unknown>[],
-    orderBy: string
-  ): Record<string, unknown>[] {
+  private applyOrder(rows: Record<string, unknown>[], orderBy: string): Record<string, unknown>[] {
     const parts = orderBy.split(",").map((p) => {
       const trimmed = p.trim();
       const descMatch = trimmed.match(/(.+?)\s+DESC/i);
       const ascMatch = trimmed.match(/(.+?)\s+ASC/i);
-      const col = (descMatch?.[1] ?? ascMatch?.[1] ?? trimmed)
-        .replace(/"/g, "")
-        .split(".")
-        .pop()!;
+      const col = (descMatch?.[1] ?? ascMatch?.[1] ?? trimmed).replace(/"/g, "").split(".").pop()!;
       const dir = descMatch ? "desc" : "asc";
       return { col, dir };
     });

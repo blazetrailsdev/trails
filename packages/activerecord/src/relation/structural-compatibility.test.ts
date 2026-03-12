@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -33,7 +73,10 @@ describe("StructuralCompatibilityTest", () => {
   it("structurally compatible returns true for same model", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const r1 = Post.where({ title: "a" });
     const r2 = Post.where({ title: "b" });
@@ -43,11 +86,17 @@ describe("StructuralCompatibilityTest", () => {
 
 describe("StructuralCompatibilityTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -73,16 +122,19 @@ describe("StructuralCompatibilityTest", () => {
 
   it("incompatible unscope", () => {
     const { Post } = makeModel();
-    const sql = Post.where({ title: "a" }).or(Post.where({ title: "b" })).toSql();
+    const sql = Post.where({ title: "a" })
+      .or(Post.where({ title: "b" }))
+      .toSql();
     expect(sql).toContain("OR");
   });
 });
 
-
 describe("structurallyCompatible", () => {
   it("returns true for relations of the same model", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.adapter = adapter;
 
@@ -93,11 +145,15 @@ describe("structurallyCompatible", () => {
 
   it("returns false for relations of different models", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.adapter = adapter;
 
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.adapter = adapter;
 

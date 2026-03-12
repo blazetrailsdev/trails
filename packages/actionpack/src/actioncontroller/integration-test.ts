@@ -96,8 +96,7 @@ export class IntegrationTest {
 
   /** The response Location header. */
   get redirectUrl(): string | undefined {
-    return this.response?.getHeader("location") ??
-      this.controller?.getHeader("location");
+    return this.response?.getHeader("location") ?? this.controller?.getHeader("location");
   }
 
   /** Flash from the last request. */
@@ -167,18 +166,29 @@ export class IntegrationTest {
     if (range) {
       if (actual < range[0] || actual > range[1]) {
         throw new Error(
-          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`
+          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`,
         );
       }
       return;
     }
 
     const SYMBOLS: Record<string, number> = {
-      ok: 200, created: 201, accepted: 202, no_content: 204,
-      moved_permanently: 301, found: 302, see_other: 303, not_modified: 304,
-      bad_request: 400, unauthorized: 401, forbidden: 403, not_found: 404,
-      method_not_allowed: 405, unprocessable_entity: 422,
-      internal_server_error: 500, service_unavailable: 503,
+      ok: 200,
+      created: 201,
+      accepted: 202,
+      no_content: 204,
+      moved_permanently: 301,
+      found: 302,
+      see_other: 303,
+      not_modified: 304,
+      bad_request: 400,
+      unauthorized: 401,
+      forbidden: 403,
+      not_found: 404,
+      method_not_allowed: 405,
+      unprocessable_entity: 422,
+      internal_server_error: 500,
+      service_unavailable: 503,
     };
     const code = SYMBOLS[expected];
     if (code !== undefined) {
@@ -208,8 +218,7 @@ export class IntegrationTest {
   }
 
   assertContentType(expected: string): void {
-    const actual = this.response?.getHeader("content-type") ??
-      this.controller?.contentType ?? "";
+    const actual = this.response?.getHeader("content-type") ?? this.controller?.contentType ?? "";
     if (!actual.includes(expected)) {
       throw new Error(`Expected content type to include "${expected}", got "${actual}"`);
     }
@@ -262,7 +271,7 @@ export class IntegrationTest {
   private async _processPath(
     method: string,
     path: string,
-    options: IntegrationRequestOptions
+    options: IntegrationRequestOptions,
   ): Promise<void> {
     // Match route
     const matched = this.routes.recognize(method, path);
@@ -285,7 +294,7 @@ export class IntegrationTest {
     if (!ControllerClass) {
       throw new Error(
         `No controller registered for "${controllerName}". ` +
-        `Call registerController("${controllerName}", YourController) first.`
+          `Call registerController("${controllerName}", YourController) first.`,
       );
     }
 
@@ -352,9 +361,7 @@ export class IntegrationTest {
       Object.assign(allParams, options.params);
     }
     (this.request as any).parameters = new Parameters(
-      Object.fromEntries(
-        Object.entries(allParams).map(([k, v]) => [k, v])
-      )
+      Object.fromEntries(Object.entries(allParams).map(([k, v]) => [k, v])),
     );
 
     // Instantiate and dispatch

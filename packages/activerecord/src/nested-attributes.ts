@@ -29,7 +29,7 @@ interface NestedAttributeConfig {
 export function acceptsNestedAttributesFor(
   modelClass: typeof Base,
   associationName: string,
-  options: NestedAttributeOptions = {}
+  options: NestedAttributeOptions = {},
 ): void {
   // Validate that the association exists
   const associations: any[] = (modelClass as any)._associations ?? [];
@@ -42,7 +42,7 @@ export function acceptsNestedAttributesFor(
   if (assocExists.type === "belongsTo" && assocExists.options?.polymorphic) {
     throw new Error(
       `Cannot build a polymorphic belongs_to association '${associationName}' with nested attributes. ` +
-      `You need to define which model to use for the polymorphic association.`
+        `You need to define which model to use for the polymorphic association.`,
     );
   }
 
@@ -82,7 +82,7 @@ export function acceptsNestedAttributesFor(
 export function assignNestedAttributes(
   record: Base,
   associationName: string,
-  attributesArray: Record<string, unknown>[] | Record<string, Record<string, unknown>>
+  attributesArray: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): void {
   // Validate input type
   if (typeof attributesArray !== "object" || attributesArray === null) {
@@ -110,8 +110,8 @@ export function assignNestedAttributes(
  * Process all pending nested attributes after save.
  */
 async function processNestedAttributes(record: Base): Promise<void> {
-  const pending: Map<string, Record<string, unknown>[]> | undefined =
-    (record as any)._pendingNestedAttributes;
+  const pending: Map<string, Record<string, unknown>[]> | undefined = (record as any)
+    ._pendingNestedAttributes;
   if (!pending) return;
 
   const ctor = record.constructor as typeof Base;
@@ -133,9 +133,13 @@ async function processNestedAttributes(record: Base): Promise<void> {
       return w;
     };
     const camelize = (n: string) =>
-      n.split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+      n
+        .split("_")
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join("");
 
-    const className = assocDef.options.className ??
+    const className =
+      assocDef.options.className ??
       (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany"
         ? camelize(singularize(assocName))
         : camelize(assocName));
@@ -144,7 +148,8 @@ async function processNestedAttributes(record: Base): Promise<void> {
     if (!targetModel) continue;
 
     const underscore = (n: string) =>
-      n.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+      n
+        .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
         .replace(/([a-z\d])([A-Z])/g, "$1_$2")
         .toLowerCase();
 
@@ -217,7 +222,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
           const pk = (ctor as any).primaryKey || "id";
           const pkVal = record.readAttribute(pk);
           await (ctor as any).adapter.executeMutation(
-            `UPDATE "${tableName}" SET "${foreignKey}" = ${created.id} WHERE "${pk}" = ${pkVal}`
+            `UPDATE "${tableName}" SET "${foreignKey}" = ${created.id} WHERE "${pk}" = ${pkVal}`,
           );
         }
       } else {

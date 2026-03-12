@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Table, sql, star, SelectManager, InsertManager, UpdateManager, DeleteManager, Nodes, Visitors, Collectors } from "../index.js";
+import {
+  Table,
+  sql,
+  star,
+  SelectManager,
+  InsertManager,
+  UpdateManager,
+  DeleteManager,
+  Nodes,
+  Visitors,
+  Collectors,
+} from "../index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -7,73 +18,73 @@ describe("Arel", () => {
   const visitor = new Visitors.ToSql();
 
   describe("sql-literal", () => {
-                it("makes a sql literal node", () => {
-          const node = new Nodes.SqlLiteral("NOW()");
-          expect(node).toBeInstanceOf(Nodes.SqlLiteral);
-          expect(node.value).toBe("NOW()");
-        });
+    it("makes a sql literal node", () => {
+      const node = new Nodes.SqlLiteral("NOW()");
+      expect(node).toBeInstanceOf(Nodes.SqlLiteral);
+      expect(node.value).toBe("NOW()");
+    });
 
-                it("makes a count node", () => {
-          const lit = new Nodes.SqlLiteral("*");
-          const count = new Nodes.NamedFunction("COUNT", [lit]);
-          const visitor = new Visitors.ToSql();
-          expect(visitor.compile(count)).toBe("COUNT(*)");
-        });
+    it("makes a count node", () => {
+      const lit = new Nodes.SqlLiteral("*");
+      const count = new Nodes.NamedFunction("COUNT", [lit]);
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(count)).toBe("COUNT(*)");
+    });
 
-                it("makes a distinct node", () => {
-          const lit = new Nodes.SqlLiteral("zomg");
-          const dist = new Nodes.Distinct();
-          const count = new Nodes.NamedFunction("COUNT", [lit], undefined, true);
-          const visitor = new Visitors.ToSql();
-          expect(visitor.compile(count)).toBe("COUNT(DISTINCT zomg)");
-        });
+    it("makes a distinct node", () => {
+      const lit = new Nodes.SqlLiteral("zomg");
+      const dist = new Nodes.Distinct();
+      const count = new Nodes.NamedFunction("COUNT", [lit], undefined, true);
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(count)).toBe("COUNT(DISTINCT zomg)");
+    });
 
-                it("makes an equality node", () => {
-          const lit = new Nodes.SqlLiteral("foo");
-          const eq = new Nodes.Equality(lit, new Nodes.Quoted(1));
-          const visitor = new Visitors.ToSql();
-          expect(visitor.compile(eq)).toBe("foo = 1");
-        });
+    it("makes an equality node", () => {
+      const lit = new Nodes.SqlLiteral("foo");
+      const eq = new Nodes.Equality(lit, new Nodes.Quoted(1));
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(eq)).toBe("foo = 1");
+    });
 
-                it("is equal with equal contents", () => {
-          const a = new Nodes.SqlLiteral("NOW()");
-          const b = new Nodes.SqlLiteral("NOW()");
-          expect(a.value).toBe(b.value);
-        });
+    it("is equal with equal contents", () => {
+      const a = new Nodes.SqlLiteral("NOW()");
+      const b = new Nodes.SqlLiteral("NOW()");
+      expect(a.value).toBe(b.value);
+    });
 
-                it("is not equal with different contents", () => {
-          const a = new Nodes.SqlLiteral("NOW()");
-          const b = new Nodes.SqlLiteral("CURRENT_TIMESTAMP");
-          expect(a.value).not.toBe(b.value);
-        });
+    it("is not equal with different contents", () => {
+      const a = new Nodes.SqlLiteral("NOW()");
+      const b = new Nodes.SqlLiteral("CURRENT_TIMESTAMP");
+      expect(a.value).not.toBe(b.value);
+    });
 
-                it("makes a grouping node with an or node", () => {
-          const lit1 = new Nodes.SqlLiteral("foo");
-          const lit2 = new Nodes.SqlLiteral("bar");
-          const eq1 = new Nodes.Equality(lit1, new Nodes.Quoted(1));
-          const eq2 = new Nodes.Equality(lit2, new Nodes.Quoted(2));
-          const orNode = eq1.or(eq2);
-          expect(orNode).toBeInstanceOf(Nodes.Grouping);
-        });
+    it("makes a grouping node with an or node", () => {
+      const lit1 = new Nodes.SqlLiteral("foo");
+      const lit2 = new Nodes.SqlLiteral("bar");
+      const eq1 = new Nodes.Equality(lit1, new Nodes.Quoted(1));
+      const eq2 = new Nodes.Equality(lit2, new Nodes.Quoted(2));
+      const orNode = eq1.or(eq2);
+      expect(orNode).toBeInstanceOf(Nodes.Grouping);
+    });
 
-                it("makes a grouping node with an and node", () => {
-          const lit1 = new Nodes.SqlLiteral("foo");
-          const lit2 = new Nodes.SqlLiteral("bar");
-          const eq1 = new Nodes.Equality(lit1, new Nodes.Quoted(1));
-          const eq2 = new Nodes.Equality(lit2, new Nodes.Quoted(2));
-          const andNode = eq1.and(eq2);
-          expect(andNode).toBeInstanceOf(Nodes.And);
-        });
+    it("makes a grouping node with an and node", () => {
+      const lit1 = new Nodes.SqlLiteral("foo");
+      const lit2 = new Nodes.SqlLiteral("bar");
+      const eq1 = new Nodes.Equality(lit1, new Nodes.Quoted(1));
+      const eq2 = new Nodes.Equality(lit2, new Nodes.Quoted(2));
+      const andNode = eq1.and(eq2);
+      expect(andNode).toBeInstanceOf(Nodes.And);
+    });
 
-                it("fails if joined with something that is not an Arel node", () => {
-          const lit = new Nodes.SqlLiteral("foo");
-          // SqlLiteral is a Node, verifying it works correctly
-          expect(lit.value).toBe("foo");
-          expect(lit).toBeInstanceOf(Nodes.Node);
-        });
+    it("fails if joined with something that is not an Arel node", () => {
+      const lit = new Nodes.SqlLiteral("foo");
+      // SqlLiteral is a Node, verifying it works correctly
+      expect(lit.value).toBe("foo");
+      expect(lit).toBeInstanceOf(Nodes.Node);
+    });
 
-            it.todo("serializes into YAML", () => {});
+    it.todo("serializes into YAML", () => {});
 
-            it.todo("generates a Fragments node", () => {});
+    it.todo("generates a Fragments node", () => {});
   });
 });

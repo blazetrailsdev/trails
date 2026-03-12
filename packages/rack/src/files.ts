@@ -8,7 +8,11 @@ export class Files {
   private headers: Record<string, string>;
   private defaultMime: string | null;
 
-  constructor(root: string, headers: Record<string, string> = {}, defaultMime: string | null = "text/plain") {
+  constructor(
+    root: string,
+    headers: Record<string, string> = {},
+    defaultMime: string | null = "text/plain",
+  ) {
     this.root = root ? path.resolve(root) : "";
     this.headers = headers;
     this.defaultMime = defaultMime;
@@ -18,11 +22,11 @@ export class Files {
     const method = env["REQUEST_METHOD"];
 
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-      return [405, { "allow": "GET, HEAD, OPTIONS" }, ["Method Not Allowed"]];
+      return [405, { allow: "GET, HEAD, OPTIONS" }, ["Method Not Allowed"]];
     }
 
     if (method === "OPTIONS") {
-      return [200, { "allow": "GET, HEAD, OPTIONS", [CONTENT_LENGTH]: "0" }, []];
+      return [200, { allow: "GET, HEAD, OPTIONS", [CONTENT_LENGTH]: "0" }, []];
     }
 
     const pathInfo = env["PATH_INFO"] || "/";
@@ -97,7 +101,11 @@ export class Files {
   }
 
   private serveRange(
-    filePath: string, size: number, range: string, headers: Record<string, string>, method: string
+    filePath: string,
+    size: number,
+    range: string,
+    headers: Record<string, string>,
+    method: string,
   ): [number, Record<string, any>, any] {
     const ranges = this.parseByteRanges(range, size);
 
@@ -134,7 +142,9 @@ export class Files {
       const fd = fs.openSync(filePath, "r");
       fs.readSync(fd, buf, 0, len, start);
       fs.closeSync(fd);
-      parts.push(`\r\n--${boundary}\r\ncontent-type: ${ct}\r\ncontent-range: bytes ${start}-${end}/${size}\r\n\r\n${buf.toString()}`);
+      parts.push(
+        `\r\n--${boundary}\r\ncontent-type: ${ct}\r\ncontent-range: bytes ${start}-${end}/${size}\r\n\r\n${buf.toString()}`,
+      );
     }
     parts.push(`\r\n--${boundary}--\r\n`);
     const bodyStr = parts.join("");
@@ -147,7 +157,7 @@ export class Files {
     const m = range.match(/^bytes=(.+)$/);
     if (!m) return null;
 
-    const specs = m[1].split(",").map(s => s.trim());
+    const specs = m[1].split(",").map((s) => s.trim());
     const ranges: [number, number][] = [];
 
     for (const spec of specs) {
@@ -202,7 +212,7 @@ class FileBody {
         if (done) return { value: undefined, done: true };
         done = true;
         return { value: data, done: false };
-      }
+      },
     };
   }
 }

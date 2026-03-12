@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -38,7 +78,10 @@ describe("FinderTest", () => {
 
   it("exists", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(await Topic.exists()).toBe(true);
@@ -46,7 +89,10 @@ describe("FinderTest", () => {
 
   it("exists with scope", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(await Topic.where({ title: "a" }).exists()).toBe(true);
@@ -55,14 +101,20 @@ describe("FinderTest", () => {
 
   it("exists with nil arg", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await Topic.exists()).toBe(false);
   });
 
   it("exists with empty hash arg", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(await Topic.exists({})).toBe(true);
@@ -70,7 +122,10 @@ describe("FinderTest", () => {
 
   it("exists with order", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(await Topic.order("title").exists()).toBe(true);
@@ -78,21 +133,30 @@ describe("FinderTest", () => {
 
   it("exists with empty table and no args given", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await Topic.exists()).toBe(false);
   });
 
   it("find an empty array raises RecordNotFound", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.find([])).rejects.toThrow();
   });
 
   it("take", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const record = await Topic.all().take();
@@ -101,7 +165,10 @@ describe("FinderTest", () => {
 
   it("take failing", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const record = await Topic.all().take();
     expect(record).toBeNull();
@@ -109,7 +176,10 @@ describe("FinderTest", () => {
 
   it("take bang present", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const record = await Topic.all().takeBang();
@@ -118,14 +188,20 @@ describe("FinderTest", () => {
 
   it("take bang missing", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.all().takeBang()).rejects.toThrow(RecordNotFound);
   });
 
   it("sole", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "only" });
     const record = await Topic.all().sole();
@@ -134,14 +210,20 @@ describe("FinderTest", () => {
 
   it("sole failing none", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.all().sole()).rejects.toThrow(RecordNotFound);
   });
 
   it("sole failing many", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -150,7 +232,10 @@ describe("FinderTest", () => {
 
   it("first", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const record = await Topic.all().first();
@@ -159,7 +244,10 @@ describe("FinderTest", () => {
 
   it("first failing", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const record = await Topic.all().first();
     expect(record).toBeNull();
@@ -167,7 +255,10 @@ describe("FinderTest", () => {
 
   it("first bang present", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const record = await Topic.all().firstBang();
@@ -176,14 +267,20 @@ describe("FinderTest", () => {
 
   it("first bang missing", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.all().firstBang()).rejects.toThrow(RecordNotFound);
   });
 
   it("first have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "b" });
     await Topic.create({ title: "a" });
@@ -194,7 +291,10 @@ describe("FinderTest", () => {
 
   it("second", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -204,7 +304,10 @@ describe("FinderTest", () => {
 
   it("second with offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -215,7 +318,10 @@ describe("FinderTest", () => {
 
   it("second have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -225,7 +331,10 @@ describe("FinderTest", () => {
 
   it("third", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -236,7 +345,10 @@ describe("FinderTest", () => {
 
   it("third with offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -248,7 +360,10 @@ describe("FinderTest", () => {
 
   it("third have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -259,7 +374,10 @@ describe("FinderTest", () => {
 
   it("fourth", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 4; i++) await Topic.create({ title: String(i) });
     const fourth = await Topic.all().fourth();
@@ -268,7 +386,10 @@ describe("FinderTest", () => {
 
   it("fourth with offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 6; i++) await Topic.create({ title: String(i) });
     const fourth = await Topic.all().offset(1).fourth();
@@ -277,7 +398,10 @@ describe("FinderTest", () => {
 
   it("fourth have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 4; i++) await Topic.create({ title: String(i) });
     const fourth = await Topic.all().fourth();
@@ -286,7 +410,10 @@ describe("FinderTest", () => {
 
   it("fifth", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const fifth = await Topic.all().fifth();
@@ -295,7 +422,10 @@ describe("FinderTest", () => {
 
   it("fifth with offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 7; i++) await Topic.create({ title: String(i) });
     const fifth = await Topic.all().offset(1).fifth();
@@ -304,7 +434,10 @@ describe("FinderTest", () => {
 
   it("fifth have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const fifth = await Topic.all().fifth();
@@ -313,7 +446,10 @@ describe("FinderTest", () => {
 
   it("second to last have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -323,7 +459,10 @@ describe("FinderTest", () => {
 
   it("third to last have primary key order by default", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -334,7 +473,10 @@ describe("FinderTest", () => {
 
   it("last bang present", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const record = await Topic.all().lastBang();
@@ -343,14 +485,20 @@ describe("FinderTest", () => {
 
   it("last bang missing", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.all().lastBang()).rejects.toThrow(RecordNotFound);
   });
 
   it("take and first and last with integer should return an array", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -364,7 +512,10 @@ describe("FinderTest", () => {
 
   it("take and first and last with integer should use sql limit", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -375,7 +526,10 @@ describe("FinderTest", () => {
 
   it("last with integer and order should keep the order", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -386,7 +540,10 @@ describe("FinderTest", () => {
 
   it("last on relation with limit and offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const last = await Topic.all().last();
@@ -395,7 +552,10 @@ describe("FinderTest", () => {
 
   it("first on relation with limit and offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const first = await Topic.all().offset(1).first();
@@ -404,7 +564,10 @@ describe("FinderTest", () => {
 
   it("find by one attribute", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "target" });
     const found = await Topic.findBy({ title: "target" });
@@ -413,7 +576,10 @@ describe("FinderTest", () => {
 
   it("find by one attribute bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "target" });
     const found = await Topic.findByBang({ title: "target" });
@@ -422,7 +588,11 @@ describe("FinderTest", () => {
 
   it("find by two attributes", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a", body: "x" });
     const found = await Topic.findBy({ title: "a", body: "x" });
@@ -431,7 +601,10 @@ describe("FinderTest", () => {
 
   it("find by nil attribute", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: null as any });
     const found = await Topic.findBy({ title: null });
@@ -441,7 +614,10 @@ describe("FinderTest", () => {
 
   it("count by sql", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const count = await Topic.all().count();
@@ -450,7 +626,10 @@ describe("FinderTest", () => {
 
   it("bind variables", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.where("title = ?", "hello").toArray();
@@ -459,7 +638,10 @@ describe("FinderTest", () => {
 
   it("named bind variables", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.where("title = :title", { title: "hello" }).toArray();
@@ -468,7 +650,10 @@ describe("FinderTest", () => {
 
   it("hash condition find with array", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -479,7 +664,10 @@ describe("FinderTest", () => {
 
   it("hash condition find with nil", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Topic.where({ title: null }).toSql();
     expect(sql).toContain("IS NULL");
@@ -487,7 +675,10 @@ describe("FinderTest", () => {
 
   it("condition interpolation", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.where("title = ?", "hello").toArray();
@@ -496,7 +687,11 @@ describe("FinderTest", () => {
 
   it("find_by with multi-arg conditions returns the first matching record", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a", body: "x" });
     const found = await Topic.findBy({ title: "a", body: "x" });
@@ -505,7 +700,10 @@ describe("FinderTest", () => {
 
   it("find_by doesn't have implicit ordering", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const found = await Topic.findBy({ title: "a" });
@@ -514,7 +712,10 @@ describe("FinderTest", () => {
 
   it("find_by! with multi-arg conditions returns the first matching record", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "target" });
     const found = await Topic.findByBang({ title: "target" });
@@ -523,7 +724,10 @@ describe("FinderTest", () => {
 
   it("find_by! doesn't have implicit ordering", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const found = await Topic.findByBang({ title: "a" });
@@ -532,7 +736,10 @@ describe("FinderTest", () => {
 
   it("find doesnt have implicit ordering", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Topic.create({ title: "a" });
     const found = await Topic.find(p.id);
@@ -541,14 +748,20 @@ describe("FinderTest", () => {
 
   it("find by empty ids raises RecordNotFound", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.find([])).rejects.toThrow();
   });
 
   it("exists returns true with one record and no args", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(await Topic.exists()).toBe(true);
@@ -556,7 +769,10 @@ describe("FinderTest", () => {
 
   it("find by sql with sti on joined table", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const results = await Topic.findBySql('SELECT * FROM "topics"');
@@ -565,7 +781,10 @@ describe("FinderTest", () => {
 
   it("select value", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "hello" });
     const values = await Topic.all().pluck("title");
@@ -574,7 +793,10 @@ describe("FinderTest", () => {
 
   it("select values", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -591,7 +813,10 @@ describe("FinderTest", () => {
 
   it("exists with order and distinct", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(await Topic.order("title").distinct().exists()).toBe(true);
@@ -599,7 +824,10 @@ describe("FinderTest", () => {
 
   it("exists with loaded relation", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const rel = Topic.all();
@@ -609,7 +837,10 @@ describe("FinderTest", () => {
 
   it("find by ids with limit and offset", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const results = await Topic.all().limit(2).offset(1).toArray();
@@ -618,7 +849,10 @@ describe("FinderTest", () => {
 
   it("find with entire select statement", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.findBySql('SELECT * FROM "topics"');
@@ -627,7 +861,10 @@ describe("FinderTest", () => {
 
   it("find with prepared select statement", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.findBySql('SELECT * FROM "topics"');
@@ -636,7 +873,10 @@ describe("FinderTest", () => {
 
   it("hash condition find with escaped characters", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Topic.where({ title: "it's" }).toSql();
     expect(sql).toContain("it''s");
@@ -644,7 +884,10 @@ describe("FinderTest", () => {
 
   it("model class responds to second bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // secondBang should exist (or similar)
     expect(typeof Topic.all().second).toBe("function");
@@ -652,56 +895,80 @@ describe("FinderTest", () => {
 
   it("model class responds to third bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Topic.all().third).toBe("function");
   });
 
   it("model class responds to fourth bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Topic.all().fourth).toBe("function");
   });
 
   it("model class responds to fifth bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Topic.all().fifth).toBe("function");
   });
 
   it("model class responds to last bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Topic.all().lastBang).toBe("function");
   });
 
   it("model class responds to second to last bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Topic.all().secondToLast).toBe("function");
   });
 
   it("model class responds to third to last bang", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Topic.all().thirdToLast).toBe("function");
   });
 
   it("unexisting record exception handling", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await expect(Topic.find(99999)).rejects.toThrow(RecordNotFound);
   });
 
   it("find one message on primary key", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     try {
       await Topic.find(0);
@@ -712,7 +979,10 @@ describe("FinderTest", () => {
 
   it("condition array interpolation", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Topic.where("title = ?", "hello").toSql();
     expect(sql).toContain("hello");
@@ -720,7 +990,10 @@ describe("FinderTest", () => {
 
   it("condition hash interpolation", () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Topic.where({ title: "hello" }).toSql();
     expect(sql).toContain("hello");
@@ -728,7 +1001,10 @@ describe("FinderTest", () => {
 
   it("find by one attribute with conditions", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "target" });
     const found = await Topic.where({ title: "target" }).first();
@@ -737,7 +1013,10 @@ describe("FinderTest", () => {
 
   it("last with integer and reorder should use sql limit", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const results = await Topic.order("title").last(2);
@@ -746,7 +1025,10 @@ describe("FinderTest", () => {
 
   it("last with integer and order should use sql limit", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const results = await Topic.order("title").last(2);
@@ -755,7 +1037,10 @@ describe("FinderTest", () => {
 
   it("nth to last with order uses limit", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
     const stl = await Topic.all().secondToLast();
@@ -764,7 +1049,11 @@ describe("FinderTest", () => {
 
   it("find by two attributes but passing only one", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a", body: "x" });
     const found = await Topic.findBy({ title: "a" });
@@ -773,7 +1062,10 @@ describe("FinderTest", () => {
 
   it("find with bad sql", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Invalid SQL should throw or return error
     try {
@@ -785,7 +1077,10 @@ describe("FinderTest", () => {
 
   it("find by with alias", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     const found = await Topic.findBy({ title: "a" });
@@ -800,7 +1095,10 @@ describe("FinderTest", () => {
   it("find with string", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "hello" });
     const results = await Topic.findBySql('SELECT * FROM "topics"');
@@ -810,7 +1108,10 @@ describe("FinderTest", () => {
   it("exists uses existing scope", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "scoped" });
     expect(await Topic.where({ title: "scoped" }).exists()).toBe(true);
@@ -820,7 +1121,10 @@ describe("FinderTest", () => {
   it("exists with string", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "hello" });
     expect(await Topic.exists()).toBe(true);
@@ -829,7 +1133,10 @@ describe("FinderTest", () => {
   it("exists with large number", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(await Topic.exists(9999999)).toBe(false);
   });
@@ -837,20 +1144,28 @@ describe("FinderTest", () => {
   it("exists with joins", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "join-test" });
     // exists on a joined query should work
-    const sql = Topic.joins("LEFT OUTER JOIN posts ON posts.id = topics.id").where({ title: "join-test" }).toSql();
+    const sql = Topic.joins("LEFT OUTER JOIN posts ON posts.id = topics.id")
+      .where({ title: "join-test" })
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
   });
 
   it("include on unloaded relation with match", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const record = await Topic.create({ title: "match" }) as any;
+    const record = (await Topic.create({ title: "match" })) as any;
     const rel = Topic.all();
     const included = await rel.include(record);
     expect(included).toBe(true);
@@ -859,9 +1174,12 @@ describe("FinderTest", () => {
   it("include on unloaded relation without match", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const record = await Topic.create({ title: "exists" }) as any;
+    const record = (await Topic.create({ title: "exists" })) as any;
     await record.destroy();
     const rel = Topic.all();
     const included = await rel.include(record);
@@ -871,9 +1189,12 @@ describe("FinderTest", () => {
   it("include on loaded relation with match", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const record = await Topic.create({ title: "loaded-match" }) as any;
+    const record = (await Topic.create({ title: "loaded-match" })) as any;
     const rel = Topic.all();
     await rel.load();
     const included = await rel.include(record);
@@ -883,9 +1204,12 @@ describe("FinderTest", () => {
   it("include on loaded relation without match", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const record = await Topic.create({ title: "no-match" }) as any;
+    const record = (await Topic.create({ title: "no-match" })) as any;
     await record.destroy();
     const rel = Topic.all();
     await rel.load();
@@ -896,7 +1220,10 @@ describe("FinderTest", () => {
   it("find with large number", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await expect(Topic.find(99999999)).rejects.toThrow();
   });
@@ -904,7 +1231,10 @@ describe("FinderTest", () => {
   it("find by with large number", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const result = await Topic.findBy({ id: 99999999 });
     expect(result).toBeNull();
@@ -913,7 +1243,10 @@ describe("FinderTest", () => {
   it("find by id with large number", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const result = await Topic.findBy({ id: 99999999 });
     expect(result).toBeNull();
@@ -922,7 +1255,10 @@ describe("FinderTest", () => {
   it("last on loaded relation should not use sql", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -936,9 +1272,12 @@ describe("FinderTest", () => {
   it("find by and where consistency with active record instance", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const created = await Topic.create({ title: "consistency" }) as any;
+    const created = (await Topic.create({ title: "consistency" })) as any;
     const found = await Topic.findBy({ id: created.id });
     expect(found).not.toBeNull();
     expect((found as any).id).toBe(created.id);
@@ -947,7 +1286,10 @@ describe("FinderTest", () => {
   it("any with scope on hash includes", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "any-test" });
     expect(await Topic.where({ title: "any-test" }).isAny()).toBe(true);
@@ -956,7 +1298,10 @@ describe("FinderTest", () => {
   it("symbols table ref", () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Topic.where({ title: "test" }).toSql();
     expect(sql).toContain("topics");
@@ -965,7 +1310,10 @@ describe("FinderTest", () => {
   it("find with group and sanitized having method", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "group-test" });
     const sql = Topic.group("title").having("COUNT(*) > 0").toSql();
@@ -976,7 +1324,10 @@ describe("FinderTest", () => {
   it("find by association subquery", () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const subq = Topic.where({ title: "x" }).select("id");
     const sql = Topic.where({ id: subq }).toSql();
@@ -992,7 +1343,12 @@ describe("FinderTest2", () => {
   beforeEach(() => {
     const adp = createTestAdapter();
     class PostClass extends Base {
-      static { this.tableName = "posts"; this.adapter = adp; this.attribute("title", "string"); this.attribute("body", "string"); }
+      static {
+        this.tableName = "posts";
+        this.adapter = adp;
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
     }
     Post = PostClass;
   });
@@ -1188,7 +1544,10 @@ describe("FinderTest", () => {
   it("exists with loaded relation having updated owner record", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "hello" });
     const exists = await Post.where({ title: "hello" }).exists();
@@ -1198,7 +1557,10 @@ describe("FinderTest", () => {
   it("exists with distinct and offset and select", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -1209,7 +1571,10 @@ describe("FinderTest", () => {
   it("member on loaded relation with match", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "test" });
     const arr = await Post.all().toArray();
@@ -1220,7 +1585,10 @@ describe("FinderTest", () => {
   it("member on loaded relation without match", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "existing" });
     const arr = await Post.all().toArray();
@@ -1231,7 +1599,10 @@ describe("FinderTest", () => {
   it("find with nil inside set passed for attribute", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "hello" });
     const results = await Post.where({ title: ["hello", null] }).toArray();
@@ -1241,7 +1612,10 @@ describe("FinderTest", () => {
   it("find by bang on relation with large number", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ score: 1 });
     await expect(Post.findBy({ score: 9999999999 })).resolves.toBeNull();
@@ -1250,7 +1624,10 @@ describe("FinderTest", () => {
   it("find by on attribute that is a reserved word", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("status", "string"); this.adapter = adp; }
+      static {
+        this.attribute("status", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ status: "active" });
     const found = await Post.findBy({ status: "active" });
@@ -1260,7 +1637,10 @@ describe("FinderTest", () => {
   it("find by one attribute that is an alias", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "hello" });
     const found = await Post.findBy({ title: "hello" });
@@ -1270,22 +1650,30 @@ describe("FinderTest", () => {
   it("custom select takes precedence over original value", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "test", score: 5 });
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
   });
-
 });
 
 describe("FinderRespondToTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("should preserve normal respond to behavior on base", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Post.find).toBe("function");
     expect(typeof Post.where).toBe("function");
@@ -1293,29 +1681,44 @@ describe("FinderRespondToTest", () => {
 
   it("should preserve normal respond to behavior and respond to newly added method", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
-      static customMethod() { return "custom"; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+      static customMethod() {
+        return "custom";
+      }
     }
     expect(Post.customMethod()).toBe("custom");
   });
 
   it("should preserve normal respond to behavior and respond to standard object method", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(typeof Post.toString).toBe("function");
   });
 
   it("should respond to find by with bang", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
   });
 
   it("should respond to find by two attributes", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
     expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
@@ -1323,14 +1726,20 @@ describe("FinderRespondToTest", () => {
 
   it("should respond to find all by an aliased attribute", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
   });
 
   it("should not respond to find by invalid method syntax", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
   });
@@ -1338,10 +1747,16 @@ describe("FinderRespondToTest", () => {
 
 describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -1704,7 +2119,9 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "mcpk_ord_a" });
     const p2 = await Post.create({ title: "mcpk_ord_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).order("title").toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] })
+      .order("title")
+      .toArray();
     expect(results.length).toBe(2);
   });
   it("#find_by with composite primary key and query caching", async () => {
@@ -2004,7 +2421,9 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "b" });
     const p2 = await Post.create({ title: "a" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).order("title").toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] })
+      .order("title")
+      .toArray();
     expect(results.length).toBe(2);
   });
 
@@ -2013,7 +2432,10 @@ describe("FinderTest", () => {
     const p1 = await Post.create({ title: "c" });
     const p2 = await Post.create({ title: "b" });
     await Post.create({ title: "a" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).order("title").limit(1).toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] })
+      .order("title")
+      .limit(1)
+      .toArray();
     expect(results.length).toBe(1);
   });
 
@@ -2027,7 +2449,9 @@ describe("FinderTest", () => {
   it("find with ids where and limit", async () => {
     const { Post } = makeModel();
     for (let i = 0; i < 5; i++) await Post.create({ title: String(i) });
-    const results = await Post.where({ title: ["0", "1", "2"] }).limit(2).toArray();
+    const results = await Post.where({ title: ["0", "1", "2"] })
+      .limit(2)
+      .toArray();
     expect(results.length).toBe(2);
   });
 
@@ -2149,7 +2573,10 @@ describe("FinderTest", () => {
   it("member on unloaded relation with offset", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "mem_off" });
-    const exists = await Post.all().offset(0).where({ id: p.id } as any).exists();
+    const exists = await Post.all()
+      .offset(0)
+      .where({ id: p.id } as any)
+      .exists();
     expect(exists).toBe(true);
   });
 
@@ -2311,7 +2738,6 @@ describe("FinderTest", () => {
   });
 });
 
-
 describe("find_or_create_by / find_or_initialize_by", () => {
   it("findOrCreateBy returns existing record if found", async () => {
     const adapter = freshAdapter();
@@ -2387,10 +2813,14 @@ describe("find_or_create_by / find_or_initialize_by", () => {
 
 describe("sole() and take()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("sole() returns the only matching record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2401,7 +2831,9 @@ describe("sole() and take()", () => {
   });
 
   it("sole() raises RecordNotFound when zero records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2410,7 +2842,9 @@ describe("sole() and take()", () => {
   });
 
   it("sole() raises SoleRecordExceeded when multiple records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2421,7 +2855,9 @@ describe("sole() and take()", () => {
   });
 
   it("take() returns a record without ordering", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2433,7 +2869,9 @@ describe("sole() and take()", () => {
   });
 
   it("take(n) returns n records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2446,7 +2884,9 @@ describe("sole() and take()", () => {
   });
 
   it("takeBang() raises when no records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.adapter = adapter;
 
@@ -2456,10 +2896,14 @@ describe("sole() and take()", () => {
 
 describe("findSoleBy()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("returns the sole matching record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2470,7 +2914,9 @@ describe("findSoleBy()", () => {
   });
 
   it("raises SoleRecordExceeded when multiple match", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2483,10 +2929,14 @@ describe("findSoleBy()", () => {
 
 describe("exists?(conditions)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("accepts conditions hash", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2497,7 +2947,9 @@ describe("exists?(conditions)", () => {
   });
 
   it("accepts primary key value", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2510,10 +2962,14 @@ describe("exists?(conditions)", () => {
 
 describe("positional finders", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("second() returns the second record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2527,7 +2983,9 @@ describe("positional finders", () => {
   });
 
   it("third() returns the third record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2540,7 +2998,9 @@ describe("positional finders", () => {
   });
 
   it("fourth() and fifth() return correct records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2555,7 +3015,9 @@ describe("positional finders", () => {
   });
 
   it("secondToLast() returns the second-to-last record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2568,7 +3030,9 @@ describe("positional finders", () => {
   });
 
   it("thirdToLast() returns the third-to-last record", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2582,7 +3046,9 @@ describe("positional finders", () => {
   });
 
   it("returns null when not enough records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2593,7 +3059,9 @@ describe("positional finders", () => {
   });
 
   it("static second() delegates to Relation", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -2608,7 +3076,9 @@ describe("positional finders", () => {
 describe("createOrFindBy", () => {
   it("creates a new record when none exists", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -2620,7 +3090,9 @@ describe("createOrFindBy", () => {
 
   it("finds existing record when create fails", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -2635,7 +3107,9 @@ describe("createOrFindBy", () => {
 describe("findBySql", () => {
   it("returns model instances from raw SQL", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -2654,7 +3128,9 @@ describe("findBySql", () => {
 describe("find with variadic args", () => {
   it("finds multiple records with variadic ids", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -2899,7 +3375,10 @@ describe("Finders (Rails-guided)", () => {
   });
 
   it("findOrInitializeBy returns unsaved when not found", async () => {
-    const initialized = await User.findOrInitializeBy({ name: "NewUser" }, { email: "new@test.com" });
+    const initialized = await User.findOrInitializeBy(
+      { name: "NewUser" },
+      { email: "new@test.com" },
+    );
     expect(initialized.isNewRecord()).toBe(true);
     expect(initialized.readAttribute("name")).toBe("NewUser");
   });
@@ -2937,7 +3416,6 @@ describe("Finders (Rails-guided)", () => {
     expect(result).toEqual(["Alice", 25]);
   });
 });
-
 
 describe("Finders (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -3009,10 +3487,7 @@ describe("find_or_create_by (Rails-guided)", () => {
   });
 
   it("find_or_create_by creates when not found", async () => {
-    const created = await Bird.findOrCreateBy(
-      { name: "Eagle" },
-      { color: "brown" }
-    );
+    const created = await Bird.findOrCreateBy({ name: "Eagle" }, { color: "brown" });
     expect(created.isPersisted()).toBe(true);
     expect(created.readAttribute("name")).toBe("Eagle");
     expect(created.readAttribute("color")).toBe("brown");
@@ -3025,10 +3500,7 @@ describe("find_or_create_by (Rails-guided)", () => {
   });
 
   it("find_or_initialize_by initializes when not found", async () => {
-    const bird = await Bird.findOrInitializeBy(
-      { name: "Falcon" },
-      { color: "grey" }
-    );
+    const bird = await Bird.findOrInitializeBy({ name: "Falcon" }, { color: "grey" });
     expect(bird.isNewRecord()).toBe(true);
     expect(bird.readAttribute("name")).toBe("Falcon");
     expect(bird.readAttribute("color")).toBe("grey");
@@ -3113,11 +3585,17 @@ describe("Finders edge cases (Rails-guided)", () => {
 
 describe("Base.findByAttribute", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("finds a record by a single attribute", async () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -3128,7 +3606,11 @@ describe("Base.findByAttribute", () => {
 
   it("returns null when not found", async () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const found = await User.findByAttribute("name", "Nobody");
     expect(found).toBeNull();
@@ -3137,11 +3619,18 @@ describe("Base.findByAttribute", () => {
 
 describe("Base.respondToMissingFinder", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("returns true for valid dynamic finders", () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     expect(User.respondToMissingFinder("findByName")).toBe(true);
     expect(User.respondToMissingFinder("findByEmail")).toBe(true);
@@ -3149,7 +3638,11 @@ describe("Base.respondToMissingFinder", () => {
 
   it("returns false for invalid dynamic finders", () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(User.respondToMissingFinder("findByFoo")).toBe(false);
     expect(User.respondToMissingFinder("something")).toBe(false);
@@ -3158,28 +3651,36 @@ describe("Base.respondToMissingFinder", () => {
 
 describe("Rails-guided: first/last with count", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("first(n) returns array of n records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "A" });
     await User.create({ name: "B" });
     await User.create({ name: "C" });
-    const result = await User.all().first(2) as Base[];
+    const result = (await User.all().first(2)) as Base[];
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(2);
   });
 
   it("last(n) returns last n records in original order", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "A" });
     await User.create({ name: "B" });
     await User.create({ name: "C" });
-    const result = await User.all().last(2) as Base[];
+    const result = (await User.all().last(2)) as Base[];
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(2);
   });
@@ -3187,7 +3688,9 @@ describe("Rails-guided: first/last with count", () => {
 
 describe("Base (extended) - finders", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("find with multiple IDs", async () => {
     class User extends Base {

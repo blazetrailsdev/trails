@@ -13,7 +13,11 @@ describe("Rack::ContentLength", () => {
   });
 
   it("not set content-length on variable length bodies", async () => {
-    const body = { *[Symbol.iterator]() { yield "Hello World!"; } };
+    const body = {
+      *[Symbol.iterator]() {
+        yield "Hello World!";
+      },
+    };
     const app = async () => [200, { "content-type": "text/plain" }, body] as any;
     const cl = new ContentLength(app);
     const [, headers] = await cl.call(request());
@@ -21,7 +25,8 @@ describe("Rack::ContentLength", () => {
   });
 
   it("not change content-length if it is already set", async () => {
-    const app = async () => [200, { "content-type": "text/plain", "content-length": "1" }, "Hello, World!"] as any;
+    const app = async () =>
+      [200, { "content-type": "text/plain", "content-length": "1" }, "Hello, World!"] as any;
     const cl = new ContentLength(app);
     const [, headers] = await cl.call(request());
     expect(headers["content-length"]).toBe("1");
@@ -35,7 +40,8 @@ describe("Rack::ContentLength", () => {
   });
 
   it("not set content-length when transfer-encoding is chunked", async () => {
-    const app = async () => [200, { "content-type": "text/plain", "transfer-encoding": "chunked" }, []] as any;
+    const app = async () =>
+      [200, { "content-type": "text/plain", "transfer-encoding": "chunked" }, []] as any;
     const cl = new ContentLength(app);
     const [, headers] = await cl.call(request());
     expect(headers["content-length"]).toBeUndefined();
@@ -44,7 +50,9 @@ describe("Rack::ContentLength", () => {
   it("close bodies that need to be closed", async () => {
     let closed = false;
     const body = ["one", "two", "three"];
-    (body as any).close = () => { closed = true; };
+    (body as any).close = () => {
+      closed = true;
+    };
     const app = async () => [200, { "content-type": "text/plain" }, body] as any;
     const cl = new ContentLength(app);
     await cl.call(request());

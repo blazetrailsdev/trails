@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,18 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makePost() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.attribute("created_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.attribute("created_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     return Post;
   }
@@ -102,7 +149,7 @@ describe("TimestampTest", () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
     const orig = post.readAttribute("updated_at");
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     await post.touch("updated_at");
     const newVal = post.readAttribute("updated_at");
     // Touch should set updated_at
@@ -125,7 +172,10 @@ describe("TimestampTest", () => {
 
   it("touching a record without timestamps is unexceptional", async () => {
     class Simple extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const s = await Simple.create({ name: "x" });
     expect(async () => await s.touch()).not.toThrow();
@@ -187,7 +237,11 @@ describe("TimestampTest", () => {
 
   it("saving a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
     class Author extends Base {
-      static { this.attribute("name", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const author = await Author.create({ name: "Alice" });
     expect(author.id).toBeDefined();
@@ -302,16 +356,20 @@ describe("TimestampsWithoutTransactionTest", () => {
   it("do not write timestamps on save if they are not attributes", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // No created_at/updated_at defined, save should work without error
     const p = await Post.create({ title: "no timestamps" });
     expect(p.isPersisted()).toBe(true);
     expect(p.readAttribute("created_at") ?? undefined).toBeUndefined();
   });
-  it.skip("index is created for both timestamps", () => { /* fixture-dependent */ });
+  it.skip("index is created for both timestamps", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("Timestamps", () => {
   it("auto-sets created_at and updated_at on insert", async () => {
@@ -458,7 +516,9 @@ describe("touch", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
-        this.beforeSave(() => { log.push("before_save"); });
+        this.beforeSave(() => {
+          log.push("before_save");
+        });
       }
     }
 
@@ -527,10 +587,14 @@ describe("touch edge cases", () => {
 
 describe("touchAll()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("updates timestamps on all matching records", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("updated_at", "datetime");
     Item.adapter = adapter;
@@ -546,14 +610,21 @@ describe("touchAll()", () => {
 describe("recordTimestamps", () => {
   it("defaults to true", () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.adapter = freshAdapter(); }
+      static {
+        this.attribute("id", "integer");
+        this.adapter = freshAdapter();
+      }
     }
     expect(User.recordTimestamps).toBe(true);
   });
 
   it("can be disabled", () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.adapter = freshAdapter(); this.recordTimestamps = false; }
+      static {
+        this.attribute("id", "integer");
+        this.adapter = freshAdapter();
+        this.recordTimestamps = false;
+      }
     }
     expect(User.recordTimestamps).toBe(false);
   });
@@ -562,7 +633,10 @@ describe("recordTimestamps", () => {
 describe("noTouching()", () => {
   it("suppresses touching during the block", async () => {
     class User extends Base {
-      static { this.attribute("id", "integer"); this.adapter = freshAdapter(); }
+      static {
+        this.attribute("id", "integer");
+        this.adapter = freshAdapter();
+      }
     }
     expect(User.isTouchingSuppressed).toBe(false);
     await User.noTouching(async () => {
@@ -574,7 +648,9 @@ describe("noTouching()", () => {
 
 describe("Timestamps (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("sets created_at and updated_at on create", async () => {
     class Post extends Base {
@@ -671,7 +747,9 @@ describe("Timestamps (Rails-guided)", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
-        this.beforeSave(() => { log.push("before_save"); });
+        this.beforeSave(() => {
+          log.push("before_save");
+        });
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -708,11 +786,16 @@ describe("Timestamps (Rails-guided)", () => {
 
 describe("Touch All (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("touchAll updates timestamps on all records", async () => {
     class Item extends Base {
-      static { this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     await Item.create({});
     await Item.create({});
@@ -720,7 +803,6 @@ describe("Touch All (Rails-guided)", () => {
     expect(affected).toBe(2);
   });
 });
-
 
 describe("Timestamps (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -788,12 +870,24 @@ describe("Touch on belongs_to (Rails-guided)", () => {
   // Rails: test "touch parent on save"
   it("touches the parent record when child is saved", async () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     registerModel(Post);
 
     class Comment extends Base {
-      static { this._tableName = "comments"; this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     Associations.belongsTo.call(Comment, "post", { touch: true });
     registerModel(Comment);

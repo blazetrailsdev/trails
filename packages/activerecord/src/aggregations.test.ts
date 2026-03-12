@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -39,17 +79,32 @@ describe("AggregationsTest", () => {
   // Rails: test_find_multiple_value_object
   it("find multiple value object", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
     class Customer extends Base {
-      static { this.attribute("name", "string"); this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
-    const c = await Customer.create({ name: "Alice", address_street: "123 Main", address_city: "NYC" });
+    const c = await Customer.create({
+      name: "Alice",
+      address_street: "123 Main",
+      address_city: "NYC",
+    });
     const addr = (c as any).address;
     expect(addr).toBeInstanceOf(Address);
     expect(addr.street).toBe("123 Main");
@@ -59,14 +114,25 @@ describe("AggregationsTest", () => {
   // Rails: test_change_single_value_object
   it("change single value object", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
     class Customer extends Base {
-      static { this.attribute("name", "string"); this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
     const c = await Customer.create({ name: "Bob", address_street: "Old St", address_city: "LA" });
@@ -78,17 +144,32 @@ describe("AggregationsTest", () => {
   // Rails: test_nil_assignment_results_in_nil
   it("nil assignment results in nil", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
     class Customer extends Base {
-      static { this.attribute("name", "string"); this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
-    const c = await Customer.create({ name: "Carol", address_street: "123 Elm", address_city: "PDX" });
+    const c = await Customer.create({
+      name: "Carol",
+      address_street: "123 Elm",
+      address_city: "PDX",
+    });
     (c as any).address = null;
     expect(c.readAttribute("address_street")).toBeNull();
     expect(c.readAttribute("address_city")).toBeNull();
@@ -98,14 +179,25 @@ describe("AggregationsTest", () => {
   // Rails: test_allow_nil_address_set_to_nil
   it("allow nil address set to nil", async () => {
     class GeoPoint {
-      constructor(public lat: number, public lng: number) {}
+      constructor(
+        public lat: number,
+        public lng: number,
+      ) {}
     }
     class Location extends Base {
-      static { this.attribute("name", "string"); this.attribute("lat", "float"); this.attribute("lng", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("lat", "float");
+        this.attribute("lng", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Location, "gps", {
       className: GeoPoint,
-      mapping: [["lat", "lat"], ["lng", "lng"]],
+      mapping: [
+        ["lat", "lat"],
+        ["lng", "lng"],
+      ],
     });
 
     const loc = await Location.create({ name: "HQ", lat: 37.7, lng: -122.4 });
@@ -117,14 +209,25 @@ describe("AggregationsTest", () => {
   // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
   it("allow nil address loaded when only some attributes are nil", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
     class Customer extends Base {
-      static { this.attribute("name", "string"); this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
     const c = new Customer({ name: "Dan", address_street: "123 Oak", address_city: null } as any);
@@ -135,14 +238,25 @@ describe("AggregationsTest", () => {
   // Rails: test_custom_converter
   it("custom converter", async () => {
     class Money {
-      constructor(public amount: number, public currency: string) {}
+      constructor(
+        public amount: number,
+        public currency: string,
+      ) {}
     }
     class Order extends Base {
-      static { this.attribute("label", "string"); this.attribute("price_amount", "float"); this.attribute("price_currency", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.attribute("price_amount", "float");
+        this.attribute("price_currency", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Order, "price", {
       className: Money,
-      mapping: [["price_amount", "amount"], ["price_currency", "currency"]],
+      mapping: [
+        ["price_amount", "amount"],
+        ["price_currency", "currency"],
+      ],
       converter: (v: unknown) => {
         if (typeof v === "number") return new Money(v, "USD");
         return v;
@@ -164,10 +278,16 @@ describe("AggregationsTest", () => {
   it("custom constructor", async () => {
     class Temperature {
       degrees: number;
-      constructor(degrees: number) { this.degrees = degrees; }
+      constructor(degrees: number) {
+        this.degrees = degrees;
+      }
     }
     class Reading extends Base {
-      static { this.attribute("label", "string"); this.attribute("temp_degrees", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.attribute("temp_degrees", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Reading, "temperature", {
       className: Temperature,
@@ -183,14 +303,25 @@ describe("AggregationsTest", () => {
   // Rails: test_hash_mapping
   it("hash mapping", async () => {
     class Coord {
-      constructor(public x: number, public y: number) {}
+      constructor(
+        public x: number,
+        public y: number,
+      ) {}
     }
     class Shape extends Base {
-      static { this.attribute("name", "string"); this.attribute("coord_x", "float"); this.attribute("coord_y", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("coord_x", "float");
+        this.attribute("coord_y", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Shape, "origin", {
       className: Coord,
-      mapping: [["coord_x", "x"], ["coord_y", "y"]],
+      mapping: [
+        ["coord_x", "x"],
+        ["coord_y", "y"],
+      ],
     });
 
     const s = await Shape.create({ name: "Square", coord_x: 1.0, coord_y: 2.0 });
@@ -202,14 +333,25 @@ describe("AggregationsTest", () => {
   // Rails: test_value_object_with_hash_mapping_assignment_changes_model_attributes
   it("value object with hash mapping assignment changes model attributes", async () => {
     class Coord {
-      constructor(public x: number, public y: number) {}
+      constructor(
+        public x: number,
+        public y: number,
+      ) {}
     }
     class Shape extends Base {
-      static { this.attribute("name", "string"); this.attribute("coord_x", "float"); this.attribute("coord_y", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("coord_x", "float");
+        this.attribute("coord_y", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Shape, "origin", {
       className: Coord,
-      mapping: [["coord_x", "x"], ["coord_y", "y"]],
+      mapping: [
+        ["coord_x", "x"],
+        ["coord_y", "y"],
+      ],
     });
 
     const s = await Shape.create({ name: "Circle", coord_x: 0.0, coord_y: 0.0 });
@@ -221,17 +363,28 @@ describe("AggregationsTest", () => {
   // Rails: test_gps_equality
   it("gps equality", async () => {
     class GpsCoord {
-      constructor(public latitude: number, public longitude: number) {}
+      constructor(
+        public latitude: number,
+        public longitude: number,
+      ) {}
       equals(other: GpsCoord) {
         return this.latitude === other.latitude && this.longitude === other.longitude;
       }
     }
     class Waypoint extends Base {
-      static { this.attribute("name", "string"); this.attribute("latitude", "float"); this.attribute("longitude", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("latitude", "float");
+        this.attribute("longitude", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Waypoint, "gps", {
       className: GpsCoord,
-      mapping: [["latitude", "latitude"], ["longitude", "longitude"]],
+      mapping: [
+        ["latitude", "latitude"],
+        ["longitude", "longitude"],
+      ],
     });
 
     const w = await Waypoint.create({ name: "HQ", latitude: 37.7, longitude: -122.4 });
@@ -243,17 +396,28 @@ describe("AggregationsTest", () => {
   // Rails: test_gps_inequality
   it("gps inequality", async () => {
     class GpsCoord {
-      constructor(public latitude: number, public longitude: number) {}
+      constructor(
+        public latitude: number,
+        public longitude: number,
+      ) {}
       equals(other: GpsCoord) {
         return this.latitude === other.latitude && this.longitude === other.longitude;
       }
     }
     class Waypoint extends Base {
-      static { this.attribute("name", "string"); this.attribute("latitude", "float"); this.attribute("longitude", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("latitude", "float");
+        this.attribute("longitude", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Waypoint, "gps", {
       className: GpsCoord,
-      mapping: [["latitude", "latitude"], ["longitude", "longitude"]],
+      mapping: [
+        ["latitude", "latitude"],
+        ["longitude", "longitude"],
+      ],
     });
 
     const w1 = await Waypoint.create({ name: "A", latitude: 37.7, longitude: -122.4 });
@@ -267,7 +431,11 @@ describe("AggregationsTest", () => {
       constructor(public readonly name: string) {}
     }
     class Article extends Base {
-      static { this.attribute("title", "string"); this.attribute("tag_name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("tag_name", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Article, "tag", {
       className: Tag,
@@ -283,17 +451,32 @@ describe("AggregationsTest", () => {
   // Rails: test_reloaded_instance_refreshes_aggregations
   it("reloaded instance refreshes aggregations", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
     class Customer extends Base {
-      static { this.attribute("name", "string"); this.attribute("address_street", "string"); this.attribute("address_city", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
-    const c = await Customer.create({ name: "Eve", address_street: "1 First St", address_city: "BOS" });
+    const c = await Customer.create({
+      name: "Eve",
+      address_street: "1 First St",
+      address_city: "BOS",
+    });
     const addr1 = (c as any).address;
     expect(addr1.city).toBe("BOS");
 
@@ -308,7 +491,11 @@ describe("AggregationsTest", () => {
       constructor(public amount: number) {}
     }
     class Account extends Base {
-      static { this.attribute("name", "string"); this.attribute("balance_amount", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("balance_amount", "float");
+        this.adapter = adapter;
+      }
     }
     composedOf(Account, "balance", {
       className: Balance,
@@ -363,9 +550,10 @@ describe("AggregationsTest", () => {
 });
 
 describe("OverridingAggregationsTest", () => {
-  it.skip("composed of aggregation redefinition reflections should differ and not inherited", () => { /* fixture-dependent */ });
+  it.skip("composed of aggregation redefinition reflections should differ and not inherited", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("Aggregations", () => {
   it("should sum field", async () => {
@@ -576,21 +764,31 @@ describe("Aggregation edge cases", () => {
 
 describe("composed_of", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("composes value objects from multiple attributes", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
 
-    class Customer extends Base { static _tableName = "customers"; }
+    class Customer extends Base {
+      static _tableName = "customers";
+    }
     Customer.attribute("id", "integer");
     Customer.attribute("address_street", "string");
     Customer.attribute("address_city", "string");
     Customer.adapter = adapter;
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
     const c = await Customer.create({ address_street: "123 Main", address_city: "NYC" });
@@ -602,17 +800,25 @@ describe("composed_of", () => {
 
   it("decomposes value object on assignment", async () => {
     class Address {
-      constructor(public street: string, public city: string) {}
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
     }
 
-    class Customer extends Base { static _tableName = "customers"; }
+    class Customer extends Base {
+      static _tableName = "customers";
+    }
     Customer.attribute("id", "integer");
     Customer.attribute("address_street", "string");
     Customer.attribute("address_city", "string");
     Customer.adapter = adapter;
     composedOf(Customer, "address", {
       className: Address,
-      mapping: [["address_street", "street"], ["address_city", "city"]],
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
     });
 
     const c = await Customer.create({ address_street: "old", address_city: "old" });
@@ -622,7 +828,6 @@ describe("composed_of", () => {
     expect(c.readAttribute("address_city")).toBe("SF");
   });
 });
-
 
 describe("composed_of (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -634,15 +839,27 @@ describe("composed_of (Rails-guided)", () => {
   // Rails: test "reading a composed-of attribute"
   it("reads a value object composed from multiple columns", async () => {
     class Money {
-      constructor(public amount: number, public currency: string) {}
+      constructor(
+        public amount: number,
+        public currency: string,
+      ) {}
     }
 
     class Product extends Base {
-      static { this._tableName = "products"; this.attribute("id", "integer"); this.attribute("price_amount", "integer"); this.attribute("price_currency", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "products";
+        this.attribute("id", "integer");
+        this.attribute("price_amount", "integer");
+        this.attribute("price_currency", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Product, "price", {
       className: Money,
-      mapping: [["price_amount", "amount"], ["price_currency", "currency"]],
+      mapping: [
+        ["price_amount", "amount"],
+        ["price_currency", "currency"],
+      ],
     });
 
     const p = await Product.create({ price_amount: 1999, price_currency: "USD" });
@@ -655,15 +872,27 @@ describe("composed_of (Rails-guided)", () => {
   // Rails: test "writing a composed-of attribute"
   it("decomposes value object into mapped columns on write", async () => {
     class Money {
-      constructor(public amount: number, public currency: string) {}
+      constructor(
+        public amount: number,
+        public currency: string,
+      ) {}
     }
 
     class Product extends Base {
-      static { this._tableName = "products"; this.attribute("id", "integer"); this.attribute("price_amount", "integer"); this.attribute("price_currency", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "products";
+        this.attribute("id", "integer");
+        this.attribute("price_amount", "integer");
+        this.attribute("price_currency", "string");
+        this.adapter = adapter;
+      }
     }
     composedOf(Product, "price", {
       className: Money,
-      mapping: [["price_amount", "amount"], ["price_currency", "currency"]],
+      mapping: [
+        ["price_amount", "amount"],
+        ["price_currency", "currency"],
+      ],
     });
 
     const p = await Product.create({ price_amount: 0, price_currency: "EUR" });
@@ -676,15 +905,26 @@ describe("composed_of (Rails-guided)", () => {
   // Rails: test "composed_of returns null when all columns are null"
   it("returns null when all mapped columns are null", () => {
     class Money {
-      constructor(public amount: number, public currency: string) {}
+      constructor(
+        public amount: number,
+        public currency: string,
+      ) {}
     }
 
     class Product extends Base {
-      static { this._tableName = "products"; this.attribute("id", "integer"); this.attribute("price_amount", "integer"); this.attribute("price_currency", "string"); }
+      static {
+        this._tableName = "products";
+        this.attribute("id", "integer");
+        this.attribute("price_amount", "integer");
+        this.attribute("price_currency", "string");
+      }
     }
     composedOf(Product, "price", {
       className: Money,
-      mapping: [["price_amount", "amount"], ["price_currency", "currency"]],
+      mapping: [
+        ["price_amount", "amount"],
+        ["price_currency", "currency"],
+      ],
     });
 
     const p = new Product({});

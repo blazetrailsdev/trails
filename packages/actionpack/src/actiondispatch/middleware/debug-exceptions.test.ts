@@ -55,7 +55,7 @@ describe("DebugExceptionsTest", () => {
   it("rescue with text error for xhr request", async () => {
     const mw = new DebugExceptions(errorApp);
     const [status, headers, body] = await mw.call(
-      makeEnv({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" })
+      makeEnv({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }),
     );
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("text/plain");
@@ -65,9 +65,7 @@ describe("DebugExceptionsTest", () => {
 
   it("rescue with JSON error for JSON API request", async () => {
     const mw = new DebugExceptions(errorApp);
-    const [status, headers, body] = await mw.call(
-      makeEnv({ HTTP_ACCEPT: "application/json" })
-    );
+    const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
     const json = JSON.parse(await bodyToString(body));
@@ -78,9 +76,7 @@ describe("DebugExceptionsTest", () => {
 
   it("rescue with HTML format for HTML API request", async () => {
     const mw = new DebugExceptions(errorApp);
-    const [status, headers, body] = await mw.call(
-      makeEnv({ HTTP_ACCEPT: "text/html" })
-    );
+    const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "text/html" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("text/html");
     const html = await bodyToString(body);
@@ -89,9 +85,7 @@ describe("DebugExceptionsTest", () => {
 
   it("rescue with XML format for XML API requests", async () => {
     const mw = new DebugExceptions(errorApp);
-    const [status, headers, body] = await mw.call(
-      makeEnv({ HTTP_ACCEPT: "application/xml" })
-    );
+    const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/xml" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/xml");
     const xml = await bodyToString(body);
@@ -101,9 +95,7 @@ describe("DebugExceptionsTest", () => {
 
   it("rescue with JSON format as fallback if API request format is not supported", async () => {
     const mw = new DebugExceptions(errorApp);
-    const [status, headers] = await mw.call(
-      makeEnv({ CONTENT_TYPE: "application/json" })
-    );
+    const [status, headers] = await mw.call(makeEnv({ CONTENT_TYPE: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
   });
@@ -202,7 +194,11 @@ describe("DebugExceptionsTest", () => {
   it("invoke interceptors before rendering", async () => {
     let intercepted = false;
     const mw = new DebugExceptions(errorApp, {
-      interceptors: [() => { intercepted = true; }],
+      interceptors: [
+        () => {
+          intercepted = true;
+        },
+      ],
     });
     await mw.call(makeEnv());
     expect(intercepted).toBe(true);
@@ -211,7 +207,9 @@ describe("DebugExceptionsTest", () => {
   it("bad interceptors doesnt debug exceptions", async () => {
     const mw = new DebugExceptions(errorApp, {
       interceptors: [
-        () => { throw new Error("interceptor broke"); },
+        () => {
+          throw new Error("interceptor broke");
+        },
       ],
     });
     // Should not throw despite bad interceptor
@@ -221,9 +219,7 @@ describe("DebugExceptionsTest", () => {
 
   it("show the controller name in the diagnostics template when controller name is present", async () => {
     const mw = new DebugExceptions(errorApp);
-    const [, , body] = await mw.call(
-      makeEnv({ "action_dispatch.controller": "UsersController" })
-    );
+    const [, , body] = await mw.call(makeEnv({ "action_dispatch.controller": "UsersController" }));
     const html = await bodyToString(body);
     expect(html).toContain("UsersController");
   });

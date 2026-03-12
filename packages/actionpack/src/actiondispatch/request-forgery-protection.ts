@@ -87,7 +87,11 @@ export class RequestForgeryProtection {
   }
 
   /** Generate a per-form token for a specific action and method. */
-  generatePerFormToken(session: Record<string, unknown>, actionPath: string, method: string): string {
+  generatePerFormToken(
+    session: Record<string, unknown>,
+    actionPath: string,
+    method: string,
+  ): string {
     const realToken = this.getRealToken(session);
     const normalizedPath = this.normalizePath(actionPath);
     const normalizedMethod = method.toUpperCase();
@@ -121,7 +125,7 @@ export class RequestForgeryProtection {
   verifyToken(
     session: Record<string, unknown>,
     submittedToken: string | null | undefined,
-    options?: { actionPath?: string; method?: string }
+    options?: { actionPath?: string; method?: string },
   ): boolean {
     if (!submittedToken || submittedToken.length === 0) return false;
 
@@ -216,9 +220,7 @@ export class RequestForgeryProtection {
     if (!this.verifyToken(session, token, { actionPath, method })) {
       return {
         verified: false,
-        warning: this.logging
-          ? "Can't verify CSRF token authenticity."
-          : undefined,
+        warning: this.logging ? "Can't verify CSRF token authenticity." : undefined,
       };
     }
 

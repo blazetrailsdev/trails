@@ -53,9 +53,7 @@ function rubyFileToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   // Default: snake_case → kebab-case
-  return rubyFile
-    .replace(/_test\.rb$/, ".test.ts")
-    .replace(/_/g, "-");
+  return rubyFile.replace(/_test\.rb$/, ".test.ts").replace(/_/g, "-");
 }
 
 /**
@@ -69,12 +67,22 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "associations/belongs_to_associations_test.rb": ["belongs-to.test.ts"],
     "associations/has_many_associations_test.rb": ["has-many.test.ts"],
     "associations/has_one_associations_test.rb": ["has-one-habtm.test.ts", "has-one-async.test.ts"],
-    "associations/has_many_through_associations_test.rb": ["has-many-through.test.ts", "eager-hmthrough.test.ts"],
+    "associations/has_many_through_associations_test.rb": [
+      "has-many-through.test.ts",
+      "eager-hmthrough.test.ts",
+    ],
     "associations/has_one_through_associations_test.rb": ["has-one-habtm.test.ts"],
-    "associations/has_and_belongs_to_many_associations_test.rb": ["has-one-habtm.test.ts", "habtm.test.ts"],
+    "associations/has_and_belongs_to_many_associations_test.rb": [
+      "has-one-habtm.test.ts",
+      "habtm.test.ts",
+    ],
     "associations/inverse_associations_test.rb": [
-      "inverse.test.ts", "inverse-has-many.test.ts", "inverse-has-one.test.ts",
-      "inverse-belongs-to.test.ts", "inverse-automatic.test.ts", "inverse-polymorphic-belongs-to.test.ts",
+      "inverse.test.ts",
+      "inverse-has-many.test.ts",
+      "inverse-has-one.test.ts",
+      "inverse-belongs-to.test.ts",
+      "inverse-automatic.test.ts",
+      "inverse-polymorphic-belongs-to.test.ts",
     ],
     "associations/join_model_test.rb": ["has-one-habtm.test.ts"],
     "associations/nested_through_associations_test.rb": ["has-one-habtm.test.ts"],
@@ -106,13 +114,26 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
 
     // Associations misc
     "associations/required_test.rb": ["required.test.ts"],
-    "associations_test.rb": ["associations.test.ts", "proxy.test.ts", "overriding.test.ts", "generated-methods.test.ts"],
+    "associations_test.rb": [
+      "associations.test.ts",
+      "proxy.test.ts",
+      "overriding.test.ts",
+      "generated-methods.test.ts",
+    ],
 
     // Other non-standard mappings
     "active_record_schema_test.rb": ["schema.test.ts"],
     "annotate_test.rb": ["annotations.test.ts"],
     "attributes_test.rb": ["custom-properties.test.ts"],
-    "base_test.rb": ["base.test.ts", "core.test.ts", "persistence.test.ts", "finder.test.ts", "calculations.test.ts", "attribute-methods.test.ts", "enum.test.ts"],
+    "base_test.rb": [
+      "base.test.ts",
+      "core.test.ts",
+      "persistence.test.ts",
+      "finder.test.ts",
+      "calculations.test.ts",
+      "attribute-methods.test.ts",
+      "enum.test.ts",
+    ],
     "calculations_test.rb": ["calculations.test.ts", "calculations-finder-basics.test.ts"],
     "finder_respond_to_test.rb": ["finder.test.ts"],
     "habtm_destroy_order_test.rb": ["habtm.test.ts"],
@@ -124,8 +145,15 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "nested_attributes_with_callbacks_test.rb": ["nested-attributes.test.ts"],
     "persistence/reload_association_cache_test.rb": ["reload-cache.test.ts"],
     "reflection_test.rb": ["reflection.test.ts", "reflection-migration.test.ts"],
-    "relation/delegation_test.rb": ["querying-methods-delegation.test.ts", "delegation-caching.test.ts"],
-    "scoping/relation_scoping_test.rb": ["relation-scoping.test.ts", "has-many-scoping.test.ts", "habtm-scoping.test.ts"],
+    "relation/delegation_test.rb": [
+      "querying-methods-delegation.test.ts",
+      "delegation-caching.test.ts",
+    ],
+    "scoping/relation_scoping_test.rb": [
+      "relation-scoping.test.ts",
+      "has-many-scoping.test.ts",
+      "habtm-scoping.test.ts",
+    ],
 
     // Associations callback test lives in associations/callbacks.test.ts not top-level callbacks.test.ts
     "associations/callbacks_test.rb": ["callbacks.test.ts"],
@@ -195,7 +223,9 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "adapters/abstract_mysql_adapter/case_sensitivity_test.rb": ["mysql-adapter.test.ts"],
     "adapters/abstract_mysql_adapter/charset_collation_test.rb": ["mysql-adapter.test.ts"],
     "adapters/abstract_mysql_adapter/connection_test.rb": ["mysql-adapter.test.ts"],
-    "adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb": ["mysql-adapter.test.ts"],
+    "adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb": [
+      "mysql-adapter.test.ts",
+    ],
     "adapters/abstract_mysql_adapter/mysql_boolean_test.rb": ["mysql-adapter.test.ts"],
     "adapters/abstract_mysql_adapter/mysql_enum_test.rb": ["mysql-adapter.test.ts"],
     "adapters/abstract_mysql_adapter/mysql_explain_test.rb": ["mysql-adapter.test.ts"],
@@ -236,7 +266,9 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
   activesupport: {
     "inflector_test.rb": ["inflector.test.ts", "hwia-module-string.test.ts"],
     "core_ext/string_ext_test.rb": [
-      "string-ext.test.ts", "hwia-module-string.test.ts", "safe-buffer.test.ts",
+      "string-ext.test.ts",
+      "hwia-module-string.test.ts",
+      "safe-buffer.test.ts",
       "hwia-extended.test.ts",
     ],
   },
@@ -402,7 +434,8 @@ function main() {
     const pkgComparison = comparePackage(pkg, rubyPkg, tsLookup);
     result.packages[pkg] = pkgComparison;
 
-    result.summary.totalRubyTests += pkgComparison.matched + pkgComparison.stub + pkgComparison.skipped + pkgComparison.missing;
+    result.summary.totalRubyTests +=
+      pkgComparison.matched + pkgComparison.stub + pkgComparison.skipped + pkgComparison.missing;
     result.summary.matched += pkgComparison.matched;
     result.summary.stub += pkgComparison.stub;
     result.summary.skipped += pkgComparison.skipped;
@@ -410,12 +443,16 @@ function main() {
     result.summary.extra += pkgComparison.extra;
   }
 
-  result.summary.coveragePercent = result.summary.totalRubyTests > 0
-    ? Math.round((result.summary.matched / result.summary.totalRubyTests) * 1000) / 10
-    : 0;
+  result.summary.coveragePercent =
+    result.summary.totalRubyTests > 0
+      ? Math.round((result.summary.matched / result.summary.totalRubyTests) * 1000) / 10
+      : 0;
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(OUTPUT_DIR, "test-comparison-report.json"), JSON.stringify(result, null, 2));
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, "test-comparison-report.json"),
+    JSON.stringify(result, null, 2),
+  );
   fs.writeFileSync(path.join(OUTPUT_DIR, "test-comparison-report.md"), generateMarkdown(result));
 
   printSummary(result);
@@ -512,9 +549,7 @@ function comparePackage(
   }
 
   const totalRuby = totalMatched + totalStub + totalSkipped + totalMissing;
-  const coverage = totalRuby > 0
-    ? Math.round((totalMatched / totalRuby) * 1000) / 10
-    : 0;
+  const coverage = totalRuby > 0 ? Math.round((totalMatched / totalRuby) * 1000) / 10 : 0;
 
   return {
     package: pkg,
@@ -528,10 +563,7 @@ function comparePackage(
   };
 }
 
-function matchRubyTest(
-  rubyTest: TestCaseInfo,
-  tsTests: TsTestEntry[],
-): TestComparison {
+function matchRubyTest(rubyTest: TestCaseInfo, tsTests: TsTestEntry[]): TestComparison {
   // Check manual overrides first
   const overrideResult = TEST_OVERRIDES[rubyTest.path];
   if (overrideResult !== undefined) {
@@ -583,8 +615,7 @@ function matchRubyTest(
 
     if (
       confidence !== "none" &&
-      (bestConfidence === "none" ||
-        confidenceRank(confidence) > confidenceRank(bestConfidence))
+      (bestConfidence === "none" || confidenceRank(confidence) > confidenceRank(bestConfidence))
     ) {
       bestMatch = tsTest;
       bestConfidence = confidence;
@@ -613,10 +644,14 @@ function matchRubyTest(
 
 function confidenceRank(c: "exact" | "normalized" | "fuzzy" | "none"): number {
   switch (c) {
-    case "exact": return 3;
-    case "normalized": return 2;
-    case "fuzzy": return 1;
-    case "none": return 0;
+    case "exact":
+      return 3;
+    case "normalized":
+      return 2;
+    case "fuzzy":
+      return 1;
+    case "none":
+      return 0;
   }
 }
 
@@ -649,7 +684,9 @@ function generateMarkdown(result: TestComparisonResult): string {
   for (const [pkg, pkgComp] of Object.entries(result.packages)) {
     lines.push(`## ${pkg}`);
     lines.push("");
-    lines.push(`Coverage: ${pkgComp.coveragePercent}% real (${pkgComp.matched} matched, ${pkgComp.stub} stub, ${pkgComp.skipped} skipped, ${pkgComp.missing} missing, ${pkgComp.extra} extra)`);
+    lines.push(
+      `Coverage: ${pkgComp.coveragePercent}% real (${pkgComp.matched} matched, ${pkgComp.stub} stub, ${pkgComp.skipped} skipped, ${pkgComp.missing} missing, ${pkgComp.extra} extra)`,
+    );
     lines.push("");
 
     for (const fileComp of pkgComp.files) {
@@ -659,7 +696,9 @@ function generateMarkdown(result: TestComparisonResult): string {
       const coverage = total > 0 ? Math.round((fileComp.matched / total) * 100) : 0;
       lines.push(`### ${fileComp.rubyFile}`);
       lines.push(`TS target: ${fileComp.tsFile || "unmapped"}`);
-      lines.push(`Coverage: ${coverage}% real (${fileComp.matched} matched, ${fileComp.stub} stub, ${fileComp.skipped} skipped, ${fileComp.missing} missing)`);
+      lines.push(
+        `Coverage: ${coverage}% real (${fileComp.matched} matched, ${fileComp.stub} stub, ${fileComp.skipped} skipped, ${fileComp.missing} missing)`,
+      );
       lines.push("");
 
       const missing = fileComp.tests.filter((t) => t.status === "missing");
@@ -732,12 +771,14 @@ function printSummary(result: TestComparisonResult) {
 
   for (const [pkg, pkgComp] of Object.entries(result.packages)) {
     const total = pkgComp.matched + pkgComp.stub + pkgComp.skipped + pkgComp.missing;
-    console.log(`  ${pkg}: ${pkgComp.coveragePercent}% real (${pkgComp.matched} matched, ${pkgComp.stub} stub / ${total} total)`);
+    console.log(
+      `  ${pkg}: ${pkgComp.coveragePercent}% real (${pkgComp.matched} matched, ${pkgComp.stub} stub / ${total} total)`,
+    );
 
     // Per-file breakdown sorted by stub count (highest first)
     const filesWithTests = pkgComp.files
       .filter((f) => f.tests.length > 0)
-      .sort((a, b) => (b.stub + b.missing) - (a.stub + a.missing));
+      .sort((a, b) => b.stub + b.missing - (a.stub + a.missing));
 
     for (const f of filesWithTests) {
       const fTotal = f.matched + f.stub + f.skipped + f.missing;
@@ -748,7 +789,9 @@ function printSummary(result: TestComparisonResult) {
       if (f.missing > 0) parts.push(`${f.missing} miss`);
       if (f.skipped > 0) parts.push(`${f.skipped} null`);
       const status = f.matched === 0 && f.stub === 0 ? " ✗" : fPct === 100 ? " ✓" : "";
-      console.log(`    ${fPct.toString().padStart(3)}% ${f.rubyFile} (${parts.join(", ")})${status}`);
+      console.log(
+        `    ${fPct.toString().padStart(3)}% ${f.rubyFile} (${parts.join(", ")})${status}`,
+      );
     }
   }
 

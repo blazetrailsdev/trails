@@ -23,7 +23,9 @@ describe("NumberHelperTest", () => {
     expect(numberToCurrency(1234567890.5)).toBe("$1,234,567,890.50");
     expect(numberToCurrency(1234567890.506)).toBe("$1,234,567,890.51");
     expect(numberToCurrency("1234567890.50")).toBe("$1,234,567,890.50");
-    expect(numberToCurrency(1234567890.5, { unit: "Kroner", format: "%n %u" })).toBe("1,234,567,890.50 Kroner");
+    expect(numberToCurrency(1234567890.5, { unit: "Kroner", format: "%n %u" })).toBe(
+      "1,234,567,890.50 Kroner",
+    );
     expect(numberToCurrency(-1234567890.5)).toBe("($1,234,567,890.50)");
     expect(numberToCurrency(-1234567890.5, { format: "%u%n" })).toBe("$-1,234,567,890.50");
   });
@@ -51,7 +53,9 @@ describe("NumberHelperTest", () => {
     expect(numberWithDelimiter(12345678, { delimiter: "." })).toBe("12.345.678");
     expect(numberWithDelimiter(12345678, { delimiter: "," })).toBe("12,345,678");
     expect(numberWithDelimiter(12345678.05, { separator: "." })).toBe("12,345,678.05");
-    expect(numberWithDelimiter(12345678.05, { delimiter: ".", separator: "," })).toBe("12.345.678,05");
+    expect(numberWithDelimiter(12345678.05, { delimiter: ".", separator: "," })).toBe(
+      "12.345.678,05",
+    );
   });
 
   it("to rounded", () => {
@@ -67,7 +71,9 @@ describe("NumberHelperTest", () => {
 
   it("to rounded with custom delimiter and separator", () => {
     expect(numberToRounded(31.825, { precision: 2, separator: "," })).toBe("31,83");
-    expect(numberToRounded(1231.825, { precision: 2, separator: ",", delimiter: "." })).toBe("1.231,83");
+    expect(numberToRounded(1231.825, { precision: 2, separator: ",", delimiter: "." })).toBe(
+      "1.231,83",
+    );
   });
 
   it("to rounded with significant digits", () => {
@@ -80,8 +86,12 @@ describe("NumberHelperTest", () => {
   });
 
   it("to rounded with strip insignificant zeros", () => {
-    expect(numberToRounded(9775, { precision: 4, stripInsignificantZeros: true, significant: true })).toBe("9775");
-    expect(numberToRounded(111.2346, { precision: 7, stripInsignificantZeros: true })).toBe("111.2346");
+    expect(
+      numberToRounded(9775, { precision: 4, stripInsignificantZeros: true, significant: true }),
+    ).toBe("9775");
+    expect(numberToRounded(111.2346, { precision: 7, stripInsignificantZeros: true })).toBe(
+      "111.2346",
+    );
     expect(numberToRounded(13, { precision: 5, stripInsignificantZeros: true })).toBe("13");
   });
 
@@ -110,8 +120,12 @@ describe("NumberHelperTest", () => {
   it("number to human size with options hash", () => {
     expect(numberToHumanSize(1234567, { precision: 2 })).toBe("1.2 MB");
     // 123000 / 1024 = 120.117... KB
-    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe("120.1 KB");
-    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: false })).toBe("120.1 KB");
+    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe(
+      "120.1 KB",
+    );
+    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: false })).toBe(
+      "120.1 KB",
+    );
   });
 
   it("number to human size with custom delimiter and separator", () => {
@@ -198,7 +212,9 @@ describe("NumericExtFormattingTest", () => {
 
   it("to fs  rounded with custom delimiter and separator", () => {
     expect(numberToRounded(31.825, { precision: 2, separator: "," })).toBe("31,83");
-    expect(numberToRounded(1231.825, { precision: 2, separator: ",", delimiter: "." })).toBe("1.231,83");
+    expect(numberToRounded(1231.825, { precision: 2, separator: ",", delimiter: "." })).toBe(
+      "1.231,83",
+    );
   });
 
   it("to fs  rounded  with significant digits", () => {
@@ -207,8 +223,12 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs  rounded  with strip insignificant zeros", () => {
-    expect(numberToRounded(9775, { precision: 4, stripInsignificantZeros: true, significant: true })).toBe("9775");
-    expect(numberToRounded(111.2346, { precision: 7, stripInsignificantZeros: true })).toBe("111.2346");
+    expect(
+      numberToRounded(9775, { precision: 4, stripInsignificantZeros: true, significant: true }),
+    ).toBe("9775");
+    expect(numberToRounded(111.2346, { precision: 7, stripInsignificantZeros: true })).toBe(
+      "111.2346",
+    );
   });
 
   it("to fs  rounded  with significant true and zero precision", () => {
@@ -228,7 +248,9 @@ describe("NumericExtFormattingTest", () => {
 
   it("to fs  delimited  with options hash", () => {
     expect(numberWithDelimiter(12345678, { delimiter: "." })).toBe("12.345.678");
-    expect(numberWithDelimiter(12345678.05, { delimiter: ".", separator: "," })).toBe("12.345.678,05");
+    expect(numberWithDelimiter(12345678.05, { delimiter: ".", separator: "," })).toBe(
+      "12.345.678,05",
+    );
   });
 
   it("to fs  human size", () => {
@@ -245,7 +267,9 @@ describe("NumericExtFormattingTest", () => {
 
   it("to fs  human size with options hash", () => {
     expect(numberToHumanSize(1234567, { precision: 2 })).toBe("1.2 MB");
-    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe("120.1 KB");
+    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe(
+      "120.1 KB",
+    );
   });
 
   it("to fs  human size with custom delimiter and separator", () => {

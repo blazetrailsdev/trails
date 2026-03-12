@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -38,7 +78,11 @@ describe("AndTest", () => {
 
   it("and combines two relations", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     const r1 = Post.where({ title: "a" });
     const r2 = Post.where({ body: "x" });
@@ -49,11 +93,17 @@ describe("AndTest", () => {
 
 describe("AndTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -81,11 +131,12 @@ describe("AndTest", () => {
   });
 });
 
-
 describe("and()", () => {
   it("combines two relations with AND", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("role", "string");
@@ -105,17 +156,25 @@ describe("and()", () => {
 
 describe("Relation And (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("and merges where conditions", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Alice", active: true });
     await User.create({ name: "Bob", active: false });
     await User.create({ name: "Charlie", active: true });
 
-    const result = await User.where({ active: true }).and(User.where({ name: "Alice" })).toArray();
+    const result = await User.where({ active: true })
+      .and(User.where({ name: "Alice" }))
+      .toArray();
     expect(result).toHaveLength(1);
     expect(result[0].readAttribute("name")).toBe("Alice");
   });

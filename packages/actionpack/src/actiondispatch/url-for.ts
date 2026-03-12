@@ -27,7 +27,9 @@ export function urlFor(options: UrlOptions = {}): string {
   const onlyPath = options.only_path ?? false;
 
   if (!onlyPath && !host) {
-    throw new Error("Missing host to link to! Please provide the :host parameter, set default_url_options[:host], or set :only_path to true");
+    throw new Error(
+      "Missing host to link to! Please provide the :host parameter, set default_url_options[:host], or set :only_path to true",
+    );
   }
 
   let path = options.path ?? "/";
@@ -98,7 +100,9 @@ function buildQueryString(params: Record<string, unknown>): string {
     } else if (typeof value === "object") {
       for (const [subKey, subVal] of Object.entries(value as Record<string, unknown>)) {
         if (subVal !== null && subVal !== undefined) {
-          parts.push(`${encodeURIComponent(key)}%5B${encodeURIComponent(subKey)}%5D=${encodeURIComponent(String(subVal))}`);
+          parts.push(
+            `${encodeURIComponent(key)}%5B${encodeURIComponent(subKey)}%5D=${encodeURIComponent(String(subVal))}`,
+          );
         }
       }
     } else {

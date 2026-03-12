@@ -1,4 +1,12 @@
-import { CONTENT_LENGTH, CONTENT_TYPE, TRANSFER_ENCODING, SET_COOKIE, CACHE_CONTROL, EXPIRES, ETAG } from "./constants.js";
+import {
+  CONTENT_LENGTH,
+  CONTENT_TYPE,
+  TRANSFER_ENCODING,
+  SET_COOKIE,
+  CACHE_CONTROL,
+  EXPIRES,
+  ETAG,
+} from "./constants.js";
 import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import * as MediaTypeModule from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
@@ -45,13 +53,21 @@ export class Response {
   }
 
   // Bracket accessor
-  get(key: string): any { return this.headers[key]; }
-  set(key: string, value: any): void { this.headers[key] = value; }
+  get(key: string): any {
+    return this.headers[key];
+  }
+  set(key: string, value: any): void {
+    this.headers[key] = value;
+  }
 
   // Alias for bracket notation
-  [Symbol.for("[]")](key: string): any { return this.headers[key]; }
+  [Symbol.for("[]")](key: string): any {
+    return this.headers[key];
+  }
 
-  includes(key: string): boolean { return key in this.headers; }
+  includes(key: string): boolean {
+    return key in this.headers;
+  }
 
   redirect(target: string, status = 302): void {
     this.status = status;
@@ -144,44 +160,111 @@ export class Response {
   }
 
   // Status helpers
-  get isInvalid(): boolean { return this.status < 100 || this.status >= 600; }
-  get isInformational(): boolean { return this.status >= 100 && this.status < 200; }
-  get isSuccessful(): boolean { return this.status >= 200 && this.status < 300; }
-  get isRedirection(): boolean { return this.status >= 300 && this.status < 400; }
-  get isClientError(): boolean { return this.status >= 400 && this.status < 500; }
-  get isServerError(): boolean { return this.status >= 500 && this.status < 600; }
-  get isOk(): boolean { return this.status === 200; }
-  get isCreated(): boolean { return this.status === 201; }
-  get isAccepted(): boolean { return this.status === 202; }
-  get isNoContent(): boolean { return this.status === 204; }
-  get isMovedPermanently(): boolean { return this.status === 301; }
-  get isNotFound(): boolean { return this.status === 404; }
-  get isBadRequest(): boolean { return this.status === 400; }
-  get isUnauthorized(): boolean { return this.status === 401; }
-  get isMethodNotAllowed(): boolean { return this.status === 405; }
-  get isNotAcceptable(): boolean { return this.status === 406; }
-  get isRequestTimeout(): boolean { return this.status === 408; }
-  get isPreconditionFailed(): boolean { return this.status === 412; }
-  get isRedirect(): boolean { return [301, 302, 303, 307, 308].includes(this.status); }
-  get isUnprocessable(): boolean { return this.status === 422; }
+  get isInvalid(): boolean {
+    return this.status < 100 || this.status >= 600;
+  }
+  get isInformational(): boolean {
+    return this.status >= 100 && this.status < 200;
+  }
+  get isSuccessful(): boolean {
+    return this.status >= 200 && this.status < 300;
+  }
+  get isRedirection(): boolean {
+    return this.status >= 300 && this.status < 400;
+  }
+  get isClientError(): boolean {
+    return this.status >= 400 && this.status < 500;
+  }
+  get isServerError(): boolean {
+    return this.status >= 500 && this.status < 600;
+  }
+  get isOk(): boolean {
+    return this.status === 200;
+  }
+  get isCreated(): boolean {
+    return this.status === 201;
+  }
+  get isAccepted(): boolean {
+    return this.status === 202;
+  }
+  get isNoContent(): boolean {
+    return this.status === 204;
+  }
+  get isMovedPermanently(): boolean {
+    return this.status === 301;
+  }
+  get isNotFound(): boolean {
+    return this.status === 404;
+  }
+  get isBadRequest(): boolean {
+    return this.status === 400;
+  }
+  get isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+  get isMethodNotAllowed(): boolean {
+    return this.status === 405;
+  }
+  get isNotAcceptable(): boolean {
+    return this.status === 406;
+  }
+  get isRequestTimeout(): boolean {
+    return this.status === 408;
+  }
+  get isPreconditionFailed(): boolean {
+    return this.status === 412;
+  }
+  get isRedirect(): boolean {
+    return [301, 302, 303, 307, 308].includes(this.status);
+  }
+  get isUnprocessable(): boolean {
+    return this.status === 422;
+  }
 
-  get contentType(): string | undefined { return this.getHeader(CONTENT_TYPE); }
-  set contentType(v: string) { this.setHeader(CONTENT_TYPE, v); }
-  get contentLength(): number | null { const cl = this.getHeader(CONTENT_LENGTH); return cl ? parseInt(cl) : null; }
-  get location(): string | undefined { return this.getHeader("location"); }
-  set location(v: string) { this.setHeader("location", v); }
+  get contentType(): string | undefined {
+    return this.getHeader(CONTENT_TYPE);
+  }
+  set contentType(v: string) {
+    this.setHeader(CONTENT_TYPE, v);
+  }
+  get contentLength(): number | null {
+    const cl = this.getHeader(CONTENT_LENGTH);
+    return cl ? parseInt(cl) : null;
+  }
+  get location(): string | undefined {
+    return this.getHeader("location");
+  }
+  set location(v: string) {
+    this.setHeader("location", v);
+  }
 
-  get mediaType(): string | null { return MediaTypeModule.type(this.contentType ?? null); }
-  get mediaTypeParams(): Record<string, string> { return MediaTypeModule.params(this.contentType ?? null); }
+  get mediaType(): string | null {
+    return MediaTypeModule.type(this.contentType ?? null);
+  }
+  get mediaTypeParams(): Record<string, string> {
+    return MediaTypeModule.params(this.contentType ?? null);
+  }
 
-  get setCookieHeaderValue(): any { return this.getHeader(SET_COOKIE); }
-  set setCookieHeaderValue(v: any) { this.setHeader(SET_COOKIE, v); }
+  get setCookieHeaderValue(): any {
+    return this.getHeader(SET_COOKIE);
+  }
+  set setCookieHeaderValue(v: any) {
+    this.setHeader(SET_COOKIE, v);
+  }
 
-  get cacheControl(): string | undefined { return this.getHeader(CACHE_CONTROL); }
-  set cacheControl(v: string) { this.setHeader(CACHE_CONTROL, v); }
+  get cacheControl(): string | undefined {
+    return this.getHeader(CACHE_CONTROL);
+  }
+  set cacheControl(v: string) {
+    this.setHeader(CACHE_CONTROL, v);
+  }
 
-  get etag(): string | undefined { return this.getHeader(ETAG); }
-  set etag(v: string) { this.setHeader(ETAG, v); }
+  get etag(): string | undefined {
+    return this.getHeader(ETAG);
+  }
+  set etag(v: string) {
+    this.setHeader(ETAG, v);
+  }
 
   addHeader(key: string | null, value: string | null): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
@@ -225,7 +308,10 @@ export class Response {
     if (this._buffered === null) {
       if (Array.isArray(this.body)) {
         this.body = this.body.filter((p: any) => p !== null && p !== undefined);
-        this.length = this.body.reduce((s: number, p: string) => s + Buffer.byteLength(String(p)), 0);
+        this.length = this.body.reduce(
+          (s: number, p: string) => s + Buffer.byteLength(String(p)),
+          0,
+        );
         this._buffered = true;
       } else if (this.body && typeof this.body.each === "function") {
         const oldBody = this.body;
@@ -283,9 +369,19 @@ export class ResponseRaw {
     return val ?? null;
   }
 
-  get isInvalid(): boolean { return this.status < 100 || this.status >= 600; }
-  get isSuccessful(): boolean { return this.status >= 200 && this.status < 300; }
-  get isOk(): boolean { return this.status === 200; }
-  get isNotFound(): boolean { return this.status === 404; }
-  get isRedirect(): boolean { return [301, 302, 303, 307, 308].includes(this.status); }
+  get isInvalid(): boolean {
+    return this.status < 100 || this.status >= 600;
+  }
+  get isSuccessful(): boolean {
+    return this.status >= 200 && this.status < 300;
+  }
+  get isOk(): boolean {
+    return this.status === 200;
+  }
+  get isNotFound(): boolean {
+    return this.status === 404;
+  }
+  get isRedirect(): boolean {
+    return [301, 302, 303, 307, 308].includes(this.status);
+  }
 }

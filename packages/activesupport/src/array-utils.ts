@@ -18,7 +18,7 @@ export function wrap<T>(value: T | T[] | null | undefined): T[] {
 export function inGroupsOf<T>(
   array: T[],
   n: number,
-  fillWith: T | null | false = null
+  fillWith: T | null | false = null,
 ): (T | null | false)[][] {
   const result: (T | null | false)[][] = [];
   for (let i = 0; i < array.length; i += n) {
@@ -43,7 +43,7 @@ export function toSentence(
     wordsConnector?: string;
     twoWordsConnector?: string;
     lastWordConnector?: string;
-  } = {}
+  } = {},
 ): string {
   const {
     wordsConnector = ", ",
@@ -55,11 +55,7 @@ export function toSentence(
   if (array.length === 1) return array[0];
   if (array.length === 2) return array[0] + twoWordsConnector + array[1];
 
-  return (
-    array.slice(0, -1).join(wordsConnector) +
-    lastWordConnector +
-    array[array.length - 1]
-  );
+  return array.slice(0, -1).join(wordsConnector) + lastWordConnector + array[array.length - 1];
 }
 
 /**
@@ -69,7 +65,7 @@ export function toSentence(
 export function inGroups<T>(
   array: T[],
   n: number,
-  fillWith: T | null | false = null
+  fillWith: T | null | false = null,
 ): (T | null | false)[][] {
   const quotient = Math.floor(array.length / n);
   const remainder = array.length % n;

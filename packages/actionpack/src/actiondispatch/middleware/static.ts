@@ -85,14 +85,20 @@ export class Static {
     if (this.brotli && acceptEncoding.includes("br")) {
       const brPath = filePath + ".br";
       if (this.isFile(brPath)) {
-        return this.serveFile(brPath, filePath, { "content-encoding": "br", vary: "Accept-Encoding" });
+        return this.serveFile(brPath, filePath, {
+          "content-encoding": "br",
+          vary: "Accept-Encoding",
+        });
       }
     }
 
     if (this.gzip && acceptEncoding.includes("gzip")) {
       const gzPath = filePath + ".gz";
       if (this.isFile(gzPath)) {
-        return this.serveFile(gzPath, filePath, { "content-encoding": "gzip", vary: "Accept-Encoding" });
+        return this.serveFile(gzPath, filePath, {
+          "content-encoding": "gzip",
+          vary: "Accept-Encoding",
+        });
       }
     }
 
@@ -122,7 +128,11 @@ export class Static {
     return null;
   }
 
-  private serveFile(actualPath: string, originalPath: string, extraHeaders: Record<string, string> = {}): RackResponse {
+  private serveFile(
+    actualPath: string,
+    originalPath: string,
+    extraHeaders: Record<string, string> = {},
+  ): RackResponse {
     const content = fs.readFileSync(actualPath);
     const contentType = this.getMimeType(originalPath);
 

@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -38,7 +78,10 @@ describe("WhereTest", () => {
 
   it("where with string generates sql", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where("title = 'hello'").toSql();
     expect(sql).toContain("title = 'hello'");
@@ -46,7 +89,10 @@ describe("WhereTest", () => {
 
   it("where with hash generates sql", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: "hello" }).toSql();
     expect(sql).toContain("WHERE");
@@ -54,7 +100,10 @@ describe("WhereTest", () => {
 
   it("where not generates sql", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.all().whereNot({ title: "hello" }).toSql();
     expect(sql).toContain("!=");
@@ -62,7 +111,10 @@ describe("WhereTest", () => {
 
   it("rewhere replaces existing conditions", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: "old" }).rewhere({ title: "new" }).toSql();
     expect(sql).toContain("new");
@@ -70,7 +122,10 @@ describe("WhereTest", () => {
 
   it("where with range generates BETWEEN", () => {
     class Post extends Base {
-      static { this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ age: new Range(18, 30) }).toSql();
     expect(sql).toContain("BETWEEN");
@@ -78,7 +133,10 @@ describe("WhereTest", () => {
 
   it("where with array generates IN", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: ["a", "b", "c"] }).toSql();
     expect(sql).toContain("IN");
@@ -86,7 +144,10 @@ describe("WhereTest", () => {
 
   it("where with null generates IS NULL", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: null }).toSql();
     expect(sql).toContain("IS NULL");
@@ -94,7 +155,10 @@ describe("WhereTest", () => {
 
   it("invert where swaps conditions", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = Post.where({ title: "a" }).invertWhere();
     const sql = rel.toSql();
@@ -111,7 +175,11 @@ describe("WhereTest", () => {
 
   it("+ combines two where clauses", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = Post.where({ title: "hello" }).and(Post.where({ status: "active" }));
     const sql = rel.toSql();
@@ -120,7 +188,10 @@ describe("WhereTest", () => {
   });
   it("or returns an empty where clause when either side is empty", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const rel = Post.where({ title: "hello" }).or(Post.all());
     const sql = rel.toSql();
@@ -130,7 +201,10 @@ describe("WhereTest", () => {
 
   it("where copies bind params", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const rel1 = Post.where("title = ?", "hello");
     const rel2 = rel1.where("title = ?", "world");
@@ -144,23 +218,34 @@ describe("WhereTest", () => {
   });
   it("where with table name and target table", () => {
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: "hello" }).toSql();
-    expect(sql).toContain("\"posts\"");
+    expect(sql).toContain('"posts"');
     expect(sql).toContain("title");
   });
   it.skip("where with table name and target table joined", () => {});
   it("where with string and bound variable", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where("title = ?", "hello").toSql();
     expect(sql).toContain("title = 'hello'");
   });
   it("where with string and multiple bound variables", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where("title = ? AND status = ?", "hello", "active").toSql();
     expect(sql).toContain("title = 'hello'");
@@ -168,14 +253,20 @@ describe("WhereTest", () => {
   });
   it("where with string conditions", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where("title = 'hello'").toSql();
     expect(sql).toContain("title = 'hello'");
   });
   it("where with array and empty string", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // where with empty string should produce no additional conditions
     const sql = Post.where("").toSql();
@@ -183,14 +274,21 @@ describe("WhereTest", () => {
   });
   it("where with blank conditions", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({}).toSql();
     expect(sql).toContain("FROM");
   });
   it("where with nested conditions", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     // Nested conditions via chaining
     const sql = Post.where({ title: "hello" }).where({ status: "active" }).toSql();
@@ -199,10 +297,20 @@ describe("WhereTest", () => {
   });
   it("where with AR relation subquery", () => {
     class Author extends Base {
-      static { this._tableName = "authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
-      static { this._tableName = "posts"; this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     const aliceIds = Author.where({ name: "Alice" }).select("id") as any;
     const sql = Post.where({ author_id: aliceIds }).toSql();
@@ -210,7 +318,10 @@ describe("WhereTest", () => {
   });
   it("where with empty hash", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({}).toSql();
     // Empty hash should produce no WHERE conditions
@@ -218,7 +329,11 @@ describe("WhereTest", () => {
   });
   it("where with prehash", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     // Prehash: conditions defined as a variable before passing to where
     const conditions = { title: "hello", status: "active" };
@@ -228,14 +343,20 @@ describe("WhereTest", () => {
   });
   it("where with nil hash value", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: null }).toSql();
     expect(sql).toContain("IS NULL");
   });
   it("where with array hash value", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: ["a", "b"] }).toSql();
     expect(sql).toContain("IN");
@@ -247,7 +368,10 @@ describe("WhereTest", () => {
   it.skip("where with conditions on both tables", () => {});
   it("where with blank condition", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Blank condition (empty string) should not add where clause
     const sql = Post.where("").toSql();
@@ -255,7 +379,10 @@ describe("WhereTest", () => {
   });
   it("where with nil condition", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // where() with no args returns a clone (chainable)
     const sql = (Post.where as any)().toSql();
@@ -263,14 +390,20 @@ describe("WhereTest", () => {
   });
   it("where with range condition", () => {
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ views: new Range(1, 10) }).toSql();
     expect(sql).toContain("BETWEEN");
   });
   it("where with exclusive range condition", async () => {
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
     }
     await Post.create({ views: 1 });
     await Post.create({ views: 5 });
@@ -290,15 +423,22 @@ describe("WhereTest", () => {
   it.skip("where on association with relation", () => {});
   it("where with numeric comparison", () => {
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ views: 5 }).toSql();
-    expect(sql).toContain("\"views\"");
+    expect(sql).toContain('"views"');
     expect(sql).toContain("5");
   });
   it("where with multiple numeric comparisons", () => {
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.attribute("likes", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("views", "integer");
+        this.attribute("likes", "integer");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ views: 5, likes: 10 }).toSql();
     expect(sql).toContain("views");
@@ -306,24 +446,37 @@ describe("WhereTest", () => {
   });
   it("where with not nil condition", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.whereNot({ title: null }).toSql();
     expect(sql).toContain("IS NOT NULL");
   });
   it("where with not range condition", async () => {
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
     }
     await Post.create({ views: 5 });
     await Post.create({ views: 15 });
     await Post.create({ views: 25 });
-    const result = await Post.all().whereNot({ views: new Range(10, 20) }).toArray();
+    const result = await Post.all()
+      .whereNot({ views: new Range(10, 20) })
+      .toArray();
     expect(result).toHaveLength(2);
   });
   it("where missing with association", async () => {
     class Author extends Base {
-      static { this._tableName = "wm_authors"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "wm_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -343,10 +496,18 @@ describe("WhereTest", () => {
   });
   it("where missing with multiple associations", async () => {
     class Editor extends Base {
-      static { this._tableName = "wm_editors"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "wm_editors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Author extends Base {
-      static { this._tableName = "wm_authors2"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "wm_authors2";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -367,7 +528,11 @@ describe("WhereTest", () => {
   });
   it("where associated with association", async () => {
     class Author extends Base {
-      static { this._tableName = "wa_authors"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "wa_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -388,10 +553,18 @@ describe("WhereTest", () => {
   it.skip("where associated with has many association", () => {});
   it("where associated with multiple associations", async () => {
     class Author extends Base {
-      static { this._tableName = "wa_authors2"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "wa_authors2";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Editor extends Base {
-      static { this._tableName = "wa_editors2"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "wa_editors2";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     class Post extends Base {
       static {
@@ -415,7 +588,10 @@ describe("WhereTest", () => {
   it.skip("where not associated with multiple associations", () => {});
   it("where with enum conditions", async () => {
     class Post extends Base {
-      static { this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
     await Post.create({ status: 0 });
@@ -428,7 +604,10 @@ describe("WhereTest", () => {
   });
   it("where with enum conditions string", async () => {
     class Post extends Base {
-      static { this.attribute("status", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("status", "integer");
+        this.adapter = adapter;
+      }
     }
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
     await Post.create({ status: 0 });
@@ -439,7 +618,10 @@ describe("WhereTest", () => {
   });
   it("type cast is not evaluated at relation build time", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Building a relation should not execute any query
     const rel = Post.where({ title: "hello" });
@@ -449,7 +631,10 @@ describe("WhereTest", () => {
   });
   it("where copies arel bind params", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Ensure where creates a new relation (immutability)
     const rel1 = Post.where({ title: "a" });
@@ -478,14 +663,20 @@ describe("WhereTest", () => {
   it.skip("decorated polymorphic where", () => {});
   it("where with empty hash and no foreign key", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({}).toSql();
     expect(sql).toContain("FROM");
   });
   it("where with float for string column", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Float value should be converted to string representation
     const sql = Post.where({ title: 1.5 }).toSql();
@@ -493,7 +684,10 @@ describe("WhereTest", () => {
   });
   it("where with decimal for string column", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ title: 123.456 }).toSql();
     expect(sql).toContain("123.456");
@@ -502,14 +696,20 @@ describe("WhereTest", () => {
   it.skip("where with duration for string column", () => {});
   it("where with integer for binary column", () => {
     class Post extends Base {
-      static { this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ data: 42 }).toSql();
     expect(sql).toContain("42");
   });
   it("where with emoji for binary column", () => {
     class Post extends Base {
-      static { this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.where({ data: "hello" }).toSql();
     expect(sql).toContain("hello");
@@ -525,7 +725,10 @@ describe("WhereTest", () => {
   it.skip("where with unsupported arguments", () => {});
   it("invert where", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Post.create({ title: "hello" });
     await Post.create({ title: "world" });
@@ -554,7 +757,6 @@ describe("WhereTest", () => {
     expect(result[0].readAttribute("title")).toBe("B");
   });
 });
-
 
 describe("where with Range", () => {
   it("generates BETWEEN SQL", () => {
@@ -651,10 +853,14 @@ describe("Range edge cases", () => {
 
 describe("where with raw SQL", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("supports raw SQL string with bind params", async () => {
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("age", "integer");
@@ -664,12 +870,14 @@ describe("where with raw SQL", () => {
     await User.create({ name: "Bob", age: 17 });
     await User.create({ name: "Charlie", age: 30 });
 
-    const sql = User.where("\"users\".\"age\" > ?", 18).toSql();
-    expect(sql).toContain("\"users\".\"age\" > 18");
+    const sql = User.where('"users"."age" > ?', 18).toSql();
+    expect(sql).toContain('"users"."age" > 18');
   });
 
   it("rewhere replaces specific where conditions", async () => {
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("status", "string");
@@ -688,15 +896,21 @@ describe("where with raw SQL", () => {
 
 describe("where with subquery", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("supports Relation as value for IN subquery", async () => {
-    class Author extends Base { static _tableName = "authors"; }
+    class Author extends Base {
+      static _tableName = "authors";
+    }
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
     Author.adapter = adapter;
 
-    class Post extends Base { static _tableName = "posts"; }
+    class Post extends Base {
+      static _tableName = "posts";
+    }
     Post.attribute("id", "integer");
     Post.attribute("author_id", "integer");
     Post.attribute("title", "string");
@@ -718,7 +932,9 @@ describe("where with subquery", () => {
 describe("rewhere clears NOT clauses", () => {
   it("replaces whereNot clauses for the same key", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("role", "string");
@@ -738,7 +954,9 @@ describe("rewhere clears NOT clauses", () => {
 describe("where with named binds", () => {
   it("replaces :name placeholders with values", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("age", "integer");
@@ -748,14 +966,18 @@ describe("where with named binds", () => {
     await User.create({ name: "Bob", age: 15 });
     await User.create({ name: "Charlie", age: 35 });
 
-    const results = await User.all().where("age > :min AND age < :max", { min: 20, max: 30 }).toArray();
+    const results = await User.all()
+      .where("age > :min AND age < :max", { min: 20, max: 30 })
+      .toArray();
     expect(results.length).toBe(1);
     expect(results[0].readAttribute("name")).toBe("Alice");
   });
 
   it("handles string named binds with quoting", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -893,7 +1115,9 @@ describe("Relation Where (Rails-guided)", () => {
   });
 
   it("whereNot with array generates NOT IN", async () => {
-    const result = await User.all().whereNot({ name: ["Alice", "Bob"] }).toArray();
+    const result = await User.all()
+      .whereNot({ name: ["Alice", "Bob"] })
+      .toArray();
     expect(result).toHaveLength(1);
     expect(result[0].readAttribute("name")).toBe("Charlie");
   });
@@ -931,7 +1155,6 @@ describe("Relation Where (Rails-guided)", () => {
     expect(result[0].readAttribute("name")).toBe("Bob");
   });
 });
-
 
 describe("where with Range (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -1039,31 +1262,48 @@ describe("Raw SQL Where (Rails-guided)", () => {
   // Rails: test "where with SQL string and bind values"
   it("where accepts raw SQL string with ? placeholders", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
 
     await Person.create({ name: "Alice", age: 25 });
     await Person.create({ name: "Bob", age: 17 });
     await Person.create({ name: "Charlie", age: 30 });
 
-    const sql = Person.where("\"people\".\"age\" > ?", 18).toSql();
-    expect(sql).toContain("\"people\".\"age\" > 18");
+    const sql = Person.where('"people"."age" > ?', 18).toSql();
+    expect(sql).toContain('"people"."age" > 18');
   });
 
   // Rails: test "where with string bind for LIKE"
   it("where with LIKE query", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
-    const sql = Person.where("\"people\".\"name\" LIKE ?", "%ali%").toSql();
+    const sql = Person.where('"people"."name" LIKE ?', "%ali%").toSql();
     expect(sql).toContain("LIKE '%ali%'");
   });
 
   // Rails: test "rewhere replaces existing conditions"
   it("rewhere replaces conditions on the same column", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Person.create({ name: "Alice", status: "active" });
@@ -1080,7 +1320,14 @@ describe("Raw SQL Where (Rails-guided)", () => {
   // Rails: test "rewhere preserves other conditions"
   it("rewhere only replaces the specified keys", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("status", "string"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("status", "string");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
 
     await Person.create({ name: "Alice", status: "active", role: "admin" });

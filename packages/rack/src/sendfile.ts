@@ -26,7 +26,7 @@ export class Sendfile {
     if (!variation) return response;
 
     // Validate variation
-    if (!KNOWN_VARIATIONS.some(v => v.toLowerCase() === variation.toLowerCase())) {
+    if (!KNOWN_VARIATIONS.some((v) => v.toLowerCase() === variation.toLowerCase())) {
       const errors = env["rack.errors"];
       if (errors && typeof errors.write === "function") {
         errors.write(`Unknown x-sendfile variation: "${variation}"\n`);

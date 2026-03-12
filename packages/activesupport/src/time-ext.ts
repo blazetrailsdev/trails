@@ -5,15 +5,7 @@
  * All functions operate on JavaScript Date objects (local time).
  */
 
-const DAY_NAMES = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
+const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 function dayIndex(day: string): number {
   const idx = DAY_NAMES.indexOf(day.toLowerCase());
@@ -287,7 +279,7 @@ export function advance(
     hours?: number;
     minutes?: number;
     seconds?: number;
-  }
+  },
 ): Date {
   let d = clone(date);
 
@@ -398,7 +390,7 @@ export function changeDate(
     hour?: number;
     min?: number;
     sec?: number;
-  }
+  },
 ): Date {
   const d = clone(date);
   if (options.year !== undefined) d.setFullYear(options.year);
@@ -485,13 +477,22 @@ export function secFraction(date: Date): number {
 export function toFs(date: Date, format: string = "default"): string {
   switch (format) {
     case "db":
-      return date.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+      return date
+        .toISOString()
+        .replace("T", " ")
+        .replace(/\.\d+Z$/, "");
     case "long":
-      return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
-        " " + date.toTimeString().slice(0, 8);
+      return (
+        date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+        " " +
+        date.toTimeString().slice(0, 8)
+      );
     case "short":
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-        " " + date.toTimeString().slice(0, 5);
+      return (
+        date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+        " " +
+        date.toTimeString().slice(0, 5)
+      );
     case "rfc822":
     case "rfc2822":
       return date.toUTCString();
@@ -501,8 +502,11 @@ export function toFs(date: Date, format: string = "default"): string {
     case "inspect":
       return date.toISOString();
     default:
-      return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
-        " " + date.toTimeString().slice(0, 8);
+      return (
+        date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+        " " +
+        date.toTimeString().slice(0, 8)
+      );
   }
 }
 

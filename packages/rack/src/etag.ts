@@ -21,7 +21,12 @@ export class ETag {
 
     let digest: string | null = null;
 
-    if ((status === 200 || status === 201) && Array.isArray(body) && !headers[ETAG] && !headers["last-modified"]) {
+    if (
+      (status === 200 || status === 201) &&
+      Array.isArray(body) &&
+      !headers[ETAG] &&
+      !headers["last-modified"]
+    ) {
       const sha = createHash("sha256");
       let hasContent = false;
       for (const part of body) {

@@ -19,9 +19,7 @@ function main() {
     process.exit(1);
   }
 
-  const report: TestComparisonResult = JSON.parse(
-    fs.readFileSync(reportPath, "utf-8"),
-  );
+  const report: TestComparisonResult = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
 
   for (const [pkg, pkgComp] of Object.entries(report.packages)) {
     const missingTests: { rubyFile: string; tests: TestComparison[] }[] = [];
@@ -46,9 +44,7 @@ function main() {
     fs.writeFileSync(stubPath, stubContent);
 
     const totalMissing = missingTests.reduce((s, f) => s + f.tests.length, 0);
-    console.log(
-      `  ${pkg}: ${totalMissing} missing tests → ${stubPath}`,
-    );
+    console.log(`  ${pkg}: ${totalMissing} missing tests → ${stubPath}`);
   }
 }
 
@@ -125,10 +121,7 @@ function rubyFileToDescribeName(file: string): string {
 }
 
 function escapeTsString(str: string): string {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n");
+  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
 }
 
 main();

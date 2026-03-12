@@ -63,10 +63,7 @@ export class OrderedHash<K, V> extends Map<K, V> {
   }
 
   /** merge — returns a new OrderedHash with entries from both. Optional block resolves conflicts. */
-  merge(
-    other: OrderedHash<K, V>,
-    block?: (key: K, v1: V, v2: V) => V
-  ): OrderedHash<K, V> {
+  merge(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): OrderedHash<K, V> {
     const result = new OrderedHash<K, V>(this);
     for (const [k, v] of other) {
       if (block && result.has(k)) {
@@ -79,10 +76,7 @@ export class OrderedHash<K, V> extends Map<K, V> {
   }
 
   /** mergeInPlace — merges another hash into this one (update/merge!). */
-  mergeInPlace(
-    other: OrderedHash<K, V>,
-    block?: (key: K, v1: V, v2: V) => V
-  ): this {
+  mergeInPlace(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): this {
     for (const [k, v] of other) {
       if (block && this.has(k)) {
         this.set(k, block(k, this.get(k)!, v));

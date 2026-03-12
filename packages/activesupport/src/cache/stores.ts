@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync, statSync, rmdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  readdirSync,
+  statSync,
+  rmdirSync,
+} from "node:fs";
 import { join, dirname, basename } from "node:path";
 import type { CacheOptions, CacheStore } from "./index.js";
 
@@ -83,7 +92,11 @@ export class MemoryStore implements CacheStore {
     return this.getEntry(rk) !== undefined;
   }
 
-  fetch(key: string, optionsOrFallback?: CacheOptions | (() => unknown), maybeFallback?: () => unknown): unknown {
+  fetch(
+    key: string,
+    optionsOrFallback?: CacheOptions | (() => unknown),
+    maybeFallback?: () => unknown,
+  ): unknown {
     let options: CacheOptions | undefined;
     let fallback: (() => unknown) | undefined;
 
@@ -211,7 +224,11 @@ export class NullStore implements CacheStore {
     return false;
   }
 
-  fetch(key: string, optionsOrFallback?: CacheOptions | (() => unknown), _maybeFallback?: () => unknown): unknown {
+  fetch(
+    key: string,
+    optionsOrFallback?: CacheOptions | (() => unknown),
+    _maybeFallback?: () => unknown,
+  ): unknown {
     return null;
   }
 
@@ -304,7 +321,9 @@ export class FileStore implements CacheStore {
     const entry = this.readFile(filePath);
     if (!entry) return null;
     if (isExpired(entry)) {
-      try { unlinkSync(filePath); } catch {}
+      try {
+        unlinkSync(filePath);
+      } catch {}
       return null;
     }
     return entry.value;
@@ -342,7 +361,11 @@ export class FileStore implements CacheStore {
     return this.read(key, options) !== null;
   }
 
-  fetch(key: string, optionsOrFallback?: CacheOptions | (() => unknown), maybeFallback?: () => unknown): unknown {
+  fetch(
+    key: string,
+    optionsOrFallback?: CacheOptions | (() => unknown),
+    maybeFallback?: () => unknown,
+  ): unknown {
     let options: CacheOptions | undefined;
     let fallback: (() => unknown) | undefined;
 
@@ -378,9 +401,13 @@ export class FileStore implements CacheStore {
         const stat = statSync(fullPath);
         if (stat.isDirectory()) {
           this.clearDir(fullPath, false);
-          try { rmdirSync(fullPath); } catch {}
+          try {
+            rmdirSync(fullPath);
+          } catch {}
         } else {
-          try { unlinkSync(fullPath); } catch {}
+          try {
+            unlinkSync(fullPath);
+          } catch {}
         }
       }
     } catch {}

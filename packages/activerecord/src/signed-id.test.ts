@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,16 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("SignedIdTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     return { User };
   }
@@ -56,7 +101,7 @@ describe("SignedIdTest", () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Bob" });
     const token = u.signedId({ expiresIn: 1 });
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -177,7 +222,7 @@ describe("SignedIdTest", () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Expired" });
     const token = u.signedId({ expiresIn: 1 });
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -191,11 +236,14 @@ describe("SignedIdTest", () => {
 
   it("finding signed record outside expiration duration raises on the bang", async () => {
     class UserShort extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await UserShort.create({ name: "Jake" });
     const token = u.signedId({ expiresIn: 1 });
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     await expect(UserShort.findSignedBang(token)).rejects.toThrow(RecordNotFound);
   });
 
@@ -229,12 +277,15 @@ describe("SignedIdTest", () => {
   it.skip("find signed record with a bang within expiration duration", () => {});
 });
 
-
 describe("toGid / toSgid", () => {
   it("returns a GlobalID-like URI", async () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     expect(u.toGid()).toBe(`gid://User/${u.id}`);
@@ -243,7 +294,11 @@ describe("toGid / toSgid", () => {
   it("returns a base64-encoded signed GID", async () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     const sgid = u.toSgid();

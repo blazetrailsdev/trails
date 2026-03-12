@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -32,7 +72,10 @@ function freshAdapter(): DatabaseAdapter {
 describe("AttributeMethodsTest", () => {
   it("attribute names returns list of attribute names", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
     }
     const names = Post.attributeNames();
     expect(names).toContain("title");
@@ -41,7 +84,9 @@ describe("AttributeMethodsTest", () => {
 
   it("has attribute returns true for defined attributes", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); }
+      static {
+        this.attribute("title", "string");
+      }
     }
     const p = new Post({ title: "a" });
     expect(p.hasAttribute("title")).toBe(true);
@@ -50,7 +95,10 @@ describe("AttributeMethodsTest", () => {
 
   it("reading attributes", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
     }
     const p = new Post({ title: "hello", body: "world" });
     expect(p.readAttribute("title")).toBe("hello");
@@ -59,7 +107,9 @@ describe("AttributeMethodsTest", () => {
 
   it("writing attributes", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); }
+      static {
+        this.attribute("title", "string");
+      }
     }
     const p = new Post({ title: "old" });
     p.writeAttribute("title", "new");
@@ -74,7 +124,11 @@ describe("AttributeMethodsTest", () => {
   it("attribute keys on a new instance", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({}) as any;
     const attrs = p.attributeNames ? p.attributeNames() : {};
@@ -84,7 +138,10 @@ describe("AttributeMethodsTest", () => {
   it("boolean attributes", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("published", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("published", "boolean");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ published: true }) as any;
     expect(p.readAttribute("published")).toBe(true);
@@ -93,7 +150,10 @@ describe("AttributeMethodsTest", () => {
   it("integers as nil", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("count", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ count: null }) as any;
     expect(p.readAttribute("count")).toBeNull();
@@ -102,7 +162,10 @@ describe("AttributeMethodsTest", () => {
   it("attribute_present with booleans", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("published", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("published", "boolean");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ published: false }) as any;
     // false is a valid value, not "blank"
@@ -112,7 +175,10 @@ describe("AttributeMethodsTest", () => {
   it("array content", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ title: "test" }) as any;
     expect(p.readAttribute("title")).toBe("test");
@@ -121,7 +187,10 @@ describe("AttributeMethodsTest", () => {
   it("hash content", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ title: "hash-test" }) as any;
     const attrs = p.attributeNames ? p.attributeNames() : {};
@@ -131,16 +200,22 @@ describe("AttributeMethodsTest", () => {
   it("read_attribute_for_database", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "db-read" }) as any;
+    const p = (await Post.create({ title: "db-read" })) as any;
     expect(p.readAttribute("title")).toBe("db-read");
   });
 
   it("attributes_for_database", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ title: "for-db" }) as any;
     const attrs = p.attributeNames ? p.attributeNames() : {};
@@ -150,7 +225,10 @@ describe("AttributeMethodsTest", () => {
   it("#define_attribute_methods defines alias attribute methods after undefining", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({ title: "test" }) as any;
     expect(p.readAttribute("title")).toBe("test");
@@ -159,7 +237,10 @@ describe("AttributeMethodsTest", () => {
   it("allocated objects can be inspected", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = Post.new({}) as any;
     expect(() => p.inspect()).not.toThrow();
@@ -173,7 +254,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read_attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "hello" }) as any;
     expect(t.readAttribute("title")).toBe("hello");
@@ -182,7 +266,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read_attribute when false", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("approved", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("approved", "boolean");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ approved: false }) as any;
     expect(t.readAttribute("approved")).toBe(false);
@@ -191,7 +278,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read_attribute when true", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("approved", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("approved", "boolean");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ approved: true }) as any;
     expect(t.readAttribute("approved")).toBe(true);
@@ -200,7 +290,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read_attribute with nil should not asplode", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: null }) as any;
     expect(t.readAttribute("title")).toBeNull();
@@ -209,7 +302,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("string attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "hello" }) as any;
     expect(t.readAttribute("title")).toBeTruthy();
@@ -218,7 +314,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("number attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ views: 0 }) as any;
     expect(t.readAttribute("views")).toBe(0);
@@ -227,7 +326,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("boolean attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("approved", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("approved", "boolean");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ approved: true }) as any;
     expect(t.readAttribute("approved")).toBe(true);
@@ -236,7 +338,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("write_attribute can write aliased attributes as well", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     t.writeAttribute("title", "written");
@@ -246,7 +351,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("write_attribute allows writing to aliased attributes", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     t.writeAttribute("title", "aliased");
@@ -256,7 +364,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("overridden write_attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "original" }) as any;
     t.writeAttribute("title", "overridden");
@@ -266,7 +377,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("overridden read_attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "read-test" }) as any;
     expect(t.readAttribute("title")).toBe("read-test");
@@ -275,7 +389,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read overridden attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "overridden" }) as any;
     expect(t.readAttribute("title")).toBe("overridden");
@@ -284,7 +401,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("attribute_method?", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Topic.attributeNames()).toContain("title");
   });
@@ -292,7 +412,11 @@ describe("AttributeMethodsTestExtra", () => {
   it("attribute_names on a queried record", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     await Topic.create({ title: "t", body: "b" });
     const rec = (await Topic.all().toArray())[0] as any;
@@ -303,7 +427,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("case-sensitive attributes hash", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "Case" }) as any;
     expect(t.readAttribute("title")).toBe("Case");
@@ -312,7 +439,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("hashes are not mangled", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "mangled" }) as any;
     expect(t.readAttribute("title")).toBe("mangled");
@@ -321,16 +451,22 @@ describe("AttributeMethodsTestExtra", () => {
   it("create through factory", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const t = await Topic.create({ title: "factory" }) as any;
+    const t = (await Topic.create({ title: "factory" })) as any;
     expect(t.readAttribute("title")).toBe("factory");
   });
 
   it("converted values are returned after assignment", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ views: "5" }) as any;
     // integer type cast
@@ -340,7 +476,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("write nil to time attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("created_at", "datetime"); this.adapter = adp; }
+      static {
+        this.attribute("created_at", "datetime");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     t.writeAttribute("created_at", null);
@@ -350,7 +489,11 @@ describe("AttributeMethodsTestExtra", () => {
   it("attribute_names with a custom select", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const names = Topic.attributeNames();
     expect(names).toContain("title");
@@ -359,7 +502,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("set attributes without a hash", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     t.writeAttribute("title", "no-hash");
@@ -369,7 +515,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("set attributes with a block", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "block-test" }) as any;
     expect(t.readAttribute("title")).toBe("block-test");
@@ -378,7 +527,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("came_from_user?", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "user-set" }) as any;
     // newly set attributes come from user
@@ -388,7 +540,11 @@ describe("AttributeMethodsTestExtra", () => {
   it("accessed_fields", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "access-test" }) as any;
     t.readAttribute("title");
@@ -399,7 +555,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read_attribute_before_type_cast with aliased attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ views: "42" }) as any;
     // after type cast should be integer
@@ -409,16 +568,22 @@ describe("AttributeMethodsTestExtra", () => {
   it("read_attribute_for_database with aliased attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const t = await Topic.create({ title: "for-db" }) as any;
+    const t = (await Topic.create({ title: "for-db" })) as any;
     expect(t.readAttribute("title")).toBe("for-db");
   });
 
   it("instance methods should be defined on the base class", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     expect(typeof t.readAttribute).toBe("function");
@@ -428,7 +593,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("global methods are overwritten", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "test" }) as any;
     expect(t.readAttribute("title")).toBe("test");
@@ -437,10 +605,15 @@ describe("AttributeMethodsTestExtra", () => {
   it("method overrides in multi-level subclasses", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     class SpecialTopic extends Topic {
-      static { this.adapter = adp; }
+      static {
+        this.adapter = adp;
+      }
     }
     const t = SpecialTopic.new({ title: "inherited" }) as any;
     expect(t.readAttribute("title")).toBe("inherited");
@@ -449,10 +622,15 @@ describe("AttributeMethodsTestExtra", () => {
   it("inherited custom accessors", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     class SubTopic extends Topic {
-      static { this.adapter = adp; }
+      static {
+        this.adapter = adp;
+      }
     }
     const t = SubTopic.new({ title: "sub" }) as any;
     expect(t.readAttribute("title")).toBe("sub");
@@ -461,7 +639,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("define_attribute_method works with both symbol and string", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Topic.attributeNames()).toContain("title");
   });
@@ -469,7 +650,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("attribute readers respect access control", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "readable" }) as any;
     expect(t.readAttribute("title")).toBe("readable");
@@ -478,7 +662,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("attribute writers respect access control", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     t.writeAttribute("title", "writable");
@@ -488,7 +675,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("bulk update raises ActiveRecord::UnknownAttributeError", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     // unknown attributes are ignored or raise depending on implementation
     const t = Topic.new({ title: "valid" } as any) as any;
@@ -498,7 +688,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("user-defined text attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ body: "some text" }) as any;
     expect(t.readAttribute("body")).toBeTruthy();
@@ -507,7 +700,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("user-defined date attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("published_at", "date"); this.adapter = adp; }
+      static {
+        this.attribute("published_at", "date");
+        this.adapter = adp;
+      }
     }
     const d = new Date("2024-01-01");
     const t = Topic.new({ published_at: d }) as any;
@@ -517,7 +713,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("user-defined datetime attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("updated_at", "datetime"); this.adapter = adp; }
+      static {
+        this.attribute("updated_at", "datetime");
+        this.adapter = adp;
+      }
     }
     const d = new Date();
     const t = Topic.new({ updated_at: d }) as any;
@@ -527,7 +726,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("custom field attribute predicate", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("score", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("score", "integer");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ score: 10 }) as any;
     expect(t.readAttribute("score")).toBe(10);
@@ -536,7 +738,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("non-attribute read and write", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({ title: "test" }) as any;
     expect(t.readAttribute("title")).toBe("test");
@@ -545,7 +750,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("read attributes after type cast on a date", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("published_at", "date"); this.adapter = adp; }
+      static {
+        this.attribute("published_at", "date");
+        this.adapter = adp;
+      }
     }
     const d = new Date("2024-06-15");
     const t = Topic.new({ published_at: d }) as any;
@@ -556,9 +764,12 @@ describe("AttributeMethodsTestExtra", () => {
   it("update array content", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const t = await Topic.create({ title: "original" }) as any;
+    const t = (await Topic.create({ title: "original" })) as any;
     t.writeAttribute("title", "updated");
     await (t as any).save();
     expect(t.readAttribute("title")).toBe("updated");
@@ -567,7 +778,10 @@ describe("AttributeMethodsTestExtra", () => {
   it("write_attribute raises ActiveModel::MissingAttributeError when the attribute does not exist", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const t = Topic.new({}) as any;
     // known attributes can be written
@@ -583,7 +797,10 @@ describe("AttributeMethodsTest", () => {
   it("#id_value alias is defined if id column exist", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "test" });
     // id should be accessible
@@ -593,7 +810,10 @@ describe("AttributeMethodsTest", () => {
   it("aliasing `id` attribute allows reading the column value", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "hello" });
     expect(p.id).not.toBeNull();
@@ -602,7 +822,10 @@ describe("AttributeMethodsTest", () => {
   it("case-sensitive attributes hash", () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("Title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("Title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ Title: "test" } as any);
     expect((p as any).readAttribute("Title")).toBe("test");
@@ -611,7 +834,11 @@ describe("AttributeMethodsTest", () => {
   it("write_attribute does not raise when the attribute isn't selected", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ title: "hello", body: "world" });
     expect(() => (p as any).writeAttribute("title", "updated")).not.toThrow();
@@ -620,7 +847,10 @@ describe("AttributeMethodsTest", () => {
   it("read_attribute can read aliased attributes as well", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "test" });
     expect((p as any).readAttribute("title")).toBe("test");
@@ -629,7 +859,10 @@ describe("AttributeMethodsTest", () => {
   it("overridden write_attribute", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "original" });
     (p as any).writeAttribute("title", "modified");
@@ -639,7 +872,9 @@ describe("AttributeMethodsTest", () => {
   it("attribute_method? returns false if the table does not exist", () => {
     const adp = freshAdapter();
     class Ghost extends Base {
-      static { this.adapter = adp; }
+      static {
+        this.adapter = adp;
+      }
     }
     expect(Ghost.hasAttributeDefinition("nonexistent")).toBe(false);
   });
@@ -647,7 +882,10 @@ describe("AttributeMethodsTest", () => {
   it("typecast attribute from select to false", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("active", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("active", "boolean");
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ active: false });
     expect((p as any).readAttribute("active")).toBe(false);
@@ -656,7 +894,10 @@ describe("AttributeMethodsTest", () => {
   it("typecast attribute from select to true", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("active", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("active", "boolean");
+        this.adapter = adp;
+      }
     }
     const p = await Post.create({ active: true });
     expect((p as any).readAttribute("active")).toBe(true);
@@ -665,17 +906,24 @@ describe("AttributeMethodsTest", () => {
   it("attribute_for_inspect with an array", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "test" });
-    const inspected = (p as any).attributeForInspect?.("title") ?? (p as any).readAttribute("title");
+    const inspected =
+      (p as any).attributeForInspect?.("title") ?? (p as any).readAttribute("title");
     expect(inspected).toBeTruthy();
   });
 
   it("read attributes after type cast on a date", async () => {
     const adp = freshAdapter();
     class Event extends Base {
-      static { this.attribute("occurred_at", "date"); this.adapter = adp; }
+      static {
+        this.attribute("occurred_at", "date");
+        this.adapter = adp;
+      }
     }
     const e = new Event({ occurred_at: "2024-01-15" } as any);
     const val = (e as any).readAttribute("occurred_at");
@@ -685,10 +933,16 @@ describe("AttributeMethodsTest", () => {
   it("global methods are overwritten when subclassing", () => {
     const adp = freshAdapter();
     class Animal extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     class Dog extends Animal {
-      static { this.attribute("breed", "string"); this.adapter = adp; }
+      static {
+        this.attribute("breed", "string");
+        this.adapter = adp;
+      }
     }
     expect(Dog.hasAttributeDefinition("name")).toBe(true);
     expect(Dog.hasAttributeDefinition("breed")).toBe(true);
@@ -697,10 +951,16 @@ describe("AttributeMethodsTest", () => {
 
 describe("AttributeMethodsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("score", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -1007,7 +1267,12 @@ describe("AttributeMethodsTest", () => {
   });
   it("respond_to? with a custom primary key", () => {
     class CustomPK extends Base {
-      static { this.attribute("custom_id", "integer"); this.attribute("name", "string"); this.primaryKey = "custom_id"; this.adapter = adapter; }
+      static {
+        this.attribute("custom_id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = "custom_id";
+        this.adapter = adapter;
+      }
     }
     const p = new CustomPK({ name: "test" });
     expect(p.hasAttribute("custom_id")).toBe(true);
@@ -1015,7 +1280,12 @@ describe("AttributeMethodsTest", () => {
   });
   it("id_before_type_cast with a custom primary key", () => {
     class CustomPK extends Base {
-      static { this.attribute("custom_id", "integer"); this.attribute("name", "string"); this.primaryKey = "custom_id"; this.adapter = adapter; }
+      static {
+        this.attribute("custom_id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = "custom_id";
+        this.adapter = adapter;
+      }
     }
     const p = new CustomPK({ custom_id: "42", name: "test" });
     expect(p.readAttributeBeforeTypeCast("custom_id")).toBe("42");
@@ -1030,7 +1300,11 @@ describe("AttributeMethodsTest", () => {
   });
   it("read attributes_before_type_cast on a boolean", () => {
     class PostBool extends Base {
-      static { this.attribute("title", "string"); this.attribute("published", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adapter;
+      }
     }
     const p = new PostBool({ title: "test", published: "true" });
     expect(p.readAttributeBeforeTypeCast("published")).toBe("true");
@@ -1044,7 +1318,11 @@ describe("AttributeMethodsTest", () => {
   });
   it("write time to date attribute", () => {
     class Event extends Base {
-      static { this.attribute("name", "string"); this.attribute("starts_on", "date"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("starts_on", "date");
+        this.adapter = adapter;
+      }
     }
     const e = new Event({ name: "party", starts_on: "2024-06-15" });
     const val = e.readAttribute("starts_on");
@@ -1052,7 +1330,11 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware attribute to UTC", () => {
     class Event extends Base {
-      static { this.attribute("name", "string"); this.attribute("created_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("created_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const utcDate = new Date("2024-06-15T12:00:00Z");
     const e = new Event({ name: "utc", created_at: utcDate });
@@ -1069,10 +1351,11 @@ describe("AttributeMethodsTest", () => {
   });
 });
 
-
 describe("alias_attribute", () => {
   it("creates a getter/setter alias for an attribute", () => {
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.aliasAttribute("fullName", "name");
@@ -1088,7 +1371,9 @@ describe("alias_attribute", () => {
 describe("attributeForInspect", () => {
   it("formats string attributes with quotes", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -1099,7 +1384,9 @@ describe("attributeForInspect", () => {
 
   it("truncates long strings to 50 chars", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -1112,7 +1399,9 @@ describe("attributeForInspect", () => {
 
   it("returns nil for null", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -1123,7 +1412,9 @@ describe("attributeForInspect", () => {
 
   it("formats numbers as JSON", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("age", "integer");
     User.adapter = adapter;
@@ -1132,7 +1423,6 @@ describe("attributeForInspect", () => {
     expect(user.attributeForInspect("age")).toBe("25");
   });
 });
-
 
 describe("alias_attribute (Rails-guided)", () => {
   // Rails: test "alias_attribute creates accessor alias"
@@ -1183,7 +1473,9 @@ describe("humanAttributeName", () => {
 describe("attributePresent()", () => {
   it("returns true for non-null, non-empty values", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("email", "string");
@@ -1196,7 +1488,9 @@ describe("attributePresent()", () => {
 
   it("returns false for empty strings", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -1245,7 +1539,12 @@ describe("Base.attributeTypes", () => {
   it("returns a map of attribute name to type object", () => {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const types = User.attributeTypes;
     expect(types).toHaveProperty("id");
@@ -1298,7 +1597,9 @@ describe("Base.contentColumns", () => {
 
 describe("ignoredColumns", () => {
   it("can be set and retrieved on a model class", () => {
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
 

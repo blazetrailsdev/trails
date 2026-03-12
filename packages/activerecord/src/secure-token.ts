@@ -30,7 +30,7 @@ function generateToken(length: number = 24): string {
 export function hasSecureToken(
   modelClass: typeof Base,
   attribute: string = "token",
-  options?: { length?: number }
+  options?: { length?: number },
 ): void {
   const tokenLength = options?.length ?? 24;
 

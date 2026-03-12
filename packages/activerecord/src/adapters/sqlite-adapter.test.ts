@@ -27,57 +27,35 @@ describe("SqliteAdapter", () => {
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {
       adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-      await adapter.executeMutation(
-        `INSERT INTO "users" ("name") VALUES ('Alice')`
-      );
+      await adapter.executeMutation(`INSERT INTO "users" ("name") VALUES ('Alice')`);
       const rows = await adapter.execute(`SELECT * FROM "users"`);
       expect(rows).toHaveLength(1);
       expect(rows[0].name).toBe("Alice");
     });
 
     it("returns last insert rowid for INSERT", async () => {
-      adapter.exec(
-        `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`
-      );
-      const id1 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('A')`
-      );
-      const id2 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('B')`
-      );
+      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
+      const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
       expect(id1).toBe(1);
       expect(id2).toBe(2);
     });
 
     it("returns affected rows for UPDATE", async () => {
       adapter.exec(
-        `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)`
+        `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)`,
       );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('A')`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('B')`
-      );
-      const affected = await adapter.executeMutation(
-        `UPDATE "items" SET "active" = 0`
-      );
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
+      const affected = await adapter.executeMutation(`UPDATE "items" SET "active" = 0`);
       expect(affected).toBe(2);
     });
 
     it("returns affected rows for DELETE", async () => {
-      adapter.exec(
-        `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('A')`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('B')`
-      );
-      const deleted = await adapter.executeMutation(
-        `DELETE FROM "items" WHERE "name" = 'A'`
-      );
+      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
+      const deleted = await adapter.executeMutation(`DELETE FROM "items" WHERE "name" = 'A'`);
       expect(deleted).toBe(1);
     });
   });
@@ -86,17 +64,17 @@ describe("SqliteAdapter", () => {
   describe("transactions", () => {
     beforeEach(() => {
       adapter.exec(
-        `CREATE TABLE "accounts" ("id" INTEGER PRIMARY KEY, "name" TEXT, "balance" INTEGER)`
+        `CREATE TABLE "accounts" ("id" INTEGER PRIMARY KEY, "name" TEXT, "balance" INTEGER)`,
       );
     });
 
     it("commits on success", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`,
       );
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`,
       );
       await adapter.commit();
 
@@ -107,7 +85,7 @@ describe("SqliteAdapter", () => {
     it("rolls back on failure", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`,
       );
       await adapter.rollback();
 
@@ -118,17 +96,17 @@ describe("SqliteAdapter", () => {
     it("savepoints allow partial rollback", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`,
       );
 
       await adapter.createSavepoint("sp1");
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`,
       );
       await adapter.rollbackToSavepoint("sp1");
 
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Charlie', 300)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Charlie', 300)`,
       );
       await adapter.commit();
 
@@ -291,26 +269,18 @@ describe("SqliteAdapter", () => {
     });
 
     it("chained where conditions", async () => {
-      const items = await Product.where({ category: "fruit" })
-        .where({ name: "Apple" })
-        .toArray();
+      const items = await Product.where({ category: "fruit" }).where({ name: "Apple" }).toArray();
       expect(items).toHaveLength(1);
     });
 
     it("order sorts correctly", async () => {
-      const items = await Product.all()
-        .order({ price: "desc" })
-        .toArray();
+      const items = await Product.all().order({ price: "desc" }).toArray();
       expect(items[0].readAttribute("name")).toBe("Eggplant");
       expect(items[4].readAttribute("name")).toBe("Apple");
     });
 
     it("limit and offset", async () => {
-      const items = await Product.all()
-        .order("name")
-        .limit(2)
-        .offset(1)
-        .toArray();
+      const items = await Product.all().order("name").limit(2).offset(1).toArray();
       expect(items).toHaveLength(2);
     });
 
@@ -326,13 +296,7 @@ describe("SqliteAdapter", () => {
 
     it("pluck single column", async () => {
       const names = await Product.all().order("name").pluck("name");
-      expect(names).toEqual([
-        "Apple",
-        "Banana",
-        "Carrot",
-        "Date",
-        "Eggplant",
-      ]);
+      expect(names).toEqual(["Apple", "Banana", "Carrot", "Date", "Eggplant"]);
     });
 
     it("ids", async () => {
@@ -385,7 +349,7 @@ describe("SqliteAdapter", () => {
 
       // Verify table exists
       const id = await adapter.executeMutation(
-        `INSERT INTO "posts" ("title", "body", "author_id", "published", "created_at", "updated_at") VALUES ('Test', 'Body', 1, 0, '2024-01-01', '2024-01-01')`
+        `INSERT INTO "posts" ("title", "body", "author_id", "published", "created_at", "updated_at") VALUES ('Test', 'Body', 1, 0, '2024-01-01', '2024-01-01')`,
       );
       expect(id).toBe(1);
 
@@ -395,15 +359,11 @@ describe("SqliteAdapter", () => {
 
       // Rollback
       await migration.run(adapter, "down");
-      await expect(
-        adapter.execute(`SELECT * FROM "posts"`)
-      ).rejects.toThrow();
+      await expect(adapter.execute(`SELECT * FROM "posts"`)).rejects.toThrow();
     });
 
     it("adds columns with migrations", async () => {
-      adapter.exec(
-        `CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`
-      );
+      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
 
       class AddEmailToUsers extends Migration {
         async up() {
@@ -419,16 +379,14 @@ describe("SqliteAdapter", () => {
       await migration.run(adapter, "up");
 
       await adapter.executeMutation(
-        `INSERT INTO "users" ("name", "email") VALUES ('Alice', 'alice@test.com')`
+        `INSERT INTO "users" ("name", "email") VALUES ('Alice', 'alice@test.com')`,
       );
       const rows = await adapter.execute(`SELECT * FROM "users"`);
       expect(rows[0].email).toBe("alice@test.com");
     });
 
     it("creates indexes", async () => {
-      adapter.exec(
-        `CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "email" TEXT)`
-      );
+      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "email" TEXT)`);
 
       class AddEmailIndex extends Migration {
         async up() {
@@ -444,13 +402,9 @@ describe("SqliteAdapter", () => {
       await migration.run(adapter, "up");
 
       // Unique index should prevent duplicates
-      await adapter.executeMutation(
-        `INSERT INTO "users" ("email") VALUES ('alice@test.com')`
-      );
+      await adapter.executeMutation(`INSERT INTO "users" ("email") VALUES ('alice@test.com')`);
       await expect(
-        adapter.executeMutation(
-          `INSERT INTO "users" ("email") VALUES ('alice@test.com')`
-        )
+        adapter.executeMutation(`INSERT INTO "users" ("email") VALUES ('alice@test.com')`),
       ).rejects.toThrow();
     });
   });
@@ -587,7 +541,9 @@ describe("SqliteAdapter", () => {
   // -- Rails test class: sqlite3_adapter_test.rb --
   describe("SQLite3AdapterTest", () => {
     beforeEach(() => {
-      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT, "price" INTEGER, "active" INTEGER DEFAULT 1)`);
+      adapter.exec(
+        `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT, "price" INTEGER, "active" INTEGER DEFAULT 1)`,
+      );
     });
 
     it("database should get created when missing parent directories for database path", async () => {
@@ -601,7 +557,10 @@ describe("SqliteAdapter", () => {
       expect(a.isOpen).toBe(true);
       a.close();
       fs.unlinkSync(dbPath);
-      fs.rmSync(path.join(os.tmpdir(), `sqlite-nested-${Date.now()}`), { recursive: true, force: true });
+      fs.rmSync(path.join(os.tmpdir(), `sqlite-nested-${Date.now()}`), {
+        recursive: true,
+        force: true,
+      });
     });
 
     it("database exists returns false when the database does not exist", async () => {
@@ -635,7 +594,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("column types", async () => {
-      adapter.exec(`CREATE TABLE "typed" ("id" INTEGER PRIMARY KEY, "name" TEXT, "age" INTEGER, "score" REAL, "data" BLOB)`);
+      adapter.exec(
+        `CREATE TABLE "typed" ("id" INTEGER PRIMARY KEY, "name" TEXT, "age" INTEGER, "score" REAL, "data" BLOB)`,
+      );
       const cols = await adapter.execute(`PRAGMA table_info("typed")`);
       expect(cols.length).toBe(5);
       const types = cols.map((c: any) => c.type);
@@ -651,7 +612,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("exec insert with quote", async () => {
-      const id = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('it''s a test')`);
+      const id = await adapter.executeMutation(
+        `INSERT INTO "items" ("name") VALUES ('it''s a test')`,
+      );
       expect(id).toBe(1);
       const rows = await adapter.execute(`SELECT "name" FROM "items" WHERE "id" = 1`);
       expect(rows[0].name).toBe("it's a test");
@@ -666,7 +629,9 @@ describe("SqliteAdapter", () => {
 
     it("connection no db", () => {
       // Attempting to open a non-existent file in readonly mode throws
-      expect(() => new SqliteAdapter("/tmp/nonexistent-path-12345/no.db", { readonly: true })).toThrow();
+      expect(
+        () => new SqliteAdapter("/tmp/nonexistent-path-12345/no.db", { readonly: true }),
+      ).toThrow();
     });
 
     it("bad timeout", () => {
@@ -775,7 +740,10 @@ describe("SqliteAdapter", () => {
     });
 
     it("exec query typecasts bind vals", async () => {
-      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES (?, ?)`, ["widget", 10]);
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES (?, ?)`, [
+        "widget",
+        10,
+      ]);
       const rows = await adapter.execute(`SELECT * FROM "items" WHERE "name" = ?`, ["widget"]);
       expect(rows).toHaveLength(1);
       expect(rows[0].price).toBe(10);
@@ -821,7 +789,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("exec insert default values with returning disabled", async () => {
-      adapter.exec(`CREATE TABLE "def_vals" ("id" INTEGER PRIMARY KEY, "name" TEXT DEFAULT 'default')`);
+      adapter.exec(
+        `CREATE TABLE "def_vals" ("id" INTEGER PRIMARY KEY, "name" TEXT DEFAULT 'default')`,
+      );
       const id = await adapter.executeMutation(`INSERT INTO "def_vals" DEFAULT VALUES`);
       expect(id).toBe(1);
       const rows = await adapter.execute(`SELECT * FROM "def_vals"`);
@@ -849,7 +819,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("tables", async () => {
-      const rows = await adapter.execute(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`);
+      const rows = await adapter.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+      );
       const names = rows.map((r: any) => r.name);
       expect(names).toContain("items");
     });
@@ -985,7 +957,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("copy table with composite primary keys", async () => {
-      adapter.exec(`CREATE TABLE "cpk_src" ("a" INTEGER, "b" INTEGER, "val" TEXT, PRIMARY KEY ("a", "b"))`);
+      adapter.exec(
+        `CREATE TABLE "cpk_src" ("a" INTEGER, "b" INTEGER, "val" TEXT, PRIMARY KEY ("a", "b"))`,
+      );
       await adapter.executeMutation(`INSERT INTO "cpk_src" ("a", "b", "val") VALUES (1, 2, 'x')`);
       adapter.exec(`CREATE TABLE "cpk_dest" AS SELECT * FROM "cpk_src"`);
       const rows = await adapter.execute(`SELECT * FROM "cpk_dest"`);
@@ -1095,7 +1069,9 @@ describe("SqliteAdapter", () => {
       writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       writer.close();
       const reader = new SqliteAdapter(tmpFile, { readonly: true });
-      await expect(reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`)).rejects.toThrow();
+      await expect(
+        reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`),
+      ).rejects.toThrow();
       reader.close();
       fs.unlinkSync(tmpFile);
     });
@@ -1145,7 +1121,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("integer cpk column returns false for rowid", async () => {
-      adapter.exec(`CREATE TABLE "cpk" ("id1" INTEGER, "id2" INTEGER, "name" TEXT, PRIMARY KEY ("id1", "id2"))`);
+      adapter.exec(
+        `CREATE TABLE "cpk" ("id1" INTEGER, "id2" INTEGER, "name" TEXT, PRIMARY KEY ("id1", "id2"))`,
+      );
       const cols = await adapter.execute(`PRAGMA table_info("cpk")`);
       // Composite PK - neither column is a single rowid alias
       const pkCols = cols.filter((c: any) => c.pk > 0);
@@ -1200,14 +1178,18 @@ describe("SqliteAdapter", () => {
   // -- Rails test class: collation_test.rb --
   describe("SQLite3CollationTest", () => {
     it("string column with collation", async () => {
-      adapter.exec(`CREATE TABLE "coll_str" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE NOCASE)`);
+      adapter.exec(
+        `CREATE TABLE "coll_str" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE NOCASE)`,
+      );
       await adapter.executeMutation(`INSERT INTO "coll_str" ("name") VALUES ('Alice')`);
       const rows = await adapter.execute(`SELECT * FROM "coll_str" WHERE "name" = 'alice'`);
       expect(rows).toHaveLength(1);
     });
 
     it("text column with collation", async () => {
-      adapter.exec(`CREATE TABLE "coll_text" ("id" INTEGER PRIMARY KEY, "body" TEXT COLLATE NOCASE)`);
+      adapter.exec(
+        `CREATE TABLE "coll_text" ("id" INTEGER PRIMARY KEY, "body" TEXT COLLATE NOCASE)`,
+      );
       await adapter.executeMutation(`INSERT INTO "coll_text" ("body") VALUES ('Hello World')`);
       const rows = await adapter.execute(`SELECT * FROM "coll_text" WHERE "body" = 'hello world'`);
       expect(rows).toHaveLength(1);
@@ -1231,7 +1213,9 @@ describe("SqliteAdapter", () => {
 
       // SQLite doesn't support ALTER COLUMN, so we recreate the table (Rails-style copy)
       adapter.exec(`ALTER TABLE "coll_change" RENAME TO "coll_change_old"`);
-      adapter.exec(`CREATE TABLE "coll_change" ("id" INTEGER PRIMARY KEY, "title" TEXT COLLATE NOCASE)`);
+      adapter.exec(
+        `CREATE TABLE "coll_change" ("id" INTEGER PRIMARY KEY, "title" TEXT COLLATE NOCASE)`,
+      );
       adapter.exec(`INSERT INTO "coll_change" SELECT * FROM "coll_change_old"`);
       adapter.exec(`DROP TABLE "coll_change_old"`);
 
@@ -1257,7 +1241,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("copy table with column with default", async () => {
-      adapter.exec(`CREATE TABLE "src_def" ("id" INTEGER PRIMARY KEY, "name" TEXT DEFAULT 'unnamed')`);
+      adapter.exec(
+        `CREATE TABLE "src_def" ("id" INTEGER PRIMARY KEY, "name" TEXT DEFAULT 'unnamed')`,
+      );
       await adapter.executeMutation(`INSERT INTO "src_def" ("id") VALUES (1)`);
       const rows = await adapter.execute(`SELECT * FROM "src_def"`);
       expect(rows[0].name).toBe("unnamed");
@@ -1296,7 +1282,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("copy table with id col that is not primary key", async () => {
-      adapter.exec(`CREATE TABLE "id_not_pk" ("id" INTEGER, "real_pk" INTEGER PRIMARY KEY, "name" TEXT)`);
+      adapter.exec(
+        `CREATE TABLE "id_not_pk" ("id" INTEGER, "real_pk" INTEGER PRIMARY KEY, "name" TEXT)`,
+      );
       await adapter.executeMutation(`INSERT INTO "id_not_pk" ("id", "name") VALUES (99, 'test')`);
       adapter.exec(`CREATE TABLE "id_not_pk_copy" AS SELECT * FROM "id_not_pk"`);
       const rows = await adapter.execute(`SELECT * FROM "id_not_pk_copy"`);
@@ -1306,7 +1294,9 @@ describe("SqliteAdapter", () => {
 
     it("copy table with unconventional primary key", async () => {
       adapter.exec(`CREATE TABLE "unconv_pk" ("guid" TEXT PRIMARY KEY, "name" TEXT)`);
-      await adapter.executeMutation(`INSERT INTO "unconv_pk" ("guid", "name") VALUES ('abc-123', 'test')`);
+      await adapter.executeMutation(
+        `INSERT INTO "unconv_pk" ("guid", "name") VALUES ('abc-123', 'test')`,
+      );
       adapter.exec(`CREATE TABLE "unconv_pk_copy" AS SELECT * FROM "unconv_pk"`);
       const rows = await adapter.execute(`SELECT * FROM "unconv_pk_copy"`);
       expect(rows).toHaveLength(1);
@@ -1323,7 +1313,9 @@ describe("SqliteAdapter", () => {
     });
 
     it("copy table with virtual column", async () => {
-      adapter.exec(`CREATE TABLE "virt_src" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER, "sum" INTEGER GENERATED ALWAYS AS ("a" + "b") VIRTUAL)`);
+      adapter.exec(
+        `CREATE TABLE "virt_src" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER, "sum" INTEGER GENERATED ALWAYS AS ("a" + "b") VIRTUAL)`,
+      );
       await adapter.executeMutation(`INSERT INTO "virt_src" ("a", "b") VALUES (1, 2)`);
       // CREATE TABLE AS SELECT copies data but not generated columns
       adapter.exec(`CREATE TABLE "virt_copy" AS SELECT "id", "a", "b", "sum" FROM "virt_src"`);
@@ -1370,7 +1362,7 @@ describe("SqliteAdapter", () => {
 
     it("type cast binary encoding without logger", async () => {
       adapter.exec(`CREATE TABLE "bin_enc" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
-      const buf = Buffer.from([0xDE, 0xAD, 0xBE, 0xEF]);
+      const buf = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
       await adapter.executeMutation(`INSERT INTO "bin_enc" ("data") VALUES (?)`, [buf]);
       const rows = await adapter.execute(`SELECT "data" FROM "bin_enc"`);
       expect(Buffer.from(rows[0].data as Buffer)).toEqual(buf);
@@ -1460,7 +1452,9 @@ describe("SqliteAdapter", () => {
     it("errors when an insert query is called while preventing writes", async () => {
       adapter.exec(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       await adapter.withPreventedWrites(async () => {
-        await expect(adapter.executeMutation(`INSERT INTO "pw" ("name") VALUES ('x')`)).rejects.toThrow(/preventing writes/);
+        await expect(
+          adapter.executeMutation(`INSERT INTO "pw" ("name") VALUES ('x')`),
+        ).rejects.toThrow(/preventing writes/);
       });
     });
 
@@ -1468,7 +1462,9 @@ describe("SqliteAdapter", () => {
       adapter.exec(`CREATE TABLE "pw2" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "pw2" ("name") VALUES ('x')`);
       await adapter.withPreventedWrites(async () => {
-        await expect(adapter.executeMutation(`UPDATE "pw2" SET "name" = 'y'`)).rejects.toThrow(/preventing writes/);
+        await expect(adapter.executeMutation(`UPDATE "pw2" SET "name" = 'y'`)).rejects.toThrow(
+          /preventing writes/,
+        );
       });
     });
 
@@ -1476,14 +1472,18 @@ describe("SqliteAdapter", () => {
       adapter.exec(`CREATE TABLE "pw3" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "pw3" ("name") VALUES ('x')`);
       await adapter.withPreventedWrites(async () => {
-        await expect(adapter.executeMutation(`DELETE FROM "pw3"`)).rejects.toThrow(/preventing writes/);
+        await expect(adapter.executeMutation(`DELETE FROM "pw3"`)).rejects.toThrow(
+          /preventing writes/,
+        );
       });
     });
 
     it("errors when a replace query is called while preventing writes", async () => {
       adapter.exec(`CREATE TABLE "pw4" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       await adapter.withPreventedWrites(async () => {
-        await expect(adapter.executeMutation(`REPLACE INTO "pw4" ("id", "name") VALUES (1, 'x')`)).rejects.toThrow(/preventing writes/);
+        await expect(
+          adapter.executeMutation(`REPLACE INTO "pw4" ("id", "name") VALUES (1, 'x')`),
+        ).rejects.toThrow(/preventing writes/);
       });
     });
 
@@ -1512,7 +1512,9 @@ describe("SqliteAdapter", () => {
   // -- Rails test class: virtual_column_test.rb --
   describe("SQLite3VirtualColumnTest", () => {
     it("virtual column with full inserts", async () => {
-      adapter.exec(`CREATE TABLE "virt_full" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER, "sum" INTEGER GENERATED ALWAYS AS ("x" + "y") VIRTUAL)`);
+      adapter.exec(
+        `CREATE TABLE "virt_full" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER, "sum" INTEGER GENERATED ALWAYS AS ("x" + "y") VIRTUAL)`,
+      );
       // Cannot insert into generated columns — should only specify real columns
       await adapter.executeMutation(`INSERT INTO "virt_full" ("x", "y") VALUES (5, 3)`);
       const rows = await adapter.execute(`SELECT "sum" FROM "virt_full"`);
@@ -1520,38 +1522,52 @@ describe("SqliteAdapter", () => {
     });
 
     it("stored column", async () => {
-      adapter.exec(`CREATE TABLE "stored_gen" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`);
+      adapter.exec(
+        `CREATE TABLE "stored_gen" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`,
+      );
       await adapter.executeMutation(`INSERT INTO "stored_gen" ("price", "tax") VALUES (100, 10)`);
       const rows = await adapter.execute(`SELECT "total" FROM "stored_gen"`);
       expect(rows[0].total).toBe(110);
     });
 
     it("explicit virtual column", async () => {
-      adapter.exec(`CREATE TABLE "virt_gen" ("id" INTEGER PRIMARY KEY, "first" TEXT, "last" TEXT, "full" TEXT GENERATED ALWAYS AS ("first" || ' ' || "last") VIRTUAL)`);
-      await adapter.executeMutation(`INSERT INTO "virt_gen" ("first", "last") VALUES ('Alice', 'Smith')`);
+      adapter.exec(
+        `CREATE TABLE "virt_gen" ("id" INTEGER PRIMARY KEY, "first" TEXT, "last" TEXT, "full" TEXT GENERATED ALWAYS AS ("first" || ' ' || "last") VIRTUAL)`,
+      );
+      await adapter.executeMutation(
+        `INSERT INTO "virt_gen" ("first", "last") VALUES ('Alice', 'Smith')`,
+      );
       const rows = await adapter.execute(`SELECT "full" FROM "virt_gen"`);
       expect(rows[0].full).toBe("Alice Smith");
     });
 
     it("implicit virtual column", async () => {
       // Without STORED keyword, generated columns are virtual by default
-      adapter.exec(`CREATE TABLE "impl_virt" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER, "c" INTEGER GENERATED ALWAYS AS ("a" + "b"))`);
+      adapter.exec(
+        `CREATE TABLE "impl_virt" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER, "c" INTEGER GENERATED ALWAYS AS ("a" + "b"))`,
+      );
       await adapter.executeMutation(`INSERT INTO "impl_virt" ("a", "b") VALUES (3, 4)`);
       const rows = await adapter.execute(`SELECT "c" FROM "impl_virt"`);
       expect(rows[0].c).toBe(7);
     });
 
     it("virtual column with comma in definition", async () => {
-      adapter.exec(`CREATE TABLE "virt_comma" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER, "label" TEXT GENERATED ALWAYS AS (CAST("x" AS TEXT) || ',' || CAST("y" AS TEXT)) VIRTUAL)`);
+      adapter.exec(
+        `CREATE TABLE "virt_comma" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER, "label" TEXT GENERATED ALWAYS AS (CAST("x" AS TEXT) || ',' || CAST("y" AS TEXT)) VIRTUAL)`,
+      );
       await adapter.executeMutation(`INSERT INTO "virt_comma" ("x", "y") VALUES (1, 2)`);
       const rows = await adapter.execute(`SELECT "label" FROM "virt_comma"`);
       expect(rows[0].label).toBe("1,2");
     });
 
     it("change table with stored generated column", async () => {
-      adapter.exec(`CREATE TABLE "chg_stored" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER)`);
+      adapter.exec(
+        `CREATE TABLE "chg_stored" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER)`,
+      );
       // SQLite 3.31+ supports ADD COLUMN with generated
-      adapter.exec(`ALTER TABLE "chg_stored" ADD COLUMN "total" INTEGER GENERATED ALWAYS AS ("x" + "y") STORED`);
+      adapter.exec(
+        `ALTER TABLE "chg_stored" ADD COLUMN "total" INTEGER GENERATED ALWAYS AS ("x" + "y") STORED`,
+      );
       await adapter.executeMutation(`INSERT INTO "chg_stored" ("x", "y") VALUES (5, 3)`);
       const rows = await adapter.execute(`SELECT "total" FROM "chg_stored"`);
       expect(rows[0].total).toBe(8);
@@ -1559,8 +1575,12 @@ describe("SqliteAdapter", () => {
 
     it("change table with explicit virtual generated column", async () => {
       adapter.exec(`CREATE TABLE "chg_virt" ("id" INTEGER PRIMARY KEY, "first" TEXT, "last" TEXT)`);
-      adapter.exec(`ALTER TABLE "chg_virt" ADD COLUMN "full" TEXT GENERATED ALWAYS AS ("first" || ' ' || "last") VIRTUAL`);
-      await adapter.executeMutation(`INSERT INTO "chg_virt" ("first", "last") VALUES ('John', 'Doe')`);
+      adapter.exec(
+        `ALTER TABLE "chg_virt" ADD COLUMN "full" TEXT GENERATED ALWAYS AS ("first" || ' ' || "last") VIRTUAL`,
+      );
+      await adapter.executeMutation(
+        `INSERT INTO "chg_virt" ("first", "last") VALUES ('John', 'Doe')`,
+      );
       const rows = await adapter.execute(`SELECT "full" FROM "chg_virt"`);
       expect(rows[0].full).toBe("John Doe");
     });

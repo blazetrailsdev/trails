@@ -534,7 +534,7 @@ describe("MemoryStorePruningTest", () => {
     store.write("b", "2");
     store.write("c", "3"); // may trigger pruning
     // At least some entries exist
-    const count = ["a", "b", "c"].filter(k => store.exist(k)).length;
+    const count = ["a", "b", "c"].filter((k) => store.exist(k)).length;
     expect(count).toBeGreaterThan(0);
   });
 
@@ -542,7 +542,9 @@ describe("MemoryStorePruningTest", () => {
     const store = new MemoryStore({ sizeLimit: 10 });
     store.write("short", "v");
     store.write("a_very_long_key_that_takes_space", "v");
-    const count = ["short", "a_very_long_key_that_takes_space"].filter(k => store.exist(k)).length;
+    const count = ["short", "a_very_long_key_that_takes_space"].filter((k) =>
+      store.exist(k),
+    ).length;
     expect(count).toBeGreaterThan(0);
   });
 

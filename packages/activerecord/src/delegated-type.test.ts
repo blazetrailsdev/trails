@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,7 +68,9 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("DelegatedTypeTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModels() {
     class Entry extends Base {
@@ -63,7 +105,11 @@ describe("DelegatedTypeTest", () => {
         this.adapter = adapter;
       }
     }
-    delegatedType(Entry2, "entryable", { types: ["Message"], foreignType: "custom_type", foreignKey: "custom_id" });
+    delegatedType(Entry2, "entryable", {
+      types: ["Message"],
+      foreignType: "custom_type",
+      foreignKey: "custom_id",
+    });
     const e = new Entry2({ custom_type: "Message", custom_id: 1 });
     expect((e as any).entryableClass).toBe("Message");
   });
@@ -89,7 +135,11 @@ describe("DelegatedTypeTest", () => {
         this.adapter = adapter;
       }
     }
-    delegatedType(Entry2, "entryable", { types: ["Message", "Comment"], foreignType: "custom_type", foreignKey: "custom_id" });
+    delegatedType(Entry2, "entryable", {
+      types: ["Message", "Comment"],
+      foreignType: "custom_type",
+      foreignKey: "custom_id",
+    });
     const e = new Entry2({ custom_type: "Comment", custom_id: 1 });
     expect((e as any).isComment()).toBe(true);
     expect((e as any).isMessage()).toBe(false);
@@ -113,7 +163,11 @@ describe("DelegatedTypeTest", () => {
         this.adapter = adapter;
       }
     }
-    delegatedType(Entry2, "entryable", { types: ["Message", "Comment"], foreignType: "custom_type", foreignKey: "custom_id" });
+    delegatedType(Entry2, "entryable", {
+      types: ["Message", "Comment"],
+      foreignType: "custom_type",
+      foreignKey: "custom_id",
+    });
     await Entry2.create({ title: "a", custom_type: "Message", custom_id: 1 });
     await Entry2.create({ title: "b", custom_type: "Comment", custom_id: 2 });
     const comments = await (Entry2 as any).comments().toArray();
@@ -134,9 +188,13 @@ describe("DelegatedTypeTest", () => {
     expect(e.readAttribute("entryable_id")).toBe(99);
   });
 
-  it.skip("association uuid", () => { /* needs UUID primary key support */ });
+  it.skip("association uuid", () => {
+    /* needs UUID primary key support */
+  });
 
-  it.skip("touch account", () => { /* needs touch support on polymorphic association */ });
+  it.skip("touch account", () => {
+    /* needs touch support on polymorphic association */
+  });
 
   it("builder method", () => {
     const { Entry } = makeModels();

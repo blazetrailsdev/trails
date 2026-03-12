@@ -44,12 +44,13 @@ export class RoutesInspector {
       r.controller && r.action ? `${r.controller}#${r.action}` : "",
     ]);
 
-    const widths = headers.map((h, i) =>
-      Math.max(h.length, ...data.map((row) => row[i].length))
-    );
+    const widths = headers.map((h, i) => Math.max(h.length, ...data.map((row) => row[i].length)));
 
     const formatRow = (cols: string[]) =>
-      cols.map((c, i) => c.padEnd(widths[i])).join("  ").trimEnd();
+      cols
+        .map((c, i) => c.padEnd(widths[i]))
+        .join("  ")
+        .trimEnd();
 
     const lines = data.map(formatRow);
     return lines.join("\n");

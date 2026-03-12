@@ -140,7 +140,9 @@ describe("TestJSONEncoding", () => {
   it("enumerable should generate json with to json", () => {
     class Item {
       constructor(public value: string) {}
-      toJSON() { return { value: this.value }; }
+      toJSON() {
+        return { value: this.value };
+      }
     }
     const item = new Item("test");
     expect(JSON.parse(JSON.stringify(item))).toEqual({ value: "test" });
@@ -154,7 +156,9 @@ describe("TestJSONEncoding", () => {
   it("enumerable should pass encoding options to children in to json", () => {
     class Container {
       constructor(private items: number[]) {}
-      toJSON() { return this.items; }
+      toJSON() {
+        return this.items;
+      }
     }
     const c = new Container([1, 2, 3]);
     expect(JSON.parse(JSON.stringify(c))).toEqual([1, 2, 3]);
@@ -190,21 +194,55 @@ describe("TestJSONEncoding", () => {
     expect(JSON.parse(json)).toEqual([{ x: "hello" }]);
   });
 
-  it.skip("process status", () => { /* Ruby process status object */ });
-  it.skip("hash keys encoding option", () => { /* Ruby-specific encoding options */ });
-  it.skip("non utf8 string transcodes", () => { /* Ruby encoding transcoding */ });
-  it.skip("hash like with options", () => { /* Ruby-specific hash-like objects */ });
-  it.skip("struct to json with options", () => { /* Ruby Struct */ });
-  it.skip("struct to json with options nested", () => { /* Ruby Struct nested */ });
-  it.skip("data encoding", () => { /* Ruby Data class */ });
-  it.skip("json gem dump by passing active support encoder", () => { /* Ruby json gem */ });
-  it.skip("json gem generate by passing active support encoder", () => { /* Ruby json gem */ });
-  it.skip("json gem pretty generate by passing active support encoder", () => { /* Ruby json gem */ });
-  it.skip("twz to json with use standard json time format config set to false", () => { /* TimeWithZone */ });
-  it.skip("twz to json with use standard json time format config set to true", () => { /* TimeWithZone */ });
-  it.skip("twz to json with custom time precision", () => { /* TimeWithZone */ });
-  it.skip("time to json with custom time precision", () => { /* custom precision */ });
-  it.skip("datetime to json with custom time precision", () => { /* custom precision */ });
-  it.skip("twz to json when wrapping a date time", () => { /* TimeWithZone */ });
-  it.skip("to json works on io objects", () => { /* Ruby IO */ });
+  it.skip("process status", () => {
+    /* Ruby process status object */
+  });
+  it.skip("hash keys encoding option", () => {
+    /* Ruby-specific encoding options */
+  });
+  it.skip("non utf8 string transcodes", () => {
+    /* Ruby encoding transcoding */
+  });
+  it.skip("hash like with options", () => {
+    /* Ruby-specific hash-like objects */
+  });
+  it.skip("struct to json with options", () => {
+    /* Ruby Struct */
+  });
+  it.skip("struct to json with options nested", () => {
+    /* Ruby Struct nested */
+  });
+  it.skip("data encoding", () => {
+    /* Ruby Data class */
+  });
+  it.skip("json gem dump by passing active support encoder", () => {
+    /* Ruby json gem */
+  });
+  it.skip("json gem generate by passing active support encoder", () => {
+    /* Ruby json gem */
+  });
+  it.skip("json gem pretty generate by passing active support encoder", () => {
+    /* Ruby json gem */
+  });
+  it.skip("twz to json with use standard json time format config set to false", () => {
+    /* TimeWithZone */
+  });
+  it.skip("twz to json with use standard json time format config set to true", () => {
+    /* TimeWithZone */
+  });
+  it.skip("twz to json with custom time precision", () => {
+    /* TimeWithZone */
+  });
+  it.skip("time to json with custom time precision", () => {
+    /* custom precision */
+  });
+  it.skip("datetime to json with custom time precision", () => {
+    /* custom precision */
+  });
+  it.skip("twz to json when wrapping a date time", () => {
+    /* TimeWithZone */
+  });
+  it.skip("to json works on io objects", () => {
+    /* Ruby IO */
+  });
 });

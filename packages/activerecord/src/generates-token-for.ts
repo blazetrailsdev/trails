@@ -34,7 +34,7 @@ export function generatesTokenFor(
   options: {
     expiresIn?: number;
     generator?: (record: any) => string;
-  } = {}
+  } = {},
 ): void {
   if (!tokenPurposes.has(modelClass)) {
     tokenPurposes.set(modelClass, new Map());
@@ -62,7 +62,7 @@ export function generatesTokenFor(
       value: async function (
         this: typeof Base,
         purposeName: string,
-        token: string
+        token: string,
       ): Promise<Base | null> {
         return _findByToken(this, purposeName, token);
       },
@@ -74,11 +74,7 @@ export function generatesTokenFor(
   // Add static method: findByTokenForBang(purpose, token)
   if (!(modelClass as any).findByTokenForBang) {
     Object.defineProperty(modelClass, "findByTokenForBang", {
-      value: async function (
-        this: typeof Base,
-        purposeName: string,
-        token: string
-      ): Promise<Base> {
+      value: async function (this: typeof Base, purposeName: string, token: string): Promise<Base> {
         const record = await _findByToken(this, purposeName, token);
         if (!record) {
           const { RecordNotFound } = await import("./errors.js");
@@ -110,7 +106,7 @@ function _generateToken(record: Base, purpose: string): string {
 async function _findByToken(
   modelClass: typeof Base,
   purpose: string,
-  token: string
+  token: string,
 ): Promise<Base | null> {
   const config = _getConfig(modelClass, purpose);
   if (!config) return null;
@@ -120,9 +116,7 @@ async function _findByToken(
   const [encoded, sig] = parts;
 
   // Verify signature
-  const expectedSig = createHmac("sha256", SECRET)
-    .update(encoded)
-    .digest("base64url");
+  const expectedSig = createHmac("sha256", SECRET).update(encoded).digest("base64url");
   if (sig !== expectedSig) return null;
 
   let payload: any;
@@ -153,7 +147,7 @@ async function _findByToken(
 
 function _getConfig(
   modelClass: typeof Base,
-  purpose: string
+  purpose: string,
 ): { expiresIn?: number; generator: (record: any) => string } | undefined {
   let current: any = modelClass;
   while (current) {

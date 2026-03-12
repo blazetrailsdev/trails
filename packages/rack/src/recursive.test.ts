@@ -6,11 +6,15 @@ import { RACK_RECURSIVE_INCLUDE } from "./constants.js";
 
 describe("Rack::Recursive", () => {
   const app1 = async (env: Record<string, any>) =>
-    [200, {
-      "content-type": "text/plain",
-      "x-path-info": env["PATH_INFO"],
-      "x-query-string": env["QUERY_STRING"] || "",
-    }, ["App1"]] as any;
+    [
+      200,
+      {
+        "content-type": "text/plain",
+        "x-path-info": env["PATH_INFO"],
+        "x-query-string": env["QUERY_STRING"] || "",
+      },
+      ["App1"],
+    ] as any;
 
   const app2 = async (env: Record<string, any>) => {
     const include = env[RACK_RECURSIVE_INCLUDE];
@@ -32,7 +36,7 @@ describe("Rack::Recursive", () => {
 
   it("allow for subrequests", async () => {
     const res = await new MockRequest((env) =>
-      recursive({ "/app1": app1, "/app2": app2 }).call(env)
+      recursive({ "/app1": app1, "/app2": app2 }).call(env),
     ).get("/app2");
     expect(res.status).toBe(200);
     expect(res.bodyString).toBe("App2App1");

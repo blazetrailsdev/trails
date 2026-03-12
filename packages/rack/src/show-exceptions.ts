@@ -47,16 +47,23 @@ export class ShowExceptions {
     const escapedMessage = escapeHtml(message);
     const escapedName = escapeHtml(name);
 
-    return `<!DOCTYPE html><html><head><title>${escapedName}: ${escapedMessage}</title></head>` +
+    return (
+      `<!DOCTYPE html><html><head><title>${escapedName}: ${escapedMessage}</title></head>` +
       `<body><h1>${escapedName}: ${escapedMessage}</h1>` +
       `<h2>Rack::ShowExceptions</h2>` +
       `<h3>Backtrace</h3><pre>${stack}</pre>` +
       `<h3>GET Data</h3><p>${getData}</p>` +
       `<h3>POST Data</h3><p>${postData}</p>` +
-      `</body></html>`;
+      `</body></html>`
+    );
   }
 
-  private renderPlaintext(e: Error, name: string, message: string, env: Record<string, any>): string {
+  private renderPlaintext(
+    e: Error,
+    name: string,
+    message: string,
+    env: Record<string, any>,
+  ): string {
     const stack = e.stack || "unknown location";
     return `${name}: ${message}\n\n${stack}`;
   }
@@ -64,9 +71,11 @@ export class ShowExceptions {
   private formatBacktrace(e: Error): string {
     const stack = e.stack;
     if (!stack) return "unknown location";
-    const lines = stack.split("\n").filter(line => {
+    const lines = stack.split("\n").filter((line) => {
       // Filter out lines that don't look like stack frames
-      return line.includes(":") && (line.includes("/") || line.includes("\\") || line.includes("at "));
+      return (
+        line.includes(":") && (line.includes("/") || line.includes("\\") || line.includes("at "))
+      );
     });
     if (lines.length === 0) return "unknown location";
     return escapeHtml(lines.join("\n"));

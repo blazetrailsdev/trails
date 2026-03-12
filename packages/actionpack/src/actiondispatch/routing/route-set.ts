@@ -20,7 +20,7 @@ export type Dispatcher = (
   controller: string,
   action: string,
   params: Record<string, string>,
-  env: RackEnv
+  env: RackEnv,
 ) => Promise<RackResponse>;
 
 export class RouteSet {
@@ -68,10 +68,7 @@ export class RouteSet {
    * Generate a path for a named route.
    * Mirrors Rails' `posts_path(id: 1)`.
    */
-  pathFor(
-    routeName: string,
-    params: Record<string, string | number> = {}
-  ): string {
+  pathFor(routeName: string, params: Record<string, string | number> = {}): string {
     const route = this.namedRoutes.get(routeName);
     if (!route) {
       throw new Error(`No route matches name "${routeName}"`);
@@ -85,13 +82,15 @@ export class RouteSet {
   urlFor(
     routeName: string,
     params: Record<string, string | number> = {},
-    options: { host?: string; onlyPath?: boolean } = {}
+    options: { host?: string; onlyPath?: boolean } = {},
   ): string {
     const path = this.pathFor(routeName, params);
     if (options.onlyPath) return path;
     const host = options.host ?? this.defaultUrlOptions.host;
     if (!host) {
-      throw new Error("Missing host to link to! Please provide the :host parameter or set default_url_options[:host]");
+      throw new Error(
+        "Missing host to link to! Please provide the :host parameter or set default_url_options[:host]",
+      );
     }
     return `http://${host}${path}`;
   }
@@ -175,10 +174,6 @@ export class RouteSet {
       action: route.action,
       params,
     });
-    return [
-      200,
-      { "content-type": "application/json" },
-      bodyFromString(body),
-    ];
+    return [200, { "content-type": "application/json" }, bodyFromString(body)];
   }
 }

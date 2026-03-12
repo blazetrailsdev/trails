@@ -59,7 +59,7 @@ export class Parameters {
                   (item) =>
                     typeof item === "string" ||
                     typeof item === "number" ||
-                    typeof item === "boolean"
+                    typeof item === "boolean",
                 );
               } else if (Array.isArray(v)) {
                 // Array of hashes — permit each
@@ -82,16 +82,12 @@ export class Parameters {
 
     // Handle unpermitted parameters action
     if (Parameters.actionOnUnpermittedParameters) {
-      const unpermitted = Object.keys(this._data).filter(
-        (k) => !permittedKeyNames.has(k)
-      );
+      const unpermitted = Object.keys(this._data).filter((k) => !permittedKeyNames.has(k));
       if (unpermitted.length > 0) {
         if (Parameters.actionOnUnpermittedParameters === "raise") {
           throw new UnpermittedParameters(unpermitted);
         } else if (Parameters.actionOnUnpermittedParameters === "log") {
-          console.warn(
-            `found unpermitted parameters: ${unpermitted.join(", ")}`
-          );
+          console.warn(`found unpermitted parameters: ${unpermitted.join(", ")}`);
         }
       }
     }
@@ -118,9 +114,7 @@ export class Parameters {
     return val;
   }
 
-  expect(
-    keyOrSpec: string | Record<string, (string | Record<string, unknown>)[]>
-  ): unknown {
+  expect(keyOrSpec: string | Record<string, (string | Record<string, unknown>)[]>): unknown {
     if (typeof keyOrSpec === "string") {
       return this.require(keyOrSpec);
     }
@@ -362,9 +356,7 @@ export class Parameters {
       if (v instanceof Parameters) {
         result[k] = v.toUnsafeHash();
       } else if (Array.isArray(v)) {
-        result[k] = v.map((item) =>
-          item instanceof Parameters ? item.toUnsafeHash() : item
-        );
+        result[k] = v.map((item) => (item instanceof Parameters ? item.toUnsafeHash() : item));
       } else {
         result[k] = v;
       }
@@ -376,9 +368,7 @@ export class Parameters {
     const parts: string[] = [];
     for (const [k, v] of Object.entries(this._data)) {
       const key = prefix ? `${prefix}[${k}]` : k;
-      parts.push(
-        `${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`
-      );
+      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`);
     }
     return parts.join("&");
   }

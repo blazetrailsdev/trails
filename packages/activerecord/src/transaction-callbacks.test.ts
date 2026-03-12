@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -27,7 +67,9 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("TransactionCallbacksTest", () => {
-  it.skip("before commit exception should pop transaction stack", () => { /* fixture-dependent */ });
+  it.skip("before commit exception should pop transaction stack", () => {
+    /* fixture-dependent */
+  });
 
   it("dont call any callbacks after transaction commits for invalid record", async () => {
     const adp = freshAdapter();
@@ -39,7 +81,9 @@ describe("TransactionCallbacksTest", () => {
       }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     const t = new Topic({});
     const saved = await t.save();
     expect(saved).toBe(false);
@@ -56,7 +100,9 @@ describe("TransactionCallbacksTest", () => {
       }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     await transaction(Topic, async () => {
       const t = new Topic({});
       await t.save();
@@ -67,10 +113,15 @@ describe("TransactionCallbacksTest", () => {
   it("dont call after commit on update based on previous transaction", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     await transaction(Topic, async () => {
       await Topic.create({ title: "first" });
     });
@@ -83,15 +134,22 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("dont call after commit on destroy based on previous transaction", () => { /* destroy doesn't trigger transaction callbacks */ });
+  it.skip("dont call after commit on destroy based on previous transaction", () => {
+    /* destroy doesn't trigger transaction callbacks */
+  });
 
   it("only call after commit on save after transaction commits for saving record", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     await transaction(Topic, async () => {
       await Topic.create({ title: "test" });
       expect(called).toEqual([]); // not fired yet
@@ -102,11 +160,16 @@ describe("TransactionCallbacksTest", () => {
   it("only call after commit on update after transaction commits for existing record", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const topic = await Topic.create({ title: "original" });
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     await transaction(Topic, async () => {
       await topic.update({ title: "updated" });
       expect(called).toEqual([]);
@@ -114,16 +177,25 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("only call after commit on destroy after transaction commits for destroyed record", () => { /* destroy doesn't trigger transaction callbacks */ });
+  it.skip("only call after commit on destroy after transaction commits for destroyed record", () => {
+    /* destroy doesn't trigger transaction callbacks */
+  });
 
-  it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => { /* fixture-dependent */ });
+  it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => {
+    /* fixture-dependent */
+  });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     await transaction(Topic, async () => {
       const t = new Topic({ title: "unsaved" });
       await t.destroy();
@@ -135,10 +207,15 @@ describe("TransactionCallbacksTest", () => {
   it("only call after commit on create and doesnt leaky", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: number[] = [];
-    Topic.afterCommit(function() { called.push(1); });
+    Topic.afterCommit(function () {
+      called.push(1);
+    });
     await transaction(Topic, async () => {
       await Topic.create({ title: "one" });
     });
@@ -148,16 +225,25 @@ describe("TransactionCallbacksTest", () => {
     expect(called.length).toBe(2);
   });
 
-  it.skip("only call after commit on update after transaction commits for existing record on touch", () => { /* fixture-dependent */ });
-  it.skip("only call after commit on top level transactions", () => { /* fixture-dependent */ });
+  it.skip("only call after commit on update after transaction commits for existing record on touch", () => {
+    /* fixture-dependent */
+  });
+  it.skip("only call after commit on top level transactions", () => {
+    /* fixture-dependent */
+  });
 
   it("call after rollback after transaction rollsback", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterRollback(function() { called.push("after_rollback"); });
+    Topic.afterRollback(function () {
+      called.push("after_rollback");
+    });
     try {
       await transaction(Topic, async () => {
         await Topic.create({ title: "test" });
@@ -170,11 +256,16 @@ describe("TransactionCallbacksTest", () => {
   it("only call after rollback on update after transaction rollsback for existing record", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const topic = await Topic.create({ title: "original" });
     const called: string[] = [];
-    Topic.afterRollback(function() { called.push("after_rollback"); });
+    Topic.afterRollback(function () {
+      called.push("after_rollback");
+    });
     try {
       await transaction(Topic, async () => {
         await topic.update({ title: "updated" });
@@ -184,17 +275,26 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_rollback"]);
   });
 
-  it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => { /* fixture-dependent */ });
+  it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => {
+    /* fixture-dependent */
+  });
 
-  it.skip("only call after rollback on destroy after transaction rollsback for destroyed record", () => { /* destroy doesn't trigger transaction callbacks */ });
+  it.skip("only call after rollback on destroy after transaction rollsback for destroyed record", () => {
+    /* destroy doesn't trigger transaction callbacks */
+  });
 
   it("only call after rollback on create after transaction rollsback for new record", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterRollback(function() { called.push("after_rollback"); });
+    Topic.afterRollback(function () {
+      called.push("after_rollback");
+    });
     try {
       await transaction(Topic, async () => {
         await Topic.create({ title: "test" });
@@ -204,27 +304,45 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_rollback"]);
   });
 
-  it.skip("call after rollback when commit fails", () => { /* fixture-dependent */ });
-  it.skip("only call after rollback on records rolled back to a savepoint", () => { /* fixture-dependent */ });
-  it.skip("only call after rollback on records rolled back to a savepoint when release savepoint fails", () => { /* fixture-dependent */ });
+  it.skip("call after rollback when commit fails", () => {
+    /* fixture-dependent */
+  });
+  it.skip("only call after rollback on records rolled back to a savepoint", () => {
+    /* fixture-dependent */
+  });
+  it.skip("only call after rollback on records rolled back to a savepoint when release savepoint fails", () => {
+    /* fixture-dependent */
+  });
 
   it("after commit callback should not swallow errors", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    Topic.afterCommit(function() { throw new Error("boom"); });
-    await expect(transaction(Topic, async () => {
-      await Topic.create({ title: "test" });
-    })).rejects.toThrow("boom");
+    Topic.afterCommit(function () {
+      throw new Error("boom");
+    });
+    await expect(
+      transaction(Topic, async () => {
+        await Topic.create({ title: "test" });
+      }),
+    ).rejects.toThrow("boom");
   });
 
   it("after commit callback when raise should not restore state", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    Topic.afterCommit(function() { throw new Error("boom"); });
+    Topic.afterCommit(function () {
+      throw new Error("boom");
+    });
     try {
       await transaction(Topic, async () => {
         await Topic.create({ title: "persisted" });
@@ -237,24 +355,34 @@ describe("TransactionCallbacksTest", () => {
   it("after rollback callback should not swallow errors when set to raise", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    Topic.afterRollback(function() { throw new Error("rollback_boom"); });
-    await expect((async () => {
-      await transaction(Topic, async () => {
-        await Topic.create({ title: "test" });
-        throw new Error("trigger_rollback");
-      });
-    })()).rejects.toThrow();
+    Topic.afterRollback(function () {
+      throw new Error("rollback_boom");
+    });
+    await expect(
+      (async () => {
+        await transaction(Topic, async () => {
+          await Topic.create({ title: "test" });
+          throw new Error("trigger_rollback");
+        });
+      })(),
+    ).rejects.toThrow();
   });
 
   it("after commit callback should not rollback state that already been succeeded", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let commitCalled = false;
-    Topic.afterCommit(function() {
+    Topic.afterCommit(function () {
       commitCalled = true;
       throw new Error("callback error");
     });
@@ -268,17 +396,28 @@ describe("TransactionCallbacksTest", () => {
     expect(all.length).toBe(1);
   });
 
-  it.skip("after rollback callback when raise should restore state", () => { /* fixture-dependent */ });
-  it.skip("after rollback callbacks should validate on condition", () => { /* fixture-dependent */ });
-  it.skip("after commit callbacks should validate on condition", () => { /* fixture-dependent */ });
+  it.skip("after rollback callback when raise should restore state", () => {
+    /* fixture-dependent */
+  });
+  it.skip("after rollback callbacks should validate on condition", () => {
+    /* fixture-dependent */
+  });
+  it.skip("after commit callbacks should validate on condition", () => {
+    /* fixture-dependent */
+  });
 
   it("after commit chain not called on errors", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     try {
       await transaction(Topic, async () => {
         await Topic.create({ title: "test" });
@@ -288,15 +427,22 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual([]);
   });
 
-  it.skip("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", () => { /* fixture-dependent */ });
+  it.skip("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", () => {
+    /* fixture-dependent */
+  });
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterCommit(function() { called.push("after_commit"); });
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
     await transaction(Topic, async () => {
       await Topic.create({ title: "first" });
       await Topic.create({ title: "second" });
@@ -307,10 +453,15 @@ describe("TransactionCallbacksTest", () => {
   it("saving two records that override object id should run after rollback callbacks for both", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const called: string[] = [];
-    Topic.afterRollback(function() { called.push("after_rollback"); });
+    Topic.afterRollback(function () {
+      called.push("after_rollback");
+    });
     try {
       await transaction(Topic, async () => {
         await Topic.create({ title: "first" });
@@ -326,9 +477,14 @@ describe("TransactionCallbacksTest", () => {
     const opts = ["create", "update"];
     const original = [...opts];
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    Topic.afterCommit(function() { /* noop */ });
+    Topic.afterCommit(function () {
+      /* noop */
+    });
     await transaction(Topic, async () => {
       await Topic.create({ title: "test" });
     });
@@ -340,7 +496,6 @@ describe("TransactionCallbacksTest", () => {
   it.skip("callbacks run in order defined in model if not using run after transaction callbacks in order defined", () => {});
 });
 
-
 describe("afterCommit / afterRollback", () => {
   it("fires afterCommit callback outside transaction", async () => {
     const adapter = freshAdapter();
@@ -350,7 +505,9 @@ describe("afterCommit / afterRollback", () => {
       static {
         this.attribute("total", "integer");
         this.adapter = adapter;
-        this.afterCommit((record: any) => { log.push("committed"); });
+        this.afterCommit((record: any) => {
+          log.push("committed");
+        });
       }
     }
 
@@ -366,7 +523,9 @@ describe("afterCommit / afterRollback", () => {
       static {
         this.attribute("amount", "integer");
         this.adapter = adapter;
-        this.afterCommit((record: any) => { log.push("committed"); });
+        this.afterCommit((record: any) => {
+          log.push("committed");
+        });
       }
     }
 
@@ -383,7 +542,9 @@ describe("afterCommit / afterRollback", () => {
       static {
         this.attribute("amount", "integer");
         this.adapter = adp;
-        this.afterCommit(() => { log.push("committed"); });
+        this.afterCommit(() => {
+          log.push("committed");
+        });
       }
     }
     await Order.create({ amount: 100 });
@@ -397,7 +558,9 @@ describe("afterCommit / afterRollback", () => {
       static {
         this.attribute("total", "integer");
         this.adapter = adp;
-        this.afterCommit(() => { log.push("invoice committed"); });
+        this.afterCommit(() => {
+          log.push("invoice committed");
+        });
       }
     }
     await transaction(Invoice, async () => {

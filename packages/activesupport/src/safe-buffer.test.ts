@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { SafeBuffer, htmlSafe, htmlEscape, htmlEscapeOnce, xmlNameEscape, isHtmlSafe } from "./safe-buffer.js";
+import {
+  SafeBuffer,
+  htmlSafe,
+  htmlEscape,
+  htmlEscapeOnce,
+  xmlNameEscape,
+  isHtmlSafe,
+} from "./safe-buffer.js";
 
 describe("SafeBufferTest", () => {
   it("Should look like a string", () => {
@@ -124,28 +131,72 @@ describe("SafeBufferTest", () => {
     expect(result.htmlSafe).toBe(true);
   });
 
-  it.skip("titleize", () => { /* string method, not directly SafeBuffer */ });
-  it.skip("Should be converted to_yaml", () => { /* YAML, not applicable in JS */ });
-  it.skip("Should work in nested to_yaml conversion", () => { /* YAML */ });
-  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => { /* YAML */ });
-  it.skip("Should work with underscore", () => { /* Ruby string method */ });
-  it.skip("Should not return safe buffer from ", () => { /* Ruby gsub */ });
-  it.skip("Should not return safe buffer from !", () => { /* Ruby gsub! */ });
-  it.skip("can assign value into zero-index", () => { /* Ruby index assignment */ });
-  it.skip("can assign value into non zero-index", () => { /* Ruby index assignment */ });
-  it.skip("can assign value into slice", () => { /* Ruby slice assignment */ });
-  it.skip("can assign value into offset slice", () => { /* Ruby slice assignment */ });
-  it.skip("Should preserve html_safe? status on multiplication", () => { /* Ruby string * */ });
-  it.skip("Should not fail if the returned object is not a string", () => { /* Ruby-specific */ });
-  it.skip("Should continue safe on chr", () => { /* Ruby chr */ });
-  it.skip("Should continue unsafe on chr", () => { /* Ruby chr */ });
-  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => { /* Ruby slice! */ });
-  it.skip("Should return a String on slice! if original value was not safe", () => { /* Ruby slice! */ });
-  it.skip("Should work with interpolation (array argument)", () => { /* Ruby % operator */ });
-  it.skip("Should work with interpolation (hash argument)", () => { /* Ruby % operator */ });
-  it.skip("Should not affect frozen objects when accessing characters", () => { /* Ruby frozen */ });
-  it.skip("Should set back references", () => { /* Ruby regex back refs */ });
-  it.skip("Should support Enumerator", () => { /* Ruby enumerator */ });
+  it.skip("titleize", () => {
+    /* string method, not directly SafeBuffer */
+  });
+  it.skip("Should be converted to_yaml", () => {
+    /* YAML, not applicable in JS */
+  });
+  it.skip("Should work in nested to_yaml conversion", () => {
+    /* YAML */
+  });
+  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => {
+    /* YAML */
+  });
+  it.skip("Should work with underscore", () => {
+    /* Ruby string method */
+  });
+  it.skip("Should not return safe buffer from ", () => {
+    /* Ruby gsub */
+  });
+  it.skip("Should not return safe buffer from !", () => {
+    /* Ruby gsub! */
+  });
+  it.skip("can assign value into zero-index", () => {
+    /* Ruby index assignment */
+  });
+  it.skip("can assign value into non zero-index", () => {
+    /* Ruby index assignment */
+  });
+  it.skip("can assign value into slice", () => {
+    /* Ruby slice assignment */
+  });
+  it.skip("can assign value into offset slice", () => {
+    /* Ruby slice assignment */
+  });
+  it.skip("Should preserve html_safe? status on multiplication", () => {
+    /* Ruby string * */
+  });
+  it.skip("Should not fail if the returned object is not a string", () => {
+    /* Ruby-specific */
+  });
+  it.skip("Should continue safe on chr", () => {
+    /* Ruby chr */
+  });
+  it.skip("Should continue unsafe on chr", () => {
+    /* Ruby chr */
+  });
+  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => {
+    /* Ruby slice! */
+  });
+  it.skip("Should return a String on slice! if original value was not safe", () => {
+    /* Ruby slice! */
+  });
+  it.skip("Should work with interpolation (array argument)", () => {
+    /* Ruby % operator */
+  });
+  it.skip("Should work with interpolation (hash argument)", () => {
+    /* Ruby % operator */
+  });
+  it.skip("Should not affect frozen objects when accessing characters", () => {
+    /* Ruby frozen */
+  });
+  it.skip("Should set back references", () => {
+    /* Ruby regex back refs */
+  });
+  it.skip("Should support Enumerator", () => {
+    /* Ruby enumerator */
+  });
 });
 
 describe("OutputSafetyTest", () => {
@@ -351,7 +402,9 @@ describe("OutputSafetyTest", () => {
   it("Replacing safe with safe yields safe", () => {
     const safe = htmlSafe("<b>hello</b>");
     // Replace via slice and concat
-    const result = htmlSafe(safe.toString().replace("<b>", "<strong>").replace("</b>", "</strong>"));
+    const result = htmlSafe(
+      safe.toString().replace("<b>", "<strong>").replace("</b>", "</strong>"),
+    );
     expect(result.htmlSafe).toBe(true);
   });
 
@@ -366,7 +419,9 @@ describe("OutputSafetyTest", () => {
   it("Replacing index of safe with safe yields safe", () => {
     const safe = htmlSafe("hello world");
     const replacement = htmlSafe("there");
-    const result = htmlSafe(safe.toString().slice(0, 6) + replacement.toString() + safe.toString().slice(11));
+    const result = htmlSafe(
+      safe.toString().slice(0, 6) + replacement.toString() + safe.toString().slice(11),
+    );
     expect(result.htmlSafe).toBe(true);
   });
 
@@ -379,10 +434,22 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toContain("&lt;b&gt;");
   });
 
-  it.skip("Bytesplicing safe into safe yields safe", () => { /* Ruby bytesplice */ });
-  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => { /* Ruby bytesplice */ });
-  it.skip("emits normal string YAML", () => { /* YAML */ });
-  it.skip("call to_param returns a normal string", () => { /* Ruby to_param */ });
-  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => { /* Ruby encoding */ });
-  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => { /* Ruby encoding */ });
+  it.skip("Bytesplicing safe into safe yields safe", () => {
+    /* Ruby bytesplice */
+  });
+  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => {
+    /* Ruby bytesplice */
+  });
+  it.skip("emits normal string YAML", () => {
+    /* YAML */
+  });
+  it.skip("call to_param returns a normal string", () => {
+    /* Ruby to_param */
+  });
+  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
+    /* Ruby encoding */
+  });
+  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
+    /* Ruby encoding */
+  });
 });

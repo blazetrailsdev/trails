@@ -5,8 +5,13 @@
  * callbacks, and format collection.
  */
 
-export type ActionCallback = (controller: AbstractController) => void | Promise<void> | boolean | Promise<boolean>;
-export type AroundCallback = (controller: AbstractController, next: () => Promise<void>) => void | Promise<void>;
+export type ActionCallback = (
+  controller: AbstractController,
+) => void | Promise<void> | boolean | Promise<boolean>;
+export type AroundCallback = (
+  controller: AbstractController,
+  next: () => Promise<void>,
+) => void | Promise<void>;
 
 export interface CallbackOptions {
   only?: string[];
@@ -36,15 +41,16 @@ export class AbstractController {
   private static _callbacks: CallbackEntry[] = [];
 
   /** Skipped callback identifiers. */
-  private static _skippedCallbacks: Array<{ callback: ActionCallback | AroundCallback; options: CallbackOptions }> = [];
+  private static _skippedCallbacks: Array<{
+    callback: ActionCallback | AroundCallback;
+    options: CallbackOptions;
+  }> = [];
 
   /** Available actions. Override in subclasses. */
   static actionMethods(): string[] {
     const proto = this.prototype;
     const methods: string[] = [];
-    const excluded = new Set([
-      "constructor", "processAction", "availableActions",
-    ]);
+    const excluded = new Set(["constructor", "processAction", "availableActions"]);
     let current = proto;
     while (current && current !== Object.prototype) {
       for (const name of Object.getOwnPropertyNames(current)) {
@@ -114,8 +120,12 @@ export class AbstractController {
   }
 
   /** Get all skipped callbacks. */
-  static getSkipped(): Array<{ callback: ActionCallback | AroundCallback; options: CallbackOptions }> {
-    const skipped: Array<{ callback: ActionCallback | AroundCallback; options: CallbackOptions }> = [];
+  static getSkipped(): Array<{
+    callback: ActionCallback | AroundCallback;
+    options: CallbackOptions;
+  }> {
+    const skipped: Array<{ callback: ActionCallback | AroundCallback; options: CallbackOptions }> =
+      [];
     const hierarchy = this._getHierarchy();
     for (const klass of hierarchy) {
       if (Object.prototype.hasOwnProperty.call(klass, "_skippedCallbacks")) {
@@ -164,7 +174,9 @@ export class AbstractController {
       if (typeof method === "function") {
         await method.call(this);
       } else {
-        throw new ActionNotFound(`The action '${action}' could not be found for ${this.constructor.name}`);
+        throw new ActionNotFound(
+          `The action '${action}' could not be found for ${this.constructor.name}`,
+        );
       }
 
       // Run after callbacks (in reverse order)
@@ -216,7 +228,10 @@ export class AbstractController {
     return (this as any)._callbacks;
   }
 
-  private static _ensureOwnSkipped(): Array<{ callback: ActionCallback | AroundCallback; options: CallbackOptions }> {
+  private static _ensureOwnSkipped(): Array<{
+    callback: ActionCallback | AroundCallback;
+    options: CallbackOptions;
+  }> {
     if (!Object.prototype.hasOwnProperty.call(this, "_skippedCallbacks")) {
       (this as any)._skippedCallbacks = [];
     }

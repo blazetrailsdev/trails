@@ -25,8 +25,12 @@ export class StringInquirer {
     });
   }
 
-  toString(): string { return this._value; }
-  valueOf(): string { return this._value; }
+  toString(): string {
+    return this._value;
+  }
+  valueOf(): string {
+    return this._value;
+  }
 
   /** Programmatic inquiry — mirrors Ruby's respond_to? pattern. */
   is(name: string): boolean {

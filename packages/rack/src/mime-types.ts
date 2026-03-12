@@ -638,5 +638,5 @@ export const MIME_TYPES: Record<string, string> = {
   ".yml": "text/yaml",
   ".zaz": "application/vnd.zzazz.deck+xml",
   ".zip": "application/zip",
-  ".zmm": "application/vnd.handheld-entertainment+xml"
+  ".zmm": "application/vnd.handheld-entertainment+xml",
 };

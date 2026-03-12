@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -38,7 +78,10 @@ describe("CacheKeyTest", () => {
 
   it("cache_key format is not too precise", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Post.create({ title: "a" });
     const key = p.cacheKey();
@@ -47,7 +90,10 @@ describe("CacheKeyTest", () => {
 
   it("cache_key_with_version always has both key and version", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = new Post({ title: "a" });
     const key = p.cacheKey();
@@ -63,7 +109,7 @@ describe("CacheKeyTest", () => {
     } else if (typeof key === "boolean") {
       base = String(key);
     } else if (Array.isArray(key)) {
-      base = key.map(k => expandCacheKey(k)).join("/");
+      base = key.map((k) => expandCacheKey(k)).join("/");
     } else if (typeof key === "object" && key !== null && "cacheKey" in key) {
       base = (key as { cacheKey(): string }).cacheKey();
     } else {
@@ -96,12 +142,20 @@ describe("CacheKeyTest", () => {
   });
 
   it("expand cache key respond to cache key", () => {
-    const obj = { cacheKey() { return "custom/key"; } };
+    const obj = {
+      cacheKey() {
+        return "custom/key";
+      },
+    };
     expect(expandCacheKey(obj)).toBe("custom/key");
   });
 
   it("expand cache key array with something that responds to cache key", () => {
-    const obj = { cacheKey() { return "obj-1"; } };
+    const obj = {
+      cacheKey() {
+        return "obj-1";
+      },
+    };
     expect(expandCacheKey([obj, "extra"])).toBe("obj-1/extra");
   });
 
@@ -125,7 +179,11 @@ describe("CacheKeyTest", () => {
   it("cache_version is only there when versioning is on", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const p = await Post.create({ title: "test", updated_at: new Date() });
     const version = p.cacheVersion();
@@ -136,7 +194,11 @@ describe("CacheKeyTest", () => {
   it("cache_version is the same when it comes from the DB or from the user", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const now = new Date();
     const p = await Post.create({ title: "test", updated_at: now });
@@ -147,7 +209,11 @@ describe("CacheKeyTest", () => {
   it("cache_version does NOT call updated_at when value is from the database", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const now = new Date();
     const p = await Post.create({ title: "test", updated_at: now });
@@ -160,7 +226,11 @@ describe("CacheKeyTest", () => {
   it("cache_version does call updated_at when it is assigned via a Time object", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const now = new Date();
     const p = new Post({ title: "test", updated_at: now });
@@ -172,7 +242,11 @@ describe("CacheKeyTest", () => {
   it("cache_version does call updated_at when it is assigned via a string", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const p = new Post({ title: "test", updated_at: "2025-01-01T00:00:00.000Z" });
     const version = p.cacheVersion();
@@ -187,7 +261,11 @@ describe("CacheKeyTest", () => {
   it("cache_version does call updated_at when it is assigned via a hash", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("updated_at", "datetime"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
     }
     const now = new Date(2025, 0, 1, 12, 0, 0);
     const p = new Post({ title: "test", updated_at: now });
@@ -199,7 +277,10 @@ describe("CacheKeyTest", () => {
   it("updated_at on class but not on instance raises an error", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = new Post({ title: "test" });
     const version = p.cacheVersion();
@@ -215,11 +296,12 @@ describe("CacheKeyTest", () => {
   it.skip("cache_version calls updated_at when the value is generated at create time", () => {});
 });
 
-
 describe("cacheKey / cacheKeyWithVersion", () => {
   it("returns model/new for new records", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -230,7 +312,9 @@ describe("cacheKey / cacheKeyWithVersion", () => {
 
   it("returns model/id for persisted records", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -241,7 +325,9 @@ describe("cacheKey / cacheKeyWithVersion", () => {
 
   it("cacheKeyWithVersion includes updated_at", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("updated_at", "datetime");
@@ -254,7 +340,9 @@ describe("cacheKey / cacheKeyWithVersion", () => {
 
   it("cacheVersion returns timestamp string", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("updated_at", "datetime");
     User.adapter = adapter;

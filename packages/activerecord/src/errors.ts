@@ -79,7 +79,9 @@ export class StaleObjectError extends Error {
 
   constructor(record: any, attemptedAction: string) {
     const model = record?.constructor?.name ?? "Record";
-    super(`StaleObjectError: Attempted to ${attemptedAction} a stale ${model}. The record has been modified by another process.`);
+    super(
+      `StaleObjectError: Attempted to ${attemptedAction} a stale ${model}. The record has been modified by another process.`,
+    );
     this.name = "StaleObjectError";
     this.record = record;
   }
@@ -127,7 +129,9 @@ export class StrictLoadingViolationError extends Error {
 
   constructor(record: any, association: string) {
     const model = record?.constructor?.name ?? "Record";
-    super(`${model} is marked for strict_loading. The ${association} association cannot be lazily loaded.`);
+    super(
+      `${model} is marked for strict_loading. The ${association} association cannot be lazily loaded.`,
+    );
     this.name = "StrictLoadingViolationError";
     this.record = record;
     this.association = association;

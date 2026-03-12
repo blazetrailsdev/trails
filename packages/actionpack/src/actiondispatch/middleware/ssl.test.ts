@@ -233,7 +233,7 @@ describe("ActionDispatch::SSL", () => {
       REQUEST_METHOD: "GET",
     });
     expect(headers["strict-transport-security"]).toBe(
-      "max-age=63072000; includeSubDomains; preload"
+      "max-age=63072000; includeSubDomains; preload",
     );
   });
 });

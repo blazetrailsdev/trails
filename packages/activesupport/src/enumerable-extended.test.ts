@@ -167,7 +167,11 @@ describe("EnumerableTests", () => {
   });
 
   it("eachCons — sliding window", () => {
-    expect(eachCons([1, 2, 3, 4], 2)).toEqual([[1, 2], [2, 3], [3, 4]]);
+    expect(eachCons([1, 2, 3, 4], 2)).toEqual([
+      [1, 2],
+      [2, 3],
+      [3, 4],
+    ]);
     expect(eachCons([1, 2, 3], 3)).toEqual([[1, 2, 3]]);
   });
 
@@ -263,7 +267,10 @@ describe("EnumerableTests", () => {
 
   it("many iterates only on what is needed", () => {
     let count = 0;
-    many([1, 2, 3], (x) => { count++; return x > 0; });
+    many([1, 2, 3], (x) => {
+      count++;
+      return x > 0;
+    });
     // stops early once 2 matches found
     expect(count).toBeLessThanOrEqual(3);
   });

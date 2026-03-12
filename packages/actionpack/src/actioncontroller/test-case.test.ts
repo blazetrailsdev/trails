@@ -61,7 +61,7 @@ class PostsController extends Base {
   }
 
   async useSession() {
-    const count = (this.session.count as number ?? 0) + 1;
+    const count = ((this.session.count as number) ?? 0) + 1;
     this.session.count = count;
     this.render({ json: { count } });
   }

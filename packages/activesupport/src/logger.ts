@@ -32,11 +32,17 @@ export interface LoggerOutput {
  */
 export class Logger {
   progname: string = "rails-ts";
-  protected _formatter: ((severity: string, datetime: Date, progname: string, msg: string) => string) | null = null;
-  get formatter(): ((severity: string, datetime: Date, progname: string, msg: string) => string) | null {
+  protected _formatter:
+    | ((severity: string, datetime: Date, progname: string, msg: string) => string)
+    | null = null;
+  get formatter():
+    | ((severity: string, datetime: Date, progname: string, msg: string) => string)
+    | null {
     return this._formatter;
   }
-  set formatter(value: ((severity: string, datetime: Date, progname: string, msg: string) => string) | null) {
+  set formatter(
+    value: ((severity: string, datetime: Date, progname: string, msg: string) => string) | null,
+  ) {
     this._formatter = value;
   }
 
@@ -122,17 +128,37 @@ export class Logger {
     return this.log(Logger.UNKNOWN, message);
   }
 
-  get "debug?"(): boolean { return this.level <= Logger.DEBUG; }
-  get "info?"(): boolean { return this.level <= Logger.INFO; }
-  get "warn?"(): boolean { return this.level <= Logger.WARN; }
-  get "error?"(): boolean { return this.level <= Logger.ERROR; }
-  get "fatal?"(): boolean { return this.level <= Logger.FATAL; }
+  get "debug?"(): boolean {
+    return this.level <= Logger.DEBUG;
+  }
+  get "info?"(): boolean {
+    return this.level <= Logger.INFO;
+  }
+  get "warn?"(): boolean {
+    return this.level <= Logger.WARN;
+  }
+  get "error?"(): boolean {
+    return this.level <= Logger.ERROR;
+  }
+  get "fatal?"(): boolean {
+    return this.level <= Logger.FATAL;
+  }
 
-  get debugEnabled(): boolean { return this.level <= Logger.DEBUG; }
-  get infoEnabled(): boolean { return this.level <= Logger.INFO; }
-  get warnEnabled(): boolean { return this.level <= Logger.WARN; }
-  get errorEnabled(): boolean { return this.level <= Logger.ERROR; }
-  get fatalEnabled(): boolean { return this.level <= Logger.FATAL; }
+  get debugEnabled(): boolean {
+    return this.level <= Logger.DEBUG;
+  }
+  get infoEnabled(): boolean {
+    return this.level <= Logger.INFO;
+  }
+  get warnEnabled(): boolean {
+    return this.level <= Logger.WARN;
+  }
+  get errorEnabled(): boolean {
+    return this.level <= Logger.ERROR;
+  }
+  get fatalEnabled(): boolean {
+    return this.level <= Logger.FATAL;
+  }
 
   silence(tempLevel: number | LogLevel = Logger.ERROR, fn?: () => void): void {
     const prevLocal = this._localLevel;
@@ -206,13 +232,17 @@ export class BroadcastLogger extends Logger {
   set level(value: number | LogLevel) {
     const lvl = typeof value === "string" ? LOG_LEVELS[value] : value;
     this._level = lvl;
-    this.broadcasts.forEach((l) => { l.level = lvl; });
+    this.broadcasts.forEach((l) => {
+      l.level = lvl;
+    });
   }
 
   set localLevel(value: number | LogLevel | null) {
     const lvl = value === null ? null : typeof value === "string" ? LOG_LEVELS[value] : value;
     this._localLevel = lvl;
-    this.broadcasts.forEach((l) => { l.localLevel = lvl; });
+    this.broadcasts.forEach((l) => {
+      l.localLevel = lvl;
+    });
   }
 
   get localLevel(): number | null {
@@ -220,7 +250,9 @@ export class BroadcastLogger extends Logger {
   }
 
   set formatter(value: any) {
-    this.broadcasts.forEach((l) => { (l as any).formatter = value; });
+    this.broadcasts.forEach((l) => {
+      (l as any).formatter = value;
+    });
   }
 
   get formatter(): any {
@@ -262,11 +294,21 @@ export class BroadcastLogger extends Logger {
     return this.log(Logger.UNKNOWN, message);
   }
 
-  get debugEnabled(): boolean { return this.broadcasts.some((l) => l.level <= Logger.DEBUG); }
-  get infoEnabled(): boolean { return this.broadcasts.some((l) => l.level <= Logger.INFO); }
-  get warnEnabled(): boolean { return this.broadcasts.some((l) => l.level <= Logger.WARN); }
-  get errorEnabled(): boolean { return this.broadcasts.some((l) => l.level <= Logger.ERROR); }
-  get fatalEnabled(): boolean { return this.broadcasts.some((l) => l.level <= Logger.FATAL); }
+  get debugEnabled(): boolean {
+    return this.broadcasts.some((l) => l.level <= Logger.DEBUG);
+  }
+  get infoEnabled(): boolean {
+    return this.broadcasts.some((l) => l.level <= Logger.INFO);
+  }
+  get warnEnabled(): boolean {
+    return this.broadcasts.some((l) => l.level <= Logger.WARN);
+  }
+  get errorEnabled(): boolean {
+    return this.broadcasts.some((l) => l.level <= Logger.ERROR);
+  }
+  get fatalEnabled(): boolean {
+    return this.broadcasts.some((l) => l.level <= Logger.FATAL);
+  }
 
   silence(tempLevel: number | LogLevel = Logger.ERROR, fn?: () => void): void {
     const lvl = typeof tempLevel === "string" ? LOG_LEVELS[tempLevel] : tempLevel;
@@ -368,33 +410,65 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
   }
 
   const proxy: any = {
-    get level() { return logger.level; },
-    set level(v: any) { logger.level = v; },
-    get localLevel() { return logger.localLevel; },
-    set localLevel(v: any) { logger.localLevel = v; },
-    get progname() { return logger.progname; },
-    set progname(v: any) { logger.progname = v; },
-    get formatter() { return (logger as any).formatter; },
-    set formatter(v: any) { (logger as any).formatter = v; },
+    get level() {
+      return logger.level;
+    },
+    set level(v: any) {
+      logger.level = v;
+    },
+    get localLevel() {
+      return logger.localLevel;
+    },
+    set localLevel(v: any) {
+      logger.localLevel = v;
+    },
+    get progname() {
+      return logger.progname;
+    },
+    set progname(v: any) {
+      logger.progname = v;
+    },
+    get formatter() {
+      return (logger as any).formatter;
+    },
+    set formatter(v: any) {
+      (logger as any).formatter = v;
+    },
 
     add(severity: number, message?: string | null, _progname?: string): boolean {
       const msg = message != null ? formatMsg(String(message)) : undefined;
       return logger.add(severity, msg);
     },
 
-    debug(message?: string | (() => string)): boolean { return logMsg(Logger.DEBUG, message); },
-    info(message?: string | (() => string)): boolean { return logMsg(Logger.INFO, message); },
-    warn(message?: string | (() => string)): boolean { return logMsg(Logger.WARN, message); },
-    error(message?: string | (() => string)): boolean { return logMsg(Logger.ERROR, message); },
-    fatal(message?: string | (() => string)): boolean { return logMsg(Logger.FATAL, message); },
-    unknown(message?: string | (() => string)): boolean { return logMsg(Logger.UNKNOWN, message); },
+    debug(message?: string | (() => string)): boolean {
+      return logMsg(Logger.DEBUG, message);
+    },
+    info(message?: string | (() => string)): boolean {
+      return logMsg(Logger.INFO, message);
+    },
+    warn(message?: string | (() => string)): boolean {
+      return logMsg(Logger.WARN, message);
+    },
+    error(message?: string | (() => string)): boolean {
+      return logMsg(Logger.ERROR, message);
+    },
+    fatal(message?: string | (() => string)): boolean {
+      return logMsg(Logger.FATAL, message);
+    },
+    unknown(message?: string | (() => string)): boolean {
+      return logMsg(Logger.UNKNOWN, message);
+    },
 
     silence(tempLevel: any = Logger.ERROR, fn?: () => void): void {
       (logger as any).silence(tempLevel, fn);
     },
-    close(): void { logger.close(); },
+    close(): void {
+      logger.close();
+    },
 
-    get currentTags(): string[] { return [...tagStack]; },
+    get currentTags(): string[] {
+      return [...tagStack];
+    },
 
     pushTags(...rawTags: (string | string[] | null | undefined)[]): string[] {
       const flat = flattenTags(rawTags);
@@ -431,7 +505,9 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
   (["debug", "info", "warn", "error", "fatal"] as LogLevel[]).forEach((name) => {
     const level = LOG_LEVELS[name];
     Object.defineProperty(proxy, `${name}?`, {
-      get() { return logger.level <= level; },
+      get() {
+        return logger.level <= level;
+      },
       configurable: true,
     });
   });

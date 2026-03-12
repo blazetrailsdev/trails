@@ -11,7 +11,14 @@ import { pathToFileURL } from "node:url";
 
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString } from "@rails-ts/rack";
-import { RouteSet, Mapper, Request, Response, ActionController, ActionView } from "@rails-ts/actionpack";
+import {
+  RouteSet,
+  Mapper,
+  Request,
+  Response,
+  ActionController,
+  ActionView,
+} from "@rails-ts/actionpack";
 
 export interface ApplicationOptions {
   cwd: string;
@@ -107,7 +114,7 @@ export class Application {
     controllerName: string,
     action: string,
     params: Record<string, string>,
-    env: RackEnv
+    env: RackEnv,
   ): Promise<RackResponse> {
     try {
       const ControllerClass = await this.resolveController(controllerName);
@@ -162,10 +169,7 @@ export class Application {
 
         // Find the controller class — look for *Controller export
         for (const [exportName, exportValue] of Object.entries(mod)) {
-          if (
-            exportName.endsWith("Controller") &&
-            typeof exportValue === "function"
-          ) {
+          if (exportName.endsWith("Controller") && typeof exportValue === "function") {
             this.controllerCache.set(name, exportValue as any);
             return exportValue;
           }
@@ -175,7 +179,7 @@ export class Application {
 
     throw new Error(
       `Controller not found: ${name}. ` +
-      `Expected a file at src/app/controllers/${dasherized}-controller.ts`
+        `Expected a file at src/app/controllers/${dasherized}-controller.ts`,
     );
   }
 

@@ -50,7 +50,8 @@ export class Assignment extends Binary {}
 /** As: expr AS alias */
 export class As extends Binary {
   toCte(): Cte {
-    const name = this.right instanceof SqlLiteral ? (this.right as SqlLiteral).value : String(this.right);
+    const name =
+      this.right instanceof SqlLiteral ? (this.right as SqlLiteral).value : String(this.right);
     return new Cte(name, this.left as Node);
   }
 }

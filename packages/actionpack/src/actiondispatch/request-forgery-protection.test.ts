@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { RequestForgeryProtection, InvalidAuthenticityToken } from "./request-forgery-protection.js";
+import {
+  RequestForgeryProtection,
+  InvalidAuthenticityToken,
+} from "./request-forgery-protection.js";
 
 // ==========================================================================
 // controller/request_forgery_protection_test.rb
@@ -319,7 +322,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     const perFormMasked = csrf.generatePerFormToken(session, "/posts", "POST");
     // Both should be masked (64 bytes base64)
     expect(Buffer.from(perFormMasked, "base64").length).toBe(
-      Buffer.from(globalMasked, "base64").length
+      Buffer.from(globalMasked, "base64").length,
     );
   });
 
@@ -327,18 +330,18 @@ describe("ActionController::RequestForgeryProtection", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(
-      csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })).toBe(
+      true,
+    );
   });
 
   it("accepts token with path with query params", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const perFormToken = csrf.generatePerFormToken(session, "/posts?page=1", "POST");
-    expect(
-      csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })).toBe(
+      true,
+    );
   });
 
   it("rejects token for incorrect path", () => {
@@ -346,7 +349,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     const session: Record<string, unknown> = {};
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(
-      csrf.verifyToken(session, perFormToken, { actionPath: "/comments", method: "POST" })
+      csrf.verifyToken(session, perFormToken, { actionPath: "/comments", method: "POST" }),
     ).toBe(false);
   });
 
@@ -355,7 +358,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     const session: Record<string, unknown> = {};
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(
-      csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "DELETE" })
+      csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "DELETE" }),
     ).toBe(false);
   });
 
@@ -382,9 +385,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const t1 = csrf.generatePerFormToken(session, "/posts/", "POST");
-    expect(
-      csrf.verifyToken(session, t1, { actionPath: "/posts", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, t1, { actionPath: "/posts", method: "POST" })).toBe(true);
   });
 
   it("ignores trailing slash during generation", () => {
@@ -399,9 +400,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const token = csrf.generatePerFormToken(session, "", "POST");
-    expect(
-      csrf.verifyToken(session, token, { actionPath: "/", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, token, { actionPath: "/", method: "POST" })).toBe(true);
   });
 
   it("handles query string", () => {
@@ -409,7 +408,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     const session: Record<string, unknown> = {};
     const token = csrf.generatePerFormToken(session, "/posts?sort=name", "POST");
     expect(
-      csrf.verifyToken(session, token, { actionPath: "/posts?sort=date", method: "POST" })
+      csrf.verifyToken(session, token, { actionPath: "/posts?sort=date", method: "POST" }),
     ).toBe(true);
   });
 
@@ -417,27 +416,21 @@ describe("ActionController::RequestForgeryProtection", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const token = csrf.generatePerFormToken(session, "/posts#top", "POST");
-    expect(
-      csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
   });
 
   it("ignores trailing slash during validation", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const token = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(
-      csrf.verifyToken(session, token, { actionPath: "/posts/", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, token, { actionPath: "/posts/", method: "POST" })).toBe(true);
   });
 
   it("method is case insensitive", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
     const session: Record<string, unknown> = {};
     const token = csrf.generatePerFormToken(session, "/posts", "post");
-    expect(
-      csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })
-    ).toBe(true);
+    expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
   });
 
   // --- Reset token ---
@@ -552,7 +545,9 @@ describe("ActionController::RequestForgeryProtection", () => {
   });
 
   it("should allow post without token on unsafe action when not required", () => {
-    const csrf = new RequestForgeryProtection({ protectedMethods: new Set(["PATCH", "PUT", "DELETE"]) });
+    const csrf = new RequestForgeryProtection({
+      protectedMethods: new Set(["PATCH", "PUT", "DELETE"]),
+    });
     const result = csrf.verifyRequest({
       method: "POST",
       session: {},

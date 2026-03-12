@@ -1,9 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
-  MultipartParser, MultipartPartLimitError, MultipartTotalPartLimitError,
+  MultipartParser,
+  MultipartPartLimitError,
+  MultipartTotalPartLimitError,
   MultipartBufferedMimeDataError,
-  BoundaryTooLongError, EmptyContentError, MissingInputError,
-  parseMultipart, UploadedFile,
+  BoundaryTooLongError,
+  EmptyContentError,
+  MissingInputError,
+  parseMultipart,
+  UploadedFile,
 } from "./multipart.js";
 import { MockRequest } from "./mock-request.js";
 import * as fs from "fs";
@@ -17,7 +22,11 @@ function multipartFixture(name: string, boundary = "AaB03x"): Record<string, any
   return {
     CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
     CONTENT_LENGTH: String(data.length),
-    "rack.input": { read() { return data; } },
+    "rack.input": {
+      read() {
+        return data;
+      },
+    },
   };
 }
 
@@ -27,7 +36,10 @@ function parseFixture(name: string, boundary = "AaB03x"): Record<string, any> | 
 }
 
 it("parses filename with unescaped percentage characters that look like partial hex escapes", () => {
-  const params = parseFixture("filename_with_unescaped_percentages2", "----WebKitFormBoundary2NHc7OhsgU68l3Al")!;
+  const params = parseFixture(
+    "filename_with_unescaped_percentages2",
+    "----WebKitFormBoundary2NHc7OhsgU68l3Al",
+  )!;
   const files = params["document"]["attachment"];
   expect(files.filename).toBe("100%a");
   expect(files.type).toBe("image/jpeg");
@@ -36,7 +48,10 @@ it("parses filename with unescaped percentage characters that look like partial 
 });
 
 it("parses filename with unescaped percentage characters that look like partial hex escapes", () => {
-  const params = parseFixture("filename_with_unescaped_percentages3", "----WebKitFormBoundary2NHc7OhsgU68l3Al")!;
+  const params = parseFixture(
+    "filename_with_unescaped_percentages3",
+    "----WebKitFormBoundary2NHc7OhsgU68l3Al",
+  )!;
   const files = params["document"]["attachment"];
   expect(files.filename).toBe("100%");
   expect(files.type).toBe("image/jpeg");
@@ -55,7 +70,10 @@ it("supports uploading files in binary mode", () => {
 });
 
 it("builds multipart body", () => {
-  const { body, boundary } = MultipartParser.buildMultipartBody({ "submit-name": "Larry", foo: "bar" });
+  const { body, boundary } = MultipartParser.buildMultipartBody({
+    "submit-name": "Larry",
+    foo: "bar",
+  });
   expect(body).toContain("Larry");
   expect(body).toContain(boundary);
 });
@@ -82,7 +100,13 @@ it("builds nested multipart body using hash", () => {
 
 it("builds multipart body from StringIO", () => {
   const { body } = MultipartParser.buildMultipartBody({
-    file: { filename: "test.txt", type: "text/plain", read() { return "hello"; } },
+    file: {
+      filename: "test.txt",
+      type: "text/plain",
+      read() {
+        return "hello";
+      },
+    },
   });
   expect(body).toContain("hello");
 });
@@ -100,7 +124,9 @@ it("can parse fields that end at the end of the buffer", () => {
 it("builds complete params with the chunk size of 16384 slicing exactly on boundary", () => {
   const boundary = "AaB03x";
   // Pad so boundary falls exactly at 16384 byte offset
-  const padding = "x".repeat(16384 - `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n`.length - 2);
+  const padding = "x".repeat(
+    16384 - `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n`.length - 2,
+  );
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${padding}\r\n--${boundary}\r\ncontent-disposition: form-data; name="b"\r\n\r\nval\r\n--${boundary}--\r\n`;
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
   expect(params["a"]).toBe(padding);
@@ -110,21 +136,27 @@ it("builds complete params with the chunk size of 16384 slicing exactly on bound
 it("does not reach a multi-part limit", () => {
   const boundary = "AaB03x";
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
-  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_total_limit: 10 });
+  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, {
+    multipart_total_limit: 10,
+  });
   expect(result!["a"]).toBe("val");
 });
 
 it("treats a multipart limit of 0 as no limit", () => {
   const boundary = "AaB03x";
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
-  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_total_limit: 0 });
+  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, {
+    multipart_total_limit: 0,
+  });
   expect(result!["a"]).toBe("val");
 });
 
 it("treats a multipart limit of 0 as no limit", () => {
   const boundary = "AaB03x";
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
-  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_file_limit: 0 });
+  const result = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, {
+    multipart_file_limit: 0,
+  });
   expect(result!["a"]).toBe("val");
 });
 
@@ -132,7 +164,9 @@ it("reaches a multipart file limit", () => {
   const boundary = "AaB03x";
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="f1"; filename="a.txt"\r\ncontent-type: text/plain\r\n\r\ndata1\r\n--${boundary}\r\ncontent-disposition: form-data; name="f2"; filename="b.txt"\r\ncontent-type: text/plain\r\n\r\ndata2\r\n--${boundary}--\r\n`;
   expect(() => {
-    MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_file_limit: 1 });
+    MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, {
+      multipart_file_limit: 1,
+    });
   }).toThrow(MultipartPartLimitError);
 });
 
@@ -140,7 +174,9 @@ it("reaches a multipart total limit", () => {
   const boundary = "AaB03x";
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval1\r\n--${boundary}\r\ncontent-disposition: form-data; name="b"\r\n\r\nval2\r\n--${boundary}--\r\n`;
   expect(() => {
-    MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, { multipart_total_limit: 1 });
+    MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`, {
+      multipart_total_limit: 1,
+    });
   }).toThrow(MultipartTotalPartLimitError);
 });
 
@@ -163,7 +199,11 @@ it("parses multipart upload with no content-length header", () => {
   const data = fs.readFileSync(filePath);
   const env = {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-    "rack.input": { read() { return data; } },
+    "rack.input": {
+      read() {
+        return data;
+      },
+    },
   };
   const params = parseMultipart(env)!;
   expect(params["submit-name"]).toBe("Larry");
@@ -229,12 +269,21 @@ it("supports ISO-2022-JP-encoded part", () => {
 
 describe("Rack::Multipart", () => {
   it("returns nil if the content type is not multipart", () => {
-    const env = { CONTENT_TYPE: "application/x-www-form-urlencoded", "rack.input": { read() { return ""; } } };
+    const env = {
+      CONTENT_TYPE: "application/x-www-form-urlencoded",
+      "rack.input": {
+        read() {
+          return "";
+        },
+      },
+    };
     expect(parseMultipart(env)).toBeNull();
   });
 
   it("raises an exception if boundary is too long", () => {
-    expect(() => parseFixture("content_type_and_no_filename", "A".repeat(71))).toThrow(BoundaryTooLongError);
+    expect(() => parseFixture("content_type_and_no_filename", "A".repeat(71))).toThrow(
+      BoundaryTooLongError,
+    );
   });
 
   it("raises a bad request exception if no body is given but content type indicates a multipart body", () => {
@@ -255,7 +304,11 @@ describe("Rack::Multipart", () => {
     const data = fs.readFileSync(filePath);
     const env = {
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-      "rack.input": { read() { return data; } },
+      "rack.input": {
+        read() {
+          return data;
+        },
+      },
     };
     const params = parseMultipart(env)!;
     expect(params["text/plain; charset=US-ASCII"]).toBeDefined();
@@ -361,9 +414,9 @@ describe("Rack::Multipart", () => {
     const boundary = "AaB03x";
     const hugeValue = "x".repeat(128 * 1024); // 128KB, exceeds 64KB default
     const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${hugeValue}\r\n--${boundary}--\r\n`;
-    expect(() =>
-      MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)
-    ).toThrow(MultipartBufferedMimeDataError);
+    expect(() => MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)).toThrow(
+      MultipartBufferedMimeDataError,
+    );
   });
 
   it("rejects excessive buffered mime data size when split into multiple parameters", () => {
@@ -371,9 +424,9 @@ describe("Rack::Multipart", () => {
     // Each param is under the single-param limit, but total exceeds 64KB
     const chunk = "x".repeat(40 * 1024); // 40KB each, two = 80KB > 64KB
     const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${chunk}\r\n--${boundary}\r\ncontent-disposition: form-data; name="b"\r\n\r\n${chunk}\r\n--${boundary}--\r\n`;
-    expect(() =>
-      MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)
-    ).toThrow(MultipartBufferedMimeDataError);
+    expect(() => MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)).toThrow(
+      MultipartBufferedMimeDataError,
+    );
   });
 
   it("allows large nonbuffered mime parameters", () => {
@@ -491,7 +544,11 @@ describe("Rack::Multipart", () => {
     const env = {
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: "100",
-      "rack.input": { read() { return ""; } },
+      "rack.input": {
+        read() {
+          return "";
+        },
+      },
     };
     expect(() => parseMultipart(env)).toThrow(EmptyContentError);
   });
@@ -532,11 +589,16 @@ describe("Rack::Multipart", () => {
     const env = multipartFixture("text");
     let writtenContent = "";
     const myTempfile = {
-      write(data: string) { writtenContent += data; },
-      read() { return writtenContent; },
+      write(data: string) {
+        writtenContent += data;
+      },
+      read() {
+        return writtenContent;
+      },
       rewind() {},
     };
-    env["rack.multipart.tempfile_factory"] = (_filename: string, _contentType: string) => myTempfile;
+    env["rack.multipart.tempfile_factory"] = (_filename: string, _contentType: string) =>
+      myTempfile;
     const params = parseMultipart(env)!;
     expect(params["files"].tempfile).toBe(myTempfile);
     expect(writtenContent).toBe("contents");
@@ -667,7 +729,10 @@ describe("Rack::Multipart", () => {
   });
 
   it("parses filename with unescaped percentage characters", () => {
-    const params = parseFixture("filename_with_unescaped_percentages", "----WebKitFormBoundary2NHc7OhsgU68l3Al")!;
+    const params = parseFixture(
+      "filename_with_unescaped_percentages",
+      "----WebKitFormBoundary2NHc7OhsgU68l3Al",
+    )!;
     const files = params["document"]["attachment"];
     expect(files.type).toBe("image/jpeg");
     expect(files.filename).toBe("100% of a photo.jpeg");

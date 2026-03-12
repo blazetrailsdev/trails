@@ -62,43 +62,16 @@ export class Inflections {
     const pRest = plural.slice(1);
 
     if (s0.toUpperCase() === p0.toUpperCase()) {
-      this.plural(
-        new RegExp(`(${s0})${sRest}$`, "i"),
-        `$1${pRest}`
-      );
-      this.plural(
-        new RegExp(`(${p0})${pRest}$`, "i"),
-        `$1${pRest}`
-      );
-      this.singular(
-        new RegExp(`(${p0})${pRest}$`, "i"),
-        `$1${sRest}`
-      );
+      this.plural(new RegExp(`(${s0})${sRest}$`, "i"), `$1${pRest}`);
+      this.plural(new RegExp(`(${p0})${pRest}$`, "i"), `$1${pRest}`);
+      this.singular(new RegExp(`(${p0})${pRest}$`, "i"), `$1${sRest}`);
     } else {
-      this.plural(
-        new RegExp(`${s0.toUpperCase()}(?i:${sRest})$`),
-        p0.toUpperCase() + pRest
-      );
-      this.plural(
-        new RegExp(`${s0.toLowerCase()}(?i:${sRest})$`),
-        p0.toLowerCase() + pRest
-      );
-      this.plural(
-        new RegExp(`${p0.toUpperCase()}(?i:${pRest})$`),
-        p0.toUpperCase() + pRest
-      );
-      this.plural(
-        new RegExp(`${p0.toLowerCase()}(?i:${pRest})$`),
-        p0.toLowerCase() + pRest
-      );
-      this.singular(
-        new RegExp(`${p0.toUpperCase()}(?i:${pRest})$`),
-        s0.toUpperCase() + sRest
-      );
-      this.singular(
-        new RegExp(`${p0.toLowerCase()}(?i:${pRest})$`),
-        s0.toLowerCase() + sRest
-      );
+      this.plural(new RegExp(`${s0.toUpperCase()}(?i:${sRest})$`), p0.toUpperCase() + pRest);
+      this.plural(new RegExp(`${s0.toLowerCase()}(?i:${sRest})$`), p0.toLowerCase() + pRest);
+      this.plural(new RegExp(`${p0.toUpperCase()}(?i:${pRest})$`), p0.toUpperCase() + pRest);
+      this.plural(new RegExp(`${p0.toLowerCase()}(?i:${pRest})$`), p0.toLowerCase() + pRest);
+      this.singular(new RegExp(`${p0.toUpperCase()}(?i:${pRest})$`), s0.toUpperCase() + sRest);
+      this.singular(new RegExp(`${p0.toLowerCase()}(?i:${pRest})$`), s0.toLowerCase() + sRest);
     }
   }
 
@@ -119,7 +92,9 @@ export class Inflections {
     this.humans.unshift({ rule, replacement });
   }
 
-  clear(scope: "all" | "plurals" | "singulars" | "uncountables" | "humans" | "acronyms" = "all"): void {
+  clear(
+    scope: "all" | "plurals" | "singulars" | "uncountables" | "humans" | "acronyms" = "all",
+  ): void {
     if (scope === "all") {
       this.plurals = [];
       this.singulars = [];
@@ -172,10 +147,7 @@ export function loadDefaults(inflect: Inflections): void {
   inflect.singular(/(ss)$/i, "$1");
   inflect.singular(/(n)ews$/i, "$1ews");
   inflect.singular(/([ti])a$/i, "$1um");
-  inflect.singular(
-    /((a)naly|(b)a|(d)iagno|(p)arenthe|(p)rogno|(s)ynop|(t)he)(sis|ses)$/i,
-    "$1sis"
-  );
+  inflect.singular(/((a)naly|(b)a|(d)iagno|(p)arenthe|(p)rogno|(s)ynop|(t)he)(sis|ses)$/i, "$1sis");
   inflect.singular(/(^analy)(sis|ses)$/i, "$1sis");
   inflect.singular(/([^f])ves$/i, "$1fe");
   inflect.singular(/(hive)s$/i, "$1");
@@ -216,7 +188,7 @@ export function loadDefaults(inflect: Inflections): void {
     "fish",
     "sheep",
     "jeans",
-    "police"
+    "police",
   );
 }
 

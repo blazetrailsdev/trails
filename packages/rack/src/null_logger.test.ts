@@ -6,7 +6,11 @@ describe("Rack::NullLogger", () => {
   it("act as a noop logger", async () => {
     const app = async (env: Record<string, any>) => {
       (env["rack.logger"] as any).warn("b00m");
-      return [200, { "content-type": "text/plain" }, ["Hello, World!"]] as [number, Record<string, string>, any];
+      return [200, { "content-type": "text/plain" }, ["Hello, World!"]] as [
+        number,
+        Record<string, string>,
+        any,
+      ];
     };
     const logger = new NullLogger(app);
     const res = await logger.call(MockRequest.envFor("/"));

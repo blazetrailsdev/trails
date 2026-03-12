@@ -3,7 +3,43 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass , savepoint} from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+  savepoint,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +52,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -38,7 +79,10 @@ describe("TransactionTest", () => {
 
   it("transaction commits on success", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     // Transaction requires adapter with beginTransaction support
     await Topic.create({ title: "a" });
@@ -47,7 +91,10 @@ describe("TransactionTest", () => {
 
   it("transaction rolls back on error", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Topic.create({ title: "a" });
     expect(typeof (await Topic.all().count())).toBe("number");
@@ -61,7 +108,10 @@ describe("TransactionTest", () => {
   it("blank?", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     // A new relation is not blank when records exist
     await Post.create({ title: "exists" });
@@ -71,23 +121,31 @@ describe("TransactionTest", () => {
   it("rollback dirty changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "original" }) as any;
+    const p = (await Post.create({ title: "original" })) as any;
     try {
       await transaction(Post, async () => {
         await p.update({ title: "changed" });
         throw new Error("rollback");
       });
-    } catch (_) { /* expected */ }
-    const found = await Post.find(p.id) as any;
+    } catch (_) {
+      /* expected */
+    }
+    const found = (await Post.find(p.id)) as any;
     expect(found).not.toBeNull();
   });
 
   it("transaction does not apply default scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "in-tx" });
     await transaction(Post, async () => {
@@ -99,7 +157,10 @@ describe("TransactionTest", () => {
   it("successful with instance method", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let created: any;
     await transaction(Post, async () => {
@@ -113,7 +174,10 @@ describe("TransactionTest", () => {
   it("return from transaction commits", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       await Post.create({ title: "committed" });
@@ -124,18 +188,24 @@ describe("TransactionTest", () => {
   it("rollback dirty changes multiple saves", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "start" }) as any;
+    const p = (await Post.create({ title: "start" })) as any;
     expect(p).not.toBeNull();
   });
 
   it("raise after destroy", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "destroy-test" }) as any;
+    const p = (await Post.create({ title: "destroy-test" })) as any;
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
   });
@@ -143,9 +213,12 @@ describe("TransactionTest", () => {
   it("persisted in a model with custom primary key after failed save", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "persisted" }) as any;
+    const p = (await Post.create({ title: "persisted" })) as any;
     expect(p.isPersisted()).toBe(true);
   });
 });
@@ -157,7 +230,10 @@ describe("TransactionTest", () => {
   it("successful", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       await Post.create({ title: "tx-committed" });
@@ -168,21 +244,29 @@ describe("TransactionTest", () => {
   it("failing on exception", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     try {
       await transaction(Post, async () => {
         await Post.create({ title: "will-rollback" });
         throw new Error("forced rollback");
       });
-    } catch (_) { /* expected */ }
-    expect(typeof await Post.count()).toBe("number");
+    } catch (_) {
+      /* expected */
+    }
+    expect(typeof (await Post.count())).toBe("number");
   });
 
   it("nested explicit transactions", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       await transaction(Post, async () => {
@@ -195,7 +279,10 @@ describe("TransactionTest", () => {
   it("restore active record state for all records in a transaction", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "before-tx" });
     expect(p.isNewRecord()).toBe(true);
@@ -208,23 +295,31 @@ describe("TransactionTest", () => {
   it("rollback for freshly persisted records", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "persisted" }) as any;
+    const p = (await Post.create({ title: "persisted" })) as any;
     expect(p.isPersisted()).toBe(true);
     try {
       await transaction(Post, async () => {
         await Post.create({ title: "in-tx" });
         throw new Error("rollback");
       });
-    } catch (_) { /* expected */ }
-    expect(typeof await Post.count()).toBe("number");
+    } catch (_) {
+      /* expected */
+    }
+    expect(typeof (await Post.count())).toBe("number");
   });
 
   it("transactions state from rollback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let caughtError = false;
     try {
@@ -240,7 +335,10 @@ describe("TransactionTest", () => {
   it("transactions state from commit", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let completed = false;
     await transaction(Post, async () => {
@@ -253,7 +351,10 @@ describe("TransactionTest", () => {
   it("restore id after rollback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = new Post({ title: "no-id-yet" });
     expect(p.isNewRecord()).toBe(true);
@@ -262,14 +363,19 @@ describe("TransactionTest", () => {
         await p.save();
         throw new Error("rollback");
       });
-    } catch (_) { /* expected */ }
+    } catch (_) {
+      /* expected */
+    }
     expect(p.readAttribute("title")).toBe("no-id-yet");
   });
 
   it("rollback on composite key model", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "before" });
     try {
@@ -277,14 +383,19 @@ describe("TransactionTest", () => {
         await Post.create({ title: "in-tx" });
         throw new Error("rollback");
       });
-    } catch (_) { /* expected */ }
-    expect(typeof await Post.count()).toBe("number");
+    } catch (_) {
+      /* expected */
+    }
+    expect(typeof (await Post.count())).toBe("number");
   });
 
   it("empty transaction is not materialized", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       // no-op
@@ -295,36 +406,49 @@ describe("TransactionTest", () => {
   it("update should rollback on failure", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const p = await Post.create({ title: "original" }) as any;
+    const p = (await Post.create({ title: "original" })) as any;
     try {
       await transaction(Post, async () => {
         await p.update({ title: "changed" });
         throw new Error("force rollback");
       });
-    } catch (_) { /* expected */ }
+    } catch (_) {
+      /* expected */
+    }
     expect(p.readAttribute("title")).toBeDefined();
   });
 
   it("callback rollback in create", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     try {
       await transaction(Post, async () => {
         await Post.create({ title: "callback-create" });
         throw new Error("rollback after create");
       });
-    } catch (_) { /* expected */ }
-    expect(typeof await Post.count()).toBe("number");
+    } catch (_) {
+      /* expected */
+    }
+    expect(typeof (await Post.count())).toBe("number");
   });
 
   it("transaction after commit callback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let afterCommitCalled = false;
     await transaction(Post, async () => {
@@ -338,7 +462,10 @@ describe("TransactionTest", () => {
   it("nested transactions after disable lazy transactions", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       await transaction(Post, async () => {
@@ -351,7 +478,10 @@ describe("TransactionTest", () => {
   it("transaction open?", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let insideTransaction = false;
     await transaction(Post, async () => {
@@ -364,7 +494,10 @@ describe("TransactionTest", () => {
   it("successful with return outside inner transaction", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       await Post.create({ title: "outer" });
@@ -416,7 +549,10 @@ describe("TransactionTest2", () => {
   it("successful", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
       await Post.create({ title: "in transaction" });
@@ -427,22 +563,34 @@ describe("TransactionTest2", () => {
   it("failing on exception", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let threw = false;
     try {
-      await transaction(Post, async () => { throw new Error("intentional"); });
-    } catch { threw = true; }
+      await transaction(Post, async () => {
+        throw new Error("intentional");
+      });
+    } catch {
+      threw = true;
+    }
     expect(threw).toBe(true);
   });
 
   it("nested explicit transactions", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await transaction(Post, async () => {
-      await transaction(Post, async () => { await Post.create({ title: "nested" }); });
+      await transaction(Post, async () => {
+        await Post.create({ title: "nested" });
+      });
     });
     expect(await Post.count()).toBeGreaterThan(0);
   });
@@ -450,9 +598,12 @@ describe("TransactionTest2", () => {
   it("raise after destroy", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "to destroy" }) as any;
+    const post = (await Post.create({ title: "to destroy" })) as any;
     await post.destroy();
     expect((await Post.where({ id: post.id }).toArray()).length).toBe(0);
   });
@@ -460,34 +611,50 @@ describe("TransactionTest2", () => {
   it("rollback dirty changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "changed");
     try {
-      await transaction(Post, async () => { await post.save(); throw new Error("rollback"); });
-    } catch { /* expected */ }
+      await transaction(Post, async () => {
+        await post.save();
+        throw new Error("rollback");
+      });
+    } catch {
+      /* expected */
+    }
     expect(true).toBe(true);
   });
 
   it("rollback dirty changes multiple saves", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "v1" }) as any;
-    post.writeAttribute("title", "v2"); await post.save();
-    post.writeAttribute("title", "v3"); await post.save();
+    const post = (await Post.create({ title: "v1" })) as any;
+    post.writeAttribute("title", "v2");
+    await post.save();
+    post.writeAttribute("title", "v3");
+    await post.save();
     expect(post.readAttribute("title")).toBe("v3");
   });
 
   it("update should rollback on failure", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     Post.validates("title", { presence: true });
-    const post = await Post.create({ title: "good" }) as any;
+    const post = (await Post.create({ title: "good" })) as any;
     const result = await post.update({ title: "" });
     expect(result).toBe(false);
   });
@@ -495,9 +662,12 @@ describe("TransactionTest2", () => {
   it("rollback of frozen records", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "test" }) as any;
+    const post = (await Post.create({ title: "test" })) as any;
     await post.destroy();
     expect((post as any).isDestroyed?.() ?? true).toBe(true);
   });
@@ -505,16 +675,22 @@ describe("TransactionTest2", () => {
   it("restore active record state for all records in a transaction", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post1 = await Post.create({ title: "p1" }) as any;
-    const post2 = await Post.create({ title: "p2" }) as any;
+    const post1 = (await Post.create({ title: "p1" })) as any;
+    const post2 = (await Post.create({ title: "p2" })) as any;
     try {
       await transaction(Post, async () => {
-        post1.writeAttribute("title", "p1-mod"); post2.writeAttribute("title", "p2-mod");
+        post1.writeAttribute("title", "p1-mod");
+        post2.writeAttribute("title", "p2-mod");
         throw new Error("rollback");
       });
-    } catch { /* expected */ }
+    } catch {
+      /* expected */
+    }
     expect(post1).toBeTruthy();
     expect(post2).toBeTruthy();
   });
@@ -522,7 +698,10 @@ describe("TransactionTest2", () => {
   it("persisted in a model with custom primary key after failed save", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     Post.validates("title", { presence: true });
     const post = Post.new({ title: "" }) as any;
@@ -533,16 +712,22 @@ describe("TransactionTest2", () => {
   it("callback rollback in create", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "created" }) as any;
+    const post = (await Post.create({ title: "created" })) as any;
     expect(post.isPersisted()).toBe(true);
   });
 
   it("transactions state from rollback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Post.new({ title: "new" }).isNewRecord()).toBe(true);
   });
@@ -550,15 +735,21 @@ describe("TransactionTest2", () => {
   it("transactions state from commit", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    expect((await Post.create({ title: "created" }) as any).isPersisted()).toBe(true);
+    expect(((await Post.create({ title: "created" })) as any).isPersisted()).toBe(true);
   });
 
   it("restore id after rollback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const post = Post.new({ title: "no id" }) as any;
     expect(post.id == null).toBe(true); // null or undefined before save
@@ -569,9 +760,12 @@ describe("TransactionTest2", () => {
   it("read attribute after rollback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "changed");
     expect(post.readAttribute("title")).toBe("changed");
   });
@@ -579,9 +773,12 @@ describe("TransactionTest2", () => {
   it("write attribute after rollback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "new value");
     expect(post.readAttribute("title")).toBe("new value");
   });
@@ -589,9 +786,12 @@ describe("TransactionTest2", () => {
   it("rollback for freshly persisted records", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "fresh" }) as any;
+    const post = (await Post.create({ title: "fresh" })) as any;
     expect(post.isPersisted()).toBe(true);
     expect(post.isNewRecord()).toBe(false);
   });
@@ -599,49 +799,74 @@ describe("TransactionTest2", () => {
   it("empty transaction is not materialized", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    await transaction(Post, async () => { /* no-op */ });
+    await transaction(Post, async () => {
+      /* no-op */
+    });
     expect(await Post.count()).toBe(0);
   });
 
   it("transaction after commit callback", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let called = false;
-    await transaction(Post, async () => { await Post.create({ title: "t" }); called = true; });
+    await transaction(Post, async () => {
+      await Post.create({ title: "t" });
+      called = true;
+    });
     expect(called).toBe(true);
   });
 
   it("restore new record after double save", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const post = Post.new({ title: "double" }) as any;
-    await post.save(); await post.save();
+    await post.save();
+    await post.save();
     expect(post.isPersisted()).toBe(true);
   });
 
   it("rollback dirty changes then retry save", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
-    post.writeAttribute("title", "retry"); await post.save();
+    const post = (await Post.create({ title: "original" })) as any;
+    post.writeAttribute("title", "retry");
+    await post.save();
     expect(post.readAttribute("title")).toBe("retry");
   });
 
   it("transaction commits on success", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let committed = false;
-    await transaction(Post, async () => { await Post.create({ title: "committed" }); committed = true; });
+    await transaction(Post, async () => {
+      await Post.create({ title: "committed" });
+      committed = true;
+    });
     expect(committed).toBe(true);
     expect(await Post.count()).toBe(1);
   });
@@ -649,12 +874,19 @@ describe("TransactionTest2", () => {
   it("transaction rolls back on error", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     let threw = false;
     try {
-      await transaction(Post, async () => { throw new Error("rollback error"); });
-    } catch { threw = true; }
+      await transaction(Post, async () => {
+        throw new Error("rollback error");
+      });
+    } catch {
+      threw = true;
+    }
     expect(threw).toBe(true);
   });
 });
@@ -665,13 +897,23 @@ describe("TransactionTest2", () => {
 describe("CreateOrFindByWithinTransactions", () => {
   it("multiple find or create by within transactions", async () => {
     const adp = freshAdapter();
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adp; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
     const p = await Post.create({ title: "txn1" });
     expect((p as any).isPersisted()).toBe(true);
   });
   it("multiple find or create by bang within transactions", async () => {
     const adp = freshAdapter();
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adp; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
     const p = await Post.create({ title: "txn2" });
     expect((p as any).isPersisted()).toBe(true);
   });
@@ -682,88 +924,197 @@ describe("CreateOrFindByWithinTransactions", () => {
 // ==========================================================================
 describe("TransactionTest3", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
-  it("rollback dirty changes even with raise during rollback removes from pool", () => { expect(true).toBe(true); });
-  it("rollback dirty changes even with raise during rollback doesnt commit transaction", () => { expect(true).toBe(true); });
-  it("connection removed from pool when commit raises and rollback raises", () => { expect(true).toBe(true); });
-  it("connection removed from pool when begin raises after successfully beginning a transaction", () => { expect(true).toBe(true); });
-  it("connection removed from pool when thread killed in begin after successfully beginning a transaction", () => { expect(true).toBe(true); });
-  it("rollback dirty changes then retry save on new record with autosave association", () => { expect(true).toBe(true); });
-  it("add to null transaction", () => { expect(true).toBe(true); });
-  it("deprecation on ruby timeout outside inner transaction", () => { expect(true).toBe(true); });
-  it("rolling back in a callback rollbacks before save", () => { expect(true).toBe(true); });
-  it("raising exception in nested transaction restore state in save", () => { expect(true).toBe(true); });
+  it("rollback dirty changes even with raise during rollback removes from pool", () => {
+    expect(true).toBe(true);
+  });
+  it("rollback dirty changes even with raise during rollback doesnt commit transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("connection removed from pool when commit raises and rollback raises", () => {
+    expect(true).toBe(true);
+  });
+  it("connection removed from pool when begin raises after successfully beginning a transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("connection removed from pool when thread killed in begin after successfully beginning a transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("rollback dirty changes then retry save on new record with autosave association", () => {
+    expect(true).toBe(true);
+  });
+  it("add to null transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("deprecation on ruby timeout outside inner transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("rolling back in a callback rollbacks before save", () => {
+    expect(true).toBe(true);
+  });
+  it("raising exception in nested transaction restore state in save", () => {
+    expect(true).toBe(true);
+  });
   it("transaction state is cleared when record is persisted", async () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     const p = await Post.create({ title: "txn-state" });
     expect((p as any).isPersisted()).toBe(true);
   });
-  it("cancellation from before destroy rollbacks in destroy", () => { expect(true).toBe(true); });
-  it("callback rollback in create with record invalid exception", () => { expect(true).toBe(true); });
-  it("callback rollback in create with rollback exception", () => { expect(true).toBe(true); });
-  it("nested transaction with new transaction applies parent state on rollback", () => { expect(true).toBe(true); });
-  it("nested transaction without new transaction applies parent state on rollback", () => { expect(true).toBe(true); });
-  it("double nested transaction applies parent state on rollback", () => { expect(true).toBe(true); });
-  it("invalid keys for transaction", () => { expect(true).toBe(true); });
-  it("no savepoint in nested transaction without force", () => { expect(true).toBe(true); });
-  it("many savepoints", () => { expect(true).toBe(true); });
-  it("using named savepoints", () => { expect(true).toBe(true); });
-  it("releasing named savepoints", () => { expect(true).toBe(true); });
-  it("savepoints name", () => { expect(true).toBe(true); });
-  it("rollback when thread killed", () => { expect(true).toBe(true); });
-  it("dont restore new record in subsequent transaction", () => { expect(true).toBe(true); });
-  it("assign custom primary key after rollback", () => { expect(true).toBe(true); });
-  it("read attribute with custom primary key after rollback", () => { expect(true).toBe(true); });
-  it("write attribute after rollback", () => { expect(true).toBe(true); });
-  it("write attribute with custom primary key after rollback", () => { expect(true).toBe(true); });
-  it("sqlite add column in transaction", () => { expect(true).toBe(true); });
-  it("sqlite default transaction mode is immediate", () => { expect(true).toBe(true); });
-  it("mark transaction state as committed", () => { expect(true).toBe(true); });
-  it("mark transaction state as rolledback", () => { expect(true).toBe(true); });
-  it("mark transaction state as nil", () => { expect(true).toBe(true); });
-  it("transaction rollback with primarykeyless tables", () => { expect(true).toBe(true); });
-  it("unprepared statement materializes transaction", () => { expect(true).toBe(true); });
-  it("nested transactions skip excess savepoints", () => { expect(true).toBe(true); });
-  it("prepared statement materializes transaction", () => { expect(true).toBe(true); });
-  it("savepoint does not materialize transaction", () => { expect(true).toBe(true); });
-  it("raising does not materialize transaction", () => { expect(true).toBe(true); });
-  it("accessing raw connection materializes transaction", () => { expect(true).toBe(true); });
-  it("accessing raw connection disables lazy transactions", () => { expect(true).toBe(true); });
-  it("checking in connection reenables lazy transactions", () => { expect(true).toBe(true); });
-  it("transactions can be manually materialized", () => { expect(true).toBe(true); });
+  it("cancellation from before destroy rollbacks in destroy", () => {
+    expect(true).toBe(true);
+  });
+  it("callback rollback in create with record invalid exception", () => {
+    expect(true).toBe(true);
+  });
+  it("callback rollback in create with rollback exception", () => {
+    expect(true).toBe(true);
+  });
+  it("nested transaction with new transaction applies parent state on rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("nested transaction without new transaction applies parent state on rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("double nested transaction applies parent state on rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("invalid keys for transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("no savepoint in nested transaction without force", () => {
+    expect(true).toBe(true);
+  });
+  it("many savepoints", () => {
+    expect(true).toBe(true);
+  });
+  it("using named savepoints", () => {
+    expect(true).toBe(true);
+  });
+  it("releasing named savepoints", () => {
+    expect(true).toBe(true);
+  });
+  it("savepoints name", () => {
+    expect(true).toBe(true);
+  });
+  it("rollback when thread killed", () => {
+    expect(true).toBe(true);
+  });
+  it("dont restore new record in subsequent transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("assign custom primary key after rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("read attribute with custom primary key after rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("write attribute after rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("write attribute with custom primary key after rollback", () => {
+    expect(true).toBe(true);
+  });
+  it("sqlite add column in transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("sqlite default transaction mode is immediate", () => {
+    expect(true).toBe(true);
+  });
+  it("mark transaction state as committed", () => {
+    expect(true).toBe(true);
+  });
+  it("mark transaction state as rolledback", () => {
+    expect(true).toBe(true);
+  });
+  it("mark transaction state as nil", () => {
+    expect(true).toBe(true);
+  });
+  it("transaction rollback with primarykeyless tables", () => {
+    expect(true).toBe(true);
+  });
+  it("unprepared statement materializes transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("nested transactions skip excess savepoints", () => {
+    expect(true).toBe(true);
+  });
+  it("prepared statement materializes transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("savepoint does not materialize transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("raising does not materialize transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("accessing raw connection materializes transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("accessing raw connection disables lazy transactions", () => {
+    expect(true).toBe(true);
+  });
+  it("checking in connection reenables lazy transactions", () => {
+    expect(true).toBe(true);
+  });
+  it("transactions can be manually materialized", () => {
+    expect(true).toBe(true);
+  });
 });
 
 // ==========================================================================
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionsWithTransactionalFixturesTest", () => {
-  it("automatic savepoint in outer transaction", () => { expect(true).toBe(true); });
-  it("no automatic savepoint for inner transaction", () => { expect(true).toBe(true); });
+  it("automatic savepoint in outer transaction", () => {
+    expect(true).toBe(true);
+  });
+  it("no automatic savepoint for inner transaction", () => {
+    expect(true).toBe(true);
+  });
 });
 
 // ==========================================================================
 // TransactionUUIDTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionUUIDTest", () => {
-  it("the uuid is lazily computed", () => { expect(true).toBe(true); });
-  it("the uuid for regular transactions is generated and memoized", () => { expect(true).toBe(true); });
-  it("the uuid for null transactions is nil", () => { expect(true).toBe(true); });
+  it("the uuid is lazily computed", () => {
+    expect(true).toBe(true);
+  });
+  it("the uuid for regular transactions is generated and memoized", () => {
+    expect(true).toBe(true);
+  });
+  it("the uuid for null transactions is nil", () => {
+    expect(true).toBe(true);
+  });
 });
 
 // ==========================================================================
 // ConcurrentTransactionTest — from transactions_test.rb
 // ==========================================================================
 describe("ConcurrentTransactionTest", () => {
-  it("transaction per thread", () => { expect(true).toBe(true); });
-  it("transaction isolation  read committed", () => { expect(true).toBe(true); });
+  it("transaction per thread", () => {
+    expect(true).toBe(true);
+  });
+  it("transaction isolation  read committed", () => {
+    expect(true).toBe(true);
+  });
 });
 
 // ==========================================================================
 // after current transaction commit multidb nested transactions (standalone)
 // ==========================================================================
 describe("after current transaction commit multidb nested transactions", () => {
-  it("after current transaction commit multidb nested transactions", () => { expect(true).toBe(true); });
+  it("after current transaction commit multidb nested transactions", () => {
+    expect(true).toBe(true);
+  });
 });
 
 describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
@@ -776,8 +1127,12 @@ describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
         this.attribute("title", "string");
         this.attribute("lock_version", "integer", { default: 0 });
         this.adapter = adapter;
-        this.afterCreate(function() { log.push("created"); });
-        this.afterUpdate(function() { log.push("updated"); });
+        this.afterCreate(function () {
+          log.push("created");
+        });
+        this.afterUpdate(function () {
+          log.push("updated");
+        });
       }
     }
     const p = await Post.create({ title: "test" });
@@ -787,7 +1142,6 @@ describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
     expect(p.readAttribute("lock_version")).toBe(1);
   });
 });
-
 
 describe("Transactions", () => {
   let adapter: DatabaseAdapter;
@@ -881,11 +1235,17 @@ describe("Transactions", () => {
 
 describe("Transactions (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("successful transaction commits", async () => {
     class Account extends Base {
-      static { this.attribute("name", "string"); this.attribute("balance", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("balance", "integer");
+        this.adapter = adapter;
+      }
     }
     await transaction(Account, async () => {
       await Account.create({ name: "Alice", balance: 100 });
@@ -896,11 +1256,16 @@ describe("Transactions (Rails-guided)", () => {
 
   it("afterCommit runs on success", async () => {
     class Account extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const log: string[] = [];
     await transaction(Account, async (tx) => {
-      tx.afterCommit(() => { log.push("committed"); });
+      tx.afterCommit(() => {
+        log.push("committed");
+      });
       await Account.create({ name: "Alice" });
     });
     expect(log).toEqual(["committed"]);
@@ -908,33 +1273,46 @@ describe("Transactions (Rails-guided)", () => {
 
   it("afterRollback runs on error", async () => {
     class Account extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const log: string[] = [];
     try {
       await transaction(Account, async (tx) => {
-        tx.afterRollback(() => { log.push("rolled_back"); });
+        tx.afterRollback(() => {
+          log.push("rolled_back");
+        });
         throw new Error("boom");
       });
-    } catch { /* expected */ }
+    } catch {
+      /* expected */
+    }
     expect(log).toEqual(["rolled_back"]);
   });
 
   it("nested savepoint", async () => {
     class Account extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await transaction(Account, async () => {
       await Account.create({ name: "Alice" });
       try {
-        await savepoint(Account, "sp1", async () => { throw new Error("inner"); });
-      } catch { /* savepoint rolled back */ }
+        await savepoint(Account, "sp1", async () => {
+          throw new Error("inner");
+        });
+      } catch {
+        /* savepoint rolled back */
+      }
       await Account.create({ name: "Bob" });
     });
     expect(await Account.all().count()).toBe(2);
   });
 });
-
 
 describe("Transactions (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -974,7 +1352,9 @@ describe("Transactions (Rails-guided)", () => {
     const log: string[] = [];
 
     await transaction(Account, async (tx) => {
-      tx.afterCommit(() => { log.push("committed"); });
+      tx.afterCommit(() => {
+        log.push("committed");
+      });
       await Account.create({ name: "Alice", balance: 100 });
     });
 
@@ -986,7 +1366,9 @@ describe("Transactions (Rails-guided)", () => {
 
     try {
       await transaction(Account, async (tx) => {
-        tx.afterRollback(() => { log.push("rolled_back"); });
+        tx.afterRollback(() => {
+          log.push("rolled_back");
+        });
         throw new Error("boom");
       });
     } catch {
@@ -1001,7 +1383,9 @@ describe("Transactions (Rails-guided)", () => {
 
     try {
       await transaction(Account, async (tx) => {
-        tx.afterCommit(() => { log.push("committed"); });
+        tx.afterCommit(() => {
+          log.push("committed");
+        });
         throw new Error("boom");
       });
     } catch {
@@ -1015,7 +1399,9 @@ describe("Transactions (Rails-guided)", () => {
     const log: string[] = [];
 
     await transaction(Account, async (tx) => {
-      tx.afterRollback(() => { log.push("rolled_back"); });
+      tx.afterRollback(() => {
+        log.push("rolled_back");
+      });
       await Account.create({ name: "Alice", balance: 100 });
     });
 
@@ -1044,9 +1430,15 @@ describe("Transactions (Rails-guided)", () => {
     const log: string[] = [];
 
     await transaction(Account, async (tx) => {
-      tx.afterCommit(() => { log.push("first"); });
-      tx.afterCommit(() => { log.push("second"); });
-      tx.afterCommit(() => { log.push("third"); });
+      tx.afterCommit(() => {
+        log.push("first");
+      });
+      tx.afterCommit(() => {
+        log.push("second");
+      });
+      tx.afterCommit(() => {
+        log.push("third");
+      });
     });
 
     expect(log).toEqual(["first", "second", "third"]);
@@ -1056,7 +1448,7 @@ describe("Transactions (Rails-guided)", () => {
     await expect(
       transaction(Account, async () => {
         throw new Error("specific error message");
-      })
+      }),
     ).rejects.toThrow("specific error message");
   });
 });

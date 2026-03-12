@@ -3,7 +3,43 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass , loadHabtm} from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+  loadHabtm,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +52,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -27,12 +68,19 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("HabtmDestroyOrderTest", () => {
-  it.skip("may not delete a lesson with students", () => { /* fixture-dependent */ });
-  it.skip("should not raise error if have foreign key in the join table", () => { /* fixture-dependent */ });
-  it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => { /* fixture-dependent */ });
-  it.skip("not destroying a lesson with students leaves student<=>lesson association intact", () => { /* fixture-dependent */ });
+  it.skip("may not delete a lesson with students", () => {
+    /* fixture-dependent */
+  });
+  it.skip("should not raise error if have foreign key in the join table", () => {
+    /* fixture-dependent */
+  });
+  it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => {
+    /* fixture-dependent */
+  });
+  it.skip("not destroying a lesson with students leaves student<=>lesson association intact", () => {
+    /* fixture-dependent */
+  });
 });
-
 
 describe("has_and_belongs_to_many", () => {
   let adapter: DatabaseAdapter;
@@ -61,7 +109,7 @@ describe("has_and_belongs_to_many", () => {
 
     // Create the join table
     await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "posts_tags" ("post_id" INTEGER, "tag_id" INTEGER)`
+      `CREATE TABLE IF NOT EXISTS "posts_tags" ("post_id" INTEGER, "tag_id" INTEGER)`,
     );
 
     const post = await Post.create({ title: "Hello" });
@@ -71,10 +119,10 @@ describe("has_and_belongs_to_many", () => {
 
     // Manually insert into join table
     await adapter.executeMutation(
-      `INSERT INTO "posts_tags" ("post_id", "tag_id") VALUES (${post.id}, ${t1.id})`
+      `INSERT INTO "posts_tags" ("post_id", "tag_id") VALUES (${post.id}, ${t1.id})`,
     );
     await adapter.executeMutation(
-      `INSERT INTO "posts_tags" ("post_id", "tag_id") VALUES (${post.id}, ${t2.id})`
+      `INSERT INTO "posts_tags" ("post_id", "tag_id") VALUES (${post.id}, ${t2.id})`,
     );
 
     const tags = await loadHabtm(post, "tags", { joinTable: "posts_tags" });
@@ -103,7 +151,7 @@ describe("has_and_belongs_to_many", () => {
 
     // Create the join table
     await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
     const dev = await Developer.create({ name: "Alice" });
@@ -112,7 +160,7 @@ describe("has_and_belongs_to_many", () => {
     // Default join table: alphabetical order of pluralized names
     // "developers" and "projects" -> "developers_projects"
     await adapter.executeMutation(
-      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${proj.id})`
+      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${proj.id})`,
     );
 
     const projects = await loadHabtm(dev, "projects", {});

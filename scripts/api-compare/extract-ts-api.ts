@@ -42,7 +42,9 @@ function main() {
     for (const cls of Object.values(data.classes)) {
       methodCount += cls.instanceMethods.length + cls.classMethods.length;
     }
-    console.log(`  ${pkg}: ${classCount} classes, ${moduleCount} modules, ${methodCount} public methods`);
+    console.log(
+      `  ${pkg}: ${classCount} classes, ${moduleCount} modules, ${methodCount} public methods`,
+    );
   }
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -70,7 +72,11 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   if (fs.existsSync(tsConfigPath)) {
     const configFile = ts.readConfigFile(tsConfigPath, ts.sys.readFile);
     if (configFile.config) {
-      const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, path.dirname(tsConfigPath));
+      const parsed = ts.parseJsonConfigFileContent(
+        configFile.config,
+        ts.sys,
+        path.dirname(tsConfigPath),
+      );
       compilerOptions = { ...compilerOptions, ...parsed.options };
     }
   }
@@ -100,7 +106,11 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   return info;
 }
 
-function extractClass(node: ts.ClassDeclaration, checker: ts.TypeChecker, file: string): ClassInfo | null {
+function extractClass(
+  node: ts.ClassDeclaration,
+  checker: ts.TypeChecker,
+  file: string,
+): ClassInfo | null {
   const name = node.name?.text;
   if (!name) return null;
 
@@ -270,7 +280,11 @@ function getAllTsFiles(dir: string): string[] {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...getAllTsFiles(fullPath));
-    } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts") && !entry.name.endsWith(".d.ts")) {
+    } else if (
+      entry.name.endsWith(".ts") &&
+      !entry.name.endsWith(".test.ts") &&
+      !entry.name.endsWith(".d.ts")
+    ) {
       results.push(fullPath);
     }
   }

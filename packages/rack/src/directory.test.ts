@@ -146,7 +146,9 @@ describe("Rack::Directory", () => {
 
   it("correctly escape script name", async () => {
     const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/", { SCRIPT_NAME: "/test<script>" });
+    const res = await new MockRequest((env) => app.call(env)).get("/", {
+      SCRIPT_NAME: "/test<script>",
+    });
     expect(res.status).toBe(200);
     expect(res.bodyString).not.toContain("<script>");
     expect(res.bodyString).toContain("&lt;script&gt;");

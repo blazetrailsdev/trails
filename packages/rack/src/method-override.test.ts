@@ -16,7 +16,19 @@ describe("Rack::MethodOverride", () => {
   });
 
   it("sets rack.errors for invalid UTF8 _method values", async () => {
-    const errors = { messages: [] as string[], puts(s: string) { this.messages.push(s); }, write(s: string) { this.messages.push(s); }, flush() {}, string() { return this.messages.join(""); } };
+    const errors = {
+      messages: [] as string[],
+      puts(s: string) {
+        this.messages.push(s);
+      },
+      write(s: string) {
+        this.messages.push(s);
+      },
+      flush() {},
+      string() {
+        return this.messages.join("");
+      },
+    };
     const env = MockRequest.envFor("/", {
       method: "POST",
       input: "_method=\xBF",
@@ -67,7 +79,7 @@ describe("Rack::MethodOverride", () => {
   });
 
   it("not modify REQUEST_METHOD when given invalid multipart form data", async () => {
-    const input = "--AaB03x\r\ncontent-disposition: form-data; name=\"huge\"; filename=\"huge\"\r\n";
+    const input = '--AaB03x\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n';
     const env = MockRequest.envFor("/", {
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: String(Buffer.byteLength(input)),
@@ -79,8 +91,20 @@ describe("Rack::MethodOverride", () => {
   });
 
   it("writes error to RACK_ERRORS when given invalid multipart form data", async () => {
-    const input = "--AaB03x\r\ncontent-disposition: form-data; name=\"huge\"; filename=\"huge\"\r\n";
-    const errors = { messages: [] as string[], puts(s: string) { this.messages.push(s); }, write(s: string) { this.messages.push(s); }, flush() {}, string() { return this.messages.join("\n"); } };
+    const input = '--AaB03x\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n';
+    const errors = {
+      messages: [] as string[],
+      puts(s: string) {
+        this.messages.push(s);
+      },
+      write(s: string) {
+        this.messages.push(s);
+      },
+      flush() {},
+      string() {
+        return this.messages.join("\n");
+      },
+    };
     const env = MockRequest.envFor("/", {
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: String(Buffer.byteLength(input)),
@@ -95,8 +119,21 @@ describe("Rack::MethodOverride", () => {
 
   it("writes error to RACK_ERRORS when using incompatible multipart encoding", async () => {
     // Simplified: incomplete multipart with encoding issues
-    const input = "--AaB03x\r\ncontent-disposition: form-data; name=\"bad\"\r\n\r\ndata\r\n--AaB03x--\r\n";
-    const errors = { messages: [] as string[], puts(s: string) { this.messages.push(s); }, write(s: string) { this.messages.push(s); }, flush() {}, string() { return this.messages.join("\n"); } };
+    const input =
+      '--AaB03x\r\ncontent-disposition: form-data; name="bad"\r\n\r\ndata\r\n--AaB03x--\r\n';
+    const errors = {
+      messages: [] as string[],
+      puts(s: string) {
+        this.messages.push(s);
+      },
+      write(s: string) {
+        this.messages.push(s);
+      },
+      flush() {},
+      string() {
+        return this.messages.join("\n");
+      },
+    };
     const env = MockRequest.envFor("/", {
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: String(Buffer.byteLength(input)),

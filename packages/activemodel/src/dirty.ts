@@ -19,11 +19,7 @@ export class DirtyTracker {
   /**
    * Record an attribute change.
    */
-  attributeWillChange(
-    name: string,
-    from: unknown,
-    to: unknown
-  ): void {
+  attributeWillChange(name: string, from: unknown, to: unknown): void {
     if (from === to) {
       this._changedAttributes.delete(name);
     } else {
@@ -31,10 +27,7 @@ export class DirtyTracker {
       if (to === original) {
         this._changedAttributes.delete(name);
       } else {
-        this._changedAttributes.set(name, [
-          this._originalAttributes.get(name),
-          to,
-        ]);
+        this._changedAttributes.set(name, [this._originalAttributes.get(name), to]);
       }
     }
   }

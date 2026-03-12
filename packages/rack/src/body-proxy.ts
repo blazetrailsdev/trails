@@ -49,7 +49,11 @@ export class BodyProxy {
   respondTo(method: string): boolean {
     if (method === "toStr" || method === "to_str") return false;
     if (method === "toArray" || method === "to_ary") {
-      return Array.isArray(this.body) || typeof this.body?.toArray === "function" || typeof this.body?.to_ary === "function";
+      return (
+        Array.isArray(this.body) ||
+        typeof this.body?.toArray === "function" ||
+        typeof this.body?.to_ary === "function"
+      );
     }
     if (method === "toPath" || method === "to_path") {
       return typeof this.body?.toPath === "function" || typeof this.body?.to_path === "function";

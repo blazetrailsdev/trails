@@ -127,19 +127,27 @@ describe("TimeExtCalculationsTest", () => {
     expect(ago(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
     expect(ago(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 9, 10, 10));
     expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 20, 10, 10, 10));
-    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(d(2005, 2, 20, 9, 9, 45));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+      d(2005, 2, 20, 9, 9, 45),
+    );
   });
 
   it("since", () => {
     expect(since(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
     expect(since(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 11, 10, 10));
     expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 24, 10, 10, 10));
-    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(d(2005, 2, 24, 11, 10, 35));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+      d(2005, 2, 24, 11, 10, 35),
+    );
   });
 
   it("change (changeDate)", () => {
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 })).toEqual(d(2006, 2, 22, 15, 15, 10));
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 })).toEqual(d(2005, 6, 22, 15, 15, 10));
+    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 })).toEqual(
+      d(2006, 2, 22, 15, 15, 10),
+    );
+    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 })).toEqual(
+      d(2005, 6, 22, 15, 15, 10),
+    );
     expect(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 })).toEqual(d(2005, 2, 22, 16, 0, 0));
     expect(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(d(2005, 2, 22, 15, 45, 0));
   });
@@ -173,12 +181,12 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("advance combined", () => {
-    expect(
-      advance(d(2005, 2, 28, 15, 15, 10), { years: 7, months: 7 })
-    ).toEqual(d(2012, 9, 28, 15, 15, 10));
-    expect(
-      advance(d(2005, 2, 28, 15, 15, 10), { years: -3, months: -2, days: -1 })
-    ).toEqual(d(2001, 12, 27, 15, 15, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { years: 7, months: 7 })).toEqual(
+      d(2012, 9, 28, 15, 15, 10),
+    );
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { years: -3, months: -2, days: -1 })).toEqual(
+      d(2001, 12, 27, 15, 15, 10),
+    );
   });
 
   it("advance leap day plus one year", () => {
@@ -243,13 +251,13 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("on_weekday", () => {
-    expect(onWeekday(d(2023, 1, 9))).toBe(true);  // Monday
+    expect(onWeekday(d(2023, 1, 9))).toBe(true); // Monday
     expect(onWeekday(d(2023, 1, 7))).toBe(false); // Saturday
     expect(onWeekday(d(2023, 1, 8))).toBe(false); // Sunday
   });
 
   it("on_weekend", () => {
-    expect(onWeekend(d(2023, 1, 7))).toBe(true);  // Saturday
+    expect(onWeekend(d(2023, 1, 7))).toBe(true); // Saturday
     expect(onWeekend(d(2023, 1, 9))).toBe(false); // Monday
   });
 
@@ -280,7 +288,7 @@ describe("TimeExtCalculationsTest", () => {
   it("all_week", () => {
     const { start, end } = allWeek(d(2023, 1, 11)); // Wednesday
     expect(start.getDay()).toBe(1); // Monday
-    expect(end.getDay()).toBe(0);   // Sunday
+    expect(end.getDay()).toBe(0); // Sunday
   });
 
   it("all_month", () => {
@@ -994,9 +1002,7 @@ describe("DateTimeExtCalculationsTest", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
     expect(advance(dt, { years: 1 })).toEqual(d(2006, 2, 22, 15, 15, 10));
     expect(advance(dt, { months: 4 })).toEqual(d(2005, 6, 22, 15, 15, 10));
-    expect(advance(dt, { hours: 5, minutes: 7, seconds: 9 })).toEqual(
-      d(2005, 2, 22, 20, 22, 19)
-    );
+    expect(advance(dt, { hours: 5, minutes: 7, seconds: 9 })).toEqual(d(2005, 2, 22, 20, 22, 19));
   });
 
   it("ago from datetime", () => {

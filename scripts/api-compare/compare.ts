@@ -170,9 +170,10 @@ function main() {
       result.summary.signatureMismatch += cls.signatureMismatch;
     }
   }
-  result.summary.coveragePercent = result.summary.totalRubyMethods > 0
-    ? Math.round((result.summary.matched / result.summary.totalRubyMethods) * 1000) / 10
-    : 0;
+  result.summary.coveragePercent =
+    result.summary.totalRubyMethods > 0
+      ? Math.round((result.summary.matched / result.summary.totalRubyMethods) * 1000) / 10
+      : 0;
 
   // Write JSON report
   const jsonPath = path.join(OUTPUT_DIR, "comparison-report.json");
@@ -308,7 +309,9 @@ function generateMarkdown(result: ComparisonResult): string {
     for (const cls of comparisons) {
       lines.push(`### ${cls.tsClass}`);
       lines.push(`Ruby source: ${cls.rubyClass}`);
-      lines.push(`Coverage: ${cls.coveragePercent}% (${cls.matched} matched, ${cls.missing} missing, ${cls.signatureMismatch} signature mismatch, ${cls.extra} extra)`);
+      lines.push(
+        `Coverage: ${cls.coveragePercent}% (${cls.matched} matched, ${cls.missing} missing, ${cls.signatureMismatch} signature mismatch, ${cls.extra} extra)`,
+      );
       lines.push("");
 
       const allMethods = [...cls.instanceMethods, ...cls.classMethods];
@@ -339,7 +342,9 @@ function generateMarkdown(result: ComparisonResult): string {
       if (missing.length > 0) {
         lines.push(`**Missing (${missing.length}):**`);
         for (const m of missing) {
-          const params = m.rubyParams?.map((p) => `${p.name}${p.kind === "optional" ? "?" : ""}`).join(", ") ?? "";
+          const params =
+            m.rubyParams?.map((p) => `${p.name}${p.kind === "optional" ? "?" : ""}`).join(", ") ??
+            "";
           lines.push(`- \`${m.rubyName}(${params})\` -> expected \`${m.tsName}\``);
         }
         lines.push("");
@@ -385,13 +390,18 @@ function printSummary(result: ComparisonResult) {
 
   for (const [pkg, comparisons] of Object.entries(result.packages)) {
     const pkgMatched = comparisons.reduce((s, c) => s + c.matched, 0);
-    const pkgTotal = comparisons.reduce((s, c) => s + c.matched + c.missing + c.signatureMismatch, 0);
+    const pkgTotal = comparisons.reduce(
+      (s, c) => s + c.matched + c.missing + c.signatureMismatch,
+      0,
+    );
     const pkgCoverage = pkgTotal > 0 ? Math.round((pkgMatched / pkgTotal) * 1000) / 10 : 0;
     console.log(`  ${pkg}: ${pkgCoverage}% (${pkgMatched}/${pkgTotal})`);
     for (const cls of comparisons) {
       const total = cls.matched + cls.missing + cls.signatureMismatch;
       if (total > 0) {
-        console.log(`    ${cls.tsClass.split(":")[1]}: ${cls.coveragePercent}% (${cls.matched}/${total})`);
+        console.log(
+          `    ${cls.tsClass.split(":")[1]}: ${cls.coveragePercent}% (${cls.matched}/${total})`,
+        );
       }
     }
   }

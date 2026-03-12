@@ -136,9 +136,7 @@ export class TestCase {
     const actual = this.response?.statusCode ?? this.controller?.status;
     if (typeof expected === "number") {
       if (actual !== expected) {
-        throw new Error(
-          `Expected response status ${expected}, got ${actual}`
-        );
+        throw new Error(`Expected response status ${expected}, got ${actual}`);
       }
       return;
     }
@@ -148,7 +146,7 @@ export class TestCase {
     if (range) {
       if (actual < range[0] || actual > range[1]) {
         throw new Error(
-          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`
+          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`,
         );
       }
       return;
@@ -156,18 +154,27 @@ export class TestCase {
 
     // Check Rails status symbols
     const SYMBOLS: Record<string, number> = {
-      ok: 200, created: 201, accepted: 202, no_content: 204,
-      moved_permanently: 301, found: 302, see_other: 303, not_modified: 304,
-      bad_request: 400, unauthorized: 401, forbidden: 403, not_found: 404,
-      method_not_allowed: 405, unprocessable_entity: 422,
-      internal_server_error: 500, service_unavailable: 503,
+      ok: 200,
+      created: 201,
+      accepted: 202,
+      no_content: 204,
+      moved_permanently: 301,
+      found: 302,
+      see_other: 303,
+      not_modified: 304,
+      bad_request: 400,
+      unauthorized: 401,
+      forbidden: 403,
+      not_found: 404,
+      method_not_allowed: 405,
+      unprocessable_entity: 422,
+      internal_server_error: 500,
+      service_unavailable: 503,
     };
     const code = SYMBOLS[expected];
     if (code !== undefined) {
       if (actual !== code) {
-        throw new Error(
-          `Expected response status :${expected} (${code}), got ${actual}`
-        );
+        throw new Error(`Expected response status :${expected} (${code}), got ${actual}`);
       }
       return;
     }
@@ -179,22 +186,17 @@ export class TestCase {
    * Assert the response redirected to a given URL or path.
    */
   assertRedirectedTo(expected: string | RegExp): void {
-    const location = this.response?.getHeader("location") ??
-      this.controller?.getHeader("location");
+    const location = this.response?.getHeader("location") ?? this.controller?.getHeader("location");
     if (!location) {
       throw new Error("Expected a redirect but no Location header was set");
     }
     if (typeof expected === "string") {
       if (location !== expected) {
-        throw new Error(
-          `Expected redirect to "${expected}", got "${location}"`
-        );
+        throw new Error(`Expected redirect to "${expected}", got "${location}"`);
       }
     } else {
       if (!expected.test(location)) {
-        throw new Error(
-          `Expected redirect matching ${expected}, got "${location}"`
-        );
+        throw new Error(`Expected redirect matching ${expected}, got "${location}"`);
       }
     }
   }
@@ -203,12 +205,9 @@ export class TestCase {
    * Assert the response content type.
    */
   assertContentType(expected: string): void {
-    const actual = this.response?.getHeader("content-type") ??
-      this.controller?.contentType ?? "";
+    const actual = this.response?.getHeader("content-type") ?? this.controller?.contentType ?? "";
     if (!actual.includes(expected)) {
-      throw new Error(
-        `Expected content type to include "${expected}", got "${actual}"`
-      );
+      throw new Error(`Expected content type to include "${expected}", got "${actual}"`);
     }
   }
 
@@ -216,22 +215,17 @@ export class TestCase {
    * Assert a response header value.
    */
   assertHeader(name: string, expected: string | RegExp): void {
-    const actual = this.response?.getHeader(name) ??
-      this.controller?.getHeader(name);
+    const actual = this.response?.getHeader(name) ?? this.controller?.getHeader(name);
     if (actual === undefined) {
       throw new Error(`Expected header "${name}" to be set`);
     }
     if (typeof expected === "string") {
       if (actual !== expected) {
-        throw new Error(
-          `Expected header "${name}" to be "${expected}", got "${actual}"`
-        );
+        throw new Error(`Expected header "${name}" to be "${expected}", got "${actual}"`);
       }
     } else {
       if (!expected.test(actual)) {
-        throw new Error(
-          `Expected header "${name}" to match ${expected}, got "${actual}"`
-        );
+        throw new Error(`Expected header "${name}" to match ${expected}, got "${actual}"`);
       }
     }
   }
@@ -248,15 +242,11 @@ export class TestCase {
     if (expected !== undefined) {
       if (typeof expected === "string") {
         if (value !== expected) {
-          throw new Error(
-            `Expected flash[:${key}] to be "${expected}", got "${value}"`
-          );
+          throw new Error(`Expected flash[:${key}] to be "${expected}", got "${value}"`);
         }
       } else {
         if (!expected.test(value as string)) {
-          throw new Error(
-            `Expected flash[:${key}] to match ${expected}, got "${value}"`
-          );
+          throw new Error(`Expected flash[:${key}] to match ${expected}, got "${value}"`);
         }
       }
     }
@@ -268,9 +258,7 @@ export class TestCase {
   assertNoFlash(key: string): void {
     const flash = this.flash;
     if (flash.has(key)) {
-      throw new Error(
-        `Expected no flash[:${key}], but got "${flash.get(key)}"`
-      );
+      throw new Error(`Expected no flash[:${key}], but got "${flash.get(key)}"`);
     }
   }
 
@@ -286,11 +274,7 @@ export class TestCase {
 
   // --- Internal ---
 
-  private async _process(
-    action: string,
-    method: string,
-    options: RequestOptions
-  ): Promise<void> {
+  private async _process(action: string, method: string, options: RequestOptions): Promise<void> {
     const env: Record<string, unknown> = {
       REQUEST_METHOD: method,
       PATH_INFO: options.params?.path ?? `/${action}`,
@@ -342,9 +326,7 @@ export class TestCase {
     // Set up request parameters as a Parameters object
     const allParams = { ...(options.params ?? {}) };
     (this.request as any).parameters = new Parameters(
-      Object.fromEntries(
-        Object.entries(allParams).map(([k, v]) => [k, v])
-      )
+      Object.fromEntries(Object.entries(allParams).map(([k, v]) => [k, v])),
     );
 
     // Flash setup

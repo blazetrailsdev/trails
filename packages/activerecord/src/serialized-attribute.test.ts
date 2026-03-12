@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -30,7 +70,11 @@ describe("SerializedAttributeTest", () => {
   function makeModel() {
     const adapter = freshAdapter();
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("preferences", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("preferences", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(User, "preferences");
     return { User, adapter };
@@ -40,7 +84,11 @@ describe("SerializedAttributeTest", () => {
     // Calling serialize should not force column loading; it just registers the serialization
     const adapter = freshAdapter();
     class LazyUser extends Base {
-      static { this.attribute("name", "string"); this.attribute("prefs", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("prefs", "string");
+        this.adapter = adapter;
+      }
     }
     // serialize should work without forcing any column enumeration
     serialize(LazyUser, "prefs");
@@ -81,7 +129,11 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute with default", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("settings", "string", { default: "{}" }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("settings", "string", { default: "{}" });
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "settings");
     const p = new Post();
@@ -92,7 +144,11 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute on custom attribute with default", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("metadata", "string", { default: '{"version":1}' }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("metadata", "string", { default: '{"version":1}' });
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "metadata");
     const p = new Post();
@@ -103,7 +159,11 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute in base class", () => {
     const adapter = freshAdapter();
     class Parent extends Base {
-      static { this.attribute("name", "string"); this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(Parent, "data");
     class Child extends Parent {}
@@ -115,12 +175,19 @@ describe("SerializedAttributeTest", () => {
   it("serialized attributes from database on subclass", async () => {
     const adapter = freshAdapter();
     class Parent extends Base {
-      static { this.attribute("name", "string"); this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(Parent, "data");
     class Child extends Parent {}
     Child._tableName = "parents";
-    const created = await Child.create({ name: "test", data: JSON.stringify({ key: "val" }) as any });
+    const created = await Child.create({
+      name: "test",
+      data: JSON.stringify({ key: "val" }) as any,
+    });
     const found = await Child.find(created.readAttribute("id"));
     expect(found.readAttribute("data")).toEqual({ key: "val" });
   });
@@ -155,7 +222,11 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute declared in subclass", () => {
     const adapter = freshAdapter();
     class Parent extends Base {
-      static { this.attribute("name", "string"); this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     class Child extends Parent {}
     serialize(Child, "data");
@@ -180,8 +251,12 @@ describe("SerializedAttributeTest", () => {
     expect(u.readAttribute("preferences")).toBe("just a string");
   });
 
-  it.skip("serialized class attribute", () => { /* needs class-based serialization */ });
-  it.skip("serialized class does not become frozen", () => { /* Ruby-specific frozen concept */ });
+  it.skip("serialized class attribute", () => {
+    /* needs class-based serialization */
+  });
+  it.skip("serialized class does not become frozen", () => {
+    /* Ruby-specific frozen concept */
+  });
 
   it("nil serialized attribute without class constraint", () => {
     const { User } = makeModel();
@@ -202,17 +277,33 @@ describe("SerializedAttributeTest", () => {
     expect(u.readAttribute("preferences")).toBeNull();
   });
 
-  it.skip("serialized attribute should raise exception on assignment with wrong type", () => { /* needs type constraint checking */ });
-  it.skip("should raise exception on serialized attribute with type mismatch", () => { /* needs type constraint checking */ });
-  it.skip("serialized attribute with class constraint", () => { /* needs class-based serialization */ });
-  it.skip("where by serialized attribute with array", () => { /* needs serialized where support */ });
-  it.skip("where by serialized attribute with hash", () => { /* needs serialized where support */ });
-  it.skip("where by serialized attribute with hash in array", () => { /* needs serialized where support */ });
+  it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
+    /* needs type constraint checking */
+  });
+  it.skip("should raise exception on serialized attribute with type mismatch", () => {
+    /* needs type constraint checking */
+  });
+  it.skip("serialized attribute with class constraint", () => {
+    /* needs class-based serialization */
+  });
+  it.skip("where by serialized attribute with array", () => {
+    /* needs serialized where support */
+  });
+  it.skip("where by serialized attribute with hash", () => {
+    /* needs serialized where support */
+  });
+  it.skip("where by serialized attribute with hash in array", () => {
+    /* needs serialized where support */
+  });
 
   it("serialized default class", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("tags", "string", { default: "[]" }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("tags", "string", { default: "[]" });
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "tags");
     const p = new Post();
@@ -242,7 +333,11 @@ describe("SerializedAttributeTest", () => {
   it("serialize with coder", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("tags", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("tags", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "tags", { coder: "array" });
     const p = new Post();
@@ -250,20 +345,30 @@ describe("SerializedAttributeTest", () => {
     expect(p.readAttribute("tags")).toEqual(["a", "b"]);
   });
 
-  it.skip("serialize attribute via select method when time zone available", () => { /* needs timezone support */ });
-  it.skip("serialize attribute can be serialized in an integer column", () => { /* needs integer column serialize */ });
+  it.skip("serialize attribute via select method when time zone available", () => {
+    /* needs timezone support */
+  });
+  it.skip("serialize attribute can be serialized in an integer column", () => {
+    /* needs integer column serialize */
+  });
 
   it("regression serialized default on text column with null false", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("data", "string", { default: "{}" }); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("data", "string", { default: "{}" });
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "data");
     const p = new Post({ title: "test" });
     expect(p.readAttribute("data")).toEqual({});
   });
 
-  it.skip("unexpected serialized type", () => { /* needs type checking */ });
+  it.skip("unexpected serialized type", () => {
+    /* needs type checking */
+  });
 
   it("serialized column should unserialize after update column", async () => {
     const { User } = makeModel();
@@ -290,7 +395,9 @@ describe("SerializedAttributeTest", () => {
     expect(u.changedAttributes).not.toContain("preferences");
   });
 
-  it.skip("classes without no arg constructors are not supported", () => { /* Ruby-specific */ });
+  it.skip("classes without no arg constructors are not supported", () => {
+    /* Ruby-specific */
+  });
 
   it("newly emptied serialized hash is changed", () => {
     const { User } = makeModel();
@@ -300,8 +407,12 @@ describe("SerializedAttributeTest", () => {
     expect(u.changed).toBe(true);
   });
 
-  it.skip("is not changed when stored blob", () => { /* needs blob support */ });
-  it.skip("is not changed when stored in blob frozen payload", () => { /* needs blob support */ });
+  it.skip("is not changed when stored blob", () => {
+    /* needs blob support */
+  });
+  it.skip("is not changed when stored in blob frozen payload", () => {
+    /* needs blob support */
+  });
 
   it("values cast from nil are persisted as nil", async () => {
     const { User } = makeModel();
@@ -314,7 +425,11 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute can be defined in abstract classes", () => {
     const adapter = freshAdapter();
     class AbstractBase extends Base {
-      static { this.attribute("name", "string"); this.attribute("data", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(AbstractBase, "data");
     class Concrete extends AbstractBase {}
@@ -333,7 +448,11 @@ describe("SerializedAttributeTest", () => {
   it("hash coder returns empty hash for null", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("meta", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("meta", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "meta", { coder: "hash" });
     const p = new Post();
@@ -344,7 +463,11 @@ describe("SerializedAttributeTest", () => {
   it("array coder returns empty array for null", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("tags", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("tags", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(Post, "tags", { coder: "array" });
     const p = new Post();
@@ -352,8 +475,12 @@ describe("SerializedAttributeTest", () => {
     expect(p.readAttribute("tags")).toEqual([]);
   });
 
-  it.skip("decorated type with type for attribute", () => { /* needs custom type decoration */ });
-  it.skip("decorated type with decorator block", () => { /* needs custom type decoration */ });
+  it.skip("decorated type with type for attribute", () => {
+    /* needs custom type decoration */
+  });
+  it.skip("decorated type with decorator block", () => {
+    /* needs custom type decoration */
+  });
 
   it("mutation detection does not double serialize", async () => {
     const { User } = makeModel();
@@ -370,7 +497,9 @@ describe("SerializedAttributeTest", () => {
     expect(currentPrefs.b).toBe(2);
   });
 
-  it.skip("serialized attribute works under concurrent initial access", () => { /* needs concurrency testing */ });
+  it.skip("serialized attribute works under concurrent initial access", () => {
+    /* needs concurrency testing */
+  });
 
   it.skip("json read legacy null", () => {});
   it.skip("supports permitted classes for default column serializer", () => {});
@@ -392,13 +521,16 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   it.skip("supports permitted classes for default column serializer — YAML-specific, not applicable to TypeScript", () => {});
 });
 
-
 describe("serialize", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("serializes and deserializes JSON data", async () => {
-    class Setting extends Base { static _tableName = "settings"; }
+    class Setting extends Base {
+      static _tableName = "settings";
+    }
     Setting.attribute("id", "integer");
     Setting.attribute("data", "string");
     Setting.adapter = adapter;
@@ -412,7 +544,9 @@ describe("serialize", () => {
   });
 
   it("deserializes array coder", async () => {
-    class Pref extends Base { static _tableName = "prefs"; }
+    class Pref extends Base {
+      static _tableName = "prefs";
+    }
     Pref.attribute("id", "integer");
     Pref.attribute("tags", "string");
     Pref.adapter = adapter;
@@ -424,7 +558,6 @@ describe("serialize", () => {
   });
 });
 
-
 describe("serialize (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
@@ -435,7 +568,12 @@ describe("serialize (Rails-guided)", () => {
   // Rails: test "serialized attribute"
   it("deserializes JSON data on read", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("preferences", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("preferences", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(User, "preferences", { coder: "json" });
 
@@ -448,7 +586,12 @@ describe("serialize (Rails-guided)", () => {
   // Rails: test "serialized array"
   it("deserializes array data on read", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("roles", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("roles", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(User, "roles", { coder: "array" });
 
@@ -460,7 +603,12 @@ describe("serialize (Rails-guided)", () => {
   // Rails: test "serialized hash"
   it("deserializes hash data on read", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("settings", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
     }
     serialize(User, "settings", { coder: "hash" });
 
@@ -484,7 +632,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute — stores and retrieves JSON", async () => {
     class Topic extends Base {
-      static { this.attribute("content", "string"); }
+      static {
+        this.attribute("content", "string");
+      }
     }
     Topic.adapter = adapter;
     serialize(Topic, "content", { coder: "json" });
@@ -509,7 +659,9 @@ describe("SerializedAttributeTest", () => {
     };
 
     class Settings extends Base {
-      static { this.attribute("data", "string"); }
+      static {
+        this.attribute("data", "string");
+      }
     }
     Settings.adapter = adapter;
     serialize(Settings, "data", { coder: customCoder });
@@ -521,7 +673,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with array coder returns array", async () => {
     class TagList extends Base {
-      static { this.attribute("tags", "string"); }
+      static {
+        this.attribute("tags", "string");
+      }
     }
     TagList.adapter = adapter;
     serialize(TagList, "tags", { coder: "array" });
@@ -533,7 +687,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with array coder returns [] for null", async () => {
     class TagList2 extends Base {
-      static { this.attribute("tags", "string"); }
+      static {
+        this.attribute("tags", "string");
+      }
     }
     TagList2.adapter = adapter;
     serialize(TagList2, "tags", { coder: "array" });
@@ -545,7 +701,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with hash coder returns hash", async () => {
     class Prefs extends Base {
-      static { this.attribute("settings", "string"); }
+      static {
+        this.attribute("settings", "string");
+      }
     }
     Prefs.adapter = adapter;
     serialize(Prefs, "settings", { coder: "hash" });
@@ -557,7 +715,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with hash coder returns {} for null", async () => {
     class Prefs2 extends Base {
-      static { this.attribute("settings", "string"); }
+      static {
+        this.attribute("settings", "string");
+      }
     }
     Prefs2.adapter = adapter;
     serialize(Prefs2, "settings", { coder: "hash" });
@@ -569,7 +729,9 @@ describe("SerializedAttributeTest", () => {
 
   it("nil serialized attribute without coder constraint returns null", async () => {
     class Doc extends Base {
-      static { this.attribute("body", "string"); }
+      static {
+        this.attribute("body", "string");
+      }
     }
     Doc.adapter = adapter;
     serialize(Doc, "body");
@@ -581,7 +743,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute returns object when raw is already JSON string", async () => {
     class Config extends Base {
-      static { this.attribute("options", "string"); }
+      static {
+        this.attribute("options", "string");
+      }
     }
     Config.adapter = adapter;
     serialize(Config, "options", { coder: "json" });
@@ -593,7 +757,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute handles JSON parse errors gracefully", async () => {
     class Blob extends Base {
-      static { this.attribute("data", "string"); }
+      static {
+        this.attribute("data", "string");
+      }
     }
     Blob.adapter = adapter;
     serialize(Blob, "data", { coder: "json" });
@@ -639,7 +805,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialize with no options defaults to JSON coder", async () => {
     class JsonDefault extends Base {
-      static { this.attribute("payload", "string"); }
+      static {
+        this.attribute("payload", "string");
+      }
     }
     JsonDefault.adapter = adapter;
     serialize(JsonDefault, "payload");
@@ -651,7 +819,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with boolean true", async () => {
     class Flags extends Base {
-      static { this.attribute("active", "string"); }
+      static {
+        this.attribute("active", "string");
+      }
     }
     Flags.adapter = adapter;
     serialize(Flags, "active", { coder: "json" });
@@ -663,7 +833,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with boolean false", async () => {
     class Flags2 extends Base {
-      static { this.attribute("active", "string"); }
+      static {
+        this.attribute("active", "string");
+      }
     }
     Flags2.adapter = adapter;
     serialize(Flags2, "active", { coder: "json" });
@@ -675,7 +847,9 @@ describe("SerializedAttributeTest", () => {
 
   it("serialized attribute with numeric value", async () => {
     class Counter extends Base {
-      static { this.attribute("count", "string"); }
+      static {
+        this.attribute("count", "string");
+      }
     }
     Counter.adapter = adapter;
     serialize(Counter, "count", { coder: "json" });

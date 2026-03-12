@@ -11,7 +11,9 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
-function makeResponse(): Response { return new Response(); }
+function makeResponse(): Response {
+  return new Response();
+}
 
 // ==========================================================================
 // action_controller/filters_test.rb — Controller-level filters
@@ -20,9 +22,14 @@ describe("ActionController Filters", () => {
   it("before_action on controller", async () => {
     const log: string[] = [];
     class AppController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    AppController.beforeAction(() => { log.push("before"); });
+    AppController.beforeAction(() => {
+      log.push("before");
+    });
 
     const c = new AppController();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -31,9 +38,11 @@ describe("ActionController Filters", () => {
 
   it("before_action halts with render", async () => {
     class AuthController extends Base {
-      async index() { this.render({ plain: "protected" }); }
+      async index() {
+        this.render({ plain: "protected" });
+      }
     }
-    AuthController.beforeAction(function(this: any, controller: any) {
+    AuthController.beforeAction(function (this: any, controller: any) {
       controller.render({ plain: "unauthorized", status: 401 });
       return false;
     });
@@ -47,9 +56,14 @@ describe("ActionController Filters", () => {
   it("after_action runs after render", async () => {
     const log: string[] = [];
     class LogController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    LogController.afterAction(() => { log.push("after"); });
+    LogController.afterAction(() => {
+      log.push("after");
+    });
 
     const c = new LogController();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -59,7 +73,10 @@ describe("ActionController Filters", () => {
   it("around_action wraps controller action", async () => {
     const log: string[] = [];
     class TimingController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
     TimingController.aroundAction(async (_c, next) => {
       log.push("start");
@@ -75,10 +92,21 @@ describe("ActionController Filters", () => {
   it("before_action with only option", async () => {
     const log: string[] = [];
     class OnlyController extends Base {
-      async index() { this.render({ plain: "index" }); log.push("index"); }
-      async show() { this.render({ plain: "show" }); log.push("show"); }
+      async index() {
+        this.render({ plain: "index" });
+        log.push("index");
+      }
+      async show() {
+        this.render({ plain: "show" });
+        log.push("show");
+      }
     }
-    OnlyController.beforeAction(() => { log.push("auth"); }, { only: ["index"] });
+    OnlyController.beforeAction(
+      () => {
+        log.push("auth");
+      },
+      { only: ["index"] },
+    );
 
     const c1 = new OnlyController();
     await c1.dispatch("index", makeRequest(), makeResponse());
@@ -93,10 +121,21 @@ describe("ActionController Filters", () => {
   it("before_action with except option", async () => {
     const log: string[] = [];
     class ExceptController extends Base {
-      async index() { this.render({ plain: "index" }); log.push("index"); }
-      async show() { this.render({ plain: "show" }); log.push("show"); }
+      async index() {
+        this.render({ plain: "index" });
+        log.push("index");
+      }
+      async show() {
+        this.render({ plain: "show" });
+        log.push("show");
+      }
     }
-    ExceptController.beforeAction(() => { log.push("log"); }, { except: ["show"] });
+    ExceptController.beforeAction(
+      () => {
+        log.push("log");
+      },
+      { except: ["show"] },
+    );
 
     const c1 = new ExceptController();
     await c1.dispatch("index", makeRequest(), makeResponse());
@@ -110,9 +149,14 @@ describe("ActionController Filters", () => {
 
   it("skip_before_action in child controller", async () => {
     const log: string[] = [];
-    const authFn = () => { log.push("auth"); };
+    const authFn = () => {
+      log.push("auth");
+    };
     class ParentController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
     ParentController.beforeAction(authFn);
 
@@ -127,11 +171,20 @@ describe("ActionController Filters", () => {
   it("multiple before_actions run in order", async () => {
     const log: string[] = [];
     class MultiController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    MultiController.beforeAction(() => { log.push("first"); });
-    MultiController.beforeAction(() => { log.push("second"); });
-    MultiController.beforeAction(() => { log.push("third"); });
+    MultiController.beforeAction(() => {
+      log.push("first");
+    });
+    MultiController.beforeAction(() => {
+      log.push("second");
+    });
+    MultiController.beforeAction(() => {
+      log.push("third");
+    });
 
     const c = new MultiController();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -141,10 +194,20 @@ describe("ActionController Filters", () => {
   it("prepend before_action runs before others", async () => {
     const log: string[] = [];
     class PrependController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    PrependController.beforeAction(() => { log.push("normal"); });
-    PrependController.beforeAction(() => { log.push("prepended"); }, { prepend: true });
+    PrependController.beforeAction(() => {
+      log.push("normal");
+    });
+    PrependController.beforeAction(
+      () => {
+        log.push("prepended");
+      },
+      { prepend: true },
+    );
 
     const c = new PrependController();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -155,11 +218,16 @@ describe("ActionController Filters", () => {
     const log: string[] = [];
     class IfController extends Base {
       admin = false;
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
     IfController.beforeAction(
-      () => { log.push("admin-check"); },
-      { if: (c) => (c as any).admin }
+      () => {
+        log.push("admin-check");
+      },
+      { if: (c) => (c as any).admin },
     );
 
     const c1 = new IfController();
@@ -178,11 +246,16 @@ describe("ActionController Filters", () => {
     const log: string[] = [];
     class UnlessController extends Base {
       skipAuth = false;
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
     UnlessController.beforeAction(
-      () => { log.push("auth"); },
-      { unless: (c) => (c as any).skipAuth }
+      () => {
+        log.push("auth");
+      },
+      { unless: (c) => (c as any).skipAuth },
     );
 
     const c1 = new UnlessController();
@@ -199,14 +272,24 @@ describe("ActionController Filters", () => {
   it("inherited filters from parent controller", async () => {
     const log: string[] = [];
     class ApplicationController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    ApplicationController.beforeAction(() => { log.push("app-before"); });
+    ApplicationController.beforeAction(() => {
+      log.push("app-before");
+    });
 
     class PostsController extends ApplicationController {
-      async index() { this.render({ plain: "posts" }); log.push("posts"); }
+      async index() {
+        this.render({ plain: "posts" });
+        log.push("posts");
+      }
     }
-    PostsController.beforeAction(() => { log.push("posts-before"); });
+    PostsController.beforeAction(() => {
+      log.push("posts-before");
+    });
 
     const c = new PostsController();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -215,7 +298,9 @@ describe("ActionController Filters", () => {
 
   it("around_action can catch errors", async () => {
     class ErrorController extends Base {
-      async index() { throw new Error("boom"); }
+      async index() {
+        throw new Error("boom");
+      }
     }
     let caught: Error | null = null;
     ErrorController.aroundAction(async (_c, next) => {
@@ -235,7 +320,9 @@ describe("ActionController Filters", () => {
   it("after_action receives controller with action state", async () => {
     let capturedAction = "";
     class StateController extends Base {
-      async index() { this.render({ plain: "ok" }); }
+      async index() {
+        this.render({ plain: "ok" });
+      }
     }
     StateController.afterAction((controller) => {
       capturedAction = controller.actionName;
@@ -249,7 +336,9 @@ describe("ActionController Filters", () => {
   it("around_action has access to action name", async () => {
     let capturedAction = "";
     class NameController extends Base {
-      async index() { this.render({ plain: "ok" }); }
+      async index() {
+        this.render({ plain: "ok" });
+      }
     }
     NameController.aroundAction(async (controller, next) => {
       capturedAction = controller.actionName;
@@ -264,9 +353,14 @@ describe("ActionController Filters", () => {
   it("non-yielding around_action prevents action execution", async () => {
     const log: string[] = [];
     class BlockController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    BlockController.aroundAction(async () => { log.push("blocked"); });
+    BlockController.aroundAction(async () => {
+      log.push("blocked");
+    });
 
     const c = new BlockController();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -276,10 +370,17 @@ describe("ActionController Filters", () => {
   it("after_action not called when around does not yield", async () => {
     const log: string[] = [];
     class NoYieldController extends Base {
-      async index() { this.render({ plain: "ok" }); log.push("action"); }
+      async index() {
+        this.render({ plain: "ok" });
+        log.push("action");
+      }
     }
-    NoYieldController.aroundAction(async () => { log.push("around"); });
-    NoYieldController.afterAction(() => { log.push("after"); });
+    NoYieldController.aroundAction(async () => {
+      log.push("around");
+    });
+    NoYieldController.afterAction(() => {
+      log.push("after");
+    });
 
     const c = new NoYieldController();
     await c.dispatch("index", makeRequest(), makeResponse());

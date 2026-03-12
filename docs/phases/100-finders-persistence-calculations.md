@@ -6,11 +6,13 @@ covered, so this phase focuses on closing gaps in existing implementations.
 ## Finders (138/377 → target 300+)
 
 ### Already working
+
 - `find(id)`, `findBy(conditions)`, `first`, `last`, `take`
 - `exists?`, `sole`, `findSoleBy`
 - `findEach`, `findInBatches`, `inBatches`
 
 ### Missing / incomplete
+
 - `find` with array of IDs returning ordered results
 - `find` raising `RecordNotFound` with `model`, `primary_key`, `id` details
 - `first(n)` / `last(n)` returning arrays
@@ -22,6 +24,7 @@ covered, so this phase focuses on closing gaps in existing implementations.
 - `in_batches` with `finish:`, `error_on_ignore:`, `order:` options
 
 ### Key files
+
 - `packages/activerecord/src/base.ts` — static finder methods
 - `packages/activerecord/src/relation.ts` — Relation finder methods
 - Ruby reference: `finder_test.rb`, `batches_test.rb`
@@ -29,11 +32,13 @@ covered, so this phase focuses on closing gaps in existing implementations.
 ## Persistence (67/202 → target 160+)
 
 ### Already working
+
 - `save`, `create`, `update`, `destroy`, `delete`
 - `update_column`, `update_columns`
 - `touch`, `toggle`, `increment`, `decrement`
 
 ### Missing / incomplete
+
 - `save!` / `create!` / `update!` raising on validation failure
 - `destroy!` raising `RecordNotDestroyed`
 - `becomes` / `becomes!` for STI
@@ -44,17 +49,20 @@ covered, so this phase focuses on closing gaps in existing implementations.
 - Duplicate detection with `dup`
 
 ### Key files
+
 - `packages/activerecord/src/base.ts`
 - Ruby reference: `persistence_test.rb`, `timestamp_test.rb`
 
 ## Calculations (71/233 → target 180+)
 
 ### Already working
+
 - `count`, `sum`, `average`, `minimum`, `maximum`
 - `pluck`, `pick`, `ids`
 - Group-by calculations
 
 ### Missing / incomplete
+
 - `count` with `distinct: true`
 - `count` with column name (counts non-null)
 - `sum` with block
@@ -67,5 +75,6 @@ covered, so this phase focuses on closing gaps in existing implementations.
 - `annotate` on calculation queries
 
 ### Key files
+
 - `packages/activerecord/src/relation.ts` — calculation methods
 - Ruby reference: `calculations_test.rb`

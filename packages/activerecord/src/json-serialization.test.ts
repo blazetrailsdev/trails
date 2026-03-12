@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -87,7 +127,8 @@ describe("JsonSerializationTest", () => {
 
   it("methods are called on object", async () => {
     const contact = await Contact.create({ name: "David", age: 30 });
-    (contact as any).label = () => `${contact.readAttribute("name")} (${contact.readAttribute("age")})`;
+    (contact as any).label = () =>
+      `${contact.readAttribute("name")} (${contact.readAttribute("age")})`;
     const hash = contact.asJson({ methods: ["label"] });
     expect(hash.label).toBe("David (30)");
   });
@@ -141,14 +182,23 @@ describe("JsonSerializationTest", () => {
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("includes uses association name", async () => {
     class CommentJ1 extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class PostJ1 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await PostJ1.create({ title: "Hello" });
     const c1 = await CommentJ1.create({ body: "Great", post_id: post.id });
@@ -162,10 +212,17 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("includes uses association name and applies attribute filters", async () => {
     class CommentJ2 extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class PostJ2 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await PostJ2.create({ title: "Hello" });
     const c1 = await CommentJ2.create({ body: "Great", post_id: post.id });
@@ -177,13 +234,24 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("includes fetches second level associations", async () => {
     class ReplyJ3 extends Base {
-      static { this.attribute("text", "string"); this.attribute("comment_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("text", "string");
+        this.attribute("comment_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class CommentJ3 extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class PostJ3 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await PostJ3.create({ title: "Hello" });
     const c = await CommentJ3.create({ body: "Great", post_id: post.id });
@@ -198,13 +266,22 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("includes fetches nth level associations", async () => {
     class DeepJ4 extends Base {
-      static { this.attribute("val", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("val", "string");
+        this.adapter = adapter;
+      }
     }
     class MidJ4 extends Base {
-      static { this.attribute("val", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("val", "string");
+        this.adapter = adapter;
+      }
     }
     class TopJ4 extends Base {
-      static { this.attribute("val", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("val", "string");
+        this.adapter = adapter;
+      }
     }
     const top = await TopJ4.create({ val: "top" });
     const mid = await MidJ4.create({ val: "mid" });
@@ -217,10 +294,18 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("includes doesnt merge opts from base", async () => {
     class CommentJ5 extends Base {
-      static { this.attribute("body", "string"); this.attribute("post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class PostJ5 extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await PostJ5.create({ title: "Hello", author: "Alice" });
     const c = await CommentJ5.create({ body: "Great", post_id: post.id });
@@ -234,7 +319,10 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("should not call methods on associations that dont respond", async () => {
     class PostJ6 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const post = await PostJ6.create({ title: "Hello" });
     const json = post.asJson({ include: "comments" });
@@ -244,11 +332,15 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("should allow only option for list of authors", async () => {
     class AuthorJ7 extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const a1 = await AuthorJ7.create({ name: "Alice", age: 30 });
     const a2 = await AuthorJ7.create({ name: "Bob", age: 25 });
-    const result = [a1, a2].map(a => a.asJson({ only: ["name"] }));
+    const result = [a1, a2].map((a) => a.asJson({ only: ["name"] }));
     expect(result[0].name).toBe("Alice");
     expect(result[0].age).toBeUndefined();
     expect(result[1].name).toBe("Bob");
@@ -256,7 +348,11 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("should allow except option for list of authors", async () => {
     class AuthorJ8 extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const a1 = await AuthorJ8.create({ name: "Alice", age: 30 });
     const result = a1.asJson({ except: ["age", "id"] });
@@ -266,25 +362,40 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("should allow includes for list of authors", async () => {
     class BookJ9 extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class AuthorJ9 extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const a1 = await AuthorJ9.create({ name: "Alice" });
     const b1 = await BookJ9.create({ title: "Book1", author_id: a1.id });
     (a1 as any)._cachedAssociations = new Map([["books", [b1]]]);
-    const result = [a1].map(a => a.asJson({ include: "books" }));
+    const result = [a1].map((a) => a.asJson({ include: "books" }));
     expect(result[0].books).toBeDefined();
     expect((result[0].books as any[])[0].title).toBe("Book1");
   });
 
   it("should allow options for hash of authors", async () => {
     class BookJ10 extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class AuthorJ10 extends Base {
-      static { this.attribute("name", "string"); this.attribute("age", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
     }
     const a1 = await AuthorJ10.create({ name: "Alice", age: 30 });
     const b1 = await BookJ10.create({ title: "Book1", author_id: a1.id });
@@ -298,7 +409,10 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("should be able to encode relation", async () => {
     class PostJ11 extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await PostJ11.create({ title: "First" });
     await PostJ11.create({ title: "Second" });

@@ -65,19 +65,38 @@ export class OrderedOptions {
   // Hash-like interface
   // -------------------------------------------------------------------------
 
-  get(key: string): unknown { return this._data.get(key); }
-  set(key: string, value: unknown): this { this._data.set(key, value); return this; }
+  get(key: string): unknown {
+    return this._data.get(key);
+  }
+  set(key: string, value: unknown): this {
+    this._data.set(key, value);
+    return this;
+  }
   key(value: unknown): string | undefined {
     for (const [k, v] of this._data) if (v === value) return k;
     return undefined;
   }
-  has(key: string): boolean { return this._data.has(key); }
-  delete(key: string): boolean { return this._data.delete(key); }
-  keys(): string[] { return [...this._data.keys()]; }
-  values(): unknown[] { return [...this._data.values()]; }
-  entries(): [string, unknown][] { return [...this._data.entries()]; }
-  toObject(): Record<string, unknown> { return Object.fromEntries(this._data); }
-  toH(): Record<string, unknown> { return this.toObject(); }
+  has(key: string): boolean {
+    return this._data.has(key);
+  }
+  delete(key: string): boolean {
+    return this._data.delete(key);
+  }
+  keys(): string[] {
+    return [...this._data.keys()];
+  }
+  values(): unknown[] {
+    return [...this._data.values()];
+  }
+  entries(): [string, unknown][] {
+    return [...this._data.entries()];
+  }
+  toObject(): Record<string, unknown> {
+    return Object.fromEntries(this._data);
+  }
+  toH(): Record<string, unknown> {
+    return this.toObject();
+  }
 
   /** dig — nested key lookup */
   dig(...keys: string[]): unknown {
@@ -94,8 +113,12 @@ export class OrderedOptions {
     for (const [k, v] of this._data) fn(k, v);
   }
 
-  get count(): number { return this._data.size; }
-  get size(): number { return this._data.size; }
+  get count(): number {
+    return this._data.size;
+  }
+  get size(): number {
+    return this._data.size;
+  }
 
   /** inspect — like Ruby's inspect */
   inspect(): string {
@@ -103,7 +126,9 @@ export class OrderedOptions {
     return `#<OrderedOptions {${pairs.join(", ")}}>`;
   }
 
-  toString(): string { return this.inspect(); }
+  toString(): string {
+    return this.inspect();
+  }
 
   /** dup — shallow copy */
   dup(): OrderedOptions {
@@ -123,7 +148,11 @@ export class InheritableOptions extends OrderedOptions {
     const self = this;
     return new Proxy(this, {
       get(target, prop: string | symbol) {
-        if (typeof prop === "symbol" || prop in OrderedOptions.prototype || prop in InheritableOptions.prototype) {
+        if (
+          typeof prop === "symbol" ||
+          prop in OrderedOptions.prototype ||
+          prop in InheritableOptions.prototype
+        ) {
           const val = (target as any)[prop];
           return typeof val === "function" ? val.bind(target) : val;
         }

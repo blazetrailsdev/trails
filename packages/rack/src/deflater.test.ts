@@ -3,11 +3,20 @@ import { Deflater } from "./deflater.js";
 import { MockRequest } from "./mock-request.js";
 import * as zlib from "zlib";
 
-function makeApp(body: any, status = 200, headers: Record<string, string> = { "content-type": "text/plain" }) {
+function makeApp(
+  body: any,
+  status = 200,
+  headers: Record<string, string> = { "content-type": "text/plain" },
+) {
   return async (_env: any) => [status, { ...headers }, body] as [number, Record<string, any>, any];
 }
 
-function deflaterApp(body: any, opts: any = {}, status = 200, headers: Record<string, string> = { "content-type": "text/plain" }) {
+function deflaterApp(
+  body: any,
+  opts: any = {},
+  status = 200,
+  headers: Record<string, string> = { "content-type": "text/plain" },
+) {
   return new Deflater(makeApp(body, status, headers), opts);
 }
 
@@ -17,7 +26,11 @@ async function getDeflated(app: any, encoding = "deflate") {
 
 describe("Rack::Deflater", () => {
   it("be able to deflate bodies that respond to each", async () => {
-    const body = { each(cb: any) { cb("Hello World"); } };
+    const body = {
+      each(cb: any) {
+        cb("Hello World");
+      },
+    };
     const app = deflaterApp(body);
     const res = await getDeflated(app);
     expect(res.status).toBe(200);
@@ -25,13 +38,19 @@ describe("Rack::Deflater", () => {
   });
 
   it("should not update vary response header if it includes * or accept-encoding", async () => {
-    const app = new Deflater(makeApp(["test"], 200, { "content-type": "text/plain", "vary": "*" }));
+    const app = new Deflater(makeApp(["test"], 200, { "content-type": "text/plain", vary: "*" }));
     const res = await getDeflated(app, "gzip");
     expect(res.headers["vary"]).toBe("*");
   });
 
   it("be able to deflate bodies that respond to each and contain empty chunks", async () => {
-    const body = { each(cb: any) { cb(""); cb("Hello"); cb(""); } };
+    const body = {
+      each(cb: any) {
+        cb("");
+        cb("Hello");
+        cb("");
+      },
+    };
     const app = deflaterApp(body);
     const res = await getDeflated(app);
     expect(res.headers["content-encoding"]).toBe("deflate");
@@ -57,7 +76,11 @@ describe("Rack::Deflater", () => {
   });
 
   it("be able to gzip bodies that respond to each", async () => {
-    const body = { each(cb: any) { cb("Hello World"); } };
+    const body = {
+      each(cb: any) {
+        cb("Hello World");
+      },
+    };
     const app = deflaterApp(body);
     const res = await getDeflated(app, "gzip");
     expect(res.headers["content-encoding"]).toBe("gzip");
@@ -77,7 +100,9 @@ describe("Rack::Deflater", () => {
 
   it("be able to fallback to no deflation", async () => {
     const app = deflaterApp(["Hello"]);
-    const res = await new MockRequest((env) => app.call(env)).get("/", { HTTP_ACCEPT_ENCODING: "identity" });
+    const res = await new MockRequest((env) => app.call(env)).get("/", {
+      HTTP_ACCEPT_ENCODING: "identity",
+    });
     expect(res.headers["content-encoding"]).toBeUndefined();
     expect(res.bodyString).toBe("Hello");
   });
@@ -91,32 +116,45 @@ describe("Rack::Deflater", () => {
 
   it("handle the lack of an acceptable encoding", async () => {
     const app = deflaterApp(["Hello"]);
-    const res = await new MockRequest((env) => app.call(env)).get("/", { HTTP_ACCEPT_ENCODING: "unknown-only" });
+    const res = await new MockRequest((env) => app.call(env)).get("/", {
+      HTTP_ACCEPT_ENCODING: "unknown-only",
+    });
     expect(res.bodyString).toBe("Hello");
   });
 
   it("handle gzip response with last-modified header", async () => {
-    const app = new Deflater(makeApp(["test"], 200, { "content-type": "text/plain", "last-modified": "Thu, 01 Jan 2025 00:00:00 GMT" }));
+    const app = new Deflater(
+      makeApp(["test"], 200, {
+        "content-type": "text/plain",
+        "last-modified": "Thu, 01 Jan 2025 00:00:00 GMT",
+      }),
+    );
     const res = await getDeflated(app, "gzip");
     expect(res.headers["content-encoding"]).toBe("gzip");
     expect(res.headers["last-modified"]).toBe("Thu, 01 Jan 2025 00:00:00 GMT");
   });
 
   it("do nothing when no-transform cache-control directive present", async () => {
-    const app = new Deflater(makeApp(["Hello"], 200, { "content-type": "text/plain", "cache-control": "no-transform" }));
+    const app = new Deflater(
+      makeApp(["Hello"], 200, { "content-type": "text/plain", "cache-control": "no-transform" }),
+    );
     const res = await getDeflated(app);
     expect(res.headers["content-encoding"]).toBeUndefined();
     expect(res.bodyString).toBe("Hello");
   });
 
   it("do nothing when content-encoding already present", async () => {
-    const app = new Deflater(makeApp(["Hello"], 200, { "content-type": "text/plain", "content-encoding": "br" }));
+    const app = new Deflater(
+      makeApp(["Hello"], 200, { "content-type": "text/plain", "content-encoding": "br" }),
+    );
     const res = await getDeflated(app);
     expect(res.headers["content-encoding"]).toBe("br");
   });
 
   it("deflate when content-encoding is identity", async () => {
-    const app = new Deflater(makeApp(["Hello"], 200, { "content-type": "text/plain", "content-encoding": "identity" }));
+    const app = new Deflater(
+      makeApp(["Hello"], 200, { "content-type": "text/plain", "content-encoding": "identity" }),
+    );
     const res = await getDeflated(app);
     expect(res.headers["content-encoding"]).toBe("deflate");
   });
@@ -146,7 +184,9 @@ describe("Rack::Deflater", () => {
   });
 
   it("not deflate if content-length is 0", async () => {
-    const app = new Deflater(makeApp([""], 200, { "content-type": "text/plain", "content-length": "0" }));
+    const app = new Deflater(
+      makeApp([""], 200, { "content-type": "text/plain", "content-length": "0" }),
+    );
     const res = await getDeflated(app);
     expect(res.headers["content-encoding"]).toBeUndefined();
   });
@@ -168,7 +208,7 @@ describe("Rack::Deflater", () => {
       if: (_env: any, _s: any, headers: any) => {
         const cl = parseInt(headers["content-length"] || "0");
         return cl > 5;
-      }
+      },
     });
     const res = await getDeflated(app);
     // No content-length set by default in our test app, so condition may vary
@@ -190,8 +230,12 @@ describe("Rack::Deflater", () => {
   it("does not close the response body prematurely", async () => {
     let closed = false;
     const body = {
-      each(cb: any) { cb("test"); },
-      close() { closed = true; },
+      each(cb: any) {
+        cb("test");
+      },
+      close() {
+        closed = true;
+      },
     };
     const app = deflaterApp(body);
     await getDeflated(app);

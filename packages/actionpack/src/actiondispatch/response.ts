@@ -21,11 +21,19 @@ export class Response {
 
   // --- Status ---
 
-  get status(): number { return this._status; }
-  set status(value: number) { this._status = value; }
+  get status(): number {
+    return this._status;
+  }
+  set status(value: number) {
+    this._status = value;
+  }
 
-  get code(): number { return this._status; }
-  get statusCode(): number { return this._status; }
+  get code(): number {
+    return this._status;
+  }
+  get statusCode(): number {
+    return this._status;
+  }
 
   get message(): string {
     return STATUS_MESSAGES[this._status] || "";
@@ -33,7 +41,9 @@ export class Response {
 
   // --- Headers ---
 
-  get headers(): Record<string, string> { return this._headers; }
+  get headers(): Record<string, string> {
+    return this._headers;
+  }
 
   getHeader(key: string): string | undefined {
     return this._headers[key.toLowerCase()] ?? this._headers[key];
@@ -110,7 +120,9 @@ export class Response {
     this._committed = true;
   }
 
-  get committed(): boolean { return this._committed; }
+  get committed(): boolean {
+    return this._committed;
+  }
 
   // --- Cookies ---
 

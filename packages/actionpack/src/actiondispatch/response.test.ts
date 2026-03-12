@@ -335,7 +335,9 @@ describe("ActionDispatch::Response", () => {
   // --- inspect ---
 
   it("inspect for error status", () => {
-    expect(new Response(500).inspect()).toBe("#<ActionDispatch::Response 500 Internal Server Error>");
+    expect(new Response(500).inspect()).toBe(
+      "#<ActionDispatch::Response 500 Internal Server Error>",
+    );
   });
 
   it("inspect for redirect", () => {

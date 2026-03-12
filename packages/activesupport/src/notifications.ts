@@ -201,10 +201,7 @@ export class Notifications {
    * Collect all events matching pattern during the block, then return them.
    * Useful in tests — mirrors Rails' AS::Notifications test helpers.
    */
-  static collectEvents(
-    pattern: string | RegExp | null | undefined,
-    block: () => void,
-  ): Event[] {
+  static collectEvents(pattern: string | RegExp | null | undefined, block: () => void): Event[] {
     const events: Event[] = [];
     const sub = this.subscribe(pattern, (e) => events.push(e));
     try {

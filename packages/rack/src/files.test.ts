@@ -30,14 +30,18 @@ function makeApp(headers: Record<string, string> = {}, defaultMime: string | nul
 
 it("returns 416 error and correct Content-Range for unsatisfiable byte range", async () => {
   const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", { HTTP_RANGE: "bytes=100-200" });
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
+    HTTP_RANGE: "bytes=100-200",
+  });
   expect(res.status).toBe(416);
   expect(res.headers["content-range"]).toContain("bytes */");
 });
 
 it("ignores range when file size is 0 bytes", async () => {
   const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/empty.txt", { HTTP_RANGE: "bytes=0-0" });
+  const res = await new MockRequest((env) => app.call(env)).get("/empty.txt", {
+    HTTP_RANGE: "bytes=0-0",
+  });
   expect(res.status).toBe(200);
 });
 

@@ -80,7 +80,9 @@ export function sendFile(filePath: string, options: SendFileOptions = {}): SendR
   const stat = fs.statSync(resolvedPath);
   const filename = options.filename ?? path.basename(resolvedPath);
   const ext = path.extname(filename);
-  const type = options.type ? lookupMimeType(options.type) : (MIME_TYPES[ext.toLowerCase()] ?? "application/octet-stream");
+  const type = options.type
+    ? lookupMimeType(options.type)
+    : (MIME_TYPES[ext.toLowerCase()] ?? "application/octet-stream");
   const disposition = options.disposition;
 
   const headers: Record<string, string> = {

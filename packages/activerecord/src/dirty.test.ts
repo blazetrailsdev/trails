@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -38,7 +78,10 @@ describe("DirtyTest", () => {
 
   it("attribute changes", () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = new Topic({ title: "old" });
     t.writeAttribute("title", "new");
@@ -47,7 +90,10 @@ describe("DirtyTest", () => {
 
   it("object should be changed if any attribute is changed", () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = new Topic({ title: "old" });
     t.writeAttribute("title", "new");
@@ -56,7 +102,10 @@ describe("DirtyTest", () => {
 
   it("reverted changes are not dirty", () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = new Topic({ title: "old" });
     t.writeAttribute("title", "new");
@@ -67,7 +116,10 @@ describe("DirtyTest", () => {
 
   it("saved_changes returns a hash of all the changes that occurred", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "old" });
     t.writeAttribute("title", "new");
@@ -78,7 +130,10 @@ describe("DirtyTest", () => {
 
   it("changed attributes should be preserved if save failure", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = new Topic({ title: "old" });
     t.writeAttribute("title", "new");
@@ -88,7 +143,10 @@ describe("DirtyTest", () => {
 
   it("reload should clear changed attributes", async () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = await Topic.create({ title: "old" });
     t.writeAttribute("title", "modified");
@@ -99,7 +157,10 @@ describe("DirtyTest", () => {
 
   it("reverted changes are not dirty after multiple changes", () => {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const t = new Topic({ title: "original" });
     t.writeAttribute("title", "changed1");
@@ -122,9 +183,13 @@ describe("DirtyTest2", () => {
   it("attribute changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "hello", views: 0 }) as any;
+    const post = (await Post.create({ title: "hello", views: 0 })) as any;
     post.writeAttribute("title", "world");
     const changes = post.changes;
     expect(changes).toHaveProperty("title");
@@ -135,9 +200,12 @@ describe("DirtyTest2", () => {
   it("attribute will change!", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "hello" }) as any;
+    const post = (await Post.create({ title: "hello" })) as any;
     post.writeAttribute("title", "world");
     expect(post.changed).toBe(true);
   });
@@ -145,9 +213,12 @@ describe("DirtyTest2", () => {
   it("restore attribute!", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "changed");
     expect(post.changed).toBe(true);
     await post.reload();
@@ -158,9 +229,12 @@ describe("DirtyTest2", () => {
   it("clear attribute change", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "hello" }) as any;
+    const post = (await Post.create({ title: "hello" })) as any;
     post.writeAttribute("title", "world");
     expect(post.changed).toBe(true);
     // Clear by reloading or saving
@@ -171,9 +245,13 @@ describe("DirtyTest2", () => {
   it("partial update", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original", views: 0 }) as any;
+    const post = (await Post.create({ title: "original", views: 0 })) as any;
     post.writeAttribute("title", "updated");
     await post.save();
     expect(post.readAttribute("title")).toBe("updated");
@@ -183,9 +261,12 @@ describe("DirtyTest2", () => {
   it("dup objects should not copy dirty flag from creator", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "changed");
     expect(post.changed).toBe(true);
     // Just verify the original is dirty; dup not required
@@ -195,9 +276,12 @@ describe("DirtyTest2", () => {
   it("reverted changes are not dirty going from nil to value and back", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("subtitle", "string"); this.adapter = adp; }
+      static {
+        this.attribute("subtitle", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ subtitle: null }) as any;
+    const post = (await Post.create({ subtitle: null })) as any;
     post.writeAttribute("subtitle", "hello");
     post.writeAttribute("subtitle", null);
     expect(post.changed).toBe(false);
@@ -206,9 +290,12 @@ describe("DirtyTest2", () => {
   it("previous changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "updated");
     await post.save();
     expect(post.savedChanges).toHaveProperty("title");
@@ -217,10 +304,13 @@ describe("DirtyTest2", () => {
   it("changed attributes should be preserved if save failure", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     Post.validates("title", { presence: true });
-    const post = await Post.create({ title: "valid" }) as any;
+    const post = (await Post.create({ title: "valid" })) as any;
     post.writeAttribute("title", "");
     const saved = await post.save();
     // Either save fails and dirty is preserved, or save succeeds (implementation dependent)
@@ -231,9 +321,12 @@ describe("DirtyTest2", () => {
   it("nullable number not marked as changed if new value is blank", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ views: null }) as any;
+    const post = (await Post.create({ views: null })) as any;
     post.writeAttribute("views", null);
     expect(post.changed).toBe(false);
   });
@@ -241,9 +334,12 @@ describe("DirtyTest2", () => {
   it("integer zero to string zero not marked as changed", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("count", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ count: 0 }) as any;
+    const post = (await Post.create({ count: 0 })) as any;
     post.writeAttribute("count", 0);
     expect(post.changed).toBe(false);
   });
@@ -251,9 +347,12 @@ describe("DirtyTest2", () => {
   it("string attribute should compare with typecast symbol after update", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "hello" }) as any;
+    const post = (await Post.create({ title: "hello" })) as any;
     post.writeAttribute("title", "hello");
     expect(post.changed).toBe(false);
   });
@@ -261,9 +360,13 @@ describe("DirtyTest2", () => {
   it("save should store serialized attributes even with partial writes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("meta", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("meta", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "test", meta: "data" }) as any;
+    const post = (await Post.create({ title: "test", meta: "data" })) as any;
     post.writeAttribute("title", "updated");
     await post.save();
     expect(post.readAttribute("title")).toBe("updated");
@@ -273,9 +376,12 @@ describe("DirtyTest2", () => {
   it("saved changes returns a hash of all the changes that occurred", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "updated");
     await post.save();
     const sc = post.savedChanges;
@@ -286,13 +392,20 @@ describe("DirtyTest2", () => {
   it("association assignment changes foreign key", async () => {
     const adp = freshAdapter();
     class Author extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author_id", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adp;
+      }
     }
-    const author = await Author.create({ name: "Alice" }) as any;
-    const post = await Post.create({ title: "test", author_id: null }) as any;
+    const author = (await Author.create({ name: "Alice" })) as any;
+    const post = (await Post.create({ title: "test", author_id: null })) as any;
     post.writeAttribute("author_id", author.id);
     expect(post.changedAttributes.includes("author_id")).toBe(true);
   });
@@ -300,9 +413,12 @@ describe("DirtyTest2", () => {
   it("reverted changes are not dirty after multiple changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "a");
     post.writeAttribute("title", "b");
     post.writeAttribute("title", "original");
@@ -312,9 +428,12 @@ describe("DirtyTest2", () => {
   it("reload should clear changed attributes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.create({ title: "original" }) as any;
+    const post = (await Post.create({ title: "original" })) as any;
     post.writeAttribute("title", "changed");
     expect(post.changed).toBe(true);
     await post.reload();
@@ -327,67 +446,157 @@ describe("DirtyTest2", () => {
 // ==========================================================================
 describe("DirtyTest3", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
-  it("time attributes changes with time zone", () => { expect(true).toBe(true); });
-  it("setting time attributes with time zone field to itself should not be marked as a change", () => { expect(true).toBe(true); });
-  it("time attributes changes without time zone by skip", () => { expect(true).toBe(true); });
-  it("time attributes changes without time zone", () => { expect(true).toBe(true); });
-  it("nullable decimal not marked as changed if new value is blank", () => { expect(true).toBe(true); });
-  it("nullable float not marked as changed if new value is blank", () => { expect(true).toBe(true); });
-  it("nullable datetime not marked as changed if new value is blank", () => { expect(true).toBe(true); });
-  it("integer zero to integer zero not marked as changed", () => { expect(true).toBe(true); });
-  it("float zero to string zero not marked as changed", () => { expect(true).toBe(true); });
-  it("zero to blank marked as changed", () => { expect(true).toBe(true); });
-  it("virtual attribute will change", () => { expect(true).toBe(true); });
-  it("attribute should be compared with type cast", () => { expect(true).toBe(true); });
-  it("partial update with optimistic locking", () => { expect(true).toBe(true); });
-  it("save always should update timestamps when serialized attributes are present", () => { expect(true).toBe(true); });
-  it("save should not save serialized attribute with partial writes if not present", () => { expect(true).toBe(true); });
-  it("changes to save should not mutate array of hashes", () => { expect(true).toBe(true); });
-  it("field named field", () => { expect(true).toBe(true); });
-  it("datetime attribute can be updated with fractional seconds", () => { expect(true).toBe(true); });
-  it("datetime attribute doesnt change if zone is modified in string", () => { expect(true).toBe(true); });
+  it("time attributes changes with time zone", () => {
+    expect(true).toBe(true);
+  });
+  it("setting time attributes with time zone field to itself should not be marked as a change", () => {
+    expect(true).toBe(true);
+  });
+  it("time attributes changes without time zone by skip", () => {
+    expect(true).toBe(true);
+  });
+  it("time attributes changes without time zone", () => {
+    expect(true).toBe(true);
+  });
+  it("nullable decimal not marked as changed if new value is blank", () => {
+    expect(true).toBe(true);
+  });
+  it("nullable float not marked as changed if new value is blank", () => {
+    expect(true).toBe(true);
+  });
+  it("nullable datetime not marked as changed if new value is blank", () => {
+    expect(true).toBe(true);
+  });
+  it("integer zero to integer zero not marked as changed", () => {
+    expect(true).toBe(true);
+  });
+  it("float zero to string zero not marked as changed", () => {
+    expect(true).toBe(true);
+  });
+  it("zero to blank marked as changed", () => {
+    expect(true).toBe(true);
+  });
+  it("virtual attribute will change", () => {
+    expect(true).toBe(true);
+  });
+  it("attribute should be compared with type cast", () => {
+    expect(true).toBe(true);
+  });
+  it("partial update with optimistic locking", () => {
+    expect(true).toBe(true);
+  });
+  it("save always should update timestamps when serialized attributes are present", () => {
+    expect(true).toBe(true);
+  });
+  it("save should not save serialized attribute with partial writes if not present", () => {
+    expect(true).toBe(true);
+  });
+  it("changes to save should not mutate array of hashes", () => {
+    expect(true).toBe(true);
+  });
+  it("field named field", () => {
+    expect(true).toBe(true);
+  });
+  it("datetime attribute can be updated with fractional seconds", () => {
+    expect(true).toBe(true);
+  });
+  it("datetime attribute doesnt change if zone is modified in string", () => {
+    expect(true).toBe(true);
+  });
   it("partial insert", async () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     const p = await Post.create({ title: "partial" });
     expect((p as any).isPersisted()).toBe(true);
   });
   it("partial insert with empty values", async () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     const p = await Post.create({});
     expect((p as any).isPersisted()).toBe(true);
   });
-  it("in place mutation detection", () => { expect(true).toBe(true); });
-  it("in place mutation for binary", () => { expect(true).toBe(true); });
-  it("changes is correct for subclass", () => { expect(true).toBe(true); });
-  it("changes is correct if override attribute reader", () => { expect(true).toBe(true); });
-  it("attribute_changed? doesn't compute in-place changes for unrelated attributes", () => { expect(true).toBe(true); });
-  it("attribute_will_change! doesn't try to save non-persistable attributes", () => { expect(true).toBe(true); });
-  it("virtual attributes are not written with partial_writes off", () => { expect(true).toBe(true); });
-  it("mutating and then assigning doesn't remove the change", () => { expect(true).toBe(true); });
-  it("getters with side effects are allowed", () => { expect(true).toBe(true); });
-  it("attributes assigned but not selected are dirty", () => { expect(true).toBe(true); });
-  it("attributes not selected are still missing after save", () => { expect(true).toBe(true); });
+  it("in place mutation detection", () => {
+    expect(true).toBe(true);
+  });
+  it("in place mutation for binary", () => {
+    expect(true).toBe(true);
+  });
+  it("changes is correct for subclass", () => {
+    expect(true).toBe(true);
+  });
+  it("changes is correct if override attribute reader", () => {
+    expect(true).toBe(true);
+  });
+  it("attribute_changed? doesn't compute in-place changes for unrelated attributes", () => {
+    expect(true).toBe(true);
+  });
+  it("attribute_will_change! doesn't try to save non-persistable attributes", () => {
+    expect(true).toBe(true);
+  });
+  it("virtual attributes are not written with partial_writes off", () => {
+    expect(true).toBe(true);
+  });
+  it("mutating and then assigning doesn't remove the change", () => {
+    expect(true).toBe(true);
+  });
+  it("getters with side effects are allowed", () => {
+    expect(true).toBe(true);
+  });
+  it("attributes assigned but not selected are dirty", () => {
+    expect(true).toBe(true);
+  });
+  it("attributes not selected are still missing after save", () => {
+    expect(true).toBe(true);
+  });
   it("saved_changes? returns whether the last call to save changed anything", async () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
-    const p = await Post.create({ title: "a" }) as any;
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = (await Post.create({ title: "a" })) as any;
     expect(p.isPersisted()).toBe(true);
   });
-  it("changed? in around callbacks after yield returns false", () => { expect(true).toBe(true); });
-  it("partial insert off with unchanged default function attribute", () => { expect(true).toBe(true); });
-  it("partial insert off with changed default function attribute", () => { expect(true).toBe(true); });
-  it("partial insert off with changed composite identity primary key attribute", () => { expect(true).toBe(true); });
-  it("attribute_changed? properly type casts enum values", () => { expect(true).toBe(true); });
+  it("changed? in around callbacks after yield returns false", () => {
+    expect(true).toBe(true);
+  });
+  it("partial insert off with unchanged default function attribute", () => {
+    expect(true).toBe(true);
+  });
+  it("partial insert off with changed default function attribute", () => {
+    expect(true).toBe(true);
+  });
+  it("partial insert off with changed composite identity primary key attribute", () => {
+    expect(true).toBe(true);
+  });
+  it("attribute_changed? properly type casts enum values", () => {
+    expect(true).toBe(true);
+  });
 });
-
 
 describe("savedChanges", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("tracks changes from the last save", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -400,7 +609,9 @@ describe("savedChanges", () => {
   });
 
   it("savedChangeToAttribute returns true for changed attr", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -416,7 +627,9 @@ describe("savedChanges", () => {
 describe("dirty tracking: attributeInDatabase, attributeBeforeLastSave", () => {
   it("attributeInDatabase returns the pre-change value", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -428,7 +641,9 @@ describe("dirty tracking: attributeInDatabase, attributeBeforeLastSave", () => {
 
   it("attributeBeforeLastSave returns value from before last save", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -440,7 +655,9 @@ describe("dirty tracking: attributeInDatabase, attributeBeforeLastSave", () => {
 
   it("changedAttributeNamesToSave returns pending changes", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("age", "integer");
@@ -456,7 +673,9 @@ describe("dirty tracking: attributeInDatabase, attributeBeforeLastSave", () => {
 describe("isChangedForAutosave", () => {
   it("returns true for new records", () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -467,7 +686,9 @@ describe("isChangedForAutosave", () => {
 
   it("returns false for persisted unchanged records", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -478,7 +699,9 @@ describe("isChangedForAutosave", () => {
 
   it("returns true for changed records", async () => {
     const adapter = freshAdapter();
-    class User extends Base { static _tableName = "users"; }
+    class User extends Base {
+      static _tableName = "users";
+    }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
@@ -530,11 +753,16 @@ describe("attributeChanged with from/to options", () => {
 
 describe("Dirty (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("attribute changes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     expect(u.changed).toBe(false);
@@ -545,7 +773,11 @@ describe("Dirty (Rails-guided)", () => {
 
   it("object should be changed if any attribute is changed", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });
     u.writeAttribute("email", "new@b.com");
@@ -556,7 +788,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("reverted changes are not dirty", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     u.writeAttribute("name", "Bob");
@@ -567,7 +802,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("reload should clear changed attributes", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     u.writeAttribute("name", "Changed");
@@ -593,7 +831,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("savedChanges tracks changes from the last save", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     u.writeAttribute("name", "Bob");
@@ -604,7 +845,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("savedChangeToAttribute returns true for changed attr", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     u.writeAttribute("name", "Bob");
@@ -615,7 +859,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("previouslyNewRecord returns true after first save", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = new User({ name: "Alice" });
     expect(u.isPreviouslyNewRecord()).toBe(false);
@@ -625,7 +872,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("previouslyNewRecord returns false after subsequent saves", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     expect(u.isPreviouslyNewRecord()).toBe(true);
@@ -635,7 +885,10 @@ describe("Dirty (Rails-guided)", () => {
 
   it("hasChangesToSave returns true when dirty", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const u = await User.create({ name: "Alice" });
     expect(u.hasChangesToSave).toBe(false);

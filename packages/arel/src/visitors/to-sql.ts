@@ -66,7 +66,8 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.Regexp) return this.visitBinaryOp(node, "~");
     if (node instanceof Nodes.NotRegexp) return this.visitBinaryOp(node, "!~");
     if (node instanceof Nodes.IsDistinctFrom) return this.visitBinaryOp(node, "IS DISTINCT FROM");
-    if (node instanceof Nodes.IsNotDistinctFrom) return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
+    if (node instanceof Nodes.IsNotDistinctFrom)
+      return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
     if (node instanceof Nodes.Assignment) return this.visitAssignment(node);
     if (node instanceof Nodes.As) return this.visitAs(node);
 
@@ -207,9 +208,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
     if (node.wheres.length > 0) {
       this.collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1
-        ? node.wheres[0]
-        : new Nodes.And(node.wheres);
+      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
       this.visit(conditions);
     }
 
@@ -267,9 +266,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
     if (node.wheres.length > 0) {
       this.collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1
-        ? node.wheres[0]
-        : new Nodes.And(node.wheres);
+      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
       this.visit(conditions);
     }
 
@@ -293,9 +290,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
     if (node.wheres.length > 0) {
       this.collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1
-        ? node.wheres[0]
-        : new Nodes.And(node.wheres);
+      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
       this.visit(conditions);
     }
 
@@ -423,7 +418,13 @@ export class ToSql implements NodeVisitor<SQLString> {
     }
     this.visitNodeOrValue(node.left);
     // Duck-type check for SelectManager subquery - visitNodeOrValue wraps it in parens
-    if (node.right && typeof node.right === "object" && !Array.isArray(node.right) && "ast" in (node.right as any) && "toSql" in (node.right as any)) {
+    if (
+      node.right &&
+      typeof node.right === "object" &&
+      !Array.isArray(node.right) &&
+      "ast" in (node.right as any) &&
+      "toSql" in (node.right as any)
+    ) {
       this.collector.append(" IN ");
       this.visitNodeOrValue(node.right);
       return this.collector;
@@ -949,9 +950,7 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   private visitAttribute(node: Nodes.Attribute): SQLString {
-    this.collector.append(
-      `"${node.relation.tableAlias || node.relation.name}"."${node.name}"`
-    );
+    this.collector.append(`"${node.relation.tableAlias || node.relation.name}"."${node.name}"`);
     return this.collector;
   }
 
@@ -1023,7 +1022,12 @@ export class ToSql implements NodeVisitor<SQLString> {
       const m = String(v.getMonth() + 1).padStart(2, "0");
       const d = String(v.getDate()).padStart(2, "0");
       this.collector.append(`'${y}-${m}-${d}'`);
-    } else if (typeof v === "object" && v !== null && "toISOString" in v && typeof (v as any).toISOString === "function") {
+    } else if (
+      typeof v === "object" &&
+      v !== null &&
+      "toISOString" in v &&
+      typeof (v as any).toISOString === "function"
+    ) {
       this.collector.append(`'${(v as any).toISOString()}'`);
     } else {
       this.collector.append(String(v));
@@ -1049,7 +1053,12 @@ export class ToSql implements NodeVisitor<SQLString> {
       const d = String(value.getDate()).padStart(2, "0");
       return `'${y}-${m}-${d}'`;
     }
-    if (typeof value === "object" && value !== null && "toISOString" in value && typeof (value as any).toISOString === "function") {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toISOString" in value &&
+      typeof (value as any).toISOString === "function"
+    ) {
       return `'${(value as any).toISOString()}'`;
     }
     const escaped = String(value).replace(/'/g, "''");

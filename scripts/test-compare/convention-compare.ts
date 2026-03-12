@@ -94,9 +94,7 @@ function normalize(s: string): string {
 
 function main() {
   const args = process.argv.slice(2);
-  const filterPkg = args.includes("--package")
-    ? args[args.indexOf("--package") + 1]
-    : null;
+  const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
   const showMissing = args.includes("--missing");
   const jsonOutput = args.includes("--json");
 
@@ -215,9 +213,7 @@ function main() {
       return b.matched - a.matched;
     });
 
-    const percent = totalRuby > 0
-      ? Math.round((totalMatched / totalRuby) * 1000) / 10
-      : 0;
+    const percent = totalRuby > 0 ? Math.round((totalMatched / totalRuby) * 1000) / 10 : 0;
 
     results.push({
       package: pkg,
@@ -234,7 +230,10 @@ function main() {
 
   if (jsonOutput) {
     const outPath = path.join(OUTPUT_DIR, "convention-comparison.json");
-    fs.writeFileSync(outPath, JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2));
+    fs.writeFileSync(
+      outPath,
+      JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
+    );
     console.log(`Written to ${outPath}`);
     return;
   }
@@ -254,11 +253,15 @@ function main() {
     grandMapped += pkg.tsMapped;
 
     console.log(`\n${"=".repeat(90)}`);
-    console.log(`  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`);
+    console.log(
+      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
+    );
     console.log(`${"=".repeat(90)}\n`);
 
     // Show files with misplaced tests first as a moves summary
-    const filesWithMisplaced = pkg.files.filter((f) => f.misplacedTests && f.misplacedTests.length > 0);
+    const filesWithMisplaced = pkg.files.filter(
+      (f) => f.misplacedTests && f.misplacedTests.length > 0,
+    );
     if (filesWithMisplaced.length > 0) {
       console.log(`  MISPLACED TESTS (need to move):`);
       console.log(`  ${"-".repeat(86)}`);
@@ -268,7 +271,8 @@ function main() {
       for (const f of filesWithMisplaced) {
         for (const mt of f.misplacedTests!) {
           const key = `${mt.currentTsFile} → ${mt.conventionTsFile}`;
-          if (!moves.has(key)) moves.set(key, { descriptions: [], from: mt.currentTsFile, to: mt.conventionTsFile });
+          if (!moves.has(key))
+            moves.set(key, { descriptions: [], from: mt.currentTsFile, to: mt.conventionTsFile });
           moves.get(key)!.descriptions.push(mt.description);
         }
       }
@@ -283,19 +287,17 @@ function main() {
     }
 
     console.log(
-      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`
+      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
     );
     console.log(
-      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`
+      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
     );
 
     for (const f of pkg.files) {
-      const pct = f.rubyTestCount > 0
-        ? Math.round((f.matched / f.rubyTestCount) * 100)
-        : 0;
+      const pct = f.rubyTestCount > 0 ? Math.round((f.matched / f.rubyTestCount) * 100) : 0;
       const marker = !f.tsFileExists ? " ✗" : pct === 100 ? " ✓" : "";
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`
+        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {
@@ -306,11 +308,11 @@ function main() {
     }
   }
 
-  const grandPct = grandRuby > 0
-    ? Math.round((grandMatched / grandRuby) * 1000) / 10
-    : 0;
+  const grandPct = grandRuby > 0 ? Math.round((grandMatched / grandRuby) * 1000) / 10 : 0;
   console.log(`\n${"=".repeat(90)}`);
-  console.log(`  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`);
+  console.log(
+    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
+  );
   console.log(`${"=".repeat(90)}\n`);
 }
 

@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -49,8 +89,14 @@ describe("AssociationProxyTest", () => {
         this.adapter = apAdapter;
       }
     }
-    Associations.hasMany.call(APPost, "apComments", { foreignKey: "ap_post_id", className: "APComment" });
-    Associations.belongsTo.call(APComment, "apPost", { foreignKey: "ap_post_id", className: "APPost" });
+    Associations.hasMany.call(APPost, "apComments", {
+      foreignKey: "ap_post_id",
+      className: "APComment",
+    });
+    Associations.belongsTo.call(APComment, "apPost", {
+      foreignKey: "ap_post_id",
+      className: "APPost",
+    });
     registerModel("APPost", APPost);
     registerModel("APComment", APComment);
     return { APPost, APComment };
@@ -161,21 +207,55 @@ describe("AssociationProxyTest", () => {
     expect(empty).toBe(true);
   });
 
-  it.skip("push does not load target", () => { /* requires lazy-loading tracking */ });
-  it.skip("push has many through does not load target", () => { /* requires lazy-loading tracking */ });
-  it.skip("push followed by save does not load target", () => { /* requires lazy-loading tracking */ });
-  it.skip("save on parent does not load target", () => { /* requires lazy-loading tracking */ });
-  it.skip("inspect does not reload a not yet loaded target", () => { /* requires inspect on proxy */ });
-  it.skip("pretty print does not reload a not yet loaded target", () => { /* requires prettyPrint on proxy */ });
-  it.skip("save on parent saves children", () => { /* requires autosave */ });
-  it.skip("reload returns association", () => { /* requires reload on proxy */ });
-  it.skip("getting a scope from an association", () => { /* requires scope method on proxy */ });
-  it.skip("proxy object can be stubbed", () => { /* testing infrastructure */ });
-  it.skip("inverses get set of subsets of the association", () => { /* requires inverse_of tracking */ });
-  it.skip("pluck uses loaded target", () => { /* requires pluck on proxy */ });
-  it.skip("pick uses loaded target", () => { /* requires pick on proxy */ });
-  it.skip("reset unloads target", () => { /* requires reset on proxy */ });
-  it.skip("target merging ignores persisted in memory records", () => { /* requires target merging */ });
-  it.skip("target merging ignores persisted in memory records when loaded records are empty", () => { /* requires target merging */ });
-  it.skip("target merging recognizes updated in memory records", () => { /* requires target merging */ });
+  it.skip("push does not load target", () => {
+    /* requires lazy-loading tracking */
+  });
+  it.skip("push has many through does not load target", () => {
+    /* requires lazy-loading tracking */
+  });
+  it.skip("push followed by save does not load target", () => {
+    /* requires lazy-loading tracking */
+  });
+  it.skip("save on parent does not load target", () => {
+    /* requires lazy-loading tracking */
+  });
+  it.skip("inspect does not reload a not yet loaded target", () => {
+    /* requires inspect on proxy */
+  });
+  it.skip("pretty print does not reload a not yet loaded target", () => {
+    /* requires prettyPrint on proxy */
+  });
+  it.skip("save on parent saves children", () => {
+    /* requires autosave */
+  });
+  it.skip("reload returns association", () => {
+    /* requires reload on proxy */
+  });
+  it.skip("getting a scope from an association", () => {
+    /* requires scope method on proxy */
+  });
+  it.skip("proxy object can be stubbed", () => {
+    /* testing infrastructure */
+  });
+  it.skip("inverses get set of subsets of the association", () => {
+    /* requires inverse_of tracking */
+  });
+  it.skip("pluck uses loaded target", () => {
+    /* requires pluck on proxy */
+  });
+  it.skip("pick uses loaded target", () => {
+    /* requires pick on proxy */
+  });
+  it.skip("reset unloads target", () => {
+    /* requires reset on proxy */
+  });
+  it.skip("target merging ignores persisted in memory records", () => {
+    /* requires target merging */
+  });
+  it.skip("target merging ignores persisted in memory records when loaded records are empty", () => {
+    /* requires target merging */
+  });
+  it.skip("target merging recognizes updated in memory records", () => {
+    /* requires target merging */
+  });
 });

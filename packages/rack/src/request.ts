@@ -1,23 +1,42 @@
 import {
-  REQUEST_METHOD, SERVER_NAME, SERVER_PORT, SERVER_PROTOCOL,
-  QUERY_STRING, PATH_INFO, SCRIPT_NAME, RACK_URL_SCHEME,
-  RACK_INPUT, RACK_SESSION, RACK_SESSION_OPTIONS,
-  HTTP_HOST, HTTP_PORT, HTTPS, HTTP_COOKIE,
-  CONTENT_TYPE, CONTENT_LENGTH,
-  GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS,
-  RACK_REQUEST_QUERY_HASH, RACK_REQUEST_QUERY_STRING,
-  RACK_REQUEST_FORM_HASH, RACK_REQUEST_FORM_INPUT,
-  RACK_REQUEST_FORM_VARS, RACK_REQUEST_FORM_PAIRS,
-  RACK_REQUEST_COOKIE_HASH, RACK_REQUEST_COOKIE_STRING,
+  REQUEST_METHOD,
+  SERVER_NAME,
+  SERVER_PORT,
+  SERVER_PROTOCOL,
+  QUERY_STRING,
+  PATH_INFO,
+  SCRIPT_NAME,
+  RACK_URL_SCHEME,
+  RACK_INPUT,
+  RACK_SESSION,
+  RACK_SESSION_OPTIONS,
+  HTTP_HOST,
+  HTTP_PORT,
+  HTTPS,
+  HTTP_COOKIE,
+  CONTENT_TYPE,
+  CONTENT_LENGTH,
+  GET,
+  POST,
+  PUT,
+  PATCH,
+  DELETE,
+  HEAD,
+  OPTIONS,
+  RACK_REQUEST_QUERY_HASH,
+  RACK_REQUEST_QUERY_STRING,
+  RACK_REQUEST_FORM_HASH,
+  RACK_REQUEST_FORM_INPUT,
+  RACK_REQUEST_FORM_VARS,
+  RACK_REQUEST_FORM_PAIRS,
+  RACK_REQUEST_COOKIE_HASH,
+  RACK_REQUEST_COOKIE_STRING,
 } from "./constants.js";
 import { parseNestedQuery } from "./utils.js";
 import * as MediaTypeModule from "./media-type.js";
 import { parseMultipart } from "./multipart.js";
 
-const FORM_DATA_MEDIA_TYPES = [
-  "application/x-www-form-urlencoded",
-  "multipart/form-data",
-];
+const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"];
 
 function parseCookies(cookieStr: string): Record<string, string> {
   const cookies: Record<string, string> = {};
@@ -85,13 +104,27 @@ export class Request {
     }
   }
 
-  get requestMethod(): string { return this.env[REQUEST_METHOD]; }
-  get scriptName(): string { return this.env[SCRIPT_NAME] || ""; }
-  set scriptName(v: string) { this.env[SCRIPT_NAME] = v; }
-  get pathInfo(): string { return this.env[PATH_INFO] || "/"; }
-  set pathInfo(v: string) { this.env[PATH_INFO] = v; }
-  get queryString(): string { return this.env[QUERY_STRING] || ""; }
-  get serverProtocol(): string { return this.env[SERVER_PROTOCOL]; }
+  get requestMethod(): string {
+    return this.env[REQUEST_METHOD];
+  }
+  get scriptName(): string {
+    return this.env[SCRIPT_NAME] || "";
+  }
+  set scriptName(v: string) {
+    this.env[SCRIPT_NAME] = v;
+  }
+  get pathInfo(): string {
+    return this.env[PATH_INFO] || "/";
+  }
+  set pathInfo(v: string) {
+    this.env[PATH_INFO] = v;
+  }
+  get queryString(): string {
+    return this.env[QUERY_STRING] || "";
+  }
+  get serverProtocol(): string {
+    return this.env[SERVER_PROTOCOL];
+  }
 
   get contentType(): string | null {
     const ct = this.env[CONTENT_TYPE] || this.env["CONTENT_TYPE"];
@@ -377,17 +410,21 @@ export class Request {
       return remoteAddr;
     }
 
-    const trustFn: (ip: string) => boolean = trustedProxyFn === true
-      ? () => true
-      : (typeof trustedProxyFn === "function"
-        ? trustedProxyFn
-        : isTrustedProxy);
+    const trustFn: (ip: string) => boolean =
+      trustedProxyFn === true
+        ? () => true
+        : typeof trustedProxyFn === "function"
+          ? trustedProxyFn
+          : isTrustedProxy;
 
     const forwarded = this.env["HTTP_X_FORWARDED_FOR"];
     const clientIp = this.env["HTTP_CLIENT_IP"];
 
     if (forwarded) {
-      const ips = forwarded.split(",").map((s: string) => s.trim()).filter(Boolean);
+      const ips = forwarded
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter(Boolean);
 
       // Check for spoofing: if client-ip not in forwarded chain and not trusted
       if (clientIp) {
@@ -424,35 +461,55 @@ export class Request {
 
   get acceptEncoding(): Array<[string, number]> {
     const header = this.env["HTTP_ACCEPT_ENCODING"] || "";
-    return header.split(",").map((part: string) => {
-      const [enc, ...rest] = part.trim().split(";");
-      let q = 1.0;
-      for (const r of rest) {
-        const m = r.trim().match(/^q=(.+)/);
-        if (m) q = parseFloat(m[1]);
-      }
-      return [enc.trim(), q] as [string, number];
-    }).filter(([enc]: [string, number]) => enc !== "");
+    return header
+      .split(",")
+      .map((part: string) => {
+        const [enc, ...rest] = part.trim().split(";");
+        let q = 1.0;
+        for (const r of rest) {
+          const m = r.trim().match(/^q=(.+)/);
+          if (m) q = parseFloat(m[1]);
+        }
+        return [enc.trim(), q] as [string, number];
+      })
+      .filter(([enc]: [string, number]) => enc !== "");
   }
 
   get acceptLanguage(): Array<[string, number]> {
     const header = this.env["HTTP_ACCEPT_LANGUAGE"] || "";
-    return header.split(",").map((part: string) => {
-      const [lang, ...rest] = part.trim().split(";");
-      let q = 1.0;
-      for (const r of rest) {
-        const m = r.trim().match(/^q=(.+)/);
-        if (m) q = parseFloat(m[1]);
-      }
-      return [lang.trim(), q] as [string, number];
-    }).filter(([lang]: [string, number]) => lang !== "");
+    return header
+      .split(",")
+      .map((part: string) => {
+        const [lang, ...rest] = part.trim().split(";");
+        let q = 1.0;
+        for (const r of rest) {
+          const m = r.trim().match(/^q=(.+)/);
+          if (m) q = parseFloat(m[1]);
+        }
+        return [lang.trim(), q] as [string, number];
+      })
+      .filter(([lang]: [string, number]) => lang !== "");
   }
 
-  isGet(): boolean { return this.requestMethod === GET; }
-  isPost(): boolean { return this.requestMethod === POST; }
-  isPut(): boolean { return this.requestMethod === PUT; }
-  isPatch(): boolean { return this.requestMethod === PATCH; }
-  isDelete(): boolean { return this.requestMethod === DELETE; }
-  isHead(): boolean { return this.requestMethod === HEAD; }
-  isOptions(): boolean { return this.requestMethod === OPTIONS; }
+  isGet(): boolean {
+    return this.requestMethod === GET;
+  }
+  isPost(): boolean {
+    return this.requestMethod === POST;
+  }
+  isPut(): boolean {
+    return this.requestMethod === PUT;
+  }
+  isPatch(): boolean {
+    return this.requestMethod === PATCH;
+  }
+  isDelete(): boolean {
+    return this.requestMethod === DELETE;
+  }
+  isHead(): boolean {
+    return this.requestMethod === HEAD;
+  }
+  isOptions(): boolean {
+    return this.requestMethod === OPTIONS;
+  }
 }

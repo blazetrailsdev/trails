@@ -3,7 +3,11 @@ import { RewindableInput, RewindableInputMiddleware } from "./rewindable-input.j
 import { RACK_INPUT } from "./constants.js";
 
 function makeInput(data: string) {
-  return new RewindableInput({ read() { return data; } });
+  return new RewindableInput({
+    read() {
+      return data;
+    },
+  });
 }
 
 it("be able to handle to read()", () => {
@@ -118,7 +122,13 @@ describe("Rack::RewindableInput::Middleware", () => {
       return [200, {}, ["OK"]] as [number, Record<string, any>, any];
     };
     const mw = new RewindableInputMiddleware(app);
-    await mw.call({ [RACK_INPUT]: { read() { return "test"; } } });
+    await mw.call({
+      [RACK_INPUT]: {
+        read() {
+          return "test";
+        },
+      },
+    });
   });
 
   it("preserves a nil rack.input", async () => {

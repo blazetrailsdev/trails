@@ -15,7 +15,7 @@ export interface SerializeOptions {
  */
 export function serializableHash(
   record: any,
-  options: SerializeOptions = {}
+  options: SerializeOptions = {},
 ): Record<string, unknown> {
   const attrs: Map<string, unknown> = record._attributes ?? new Map();
   let keys = Array.from(attrs.keys());
@@ -46,8 +46,8 @@ export function serializableHash(
     const includes = normalizeIncludes(options.include);
     for (const [assocName, assocOpts] of Object.entries(includes)) {
       // Check for cached/preloaded associations
-      const cached = record._preloadedAssociations?.get(assocName) ??
-        record._cachedAssociations?.get(assocName);
+      const cached =
+        record._preloadedAssociations?.get(assocName) ?? record._cachedAssociations?.get(assocName);
       if (cached !== undefined) {
         if (Array.isArray(cached)) {
           result[assocName] = cached.map((r: any) => serializableHash(r, assocOpts));
@@ -64,7 +64,7 @@ export function serializableHash(
 }
 
 function normalizeIncludes(
-  include: Record<string, SerializeOptions> | string[] | string
+  include: Record<string, SerializeOptions> | string[] | string,
 ): Record<string, SerializeOptions> {
   if (typeof include === "string") {
     return { [include]: {} };

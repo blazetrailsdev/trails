@@ -33,7 +33,9 @@ describe("AppGenerator", () => {
     expect(fs.existsSync(path.join(appDir, "src/server.ts"))).toBe(true);
     expect(fs.existsSync(path.join(appDir, "src/config/routes.ts"))).toBe(true);
     expect(fs.existsSync(path.join(appDir, "src/config/database.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(appDir, "src/app/controllers/application-controller.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(appDir, "src/app/controllers/application-controller.ts"))).toBe(
+      true,
+    );
     expect(fs.existsSync(path.join(appDir, "db/seeds.ts"))).toBe(true);
   });
 

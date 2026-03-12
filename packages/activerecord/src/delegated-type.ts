@@ -40,7 +40,7 @@ const delegatedTypeRegistry = new WeakMap<
 export function delegatedType(
   modelClass: typeof Base,
   role: string,
-  options: DelegatedTypeOptions
+  options: DelegatedTypeOptions,
 ): void {
   const foreignKey = options.foreignKey ?? `${role}_id`;
   const foreignType = options.foreignType ?? `${role}_type`;
@@ -132,7 +132,7 @@ export function delegatedType(
  */
 export function getDelegatedTypeConfig(
   modelClass: typeof Base,
-  role: string
+  role: string,
 ): DelegatedTypeOptions | undefined {
   return (modelClass as any)._delegatedTypes?.get(role);
 }

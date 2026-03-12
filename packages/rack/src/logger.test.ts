@@ -10,11 +10,21 @@ describe("Rack::Logger", () => {
       log.debug("Created logger");
       log.info("Program started");
       log.warn("Nothing to do!");
-      return [200, { "content-type": "text/plain" }, (async function* () { yield "Hello, World!"; })()];
+      return [
+        200,
+        { "content-type": "text/plain" },
+        (async function* () {
+          yield "Hello, World!";
+        })(),
+      ];
     };
 
     const output: string[] = [];
-    const errors = { write(msg: string) { output.push(msg); } };
+    const errors = {
+      write(msg: string) {
+        output.push(msg);
+      },
+    };
 
     const logger = new Logger(app);
     const env = MockRequest.envFor("/");

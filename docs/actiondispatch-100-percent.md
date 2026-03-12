@@ -24,23 +24,23 @@ We already have 23 test files and 30 source files covering:
 
 ## Summary by feature area
 
-| # | Feature Area | Missing | Matched | Key Blocker |
-|---|---|---|---|---|
-| 1 | Controller Core | 814 | 158 | Needs ActionController |
-| 2 | Routing | 600 | 164 | Routing engine gaps |
-| 3 | Controller Rendering | 295 | 28 | Needs ActionController + views |
-| 4 | Controller Testing | 132 | 0 | Needs test harness |
-| 5 | Request | 125 | 74 | Param parsing, edge cases |
-| 6 | Middleware | 109 | 0 | Individual middleware impl |
-| 7 | Cookies | 96 | 41 | Cookie edge cases |
-| 8 | Sessions | 87 | 0 | Session stores |
-| 9 | Security Middleware | 81 | 0 | SSL/Host auth edge cases |
-| 10 | Error Handling | 73 | 5 | Debug exceptions, rescue |
-| 11 | Controller Filters | 54 | 0 | Needs ActionController |
-| 12 | Response | 52 | 27 | Response edge cases |
-| 13 | System Testing | 44 | 0 | Browser automation — defer |
-| 14 | Other small areas | 189 | 106 | Various |
-| | **TOTAL** | **2,751** | **603** | |
+| #   | Feature Area         | Missing   | Matched | Key Blocker                    |
+| --- | -------------------- | --------- | ------- | ------------------------------ |
+| 1   | Controller Core      | 814       | 158     | Needs ActionController         |
+| 2   | Routing              | 600       | 164     | Routing engine gaps            |
+| 3   | Controller Rendering | 295       | 28      | Needs ActionController + views |
+| 4   | Controller Testing   | 132       | 0       | Needs test harness             |
+| 5   | Request              | 125       | 74      | Param parsing, edge cases      |
+| 6   | Middleware           | 109       | 0       | Individual middleware impl     |
+| 7   | Cookies              | 96        | 41      | Cookie edge cases              |
+| 8   | Sessions             | 87        | 0       | Session stores                 |
+| 9   | Security Middleware  | 81        | 0       | SSL/Host auth edge cases       |
+| 10  | Error Handling       | 73        | 5       | Debug exceptions, rescue       |
+| 11  | Controller Filters   | 54        | 0       | Needs ActionController         |
+| 12  | Response             | 52        | 27      | Response edge cases            |
+| 13  | System Testing       | 44        | 0       | Browser automation — defer     |
+| 14  | Other small areas    | 189       | 106     | Various                        |
+|     | **TOTAL**            | **2,751** | **603** |                                |
 
 ## The ActionController question
 
@@ -161,6 +161,7 @@ The largest standalone area. The core routing DSL already works (116 matched in 
 **Phase A1 — Journey internals (72 missing)**
 
 The Journey router is Rails' internal route matching engine. We have a basic implementation but need:
+
 - Path pattern parsing and matching (20 missing)
 - Route definition parser/scanner (22 missing)
 - GTG (Generalized Transition Graph) builder (14 missing)
@@ -263,6 +264,7 @@ Nearly complete. Implementations exist.
 ### Stream I: Controller (1,295 missing — 47% of total)
 
 This is the elephant in the room. Nearly half of all missing tests require an ActionController implementation. This should be the last major stream because:
+
 1. It depends on routing, middleware, request/response all working well
 2. Many controller tests test rendering (views, templates, layouts) which is a large new subsystem
 3. Some controller tests (test_case, integration) need a test harness
@@ -270,6 +272,7 @@ This is the elephant in the room. Nearly half of all missing tests require an Ac
 **Phase I1 — Minimal controller base (~200 tests)**
 
 Build a lightweight `ActionController::Base` that can:
+
 - Dispatch actions by name
 - Run before/after/around filters (54 missing)
 - Access params, request, response, cookies, session, flash
@@ -280,6 +283,7 @@ This unlocks: filters_test (54), base_test (21), many action_pack tests.
 **Phase I2 — Parameters deep (170 missing, 42 matched)**
 
 Strong parameters is partially implemented but many edge cases remain:
+
 - `permit` with nested hashes and arrays (62 + 15 missing)
 - `expect` (25 missing) — Rails 8 addition
 - Dup/equality semantics (14 missing)
@@ -290,6 +294,7 @@ Strong parameters is partially implemented but many edge cases remain:
 **Phase I3 — Controller rendering (~295 missing)**
 
 This is the hardest part. Rails rendering involves:
+
 - Template lookup and compilation (ERB/Haml/etc)
 - Layout wrapping
 - Partial rendering
@@ -297,6 +302,7 @@ This is the hardest part. Rails rendering involves:
 - Content negotiation per format
 
 For TypeScript, we likely want a simplified rendering pipeline that supports:
+
 - `render json:`, `render plain:`, `render html:`, `render body:`
 - `render status:`, `head :ok`
 - Redirects (25 missing, 28 matched)
@@ -324,21 +330,21 @@ Full view rendering (ERB, partials, layouts) is probably out of scope initially.
 
 ### Stream J: Small standalone areas (~75 missing)
 
-| Area | Missing | Notes |
-|---|---|---|
-| Content negotiation (MIME) | 5 | Nearly complete (27 matched) |
-| Uploaded file | 12 | Partially done (8 matched) |
-| Mapper internals | 21 | Route definition edge cases |
-| Headers | 19 | Request/response header API |
-| Query parser | 9 | URL query string parsing |
-| Content disposition | 5 | Filename encoding for downloads |
-| Server timing | 5 | Server-Timing header |
-| Mount | 10 | Mounting Rack apps in routes |
-| Param builder | 6 | Building params for testing |
-| Translation | 21 | I18n integration — may defer |
-| Collector | 5 | Abstract format collection |
-| Runner | 1 | App runner |
-| Rack cache | 1 | HTTP caching integration |
+| Area                       | Missing | Notes                           |
+| -------------------------- | ------- | ------------------------------- |
+| Content negotiation (MIME) | 5       | Nearly complete (27 matched)    |
+| Uploaded file              | 12      | Partially done (8 matched)      |
+| Mapper internals           | 21      | Route definition edge cases     |
+| Headers                    | 19      | Request/response header API     |
+| Query parser               | 9       | URL query string parsing        |
+| Content disposition        | 5       | Filename encoding for downloads |
+| Server timing              | 5       | Server-Timing header            |
+| Mount                      | 10      | Mounting Rack apps in routes    |
+| Param builder              | 6       | Building params for testing     |
+| Translation                | 21      | I18n integration — may defer    |
+| Collector                  | 5       | Abstract format collection      |
+| Runner                     | 1       | App runner                      |
+| Rack cache                 | 1       | HTTP caching integration        |
 
 ## Recommended execution order
 
@@ -389,6 +395,7 @@ Phase 5 — Cleanup:
 ## What "out of scope" might look like
 
 Some Rails features don't translate to TypeScript:
+
 - **System testing** (44 tests) — Selenium/browser automation
 - **Template rendering** (~150 tests) — ERB/Haml compilation, partials, layouts
 - **Caching** (32 tests) — Fragment/page caching tied to views
@@ -403,6 +410,7 @@ npm run test:compare
 ```
 
 Key metric:
+
 ```
 actiondispatch: XX% real (NNN matched, 0 stub / 3354 total)
 ```

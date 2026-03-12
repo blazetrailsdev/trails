@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,10 +68,15 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("ErrorsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   it("can be instantiated with no args", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = new Post();
     expect(p.errors).toBeDefined();
@@ -41,10 +86,14 @@ describe("ErrorsTest", () => {
 
 describe("error classes", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("find throws RecordNotFound with metadata", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.adapter = adapter;
 
@@ -60,7 +109,9 @@ describe("error classes", () => {
   });
 
   it("saveBang throws RecordInvalid with record reference", async () => {
-    class Widget extends Base { static _tableName = "widgets"; }
+    class Widget extends Base {
+      static _tableName = "widgets";
+    }
     Widget.attribute("id", "integer");
     Widget.attribute("name", "string");
     Widget.validates("name", { presence: true });
@@ -78,7 +129,9 @@ describe("error classes", () => {
   });
 
   it("readonly record throws ReadOnlyRecord", async () => {
-    class Thing extends Base { static _tableName = "things"; }
+    class Thing extends Base {
+      static _tableName = "things";
+    }
     Thing.attribute("id", "integer");
     Thing.attribute("name", "string");
     Thing.adapter = adapter;
@@ -94,7 +147,9 @@ describe("error classes", () => {
   });
 
   it("firstBang throws RecordNotFound", async () => {
-    class Empty extends Base { static _tableName = "empties"; }
+    class Empty extends Base {
+      static _tableName = "empties";
+    }
     Empty.attribute("id", "integer");
     Empty.adapter = adapter;
 
@@ -117,7 +172,12 @@ describe("Error Classes (Rails-guided)", () => {
   // Rails: test "RecordNotFound"
   it("find raises RecordNotFound with model, primary_key, and id", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     try {
@@ -135,7 +195,11 @@ describe("Error Classes (Rails-guided)", () => {
   // Rails: test "RecordNotFound with multiple IDs"
   it("find with multiple IDs raises RecordNotFound listing missing IDs", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
     }
     await Person.create({ id: 1 });
 
@@ -152,8 +216,15 @@ describe("Error Classes (Rails-guided)", () => {
   // Rails: test "RecordInvalid"
   it("save! raises RecordInvalid with error messages", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
-      static { this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+      static {
+        this.validates("name", { presence: true });
+      }
     }
 
     const p = new Person({});
@@ -170,8 +241,15 @@ describe("Error Classes (Rails-guided)", () => {
   // Rails: test "create! raises RecordInvalid"
   it("create! raises RecordInvalid on validation failure", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
-      static { this.validates("name", { presence: true }); }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+      static {
+        this.validates("name", { presence: true });
+      }
     }
 
     await expect(Person.createBang({})).rejects.toThrow(RecordInvalid);
@@ -180,7 +258,12 @@ describe("Error Classes (Rails-guided)", () => {
   // Rails: test "find_by! raises RecordNotFound"
   it("findByBang raises RecordNotFound when no record matches", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     await expect(Person.findByBang({ name: "Nobody" })).rejects.toThrow(RecordNotFound);
@@ -189,7 +272,12 @@ describe("Error Classes (Rails-guided)", () => {
   // Rails: test "ReadOnlyRecord"
   it("save on readonly record raises ReadOnlyRecord", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
 
     const p = await Person.create({ name: "Alice" });

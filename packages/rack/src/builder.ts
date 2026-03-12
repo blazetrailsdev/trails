@@ -4,7 +4,11 @@ type RackApp = (env: Record<string, any>) => any;
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => { call: RackApp };
 
 export class Builder {
-  private _middlewares: Array<{ klass: MiddlewareFactory | ((app: RackApp) => { call: RackApp }); args: any[]; block?: any }> = [];
+  private _middlewares: Array<{
+    klass: MiddlewareFactory | ((app: RackApp) => { call: RackApp });
+    args: any[];
+    block?: any;
+  }> = [];
   private _map: Record<string, RackApp> = {};
   private _run: RackApp | null = null;
   private _warmupBlock: ((app: RackApp) => void) | null = null;

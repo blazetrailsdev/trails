@@ -36,22 +36,13 @@ export interface TemplateResolver {
    * @param extensions Handler extensions to search for (e.g., ["ejs", "tsx"])
    * @returns The resolved template, or null if not found
    */
-  find(
-    name: string,
-    prefix: string,
-    format: string,
-    extensions: string[]
-  ): Template | null;
+  find(name: string, prefix: string, format: string, extensions: string[]): Template | null;
 
   /**
    * Find a layout template.
    * Default implementation delegates to find() with "layouts" prefix.
    */
-  findLayout?(
-    name: string,
-    format: string,
-    extensions: string[]
-  ): Template | null;
+  findLayout?(name: string, format: string, extensions: string[]): Template | null;
 }
 
 /**
@@ -71,12 +62,7 @@ export interface TemplateResolver {
 export class FileSystemResolver implements TemplateResolver {
   constructor(private basePath: string) {}
 
-  find(
-    name: string,
-    prefix: string,
-    format: string,
-    extensions: string[]
-  ): Template | null {
+  find(name: string, prefix: string, format: string, extensions: string[]): Template | null {
     const dir = path.join(this.basePath, prefix);
 
     for (const ext of extensions) {
@@ -110,11 +96,7 @@ export class FileSystemResolver implements TemplateResolver {
     return null;
   }
 
-  findLayout(
-    name: string,
-    format: string,
-    extensions: string[]
-  ): Template | null {
+  findLayout(name: string, format: string, extensions: string[]): Template | null {
     const template = this.find(name, "layouts", format, extensions);
     if (template) {
       return { ...template, isLayout: true };
@@ -192,12 +174,7 @@ export class InMemoryResolver implements TemplateResolver {
     this.add(partialIdentifier, format, extension, source);
   }
 
-  find(
-    name: string,
-    prefix: string,
-    format: string,
-    extensions: string[]
-  ): Template | null {
+  find(name: string, prefix: string, format: string, extensions: string[]): Template | null {
     const identifier = prefix ? `${prefix}/${name}` : name;
 
     // Try format-specific match
@@ -217,11 +194,7 @@ export class InMemoryResolver implements TemplateResolver {
     return null;
   }
 
-  findLayout(
-    name: string,
-    format: string,
-    extensions: string[]
-  ): Template | null {
+  findLayout(name: string, format: string, extensions: string[]): Template | null {
     const template = this.find(name, "layouts", format, extensions);
     if (template) {
       return { ...template, isLayout: true };

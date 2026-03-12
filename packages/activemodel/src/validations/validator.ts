@@ -16,10 +16,7 @@ export interface ConditionalOptions {
   on?: "create" | "update";
 }
 
-export function shouldValidate(
-  record: any,
-  options: ConditionalOptions
-): boolean {
+export function shouldValidate(record: any, options: ConditionalOptions): boolean {
   if (options.if && !options.if(record)) return false;
   if (options.unless && options.unless(record)) return false;
   return true;

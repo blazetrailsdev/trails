@@ -32,10 +32,7 @@ export function registerSubclass(klass: typeof Base): void {
  * Configure STI on a base model class.
  * Call this on the parent class to enable STI.
  */
-export function enableSti(
-  modelClass: typeof Base,
-  options: { column?: string } = {}
-): void {
+export function enableSti(modelClass: typeof Base, options: { column?: string } = {}): void {
   const column = options.column ?? "type";
   (modelClass as any)._inheritanceColumn = column;
 }
@@ -43,9 +40,7 @@ export function enableSti(
 /**
  * Get the inheritance column for a model, if STI is enabled.
  */
-export function getInheritanceColumn(
-  modelClass: typeof Base
-): string | null {
+export function getInheritanceColumn(modelClass: typeof Base): string | null {
   return (modelClass as any)._inheritanceColumn ?? null;
 }
 
@@ -83,20 +78,17 @@ export function getStiBase(modelClass: typeof Base): typeof Base {
  *
  * Mirrors: ActiveRecord::Inheritance.find_sti_class
  */
-export function findStiClass(
-  baseClass: typeof Base,
-  typeName: string
-): typeof Base {
+export function findStiClass(baseClass: typeof Base, typeName: string): typeof Base {
   const klass = modelRegistry.get(typeName);
   if (!klass) {
     throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`
+      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
     );
   }
   // Verify it's actually a subclass (or the base itself)
   if (klass !== baseClass && !(klass.prototype instanceof baseClass)) {
     throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`
+      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
     );
   }
   return klass;
@@ -122,10 +114,7 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
 /**
  * Instantiate the correct STI subclass from a database row.
  */
-export function instantiateSti(
-  baseClass: typeof Base,
-  row: Record<string, unknown>
-): Base {
+export function instantiateSti(baseClass: typeof Base, row: Record<string, unknown>): Base {
   const column = getInheritanceColumn(baseClass);
   if (!column) return directInstantiate(baseClass, row);
 

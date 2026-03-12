@@ -24,11 +24,7 @@ export function squish(str: string): string {
   return str.trim().replace(/\s+/g, " ");
 }
 
-export function truncate(
-  str: string,
-  length: number,
-  options: { omission?: string } = {}
-): string {
+export function truncate(str: string, length: number, options: { omission?: string } = {}): string {
   const { omission = "..." } = options;
   if (str.length <= length) return str;
   return str.slice(0, length - omission.length) + omission;
@@ -37,7 +33,7 @@ export function truncate(
 export function truncateWords(
   str: string,
   count: number,
-  options: { omission?: string } = {}
+  options: { omission?: string } = {},
 ): string {
   const { omission = "..." } = options;
   const words = str.split(/\s+/);
@@ -53,9 +49,7 @@ export function stripHeredoc(str: string): string {
   const lines = str.split("\n");
   const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
   if (nonEmptyLines.length === 0) return str;
-  const minIndent = Math.min(
-    ...nonEmptyLines.map((l) => l.match(/^(\s*)/)?.[1].length ?? 0)
-  );
+  const minIndent = Math.min(...nonEmptyLines.map((l) => l.match(/^(\s*)/)?.[1].length ?? 0));
   return lines.map((l) => l.slice(minIndent)).join("\n");
 }
 
@@ -142,7 +136,7 @@ export function indent(
   str: string,
   n: number,
   char: string = " ",
-  indentEmptyLines: boolean = false
+  indentEmptyLines: boolean = false,
 ): string {
   const pad = char.repeat(n);
   return str

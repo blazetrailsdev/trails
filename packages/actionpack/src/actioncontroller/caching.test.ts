@@ -11,7 +11,9 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
-function makeResponse(): Response { return new Response(); }
+function makeResponse(): Response {
+  return new Response();
+}
 
 // ==========================================================================
 // action_controller/caching_test.rb — Conditional GET
@@ -69,10 +71,16 @@ describe("ActionController conditional GET", () => {
 
     // Conditional request
     const c2 = new C();
-    await c2.dispatch("show", new Request({
-      REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost",
-      HTTP_IF_NONE_MATCH: etag,
-    }), makeResponse());
+    await c2.dispatch(
+      "show",
+      new Request({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/",
+        HTTP_HOST: "localhost",
+        HTTP_IF_NONE_MATCH: etag,
+      }),
+      makeResponse(),
+    );
     expect(c2.status).toBe(304);
   });
 
@@ -85,10 +93,16 @@ describe("ActionController conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", new Request({
-      REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost",
-      HTTP_IF_MODIFIED_SINCE: date.toUTCString(),
-    }), makeResponse());
+    await c.dispatch(
+      "show",
+      new Request({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/",
+        HTTP_HOST: "localhost",
+        HTTP_IF_MODIFIED_SINCE: date.toUTCString(),
+      }),
+      makeResponse(),
+    );
     expect(c.status).toBe(304);
   });
 
@@ -100,10 +114,16 @@ describe("ActionController conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", new Request({
-      REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost",
-      HTTP_IF_NONE_MATCH: 'W/"old-etag"',
-    }), makeResponse());
+    await c.dispatch(
+      "show",
+      new Request({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/",
+        HTTP_HOST: "localhost",
+        HTTP_IF_NONE_MATCH: 'W/"old-etag"',
+      }),
+      makeResponse(),
+    );
     expect(c.status).toBe(200);
   });
 
@@ -141,10 +161,16 @@ describe("ActionController conditional GET", () => {
       }
     }
     const c2 = new C2();
-    await c2.dispatch("show", new Request({
-      REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost",
-      HTTP_IF_NONE_MATCH: etag,
-    }), makeResponse());
+    await c2.dispatch(
+      "show",
+      new Request({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/",
+        HTTP_HOST: "localhost",
+        HTTP_IF_NONE_MATCH: etag,
+      }),
+      makeResponse(),
+    );
     expect(result).toBe(false);
   });
 

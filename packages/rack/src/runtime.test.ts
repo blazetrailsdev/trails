@@ -13,7 +13,8 @@ describe("Rack::Runtime", () => {
   });
 
   it("doesn't set the x-runtime if it is already set", async () => {
-    const app = async () => [200, { "content-type": "text/plain", "x-runtime": "foobar" }, "Hello, World!"] as any;
+    const app = async () =>
+      [200, { "content-type": "text/plain", "x-runtime": "foobar" }, "Hello, World!"] as any;
     const runtime = new Runtime(app);
     const [, headers] = await runtime.call(request());
     expect(headers["x-runtime"]).toBe("foobar");
@@ -29,7 +30,7 @@ describe("Rack::Runtime", () => {
   it("allow multiple timers to be set", async () => {
     const inner = async () => {
       // Small delay to ensure measurable time
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
       return [200, { "content-type": "text/plain" }, "Hello, World!"] as any;
     };
     let app: any = new Runtime(inner, "App");
@@ -41,6 +42,8 @@ describe("Rack::Runtime", () => {
     const [, headers] = await outer.call(request());
     expect(headers["x-runtime-app"]).toMatch(/[\d.]+/);
     expect(headers["x-runtime-all"]).toMatch(/[\d.]+/);
-    expect(parseFloat(headers["x-runtime-all"])).toBeGreaterThan(parseFloat(headers["x-runtime-app"]));
+    expect(parseFloat(headers["x-runtime-all"])).toBeGreaterThan(
+      parseFloat(headers["x-runtime-app"]),
+    );
   });
 });

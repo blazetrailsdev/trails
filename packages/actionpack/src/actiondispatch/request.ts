@@ -28,8 +28,7 @@ export class Request {
     // Check for method override via _method parameter or X-Http-Method-Override header
     if (this.requestMethod === "POST") {
       const override =
-        (this.env["HTTP_X_HTTP_METHOD_OVERRIDE"] as string) ??
-        this.params?.["_method"];
+        (this.env["HTTP_X_HTTP_METHOD_OVERRIDE"] as string) ?? this.params?.["_method"];
       if (override) {
         const upper = String(override).toUpperCase();
         if (["GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(upper)) {
@@ -44,12 +43,24 @@ export class Request {
     return ((this.env["REQUEST_METHOD"] as string) || "GET").toUpperCase();
   }
 
-  get isGet(): boolean { return this.method === "GET"; }
-  get isHead(): boolean { return this.method === "HEAD"; }
-  get isPost(): boolean { return this.method === "POST"; }
-  get isPut(): boolean { return this.method === "PUT"; }
-  get isPatch(): boolean { return this.method === "PATCH"; }
-  get isDelete(): boolean { return this.method === "DELETE"; }
+  get isGet(): boolean {
+    return this.method === "GET";
+  }
+  get isHead(): boolean {
+    return this.method === "HEAD";
+  }
+  get isPost(): boolean {
+    return this.method === "POST";
+  }
+  get isPut(): boolean {
+    return this.method === "PUT";
+  }
+  get isPatch(): boolean {
+    return this.method === "PATCH";
+  }
+  get isDelete(): boolean {
+    return this.method === "DELETE";
+  }
 
   // --- URL components ---
 
@@ -74,8 +85,9 @@ export class Request {
   }
 
   get rawHost(): string {
-    return (this.env["HTTP_HOST"] as string) ||
-      `${this.env["SERVER_NAME"]}:${this.env["SERVER_PORT"]}`;
+    return (
+      (this.env["HTTP_HOST"] as string) || `${this.env["SERVER_NAME"]}:${this.env["SERVER_PORT"]}`
+    );
   }
 
   get port(): number {
@@ -188,7 +200,10 @@ export class Request {
   get ifNoneMatchEtags(): string[] {
     const header = this.ifNoneMatch;
     if (!header) return [];
-    return header.split(",").map(s => s.trim()).filter(Boolean);
+    return header
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   // --- Request type checks ---

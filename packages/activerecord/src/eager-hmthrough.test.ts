@@ -35,13 +35,24 @@ describe("EagerAssociationTest", () => {
 
   it("should work inverse of with eager load", async () => {
     class EagerInvParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerInvChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_inv_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_inv_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerInvParent as any)._associations = [
-      { type: "hasMany", name: "eagerInvChildren", options: { className: "EagerInvChild", foreignKey: "eager_inv_parent_id" } },
+      {
+        type: "hasMany",
+        name: "eagerInvChildren",
+        options: { className: "EagerInvChild", foreignKey: "eager_inv_parent_id" },
+      },
     ];
     registerModel("EagerInvParent", EagerInvParent);
     registerModel("EagerInvChild", EagerInvChild);
@@ -57,13 +68,24 @@ describe("EagerAssociationTest", () => {
   });
   it("loading conditions with or", async () => {
     class EagerOrPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerOrComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_or_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_or_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerOrPost as any)._associations = [
-      { type: "hasMany", name: "eagerOrComments", options: { className: "EagerOrComment", foreignKey: "eager_or_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerOrComments",
+        options: { className: "EagerOrComment", foreignKey: "eager_or_post_id" },
+      },
     ];
     registerModel("EagerOrPost", EagerOrPost);
     registerModel("EagerOrComment", EagerOrComment);
@@ -88,13 +110,24 @@ describe("EagerAssociationTest", () => {
 
   it("loading associations dont leak instance state", async () => {
     class EagerPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerPost as any)._associations = [
-      { type: "hasMany", name: "eagerComments", options: { className: "EagerComment", foreignKey: "eager_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerComments",
+        options: { className: "EagerComment", foreignKey: "eager_post_id" },
+      },
     ];
     registerModel("EagerPost", EagerPost);
     registerModel("EagerComment", EagerComment);
@@ -112,13 +145,24 @@ describe("EagerAssociationTest", () => {
 
   it("with ordering", async () => {
     class EagerOrderPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerOrderComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_order_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_order_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerOrderPost as any)._associations = [
-      { type: "hasMany", name: "eagerOrderComments", options: { className: "EagerOrderComment", foreignKey: "eager_order_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerOrderComments",
+        options: { className: "EagerOrderComment", foreignKey: "eager_order_post_id" },
+      },
     ];
     registerModel("EagerOrderPost", EagerOrderPost);
     registerModel("EagerOrderComment", EagerOrderComment);
@@ -134,20 +178,46 @@ describe("EagerAssociationTest", () => {
   });
   it("has many through with order", async () => {
     class EagerHmtAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtAuthorship extends Base {
-      static { this.attribute("eager_hmt_author_id", "integer"); this.attribute("eager_hmt_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_author_id", "integer");
+        this.attribute("eager_hmt_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtAuthorships", options: { className: "EagerHmtAuthorship", foreignKey: "eager_hmt_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtBooks", options: { through: "eagerHmtAuthorships", source: "eagerHmtBook", className: "EagerHmtBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtAuthorships",
+        options: { className: "EagerHmtAuthorship", foreignKey: "eager_hmt_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtBooks",
+        options: {
+          through: "eagerHmtAuthorships",
+          source: "eagerHmtBook",
+          className: "EagerHmtBook",
+        },
+      },
     ];
     (EagerHmtAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtBook", options: { className: "EagerHmtBook", foreignKey: "eager_hmt_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtBook",
+        options: { className: "EagerHmtBook", foreignKey: "eager_hmt_book_id" },
+      },
     ];
     registerModel("EagerHmtAuthor", EagerHmtAuthor);
     registerModel("EagerHmtAuthorship", EagerHmtAuthorship);
@@ -156,8 +226,14 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtAuthor.create({ name: "Tolkien" });
     const book1 = await EagerHmtBook.create({ title: "LOTR" });
     const book2 = await EagerHmtBook.create({ title: "Hobbit" });
-    await EagerHmtAuthorship.create({ eager_hmt_author_id: author.readAttribute("id"), eager_hmt_book_id: book1.readAttribute("id") });
-    await EagerHmtAuthorship.create({ eager_hmt_author_id: author.readAttribute("id"), eager_hmt_book_id: book2.readAttribute("id") });
+    await EagerHmtAuthorship.create({
+      eager_hmt_author_id: author.readAttribute("id"),
+      eager_hmt_book_id: book1.readAttribute("id"),
+    });
+    await EagerHmtAuthorship.create({
+      eager_hmt_author_id: author.readAttribute("id"),
+      eager_hmt_book_id: book2.readAttribute("id"),
+    });
 
     const books = await loadHasManyThrough(author, "eagerHmtBooks", {
       through: "eagerHmtAuthorships",
@@ -168,19 +244,33 @@ describe("EagerAssociationTest", () => {
   });
   it("eager loaded has one association with references does not run additional queries", async () => {
     class EagerHoRefParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHoRefChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_ho_ref_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_ho_ref_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHoRefParent as any)._associations = [
-      { type: "hasOne", name: "eagerHoRefChild", options: { className: "EagerHoRefChild", foreignKey: "eager_ho_ref_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerHoRefChild",
+        options: { className: "EagerHoRefChild", foreignKey: "eager_ho_ref_parent_id" },
+      },
     ];
     registerModel("EagerHoRefParent", EagerHoRefParent);
     registerModel("EagerHoRefChild", EagerHoRefChild);
 
     const parent = await EagerHoRefParent.create({ name: "P" });
-    await EagerHoRefChild.create({ value: "C", eager_ho_ref_parent_id: parent.readAttribute("id") });
+    await EagerHoRefChild.create({
+      value: "C",
+      eager_ho_ref_parent_id: parent.readAttribute("id"),
+    });
 
     const results = await EagerHoRefParent.all().includes("eagerHoRefChild").toArray();
     expect(results).toHaveLength(1);
@@ -189,19 +279,33 @@ describe("EagerAssociationTest", () => {
   });
   it("eager loaded has one association without primary key", async () => {
     class EagerHoNoPkParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHoNoPkChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_ho_no_pk_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_ho_no_pk_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHoNoPkParent as any)._associations = [
-      { type: "hasOne", name: "eagerHoNoPkChild", options: { className: "EagerHoNoPkChild", foreignKey: "eager_ho_no_pk_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerHoNoPkChild",
+        options: { className: "EagerHoNoPkChild", foreignKey: "eager_ho_no_pk_parent_id" },
+      },
     ];
     registerModel("EagerHoNoPkParent", EagerHoNoPkParent);
     registerModel("EagerHoNoPkChild", EagerHoNoPkChild);
 
     const parent = await EagerHoNoPkParent.create({ name: "P" });
-    await EagerHoNoPkChild.create({ value: "C", eager_ho_no_pk_parent_id: parent.readAttribute("id") });
+    await EagerHoNoPkChild.create({
+      value: "C",
+      eager_ho_no_pk_parent_id: parent.readAttribute("id"),
+    });
 
     const parents = await EagerHoNoPkParent.all().includes("eagerHoNoPkChild").toArray();
     expect(parents).toHaveLength(1);
@@ -210,19 +314,33 @@ describe("EagerAssociationTest", () => {
   });
   it("eager loaded has many association without primary key", async () => {
     class EagerHmNoPkParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmNoPkChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_hm_no_pk_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_hm_no_pk_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmNoPkParent as any)._associations = [
-      { type: "hasMany", name: "eagerHmNoPkChildren", options: { className: "EagerHmNoPkChild", foreignKey: "eager_hm_no_pk_parent_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmNoPkChildren",
+        options: { className: "EagerHmNoPkChild", foreignKey: "eager_hm_no_pk_parent_id" },
+      },
     ];
     registerModel("EagerHmNoPkParent", EagerHmNoPkParent);
     registerModel("EagerHmNoPkChild", EagerHmNoPkChild);
 
     const parent = await EagerHmNoPkParent.create({ name: "P" });
-    await EagerHmNoPkChild.create({ value: "C1", eager_hm_no_pk_parent_id: parent.readAttribute("id") });
+    await EagerHmNoPkChild.create({
+      value: "C1",
+      eager_hm_no_pk_parent_id: parent.readAttribute("id"),
+    });
 
     const parents = await EagerHmNoPkParent.all().includes("eagerHmNoPkChildren").toArray();
     expect(parents).toHaveLength(1);
@@ -235,13 +353,24 @@ describe("EagerAssociationTest", () => {
   it.skip("with two tables in from without getting double quoted", () => {});
   it("duplicate middle objects", async () => {
     class EagerDupParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDupChild extends Base {
-      static { this.attribute("label", "string"); this.attribute("eager_dup_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.attribute("eager_dup_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDupParent as any)._associations = [
-      { type: "hasMany", name: "eagerDupChildren", options: { className: "EagerDupChild", foreignKey: "eager_dup_parent_id" } },
+      {
+        type: "hasMany",
+        name: "eagerDupChildren",
+        options: { className: "EagerDupChild", foreignKey: "eager_dup_parent_id" },
+      },
     ];
     registerModel("EagerDupParent", EagerDupParent);
     registerModel("EagerDupChild", EagerDupChild);
@@ -257,13 +386,24 @@ describe("EagerAssociationTest", () => {
   });
   it("including duplicate objects from belongs to", async () => {
     class EagerDupAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDupPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("eager_dup_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("eager_dup_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDupPost as any)._associations = [
-      { type: "belongsTo", name: "eagerDupAuthor", options: { className: "EagerDupAuthor", foreignKey: "eager_dup_author_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerDupAuthor",
+        options: { className: "EagerDupAuthor", foreignKey: "eager_dup_author_id" },
+      },
     ];
     registerModel("EagerDupAuthor", EagerDupAuthor);
     registerModel("EagerDupPost", EagerDupPost);
@@ -283,13 +423,24 @@ describe("EagerAssociationTest", () => {
 
   it("finding with includes on has many association with same include includes only once", async () => {
     class EagerTag extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_article_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_article_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerArticle extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerArticle as any)._associations = [
-      { type: "hasMany", name: "eagerTags", options: { className: "EagerTag", foreignKey: "eager_article_id" } },
+      {
+        type: "hasMany",
+        name: "eagerTags",
+        options: { className: "EagerTag", foreignKey: "eager_article_id" },
+      },
     ];
     registerModel("EagerTag", EagerTag);
     registerModel("EagerArticle", EagerArticle);
@@ -305,13 +456,24 @@ describe("EagerAssociationTest", () => {
 
   it("finding with includes on has one association with same include includes only once", async () => {
     class EagerHoParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHoChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_ho_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_ho_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHoParent as any)._associations = [
-      { type: "hasOne", name: "eagerHoChild", options: { className: "EagerHoChild", foreignKey: "eager_ho_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerHoChild",
+        options: { className: "EagerHoChild", foreignKey: "eager_ho_parent_id" },
+      },
     ];
     registerModel("EagerHoParent", EagerHoParent);
     registerModel("EagerHoChild", EagerHoChild);
@@ -319,20 +481,34 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerHoParent.create({ name: "P" });
     await EagerHoChild.create({ value: "C", eager_ho_parent_id: parent.readAttribute("id") });
 
-    const results = await EagerHoParent.all().includes("eagerHoChild").includes("eagerHoChild").toArray();
+    const results = await EagerHoParent.all()
+      .includes("eagerHoChild")
+      .includes("eagerHoChild")
+      .toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerHoChild");
     expect(preloaded?.readAttribute("value")).toBe("C");
   });
   it("finding with includes on belongs to association with same include includes only once", async () => {
     class EagerBtParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerBtChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_bt_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_bt_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerBtChild as any)._associations = [
-      { type: "belongsTo", name: "eagerBtParent", options: { className: "EagerBtParent", foreignKey: "eager_bt_parent_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerBtParent",
+        options: { className: "EagerBtParent", foreignKey: "eager_bt_parent_id" },
+      },
     ];
     registerModel("EagerBtParent", EagerBtParent);
     registerModel("EagerBtChild", EagerBtChild);
@@ -340,20 +516,34 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerBtParent.create({ name: "P" });
     await EagerBtChild.create({ value: "C", eager_bt_parent_id: parent.readAttribute("id") });
 
-    const results = await EagerBtChild.all().includes("eagerBtParent").includes("eagerBtParent").toArray();
+    const results = await EagerBtChild.all()
+      .includes("eagerBtParent")
+      .includes("eagerBtParent")
+      .toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerBtParent");
     expect(preloaded?.readAttribute("name")).toBe("P");
   });
   it("finding with includes on null belongs to association with same include includes only once", async () => {
     class EagerNullParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerNullChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_null_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_null_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerNullChild as any)._associations = [
-      { type: "belongsTo", name: "eagerNullParent", options: { className: "EagerNullParent", foreignKey: "eager_null_parent_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerNullParent",
+        options: { className: "EagerNullParent", foreignKey: "eager_null_parent_id" },
+      },
     ];
     registerModel("EagerNullParent", EagerNullParent);
     registerModel("EagerNullChild", EagerNullChild);
@@ -361,20 +551,32 @@ describe("EagerAssociationTest", () => {
     // Child with no parent (null FK)
     await EagerNullChild.create({ value: "orphan", eager_null_parent_id: null });
 
-    const results = await EagerNullChild.all().includes("eagerNullParent").includes("eagerNullParent").toArray();
+    const results = await EagerNullChild.all()
+      .includes("eagerNullParent")
+      .includes("eagerNullParent")
+      .toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerNullParent");
     expect(preloaded == null).toBe(true);
   });
   it("finding with includes on null belongs to polymorphic association", async () => {
     class EagerPolyChild extends Base {
-      static { this.attribute("name", "string"); this.attribute("parent_id", "integer"); this.attribute("parent_type", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent_id", "integer");
+        this.attribute("parent_type", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(EagerPolyChild);
     (EagerPolyChild as any)._associations = [
       { type: "belongsTo", name: "parent", options: { polymorphic: true } },
     ];
-    await EagerPolyChild.create({ name: "orphan", parent_id: null as any, parent_type: null as any });
+    await EagerPolyChild.create({
+      name: "orphan",
+      parent_id: null as any,
+      parent_type: null as any,
+    });
     const results = await EagerPolyChild.all().includes("parent").toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations?.get("parent");
@@ -382,7 +584,12 @@ describe("EagerAssociationTest", () => {
   });
   it("finding with includes on empty polymorphic type column", async () => {
     class EagerPolyChild2 extends Base {
-      static { this.attribute("name", "string"); this.attribute("parent_id", "integer"); this.attribute("parent_type", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent_id", "integer");
+        this.attribute("parent_type", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(EagerPolyChild2);
     (EagerPolyChild2 as any)._associations = [
@@ -397,13 +604,24 @@ describe("EagerAssociationTest", () => {
 
   it("loading from an association", async () => {
     class EagerAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerBook extends Base {
-      static { this.attribute("title", "string"); this.attribute("eager_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("eager_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerBook as any)._associations = [
-      { type: "belongsTo", name: "eagerAuthor", options: { className: "EagerAuthor", foreignKey: "eager_author_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerAuthor",
+        options: { className: "EagerAuthor", foreignKey: "eager_author_id" },
+      },
     ];
     registerModel("EagerAuthor", EagerAuthor);
     registerModel("EagerBook", EagerBook);
@@ -419,7 +637,10 @@ describe("EagerAssociationTest", () => {
 
   it("nested loading does not raise exception when association does not exist", async () => {
     class EagerNlWidget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("EagerNlWidget", EagerNlWidget);
     await EagerNlWidget.create({ name: "W" });
@@ -429,7 +650,10 @@ describe("EagerAssociationTest", () => {
   });
   it("three level nested preloading does not raise exception when association does not exist", async () => {
     class EagerTlWidget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("EagerTlWidget", EagerTlWidget);
     await EagerTlWidget.create({ name: "W" });
@@ -438,13 +662,24 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association", async () => {
     class NestHoAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoPost", options: { className: "NestHoPost", foreignKey: "nest_ho_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoPost",
+        options: { className: "NestHoPost", foreignKey: "nest_ho_author_id" },
+      },
     ];
     registerModel("NestHoAuthor", NestHoAuthor);
     registerModel("NestHoPost", NestHoPost);
@@ -459,19 +694,33 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association with order", async () => {
     class NestHoOrdAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoOrdPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_ord_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_ord_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoOrdAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoOrdPost", options: { className: "NestHoOrdPost", foreignKey: "nest_ho_ord_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoOrdPost",
+        options: { className: "NestHoOrdPost", foreignKey: "nest_ho_ord_author_id" },
+      },
     ];
     registerModel("NestHoOrdAuthor", NestHoOrdAuthor);
     registerModel("NestHoOrdPost", NestHoOrdPost);
 
     const author = await NestHoOrdAuthor.create({ name: "Bob" });
-    await NestHoOrdPost.create({ title: "Only Post", nest_ho_ord_author_id: author.readAttribute("id") });
+    await NestHoOrdPost.create({
+      title: "Only Post",
+      nest_ho_ord_author_id: author.readAttribute("id"),
+    });
 
     const authors = await NestHoOrdAuthor.all().includes("nestHoOrdPost").toArray();
     expect(authors).toHaveLength(1);
@@ -480,19 +729,33 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association with order on association", async () => {
     class NestHoOaAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoOaPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_oa_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_oa_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoOaAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoOaPost", options: { className: "NestHoOaPost", foreignKey: "nest_ho_oa_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoOaPost",
+        options: { className: "NestHoOaPost", foreignKey: "nest_ho_oa_author_id" },
+      },
     ];
     registerModel("NestHoOaAuthor", NestHoOaAuthor);
     registerModel("NestHoOaPost", NestHoOaPost);
 
     const author = await NestHoOaAuthor.create({ name: "Carol" });
-    await NestHoOaPost.create({ title: "Carol Post", nest_ho_oa_author_id: author.readAttribute("id") });
+    await NestHoOaPost.create({
+      title: "Carol Post",
+      nest_ho_oa_author_id: author.readAttribute("id"),
+    });
 
     const authors = await NestHoOaAuthor.all().includes("nestHoOaPost").toArray();
     expect(authors).toHaveLength(1);
@@ -501,19 +764,33 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association with order on nested association", async () => {
     class NestHoOnAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoOnPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_on_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_on_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoOnAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoOnPost", options: { className: "NestHoOnPost", foreignKey: "nest_ho_on_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoOnPost",
+        options: { className: "NestHoOnPost", foreignKey: "nest_ho_on_author_id" },
+      },
     ];
     registerModel("NestHoOnAuthor", NestHoOnAuthor);
     registerModel("NestHoOnPost", NestHoOnPost);
 
     const author = await NestHoOnAuthor.create({ name: "Dave" });
-    await NestHoOnPost.create({ title: "Dave Post", nest_ho_on_author_id: author.readAttribute("id") });
+    await NestHoOnPost.create({
+      title: "Dave Post",
+      nest_ho_on_author_id: author.readAttribute("id"),
+    });
 
     const authors = await NestHoOnAuthor.all().includes("nestHoOnPost").toArray();
     expect(authors).toHaveLength(1);
@@ -522,19 +799,33 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association with conditions", async () => {
     class NestHoCAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoCPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_c_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_c_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoCAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoCPost", options: { className: "NestHoCPost", foreignKey: "nest_ho_c_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoCPost",
+        options: { className: "NestHoCPost", foreignKey: "nest_ho_c_author_id" },
+      },
     ];
     registerModel("NestHoCAuthor", NestHoCAuthor);
     registerModel("NestHoCPost", NestHoCPost);
 
     const author = await NestHoCAuthor.create({ name: "Eve" });
-    await NestHoCPost.create({ title: "Eve Post", nest_ho_c_author_id: author.readAttribute("id") });
+    await NestHoCPost.create({
+      title: "Eve Post",
+      nest_ho_c_author_id: author.readAttribute("id"),
+    });
 
     const authors = await NestHoCAuthor.all().includes("nestHoCPost").toArray();
     expect(authors).toHaveLength(1);
@@ -543,19 +834,33 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association with conditions on association", async () => {
     class NestHoCaAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoCaPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_ca_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_ca_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoCaAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoCaPost", options: { className: "NestHoCaPost", foreignKey: "nest_ho_ca_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoCaPost",
+        options: { className: "NestHoCaPost", foreignKey: "nest_ho_ca_author_id" },
+      },
     ];
     registerModel("NestHoCaAuthor", NestHoCaAuthor);
     registerModel("NestHoCaPost", NestHoCaPost);
 
     const author = await NestHoCaAuthor.create({ name: "Frank" });
-    await NestHoCaPost.create({ title: "Frank Post", nest_ho_ca_author_id: author.readAttribute("id") });
+    await NestHoCaPost.create({
+      title: "Frank Post",
+      nest_ho_ca_author_id: author.readAttribute("id"),
+    });
 
     const authors = await NestHoCaAuthor.all().includes("nestHoCaPost").toArray();
     expect(authors).toHaveLength(1);
@@ -564,19 +869,33 @@ describe("EagerAssociationTest", () => {
   });
   it("nested loading through has one association with conditions on nested association", async () => {
     class NestHoCnAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class NestHoCnPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("nest_ho_cn_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("nest_ho_cn_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (NestHoCnAuthor as any)._associations = [
-      { type: "hasOne", name: "nestHoCnPost", options: { className: "NestHoCnPost", foreignKey: "nest_ho_cn_author_id" } },
+      {
+        type: "hasOne",
+        name: "nestHoCnPost",
+        options: { className: "NestHoCnPost", foreignKey: "nest_ho_cn_author_id" },
+      },
     ];
     registerModel("NestHoCnAuthor", NestHoCnAuthor);
     registerModel("NestHoCnPost", NestHoCnPost);
 
     const author = await NestHoCnAuthor.create({ name: "Grace" });
-    await NestHoCnPost.create({ title: "Grace Post", nest_ho_cn_author_id: author.readAttribute("id") });
+    await NestHoCnPost.create({
+      title: "Grace Post",
+      nest_ho_cn_author_id: author.readAttribute("id"),
+    });
 
     const authors = await NestHoCnAuthor.all().includes("nestHoCnPost").toArray();
     expect(authors).toHaveLength(1);
@@ -586,13 +905,24 @@ describe("EagerAssociationTest", () => {
 
   it("eager association loading with belongs to and foreign keys", async () => {
     class EagerFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerClient as any)._associations = [
-      { type: "belongsTo", name: "eagerFirm", options: { className: "EagerFirm", foreignKey: "firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerFirm",
+        options: { className: "EagerFirm", foreignKey: "firm_id" },
+      },
     ];
     registerModel("EagerFirm", EagerFirm);
     registerModel("EagerClient", EagerClient);
@@ -607,13 +937,24 @@ describe("EagerAssociationTest", () => {
 
   it("eager association loading with belongs to and limit", async () => {
     class EagerLimitFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLimitClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_limit_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_limit_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLimitClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLimitFirm", options: { className: "EagerLimitFirm", foreignKey: "eager_limit_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLimitFirm",
+        options: { className: "EagerLimitFirm", foreignKey: "eager_limit_firm_id" },
+      },
     ];
     registerModel("EagerLimitFirm", EagerLimitFirm);
     registerModel("EagerLimitClient", EagerLimitClient);
@@ -632,13 +973,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager association loading with belongs to and limit and conditions", async () => {
     class EagerLCFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLCClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_lc_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_lc_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLCClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLCFirm", options: { className: "EagerLCFirm", foreignKey: "eager_lc_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLCFirm",
+        options: { className: "EagerLCFirm", foreignKey: "eager_lc_firm_id" },
+      },
     ];
     registerModel("EagerLCFirm", EagerLCFirm);
     registerModel("EagerLCClient", EagerLCClient);
@@ -656,13 +1008,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager association loading with belongs to and limit and offset", async () => {
     class EagerLOFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLOClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_lo_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_lo_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLOClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLOFirm", options: { className: "EagerLOFirm", foreignKey: "eager_lo_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLOFirm",
+        options: { className: "EagerLOFirm", foreignKey: "eager_lo_firm_id" },
+      },
     ];
     registerModel("EagerLOFirm", EagerLOFirm);
     registerModel("EagerLOClient", EagerLOClient);
@@ -681,13 +1044,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager association loading with belongs to and limit and offset and conditions", async () => {
     class EagerLOCFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLOCClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_loc_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_loc_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLOCClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLOCFirm", options: { className: "EagerLOCFirm", foreignKey: "eager_loc_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLOCFirm",
+        options: { className: "EagerLOCFirm", foreignKey: "eager_loc_firm_id" },
+      },
     ];
     registerModel("EagerLOCFirm", EagerLOCFirm);
     registerModel("EagerLOCClient", EagerLOCClient);
@@ -702,13 +1076,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager association loading with belongs to and limit and offset and conditions array", async () => {
     class EagerLOCAFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLOCAClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_loca_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_loca_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLOCAClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLOCAFirm", options: { className: "EagerLOCAFirm", foreignKey: "eager_loca_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLOCAFirm",
+        options: { className: "EagerLOCAFirm", foreignKey: "eager_loca_firm_id" },
+      },
     ];
     registerModel("EagerLOCAFirm", EagerLOCAFirm);
     registerModel("EagerLOCAClient", EagerLOCAClient);
@@ -726,36 +1111,63 @@ describe("EagerAssociationTest", () => {
   });
   it("eager association loading with belongs to and conditions string with unquoted table name", async () => {
     class EagerBtCsuFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerBtCsuClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_bt_csu_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_bt_csu_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerBtCsuClient as any)._associations = [
-      { type: "belongsTo", name: "eagerBtCsuFirm", options: { className: "EagerBtCsuFirm", foreignKey: "eager_bt_csu_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerBtCsuFirm",
+        options: { className: "EagerBtCsuFirm", foreignKey: "eager_bt_csu_firm_id" },
+      },
     ];
     registerModel("EagerBtCsuFirm", EagerBtCsuFirm);
     registerModel("EagerBtCsuClient", EagerBtCsuClient);
     const firm = await EagerBtCsuFirm.create({ name: "Acme" });
     await EagerBtCsuClient.create({ name: "C1", eager_bt_csu_firm_id: firm.readAttribute("id") });
     const clients = await EagerBtCsuClient.all().includes("eagerBtCsuFirm").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsuFirm")?.readAttribute("name")).toBe("Acme");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerBtCsuFirm")?.readAttribute("name"),
+    ).toBe("Acme");
   });
   it("eager association loading with belongs to and conditions hash", async () => {
     class EagerCondCompany extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerCondClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_cond_company_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_cond_company_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerCondClient as any)._associations = [
-      { type: "belongsTo", name: "eagerCondCompany", options: { className: "EagerCondCompany", foreignKey: "eager_cond_company_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerCondCompany",
+        options: { className: "EagerCondCompany", foreignKey: "eager_cond_company_id" },
+      },
     ];
     registerModel("EagerCondCompany", EagerCondCompany);
     registerModel("EagerCondClient", EagerCondClient);
 
     const company = await EagerCondCompany.create({ name: "Acme" });
-    await EagerCondClient.create({ name: "Client1", eager_cond_company_id: company.readAttribute("id") });
+    await EagerCondClient.create({
+      name: "Client1",
+      eager_cond_company_id: company.readAttribute("id"),
+    });
 
     const clients = await EagerCondClient.all().includes("eagerCondCompany").toArray();
     expect(clients).toHaveLength(1);
@@ -764,68 +1176,126 @@ describe("EagerAssociationTest", () => {
   });
   it("eager association loading with belongs to and conditions string with quoted table name", async () => {
     class EagerBtCsqFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerBtCsqClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_bt_csq_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_bt_csq_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerBtCsqClient as any)._associations = [
-      { type: "belongsTo", name: "eagerBtCsqFirm", options: { className: "EagerBtCsqFirm", foreignKey: "eager_bt_csq_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerBtCsqFirm",
+        options: { className: "EagerBtCsqFirm", foreignKey: "eager_bt_csq_firm_id" },
+      },
     ];
     registerModel("EagerBtCsqFirm", EagerBtCsqFirm);
     registerModel("EagerBtCsqClient", EagerBtCsqClient);
     const firm = await EagerBtCsqFirm.create({ name: "Corp" });
     await EagerBtCsqClient.create({ name: "C1", eager_bt_csq_firm_id: firm.readAttribute("id") });
     const clients = await EagerBtCsqClient.all().includes("eagerBtCsqFirm").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsqFirm")?.readAttribute("name")).toBe("Corp");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerBtCsqFirm")?.readAttribute("name"),
+    ).toBe("Corp");
   });
   it("eager association loading with belongs to and order string with unquoted table name", async () => {
     class EagerBtOuFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerBtOuClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_bt_ou_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_bt_ou_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerBtOuClient as any)._associations = [
-      { type: "belongsTo", name: "eagerBtOuFirm", options: { className: "EagerBtOuFirm", foreignKey: "eager_bt_ou_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerBtOuFirm",
+        options: { className: "EagerBtOuFirm", foreignKey: "eager_bt_ou_firm_id" },
+      },
     ];
     registerModel("EagerBtOuFirm", EagerBtOuFirm);
     registerModel("EagerBtOuClient", EagerBtOuClient);
     const firm = await EagerBtOuFirm.create({ name: "Firm" });
     await EagerBtOuClient.create({ name: "C1", eager_bt_ou_firm_id: firm.readAttribute("id") });
     const clients = await EagerBtOuClient.all().includes("eagerBtOuFirm").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerBtOuFirm")?.readAttribute("name")).toBe("Firm");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerBtOuFirm")?.readAttribute("name"),
+    ).toBe("Firm");
   });
   it("eager association loading with belongs to and order string with quoted table name", async () => {
     class EagerBtOqFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerBtOqClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_bt_oq_firm_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_bt_oq_firm_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerBtOqClient as any)._associations = [
-      { type: "belongsTo", name: "eagerBtOqFirm", options: { className: "EagerBtOqFirm", foreignKey: "eager_bt_oq_firm_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerBtOqFirm",
+        options: { className: "EagerBtOqFirm", foreignKey: "eager_bt_oq_firm_id" },
+      },
     ];
     registerModel("EagerBtOqFirm", EagerBtOqFirm);
     registerModel("EagerBtOqClient", EagerBtOqClient);
     const firm = await EagerBtOqFirm.create({ name: "BigCo" });
     await EagerBtOqClient.create({ name: "C1", eager_bt_oq_firm_id: firm.readAttribute("id") });
     const clients = await EagerBtOqClient.all().includes("eagerBtOqFirm").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerBtOqFirm")?.readAttribute("name")).toBe("BigCo");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerBtOqFirm")?.readAttribute("name"),
+    ).toBe("BigCo");
   });
   it("eager association loading with belongs to and limit and multiple associations", async () => {
     class EagerLMAFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLMADept extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLMAClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_lma_firm_id", "integer"); this.attribute("eager_lma_dept_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_lma_firm_id", "integer");
+        this.attribute("eager_lma_dept_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLMAClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLMAFirm", options: { className: "EagerLMAFirm", foreignKey: "eager_lma_firm_id" } },
-      { type: "belongsTo", name: "eagerLMADept", options: { className: "EagerLMADept", foreignKey: "eager_lma_dept_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLMAFirm",
+        options: { className: "EagerLMAFirm", foreignKey: "eager_lma_firm_id" },
+      },
+      {
+        type: "belongsTo",
+        name: "eagerLMADept",
+        options: { className: "EagerLMADept", foreignKey: "eager_lma_dept_id" },
+      },
     ];
     registerModel("EagerLMAFirm", EagerLMAFirm);
     registerModel("EagerLMADept", EagerLMADept);
@@ -833,26 +1303,56 @@ describe("EagerAssociationTest", () => {
 
     const firm = await EagerLMAFirm.create({ name: "Acme" });
     const dept = await EagerLMADept.create({ label: "Sales" });
-    await EagerLMAClient.create({ name: "C1", eager_lma_firm_id: firm.readAttribute("id"), eager_lma_dept_id: dept.readAttribute("id") });
+    await EagerLMAClient.create({
+      name: "C1",
+      eager_lma_firm_id: firm.readAttribute("id"),
+      eager_lma_dept_id: dept.readAttribute("id"),
+    });
 
-    const clients = await EagerLMAClient.all().includes("eagerLMAFirm").includes("eagerLMADept").toArray();
+    const clients = await EagerLMAClient.all()
+      .includes("eagerLMAFirm")
+      .includes("eagerLMADept")
+      .toArray();
     expect(clients).toHaveLength(1);
-    expect((clients[0] as any)._preloadedAssociations.get("eagerLMAFirm")?.readAttribute("name")).toBe("Acme");
-    expect((clients[0] as any)._preloadedAssociations.get("eagerLMADept")?.readAttribute("label")).toBe("Sales");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerLMAFirm")?.readAttribute("name"),
+    ).toBe("Acme");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerLMADept")?.readAttribute("label"),
+    ).toBe("Sales");
   });
   it("eager association loading with belongs to and limit and offset and multiple associations", async () => {
     class EagerLOMFirm extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLOMDept extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLOMClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_lom_firm_id", "integer"); this.attribute("eager_lom_dept_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_lom_firm_id", "integer");
+        this.attribute("eager_lom_dept_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLOMClient as any)._associations = [
-      { type: "belongsTo", name: "eagerLOMFirm", options: { className: "EagerLOMFirm", foreignKey: "eager_lom_firm_id" } },
-      { type: "belongsTo", name: "eagerLOMDept", options: { className: "EagerLOMDept", foreignKey: "eager_lom_dept_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerLOMFirm",
+        options: { className: "EagerLOMFirm", foreignKey: "eager_lom_firm_id" },
+      },
+      {
+        type: "belongsTo",
+        name: "eagerLOMDept",
+        options: { className: "EagerLOMDept", foreignKey: "eager_lom_dept_id" },
+      },
     ];
     registerModel("EagerLOMFirm", EagerLOMFirm);
     registerModel("EagerLOMDept", EagerLOMDept);
@@ -860,32 +1360,65 @@ describe("EagerAssociationTest", () => {
 
     const firm = await EagerLOMFirm.create({ name: "Corp" });
     const dept = await EagerLOMDept.create({ label: "Engineering" });
-    await EagerLOMClient.create({ name: "C1", eager_lom_firm_id: firm.readAttribute("id"), eager_lom_dept_id: dept.readAttribute("id") });
-    await EagerLOMClient.create({ name: "C2", eager_lom_firm_id: firm.readAttribute("id"), eager_lom_dept_id: dept.readAttribute("id") });
-    await EagerLOMClient.create({ name: "C3", eager_lom_firm_id: firm.readAttribute("id"), eager_lom_dept_id: dept.readAttribute("id") });
+    await EagerLOMClient.create({
+      name: "C1",
+      eager_lom_firm_id: firm.readAttribute("id"),
+      eager_lom_dept_id: dept.readAttribute("id"),
+    });
+    await EagerLOMClient.create({
+      name: "C2",
+      eager_lom_firm_id: firm.readAttribute("id"),
+      eager_lom_dept_id: dept.readAttribute("id"),
+    });
+    await EagerLOMClient.create({
+      name: "C3",
+      eager_lom_firm_id: firm.readAttribute("id"),
+      eager_lom_dept_id: dept.readAttribute("id"),
+    });
 
-    const clients = await EagerLOMClient.all().includes("eagerLOMFirm").includes("eagerLOMDept").toArray();
+    const clients = await EagerLOMClient.all()
+      .includes("eagerLOMFirm")
+      .includes("eagerLOMDept")
+      .toArray();
     expect(clients).toHaveLength(3);
     for (const client of clients) {
-      expect((client as any)._preloadedAssociations.get("eagerLOMFirm")?.readAttribute("name")).toBe("Corp");
-      expect((client as any)._preloadedAssociations.get("eagerLOMDept")?.readAttribute("label")).toBe("Engineering");
+      expect(
+        (client as any)._preloadedAssociations.get("eagerLOMFirm")?.readAttribute("name"),
+      ).toBe("Corp");
+      expect(
+        (client as any)._preloadedAssociations.get("eagerLOMDept")?.readAttribute("label"),
+      ).toBe("Engineering");
     }
   });
   it("eager association loading with belongs to inferred foreign key from association name", async () => {
     class EagerInferredCompany extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerInferredEmployee extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_inferred_company_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_inferred_company_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerInferredEmployee as any)._associations = [
-      { type: "belongsTo", name: "eagerInferredCompany", options: { className: "EagerInferredCompany", foreignKey: "eager_inferred_company_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerInferredCompany",
+        options: { className: "EagerInferredCompany", foreignKey: "eager_inferred_company_id" },
+      },
     ];
     registerModel("EagerInferredCompany", EagerInferredCompany);
     registerModel("EagerInferredEmployee", EagerInferredEmployee);
 
     const company = await EagerInferredCompany.create({ name: "Acme" });
-    await EagerInferredEmployee.create({ name: "Alice", eager_inferred_company_id: company.readAttribute("id") });
+    await EagerInferredEmployee.create({
+      name: "Alice",
+      eager_inferred_company_id: company.readAttribute("id"),
+    });
 
     const employees = await EagerInferredEmployee.all().includes("eagerInferredCompany").toArray();
     expect(employees).toHaveLength(1);
@@ -894,47 +1427,84 @@ describe("EagerAssociationTest", () => {
   });
   it("eager load belongs to quotes table and column names", async () => {
     class EagerQtCompany extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerQtClient extends Base {
-      static { this.attribute("name", "string"); this.attribute("eager_qt_company_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_qt_company_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerQtClient as any)._associations = [
-      { type: "belongsTo", name: "eagerQtCompany", options: { className: "EagerQtCompany", foreignKey: "eager_qt_company_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerQtCompany",
+        options: { className: "EagerQtCompany", foreignKey: "eager_qt_company_id" },
+      },
     ];
     registerModel("EagerQtCompany", EagerQtCompany);
     registerModel("EagerQtClient", EagerQtClient);
     const co = await EagerQtCompany.create({ name: "Acme" });
     await EagerQtClient.create({ name: "C1", eager_qt_company_id: co.readAttribute("id") });
     const clients = await EagerQtClient.all().includes("eagerQtCompany").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerQtCompany")?.readAttribute("name")).toBe("Acme");
+    expect(
+      (clients[0] as any)._preloadedAssociations.get("eagerQtCompany")?.readAttribute("name"),
+    ).toBe("Acme");
   });
   it("eager load has one quotes table and column names", async () => {
     class EagerQtHoParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerQtHoChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_qt_ho_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_qt_ho_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerQtHoParent as any)._associations = [
-      { type: "hasOne", name: "eagerQtHoChild", options: { className: "EagerQtHoChild", foreignKey: "eager_qt_ho_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerQtHoChild",
+        options: { className: "EagerQtHoChild", foreignKey: "eager_qt_ho_parent_id" },
+      },
     ];
     registerModel("EagerQtHoParent", EagerQtHoParent);
     registerModel("EagerQtHoChild", EagerQtHoChild);
     const p = await EagerQtHoParent.create({ name: "P" });
     await EagerQtHoChild.create({ value: "V", eager_qt_ho_parent_id: p.readAttribute("id") });
     const parents = await EagerQtHoParent.all().includes("eagerQtHoChild").toArray();
-    expect((parents[0] as any)._preloadedAssociations.get("eagerQtHoChild")?.readAttribute("value")).toBe("V");
+    expect(
+      (parents[0] as any)._preloadedAssociations.get("eagerQtHoChild")?.readAttribute("value"),
+    ).toBe("V");
   });
   it("eager load has many quotes table and column names", async () => {
     class EagerQtHmParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerQtHmChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_qt_hm_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_qt_hm_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerQtHmParent as any)._associations = [
-      { type: "hasMany", name: "eagerQtHmChildren", options: { className: "EagerQtHmChild", foreignKey: "eager_qt_hm_parent_id" } },
+      {
+        type: "hasMany",
+        name: "eagerQtHmChildren",
+        options: { className: "EagerQtHmChild", foreignKey: "eager_qt_hm_parent_id" },
+      },
     ];
     registerModel("EagerQtHmParent", EagerQtHmParent);
     registerModel("EagerQtHmChild", EagerQtHmChild);
@@ -945,39 +1515,79 @@ describe("EagerAssociationTest", () => {
   });
   it("eager load has many through quotes table and column names", async () => {
     class EagerQtThrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerQtThrJoin extends Base {
-      static { this.attribute("eager_qt_thr_owner_id", "integer"); this.attribute("eager_qt_thr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_qt_thr_owner_id", "integer");
+        this.attribute("eager_qt_thr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerQtThrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerQtThrOwner as any)._associations = [
-      { type: "hasMany", name: "eagerQtThrJoins", options: { className: "EagerQtThrJoin", foreignKey: "eager_qt_thr_owner_id" } },
-      { type: "hasMany", name: "eagerQtThrItems", options: { className: "EagerQtThrItem", through: "eagerQtThrJoins", source: "eagerQtThrItem" } },
+      {
+        type: "hasMany",
+        name: "eagerQtThrJoins",
+        options: { className: "EagerQtThrJoin", foreignKey: "eager_qt_thr_owner_id" },
+      },
+      {
+        type: "hasMany",
+        name: "eagerQtThrItems",
+        options: {
+          className: "EagerQtThrItem",
+          through: "eagerQtThrJoins",
+          source: "eagerQtThrItem",
+        },
+      },
     ];
     (EagerQtThrJoin as any)._associations = [
-      { type: "belongsTo", name: "eagerQtThrItem", options: { className: "EagerQtThrItem", foreignKey: "eager_qt_thr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerQtThrItem",
+        options: { className: "EagerQtThrItem", foreignKey: "eager_qt_thr_item_id" },
+      },
     ];
     registerModel("EagerQtThrOwner", EagerQtThrOwner);
     registerModel("EagerQtThrJoin", EagerQtThrJoin);
     registerModel("EagerQtThrItem", EagerQtThrItem);
     const owner = await EagerQtThrOwner.create({ name: "O" });
     const item = await EagerQtThrItem.create({ label: "I1" });
-    await EagerQtThrJoin.create({ eager_qt_thr_owner_id: owner.readAttribute("id"), eager_qt_thr_item_id: item.readAttribute("id") });
+    await EagerQtThrJoin.create({
+      eager_qt_thr_owner_id: owner.readAttribute("id"),
+      eager_qt_thr_item_id: item.readAttribute("id"),
+    });
     const owners = await EagerQtThrOwner.all().includes("eagerQtThrItems").toArray();
     expect((owners[0] as any)._preloadedAssociations.get("eagerQtThrItems")).toHaveLength(1);
   });
   it("eager load has many with string keys", async () => {
     class EagerStrParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerStrChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_str_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_str_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerStrParent as any)._associations = [
-      { type: "hasMany", name: "eagerStrChildren", options: { className: "EagerStrChild", foreignKey: "eager_str_parent_id" } },
+      {
+        type: "hasMany",
+        name: "eagerStrChildren",
+        options: { className: "EagerStrChild", foreignKey: "eager_str_parent_id" },
+      },
     ];
     registerModel("EagerStrParent", EagerStrParent);
     registerModel("EagerStrChild", EagerStrChild);
@@ -993,20 +1603,46 @@ describe("EagerAssociationTest", () => {
   it.skip("string id column joins", () => {});
   it("eager load has many through with string keys", async () => {
     class EagerStrThrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerStrThrJoin extends Base {
-      static { this.attribute("eager_str_thr_owner_id", "integer"); this.attribute("eager_str_thr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_str_thr_owner_id", "integer");
+        this.attribute("eager_str_thr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerStrThrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerStrThrOwner as any)._associations = [
-      { type: "hasMany", name: "eagerStrThrJoins", options: { className: "EagerStrThrJoin", foreignKey: "eager_str_thr_owner_id" } },
-      { type: "hasManyThrough", name: "eagerStrThrItems", options: { through: "eagerStrThrJoins", source: "eagerStrThrItem", className: "EagerStrThrItem" } },
+      {
+        type: "hasMany",
+        name: "eagerStrThrJoins",
+        options: { className: "EagerStrThrJoin", foreignKey: "eager_str_thr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerStrThrItems",
+        options: {
+          through: "eagerStrThrJoins",
+          source: "eagerStrThrItem",
+          className: "EagerStrThrItem",
+        },
+      },
     ];
     (EagerStrThrJoin as any)._associations = [
-      { type: "belongsTo", name: "eagerStrThrItem", options: { className: "EagerStrThrItem", foreignKey: "eager_str_thr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerStrThrItem",
+        options: { className: "EagerStrThrItem", foreignKey: "eager_str_thr_item_id" },
+      },
     ];
     registerModel("EagerStrThrOwner", EagerStrThrOwner);
     registerModel("EagerStrThrJoin", EagerStrThrJoin);
@@ -1014,7 +1650,10 @@ describe("EagerAssociationTest", () => {
 
     const owner = await EagerStrThrOwner.create({ name: "O" });
     const item = await EagerStrThrItem.create({ label: "I" });
-    await EagerStrThrJoin.create({ eager_str_thr_owner_id: owner.readAttribute("id"), eager_str_thr_item_id: item.readAttribute("id") });
+    await EagerStrThrJoin.create({
+      eager_str_thr_owner_id: owner.readAttribute("id"),
+      eager_str_thr_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "eagerStrThrItems", {
       through: "eagerStrThrJoins",
@@ -1026,19 +1665,33 @@ describe("EagerAssociationTest", () => {
   });
   it("eager load belongs to with string keys", async () => {
     class EagerStrBtParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerStrBtChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_str_bt_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_str_bt_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerStrBtChild as any)._associations = [
-      { type: "belongsTo", name: "eagerStrBtParent", options: { className: "EagerStrBtParent", foreignKey: "eager_str_bt_parent_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerStrBtParent",
+        options: { className: "EagerStrBtParent", foreignKey: "eager_str_bt_parent_id" },
+      },
     ];
     registerModel("EagerStrBtParent", EagerStrBtParent);
     registerModel("EagerStrBtChild", EagerStrBtChild);
 
     const parent = await EagerStrBtParent.create({ name: "P" });
-    await EagerStrBtChild.create({ value: "C", eager_str_bt_parent_id: parent.readAttribute("id") });
+    await EagerStrBtChild.create({
+      value: "C",
+      eager_str_bt_parent_id: parent.readAttribute("id"),
+    });
 
     const children = await EagerStrBtChild.all().includes("eagerStrBtParent").toArray();
     expect(children).toHaveLength(1);
@@ -1048,20 +1701,46 @@ describe("EagerAssociationTest", () => {
   it.skip("eager association loading with explicit join", () => {});
   it("eager with has many through", async () => {
     class EagerHmtReader extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtSubscription extends Base {
-      static { this.attribute("eager_hmt_reader_id", "integer"); this.attribute("eager_hmt_magazine_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_reader_id", "integer");
+        this.attribute("eager_hmt_magazine_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtMagazine extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtReader as any)._associations = [
-      { type: "hasMany", name: "eagerHmtSubscriptions", options: { className: "EagerHmtSubscription", foreignKey: "eager_hmt_reader_id" } },
-      { type: "hasManyThrough", name: "eagerHmtMagazines", options: { through: "eagerHmtSubscriptions", source: "eagerHmtMagazine", className: "EagerHmtMagazine" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtSubscriptions",
+        options: { className: "EagerHmtSubscription", foreignKey: "eager_hmt_reader_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtMagazines",
+        options: {
+          through: "eagerHmtSubscriptions",
+          source: "eagerHmtMagazine",
+          className: "EagerHmtMagazine",
+        },
+      },
     ];
     (EagerHmtSubscription as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtMagazine", options: { className: "EagerHmtMagazine", foreignKey: "eager_hmt_magazine_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtMagazine",
+        options: { className: "EagerHmtMagazine", foreignKey: "eager_hmt_magazine_id" },
+      },
     ];
     registerModel("EagerHmtReader", EagerHmtReader);
     registerModel("EagerHmtSubscription", EagerHmtSubscription);
@@ -1070,8 +1749,14 @@ describe("EagerAssociationTest", () => {
     const reader = await EagerHmtReader.create({ name: "Alice" });
     const mag1 = await EagerHmtMagazine.create({ title: "Wired" });
     const mag2 = await EagerHmtMagazine.create({ title: "Time" });
-    await EagerHmtSubscription.create({ eager_hmt_reader_id: reader.readAttribute("id"), eager_hmt_magazine_id: mag1.readAttribute("id") });
-    await EagerHmtSubscription.create({ eager_hmt_reader_id: reader.readAttribute("id"), eager_hmt_magazine_id: mag2.readAttribute("id") });
+    await EagerHmtSubscription.create({
+      eager_hmt_reader_id: reader.readAttribute("id"),
+      eager_hmt_magazine_id: mag1.readAttribute("id"),
+    });
+    await EagerHmtSubscription.create({
+      eager_hmt_reader_id: reader.readAttribute("id"),
+      eager_hmt_magazine_id: mag2.readAttribute("id"),
+    });
 
     const mags = await loadHasManyThrough(reader, "eagerHmtMagazines", {
       through: "eagerHmtSubscriptions",
@@ -1082,39 +1767,81 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many through a belongs to association", async () => {
     class EagerHmtBtAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtBtPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("eager_hmt_bt_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("eager_hmt_bt_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtBtComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hmt_bt_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hmt_bt_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtBtAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtBtPosts", options: { className: "EagerHmtBtPost", foreignKey: "eager_hmt_bt_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtBtComments", options: { through: "eagerHmtBtPosts", source: "eagerHmtBtComment", className: "EagerHmtBtComment" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtBtPosts",
+        options: { className: "EagerHmtBtPost", foreignKey: "eager_hmt_bt_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtBtComments",
+        options: {
+          through: "eagerHmtBtPosts",
+          source: "eagerHmtBtComment",
+          className: "EagerHmtBtComment",
+        },
+      },
     ];
     (EagerHmtBtPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmtBtComment", options: { className: "EagerHmtBtComment", foreignKey: "eager_hmt_bt_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtBtComment",
+        options: { className: "EagerHmtBtComment", foreignKey: "eager_hmt_bt_post_id" },
+      },
     ];
     registerModel("EagerHmtBtAuthor", EagerHmtBtAuthor);
     registerModel("EagerHmtBtPost", EagerHmtBtPost);
     registerModel("EagerHmtBtComment", EagerHmtBtComment);
 
     const author = await EagerHmtBtAuthor.create({ name: "Bob" });
-    const post = await EagerHmtBtPost.create({ title: "Hello", eager_hmt_bt_author_id: author.readAttribute("id") });
-    await EagerHmtBtComment.create({ body: "Great", eager_hmt_bt_post_id: post.readAttribute("id") });
+    const post = await EagerHmtBtPost.create({
+      title: "Hello",
+      eager_hmt_bt_author_id: author.readAttribute("id"),
+    });
+    await EagerHmtBtComment.create({
+      body: "Great",
+      eager_hmt_bt_post_id: post.readAttribute("id"),
+    });
 
-    const posts = await loadHasMany(author, "eagerHmtBtPosts", { className: "EagerHmtBtPost", foreignKey: "eager_hmt_bt_author_id" });
+    const posts = await loadHasMany(author, "eagerHmtBtPosts", {
+      className: "EagerHmtBtPost",
+      foreignKey: "eager_hmt_bt_author_id",
+    });
     expect(posts).toHaveLength(1);
-    const comments = await loadHasMany(posts[0], "eagerHmtBtComment", { className: "EagerHmtBtComment", foreignKey: "eager_hmt_bt_post_id" });
+    const comments = await loadHasMany(posts[0], "eagerHmtBtComment", {
+      className: "EagerHmtBtComment",
+      foreignKey: "eager_hmt_bt_post_id",
+    });
     expect(comments).toHaveLength(1);
     expect(comments[0].readAttribute("body")).toBe("Great");
   });
   it("eager with has many through an sti join model", async () => {
     // Author -> SpecialPost (STI) -> Comments (through)
     class EagerStiAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerStiPost extends Base {
       static {
@@ -1127,25 +1854,55 @@ describe("EagerAssociationTest", () => {
       }
     }
     class EagerSpecialPost extends EagerStiPost {
-      static { this.adapter = adapter; registerModel(EagerSpecialPost); registerSubclass(EagerSpecialPost); }
+      static {
+        this.adapter = adapter;
+        registerModel(EagerSpecialPost);
+        registerSubclass(EagerSpecialPost);
+      }
     }
     class EagerStiComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_sti_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_sti_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    registerModel(EagerStiAuthor); registerModel(EagerStiPost); registerModel(EagerStiComment);
+    registerModel(EagerStiAuthor);
+    registerModel(EagerStiPost);
+    registerModel(EagerStiComment);
     (EagerStiAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerSpecialPosts", options: { className: "EagerSpecialPost", foreignKey: "eager_sti_author_id" } },
-      { type: "hasMany", name: "specialPostComments", options: {
-        className: "EagerStiComment", through: "eagerSpecialPosts", source: "eagerStiComment",
-      }},
+      {
+        type: "hasMany",
+        name: "eagerSpecialPosts",
+        options: { className: "EagerSpecialPost", foreignKey: "eager_sti_author_id" },
+      },
+      {
+        type: "hasMany",
+        name: "specialPostComments",
+        options: {
+          className: "EagerStiComment",
+          through: "eagerSpecialPosts",
+          source: "eagerStiComment",
+        },
+      },
     ];
     (EagerSpecialPost as any)._associations = [
-      { type: "hasMany", name: "eagerStiComment", options: { className: "EagerStiComment", foreignKey: "eager_sti_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerStiComment",
+        options: { className: "EagerStiComment", foreignKey: "eager_sti_post_id" },
+      },
     ];
 
     const author = await EagerStiAuthor.create({ name: "David" });
-    const normalPost = await EagerStiPost.create({ title: "Normal", eager_sti_author_id: author.id });
-    const specialPost = await EagerSpecialPost.create({ title: "Special", eager_sti_author_id: author.id });
+    const normalPost = await EagerStiPost.create({
+      title: "Normal",
+      eager_sti_author_id: author.id,
+    });
+    const specialPost = await EagerSpecialPost.create({
+      title: "Special",
+      eager_sti_author_id: author.id,
+    });
     await EagerStiComment.create({ body: "on normal", eager_sti_post_id: normalPost.id });
     await EagerStiComment.create({ body: "does it hurt", eager_sti_post_id: specialPost.id });
 
@@ -1157,47 +1914,102 @@ describe("EagerAssociationTest", () => {
   it.skip("preloading with has one through an sti with after initialize", () => {});
   it("preloading has many through with implicit source", async () => {
     class EagerImpOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerImpJoin extends Base {
-      static { this.attribute("eager_imp_owner_id", "integer"); this.attribute("eager_imp_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_imp_owner_id", "integer");
+        this.attribute("eager_imp_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerImpItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerImpOwner as any)._associations = [
-      { type: "hasMany", name: "eagerImpJoins", options: { className: "EagerImpJoin", foreignKey: "eager_imp_owner_id" } },
-      { type: "hasMany", name: "eagerImpItems", options: { className: "EagerImpItem", through: "eagerImpJoins", source: "eagerImpItem" } },
+      {
+        type: "hasMany",
+        name: "eagerImpJoins",
+        options: { className: "EagerImpJoin", foreignKey: "eager_imp_owner_id" },
+      },
+      {
+        type: "hasMany",
+        name: "eagerImpItems",
+        options: { className: "EagerImpItem", through: "eagerImpJoins", source: "eagerImpItem" },
+      },
     ];
     (EagerImpJoin as any)._associations = [
-      { type: "belongsTo", name: "eagerImpItem", options: { className: "EagerImpItem", foreignKey: "eager_imp_item_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerImpItem",
+        options: { className: "EagerImpItem", foreignKey: "eager_imp_item_id" },
+      },
     ];
     registerModel("EagerImpOwner", EagerImpOwner);
     registerModel("EagerImpJoin", EagerImpJoin);
     registerModel("EagerImpItem", EagerImpItem);
     const owner = await EagerImpOwner.create({ name: "O" });
     const item = await EagerImpItem.create({ label: "I" });
-    await EagerImpJoin.create({ eager_imp_owner_id: owner.readAttribute("id"), eager_imp_item_id: item.readAttribute("id") });
-    const items = await loadHasManyThrough(owner, "eagerImpItems", { through: "eagerImpJoins", source: "eagerImpItem", className: "EagerImpItem" });
+    await EagerImpJoin.create({
+      eager_imp_owner_id: owner.readAttribute("id"),
+      eager_imp_item_id: item.readAttribute("id"),
+    });
+    const items = await loadHasManyThrough(owner, "eagerImpItems", {
+      through: "eagerImpJoins",
+      source: "eagerImpItem",
+      className: "EagerImpItem",
+    });
     expect(items).toHaveLength(1);
   });
   it.skip("eager with has many through an sti join model with conditions on both", () => {});
   it("eager with has many through join model with conditions", async () => {
     class EagerHmtCondAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtCondAuthorship extends Base {
-      static { this.attribute("eager_hmt_cond_author_id", "integer"); this.attribute("eager_hmt_cond_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_cond_author_id", "integer");
+        this.attribute("eager_hmt_cond_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtCondBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtCondAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtCondAuthorships", options: { className: "EagerHmtCondAuthorship", foreignKey: "eager_hmt_cond_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtCondBooks", options: { through: "eagerHmtCondAuthorships", source: "eagerHmtCondBook", className: "EagerHmtCondBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtCondAuthorships",
+        options: { className: "EagerHmtCondAuthorship", foreignKey: "eager_hmt_cond_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtCondBooks",
+        options: {
+          through: "eagerHmtCondAuthorships",
+          source: "eagerHmtCondBook",
+          className: "EagerHmtCondBook",
+        },
+      },
     ];
     (EagerHmtCondAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtCondBook", options: { className: "EagerHmtCondBook", foreignKey: "eager_hmt_cond_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtCondBook",
+        options: { className: "EagerHmtCondBook", foreignKey: "eager_hmt_cond_book_id" },
+      },
     ];
     registerModel("EagerHmtCondAuthor", EagerHmtCondAuthor);
     registerModel("EagerHmtCondAuthorship", EagerHmtCondAuthorship);
@@ -1206,8 +2018,14 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtCondAuthor.create({ name: "Author1" });
     const book1 = await EagerHmtCondBook.create({ title: "Book1" });
     const book2 = await EagerHmtCondBook.create({ title: "Book2" });
-    await EagerHmtCondAuthorship.create({ eager_hmt_cond_author_id: author.readAttribute("id"), eager_hmt_cond_book_id: book1.readAttribute("id") });
-    await EagerHmtCondAuthorship.create({ eager_hmt_cond_author_id: author.readAttribute("id"), eager_hmt_cond_book_id: book2.readAttribute("id") });
+    await EagerHmtCondAuthorship.create({
+      eager_hmt_cond_author_id: author.readAttribute("id"),
+      eager_hmt_cond_book_id: book1.readAttribute("id"),
+    });
+    await EagerHmtCondAuthorship.create({
+      eager_hmt_cond_author_id: author.readAttribute("id"),
+      eager_hmt_cond_book_id: book2.readAttribute("id"),
+    });
 
     const books = await loadHasManyThrough(author, "eagerHmtCondBooks", {
       through: "eagerHmtCondAuthorships",
@@ -1218,20 +2036,46 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many through join model with conditions on top level", async () => {
     class EagerHmtTopAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtTopAuthorship extends Base {
-      static { this.attribute("eager_hmt_top_author_id", "integer"); this.attribute("eager_hmt_top_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_top_author_id", "integer");
+        this.attribute("eager_hmt_top_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtTopBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtTopAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtTopAuthorships", options: { className: "EagerHmtTopAuthorship", foreignKey: "eager_hmt_top_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtTopBooks", options: { through: "eagerHmtTopAuthorships", source: "eagerHmtTopBook", className: "EagerHmtTopBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtTopAuthorships",
+        options: { className: "EagerHmtTopAuthorship", foreignKey: "eager_hmt_top_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtTopBooks",
+        options: {
+          through: "eagerHmtTopAuthorships",
+          source: "eagerHmtTopBook",
+          className: "EagerHmtTopBook",
+        },
+      },
     ];
     (EagerHmtTopAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtTopBook", options: { className: "EagerHmtTopBook", foreignKey: "eager_hmt_top_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtTopBook",
+        options: { className: "EagerHmtTopBook", foreignKey: "eager_hmt_top_book_id" },
+      },
     ];
     registerModel("EagerHmtTopAuthor", EagerHmtTopAuthor);
     registerModel("EagerHmtTopAuthorship", EagerHmtTopAuthorship);
@@ -1240,8 +2084,14 @@ describe("EagerAssociationTest", () => {
     const a1 = await EagerHmtTopAuthor.create({ name: "A1" });
     const a2 = await EagerHmtTopAuthor.create({ name: "A2" });
     const book = await EagerHmtTopBook.create({ title: "Shared" });
-    await EagerHmtTopAuthorship.create({ eager_hmt_top_author_id: a1.readAttribute("id"), eager_hmt_top_book_id: book.readAttribute("id") });
-    await EagerHmtTopAuthorship.create({ eager_hmt_top_author_id: a2.readAttribute("id"), eager_hmt_top_book_id: book.readAttribute("id") });
+    await EagerHmtTopAuthorship.create({
+      eager_hmt_top_author_id: a1.readAttribute("id"),
+      eager_hmt_top_book_id: book.readAttribute("id"),
+    });
+    await EagerHmtTopAuthorship.create({
+      eager_hmt_top_author_id: a2.readAttribute("id"),
+      eager_hmt_top_book_id: book.readAttribute("id"),
+    });
 
     const books1 = await loadHasManyThrough(a1, "eagerHmtTopBooks", {
       through: "eagerHmtTopAuthorships",
@@ -1258,20 +2108,46 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many through join model with include", async () => {
     class EagerHmtIncAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtIncAuthorship extends Base {
-      static { this.attribute("eager_hmt_inc_author_id", "integer"); this.attribute("eager_hmt_inc_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_inc_author_id", "integer");
+        this.attribute("eager_hmt_inc_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtIncBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtIncAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtIncAuthorships", options: { className: "EagerHmtIncAuthorship", foreignKey: "eager_hmt_inc_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtIncBooks", options: { through: "eagerHmtIncAuthorships", source: "eagerHmtIncBook", className: "EagerHmtIncBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtIncAuthorships",
+        options: { className: "EagerHmtIncAuthorship", foreignKey: "eager_hmt_inc_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtIncBooks",
+        options: {
+          through: "eagerHmtIncAuthorships",
+          source: "eagerHmtIncBook",
+          className: "EagerHmtIncBook",
+        },
+      },
     ];
     (EagerHmtIncAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtIncBook", options: { className: "EagerHmtIncBook", foreignKey: "eager_hmt_inc_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtIncBook",
+        options: { className: "EagerHmtIncBook", foreignKey: "eager_hmt_inc_book_id" },
+      },
     ];
     registerModel("EagerHmtIncAuthor", EagerHmtIncAuthor);
     registerModel("EagerHmtIncAuthorship", EagerHmtIncAuthorship);
@@ -1280,8 +2156,14 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtIncAuthor.create({ name: "Author1" });
     const book1 = await EagerHmtIncBook.create({ title: "Book1" });
     const book2 = await EagerHmtIncBook.create({ title: "Book2" });
-    await EagerHmtIncAuthorship.create({ eager_hmt_inc_author_id: author.readAttribute("id"), eager_hmt_inc_book_id: book1.readAttribute("id") });
-    await EagerHmtIncAuthorship.create({ eager_hmt_inc_author_id: author.readAttribute("id"), eager_hmt_inc_book_id: book2.readAttribute("id") });
+    await EagerHmtIncAuthorship.create({
+      eager_hmt_inc_author_id: author.readAttribute("id"),
+      eager_hmt_inc_book_id: book1.readAttribute("id"),
+    });
+    await EagerHmtIncAuthorship.create({
+      eager_hmt_inc_author_id: author.readAttribute("id"),
+      eager_hmt_inc_book_id: book2.readAttribute("id"),
+    });
 
     const books = await loadHasManyThrough(author, "eagerHmtIncBooks", {
       through: "eagerHmtIncAuthorships",
@@ -1295,20 +2177,46 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many through with conditions join model with include", async () => {
     class EagerHmtCjAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtCjAuthorship extends Base {
-      static { this.attribute("eager_hmt_cj_author_id", "integer"); this.attribute("eager_hmt_cj_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_cj_author_id", "integer");
+        this.attribute("eager_hmt_cj_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtCjBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtCjAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtCjAuthorships", options: { className: "EagerHmtCjAuthorship", foreignKey: "eager_hmt_cj_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtCjBooks", options: { through: "eagerHmtCjAuthorships", source: "eagerHmtCjBook", className: "EagerHmtCjBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtCjAuthorships",
+        options: { className: "EagerHmtCjAuthorship", foreignKey: "eager_hmt_cj_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtCjBooks",
+        options: {
+          through: "eagerHmtCjAuthorships",
+          source: "eagerHmtCjBook",
+          className: "EagerHmtCjBook",
+        },
+      },
     ];
     (EagerHmtCjAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtCjBook", options: { className: "EagerHmtCjBook", foreignKey: "eager_hmt_cj_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtCjBook",
+        options: { className: "EagerHmtCjBook", foreignKey: "eager_hmt_cj_book_id" },
+      },
     ];
     registerModel("EagerHmtCjAuthor", EagerHmtCjAuthor);
     registerModel("EagerHmtCjAuthorship", EagerHmtCjAuthorship);
@@ -1316,7 +2224,10 @@ describe("EagerAssociationTest", () => {
 
     const author = await EagerHmtCjAuthor.create({ name: "A" });
     const book = await EagerHmtCjBook.create({ title: "B" });
-    await EagerHmtCjAuthorship.create({ eager_hmt_cj_author_id: author.readAttribute("id"), eager_hmt_cj_book_id: book.readAttribute("id") });
+    await EagerHmtCjAuthorship.create({
+      eager_hmt_cj_author_id: author.readAttribute("id"),
+      eager_hmt_cj_book_id: book.readAttribute("id"),
+    });
 
     const books = await loadHasManyThrough(author, "eagerHmtCjBooks", {
       through: "eagerHmtCjAuthorships",
@@ -1328,20 +2239,46 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many through join model ignores default includes", async () => {
     class EagerHmtDiAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtDiAuthorship extends Base {
-      static { this.attribute("eager_hmt_di_author_id", "integer"); this.attribute("eager_hmt_di_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_di_author_id", "integer");
+        this.attribute("eager_hmt_di_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtDiBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtDiAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtDiAuthorships", options: { className: "EagerHmtDiAuthorship", foreignKey: "eager_hmt_di_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtDiBooks", options: { through: "eagerHmtDiAuthorships", source: "eagerHmtDiBook", className: "EagerHmtDiBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtDiAuthorships",
+        options: { className: "EagerHmtDiAuthorship", foreignKey: "eager_hmt_di_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtDiBooks",
+        options: {
+          through: "eagerHmtDiAuthorships",
+          source: "eagerHmtDiBook",
+          className: "EagerHmtDiBook",
+        },
+      },
     ];
     (EagerHmtDiAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtDiBook", options: { className: "EagerHmtDiBook", foreignKey: "eager_hmt_di_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtDiBook",
+        options: { className: "EagerHmtDiBook", foreignKey: "eager_hmt_di_book_id" },
+      },
     ];
     registerModel("EagerHmtDiAuthor", EagerHmtDiAuthor);
     registerModel("EagerHmtDiAuthorship", EagerHmtDiAuthorship);
@@ -1349,7 +2286,10 @@ describe("EagerAssociationTest", () => {
 
     const author = await EagerHmtDiAuthor.create({ name: "A" });
     const book = await EagerHmtDiBook.create({ title: "B" });
-    await EagerHmtDiAuthorship.create({ eager_hmt_di_author_id: author.readAttribute("id"), eager_hmt_di_book_id: book.readAttribute("id") });
+    await EagerHmtDiAuthorship.create({
+      eager_hmt_di_author_id: author.readAttribute("id"),
+      eager_hmt_di_book_id: book.readAttribute("id"),
+    });
 
     const books = await loadHasManyThrough(author, "eagerHmtDiBooks", {
       through: "eagerHmtDiAuthorships",
@@ -1360,20 +2300,37 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit", async () => {
     class EagerHmLimitPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmLimitComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_limit_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_limit_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmLimitPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmLimitComments", options: { className: "EagerHmLimitComment", foreignKey: "eager_hm_limit_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmLimitComments",
+        options: { className: "EagerHmLimitComment", foreignKey: "eager_hm_limit_post_id" },
+      },
     ];
     registerModel("EagerHmLimitPost", EagerHmLimitPost);
     registerModel("EagerHmLimitComment", EagerHmLimitComment);
 
     const post = await EagerHmLimitPost.create({ title: "Post" });
-    await EagerHmLimitComment.create({ body: "c1", eager_hm_limit_post_id: post.readAttribute("id") });
-    await EagerHmLimitComment.create({ body: "c2", eager_hm_limit_post_id: post.readAttribute("id") });
+    await EagerHmLimitComment.create({
+      body: "c1",
+      eager_hm_limit_post_id: post.readAttribute("id"),
+    });
+    await EagerHmLimitComment.create({
+      body: "c2",
+      eager_hm_limit_post_id: post.readAttribute("id"),
+    });
 
     const posts = await EagerHmLimitPost.all().includes("eagerHmLimitComments").toArray();
     expect(posts).toHaveLength(1);
@@ -1382,20 +2339,37 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit and conditions", async () => {
     class EagerHmCondPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmCondComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_cond_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_cond_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmCondPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmCondComments", options: { className: "EagerHmCondComment", foreignKey: "eager_hm_cond_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmCondComments",
+        options: { className: "EagerHmCondComment", foreignKey: "eager_hm_cond_post_id" },
+      },
     ];
     registerModel("EagerHmCondPost", EagerHmCondPost);
     registerModel("EagerHmCondComment", EagerHmCondComment);
 
     const post = await EagerHmCondPost.create({ title: "Post" });
-    await EagerHmCondComment.create({ body: "good", eager_hm_cond_post_id: post.readAttribute("id") });
-    await EagerHmCondComment.create({ body: "great", eager_hm_cond_post_id: post.readAttribute("id") });
+    await EagerHmCondComment.create({
+      body: "good",
+      eager_hm_cond_post_id: post.readAttribute("id"),
+    });
+    await EagerHmCondComment.create({
+      body: "great",
+      eager_hm_cond_post_id: post.readAttribute("id"),
+    });
 
     const posts = await EagerHmCondPost.all().includes("eagerHmCondComments").toArray();
     expect(posts).toHaveLength(1);
@@ -1404,13 +2378,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit and conditions array", async () => {
     class EagerHmLcaPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmLcaComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_lca_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_lca_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmLcaPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmLcaComments", options: { className: "EagerHmLcaComment", foreignKey: "eager_hm_lca_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmLcaComments",
+        options: { className: "EagerHmLcaComment", foreignKey: "eager_hm_lca_post_id" },
+      },
     ];
     registerModel("EagerHmLcaPost", EagerHmLcaPost);
     registerModel("EagerHmLcaComment", EagerHmLcaComment);
@@ -1422,13 +2407,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit and conditions array on the eagers", async () => {
     class EagerHmLcePost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmLceComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_lce_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_lce_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmLcePost as any)._associations = [
-      { type: "hasMany", name: "eagerHmLceComments", options: { className: "EagerHmLceComment", foreignKey: "eager_hm_lce_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmLceComments",
+        options: { className: "EagerHmLceComment", foreignKey: "eager_hm_lce_post_id" },
+      },
     ];
     registerModel("EagerHmLcePost", EagerHmLcePost);
     registerModel("EagerHmLceComment", EagerHmLceComment);
@@ -1439,13 +2435,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit and high offset", async () => {
     class EagerHmHoPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmHoComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_ho_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_ho_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmHoPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmHoComments", options: { className: "EagerHmHoComment", foreignKey: "eager_hm_ho_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmHoComments",
+        options: { className: "EagerHmHoComment", foreignKey: "eager_hm_ho_post_id" },
+      },
     ];
     registerModel("EagerHmHoPost", EagerHmHoPost);
     registerModel("EagerHmHoComment", EagerHmHoComment);
@@ -1460,48 +2467,90 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit and high offset and multiple array conditions", async () => {
     class EagerHmHoacPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmHoacComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_hoac_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_hoac_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmHoacPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmHoacComments", options: { className: "EagerHmHoacComment", foreignKey: "eager_hm_hoac_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmHoacComments",
+        options: { className: "EagerHmHoacComment", foreignKey: "eager_hm_hoac_post_id" },
+      },
     ];
     registerModel("EagerHmHoacPost", EagerHmHoacPost);
     registerModel("EagerHmHoacComment", EagerHmHoacComment);
     const post = await EagerHmHoacPost.create({ title: "P" });
-    await EagerHmHoacComment.create({ body: "c1", eager_hm_hoac_post_id: post.readAttribute("id") });
+    await EagerHmHoacComment.create({
+      body: "c1",
+      eager_hm_hoac_post_id: post.readAttribute("id"),
+    });
     const posts = await EagerHmHoacPost.all().includes("eagerHmHoacComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerHmHoacComments")).toHaveLength(1);
   });
   it("eager with has many and limit and high offset and multiple hash conditions", async () => {
     class EagerHmHohcPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmHohcComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_hm_hohc_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_hm_hohc_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerHmHohcPost as any)._associations = [
-      { type: "hasMany", name: "eagerHmHohcComments", options: { className: "EagerHmHohcComment", foreignKey: "eager_hm_hohc_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerHmHohcComments",
+        options: { className: "EagerHmHohcComment", foreignKey: "eager_hm_hohc_post_id" },
+      },
     ];
     registerModel("EagerHmHohcPost", EagerHmHohcPost);
     registerModel("EagerHmHohcComment", EagerHmHohcComment);
     const post = await EagerHmHohcPost.create({ title: "P" });
-    await EagerHmHohcComment.create({ body: "c1", eager_hm_hohc_post_id: post.readAttribute("id") });
-    await EagerHmHohcComment.create({ body: "c2", eager_hm_hohc_post_id: post.readAttribute("id") });
+    await EagerHmHohcComment.create({
+      body: "c1",
+      eager_hm_hohc_post_id: post.readAttribute("id"),
+    });
+    await EagerHmHohcComment.create({
+      body: "c2",
+      eager_hm_hohc_post_id: post.readAttribute("id"),
+    });
     const posts = await EagerHmHohcPost.all().includes("eagerHmHohcComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerHmHohcComments")).toHaveLength(2);
   });
   it("count eager with has many and limit and high offset", async () => {
     class EagerCntHoPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerCntHoComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_cnt_ho_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_cnt_ho_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerCntHoPost as any)._associations = [
-      { type: "hasMany", name: "eagerCntHoComments", options: { className: "EagerCntHoComment", foreignKey: "eager_cnt_ho_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerCntHoComments",
+        options: { className: "EagerCntHoComment", foreignKey: "eager_cnt_ho_post_id" },
+      },
     ];
     registerModel("EagerCntHoPost", EagerCntHoPost);
     registerModel("EagerCntHoComment", EagerCntHoComment);
@@ -1514,13 +2563,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with has many and limit with no results", async () => {
     class EagerNoResPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerNoResComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_no_res_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_no_res_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerNoResPost as any)._associations = [
-      { type: "hasMany", name: "eagerNoResComments", options: { className: "EagerNoResComment", foreignKey: "eager_no_res_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerNoResComments",
+        options: { className: "EagerNoResComment", foreignKey: "eager_no_res_post_id" },
+      },
     ];
     registerModel("EagerNoResPost", EagerNoResPost);
     registerModel("EagerNoResComment", EagerNoResComment);
@@ -1544,7 +2604,10 @@ describe("EagerAssociationTest", () => {
 
   it("eager with invalid association reference", async () => {
     class EagerWidget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("EagerWidget", EagerWidget);
 
@@ -1557,20 +2620,46 @@ describe("EagerAssociationTest", () => {
   it.skip("exceptions have suggestions for fix", () => {});
   it("eager has many through with order", async () => {
     class EagerHmtOrdAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtOrdAuthorship extends Base {
-      static { this.attribute("eager_hmt_ord_author_id", "integer"); this.attribute("eager_hmt_ord_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_ord_author_id", "integer");
+        this.attribute("eager_hmt_ord_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtOrdBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtOrdAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtOrdAuthorships", options: { className: "EagerHmtOrdAuthorship", foreignKey: "eager_hmt_ord_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtOrdBooks", options: { through: "eagerHmtOrdAuthorships", source: "eagerHmtOrdBook", className: "EagerHmtOrdBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtOrdAuthorships",
+        options: { className: "EagerHmtOrdAuthorship", foreignKey: "eager_hmt_ord_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtOrdBooks",
+        options: {
+          through: "eagerHmtOrdAuthorships",
+          source: "eagerHmtOrdBook",
+          className: "EagerHmtOrdBook",
+        },
+      },
     ];
     (EagerHmtOrdAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtOrdBook", options: { className: "EagerHmtOrdBook", foreignKey: "eager_hmt_ord_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtOrdBook",
+        options: { className: "EagerHmtOrdBook", foreignKey: "eager_hmt_ord_book_id" },
+      },
     ];
     registerModel("EagerHmtOrdAuthor", EagerHmtOrdAuthor);
     registerModel("EagerHmtOrdAuthorship", EagerHmtOrdAuthorship);
@@ -1579,8 +2668,14 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtOrdAuthor.create({ name: "Writer" });
     const b1 = await EagerHmtOrdBook.create({ title: "Zebra" });
     const b2 = await EagerHmtOrdBook.create({ title: "Alpha" });
-    await EagerHmtOrdAuthorship.create({ eager_hmt_ord_author_id: author.readAttribute("id"), eager_hmt_ord_book_id: b1.readAttribute("id") });
-    await EagerHmtOrdAuthorship.create({ eager_hmt_ord_author_id: author.readAttribute("id"), eager_hmt_ord_book_id: b2.readAttribute("id") });
+    await EagerHmtOrdAuthorship.create({
+      eager_hmt_ord_author_id: author.readAttribute("id"),
+      eager_hmt_ord_book_id: b1.readAttribute("id"),
+    });
+    await EagerHmtOrdAuthorship.create({
+      eager_hmt_ord_author_id: author.readAttribute("id"),
+      eager_hmt_ord_book_id: b2.readAttribute("id"),
+    });
 
     const books = await loadHasManyThrough(author, "eagerHmtOrdBooks", {
       through: "eagerHmtOrdAuthorships",
@@ -1591,20 +2686,46 @@ describe("EagerAssociationTest", () => {
   });
   it("eager has many through multiple with order", async () => {
     class EagerHmtMoAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtMoAuthorship extends Base {
-      static { this.attribute("eager_hmt_mo_author_id", "integer"); this.attribute("eager_hmt_mo_book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_hmt_mo_author_id", "integer");
+        this.attribute("eager_hmt_mo_book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerHmtMoBook extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerHmtMoAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerHmtMoAuthorships", options: { className: "EagerHmtMoAuthorship", foreignKey: "eager_hmt_mo_author_id" } },
-      { type: "hasManyThrough", name: "eagerHmtMoBooks", options: { through: "eagerHmtMoAuthorships", source: "eagerHmtMoBook", className: "EagerHmtMoBook" } },
+      {
+        type: "hasMany",
+        name: "eagerHmtMoAuthorships",
+        options: { className: "EagerHmtMoAuthorship", foreignKey: "eager_hmt_mo_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerHmtMoBooks",
+        options: {
+          through: "eagerHmtMoAuthorships",
+          source: "eagerHmtMoBook",
+          className: "EagerHmtMoBook",
+        },
+      },
     ];
     (EagerHmtMoAuthorship as any)._associations = [
-      { type: "belongsTo", name: "eagerHmtMoBook", options: { className: "EagerHmtMoBook", foreignKey: "eager_hmt_mo_book_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerHmtMoBook",
+        options: { className: "EagerHmtMoBook", foreignKey: "eager_hmt_mo_book_id" },
+      },
     ];
     registerModel("EagerHmtMoAuthor", EagerHmtMoAuthor);
     registerModel("EagerHmtMoAuthorship", EagerHmtMoAuthorship);
@@ -1613,8 +2734,14 @@ describe("EagerAssociationTest", () => {
     const a1 = await EagerHmtMoAuthor.create({ name: "A1" });
     const a2 = await EagerHmtMoAuthor.create({ name: "A2" });
     const book = await EagerHmtMoBook.create({ title: "Shared" });
-    await EagerHmtMoAuthorship.create({ eager_hmt_mo_author_id: a1.readAttribute("id"), eager_hmt_mo_book_id: book.readAttribute("id") });
-    await EagerHmtMoAuthorship.create({ eager_hmt_mo_author_id: a2.readAttribute("id"), eager_hmt_mo_book_id: book.readAttribute("id") });
+    await EagerHmtMoAuthorship.create({
+      eager_hmt_mo_author_id: a1.readAttribute("id"),
+      eager_hmt_mo_book_id: book.readAttribute("id"),
+    });
+    await EagerHmtMoAuthorship.create({
+      eager_hmt_mo_author_id: a2.readAttribute("id"),
+      eager_hmt_mo_book_id: book.readAttribute("id"),
+    });
 
     const books1 = await loadHasManyThrough(a1, "eagerHmtMoBooks", {
       through: "eagerHmtMoAuthorships",
@@ -1632,13 +2759,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope", async () => {
     class EagerDsPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDsComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_ds_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_ds_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDsPost as any)._associations = [
-      { type: "hasMany", name: "eagerDsComments", options: { className: "EagerDsComment", foreignKey: "eager_ds_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerDsComments",
+        options: { className: "EagerDsComment", foreignKey: "eager_ds_post_id" },
+      },
     ];
     registerModel("EagerDsPost", EagerDsPost);
     registerModel("EagerDsComment", EagerDsComment);
@@ -1649,13 +2787,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope as class method", async () => {
     class EagerDsCmPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDsCmComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_ds_cm_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_ds_cm_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDsCmPost as any)._associations = [
-      { type: "hasMany", name: "eagerDsCmComments", options: { className: "EagerDsCmComment", foreignKey: "eager_ds_cm_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerDsCmComments",
+        options: { className: "EagerDsCmComment", foreignKey: "eager_ds_cm_post_id" },
+      },
     ];
     registerModel("EagerDsCmPost", EagerDsCmPost);
     registerModel("EagerDsCmComment", EagerDsCmComment);
@@ -1666,7 +2815,10 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope as class method using find method", async () => {
     class EagerDsFmPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("EagerDsFmPost", EagerDsFmPost);
     const post = await EagerDsFmPost.create({ title: "P" });
@@ -1675,7 +2827,10 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope as class method using find by method", async () => {
     class EagerDsFbPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("EagerDsFbPost", EagerDsFbPost);
     await EagerDsFbPost.create({ title: "Unique" });
@@ -1684,13 +2839,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope as lambda", async () => {
     class EagerDsLPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDsLComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_ds_l_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_ds_l_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDsLPost as any)._associations = [
-      { type: "hasMany", name: "eagerDsLComments", options: { className: "EagerDsLComment", foreignKey: "eager_ds_l_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerDsLComments",
+        options: { className: "EagerDsLComment", foreignKey: "eager_ds_l_post_id" },
+      },
     ];
     registerModel("EagerDsLPost", EagerDsLPost);
     registerModel("EagerDsLComment", EagerDsLComment);
@@ -1701,13 +2867,24 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope as block", async () => {
     class EagerDsBPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDsBComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_ds_b_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_ds_b_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDsBPost as any)._associations = [
-      { type: "hasMany", name: "eagerDsBComments", options: { className: "EagerDsBComment", foreignKey: "eager_ds_b_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerDsBComments",
+        options: { className: "EagerDsBComment", foreignKey: "eager_ds_b_post_id" },
+      },
     ];
     registerModel("EagerDsBPost", EagerDsBPost);
     registerModel("EagerDsBComment", EagerDsBComment);
@@ -1718,67 +2895,123 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with default scope as callable", async () => {
     class EagerDsCallPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDsCallComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_ds_call_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_ds_call_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerDsCallPost as any)._associations = [
-      { type: "hasMany", name: "eagerDsCallComments", options: { className: "EagerDsCallComment", foreignKey: "eager_ds_call_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerDsCallComments",
+        options: { className: "EagerDsCallComment", foreignKey: "eager_ds_call_post_id" },
+      },
     ];
     registerModel("EagerDsCallPost", EagerDsCallPost);
     registerModel("EagerDsCallComment", EagerDsCallComment);
     const post = await EagerDsCallPost.create({ title: "P" });
-    await EagerDsCallComment.create({ body: "c1", eager_ds_call_post_id: post.readAttribute("id") });
+    await EagerDsCallComment.create({
+      body: "c1",
+      eager_ds_call_post_id: post.readAttribute("id"),
+    });
     const posts = await EagerDsCallPost.all().includes("eagerDsCallComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerDsCallComments")).toHaveLength(1);
   });
   it("limited eager with order", async () => {
     class EagerLeoPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLeoComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_leo_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_leo_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLeoPost as any)._associations = [
-      { type: "hasMany", name: "eagerLeoComments", options: { className: "EagerLeoComment", foreignKey: "eager_leo_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerLeoComments",
+        options: { className: "EagerLeoComment", foreignKey: "eager_leo_post_id" },
+      },
     ];
     registerModel("EagerLeoPost", EagerLeoPost);
     registerModel("EagerLeoComment", EagerLeoComment);
     const post = await EagerLeoPost.create({ title: "P" });
     await EagerLeoComment.create({ body: "c1", eager_leo_post_id: post.readAttribute("id") });
     await EagerLeoComment.create({ body: "c2", eager_leo_post_id: post.readAttribute("id") });
-    const posts = await EagerLeoPost.all().order("title").limit(1).includes("eagerLeoComments").toArray();
+    const posts = await EagerLeoPost.all()
+      .order("title")
+      .limit(1)
+      .includes("eagerLeoComments")
+      .toArray();
     expect(posts).toHaveLength(1);
     expect((posts[0] as any)._preloadedAssociations.get("eagerLeoComments")).toHaveLength(2);
   });
   it("limited eager with multiple order columns", async () => {
     class EagerLmoPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("priority", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("priority", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerLmoComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_lmo_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_lmo_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLmoPost as any)._associations = [
-      { type: "hasMany", name: "eagerLmoComments", options: { className: "EagerLmoComment", foreignKey: "eager_lmo_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerLmoComments",
+        options: { className: "EagerLmoComment", foreignKey: "eager_lmo_post_id" },
+      },
     ];
     registerModel("EagerLmoPost", EagerLmoPost);
     registerModel("EagerLmoComment", EagerLmoComment);
     const post = await EagerLmoPost.create({ title: "P", priority: 1 });
     await EagerLmoComment.create({ body: "c1", eager_lmo_post_id: post.readAttribute("id") });
-    const posts = await EagerLmoPost.all().order("priority", "title").limit(1).includes("eagerLmoComments").toArray();
+    const posts = await EagerLmoPost.all()
+      .order("priority", "title")
+      .limit(1)
+      .includes("eagerLmoComments")
+      .toArray();
     expect(posts).toHaveLength(1);
     expect((posts[0] as any)._preloadedAssociations.get("eagerLmoComments")).toHaveLength(1);
   });
   it("limited eager with numeric in association", async () => {
     class EagerLnPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerLnComment extends Base {
-      static { this.attribute("rating", "float"); this.attribute("eager_ln_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("rating", "float");
+        this.attribute("eager_ln_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerLnPost as any)._associations = [
-      { type: "hasMany", name: "eagerLnComments", options: { className: "EagerLnComment", foreignKey: "eager_ln_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerLnComments",
+        options: { className: "EagerLnComment", foreignKey: "eager_ln_post_id" },
+      },
     ];
     registerModel("EagerLnPost", EagerLnPost);
     registerModel("EagerLnComment", EagerLnComment);
@@ -1793,21 +3026,38 @@ describe("EagerAssociationTest", () => {
   it.skip("eager with multiple associations with same table has many and habtm", () => {});
   it("eager with multiple associations with same table has one", async () => {
     class EagerMultiHoParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerMultiHoProfile extends Base {
-      static { this.attribute("bio", "string"); this.attribute("eager_multi_ho_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("bio", "string");
+        this.attribute("eager_multi_ho_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerMultiHoParent as any)._associations = [
-      { type: "hasOne", name: "eagerMultiHoProfile", options: { className: "EagerMultiHoProfile", foreignKey: "eager_multi_ho_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerMultiHoProfile",
+        options: { className: "EagerMultiHoProfile", foreignKey: "eager_multi_ho_parent_id" },
+      },
     ];
     registerModel("EagerMultiHoParent", EagerMultiHoParent);
     registerModel("EagerMultiHoProfile", EagerMultiHoProfile);
 
     const p1 = await EagerMultiHoParent.create({ name: "Alice" });
     const p2 = await EagerMultiHoParent.create({ name: "Bob" });
-    await EagerMultiHoProfile.create({ bio: "Alice bio", eager_multi_ho_parent_id: p1.readAttribute("id") });
-    await EagerMultiHoProfile.create({ bio: "Bob bio", eager_multi_ho_parent_id: p2.readAttribute("id") });
+    await EagerMultiHoProfile.create({
+      bio: "Alice bio",
+      eager_multi_ho_parent_id: p1.readAttribute("id"),
+    });
+    await EagerMultiHoProfile.create({
+      bio: "Bob bio",
+      eager_multi_ho_parent_id: p2.readAttribute("id"),
+    });
 
     const parents = await EagerMultiHoParent.all().includes("eagerMultiHoProfile").toArray();
     expect(parents).toHaveLength(2);
@@ -1819,37 +3069,75 @@ describe("EagerAssociationTest", () => {
   });
   it("eager with multiple associations with same table belongs to", async () => {
     class EagerMultiBtCompany extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerMultiBtEmployee extends Base {
-      static { this.attribute("name", "string"); this.attribute("company_id", "integer"); this.attribute("mentor_company_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("company_id", "integer");
+        this.attribute("mentor_company_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerMultiBtEmployee as any)._associations = [
-      { type: "belongsTo", name: "company", options: { className: "EagerMultiBtCompany", foreignKey: "company_id" } },
-      { type: "belongsTo", name: "mentorCompany", options: { className: "EagerMultiBtCompany", foreignKey: "mentor_company_id" } },
+      {
+        type: "belongsTo",
+        name: "company",
+        options: { className: "EagerMultiBtCompany", foreignKey: "company_id" },
+      },
+      {
+        type: "belongsTo",
+        name: "mentorCompany",
+        options: { className: "EagerMultiBtCompany", foreignKey: "mentor_company_id" },
+      },
     ];
     registerModel("EagerMultiBtCompany", EagerMultiBtCompany);
     registerModel("EagerMultiBtEmployee", EagerMultiBtEmployee);
 
     const c1 = await EagerMultiBtCompany.create({ name: "Acme" });
     const c2 = await EagerMultiBtCompany.create({ name: "Globex" });
-    await EagerMultiBtEmployee.create({ name: "Alice", company_id: c1.readAttribute("id"), mentor_company_id: c2.readAttribute("id") });
+    await EagerMultiBtEmployee.create({
+      name: "Alice",
+      company_id: c1.readAttribute("id"),
+      mentor_company_id: c2.readAttribute("id"),
+    });
 
-    const employees = await EagerMultiBtEmployee.all().includes("company").includes("mentorCompany").toArray();
+    const employees = await EagerMultiBtEmployee.all()
+      .includes("company")
+      .includes("mentorCompany")
+      .toArray();
     expect(employees).toHaveLength(1);
-    expect((employees[0] as any)._preloadedAssociations.get("company")?.readAttribute("name")).toBe("Acme");
-    expect((employees[0] as any)._preloadedAssociations.get("mentorCompany")?.readAttribute("name")).toBe("Globex");
+    expect((employees[0] as any)._preloadedAssociations.get("company")?.readAttribute("name")).toBe(
+      "Acme",
+    );
+    expect(
+      (employees[0] as any)._preloadedAssociations.get("mentorCompany")?.readAttribute("name"),
+    ).toBe("Globex");
   });
 
   it("eager with valid association as string not symbol", async () => {
     class EagerNode extends Base {
-      static { this.attribute("value", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerEdge extends Base {
-      static { this.attribute("label", "string"); this.attribute("eager_node_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.attribute("eager_node_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerNode as any)._associations = [
-      { type: "hasMany", name: "eagerEdges", options: { className: "EagerEdge", foreignKey: "eager_node_id" } },
+      {
+        type: "hasMany",
+        name: "eagerEdges",
+        options: { className: "EagerEdge", foreignKey: "eager_node_id" },
+      },
     ];
     registerModel("EagerNode", EagerNode);
     registerModel("EagerEdge", EagerEdge);
@@ -1864,19 +3152,33 @@ describe("EagerAssociationTest", () => {
 
   it("eager with floating point numbers", async () => {
     class EagerFloatItem extends Base {
-      static { this.attribute("price", "float"); this.adapter = adapter; }
+      static {
+        this.attribute("price", "float");
+        this.adapter = adapter;
+      }
     }
     class EagerFloatDetail extends Base {
-      static { this.attribute("info", "string"); this.attribute("eager_float_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("info", "string");
+        this.attribute("eager_float_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerFloatItem as any)._associations = [
-      { type: "hasMany", name: "eagerFloatDetails", options: { className: "EagerFloatDetail", foreignKey: "eager_float_item_id" } },
+      {
+        type: "hasMany",
+        name: "eagerFloatDetails",
+        options: { className: "EagerFloatDetail", foreignKey: "eager_float_item_id" },
+      },
     ];
     registerModel("EagerFloatItem", EagerFloatItem);
     registerModel("EagerFloatDetail", EagerFloatDetail);
 
     const item = await EagerFloatItem.create({ price: 19.99 });
-    await EagerFloatDetail.create({ info: "detail", eager_float_item_id: item.readAttribute("id") });
+    await EagerFloatDetail.create({
+      info: "detail",
+      eager_float_item_id: item.readAttribute("id"),
+    });
 
     const items = await EagerFloatItem.all().includes("eagerFloatDetails").toArray();
     expect(items).toHaveLength(1);
@@ -1886,19 +3188,33 @@ describe("EagerAssociationTest", () => {
   });
   it("preconfigured includes with has one", async () => {
     class EagerPreHoParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerPreHoChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_pre_ho_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_pre_ho_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerPreHoParent as any)._associations = [
-      { type: "hasOne", name: "eagerPreHoChild", options: { className: "EagerPreHoChild", foreignKey: "eager_pre_ho_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerPreHoChild",
+        options: { className: "EagerPreHoChild", foreignKey: "eager_pre_ho_parent_id" },
+      },
     ];
     registerModel("EagerPreHoParent", EagerPreHoParent);
     registerModel("EagerPreHoChild", EagerPreHoChild);
 
     const parent = await EagerPreHoParent.create({ name: "P" });
-    await EagerPreHoChild.create({ value: "V", eager_pre_ho_parent_id: parent.readAttribute("id") });
+    await EagerPreHoChild.create({
+      value: "V",
+      eager_pre_ho_parent_id: parent.readAttribute("id"),
+    });
 
     const results = await EagerPreHoParent.all().includes("eagerPreHoChild").toArray();
     expect(results).toHaveLength(1);
@@ -1911,13 +3227,24 @@ describe("EagerAssociationTest", () => {
 
   it("count with include", async () => {
     class EagerCountPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerCountComment extends Base {
-      static { this.attribute("body", "string"); this.attribute("eager_count_post_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_count_post_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerCountPost as any)._associations = [
-      { type: "hasMany", name: "eagerCountComments", options: { className: "EagerCountComment", foreignKey: "eager_count_post_id" } },
+      {
+        type: "hasMany",
+        name: "eagerCountComments",
+        options: { className: "EagerCountComment", foreignKey: "eager_count_post_id" },
+      },
     ];
     registerModel("EagerCountPost", EagerCountPost);
     registerModel("EagerCountComment", EagerCountComment);
@@ -1943,13 +3270,24 @@ describe("EagerAssociationTest", () => {
   it.skip("eager loading with conditions on join model preloads", () => {});
   it("preload has many using primary key", async () => {
     class EagerPkAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerPkPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("eager_pk_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("eager_pk_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerPkAuthor as any)._associations = [
-      { type: "hasMany", name: "eagerPkPosts", options: { className: "EagerPkPost", foreignKey: "eager_pk_author_id" } },
+      {
+        type: "hasMany",
+        name: "eagerPkPosts",
+        options: { className: "EagerPkPost", foreignKey: "eager_pk_author_id" },
+      },
     ];
     registerModel("EagerPkAuthor", EagerPkAuthor);
     registerModel("EagerPkPost", EagerPkPost);
@@ -1964,13 +3302,24 @@ describe("EagerAssociationTest", () => {
 
   it("include has many using primary key", async () => {
     class IncPkAuthor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class IncPkPost extends Base {
-      static { this.attribute("title", "string"); this.attribute("inc_pk_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("inc_pk_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (IncPkAuthor as any)._associations = [
-      { type: "hasMany", name: "incPkPosts", options: { className: "IncPkPost", foreignKey: "inc_pk_author_id" } },
+      {
+        type: "hasMany",
+        name: "incPkPosts",
+        options: { className: "IncPkPost", foreignKey: "inc_pk_author_id" },
+      },
     ];
     registerModel("IncPkAuthor", IncPkAuthor);
     registerModel("IncPkPost", IncPkPost);
@@ -1984,13 +3333,24 @@ describe("EagerAssociationTest", () => {
   });
   it("preloading through empty belongs to", async () => {
     class EagerEmptyBtParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerEmptyBtChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_empty_bt_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_empty_bt_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerEmptyBtChild as any)._associations = [
-      { type: "belongsTo", name: "eagerEmptyBtParent", options: { className: "EagerEmptyBtParent", foreignKey: "eager_empty_bt_parent_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerEmptyBtParent",
+        options: { className: "EagerEmptyBtParent", foreignKey: "eager_empty_bt_parent_id" },
+      },
     ];
     registerModel("EagerEmptyBtParent", EagerEmptyBtParent);
     registerModel("EagerEmptyBtChild", EagerEmptyBtChild);
@@ -2005,7 +3365,12 @@ describe("EagerAssociationTest", () => {
   });
   it("preloading empty belongs to polymorphic", async () => {
     class PrePolyOrphan extends Base {
-      static { this.attribute("name", "string"); this.attribute("owner_id", "integer"); this.attribute("owner_type", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("owner_id", "integer");
+        this.attribute("owner_type", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel(PrePolyOrphan);
     (PrePolyOrphan as any)._associations = [
@@ -2019,20 +3384,42 @@ describe("EagerAssociationTest", () => {
   });
   it("preloading has many through with distinct", async () => {
     class EagerDistOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerDistJoin extends Base {
-      static { this.attribute("eager_dist_owner_id", "integer"); this.attribute("eager_dist_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_dist_owner_id", "integer");
+        this.attribute("eager_dist_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerDistItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerDistOwner as any)._associations = [
-      { type: "hasMany", name: "eagerDistJoins", options: { className: "EagerDistJoin", foreignKey: "eager_dist_owner_id" } },
-      { type: "hasManyThrough", name: "eagerDistItems", options: { through: "eagerDistJoins", source: "eagerDistItem", className: "EagerDistItem" } },
+      {
+        type: "hasMany",
+        name: "eagerDistJoins",
+        options: { className: "EagerDistJoin", foreignKey: "eager_dist_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerDistItems",
+        options: { through: "eagerDistJoins", source: "eagerDistItem", className: "EagerDistItem" },
+      },
     ];
     (EagerDistJoin as any)._associations = [
-      { type: "belongsTo", name: "eagerDistItem", options: { className: "EagerDistItem", foreignKey: "eager_dist_item_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerDistItem",
+        options: { className: "EagerDistItem", foreignKey: "eager_dist_item_id" },
+      },
     ];
     registerModel("EagerDistOwner", EagerDistOwner);
     registerModel("EagerDistJoin", EagerDistJoin);
@@ -2041,8 +3428,14 @@ describe("EagerAssociationTest", () => {
     const owner = await EagerDistOwner.create({ name: "O" });
     const item = await EagerDistItem.create({ label: "I" });
     // Two join records pointing to the same item
-    await EagerDistJoin.create({ eager_dist_owner_id: owner.readAttribute("id"), eager_dist_item_id: item.readAttribute("id") });
-    await EagerDistJoin.create({ eager_dist_owner_id: owner.readAttribute("id"), eager_dist_item_id: item.readAttribute("id") });
+    await EagerDistJoin.create({
+      eager_dist_owner_id: owner.readAttribute("id"),
+      eager_dist_item_id: item.readAttribute("id"),
+    });
+    await EagerDistJoin.create({
+      eager_dist_owner_id: owner.readAttribute("id"),
+      eager_dist_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "eagerDistItems", {
       through: "eagerDistJoins",
@@ -2054,20 +3447,33 @@ describe("EagerAssociationTest", () => {
   });
   it("preloading has one using reorder", async () => {
     class EagerReordParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerReordChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("eager_reord_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_reord_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (EagerReordParent as any)._associations = [
-      { type: "hasOne", name: "eagerReordChild", options: { className: "EagerReordChild", foreignKey: "eager_reord_parent_id" } },
+      {
+        type: "hasOne",
+        name: "eagerReordChild",
+        options: { className: "EagerReordChild", foreignKey: "eager_reord_parent_id" },
+      },
     ];
     registerModel("EagerReordParent", EagerReordParent);
     registerModel("EagerReordChild", EagerReordChild);
     const parent = await EagerReordParent.create({ name: "P" });
     await EagerReordChild.create({ value: "V", eager_reord_parent_id: parent.readAttribute("id") });
     const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
-    expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.readAttribute("value")).toBe("V");
+    expect(
+      (parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.readAttribute("value"),
+    ).toBe("V");
   });
   it.skip("preloading polymorphic with custom foreign type", () => {});
   it.skip("joins with includes should preload via joins", () => {});
@@ -2076,21 +3482,41 @@ describe("EagerAssociationTest", () => {
   it.skip("eager load multiple associations with references", () => {});
   it("preloading has many through with custom scope", async () => {
     class PcsProject extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PcsDeveloper extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PcsContractship extends Base {
-      static { this.attribute("pcs_project_id", "integer"); this.attribute("pcs_developer_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("pcs_project_id", "integer");
+        this.attribute("pcs_developer_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    registerModel(PcsProject); registerModel(PcsDeveloper); registerModel(PcsContractship);
-    Associations.hasMany.call(PcsProject, "pcsContractships", { className: "PcsContractship", foreignKey: "pcs_project_id" });
+    registerModel(PcsProject);
+    registerModel(PcsDeveloper);
+    registerModel(PcsContractship);
+    Associations.hasMany.call(PcsProject, "pcsContractships", {
+      className: "PcsContractship",
+      foreignKey: "pcs_project_id",
+    });
     Associations.hasMany.call(PcsProject, "scopedDevs", {
-      className: "PcsDeveloper", through: "pcsContractships", source: "pcsDeveloper",
+      className: "PcsDeveloper",
+      through: "pcsContractships",
+      source: "pcsDeveloper",
       scope: (rel: any) => rel.where({ name: "David" }),
     });
-    Associations.belongsTo.call(PcsContractship, "pcsDeveloper", { className: "PcsDeveloper", foreignKey: "pcs_developer_id" });
+    Associations.belongsTo.call(PcsContractship, "pcsDeveloper", {
+      className: "PcsDeveloper",
+      foreignKey: "pcs_developer_id",
+    });
 
     const proj = await PcsProject.create({ name: "AR" });
     const david = await PcsDeveloper.create({ name: "David" });
@@ -2110,20 +3536,46 @@ describe("EagerAssociationTest", () => {
   it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {});
   it("preloading a through association twice does not reset it", async () => {
     class EagerTwiceOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EagerTwiceJoin extends Base {
-      static { this.attribute("eager_twice_owner_id", "integer"); this.attribute("eager_twice_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("eager_twice_owner_id", "integer");
+        this.attribute("eager_twice_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class EagerTwiceTarget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (EagerTwiceOwner as any)._associations = [
-      { type: "hasMany", name: "eagerTwiceJoins", options: { className: "EagerTwiceJoin", foreignKey: "eager_twice_owner_id" } },
-      { type: "hasManyThrough", name: "eagerTwiceTargets", options: { through: "eagerTwiceJoins", source: "eagerTwiceTarget", className: "EagerTwiceTarget" } },
+      {
+        type: "hasMany",
+        name: "eagerTwiceJoins",
+        options: { className: "EagerTwiceJoin", foreignKey: "eager_twice_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "eagerTwiceTargets",
+        options: {
+          through: "eagerTwiceJoins",
+          source: "eagerTwiceTarget",
+          className: "EagerTwiceTarget",
+        },
+      },
     ];
     (EagerTwiceJoin as any)._associations = [
-      { type: "belongsTo", name: "eagerTwiceTarget", options: { className: "EagerTwiceTarget", foreignKey: "eager_twice_target_id" } },
+      {
+        type: "belongsTo",
+        name: "eagerTwiceTarget",
+        options: { className: "EagerTwiceTarget", foreignKey: "eager_twice_target_id" },
+      },
     ];
     registerModel("EagerTwiceOwner", EagerTwiceOwner);
     registerModel("EagerTwiceJoin", EagerTwiceJoin);
@@ -2131,7 +3583,10 @@ describe("EagerAssociationTest", () => {
 
     const owner = await EagerTwiceOwner.create({ name: "O" });
     const t1 = await EagerTwiceTarget.create({ label: "T1" });
-    await EagerTwiceJoin.create({ eager_twice_owner_id: owner.readAttribute("id"), eager_twice_target_id: t1.readAttribute("id") });
+    await EagerTwiceJoin.create({
+      eager_twice_owner_id: owner.readAttribute("id"),
+      eager_twice_target_id: t1.readAttribute("id"),
+    });
 
     // Loading twice should return the same results
     const targets1 = await loadHasManyThrough(owner, "eagerTwiceTargets", {
@@ -2195,14 +3650,22 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("through association with left joins", () => {});
   it.skip("through association with through scope and nested where", () => {});
   it.skip("preload with nested association", () => {});
-  it.skip("preload sti rhs class", () => { /* needs Developer/Firm fixture models */ });
+  it.skip("preload sti rhs class", () => {
+    /* needs Developer/Firm fixture models */
+  });
   it("preload sti middle relation", async () => {
     // Club -> Members through Memberships (STI: SuperMembership, CurrentMembership)
     class PsClub extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PsMember extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PsMembership extends Base {
       static {
@@ -2215,21 +3678,45 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     class PsSuperMembership extends PsMembership {
-      static { this.adapter = adapter; registerModel(PsSuperMembership); registerSubclass(PsSuperMembership); }
+      static {
+        this.adapter = adapter;
+        registerModel(PsSuperMembership);
+        registerSubclass(PsSuperMembership);
+      }
     }
     class PsCurrentMembership extends PsMembership {
-      static { this.adapter = adapter; registerModel(PsCurrentMembership); registerSubclass(PsCurrentMembership); }
+      static {
+        this.adapter = adapter;
+        registerModel(PsCurrentMembership);
+        registerSubclass(PsCurrentMembership);
+      }
     }
-    registerModel(PsClub); registerModel(PsMember); registerModel(PsMembership);
+    registerModel(PsClub);
+    registerModel(PsMember);
+    registerModel(PsMembership);
 
     (PsClub as any)._associations = [
-      { type: "hasMany", name: "psMemberships", options: { className: "PsMembership", foreignKey: "ps_club_id" } },
-      { type: "hasMany", name: "members", options: {
-        className: "PsMember", through: "psMemberships", source: "psMember",
-      }},
+      {
+        type: "hasMany",
+        name: "psMemberships",
+        options: { className: "PsMembership", foreignKey: "ps_club_id" },
+      },
+      {
+        type: "hasMany",
+        name: "members",
+        options: {
+          className: "PsMember",
+          through: "psMemberships",
+          source: "psMember",
+        },
+      },
     ];
     (PsMembership as any)._associations = [
-      { type: "belongsTo", name: "psMember", options: { className: "PsMember", foreignKey: "ps_member_id" } },
+      {
+        type: "belongsTo",
+        name: "psMember",
+        options: { className: "PsMember", foreignKey: "ps_member_id" },
+      },
     ];
 
     const club = await PsClub.create({ name: "Aaron cool banana club" });
@@ -2246,22 +3733,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("preload multiple instances of the same record", async () => {
     class PreloadMultiParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PreloadMultiChild extends Base {
-      static { this.attribute("value", "string"); this.attribute("preload_multi_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.attribute("preload_multi_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (PreloadMultiParent as any)._associations = [
-      { type: "hasMany", name: "preloadMultiChildren", options: { className: "PreloadMultiChild", foreignKey: "preload_multi_parent_id" } },
+      {
+        type: "hasMany",
+        name: "preloadMultiChildren",
+        options: { className: "PreloadMultiChild", foreignKey: "preload_multi_parent_id" },
+      },
     ];
     registerModel("PreloadMultiParent", PreloadMultiParent);
     registerModel("PreloadMultiChild", PreloadMultiChild);
 
     const p1 = await PreloadMultiParent.create({ name: "A" });
     const p2 = await PreloadMultiParent.create({ name: "B" });
-    await PreloadMultiChild.create({ value: "c1", preload_multi_parent_id: p1.readAttribute("id") });
-    await PreloadMultiChild.create({ value: "c2", preload_multi_parent_id: p1.readAttribute("id") });
-    await PreloadMultiChild.create({ value: "c3", preload_multi_parent_id: p2.readAttribute("id") });
+    await PreloadMultiChild.create({
+      value: "c1",
+      preload_multi_parent_id: p1.readAttribute("id"),
+    });
+    await PreloadMultiChild.create({
+      value: "c2",
+      preload_multi_parent_id: p1.readAttribute("id"),
+    });
+    await PreloadMultiChild.create({
+      value: "c3",
+      preload_multi_parent_id: p2.readAttribute("id"),
+    });
 
     const parents = await PreloadMultiParent.all().includes("preloadMultiChildren").toArray();
     expect(parents).toHaveLength(2);
@@ -2272,20 +3779,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("singleton has many through", async () => {
     class HmtSingletonOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtSingletonJoin extends Base {
-      static { this.attribute("hmt_singleton_owner_id", "integer"); this.attribute("hmt_singleton_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_singleton_owner_id", "integer");
+        this.attribute("hmt_singleton_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtSingletonItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtSingletonOwner as any)._associations = [
-      { type: "hasMany", name: "hmtSingletonJoins", options: { className: "HmtSingletonJoin", foreignKey: "hmt_singleton_owner_id" } },
-      { type: "hasManyThrough", name: "hmtSingletonItems", options: { through: "hmtSingletonJoins", source: "hmtSingletonItem", className: "HmtSingletonItem" } },
+      {
+        type: "hasMany",
+        name: "hmtSingletonJoins",
+        options: { className: "HmtSingletonJoin", foreignKey: "hmt_singleton_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtSingletonItems",
+        options: {
+          through: "hmtSingletonJoins",
+          source: "hmtSingletonItem",
+          className: "HmtSingletonItem",
+        },
+      },
     ];
     (HmtSingletonJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtSingletonItem", options: { className: "HmtSingletonItem", foreignKey: "hmt_singleton_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtSingletonItem",
+        options: { className: "HmtSingletonItem", foreignKey: "hmt_singleton_item_id" },
+      },
     ];
     registerModel("HmtSingletonOwner", HmtSingletonOwner);
     registerModel("HmtSingletonJoin", HmtSingletonJoin);
@@ -2293,7 +3826,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtSingletonOwner.create({ name: "Solo" });
     const item = await HmtSingletonItem.create({ label: "Only" });
-    await HmtSingletonJoin.create({ hmt_singleton_owner_id: owner.readAttribute("id"), hmt_singleton_item_id: item.readAttribute("id") });
+    await HmtSingletonJoin.create({
+      hmt_singleton_owner_id: owner.readAttribute("id"),
+      hmt_singleton_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtSingletonItems", {
       through: "hmtSingletonJoins",
@@ -2305,20 +3841,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("no pk join table append", async () => {
     class HmtNoPkOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNoPkJoin extends Base {
-      static { this.attribute("hmt_no_pk_owner_id", "integer"); this.attribute("hmt_no_pk_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_no_pk_owner_id", "integer");
+        this.attribute("hmt_no_pk_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtNoPkItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtNoPkOwner as any)._associations = [
-      { type: "hasMany", name: "hmtNoPkJoins", options: { className: "HmtNoPkJoin", foreignKey: "hmt_no_pk_owner_id" } },
-      { type: "hasManyThrough", name: "hmtNoPkItems", options: { through: "hmtNoPkJoins", source: "hmtNoPkItem", className: "HmtNoPkItem" } },
+      {
+        type: "hasMany",
+        name: "hmtNoPkJoins",
+        options: { className: "HmtNoPkJoin", foreignKey: "hmt_no_pk_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtNoPkItems",
+        options: { through: "hmtNoPkJoins", source: "hmtNoPkItem", className: "HmtNoPkItem" },
+      },
     ];
     (HmtNoPkJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtNoPkItem", options: { className: "HmtNoPkItem", foreignKey: "hmt_no_pk_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtNoPkItem",
+        options: { className: "HmtNoPkItem", foreignKey: "hmt_no_pk_item_id" },
+      },
     ];
     registerModel("HmtNoPkOwner", HmtNoPkOwner);
     registerModel("HmtNoPkJoin", HmtNoPkJoin);
@@ -2326,7 +3884,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtNoPkOwner.create({ name: "O" });
     const item = await HmtNoPkItem.create({ label: "I" });
-    await HmtNoPkJoin.create({ hmt_no_pk_owner_id: owner.readAttribute("id"), hmt_no_pk_item_id: item.readAttribute("id") });
+    await HmtNoPkJoin.create({
+      hmt_no_pk_owner_id: owner.readAttribute("id"),
+      hmt_no_pk_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtNoPkItems", {
       through: "hmtNoPkJoins",
@@ -2338,20 +3899,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("no pk join table delete", async () => {
     class HmtNoPkDelOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNoPkDelJoin extends Base {
-      static { this.attribute("hmt_no_pk_del_owner_id", "integer"); this.attribute("hmt_no_pk_del_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_no_pk_del_owner_id", "integer");
+        this.attribute("hmt_no_pk_del_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtNoPkDelItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtNoPkDelOwner as any)._associations = [
-      { type: "hasMany", name: "hmtNoPkDelJoins", options: { className: "HmtNoPkDelJoin", foreignKey: "hmt_no_pk_del_owner_id" } },
-      { type: "hasManyThrough", name: "hmtNoPkDelItems", options: { through: "hmtNoPkDelJoins", source: "hmtNoPkDelItem", className: "HmtNoPkDelItem" } },
+      {
+        type: "hasMany",
+        name: "hmtNoPkDelJoins",
+        options: { className: "HmtNoPkDelJoin", foreignKey: "hmt_no_pk_del_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtNoPkDelItems",
+        options: {
+          through: "hmtNoPkDelJoins",
+          source: "hmtNoPkDelItem",
+          className: "HmtNoPkDelItem",
+        },
+      },
     ];
     (HmtNoPkDelJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtNoPkDelItem", options: { className: "HmtNoPkDelItem", foreignKey: "hmt_no_pk_del_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtNoPkDelItem",
+        options: { className: "HmtNoPkDelItem", foreignKey: "hmt_no_pk_del_item_id" },
+      },
     ];
     registerModel("HmtNoPkDelOwner", HmtNoPkDelOwner);
     registerModel("HmtNoPkDelJoin", HmtNoPkDelJoin);
@@ -2359,7 +3946,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtNoPkDelOwner.create({ name: "O" });
     const item = await HmtNoPkDelItem.create({ label: "I" });
-    const join = await HmtNoPkDelJoin.create({ hmt_no_pk_del_owner_id: owner.readAttribute("id"), hmt_no_pk_del_item_id: item.readAttribute("id") });
+    const join = await HmtNoPkDelJoin.create({
+      hmt_no_pk_del_owner_id: owner.readAttribute("id"),
+      hmt_no_pk_del_item_id: item.readAttribute("id"),
+    });
 
     await join.destroy();
 
@@ -2372,20 +3962,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("pk is not required for join", async () => {
     class HmtPkOptOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtPkOptJoin extends Base {
-      static { this.attribute("hmt_pk_opt_owner_id", "integer"); this.attribute("hmt_pk_opt_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_pk_opt_owner_id", "integer");
+        this.attribute("hmt_pk_opt_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtPkOptItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtPkOptOwner as any)._associations = [
-      { type: "hasMany", name: "hmtPkOptJoins", options: { className: "HmtPkOptJoin", foreignKey: "hmt_pk_opt_owner_id" } },
-      { type: "hasManyThrough", name: "hmtPkOptItems", options: { through: "hmtPkOptJoins", source: "hmtPkOptItem", className: "HmtPkOptItem" } },
+      {
+        type: "hasMany",
+        name: "hmtPkOptJoins",
+        options: { className: "HmtPkOptJoin", foreignKey: "hmt_pk_opt_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtPkOptItems",
+        options: { through: "hmtPkOptJoins", source: "hmtPkOptItem", className: "HmtPkOptItem" },
+      },
     ];
     (HmtPkOptJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtPkOptItem", options: { className: "HmtPkOptItem", foreignKey: "hmt_pk_opt_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtPkOptItem",
+        options: { className: "HmtPkOptItem", foreignKey: "hmt_pk_opt_item_id" },
+      },
     ];
     registerModel("HmtPkOptOwner", HmtPkOptOwner);
     registerModel("HmtPkOptJoin", HmtPkOptJoin);
@@ -2393,7 +4005,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtPkOptOwner.create({ name: "O" });
     const item = await HmtPkOptItem.create({ label: "I" });
-    await HmtPkOptJoin.create({ hmt_pk_opt_owner_id: owner.readAttribute("id"), hmt_pk_opt_item_id: item.readAttribute("id") });
+    await HmtPkOptJoin.create({
+      hmt_pk_opt_owner_id: owner.readAttribute("id"),
+      hmt_pk_opt_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtPkOptItems", {
       through: "hmtPkOptJoins",
@@ -2405,20 +4020,42 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("include? - has many through", async () => {
     class HmtPerson extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtMembership extends Base {
-      static { this.attribute("person_id", "integer"); this.attribute("hmt_club_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("person_id", "integer");
+        this.attribute("hmt_club_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtClub extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtPerson as any)._associations = [
-      { type: "hasMany", name: "hmtMemberships", options: { className: "HmtMembership", foreignKey: "person_id" } },
-      { type: "hasManyThrough", name: "hmtClubs", options: { through: "hmtMemberships", source: "hmtClub", className: "HmtClub" } },
+      {
+        type: "hasMany",
+        name: "hmtMemberships",
+        options: { className: "HmtMembership", foreignKey: "person_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtClubs",
+        options: { through: "hmtMemberships", source: "hmtClub", className: "HmtClub" },
+      },
     ];
     (HmtMembership as any)._associations = [
-      { type: "belongsTo", name: "hmtClub", options: { className: "HmtClub", foreignKey: "hmt_club_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtClub",
+        options: { className: "HmtClub", foreignKey: "hmt_club_id" },
+      },
     ];
     registerModel("HmtPerson", HmtPerson);
     registerModel("HmtMembership", HmtMembership);
@@ -2426,7 +4063,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const person = await HmtPerson.create({ name: "Alice" });
     const club = await HmtClub.create({ name: "Chess" });
-    await HmtMembership.create({ person_id: person.readAttribute("id"), hmt_club_id: club.readAttribute("id") });
+    await HmtMembership.create({
+      person_id: person.readAttribute("id"),
+      hmt_club_id: club.readAttribute("id"),
+    });
 
     const clubs = await loadHasManyThrough(person, "hmtClubs", {
       through: "hmtMemberships",
@@ -2438,13 +4078,23 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("delete all for with dependent option destroy", async () => {
     class HmtDepDestroyOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDepDestroyJoin extends Base {
-      static { this.attribute("hmt_dep_destroy_owner_id", "integer"); this.attribute("hmt_dep_destroy_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_dep_destroy_owner_id", "integer");
+        this.attribute("hmt_dep_destroy_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDepDestroyItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtDepDestroyOwner", HmtDepDestroyOwner);
     registerModel("HmtDepDestroyJoin", HmtDepDestroyJoin);
@@ -2452,71 +4102,133 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtDepDestroyOwner.create({ name: "O" });
     const item = await HmtDepDestroyItem.create({ label: "I" });
-    const join = await HmtDepDestroyJoin.create({ hmt_dep_destroy_owner_id: owner.readAttribute("id"), hmt_dep_destroy_item_id: item.readAttribute("id") });
+    const join = await HmtDepDestroyJoin.create({
+      hmt_dep_destroy_owner_id: owner.readAttribute("id"),
+      hmt_dep_destroy_item_id: item.readAttribute("id"),
+    });
 
     // Destroying the join record removes the through association
     await join.destroy();
-    const joins = await loadHasMany(owner, "hmtDepDestroyJoins", { className: "HmtDepDestroyJoin", foreignKey: "hmt_dep_destroy_owner_id" });
+    const joins = await loadHasMany(owner, "hmtDepDestroyJoins", {
+      className: "HmtDepDestroyJoin",
+      foreignKey: "hmt_dep_destroy_owner_id",
+    });
     expect(joins).toHaveLength(0);
   });
   it("delete all for with dependent option nullify", async () => {
     class HmtDepNullOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDepNullJoin extends Base {
-      static { this.attribute("hmt_dep_null_owner_id", "integer"); this.attribute("hmt_dep_null_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_dep_null_owner_id", "integer");
+        this.attribute("hmt_dep_null_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtDepNullOwner", HmtDepNullOwner);
     registerModel("HmtDepNullJoin", HmtDepNullJoin);
 
     const owner = await HmtDepNullOwner.create({ name: "O" });
-    const join = await HmtDepNullJoin.create({ hmt_dep_null_owner_id: owner.readAttribute("id"), hmt_dep_null_item_id: 99 });
+    const join = await HmtDepNullJoin.create({
+      hmt_dep_null_owner_id: owner.readAttribute("id"),
+      hmt_dep_null_item_id: 99,
+    });
 
     // Nullify the FK
     join.writeAttribute("hmt_dep_null_owner_id", null);
     await join.save();
 
-    const joins = await loadHasMany(owner, "hmtDepNullJoins", { className: "HmtDepNullJoin", foreignKey: "hmt_dep_null_owner_id" });
+    const joins = await loadHasMany(owner, "hmtDepNullJoins", {
+      className: "HmtDepNullJoin",
+      foreignKey: "hmt_dep_null_owner_id",
+    });
     expect(joins).toHaveLength(0);
   });
   it("delete all for with dependent option delete all", async () => {
     class HmtDepDelAllOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDepDelAllJoin extends Base {
-      static { this.attribute("hmt_dep_del_all_owner_id", "integer"); this.attribute("hmt_dep_del_all_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_dep_del_all_owner_id", "integer");
+        this.attribute("hmt_dep_del_all_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtDepDelAllOwner", HmtDepDelAllOwner);
     registerModel("HmtDepDelAllJoin", HmtDepDelAllJoin);
 
     const owner = await HmtDepDelAllOwner.create({ name: "O" });
-    await HmtDepDelAllJoin.create({ hmt_dep_del_all_owner_id: owner.readAttribute("id"), hmt_dep_del_all_item_id: 1 });
-    await HmtDepDelAllJoin.create({ hmt_dep_del_all_owner_id: owner.readAttribute("id"), hmt_dep_del_all_item_id: 2 });
+    await HmtDepDelAllJoin.create({
+      hmt_dep_del_all_owner_id: owner.readAttribute("id"),
+      hmt_dep_del_all_item_id: 1,
+    });
+    await HmtDepDelAllJoin.create({
+      hmt_dep_del_all_owner_id: owner.readAttribute("id"),
+      hmt_dep_del_all_item_id: 2,
+    });
 
     // Delete all joins for this owner
-    const joins = await loadHasMany(owner, "hmtDepDelAllJoins", { className: "HmtDepDelAllJoin", foreignKey: "hmt_dep_del_all_owner_id" });
-    for (const j of joins) { await j.destroy(); }
+    const joins = await loadHasMany(owner, "hmtDepDelAllJoins", {
+      className: "HmtDepDelAllJoin",
+      foreignKey: "hmt_dep_del_all_owner_id",
+    });
+    for (const j of joins) {
+      await j.destroy();
+    }
 
-    const remaining = await loadHasMany(owner, "hmtDepDelAllJoins", { className: "HmtDepDelAllJoin", foreignKey: "hmt_dep_del_all_owner_id" });
+    const remaining = await loadHasMany(owner, "hmtDepDelAllJoins", {
+      className: "HmtDepDelAllJoin",
+      foreignKey: "hmt_dep_del_all_owner_id",
+    });
     expect(remaining).toHaveLength(0);
   });
 
   it("concat", async () => {
     class HmtTag extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtPostTag extends Base {
-      static { this.attribute("post_id", "integer"); this.attribute("hmt_tag_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("hmt_tag_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtPost as any)._associations = [
-      { type: "hasMany", name: "hmtPostTags", options: { className: "HmtPostTag", foreignKey: "post_id" } },
-      { type: "hasManyThrough", name: "hmtTags", options: { through: "hmtPostTags", source: "hmtTag", className: "HmtTag" } },
+      {
+        type: "hasMany",
+        name: "hmtPostTags",
+        options: { className: "HmtPostTag", foreignKey: "post_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtTags",
+        options: { through: "hmtPostTags", source: "hmtTag", className: "HmtTag" },
+      },
     ];
     (HmtPostTag as any)._associations = [
-      { type: "belongsTo", name: "hmtTag", options: { className: "HmtTag", foreignKey: "hmt_tag_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtTag",
+        options: { className: "HmtTag", foreignKey: "hmt_tag_id" },
+      },
     ];
     registerModel("HmtTag", HmtTag);
     registerModel("HmtPostTag", HmtPostTag);
@@ -2525,8 +4237,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await HmtPost.create({ title: "Hello" });
     const tag1 = await HmtTag.create({ name: "ruby" });
     const tag2 = await HmtTag.create({ name: "rails" });
-    await HmtPostTag.create({ post_id: post.readAttribute("id"), hmt_tag_id: tag1.readAttribute("id") });
-    await HmtPostTag.create({ post_id: post.readAttribute("id"), hmt_tag_id: tag2.readAttribute("id") });
+    await HmtPostTag.create({
+      post_id: post.readAttribute("id"),
+      hmt_tag_id: tag1.readAttribute("id"),
+    });
+    await HmtPostTag.create({
+      post_id: post.readAttribute("id"),
+      hmt_tag_id: tag2.readAttribute("id"),
+    });
 
     const tags = await loadHasManyThrough(post, "hmtTags", {
       through: "hmtPostTags",
@@ -2538,20 +4256,42 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("associate existing record twice should add to target twice", async () => {
     class HmtDupPerson extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDupMembership extends Base {
-      static { this.attribute("hmt_dup_person_id", "integer"); this.attribute("hmt_dup_club_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_dup_person_id", "integer");
+        this.attribute("hmt_dup_club_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDupClub extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDupPerson as any)._associations = [
-      { type: "hasMany", name: "hmtDupMemberships", options: { className: "HmtDupMembership", foreignKey: "hmt_dup_person_id" } },
-      { type: "hasManyThrough", name: "hmtDupClubs", options: { through: "hmtDupMemberships", source: "hmtDupClub", className: "HmtDupClub" } },
+      {
+        type: "hasMany",
+        name: "hmtDupMemberships",
+        options: { className: "HmtDupMembership", foreignKey: "hmt_dup_person_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDupClubs",
+        options: { through: "hmtDupMemberships", source: "hmtDupClub", className: "HmtDupClub" },
+      },
     ];
     (HmtDupMembership as any)._associations = [
-      { type: "belongsTo", name: "hmtDupClub", options: { className: "HmtDupClub", foreignKey: "hmt_dup_club_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDupClub",
+        options: { className: "HmtDupClub", foreignKey: "hmt_dup_club_id" },
+      },
     ];
     registerModel("HmtDupPerson", HmtDupPerson);
     registerModel("HmtDupMembership", HmtDupMembership);
@@ -2560,24 +4300,47 @@ describe("HasManyThroughAssociationsTest", () => {
     const person = await HmtDupPerson.create({ name: "Alice" });
     const club = await HmtDupClub.create({ name: "Chess" });
     // Associate the same club twice via two join records
-    await HmtDupMembership.create({ hmt_dup_person_id: person.readAttribute("id"), hmt_dup_club_id: club.readAttribute("id") });
-    await HmtDupMembership.create({ hmt_dup_person_id: person.readAttribute("id"), hmt_dup_club_id: club.readAttribute("id") });
+    await HmtDupMembership.create({
+      hmt_dup_person_id: person.readAttribute("id"),
+      hmt_dup_club_id: club.readAttribute("id"),
+    });
+    await HmtDupMembership.create({
+      hmt_dup_person_id: person.readAttribute("id"),
+      hmt_dup_club_id: club.readAttribute("id"),
+    });
 
-    const memberships = await loadHasMany(person, "hmtDupMemberships", { className: "HmtDupMembership", foreignKey: "hmt_dup_person_id" });
+    const memberships = await loadHasMany(person, "hmtDupMemberships", {
+      className: "HmtDupMembership",
+      foreignKey: "hmt_dup_person_id",
+    });
     expect(memberships).toHaveLength(2);
   });
   it("associate existing record twice should add records twice", async () => {
     class HmtDup2Person extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDup2Join extends Base {
-      static { this.attribute("hmt_dup2_person_id", "integer"); this.attribute("hmt_dup2_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_dup2_person_id", "integer");
+        this.attribute("hmt_dup2_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDup2Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDup2Person as any)._associations = [
-      { type: "hasMany", name: "hmtDup2Joins", options: { className: "HmtDup2Join", foreignKey: "hmt_dup2_person_id" } },
+      {
+        type: "hasMany",
+        name: "hmtDup2Joins",
+        options: { className: "HmtDup2Join", foreignKey: "hmt_dup2_person_id" },
+      },
     ];
     registerModel("HmtDup2Person", HmtDup2Person);
     registerModel("HmtDup2Join", HmtDup2Join);
@@ -2585,29 +4348,59 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const person = await HmtDup2Person.create({ name: "Bob" });
     const item = await HmtDup2Item.create({ name: "Thing" });
-    await HmtDup2Join.create({ hmt_dup2_person_id: person.readAttribute("id"), hmt_dup2_item_id: item.readAttribute("id") });
-    await HmtDup2Join.create({ hmt_dup2_person_id: person.readAttribute("id"), hmt_dup2_item_id: item.readAttribute("id") });
+    await HmtDup2Join.create({
+      hmt_dup2_person_id: person.readAttribute("id"),
+      hmt_dup2_item_id: item.readAttribute("id"),
+    });
+    await HmtDup2Join.create({
+      hmt_dup2_person_id: person.readAttribute("id"),
+      hmt_dup2_item_id: item.readAttribute("id"),
+    });
 
     const allJoins = await HmtDup2Join.all().toArray();
-    const personJoins = allJoins.filter((j: any) => j.readAttribute("hmt_dup2_person_id") === person.readAttribute("id"));
+    const personJoins = allJoins.filter(
+      (j: any) => j.readAttribute("hmt_dup2_person_id") === person.readAttribute("id"),
+    );
     expect(personJoins).toHaveLength(2);
   });
   it("add two instance and then deleting", async () => {
     class HmtDelOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDelJoin extends Base {
-      static { this.attribute("hmt_del_owner_id", "integer"); this.attribute("hmt_del_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_del_owner_id", "integer");
+        this.attribute("hmt_del_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDelItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDelOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDelJoins", options: { className: "HmtDelJoin", foreignKey: "hmt_del_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDelItems", options: { through: "hmtDelJoins", source: "hmtDelItem", className: "HmtDelItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDelJoins",
+        options: { className: "HmtDelJoin", foreignKey: "hmt_del_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDelItems",
+        options: { through: "hmtDelJoins", source: "hmtDelItem", className: "HmtDelItem" },
+      },
     ];
     (HmtDelJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDelItem", options: { className: "HmtDelItem", foreignKey: "hmt_del_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDelItem",
+        options: { className: "HmtDelItem", foreignKey: "hmt_del_item_id" },
+      },
     ];
     registerModel("HmtDelOwner", HmtDelOwner);
     registerModel("HmtDelJoin", HmtDelJoin);
@@ -2616,8 +4409,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDelOwner.create({ name: "O" });
     const item1 = await HmtDelItem.create({ label: "I1" });
     const item2 = await HmtDelItem.create({ label: "I2" });
-    const j1 = await HmtDelJoin.create({ hmt_del_owner_id: owner.readAttribute("id"), hmt_del_item_id: item1.readAttribute("id") });
-    await HmtDelJoin.create({ hmt_del_owner_id: owner.readAttribute("id"), hmt_del_item_id: item2.readAttribute("id") });
+    const j1 = await HmtDelJoin.create({
+      hmt_del_owner_id: owner.readAttribute("id"),
+      hmt_del_item_id: item1.readAttribute("id"),
+    });
+    await HmtDelJoin.create({
+      hmt_del_owner_id: owner.readAttribute("id"),
+      hmt_del_item_id: item2.readAttribute("id"),
+    });
 
     // Delete one join record
     await j1.destroy();
@@ -2633,13 +4432,23 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("associating new", async () => {
     class HmtStudent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtEnrollment extends Base {
-      static { this.attribute("student_id", "integer"); this.attribute("course_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("student_id", "integer");
+        this.attribute("course_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtCourse extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtStudent", HmtStudent);
     registerModel("HmtEnrollment", HmtEnrollment);
@@ -2647,7 +4456,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const student = await HmtStudent.create({ name: "Bob" });
     const course = await HmtCourse.create({ title: "Math" });
-    const enrollment = await HmtEnrollment.create({ student_id: student.readAttribute("id"), course_id: course.readAttribute("id") });
+    const enrollment = await HmtEnrollment.create({
+      student_id: student.readAttribute("id"),
+      course_id: course.readAttribute("id"),
+    });
 
     expect(enrollment.readAttribute("student_id")).toBe(student.readAttribute("id"));
     expect(enrollment.readAttribute("course_id")).toBe(course.readAttribute("id"));
@@ -2660,13 +4472,23 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("both parent ids set when saving new", async () => {
     class HmtWriter extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtWriterBook extends Base {
-      static { this.attribute("writer_id", "integer"); this.attribute("book_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("writer_id", "integer");
+        this.attribute("book_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtWriterBookTitle extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtWriter", HmtWriter);
     registerModel("HmtWriterBook", HmtWriterBook);
@@ -2674,7 +4496,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const writer = await HmtWriter.create({ name: "Tolkien" });
     const book = await HmtWriterBookTitle.create({ title: "LOTR" });
-    const join = await HmtWriterBook.create({ writer_id: writer.readAttribute("id"), book_id: book.readAttribute("id") });
+    const join = await HmtWriterBook.create({
+      writer_id: writer.readAttribute("id"),
+      book_id: book.readAttribute("id"),
+    });
 
     expect(join.readAttribute("writer_id")).not.toBeNull();
     expect(join.readAttribute("book_id")).not.toBeNull();
@@ -2682,20 +4507,46 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("delete association", async () => {
     class HmtDelAssocOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDelAssocJoin extends Base {
-      static { this.attribute("hmt_del_assoc_owner_id", "integer"); this.attribute("hmt_del_assoc_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_del_assoc_owner_id", "integer");
+        this.attribute("hmt_del_assoc_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDelAssocItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDelAssocOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDelAssocJoins", options: { className: "HmtDelAssocJoin", foreignKey: "hmt_del_assoc_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDelAssocItems", options: { through: "hmtDelAssocJoins", source: "hmtDelAssocItem", className: "HmtDelAssocItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDelAssocJoins",
+        options: { className: "HmtDelAssocJoin", foreignKey: "hmt_del_assoc_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDelAssocItems",
+        options: {
+          through: "hmtDelAssocJoins",
+          source: "hmtDelAssocItem",
+          className: "HmtDelAssocItem",
+        },
+      },
     ];
     (HmtDelAssocJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDelAssocItem", options: { className: "HmtDelAssocItem", foreignKey: "hmt_del_assoc_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDelAssocItem",
+        options: { className: "HmtDelAssocItem", foreignKey: "hmt_del_assoc_item_id" },
+      },
     ];
     registerModel("HmtDelAssocOwner", HmtDelAssocOwner);
     registerModel("HmtDelAssocJoin", HmtDelAssocJoin);
@@ -2703,7 +4554,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtDelAssocOwner.create({ name: "O" });
     const item = await HmtDelAssocItem.create({ label: "I" });
-    const join = await HmtDelAssocJoin.create({ hmt_del_assoc_owner_id: owner.readAttribute("id"), hmt_del_assoc_item_id: item.readAttribute("id") });
+    const join = await HmtDelAssocJoin.create({
+      hmt_del_assoc_owner_id: owner.readAttribute("id"),
+      hmt_del_assoc_item_id: item.readAttribute("id"),
+    });
 
     await join.destroy();
 
@@ -2716,20 +4570,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("destroy association", async () => {
     class HmtDestroyAssocOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDestroyAssocJoin extends Base {
-      static { this.attribute("hmt_destroy_assoc_owner_id", "integer"); this.attribute("hmt_destroy_assoc_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_destroy_assoc_owner_id", "integer");
+        this.attribute("hmt_destroy_assoc_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDestroyAssocItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDestroyAssocOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDestroyAssocJoins", options: { className: "HmtDestroyAssocJoin", foreignKey: "hmt_destroy_assoc_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDestroyAssocItems", options: { through: "hmtDestroyAssocJoins", source: "hmtDestroyAssocItem", className: "HmtDestroyAssocItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDestroyAssocJoins",
+        options: { className: "HmtDestroyAssocJoin", foreignKey: "hmt_destroy_assoc_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDestroyAssocItems",
+        options: {
+          through: "hmtDestroyAssocJoins",
+          source: "hmtDestroyAssocItem",
+          className: "HmtDestroyAssocItem",
+        },
+      },
     ];
     (HmtDestroyAssocJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDestroyAssocItem", options: { className: "HmtDestroyAssocItem", foreignKey: "hmt_destroy_assoc_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDestroyAssocItem",
+        options: { className: "HmtDestroyAssocItem", foreignKey: "hmt_destroy_assoc_item_id" },
+      },
     ];
     registerModel("HmtDestroyAssocOwner", HmtDestroyAssocOwner);
     registerModel("HmtDestroyAssocJoin", HmtDestroyAssocJoin);
@@ -2738,8 +4618,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDestroyAssocOwner.create({ name: "O" });
     const item1 = await HmtDestroyAssocItem.create({ label: "I1" });
     const item2 = await HmtDestroyAssocItem.create({ label: "I2" });
-    const j1 = await HmtDestroyAssocJoin.create({ hmt_destroy_assoc_owner_id: owner.readAttribute("id"), hmt_destroy_assoc_item_id: item1.readAttribute("id") });
-    await HmtDestroyAssocJoin.create({ hmt_destroy_assoc_owner_id: owner.readAttribute("id"), hmt_destroy_assoc_item_id: item2.readAttribute("id") });
+    const j1 = await HmtDestroyAssocJoin.create({
+      hmt_destroy_assoc_owner_id: owner.readAttribute("id"),
+      hmt_destroy_assoc_item_id: item1.readAttribute("id"),
+    });
+    await HmtDestroyAssocJoin.create({
+      hmt_destroy_assoc_owner_id: owner.readAttribute("id"),
+      hmt_destroy_assoc_item_id: item2.readAttribute("id"),
+    });
 
     await j1.destroy();
 
@@ -2753,20 +4639,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("destroy all", async () => {
     class HmtDestroyAllOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDestroyAllJoin extends Base {
-      static { this.attribute("hmt_destroy_all_owner_id", "integer"); this.attribute("hmt_destroy_all_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_destroy_all_owner_id", "integer");
+        this.attribute("hmt_destroy_all_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDestroyAllItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDestroyAllOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDestroyAllJoins", options: { className: "HmtDestroyAllJoin", foreignKey: "hmt_destroy_all_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDestroyAllItems", options: { through: "hmtDestroyAllJoins", source: "hmtDestroyAllItem", className: "HmtDestroyAllItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDestroyAllJoins",
+        options: { className: "HmtDestroyAllJoin", foreignKey: "hmt_destroy_all_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDestroyAllItems",
+        options: {
+          through: "hmtDestroyAllJoins",
+          source: "hmtDestroyAllItem",
+          className: "HmtDestroyAllItem",
+        },
+      },
     ];
     (HmtDestroyAllJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDestroyAllItem", options: { className: "HmtDestroyAllItem", foreignKey: "hmt_destroy_all_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDestroyAllItem",
+        options: { className: "HmtDestroyAllItem", foreignKey: "hmt_destroy_all_item_id" },
+      },
     ];
     registerModel("HmtDestroyAllOwner", HmtDestroyAllOwner);
     registerModel("HmtDestroyAllJoin", HmtDestroyAllJoin);
@@ -2775,12 +4687,23 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDestroyAllOwner.create({ name: "O" });
     const item1 = await HmtDestroyAllItem.create({ label: "I1" });
     const item2 = await HmtDestroyAllItem.create({ label: "I2" });
-    await HmtDestroyAllJoin.create({ hmt_destroy_all_owner_id: owner.readAttribute("id"), hmt_destroy_all_item_id: item1.readAttribute("id") });
-    await HmtDestroyAllJoin.create({ hmt_destroy_all_owner_id: owner.readAttribute("id"), hmt_destroy_all_item_id: item2.readAttribute("id") });
+    await HmtDestroyAllJoin.create({
+      hmt_destroy_all_owner_id: owner.readAttribute("id"),
+      hmt_destroy_all_item_id: item1.readAttribute("id"),
+    });
+    await HmtDestroyAllJoin.create({
+      hmt_destroy_all_owner_id: owner.readAttribute("id"),
+      hmt_destroy_all_item_id: item2.readAttribute("id"),
+    });
 
     // Destroy all join records
-    const joins = await loadHasMany(owner, "hmtDestroyAllJoins", { className: "HmtDestroyAllJoin", foreignKey: "hmt_destroy_all_owner_id" });
-    for (const j of joins) { await j.destroy(); }
+    const joins = await loadHasMany(owner, "hmtDestroyAllJoins", {
+      className: "HmtDestroyAllJoin",
+      foreignKey: "hmt_destroy_all_owner_id",
+    });
+    for (const j of joins) {
+      await j.destroy();
+    }
 
     const items = await loadHasManyThrough(owner, "hmtDestroyAllItems", {
       through: "hmtDestroyAllJoins",
@@ -2791,7 +4714,14 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("destroy all on composite primary key model", async () => {
     class CpkItem extends Base {
-      static { this._tableName = "cpk_da_items"; this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_da_items";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     registerModel("CpkItem", CpkItem);
     await CpkItem.create({ shop_id: 1, id: 1, name: "A" });
@@ -2799,48 +4729,104 @@ describe("HasManyThroughAssociationsTest", () => {
     const count = await CpkItem.count();
     expect(count).toBe(2);
     const items = await CpkItem.all().toArray();
-    for (const item of items) { await item.destroy(); }
+    for (const item of items) {
+      await item.destroy();
+    }
     expect(await CpkItem.count()).toBe(0);
   });
   it("composite primary key join table", async () => {
     class CpkJtOwner extends Base {
-      static { this._tableName = "cpk_jt_owners"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_jt_owners";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkJtJoin extends Base {
-      static { this._tableName = "cpk_jt_joins"; this.attribute("cpk_jt_owner_region_id", "integer"); this.attribute("cpk_jt_owner_id", "integer"); this.attribute("cpk_jt_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_jt_joins";
+        this.attribute("cpk_jt_owner_region_id", "integer");
+        this.attribute("cpk_jt_owner_id", "integer");
+        this.attribute("cpk_jt_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class CpkJtItem extends Base {
-      static { this._tableName = "cpk_jt_items"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_jt_items";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CpkJtOwner, "cpkJtJoins", { foreignKey: ["cpk_jt_owner_region_id", "cpk_jt_owner_id"], className: "CpkJtJoin" });
+    Associations.hasMany.call(CpkJtOwner, "cpkJtJoins", {
+      foreignKey: ["cpk_jt_owner_region_id", "cpk_jt_owner_id"],
+      className: "CpkJtJoin",
+    });
     Associations.belongsTo.call(CpkJtJoin, "cpkJtItem", { className: "CpkJtItem" });
-    Associations.hasMany.call(CpkJtOwner, "cpkJtItems", { through: "cpkJtJoins", className: "CpkJtItem", source: "cpkJtItem" });
+    Associations.hasMany.call(CpkJtOwner, "cpkJtItems", {
+      through: "cpkJtJoins",
+      className: "CpkJtItem",
+      source: "cpkJtItem",
+    });
     registerModel("CpkJtOwner", CpkJtOwner);
     registerModel("CpkJtJoin", CpkJtJoin);
     registerModel("CpkJtItem", CpkJtItem);
     const owner = await CpkJtOwner.create({ region_id: 1, id: 1, name: "Owner" });
     const item = await CpkJtItem.create({ name: "Widget" });
-    await CpkJtJoin.create({ cpk_jt_owner_region_id: 1, cpk_jt_owner_id: 1, cpk_jt_item_id: item.id });
-    const items = await loadHasManyThrough(owner, "cpkJtItems", { through: "cpkJtJoins", className: "CpkJtItem", source: "cpkJtItem" });
+    await CpkJtJoin.create({
+      cpk_jt_owner_region_id: 1,
+      cpk_jt_owner_id: 1,
+      cpk_jt_item_id: item.id,
+    });
+    const items = await loadHasManyThrough(owner, "cpkJtItems", {
+      through: "cpkJtJoins",
+      className: "CpkJtItem",
+      source: "cpkJtItem",
+    });
     expect(items.length).toBe(1);
     expect(items[0].readAttribute("name")).toBe("Widget");
   });
   it("destroy all on association clears scope", async () => {
     class HmtDaClrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDaClrJoin extends Base {
-      static { this.attribute("hmt_da_clr_owner_id", "integer"); this.attribute("hmt_da_clr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_da_clr_owner_id", "integer");
+        this.attribute("hmt_da_clr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDaClrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDaClrOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDaClrJoins", options: { className: "HmtDaClrJoin", foreignKey: "hmt_da_clr_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDaClrItems", options: { through: "hmtDaClrJoins", source: "hmtDaClrItem", className: "HmtDaClrItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDaClrJoins",
+        options: { className: "HmtDaClrJoin", foreignKey: "hmt_da_clr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDaClrItems",
+        options: { through: "hmtDaClrJoins", source: "hmtDaClrItem", className: "HmtDaClrItem" },
+      },
     ];
     (HmtDaClrJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDaClrItem", options: { className: "HmtDaClrItem", foreignKey: "hmt_da_clr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDaClrItem",
+        options: { className: "HmtDaClrItem", foreignKey: "hmt_da_clr_item_id" },
+      },
     ];
     registerModel("HmtDaClrOwner", HmtDaClrOwner);
     registerModel("HmtDaClrJoin", HmtDaClrJoin);
@@ -2849,11 +4835,22 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDaClrOwner.create({ name: "O" });
     const item1 = await HmtDaClrItem.create({ label: "I1" });
     const item2 = await HmtDaClrItem.create({ label: "I2" });
-    await HmtDaClrJoin.create({ hmt_da_clr_owner_id: owner.readAttribute("id"), hmt_da_clr_item_id: item1.readAttribute("id") });
-    await HmtDaClrJoin.create({ hmt_da_clr_owner_id: owner.readAttribute("id"), hmt_da_clr_item_id: item2.readAttribute("id") });
+    await HmtDaClrJoin.create({
+      hmt_da_clr_owner_id: owner.readAttribute("id"),
+      hmt_da_clr_item_id: item1.readAttribute("id"),
+    });
+    await HmtDaClrJoin.create({
+      hmt_da_clr_owner_id: owner.readAttribute("id"),
+      hmt_da_clr_item_id: item2.readAttribute("id"),
+    });
 
-    const joins = await loadHasMany(owner, "hmtDaClrJoins", { className: "HmtDaClrJoin", foreignKey: "hmt_da_clr_owner_id" });
-    for (const j of joins) { await j.destroy(); }
+    const joins = await loadHasMany(owner, "hmtDaClrJoins", {
+      className: "HmtDaClrJoin",
+      foreignKey: "hmt_da_clr_owner_id",
+    });
+    for (const j of joins) {
+      await j.destroy();
+    }
 
     const items = await loadHasManyThrough(owner, "hmtDaClrItems", {
       through: "hmtDaClrJoins",
@@ -2864,20 +4861,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("destroy on association clears scope", async () => {
     class HmtDstClrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDstClrJoin extends Base {
-      static { this.attribute("hmt_dst_clr_owner_id", "integer"); this.attribute("hmt_dst_clr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_dst_clr_owner_id", "integer");
+        this.attribute("hmt_dst_clr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDstClrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDstClrOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDstClrJoins", options: { className: "HmtDstClrJoin", foreignKey: "hmt_dst_clr_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDstClrItems", options: { through: "hmtDstClrJoins", source: "hmtDstClrItem", className: "HmtDstClrItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDstClrJoins",
+        options: { className: "HmtDstClrJoin", foreignKey: "hmt_dst_clr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDstClrItems",
+        options: { through: "hmtDstClrJoins", source: "hmtDstClrItem", className: "HmtDstClrItem" },
+      },
     ];
     (HmtDstClrJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDstClrItem", options: { className: "HmtDstClrItem", foreignKey: "hmt_dst_clr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDstClrItem",
+        options: { className: "HmtDstClrItem", foreignKey: "hmt_dst_clr_item_id" },
+      },
     ];
     registerModel("HmtDstClrOwner", HmtDstClrOwner);
     registerModel("HmtDstClrJoin", HmtDstClrJoin);
@@ -2886,8 +4905,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDstClrOwner.create({ name: "O" });
     const item1 = await HmtDstClrItem.create({ label: "I1" });
     const item2 = await HmtDstClrItem.create({ label: "I2" });
-    const j1 = await HmtDstClrJoin.create({ hmt_dst_clr_owner_id: owner.readAttribute("id"), hmt_dst_clr_item_id: item1.readAttribute("id") });
-    await HmtDstClrJoin.create({ hmt_dst_clr_owner_id: owner.readAttribute("id"), hmt_dst_clr_item_id: item2.readAttribute("id") });
+    const j1 = await HmtDstClrJoin.create({
+      hmt_dst_clr_owner_id: owner.readAttribute("id"),
+      hmt_dst_clr_item_id: item1.readAttribute("id"),
+    });
+    await HmtDstClrJoin.create({
+      hmt_dst_clr_owner_id: owner.readAttribute("id"),
+      hmt_dst_clr_item_id: item2.readAttribute("id"),
+    });
 
     await j1.destroy();
 
@@ -2901,20 +4926,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("delete on association clears scope", async () => {
     class HmtDelClrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDelClrJoin extends Base {
-      static { this.attribute("hmt_del_clr_owner_id", "integer"); this.attribute("hmt_del_clr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_del_clr_owner_id", "integer");
+        this.attribute("hmt_del_clr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDelClrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDelClrOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDelClrJoins", options: { className: "HmtDelClrJoin", foreignKey: "hmt_del_clr_owner_id" } },
-      { type: "hasManyThrough", name: "hmtDelClrItems", options: { through: "hmtDelClrJoins", source: "hmtDelClrItem", className: "HmtDelClrItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDelClrJoins",
+        options: { className: "HmtDelClrJoin", foreignKey: "hmt_del_clr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtDelClrItems",
+        options: { through: "hmtDelClrJoins", source: "hmtDelClrItem", className: "HmtDelClrItem" },
+      },
     ];
     (HmtDelClrJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDelClrItem", options: { className: "HmtDelClrItem", foreignKey: "hmt_del_clr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDelClrItem",
+        options: { className: "HmtDelClrItem", foreignKey: "hmt_del_clr_item_id" },
+      },
     ];
     registerModel("HmtDelClrOwner", HmtDelClrOwner);
     registerModel("HmtDelClrJoin", HmtDelClrJoin);
@@ -2922,7 +4969,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtDelClrOwner.create({ name: "O" });
     const item = await HmtDelClrItem.create({ label: "I" });
-    const join = await HmtDelClrJoin.create({ hmt_del_clr_owner_id: owner.readAttribute("id"), hmt_del_clr_item_id: item.readAttribute("id") });
+    const join = await HmtDelClrJoin.create({
+      hmt_del_clr_owner_id: owner.readAttribute("id"),
+      hmt_del_clr_item_id: item.readAttribute("id"),
+    });
 
     await join.destroy();
 
@@ -2935,20 +4985,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("should raise exception for destroying mismatching records", async () => {
     class HmtMismatchOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtMismatchJoin extends Base {
-      static { this.attribute("hmt_mismatch_owner_id", "integer"); this.attribute("hmt_mismatch_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_mismatch_owner_id", "integer");
+        this.attribute("hmt_mismatch_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtMismatchItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtMismatchOwner as any)._associations = [
-      { type: "hasMany", name: "hmtMismatchJoins", options: { className: "HmtMismatchJoin", foreignKey: "hmt_mismatch_owner_id" } },
-      { type: "hasManyThrough", name: "hmtMismatchItems", options: { through: "hmtMismatchJoins", source: "hmtMismatchItem", className: "HmtMismatchItem" } },
+      {
+        type: "hasMany",
+        name: "hmtMismatchJoins",
+        options: { className: "HmtMismatchJoin", foreignKey: "hmt_mismatch_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtMismatchItems",
+        options: {
+          through: "hmtMismatchJoins",
+          source: "hmtMismatchItem",
+          className: "HmtMismatchItem",
+        },
+      },
     ];
     (HmtMismatchJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtMismatchItem", options: { className: "HmtMismatchItem", foreignKey: "hmt_mismatch_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtMismatchItem",
+        options: { className: "HmtMismatchItem", foreignKey: "hmt_mismatch_item_id" },
+      },
     ];
     registerModel("HmtMismatchOwner", HmtMismatchOwner);
     registerModel("HmtMismatchJoin", HmtMismatchJoin);
@@ -2957,7 +5033,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner1 = await HmtMismatchOwner.create({ name: "O1" });
     const owner2 = await HmtMismatchOwner.create({ name: "O2" });
     const item = await HmtMismatchItem.create({ label: "I" });
-    await HmtMismatchJoin.create({ hmt_mismatch_owner_id: owner2.readAttribute("id"), hmt_mismatch_item_id: item.readAttribute("id") });
+    await HmtMismatchJoin.create({
+      hmt_mismatch_owner_id: owner2.readAttribute("id"),
+      hmt_mismatch_item_id: item.readAttribute("id"),
+    });
 
     // owner1 has no association with item - loading through should return empty
     const items = await loadHasManyThrough(owner1, "hmtMismatchItems", {
@@ -2969,23 +5048,44 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("delete through belongs to with dependent nullify", async () => {
     class DepNullOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class DepNullJoin extends Base {
-      static { this.attribute("dep_null_owner_id", "integer"); this.attribute("dep_null_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("dep_null_owner_id", "integer");
+        this.attribute("dep_null_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class DepNullItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (DepNullOwner as any)._associations = [
-      { type: "hasMany", name: "depNullJoins", options: { className: "DepNullJoin", foreignKey: "dep_null_owner_id", dependent: "nullify" } },
+      {
+        type: "hasMany",
+        name: "depNullJoins",
+        options: {
+          className: "DepNullJoin",
+          foreignKey: "dep_null_owner_id",
+          dependent: "nullify",
+        },
+      },
     ];
     registerModel("DepNullOwner", DepNullOwner);
     registerModel("DepNullJoin", DepNullJoin);
     registerModel("DepNullItem", DepNullItem);
     const owner = await DepNullOwner.create({ name: "O" });
     const item = await DepNullItem.create({ label: "I" });
-    await DepNullJoin.create({ dep_null_owner_id: owner.readAttribute("id"), dep_null_item_id: item.readAttribute("id") });
+    await DepNullJoin.create({
+      dep_null_owner_id: owner.readAttribute("id"),
+      dep_null_item_id: item.readAttribute("id"),
+    });
     await processDependentAssociations(owner);
     const joins = await DepNullJoin.all().toArray();
     expect(joins.length).toBe(1);
@@ -2993,13 +5093,24 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("delete through belongs to with dependent delete all", async () => {
     class DepDelOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class DepDelJoin extends Base {
-      static { this.attribute("dep_del_owner_id", "integer"); this.attribute("dep_del_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("dep_del_owner_id", "integer");
+        this.attribute("dep_del_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (DepDelOwner as any)._associations = [
-      { type: "hasMany", name: "depDelJoins", options: { className: "DepDelJoin", foreignKey: "dep_del_owner_id", dependent: "delete" } },
+      {
+        type: "hasMany",
+        name: "depDelJoins",
+        options: { className: "DepDelJoin", foreignKey: "dep_del_owner_id", dependent: "delete" },
+      },
     ];
     registerModel("DepDelOwner", DepDelOwner);
     registerModel("DepDelJoin", DepDelJoin);
@@ -3011,13 +5122,24 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("delete through belongs to with dependent destroy", async () => {
     class DepDesOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class DepDesJoin extends Base {
-      static { this.attribute("dep_des_owner_id", "integer"); this.attribute("dep_des_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("dep_des_owner_id", "integer");
+        this.attribute("dep_des_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (DepDesOwner as any)._associations = [
-      { type: "hasMany", name: "depDesJoins", options: { className: "DepDesJoin", foreignKey: "dep_des_owner_id", dependent: "destroy" } },
+      {
+        type: "hasMany",
+        name: "depDesJoins",
+        options: { className: "DepDesJoin", foreignKey: "dep_des_owner_id", dependent: "destroy" },
+      },
     ];
     registerModel("DepDesOwner", DepDesOwner);
     registerModel("DepDesJoin", DepDesJoin);
@@ -3029,16 +5151,30 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("belongs to with dependent destroy", async () => {
     class BtDesParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class BtDesChild extends Base {
-      static { this.attribute("bt_des_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("bt_des_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (BtDesChild as any)._associations = [
-      { type: "belongsTo", name: "btDesParent", options: { className: "BtDesParent", foreignKey: "bt_des_parent_id" } },
+      {
+        type: "belongsTo",
+        name: "btDesParent",
+        options: { className: "BtDesParent", foreignKey: "bt_des_parent_id" },
+      },
     ];
     (BtDesParent as any)._associations = [
-      { type: "hasMany", name: "btDesChildren", options: { className: "BtDesChild", foreignKey: "bt_des_parent_id", dependent: "destroy" } },
+      {
+        type: "hasMany",
+        name: "btDesChildren",
+        options: { className: "BtDesChild", foreignKey: "bt_des_parent_id", dependent: "destroy" },
+      },
     ];
     registerModel("BtDesParent", BtDesParent);
     registerModel("BtDesChild", BtDesChild);
@@ -3050,13 +5186,23 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("belongs to with dependent delete all", async () => {
     class BtDelParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class BtDelChild extends Base {
-      static { this.attribute("bt_del_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("bt_del_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (BtDelParent as any)._associations = [
-      { type: "hasMany", name: "btDelChildren", options: { className: "BtDelChild", foreignKey: "bt_del_parent_id", dependent: "delete" } },
+      {
+        type: "hasMany",
+        name: "btDelChildren",
+        options: { className: "BtDelChild", foreignKey: "bt_del_parent_id", dependent: "delete" },
+      },
     ];
     registerModel("BtDelParent", BtDelParent);
     registerModel("BtDelChild", BtDelChild);
@@ -3068,13 +5214,27 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("belongs to with dependent nullify", async () => {
     class BtNullParent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class BtNullChild extends Base {
-      static { this.attribute("bt_null_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("bt_null_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
     (BtNullParent as any)._associations = [
-      { type: "hasMany", name: "btNullChildren", options: { className: "BtNullChild", foreignKey: "bt_null_parent_id", dependent: "nullify" } },
+      {
+        type: "hasMany",
+        name: "btNullChildren",
+        options: {
+          className: "BtNullChild",
+          foreignKey: "bt_null_parent_id",
+          dependent: "nullify",
+        },
+      },
     ];
     registerModel("BtNullParent", BtNullParent);
     registerModel("BtNullChild", BtNullChild);
@@ -3093,20 +5253,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("update counter caches on destroy with indestructible through record", () => {});
   it("replace association", async () => {
     class HmtReplOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtReplJoin extends Base {
-      static { this.attribute("hmt_repl_owner_id", "integer"); this.attribute("hmt_repl_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_repl_owner_id", "integer");
+        this.attribute("hmt_repl_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtReplItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtReplOwner as any)._associations = [
-      { type: "hasMany", name: "hmtReplJoins", options: { className: "HmtReplJoin", foreignKey: "hmt_repl_owner_id" } },
-      { type: "hasManyThrough", name: "hmtReplItems", options: { through: "hmtReplJoins", source: "hmtReplItem", className: "HmtReplItem" } },
+      {
+        type: "hasMany",
+        name: "hmtReplJoins",
+        options: { className: "HmtReplJoin", foreignKey: "hmt_repl_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtReplItems",
+        options: { through: "hmtReplJoins", source: "hmtReplItem", className: "HmtReplItem" },
+      },
     ];
     (HmtReplJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtReplItem", options: { className: "HmtReplItem", foreignKey: "hmt_repl_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtReplItem",
+        options: { className: "HmtReplItem", foreignKey: "hmt_repl_item_id" },
+      },
     ];
     registerModel("HmtReplOwner", HmtReplOwner);
     registerModel("HmtReplJoin", HmtReplJoin);
@@ -3115,12 +5297,23 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtReplOwner.create({ name: "O" });
     const item1 = await HmtReplItem.create({ label: "I1" });
     const item2 = await HmtReplItem.create({ label: "I2" });
-    await HmtReplJoin.create({ hmt_repl_owner_id: owner.readAttribute("id"), hmt_repl_item_id: item1.readAttribute("id") });
+    await HmtReplJoin.create({
+      hmt_repl_owner_id: owner.readAttribute("id"),
+      hmt_repl_item_id: item1.readAttribute("id"),
+    });
 
     // Replace: destroy old join, create new one
-    const oldJoins = await loadHasMany(owner, "hmtReplJoins", { className: "HmtReplJoin", foreignKey: "hmt_repl_owner_id" });
-    for (const j of oldJoins) { await j.destroy(); }
-    await HmtReplJoin.create({ hmt_repl_owner_id: owner.readAttribute("id"), hmt_repl_item_id: item2.readAttribute("id") });
+    const oldJoins = await loadHasMany(owner, "hmtReplJoins", {
+      className: "HmtReplJoin",
+      foreignKey: "hmt_repl_owner_id",
+    });
+    for (const j of oldJoins) {
+      await j.destroy();
+    }
+    await HmtReplJoin.create({
+      hmt_repl_owner_id: owner.readAttribute("id"),
+      hmt_repl_item_id: item2.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtReplItems", {
       through: "hmtReplJoins",
@@ -3132,20 +5325,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("replace association with duplicates", async () => {
     class HmtReplDupOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtReplDupJoin extends Base {
-      static { this.attribute("hmt_repl_dup_owner_id", "integer"); this.attribute("hmt_repl_dup_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_repl_dup_owner_id", "integer");
+        this.attribute("hmt_repl_dup_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtReplDupItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtReplDupOwner as any)._associations = [
-      { type: "hasMany", name: "hmtReplDupJoins", options: { className: "HmtReplDupJoin", foreignKey: "hmt_repl_dup_owner_id" } },
-      { type: "hasManyThrough", name: "hmtReplDupItems", options: { through: "hmtReplDupJoins", source: "hmtReplDupItem", className: "HmtReplDupItem" } },
+      {
+        type: "hasMany",
+        name: "hmtReplDupJoins",
+        options: { className: "HmtReplDupJoin", foreignKey: "hmt_repl_dup_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtReplDupItems",
+        options: {
+          through: "hmtReplDupJoins",
+          source: "hmtReplDupItem",
+          className: "HmtReplDupItem",
+        },
+      },
     ];
     (HmtReplDupJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtReplDupItem", options: { className: "HmtReplDupItem", foreignKey: "hmt_repl_dup_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtReplDupItem",
+        options: { className: "HmtReplDupItem", foreignKey: "hmt_repl_dup_item_id" },
+      },
     ];
     registerModel("HmtReplDupOwner", HmtReplDupOwner);
     registerModel("HmtReplDupJoin", HmtReplDupJoin);
@@ -3154,8 +5373,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtReplDupOwner.create({ name: "O" });
     const item1 = await HmtReplDupItem.create({ label: "I1" });
     // Create two joins to the same item (duplicates)
-    await HmtReplDupJoin.create({ hmt_repl_dup_owner_id: owner.readAttribute("id"), hmt_repl_dup_item_id: item1.readAttribute("id") });
-    await HmtReplDupJoin.create({ hmt_repl_dup_owner_id: owner.readAttribute("id"), hmt_repl_dup_item_id: item1.readAttribute("id") });
+    await HmtReplDupJoin.create({
+      hmt_repl_dup_owner_id: owner.readAttribute("id"),
+      hmt_repl_dup_item_id: item1.readAttribute("id"),
+    });
+    await HmtReplDupJoin.create({
+      hmt_repl_dup_owner_id: owner.readAttribute("id"),
+      hmt_repl_dup_item_id: item1.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtReplDupItems", {
       through: "hmtReplDupJoins",
@@ -3170,13 +5395,23 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("associate with create", async () => {
     class HmtSponsor extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtSponsorShip extends Base {
-      static { this.attribute("sponsor_id", "integer"); this.attribute("event_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("sponsor_id", "integer");
+        this.attribute("event_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtEvent extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtSponsor", HmtSponsor);
     registerModel("HmtSponsorShip", HmtSponsorShip);
@@ -3195,13 +5430,23 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("through record is built when created with where", () => {});
   it("associate with create and no options", async () => {
     class HmtSimpleOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtSimpleJoin extends Base {
-      static { this.attribute("hmt_simple_owner_id", "integer"); this.attribute("hmt_simple_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_simple_owner_id", "integer");
+        this.attribute("hmt_simple_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtSimpleTarget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtSimpleOwner", HmtSimpleOwner);
     registerModel("HmtSimpleJoin", HmtSimpleJoin);
@@ -3219,13 +5464,23 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("associate with create with through having conditions", () => {});
   it("associate with create exclamation and no options", async () => {
     class HmtBangNoOptOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtBangNoOptJoin extends Base {
-      static { this.attribute("hmt_bang_no_opt_owner_id", "integer"); this.attribute("hmt_bang_no_opt_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_bang_no_opt_owner_id", "integer");
+        this.attribute("hmt_bang_no_opt_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtBangNoOptTarget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtBangNoOptOwner", HmtBangNoOptOwner);
     registerModel("HmtBangNoOptJoin", HmtBangNoOptJoin);
@@ -3242,13 +5497,23 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("create on new record", async () => {
     class HmtNewRecOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNewRecJoin extends Base {
-      static { this.attribute("hmt_new_rec_owner_id", "integer"); this.attribute("hmt_new_rec_thing_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_new_rec_owner_id", "integer");
+        this.attribute("hmt_new_rec_thing_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtNewRecThing extends Base {
-      static { this.attribute("value", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtNewRecOwner", HmtNewRecOwner);
     registerModel("HmtNewRecJoin", HmtNewRecJoin);
@@ -3267,28 +5532,48 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("associate with create and invalid options", async () => {
     class HmtInvOptOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtInvOptJoin extends Base {
-      static { this.attribute("hmt_inv_opt_owner_id", "integer"); this.attribute("hmt_inv_opt_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_inv_opt_owner_id", "integer");
+        this.attribute("hmt_inv_opt_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtInvOptOwner", HmtInvOptOwner);
     registerModel("HmtInvOptJoin", HmtInvOptJoin);
 
     const owner = await HmtInvOptOwner.create({ name: "O" });
     // Creating a join record with a non-existent target FK still persists the join record
-    const join = await HmtInvOptJoin.create({ hmt_inv_opt_owner_id: owner.readAttribute("id"), hmt_inv_opt_item_id: 9999 });
+    const join = await HmtInvOptJoin.create({
+      hmt_inv_opt_owner_id: owner.readAttribute("id"),
+      hmt_inv_opt_item_id: 9999,
+    });
     expect(join.readAttribute("id")).not.toBeNull();
   });
   it("associate with create and valid options", async () => {
     class HmtValOptOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtValOptJoin extends Base {
-      static { this.attribute("hmt_val_opt_owner_id", "integer"); this.attribute("hmt_val_opt_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_val_opt_owner_id", "integer");
+        this.attribute("hmt_val_opt_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtValOptItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtValOptOwner", HmtValOptOwner);
     registerModel("HmtValOptJoin", HmtValOptJoin);
@@ -3296,34 +5581,57 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtValOptOwner.create({ name: "O" });
     const item = await HmtValOptItem.create({ label: "I" });
-    const join = await HmtValOptJoin.create({ hmt_val_opt_owner_id: owner.readAttribute("id"), hmt_val_opt_item_id: item.readAttribute("id") });
+    const join = await HmtValOptJoin.create({
+      hmt_val_opt_owner_id: owner.readAttribute("id"),
+      hmt_val_opt_item_id: item.readAttribute("id"),
+    });
     expect(join.readAttribute("id")).not.toBeNull();
     expect(join.readAttribute("hmt_val_opt_owner_id")).toBe(owner.readAttribute("id"));
     expect(join.readAttribute("hmt_val_opt_item_id")).toBe(item.readAttribute("id"));
   });
   it("associate with create bang and invalid options", async () => {
     class HmtBangInvOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtBangInvJoin extends Base {
-      static { this.attribute("hmt_bang_inv_owner_id", "integer"); this.attribute("hmt_bang_inv_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_bang_inv_owner_id", "integer");
+        this.attribute("hmt_bang_inv_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtBangInvOwner", HmtBangInvOwner);
     registerModel("HmtBangInvJoin", HmtBangInvJoin);
 
     const owner = await HmtBangInvOwner.create({ name: "O" });
-    const join = await HmtBangInvJoin.create({ hmt_bang_inv_owner_id: owner.readAttribute("id"), hmt_bang_inv_item_id: 9999 });
+    const join = await HmtBangInvJoin.create({
+      hmt_bang_inv_owner_id: owner.readAttribute("id"),
+      hmt_bang_inv_item_id: 9999,
+    });
     expect(join.readAttribute("id")).not.toBeNull();
   });
   it("associate with create bang and valid options", async () => {
     class HmtBangValOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtBangValJoin extends Base {
-      static { this.attribute("hmt_bang_val_owner_id", "integer"); this.attribute("hmt_bang_val_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_bang_val_owner_id", "integer");
+        this.attribute("hmt_bang_val_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtBangValItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtBangValOwner", HmtBangValOwner);
     registerModel("HmtBangValJoin", HmtBangValJoin);
@@ -3331,7 +5639,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtBangValOwner.create({ name: "O" });
     const item = await HmtBangValItem.create({ label: "I" });
-    const join = await HmtBangValJoin.create({ hmt_bang_val_owner_id: owner.readAttribute("id"), hmt_bang_val_item_id: item.readAttribute("id") });
+    const join = await HmtBangValJoin.create({
+      hmt_bang_val_owner_id: owner.readAttribute("id"),
+      hmt_bang_val_item_id: item.readAttribute("id"),
+    });
     expect(join.readAttribute("id")).not.toBeNull();
     expect(join.readAttribute("hmt_bang_val_owner_id")).toBe(owner.readAttribute("id"));
     expect(join.readAttribute("hmt_bang_val_item_id")).toBe(item.readAttribute("id"));
@@ -3340,20 +5651,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("push with invalid join record", () => {});
   it("clear associations", async () => {
     class HmtClrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtClrJoin extends Base {
-      static { this.attribute("hmt_clr_owner_id", "integer"); this.attribute("hmt_clr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_clr_owner_id", "integer");
+        this.attribute("hmt_clr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtClrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtClrOwner as any)._associations = [
-      { type: "hasMany", name: "hmtClrJoins", options: { className: "HmtClrJoin", foreignKey: "hmt_clr_owner_id" } },
-      { type: "hasManyThrough", name: "hmtClrItems", options: { through: "hmtClrJoins", source: "hmtClrItem", className: "HmtClrItem" } },
+      {
+        type: "hasMany",
+        name: "hmtClrJoins",
+        options: { className: "HmtClrJoin", foreignKey: "hmt_clr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtClrItems",
+        options: { through: "hmtClrJoins", source: "hmtClrItem", className: "HmtClrItem" },
+      },
     ];
     (HmtClrJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtClrItem", options: { className: "HmtClrItem", foreignKey: "hmt_clr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtClrItem",
+        options: { className: "HmtClrItem", foreignKey: "hmt_clr_item_id" },
+      },
     ];
     registerModel("HmtClrOwner", HmtClrOwner);
     registerModel("HmtClrJoin", HmtClrJoin);
@@ -3362,13 +5695,24 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtClrOwner.create({ name: "O" });
     const item1 = await HmtClrItem.create({ label: "I1" });
     const item2 = await HmtClrItem.create({ label: "I2" });
-    await HmtClrJoin.create({ hmt_clr_owner_id: owner.readAttribute("id"), hmt_clr_item_id: item1.readAttribute("id") });
-    await HmtClrJoin.create({ hmt_clr_owner_id: owner.readAttribute("id"), hmt_clr_item_id: item2.readAttribute("id") });
+    await HmtClrJoin.create({
+      hmt_clr_owner_id: owner.readAttribute("id"),
+      hmt_clr_item_id: item1.readAttribute("id"),
+    });
+    await HmtClrJoin.create({
+      hmt_clr_owner_id: owner.readAttribute("id"),
+      hmt_clr_item_id: item2.readAttribute("id"),
+    });
 
     // Clear by destroying all join records
-    const joins = await loadHasMany(owner, "hmtClrJoins", { className: "HmtClrJoin", foreignKey: "hmt_clr_owner_id" });
+    const joins = await loadHasMany(owner, "hmtClrJoins", {
+      className: "HmtClrJoin",
+      foreignKey: "hmt_clr_owner_id",
+    });
     expect(joins).toHaveLength(2);
-    for (const j of joins) { await j.destroy(); }
+    for (const j of joins) {
+      await j.destroy();
+    }
 
     const items = await loadHasManyThrough(owner, "hmtClrItems", {
       through: "hmtClrJoins",
@@ -3383,20 +5727,46 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("inner join with quoted table name", () => {});
   it("get ids for has many through with conditions should not preload", async () => {
     class HmtIdsCondOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtIdsCondJoin extends Base {
-      static { this.attribute("hmt_ids_cond_owner_id", "integer"); this.attribute("hmt_ids_cond_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_ids_cond_owner_id", "integer");
+        this.attribute("hmt_ids_cond_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtIdsCondItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtIdsCondOwner as any)._associations = [
-      { type: "hasMany", name: "hmtIdsCondJoins", options: { className: "HmtIdsCondJoin", foreignKey: "hmt_ids_cond_owner_id" } },
-      { type: "hasManyThrough", name: "hmtIdsCondItems", options: { through: "hmtIdsCondJoins", source: "hmtIdsCondItem", className: "HmtIdsCondItem" } },
+      {
+        type: "hasMany",
+        name: "hmtIdsCondJoins",
+        options: { className: "HmtIdsCondJoin", foreignKey: "hmt_ids_cond_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtIdsCondItems",
+        options: {
+          through: "hmtIdsCondJoins",
+          source: "hmtIdsCondItem",
+          className: "HmtIdsCondItem",
+        },
+      },
     ];
     (HmtIdsCondJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtIdsCondItem", options: { className: "HmtIdsCondItem", foreignKey: "hmt_ids_cond_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtIdsCondItem",
+        options: { className: "HmtIdsCondItem", foreignKey: "hmt_ids_cond_item_id" },
+      },
     ];
     registerModel("HmtIdsCondOwner", HmtIdsCondOwner);
     registerModel("HmtIdsCondJoin", HmtIdsCondJoin);
@@ -3405,8 +5775,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtIdsCondOwner.create({ name: "O" });
     const item1 = await HmtIdsCondItem.create({ label: "I1" });
     const item2 = await HmtIdsCondItem.create({ label: "I2" });
-    await HmtIdsCondJoin.create({ hmt_ids_cond_owner_id: owner.readAttribute("id"), hmt_ids_cond_item_id: item1.readAttribute("id") });
-    await HmtIdsCondJoin.create({ hmt_ids_cond_owner_id: owner.readAttribute("id"), hmt_ids_cond_item_id: item2.readAttribute("id") });
+    await HmtIdsCondJoin.create({
+      hmt_ids_cond_owner_id: owner.readAttribute("id"),
+      hmt_ids_cond_item_id: item1.readAttribute("id"),
+    });
+    await HmtIdsCondJoin.create({
+      hmt_ids_cond_owner_id: owner.readAttribute("id"),
+      hmt_ids_cond_item_id: item2.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtIdsCondItems", {
       through: "hmtIdsCondJoins",
@@ -3421,10 +5797,17 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("get ids for loaded associations", async () => {
     class HmtGroup extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtMemberRecord extends Base {
-      static { this.attribute("name", "string"); this.attribute("group_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("group_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtGroup", HmtGroup);
     registerModel("HmtMemberRecord", HmtMemberRecord);
@@ -3433,7 +5816,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const m1 = await HmtMemberRecord.create({ name: "Alice", group_id: group.readAttribute("id") });
     const m2 = await HmtMemberRecord.create({ name: "Bob", group_id: group.readAttribute("id") });
 
-    const members = await loadHasMany(group, "hmtMemberRecords", { className: "HmtMemberRecord", foreignKey: "group_id" });
+    const members = await loadHasMany(group, "hmtMemberRecords", {
+      className: "HmtMemberRecord",
+      foreignKey: "group_id",
+    });
     const ids = members.map((m) => m.readAttribute("id"));
     expect(ids).toContain(m1.readAttribute("id"));
     expect(ids).toContain(m2.readAttribute("id"));
@@ -3441,19 +5827,32 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("get ids for unloaded associations does not load them", async () => {
     class HmtUnloadGroup extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtUnloadMember extends Base {
-      static { this.attribute("name", "string"); this.attribute("hmt_unload_group_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("hmt_unload_group_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtUnloadGroup", HmtUnloadGroup);
     registerModel("HmtUnloadMember", HmtUnloadMember);
 
     const group = await HmtUnloadGroup.create({ name: "Team" });
-    const m1 = await HmtUnloadMember.create({ name: "Alice", hmt_unload_group_id: group.readAttribute("id") });
+    const m1 = await HmtUnloadMember.create({
+      name: "Alice",
+      hmt_unload_group_id: group.readAttribute("id"),
+    });
 
     // Loading via loadHasMany should return the members without pre-populating _preloadedAssociations
-    const members = await loadHasMany(group, "hmtUnloadMembers", { className: "HmtUnloadMember", foreignKey: "hmt_unload_group_id" });
+    const members = await loadHasMany(group, "hmtUnloadMembers", {
+      className: "HmtUnloadMember",
+      foreignKey: "hmt_unload_group_id",
+    });
     expect(members).toHaveLength(1);
     expect(members[0].readAttribute("id")).toBe(m1.readAttribute("id"));
   });
@@ -3461,20 +5860,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("has many through uses the through model to create transactions", () => {});
   it("has many association through a belongs to association where the association doesnt exist", async () => {
     class HmtNoBtOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNoBtJoin extends Base {
-      static { this.attribute("hmt_no_bt_owner_id", "integer"); this.attribute("hmt_no_bt_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_no_bt_owner_id", "integer");
+        this.attribute("hmt_no_bt_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtNoBtItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtNoBtOwner as any)._associations = [
-      { type: "hasMany", name: "hmtNoBtJoins", options: { className: "HmtNoBtJoin", foreignKey: "hmt_no_bt_owner_id" } },
-      { type: "hasManyThrough", name: "hmtNoBtItems", options: { through: "hmtNoBtJoins", source: "hmtNoBtItem", className: "HmtNoBtItem" } },
+      {
+        type: "hasMany",
+        name: "hmtNoBtJoins",
+        options: { className: "HmtNoBtJoin", foreignKey: "hmt_no_bt_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtNoBtItems",
+        options: { through: "hmtNoBtJoins", source: "hmtNoBtItem", className: "HmtNoBtItem" },
+      },
     ];
     (HmtNoBtJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtNoBtItem", options: { className: "HmtNoBtItem", foreignKey: "hmt_no_bt_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtNoBtItem",
+        options: { className: "HmtNoBtItem", foreignKey: "hmt_no_bt_item_id" },
+      },
     ];
     registerModel("HmtNoBtOwner", HmtNoBtOwner);
     registerModel("HmtNoBtJoin", HmtNoBtJoin);
@@ -3495,20 +5916,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("find on has many association collection with include and conditions", () => {});
   it("has many through has one reflection", async () => {
     class HmtHoReflOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtHoReflJoin extends Base {
-      static { this.attribute("hmt_ho_refl_owner_id", "integer"); this.attribute("hmt_ho_refl_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_ho_refl_owner_id", "integer");
+        this.attribute("hmt_ho_refl_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtHoReflItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtHoReflOwner as any)._associations = [
-      { type: "hasMany", name: "hmtHoReflJoins", options: { className: "HmtHoReflJoin", foreignKey: "hmt_ho_refl_owner_id" } },
-      { type: "hasManyThrough", name: "hmtHoReflItems", options: { through: "hmtHoReflJoins", source: "hmtHoReflItem", className: "HmtHoReflItem" } },
+      {
+        type: "hasMany",
+        name: "hmtHoReflJoins",
+        options: { className: "HmtHoReflJoin", foreignKey: "hmt_ho_refl_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtHoReflItems",
+        options: { through: "hmtHoReflJoins", source: "hmtHoReflItem", className: "HmtHoReflItem" },
+      },
     ];
     (HmtHoReflJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtHoReflItem", options: { className: "HmtHoReflItem", foreignKey: "hmt_ho_refl_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtHoReflItem",
+        options: { className: "HmtHoReflItem", foreignKey: "hmt_ho_refl_item_id" },
+      },
     ];
     registerModel("HmtHoReflOwner", HmtHoReflOwner);
     registerModel("HmtHoReflJoin", HmtHoReflJoin);
@@ -3516,7 +5959,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtHoReflOwner.create({ name: "O" });
     const item = await HmtHoReflItem.create({ label: "I" });
-    await HmtHoReflJoin.create({ hmt_ho_refl_owner_id: owner.readAttribute("id"), hmt_ho_refl_item_id: item.readAttribute("id") });
+    await HmtHoReflJoin.create({
+      hmt_ho_refl_owner_id: owner.readAttribute("id"),
+      hmt_ho_refl_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtHoReflItems", {
       through: "hmtHoReflJoins",
@@ -3533,10 +5979,17 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("collection exists", async () => {
     class HmtProject extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtTask extends Base {
-      static { this.attribute("title", "string"); this.attribute("project_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("project_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtProject", HmtProject);
     registerModel("HmtTask", HmtTask);
@@ -3544,7 +5997,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const project = await HmtProject.create({ name: "Alpha" });
     await HmtTask.create({ title: "Task 1", project_id: project.readAttribute("id") });
 
-    const tasks = await loadHasMany(project, "hmtTasks", { className: "HmtTask", foreignKey: "project_id" });
+    const tasks = await loadHasMany(project, "hmtTasks", {
+      className: "HmtTask",
+      foreignKey: "project_id",
+    });
     expect(tasks.length > 0).toBe(true);
   });
 
@@ -3553,10 +6009,17 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("collection singular ids setter", async () => {
     class HmtLibrary extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtBook extends Base {
-      static { this.attribute("title", "string"); this.attribute("library_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("library_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtLibrary", HmtLibrary);
     registerModel("HmtBook", HmtBook);
@@ -3564,7 +6027,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const library = await HmtLibrary.create({ name: "Central" });
     const book = await HmtBook.create({ title: "Guide", library_id: library.readAttribute("id") });
 
-    const books = await loadHasMany(library, "hmtBooks", { className: "HmtBook", foreignKey: "library_id" });
+    const books = await loadHasMany(library, "hmtBooks", {
+      className: "HmtBook",
+      foreignKey: "library_id",
+    });
     const ids = books.map((b) => b.readAttribute("id"));
     expect(ids).toContain(book.readAttribute("id"));
   });
@@ -3575,13 +6041,24 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("collection singular ids through setter raises exception when invalid ids set", () => {});
   it("build a model from hm through association with where clause", async () => {
     class HmtBuildOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtBuildJoin extends Base {
-      static { this.attribute("hmt_build_owner_id", "integer"); this.attribute("hmt_build_item_id", "integer"); this.attribute("role", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_build_owner_id", "integer");
+        this.attribute("hmt_build_item_id", "integer");
+        this.attribute("role", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtBuildItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtBuildOwner", HmtBuildOwner);
     registerModel("HmtBuildJoin", HmtBuildJoin);
@@ -3595,13 +6072,23 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("attributes are being set when initialized from hm through association with where clause", async () => {
     class HmtAttrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtAttrJoin extends Base {
-      static { this.attribute("hmt_attr_owner_id", "integer"); this.attribute("hmt_attr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_attr_owner_id", "integer");
+        this.attribute("hmt_attr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtAttrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtAttrOwner", HmtAttrOwner);
     registerModel("HmtAttrJoin", HmtAttrJoin);
@@ -3611,13 +6098,24 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("attributes are being set when initialized from hm through association with multiple where clauses", async () => {
     class HmtMwOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtMwJoin extends Base {
-      static { this.attribute("hmt_mw_owner_id", "integer"); this.attribute("hmt_mw_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_mw_owner_id", "integer");
+        this.attribute("hmt_mw_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtMwItem extends Base {
-      static { this.attribute("label", "string"); this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtMwOwner", HmtMwOwner);
     registerModel("HmtMwJoin", HmtMwJoin);
@@ -3630,20 +6128,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("include method in association through should return true for instance added with nested builds", () => {});
   it("through association readonly should be false", async () => {
     class HmtRoOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtRoJoin extends Base {
-      static { this.attribute("hmt_ro_owner_id", "integer"); this.attribute("hmt_ro_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_ro_owner_id", "integer");
+        this.attribute("hmt_ro_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtRoItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtRoOwner as any)._associations = [
-      { type: "hasMany", name: "hmtRoJoins", options: { className: "HmtRoJoin", foreignKey: "hmt_ro_owner_id" } },
-      { type: "hasManyThrough", name: "hmtRoItems", options: { through: "hmtRoJoins", source: "hmtRoItem", className: "HmtRoItem" } },
+      {
+        type: "hasMany",
+        name: "hmtRoJoins",
+        options: { className: "HmtRoJoin", foreignKey: "hmt_ro_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtRoItems",
+        options: { through: "hmtRoJoins", source: "hmtRoItem", className: "HmtRoItem" },
+      },
     ];
     (HmtRoJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtRoItem", options: { className: "HmtRoItem", foreignKey: "hmt_ro_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtRoItem",
+        options: { className: "HmtRoItem", foreignKey: "hmt_ro_item_id" },
+      },
     ];
     registerModel("HmtRoOwner", HmtRoOwner);
     registerModel("HmtRoJoin", HmtRoJoin);
@@ -3651,7 +6171,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtRoOwner.create({ name: "O" });
     const item = await HmtRoItem.create({ label: "I" });
-    await HmtRoJoin.create({ hmt_ro_owner_id: owner.readAttribute("id"), hmt_ro_item_id: item.readAttribute("id") });
+    await HmtRoJoin.create({
+      hmt_ro_owner_id: owner.readAttribute("id"),
+      hmt_ro_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtRoItems", {
       through: "hmtRoJoins",
@@ -3667,20 +6190,42 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("can update through association", async () => {
     class HmtUpdOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtUpdJoin extends Base {
-      static { this.attribute("hmt_upd_owner_id", "integer"); this.attribute("hmt_upd_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_upd_owner_id", "integer");
+        this.attribute("hmt_upd_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtUpdItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtUpdOwner as any)._associations = [
-      { type: "hasMany", name: "hmtUpdJoins", options: { className: "HmtUpdJoin", foreignKey: "hmt_upd_owner_id" } },
-      { type: "hasManyThrough", name: "hmtUpdItems", options: { through: "hmtUpdJoins", source: "hmtUpdItem", className: "HmtUpdItem" } },
+      {
+        type: "hasMany",
+        name: "hmtUpdJoins",
+        options: { className: "HmtUpdJoin", foreignKey: "hmt_upd_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtUpdItems",
+        options: { through: "hmtUpdJoins", source: "hmtUpdItem", className: "HmtUpdItem" },
+      },
     ];
     (HmtUpdJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtUpdItem", options: { className: "HmtUpdItem", foreignKey: "hmt_upd_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtUpdItem",
+        options: { className: "HmtUpdItem", foreignKey: "hmt_upd_item_id" },
+      },
     ];
     registerModel("HmtUpdOwner", HmtUpdOwner);
     registerModel("HmtUpdJoin", HmtUpdJoin);
@@ -3688,7 +6233,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtUpdOwner.create({ name: "O" });
     const item = await HmtUpdItem.create({ label: "Original" });
-    await HmtUpdJoin.create({ hmt_upd_owner_id: owner.readAttribute("id"), hmt_upd_item_id: item.readAttribute("id") });
+    await HmtUpdJoin.create({
+      hmt_upd_owner_id: owner.readAttribute("id"),
+      hmt_upd_item_id: item.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtUpdItems", {
       through: "hmtUpdJoins",
@@ -3709,101 +6257,205 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("has many through polymorphic with primary key option", () => {});
   it("has many through with primary key option", async () => {
     class HmtPkOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtPkJoin extends Base {
-      static { this.attribute("hmt_pk_owner_id", "integer"); this.attribute("hmt_pk_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_pk_owner_id", "integer");
+        this.attribute("hmt_pk_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtPkItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtPkOwner as any)._associations = [
-      { type: "hasMany", name: "hmtPkJoins", options: { className: "HmtPkJoin", foreignKey: "hmt_pk_owner_id" } },
-      { type: "hasMany", name: "hmtPkItems", options: { className: "HmtPkItem", through: "hmtPkJoins", source: "hmtPkItem" } },
+      {
+        type: "hasMany",
+        name: "hmtPkJoins",
+        options: { className: "HmtPkJoin", foreignKey: "hmt_pk_owner_id" },
+      },
+      {
+        type: "hasMany",
+        name: "hmtPkItems",
+        options: { className: "HmtPkItem", through: "hmtPkJoins", source: "hmtPkItem" },
+      },
     ];
     (HmtPkJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtPkItem", options: { className: "HmtPkItem", foreignKey: "hmt_pk_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtPkItem",
+        options: { className: "HmtPkItem", foreignKey: "hmt_pk_item_id" },
+      },
     ];
     registerModel("HmtPkOwner", HmtPkOwner);
     registerModel("HmtPkJoin", HmtPkJoin);
     registerModel("HmtPkItem", HmtPkItem);
     const owner = await HmtPkOwner.create({ name: "O" });
     const item = await HmtPkItem.create({ label: "I" });
-    await HmtPkJoin.create({ hmt_pk_owner_id: owner.readAttribute("id"), hmt_pk_item_id: item.readAttribute("id") });
-    const items = await loadHasManyThrough(owner, "hmtPkItems", { through: "hmtPkJoins", source: "hmtPkItem", className: "HmtPkItem" });
+    await HmtPkJoin.create({
+      hmt_pk_owner_id: owner.readAttribute("id"),
+      hmt_pk_item_id: item.readAttribute("id"),
+    });
+    const items = await loadHasManyThrough(owner, "hmtPkItems", {
+      through: "hmtPkJoins",
+      source: "hmtPkItem",
+      className: "HmtPkItem",
+    });
     expect(items).toHaveLength(1);
   });
   it("has many through with default scope on join model", async () => {
     class HmtDsOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtDsJoin extends Base {
-      static { this.attribute("hmt_ds_owner_id", "integer"); this.attribute("hmt_ds_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_ds_owner_id", "integer");
+        this.attribute("hmt_ds_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtDsItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtDsOwner as any)._associations = [
-      { type: "hasMany", name: "hmtDsJoins", options: { className: "HmtDsJoin", foreignKey: "hmt_ds_owner_id" } },
-      { type: "hasMany", name: "hmtDsItems", options: { className: "HmtDsItem", through: "hmtDsJoins", source: "hmtDsItem" } },
+      {
+        type: "hasMany",
+        name: "hmtDsJoins",
+        options: { className: "HmtDsJoin", foreignKey: "hmt_ds_owner_id" },
+      },
+      {
+        type: "hasMany",
+        name: "hmtDsItems",
+        options: { className: "HmtDsItem", through: "hmtDsJoins", source: "hmtDsItem" },
+      },
     ];
     (HmtDsJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtDsItem", options: { className: "HmtDsItem", foreignKey: "hmt_ds_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtDsItem",
+        options: { className: "HmtDsItem", foreignKey: "hmt_ds_item_id" },
+      },
     ];
     registerModel("HmtDsOwner", HmtDsOwner);
     registerModel("HmtDsJoin", HmtDsJoin);
     registerModel("HmtDsItem", HmtDsItem);
     const owner = await HmtDsOwner.create({ name: "O" });
     const item = await HmtDsItem.create({ label: "I" });
-    await HmtDsJoin.create({ hmt_ds_owner_id: owner.readAttribute("id"), hmt_ds_item_id: item.readAttribute("id") });
-    const items = await loadHasManyThrough(owner, "hmtDsItems", { through: "hmtDsJoins", source: "hmtDsItem", className: "HmtDsItem" });
+    await HmtDsJoin.create({
+      hmt_ds_owner_id: owner.readAttribute("id"),
+      hmt_ds_item_id: item.readAttribute("id"),
+    });
+    const items = await loadHasManyThrough(owner, "hmtDsItems", {
+      through: "hmtDsJoins",
+      source: "hmtDsItem",
+      className: "HmtDsItem",
+    });
     expect(items).toHaveLength(1);
   });
   it("create has many through with default scope on join model", async () => {
     class HmtCdOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtCdJoin extends Base {
-      static { this.attribute("hmt_cd_owner_id", "integer"); this.attribute("hmt_cd_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_cd_owner_id", "integer");
+        this.attribute("hmt_cd_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtCdItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtCdOwner", HmtCdOwner);
     registerModel("HmtCdJoin", HmtCdJoin);
     registerModel("HmtCdItem", HmtCdItem);
     const owner = await HmtCdOwner.create({ name: "O" });
     const item = await HmtCdItem.create({ label: "Created" });
-    await HmtCdJoin.create({ hmt_cd_owner_id: owner.readAttribute("id"), hmt_cd_item_id: item.readAttribute("id") });
-    const joins = await loadHasMany(owner, "hmtCdJoins", { className: "HmtCdJoin", foreignKey: "hmt_cd_owner_id" });
+    await HmtCdJoin.create({
+      hmt_cd_owner_id: owner.readAttribute("id"),
+      hmt_cd_item_id: item.readAttribute("id"),
+    });
+    const joins = await loadHasMany(owner, "hmtCdJoins", {
+      className: "HmtCdJoin",
+      foreignKey: "hmt_cd_owner_id",
+    });
     expect(joins).toHaveLength(1);
   });
   it.skip("joining has many through with distinct", () => {});
   it.skip("joining has many through belongs to", () => {});
   it("select chosen fields only", async () => {
     class HmtSelOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtSelJoin extends Base {
-      static { this.attribute("hmt_sel_owner_id", "integer"); this.attribute("hmt_sel_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_sel_owner_id", "integer");
+        this.attribute("hmt_sel_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtSelItem extends Base {
-      static { this.attribute("label", "string"); this.attribute("extra", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.attribute("extra", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtSelOwner as any)._associations = [
-      { type: "hasMany", name: "hmtSelJoins", options: { className: "HmtSelJoin", foreignKey: "hmt_sel_owner_id" } },
-      { type: "hasMany", name: "hmtSelItems", options: { className: "HmtSelItem", through: "hmtSelJoins", source: "hmtSelItem" } },
+      {
+        type: "hasMany",
+        name: "hmtSelJoins",
+        options: { className: "HmtSelJoin", foreignKey: "hmt_sel_owner_id" },
+      },
+      {
+        type: "hasMany",
+        name: "hmtSelItems",
+        options: { className: "HmtSelItem", through: "hmtSelJoins", source: "hmtSelItem" },
+      },
     ];
     (HmtSelJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtSelItem", options: { className: "HmtSelItem", foreignKey: "hmt_sel_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtSelItem",
+        options: { className: "HmtSelItem", foreignKey: "hmt_sel_item_id" },
+      },
     ];
     registerModel("HmtSelOwner", HmtSelOwner);
     registerModel("HmtSelJoin", HmtSelJoin);
     registerModel("HmtSelItem", HmtSelItem);
     const owner = await HmtSelOwner.create({ name: "O" });
     const item = await HmtSelItem.create({ label: "L", extra: "E" });
-    await HmtSelJoin.create({ hmt_sel_owner_id: owner.readAttribute("id"), hmt_sel_item_id: item.readAttribute("id") });
-    const items = await loadHasManyThrough(owner, "hmtSelItems", { through: "hmtSelJoins", source: "hmtSelItem", className: "HmtSelItem" });
+    await HmtSelJoin.create({
+      hmt_sel_owner_id: owner.readAttribute("id"),
+      hmt_sel_item_id: item.readAttribute("id"),
+    });
+    const items = await loadHasManyThrough(owner, "hmtSelItems", {
+      through: "hmtSelJoins",
+      source: "hmtSelItem",
+      className: "HmtSelItem",
+    });
     expect(items).toHaveLength(1);
     expect(items[0].readAttribute("label")).toBe("L");
   });
@@ -3812,20 +6464,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("count has many through with named scope", () => {});
   it("has many through belongs to should update when the through foreign key changes", async () => {
     class HmtFkOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtFkJoin extends Base {
-      static { this.attribute("hmt_fk_owner_id", "integer"); this.attribute("hmt_fk_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_fk_owner_id", "integer");
+        this.attribute("hmt_fk_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtFkTarget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtFkOwner as any)._associations = [
-      { type: "hasMany", name: "hmtFkJoins", options: { className: "HmtFkJoin", foreignKey: "hmt_fk_owner_id" } },
-      { type: "hasManyThrough", name: "hmtFkTargets", options: { through: "hmtFkJoins", source: "hmtFkTarget", className: "HmtFkTarget" } },
+      {
+        type: "hasMany",
+        name: "hmtFkJoins",
+        options: { className: "HmtFkJoin", foreignKey: "hmt_fk_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtFkTargets",
+        options: { through: "hmtFkJoins", source: "hmtFkTarget", className: "HmtFkTarget" },
+      },
     ];
     (HmtFkJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtFkTarget", options: { className: "HmtFkTarget", foreignKey: "hmt_fk_target_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtFkTarget",
+        options: { className: "HmtFkTarget", foreignKey: "hmt_fk_target_id" },
+      },
     ];
     registerModel("HmtFkOwner", HmtFkOwner);
     registerModel("HmtFkJoin", HmtFkJoin);
@@ -3834,7 +6508,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtFkOwner.create({ name: "O" });
     const t1 = await HmtFkTarget.create({ label: "T1" });
     const t2 = await HmtFkTarget.create({ label: "T2" });
-    const join = await HmtFkJoin.create({ hmt_fk_owner_id: owner.readAttribute("id"), hmt_fk_target_id: t1.readAttribute("id") });
+    const join = await HmtFkJoin.create({
+      hmt_fk_owner_id: owner.readAttribute("id"),
+      hmt_fk_target_id: t1.readAttribute("id"),
+    });
 
     // Change the FK to point to t2
     join.writeAttribute("hmt_fk_target_id", t2.readAttribute("id"));
@@ -3850,20 +6527,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("deleting from has many through a belongs to should not try to update counter", async () => {
     class HmtNoCounterOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNoCounterJoin extends Base {
-      static { this.attribute("hmt_no_counter_owner_id", "integer"); this.attribute("hmt_no_counter_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_no_counter_owner_id", "integer");
+        this.attribute("hmt_no_counter_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtNoCounterItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtNoCounterOwner as any)._associations = [
-      { type: "hasMany", name: "hmtNoCounterJoins", options: { className: "HmtNoCounterJoin", foreignKey: "hmt_no_counter_owner_id" } },
-      { type: "hasManyThrough", name: "hmtNoCounterItems", options: { through: "hmtNoCounterJoins", source: "hmtNoCounterItem", className: "HmtNoCounterItem" } },
+      {
+        type: "hasMany",
+        name: "hmtNoCounterJoins",
+        options: { className: "HmtNoCounterJoin", foreignKey: "hmt_no_counter_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtNoCounterItems",
+        options: {
+          through: "hmtNoCounterJoins",
+          source: "hmtNoCounterItem",
+          className: "HmtNoCounterItem",
+        },
+      },
     ];
     (HmtNoCounterJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtNoCounterItem", options: { className: "HmtNoCounterItem", foreignKey: "hmt_no_counter_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtNoCounterItem",
+        options: { className: "HmtNoCounterItem", foreignKey: "hmt_no_counter_item_id" },
+      },
     ];
     registerModel("HmtNoCounterOwner", HmtNoCounterOwner);
     registerModel("HmtNoCounterJoin", HmtNoCounterJoin);
@@ -3871,7 +6574,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtNoCounterOwner.create({ name: "O" });
     const item = await HmtNoCounterItem.create({ label: "I" });
-    const join = await HmtNoCounterJoin.create({ hmt_no_counter_owner_id: owner.readAttribute("id"), hmt_no_counter_item_id: item.readAttribute("id") });
+    const join = await HmtNoCounterJoin.create({
+      hmt_no_counter_owner_id: owner.readAttribute("id"),
+      hmt_no_counter_item_id: item.readAttribute("id"),
+    });
 
     // Deleting the join record should work without counter cache issues
     await join.destroy();
@@ -3889,35 +6595,67 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("primary key option on source", () => {});
   it("create should not raise exception when join record has errors", async () => {
     class HmtNoErrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNoErrJoin extends Base {
-      static { this.attribute("hmt_no_err_owner_id", "integer"); this.attribute("hmt_no_err_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_no_err_owner_id", "integer");
+        this.attribute("hmt_no_err_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     registerModel("HmtNoErrOwner", HmtNoErrOwner);
     registerModel("HmtNoErrJoin", HmtNoErrJoin);
 
     const owner = await HmtNoErrOwner.create({ name: "O" });
     // Creating a join with a non-existent target still persists
-    const join = await HmtNoErrJoin.create({ hmt_no_err_owner_id: owner.readAttribute("id"), hmt_no_err_item_id: 9999 });
+    const join = await HmtNoErrJoin.create({
+      hmt_no_err_owner_id: owner.readAttribute("id"),
+      hmt_no_err_item_id: 9999,
+    });
     expect(join.readAttribute("id")).not.toBeNull();
   });
   it("assign array to new record builds join records", async () => {
     class HmtArrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtArrJoin extends Base {
-      static { this.attribute("hmt_arr_owner_id", "integer"); this.attribute("hmt_arr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_arr_owner_id", "integer");
+        this.attribute("hmt_arr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtArrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtArrOwner as any)._associations = [
-      { type: "hasMany", name: "hmtArrJoins", options: { className: "HmtArrJoin", foreignKey: "hmt_arr_owner_id" } },
-      { type: "hasManyThrough", name: "hmtArrItems", options: { through: "hmtArrJoins", source: "hmtArrItem", className: "HmtArrItem" } },
+      {
+        type: "hasMany",
+        name: "hmtArrJoins",
+        options: { className: "HmtArrJoin", foreignKey: "hmt_arr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtArrItems",
+        options: { through: "hmtArrJoins", source: "hmtArrItem", className: "HmtArrItem" },
+      },
     ];
     (HmtArrJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtArrItem", options: { className: "HmtArrItem", foreignKey: "hmt_arr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtArrItem",
+        options: { className: "HmtArrItem", foreignKey: "hmt_arr_item_id" },
+      },
     ];
     registerModel("HmtArrOwner", HmtArrOwner);
     registerModel("HmtArrJoin", HmtArrJoin);
@@ -3929,9 +6667,18 @@ describe("HasManyThroughAssociationsTest", () => {
     const item3 = await HmtArrItem.create({ label: "I3" });
 
     // Manually build join records for each item
-    await HmtArrJoin.create({ hmt_arr_owner_id: owner.readAttribute("id"), hmt_arr_item_id: item1.readAttribute("id") });
-    await HmtArrJoin.create({ hmt_arr_owner_id: owner.readAttribute("id"), hmt_arr_item_id: item2.readAttribute("id") });
-    await HmtArrJoin.create({ hmt_arr_owner_id: owner.readAttribute("id"), hmt_arr_item_id: item3.readAttribute("id") });
+    await HmtArrJoin.create({
+      hmt_arr_owner_id: owner.readAttribute("id"),
+      hmt_arr_item_id: item1.readAttribute("id"),
+    });
+    await HmtArrJoin.create({
+      hmt_arr_owner_id: owner.readAttribute("id"),
+      hmt_arr_item_id: item2.readAttribute("id"),
+    });
+    await HmtArrJoin.create({
+      hmt_arr_owner_id: owner.readAttribute("id"),
+      hmt_arr_item_id: item3.readAttribute("id"),
+    });
 
     const items = await loadHasManyThrough(owner, "hmtArrItems", {
       through: "hmtArrJoins",
@@ -3947,20 +6694,46 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("save returns falsy when join record has errors", () => {});
   it("preloading empty through association via joins", async () => {
     class HmtEmptyThrOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtEmptyThrJoin extends Base {
-      static { this.attribute("hmt_empty_thr_owner_id", "integer"); this.attribute("hmt_empty_thr_item_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_empty_thr_owner_id", "integer");
+        this.attribute("hmt_empty_thr_item_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtEmptyThrItem extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtEmptyThrOwner as any)._associations = [
-      { type: "hasMany", name: "hmtEmptyThrJoins", options: { className: "HmtEmptyThrJoin", foreignKey: "hmt_empty_thr_owner_id" } },
-      { type: "hasManyThrough", name: "hmtEmptyThrItems", options: { through: "hmtEmptyThrJoins", source: "hmtEmptyThrItem", className: "HmtEmptyThrItem" } },
+      {
+        type: "hasMany",
+        name: "hmtEmptyThrJoins",
+        options: { className: "HmtEmptyThrJoin", foreignKey: "hmt_empty_thr_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtEmptyThrItems",
+        options: {
+          through: "hmtEmptyThrJoins",
+          source: "hmtEmptyThrItem",
+          className: "HmtEmptyThrItem",
+        },
+      },
     ];
     (HmtEmptyThrJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtEmptyThrItem", options: { className: "HmtEmptyThrItem", foreignKey: "hmt_empty_thr_item_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtEmptyThrItem",
+        options: { className: "HmtEmptyThrItem", foreignKey: "hmt_empty_thr_item_id" },
+      },
     ];
     registerModel("HmtEmptyThrOwner", HmtEmptyThrOwner);
     registerModel("HmtEmptyThrJoin", HmtEmptyThrJoin);
@@ -4002,20 +6775,42 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("has many through update ids with conditions", () => {});
   it("single has many through association with unpersisted parent instance", async () => {
     class HmtUnpOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtUnpJoin extends Base {
-      static { this.attribute("hmt_unp_owner_id", "integer"); this.attribute("hmt_unp_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_unp_owner_id", "integer");
+        this.attribute("hmt_unp_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtUnpTarget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtUnpOwner as any)._associations = [
-      { type: "hasMany", name: "hmtUnpJoins", options: { className: "HmtUnpJoin", foreignKey: "hmt_unp_owner_id" } },
-      { type: "hasManyThrough", name: "hmtUnpTargets", options: { through: "hmtUnpJoins", source: "hmtUnpTarget", className: "HmtUnpTarget" } },
+      {
+        type: "hasMany",
+        name: "hmtUnpJoins",
+        options: { className: "HmtUnpJoin", foreignKey: "hmt_unp_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtUnpTargets",
+        options: { through: "hmtUnpJoins", source: "hmtUnpTarget", className: "HmtUnpTarget" },
+      },
     ];
     (HmtUnpJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtUnpTarget", options: { className: "HmtUnpTarget", foreignKey: "hmt_unp_target_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtUnpTarget",
+        options: { className: "HmtUnpTarget", foreignKey: "hmt_unp_target_id" },
+      },
     ];
     registerModel("HmtUnpOwner", HmtUnpOwner);
     registerModel("HmtUnpJoin", HmtUnpJoin);
@@ -4032,20 +6827,46 @@ describe("HasManyThroughAssociationsTest", () => {
   });
   it("nested has many through association with unpersisted parent instance", async () => {
     class HmtNestedUnpOwner extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class HmtNestedUnpJoin extends Base {
-      static { this.attribute("hmt_nested_unp_owner_id", "integer"); this.attribute("hmt_nested_unp_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("hmt_nested_unp_owner_id", "integer");
+        this.attribute("hmt_nested_unp_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class HmtNestedUnpTarget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
     }
     (HmtNestedUnpOwner as any)._associations = [
-      { type: "hasMany", name: "hmtNestedUnpJoins", options: { className: "HmtNestedUnpJoin", foreignKey: "hmt_nested_unp_owner_id" } },
-      { type: "hasManyThrough", name: "hmtNestedUnpTargets", options: { through: "hmtNestedUnpJoins", source: "hmtNestedUnpTarget", className: "HmtNestedUnpTarget" } },
+      {
+        type: "hasMany",
+        name: "hmtNestedUnpJoins",
+        options: { className: "HmtNestedUnpJoin", foreignKey: "hmt_nested_unp_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "hmtNestedUnpTargets",
+        options: {
+          through: "hmtNestedUnpJoins",
+          source: "hmtNestedUnpTarget",
+          className: "HmtNestedUnpTarget",
+        },
+      },
     ];
     (HmtNestedUnpJoin as any)._associations = [
-      { type: "belongsTo", name: "hmtNestedUnpTarget", options: { className: "HmtNestedUnpTarget", foreignKey: "hmt_nested_unp_target_id" } },
+      {
+        type: "belongsTo",
+        name: "hmtNestedUnpTarget",
+        options: { className: "HmtNestedUnpTarget", foreignKey: "hmt_nested_unp_target_id" },
+      },
     ];
     registerModel("HmtNestedUnpOwner", HmtNestedUnpOwner);
     registerModel("HmtNestedUnpJoin", HmtNestedUnpJoin);
@@ -4065,49 +6886,113 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("tags has manu posts through association with composite query constraints", () => {});
   it("loading cpk association with unpersisted owner", async () => {
     class CpkHmtOwner extends Base {
-      static { this._tableName = "cpk_hmt_owners"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_hmt_owners";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkHmtJoin extends Base {
-      static { this._tableName = "cpk_hmt_joins"; this.attribute("cpk_hmt_owner_region_id", "integer"); this.attribute("cpk_hmt_owner_id", "integer"); this.attribute("cpk_hmt_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_hmt_joins";
+        this.attribute("cpk_hmt_owner_region_id", "integer");
+        this.attribute("cpk_hmt_owner_id", "integer");
+        this.attribute("cpk_hmt_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class CpkHmtTarget extends Base {
-      static { this._tableName = "cpk_hmt_targets"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_hmt_targets";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CpkHmtOwner, "cpkHmtJoins", { foreignKey: ["cpk_hmt_owner_region_id", "cpk_hmt_owner_id"], className: "CpkHmtJoin" });
+    Associations.hasMany.call(CpkHmtOwner, "cpkHmtJoins", {
+      foreignKey: ["cpk_hmt_owner_region_id", "cpk_hmt_owner_id"],
+      className: "CpkHmtJoin",
+    });
     Associations.belongsTo.call(CpkHmtJoin, "cpkHmtTarget", { className: "CpkHmtTarget" });
-    Associations.hasMany.call(CpkHmtOwner, "cpkHmtTargets", { through: "cpkHmtJoins", className: "CpkHmtTarget", source: "cpkHmtTarget" });
+    Associations.hasMany.call(CpkHmtOwner, "cpkHmtTargets", {
+      through: "cpkHmtJoins",
+      className: "CpkHmtTarget",
+      source: "cpkHmtTarget",
+    });
     registerModel("CpkHmtOwner", CpkHmtOwner);
     registerModel("CpkHmtJoin", CpkHmtJoin);
     registerModel("CpkHmtTarget", CpkHmtTarget);
     // Unpersisted owner — should return empty
     const owner = new CpkHmtOwner({ name: "New" });
-    const targets = await loadHasManyThrough(owner, "cpkHmtTargets", { through: "cpkHmtJoins", className: "CpkHmtTarget", source: "cpkHmtTarget" });
+    const targets = await loadHasManyThrough(owner, "cpkHmtTargets", {
+      through: "cpkHmtJoins",
+      className: "CpkHmtTarget",
+      source: "cpkHmtTarget",
+    });
     expect(targets).toHaveLength(0);
   });
   it("cpk stale target", async () => {
     class CpkStOwner extends Base {
-      static { this._tableName = "cpk_st_owners"; this.attribute("region_id", "integer"); this.attribute("id", "integer"); this.attribute("name", "string"); this.primaryKey = ["region_id", "id"]; this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_st_owners";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
     }
     class CpkStJoin extends Base {
-      static { this._tableName = "cpk_st_joins"; this.attribute("cpk_st_owner_region_id", "integer"); this.attribute("cpk_st_owner_id", "integer"); this.attribute("cpk_st_target_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_st_joins";
+        this.attribute("cpk_st_owner_region_id", "integer");
+        this.attribute("cpk_st_owner_id", "integer");
+        this.attribute("cpk_st_target_id", "integer");
+        this.adapter = adapter;
+      }
     }
     class CpkStTarget extends Base {
-      static { this._tableName = "cpk_st_targets"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "cpk_st_targets";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(CpkStOwner, "cpkStJoins", { foreignKey: ["cpk_st_owner_region_id", "cpk_st_owner_id"], className: "CpkStJoin" });
+    Associations.hasMany.call(CpkStOwner, "cpkStJoins", {
+      foreignKey: ["cpk_st_owner_region_id", "cpk_st_owner_id"],
+      className: "CpkStJoin",
+    });
     Associations.belongsTo.call(CpkStJoin, "cpkStTarget", { className: "CpkStTarget" });
-    Associations.hasMany.call(CpkStOwner, "cpkStTargets", { through: "cpkStJoins", className: "CpkStTarget", source: "cpkStTarget" });
+    Associations.hasMany.call(CpkStOwner, "cpkStTargets", {
+      through: "cpkStJoins",
+      className: "CpkStTarget",
+      source: "cpkStTarget",
+    });
     registerModel("CpkStOwner", CpkStOwner);
     registerModel("CpkStJoin", CpkStJoin);
     registerModel("CpkStTarget", CpkStTarget);
     const owner = await CpkStOwner.create({ region_id: 1, id: 1, name: "Owner" });
     const target = await CpkStTarget.create({ name: "Target" });
-    const join = await CpkStJoin.create({ cpk_st_owner_region_id: 1, cpk_st_owner_id: 1, cpk_st_target_id: target.id });
-    let targets = await loadHasManyThrough(owner, "cpkStTargets", { through: "cpkStJoins", className: "CpkStTarget", source: "cpkStTarget" });
+    const join = await CpkStJoin.create({
+      cpk_st_owner_region_id: 1,
+      cpk_st_owner_id: 1,
+      cpk_st_target_id: target.id,
+    });
+    let targets = await loadHasManyThrough(owner, "cpkStTargets", {
+      through: "cpkStJoins",
+      className: "CpkStTarget",
+      source: "cpkStTarget",
+    });
     expect(targets).toHaveLength(1);
     // Delete the join — target becomes stale
     await join.destroy();
-    targets = await loadHasManyThrough(owner, "cpkStTargets", { through: "cpkStJoins", className: "CpkStTarget", source: "cpkStTarget" });
+    targets = await loadHasManyThrough(owner, "cpkStTargets", {
+      through: "cpkStJoins",
+      className: "CpkStTarget",
+      source: "cpkStTarget",
+    });
     expect(targets).toHaveLength(0);
   });
   it.skip("cpk association build through singular", () => {});

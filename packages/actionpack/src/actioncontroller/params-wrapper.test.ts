@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  wrapParameters,
-  applyParamsWrapper,
-  deriveWrapperKey,
-} from "./params-wrapper.js";
+import { wrapParameters, applyParamsWrapper, deriveWrapperKey } from "./params-wrapper.js";
 import { Parameters } from "../actiondispatch/parameters.js";
 
 // ==========================================================================

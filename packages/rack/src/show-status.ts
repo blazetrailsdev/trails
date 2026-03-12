@@ -15,8 +15,8 @@ export class ShowStatus {
     const detail = env[RACK_SHOWSTATUS_DETAIL];
 
     if (status >= 400) {
-      const bodyEmpty = (Array.isArray(body) && body.join("").length === 0) ||
-        (headers[CONTENT_LENGTH] === "0");
+      const bodyEmpty =
+        (Array.isArray(body) && body.join("").length === 0) || headers[CONTENT_LENGTH] === "0";
       if (bodyEmpty || detail) {
         // Close original body if it has a close method
         if (body && typeof body.close === "function") body.close();

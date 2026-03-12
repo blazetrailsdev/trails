@@ -75,7 +75,9 @@ export function parseMultipart(env: Record<string, any>): Record<string, any> | 
   if (!boundary) return null;
 
   if (boundary.length > 70) {
-    throw new BoundaryTooLongError(`multipart boundary size too large (${boundary.length} characters)`);
+    throw new BoundaryTooLongError(
+      `multipart boundary size too large (${boundary.length} characters)`,
+    );
   }
 
   const input = env["rack.input"] || (env as any)[Symbol.for("rack.input")];
@@ -90,7 +92,12 @@ export function parseMultipart(env: Record<string, any>): Record<string, any> | 
     body = Buffer.from(input, "binary");
   } else if (typeof input.read === "function") {
     const data = input.read();
-    if (data === null || data === undefined || (typeof data === "string" && data.length === 0) || (Buffer.isBuffer(data) && data.length === 0)) {
+    if (
+      data === null ||
+      data === undefined ||
+      (typeof data === "string" && data.length === 0) ||
+      (Buffer.isBuffer(data) && data.length === 0)
+    ) {
       throw new EmptyContentError();
     }
     body = Buffer.isBuffer(data) ? data : Buffer.from(data, "binary");
@@ -122,7 +129,11 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
   const totalLimit = env._multipart_total_limit || 0;
   const textLimit = env._multipart_text_limit ?? MULTIPART_TEXT_LIMIT;
   const tempfileFactory = env["rack.multipart.tempfile_factory"] as
-    ((filename: string, contentType: string) => { read(): string; rewind(): void; toString(): string } & Record<string, any>) | undefined;
+    | ((
+        filename: string,
+        contentType: string,
+      ) => { read(): string; rewind(): void; toString(): string } & Record<string, any>)
+    | undefined;
   let fileCount = 0;
   let totalCount = 0;
   let totalTextSize = 0;
@@ -141,10 +152,17 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
     const preamble = body.subarray(0, firstBoundaryIdx).toString("binary").trim();
     if (preamble.length > 0) {
       // Check if the first boundary is actually an end boundary
-      const afterFirst = body.subarray(firstBoundaryIdx + delimiter.length, firstBoundaryIdx + delimiter.length + 2);
+      const afterFirst = body.subarray(
+        firstBoundaryIdx + delimiter.length,
+        firstBoundaryIdx + delimiter.length + 2,
+      );
       if (afterFirst.toString() === "--") {
         // End boundary first - look for a real opening boundary after it
-        const nextBoundary = findNextBoundary(body, delimiter, firstBoundaryIdx + endDelimiter.length);
+        const nextBoundary = findNextBoundary(
+          body,
+          delimiter,
+          firstBoundaryIdx + endDelimiter.length,
+        );
         if (nextBoundary === -1) {
           // Only had end boundary
           return params;
@@ -324,7 +342,7 @@ function normalizeAndSet(params: Record<string, any>, name: string, value: any):
       if (!brackets) {
         params[prefix] = value;
       } else {
-        const keys = brackets.match(/\[([^\]]*)\]/g)!.map(b => b.slice(1, -1));
+        const keys = brackets.match(/\[([^\]]*)\]/g)!.map((b) => b.slice(1, -1));
         let current = params;
         if (!(prefix in current) || typeof current[prefix] !== "object") {
           current[prefix] = {};
@@ -364,7 +382,7 @@ function makeTempfile(buf: Buffer): { read(): string; rewind(): void } {
 function normalizeFilename(filename: string): string {
   // If all % sequences are valid hex escapes, decode them
   const percentSequences = filename.match(/%..?/g);
-  if (percentSequences && percentSequences.every(s => /^%[0-9a-fA-F]{2}$/.test(s))) {
+  if (percentSequences && percentSequences.every((s) => /^%[0-9a-fA-F]{2}$/.test(s))) {
     try {
       filename = decodeURIComponent(filename);
     } catch {
@@ -520,7 +538,10 @@ export class UploadedFile {
   contentType: string;
   private _binary: boolean;
 
-  constructor(pathOrOpts: string | { io: any; filename: string; content_type?: string }, opts: { binary?: boolean; content_type?: string } = {}) {
+  constructor(
+    pathOrOpts: string | { io: any; filename: string; content_type?: string },
+    opts: { binary?: boolean; content_type?: string } = {},
+  ) {
     if (typeof pathOrOpts === "string") {
       const fs = require("fs");
       if (!fs.existsSync(pathOrOpts)) {
@@ -558,14 +579,20 @@ export class UploadedFile {
 }
 
 export class MultipartParser {
-  static parse(input: string | Buffer, contentType: string, opts: Record<string, any> = {}): Record<string, any> | null {
+  static parse(
+    input: string | Buffer,
+    contentType: string,
+    opts: Record<string, any> = {},
+  ): Record<string, any> | null {
     if (!contentType || !contentType.match(/multipart/i)) return null;
 
     const boundary = parseBoundary(contentType);
     if (!boundary) return null;
 
     if (boundary.length > 70) {
-      throw new BoundaryTooLongError(`multipart boundary size too large (${boundary.length} characters)`);
+      throw new BoundaryTooLongError(
+        `multipart boundary size too large (${boundary.length} characters)`,
+      );
     }
 
     const body = typeof input === "string" ? Buffer.from(input, "binary") : input;
@@ -575,7 +602,11 @@ export class MultipartParser {
 
     const env: Record<string, any> = {
       CONTENT_TYPE: contentType,
-      "rack.input": { read() { return body; } },
+      "rack.input": {
+        read() {
+          return body;
+        },
+      },
       _multipart_file_limit: opts.multipart_file_limit || 0,
       _multipart_total_limit: opts.multipart_total_limit || 0,
     };
@@ -589,20 +620,22 @@ export class MultipartParser {
 
     function addParts(prefix: string, value: any): void {
       if (value && typeof value === "object" && value.filename) {
-        const content = typeof value.read === "function" ? value.read() : (value.content || "");
+        const content = typeof value.read === "function" ? value.read() : value.content || "";
         parts.push(
           `--${boundary}\r\n` +
-          `content-disposition: form-data; name="${prefix}"; filename="${value.filename}"\r\n` +
-          `content-type: ${value.type || value.contentType || "application/octet-stream"}\r\n\r\n` +
-          content + "\r\n"
+            `content-disposition: form-data; name="${prefix}"; filename="${value.filename}"\r\n` +
+            `content-type: ${value.type || value.contentType || "application/octet-stream"}\r\n\r\n` +
+            content +
+            "\r\n",
         );
       } else if (value instanceof UploadedFile) {
         const content = value.read();
         parts.push(
           `--${boundary}\r\n` +
-          `content-disposition: form-data; name="${prefix}"; filename="${value.filename}"\r\n` +
-          `content-type: ${value.contentType}\r\n\r\n` +
-          content + "\r\n"
+            `content-disposition: form-data; name="${prefix}"; filename="${value.filename}"\r\n` +
+            `content-type: ${value.contentType}\r\n\r\n` +
+            content +
+            "\r\n",
         );
       } else if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i++) {
@@ -614,8 +647,9 @@ export class MultipartParser {
           } else {
             parts.push(
               `--${boundary}\r\n` +
-              `content-disposition: form-data; name="${prefix}[]"\r\n\r\n` +
-              String(item) + "\r\n"
+                `content-disposition: form-data; name="${prefix}[]"\r\n\r\n` +
+                String(item) +
+                "\r\n",
             );
           }
         }
@@ -626,8 +660,9 @@ export class MultipartParser {
       } else {
         parts.push(
           `--${boundary}\r\n` +
-          `content-disposition: form-data; name="${prefix}"\r\n\r\n` +
-          String(value) + "\r\n"
+            `content-disposition: form-data; name="${prefix}"\r\n\r\n` +
+            String(value) +
+            "\r\n",
         );
       }
     }

@@ -43,7 +43,9 @@ describe("ActionController::Metal", () => {
 
   it("throws on unknown status symbol", () => {
     const c = new (class extends Metal {})();
-    expect(() => { c.status = "bogus"; }).toThrow("Unknown status: bogus");
+    expect(() => {
+      c.status = "bogus";
+    }).toThrow("Unknown status: bogus");
   });
 
   it("can set and get headers", () => {
@@ -91,7 +93,9 @@ describe("ActionController::Metal", () => {
 
   it("head throws on unknown symbol", () => {
     const c = new (class extends Metal {})();
-    expect(() => { c.head("bogus"); }).toThrow("Unknown status: bogus");
+    expect(() => {
+      c.head("bogus");
+    }).toThrow("Unknown status: bogus");
   });
 
   it("resolveStatus with number returns number", () => {
@@ -235,10 +239,16 @@ describe("ActionController::Metal", () => {
   it("callbacks work through dispatch", async () => {
     const log: string[] = [];
     class CallbackController extends Metal {
-      async index() { log.push("action"); }
+      async index() {
+        log.push("action");
+      }
     }
-    CallbackController.beforeAction(() => { log.push("before"); });
-    CallbackController.afterAction(() => { log.push("after"); });
+    CallbackController.beforeAction(() => {
+      log.push("before");
+    });
+    CallbackController.afterAction(() => {
+      log.push("after");
+    });
 
     const c = new CallbackController();
     await c.dispatch("index", makeRequest(), makeResponse());

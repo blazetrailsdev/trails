@@ -12,11 +12,16 @@ export class ContentLength {
     const response = await this.app(env);
     const [status, headers, body] = response;
 
-    if (!STATUS_WITH_NO_ENTITY_BODY[status] &&
-        !headers[CONTENT_LENGTH] &&
-        !headers[TRANSFER_ENCODING] &&
-        Array.isArray(body)) {
-      const totalSize = body.reduce((sum: number, chunk: string) => sum + Buffer.byteLength(String(chunk)), 0);
+    if (
+      !STATUS_WITH_NO_ENTITY_BODY[status] &&
+      !headers[CONTENT_LENGTH] &&
+      !headers[TRANSFER_ENCODING] &&
+      Array.isArray(body)
+    ) {
+      const totalSize = body.reduce(
+        (sum: number, chunk: string) => sum + Buffer.byteLength(String(chunk)),
+        0,
+      );
       headers[CONTENT_LENGTH] = String(totalSize);
     }
 

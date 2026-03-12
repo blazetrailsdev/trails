@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -27,23 +67,51 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("CascadedEagerLoadingTest", () => {
-  it.skip("eager association loading with cascaded two levels", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with cascaded two levels and one level", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with hmt does not table name collide when joining associations", () => { /* fixture-dependent */ });
-  it.skip("eager association loading grafts stashed associations to correct parent", () => { /* fixture-dependent */ });
-  it.skip("cascaded eager association loading with join for count", () => { /* fixture-dependent */ });
-  it.skip("cascaded eager association loading with duplicated includes", () => { /* fixture-dependent */ });
-  it.skip("cascaded eager association loading with twice includes edge cases", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with join for count", () => { /* fixture-dependent */ });
+  it.skip("eager association loading with cascaded two levels", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with cascaded two levels and one level", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading grafts stashed associations to correct parent", () => {
+    /* fixture-dependent */
+  });
+  it.skip("cascaded eager association loading with join for count", () => {
+    /* fixture-dependent */
+  });
+  it.skip("cascaded eager association loading with duplicated includes", () => {
+    /* fixture-dependent */
+  });
+  it.skip("cascaded eager association loading with twice includes edge cases", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with join for count", () => {
+    /* fixture-dependent */
+  });
   it("eager association loading with nil associations", async () => {
     const adapter = freshAdapter();
     class ENParent extends Base {
-      static { this._tableName = "en_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "en_parents";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class ENChild extends Base {
-      static { this._tableName = "en_children"; this.attribute("value", "string"); this.attribute("en_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "en_children";
+        this.attribute("value", "string");
+        this.attribute("en_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(ENParent, "enChildren", { foreignKey: "en_parent_id", className: "ENChild" });
+    Associations.hasMany.call(ENParent, "enChildren", {
+      foreignKey: "en_parent_id",
+      className: "ENChild",
+    });
     registerModel("ENParent", ENParent);
     registerModel("ENChild", ENChild);
     // Parent with no children
@@ -53,10 +121,18 @@ describe("CascadedEagerLoadingTest", () => {
     const children = (parents[0] as any)._preloadedAssociations?.get("enChildren") ?? [];
     expect(children.length).toBe(0);
   });
-  it.skip("eager association loading with cascaded two levels with two has many associations", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with cascaded two levels and self table reference", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with cascaded two levels with condition", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with cascaded three levels by ping pong", () => { /* fixture-dependent */ });
+  it.skip("eager association loading with cascaded two levels with two has many associations", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with cascaded two levels and self table reference", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with cascaded two levels with condition", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with cascaded three levels by ping pong", () => {
+    /* fixture-dependent */
+  });
   it("eager association loading with has many sti", async () => {
     const adapter = freshAdapter();
     class StiTopic extends Base {
@@ -70,11 +146,19 @@ describe("CascadedEagerLoadingTest", () => {
       }
     }
     class StiReply extends StiTopic {
-      static { this.adapter = adapter; registerModel(StiReply); registerSubclass(StiReply); }
+      static {
+        this.adapter = adapter;
+        registerModel(StiReply);
+        registerSubclass(StiReply);
+      }
     }
     registerModel(StiTopic);
     (StiTopic as any)._associations = [
-      { type: "hasMany", name: "replies", options: { className: "StiReply", foreignKey: "parent_id" } },
+      {
+        type: "hasMany",
+        name: "replies",
+        options: { className: "StiReply", foreignKey: "parent_id" },
+      },
     ];
 
     const topic1 = await StiTopic.create({ title: "First" });
@@ -84,9 +168,13 @@ describe("CascadedEagerLoadingTest", () => {
 
     const topics = await StiTopic.all().where({ type: null }).includes("replies").toArray();
     expect(topics).toHaveLength(2);
-    const t1Replies = (topics.find((t: any) => t.readAttribute("title") === "First") as any)._preloadedAssociations.get("replies");
+    const t1Replies = (
+      topics.find((t: any) => t.readAttribute("title") === "First") as any
+    )._preloadedAssociations.get("replies");
     expect(t1Replies).toHaveLength(2);
-    const t2Replies = (topics.find((t: any) => t.readAttribute("title") === "Second") as any)._preloadedAssociations.get("replies");
+    const t2Replies = (
+      topics.find((t: any) => t.readAttribute("title") === "Second") as any
+    )._preloadedAssociations.get("replies");
     expect(t2Replies).toHaveLength(0);
   });
   it("eager association loading with has many sti and subclasses", async () => {
@@ -102,14 +190,26 @@ describe("CascadedEagerLoadingTest", () => {
       }
     }
     class StiReply2 extends StiTopic2 {
-      static { this.adapter = adapter; registerModel(StiReply2); registerSubclass(StiReply2); }
+      static {
+        this.adapter = adapter;
+        registerModel(StiReply2);
+        registerSubclass(StiReply2);
+      }
     }
     class StiSillyReply2 extends StiReply2 {
-      static { this.adapter = adapter; registerModel(StiSillyReply2); registerSubclass(StiSillyReply2); }
+      static {
+        this.adapter = adapter;
+        registerModel(StiSillyReply2);
+        registerSubclass(StiSillyReply2);
+      }
     }
     registerModel(StiTopic2);
     (StiTopic2 as any)._associations = [
-      { type: "hasMany", name: "replies", options: { className: "StiReply2", foreignKey: "parent_id" } },
+      {
+        type: "hasMany",
+        name: "replies",
+        options: { className: "StiReply2", foreignKey: "parent_id" },
+      },
     ];
 
     const topic = await StiTopic2.create({ title: "First" });
@@ -135,11 +235,19 @@ describe("CascadedEagerLoadingTest", () => {
       }
     }
     class StiReply3 extends StiTopic3 {
-      static { this.adapter = adapter; registerModel(StiReply3); registerSubclass(StiReply3); }
+      static {
+        this.adapter = adapter;
+        registerModel(StiReply3);
+        registerSubclass(StiReply3);
+      }
     }
     registerModel(StiTopic3);
     (StiReply3 as any)._associations = [
-      { type: "belongsTo", name: "topic", options: { className: "StiTopic3", foreignKey: "parent_id" } },
+      {
+        type: "belongsTo",
+        name: "topic",
+        options: { className: "StiTopic3", foreignKey: "parent_id" },
+      },
     ];
 
     const topic = await StiTopic3.create({ title: "First" });
@@ -151,17 +259,33 @@ describe("CascadedEagerLoadingTest", () => {
     expect(parentTopic).not.toBeNull();
     expect(parentTopic.readAttribute("title")).toBe("First");
   });
-  it.skip("eager association loading with multiple stis and order", () => { /* fixture-dependent */ });
-  it.skip("eager association loading of stis with multiple references", () => { /* fixture-dependent */ });
+  it.skip("eager association loading with multiple stis and order", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading of stis with multiple references", () => {
+    /* fixture-dependent */
+  });
   it("eager association loading where first level returns nil", async () => {
     const adapter = freshAdapter();
     class EFParent extends Base {
-      static { this._tableName = "ef_parents"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "ef_parents";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EFChild extends Base {
-      static { this._tableName = "ef_children"; this.attribute("value", "string"); this.attribute("ef_parent_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "ef_children";
+        this.attribute("value", "string");
+        this.attribute("ef_parent_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasOne.call(EFParent, "efChild", { foreignKey: "ef_parent_id", className: "EFChild" });
+    Associations.hasOne.call(EFParent, "efChild", {
+      foreignKey: "ef_parent_id",
+      className: "EFChild",
+    });
     registerModel("EFParent", EFParent);
     registerModel("EFChild", EFChild);
     await EFParent.create({ name: "no-child" });
@@ -174,12 +298,24 @@ describe("CascadedEagerLoadingTest", () => {
   it("preload through missing records", async () => {
     const adapter = freshAdapter();
     class PMAuthor extends Base {
-      static { this._tableName = "pm_authors"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "pm_authors";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PMPost extends Base {
-      static { this._tableName = "pm_posts"; this.attribute("title", "string"); this.attribute("pm_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "pm_posts";
+        this.attribute("title", "string");
+        this.attribute("pm_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.belongsTo.call(PMPost, "pmAuthor", { foreignKey: "pm_author_id", className: "PMAuthor" });
+    Associations.belongsTo.call(PMPost, "pmAuthor", {
+      foreignKey: "pm_author_id",
+      className: "PMAuthor",
+    });
     registerModel("PMAuthor", PMAuthor);
     registerModel("PMPost", PMPost);
     // Post with non-existent author id
@@ -193,12 +329,24 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading with missing first record", async () => {
     const adapter = freshAdapter();
     class EMAuthor extends Base {
-      static { this._tableName = "em_authors"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "em_authors";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class EMPost extends Base {
-      static { this._tableName = "em_posts"; this.attribute("title", "string"); this.attribute("em_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "em_posts";
+        this.attribute("title", "string");
+        this.attribute("em_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.belongsTo.call(EMPost, "emAuthor", { foreignKey: "em_author_id", className: "EMAuthor" });
+    Associations.belongsTo.call(EMPost, "emAuthor", {
+      foreignKey: "em_author_id",
+      className: "EMAuthor",
+    });
     registerModel("EMAuthor", EMAuthor);
     registerModel("EMPost", EMPost);
     await EMPost.create({ title: "missing-author", em_author_id: null });
@@ -211,18 +359,36 @@ describe("CascadedEagerLoadingTest", () => {
     expect(authors.filter((a: any) => a != null).length).toBe(1);
     expect(authors.filter((a: any) => a == null).length).toBe(1);
   });
-  it.skip("eager association loading with recursive cascading four levels has many through", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with recursive cascading four levels has and belongs to many", () => { /* fixture-dependent */ });
-  it.skip("eager association loading with cascaded interdependent one level and two levels", () => { /* fixture-dependent */ });
+  it.skip("eager association loading with recursive cascading four levels has many through", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with recursive cascading four levels has and belongs to many", () => {
+    /* fixture-dependent */
+  });
+  it.skip("eager association loading with cascaded interdependent one level and two levels", () => {
+    /* fixture-dependent */
+  });
   it("preloaded records are not duplicated", async () => {
     const adapter = freshAdapter();
     class PDAuthor extends Base {
-      static { this._tableName = "pd_authors"; this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "pd_authors";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     class PDPost extends Base {
-      static { this._tableName = "pd_posts"; this.attribute("title", "string"); this.attribute("pd_author_id", "integer"); this.adapter = adapter; }
+      static {
+        this._tableName = "pd_posts";
+        this.attribute("title", "string");
+        this.attribute("pd_author_id", "integer");
+        this.adapter = adapter;
+      }
     }
-    Associations.hasMany.call(PDAuthor, "pdPosts", { foreignKey: "pd_author_id", className: "PDPost" });
+    Associations.hasMany.call(PDAuthor, "pdPosts", {
+      foreignKey: "pd_author_id",
+      className: "PDPost",
+    });
     registerModel("PDAuthor", PDAuthor);
     registerModel("PDPost", PDPost);
     const a = await PDAuthor.create({ name: "Alice" });
@@ -236,6 +402,10 @@ describe("CascadedEagerLoadingTest", () => {
     const ids = posts.map((p: any) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
-  it.skip("preloading across has one constrains loaded records", () => { /* fixture-dependent */ });
-  it.skip("preloading across has one through constrains loaded records", () => { /* fixture-dependent */ });
+  it.skip("preloading across has one constrains loaded records", () => {
+    /* fixture-dependent */
+  });
+  it.skip("preloading across has one through constrains loaded records", () => {
+    /* fixture-dependent */
+  });
 });

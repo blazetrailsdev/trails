@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,17 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("TokenForTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("password_digest", "string");
+        this.adapter = adapter;
+      }
     }
     generatesTokenFor(User, "password_reset", {
       expiresIn: 15 * 60 * 1000,
@@ -74,12 +120,16 @@ describe("TokenForTest", () => {
   it("does not find record when token has expired", async () => {
     const { User } = makeModel();
     class UserShortExpiry extends Base {
-      static { this.attribute("name", "string"); this.attribute("password_digest", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("password_digest", "string");
+        this.adapter = adapter;
+      }
     }
     generatesTokenFor(UserShortExpiry, "quick", { expiresIn: 1, generator: () => "" });
     const u = await UserShortExpiry.create({ name: "Bob", password_digest: "xyz" });
     const token = (u as any).generateTokenFor("quick");
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     const result = await (UserShortExpiry as any).findByTokenFor("quick", token);
     expect(result).toBeNull();
   });
@@ -112,7 +162,10 @@ describe("TokenForTest", () => {
 
   it("finds record through subclass", async () => {
     class User2 extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     generatesTokenFor(User2, "confirm");
     const u = await User2.create({ name: "Frank" });
@@ -125,19 +178,22 @@ describe("TokenForTest", () => {
   it("raises on bang when record is not found", async () => {
     const { User } = makeModel();
     await expect(
-      (User as any).findByTokenForBang("password_reset", "invalid-token")
+      (User as any).findByTokenForBang("password_reset", "invalid-token"),
     ).rejects.toThrow();
   });
 
   it("does not find record when expires_in is different", async () => {
     // Token generated with expiresIn=1ms should be expired by the time we look up
     class UserX extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     generatesTokenFor(UserX, "quick_confirm", { expiresIn: 1, generator: () => "" });
     const u = await UserX.create({ name: "Alice" });
     const token = (u as any).generateTokenFor("quick_confirm");
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     const result = await (UserX as any).findByTokenFor("quick_confirm", token);
     expect(result).toBeNull();
   });
@@ -154,9 +210,15 @@ describe("TokenForTest", () => {
   it("subclasses can redefine tokens", async () => {
     // Parent class defines "confirm" with one generator
     class Parent extends Base {
-      static { this.attribute("name", "string"); this.attribute("digest", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("digest", "string");
+        this.adapter = adapter;
+      }
     }
-    generatesTokenFor(Parent, "confirm", { generator: (r: any) => r.readAttribute("digest") ?? "" });
+    generatesTokenFor(Parent, "confirm", {
+      generator: (r: any) => r.readAttribute("digest") ?? "",
+    });
 
     // Child class redefines "confirm" with a different generator (no digest check)
     class Child extends Parent {}
@@ -179,7 +241,8 @@ describe("TokenForTest", () => {
       }
     }
     (CustomPkItem as any).generatesTokenFor = (purpose: string) => ({
-      purpose, expiresIn: 60_000,
+      purpose,
+      expiresIn: 60_000,
     });
     const item = await CustomPkItem.create({ uuid: "abc-123", name: "test" });
     expect(item.readAttribute("uuid")).toBe("abc-123");
@@ -219,7 +282,6 @@ describe("TokenForTest", () => {
     expect(() => item.signedId()).toThrow();
   });
 });
-
 
 describe("generatesTokenFor()", () => {
   it("generates and resolves a token", async () => {

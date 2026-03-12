@@ -15,14 +15,20 @@ function getPackageTestFiles(): Record<string, string[]> {
   for (const pkg of packages) {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
     const files = globSync(pattern, { cwd: ROOT_DIR }).sort();
-    
+
     result[pkg] = files;
   }
 
   // ActionPack special handling
-  const actionDispatchFiles = globSync("packages/actionpack/src/actiondispatch/**/*.test.ts", { cwd: ROOT_DIR }).sort();
-  const actionControllerFiles = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", { cwd: ROOT_DIR }).sort();
-  const actionViewFiles = globSync("packages/actionpack/src/actionview/**/*.test.ts", { cwd: ROOT_DIR }).sort();
+  const actionDispatchFiles = globSync("packages/actionpack/src/actiondispatch/**/*.test.ts", {
+    cwd: ROOT_DIR,
+  }).sort();
+  const actionControllerFiles = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", {
+    cwd: ROOT_DIR,
+  }).sort();
+  const actionViewFiles = globSync("packages/actionpack/src/actionview/**/*.test.ts", {
+    cwd: ROOT_DIR,
+  }).sort();
 
   result["actiondispatch"] = actionDispatchFiles;
   // Shared test files also relevant to controller/ Ruby tests

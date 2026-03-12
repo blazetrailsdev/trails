@@ -14,25 +14,31 @@ export class ControllerGenerator extends GeneratorBase {
       .map((a) => `  async ${a}(): Promise<void> {\n    // TODO: implement\n  }`)
       .join("\n\n");
 
-    this.createFile(`src/app/controllers/${fileName}.ts`, `import { ActionController } from "@rails-ts/actionpack";
+    this.createFile(
+      `src/app/controllers/${fileName}.ts`,
+      `import { ActionController } from "@rails-ts/actionpack";
 
 export class ${className} extends ActionController.Base {
 ${actionMethods}
 }
-`);
+`,
+    );
 
     // Test file
     const actionTests = actions
       .map((a) => `  it("${a}", () => {\n    // TODO: test ${a} action\n  });`)
       .join("\n\n");
 
-    this.createFile(`test/controllers/${fileName}.test.ts`, `import { describe, it, expect } from "vitest";
+    this.createFile(
+      `test/controllers/${fileName}.test.ts`,
+      `import { describe, it, expect } from "vitest";
 import { ${className} } from "../../src/app/controllers/${fileName}.js";
 
 describe("${className}", () => {
 ${actionTests}
 });
-`);
+`,
+    );
 
     // Append routes
     if (actions.length > 0 && this.fileExists("src/config/routes.ts")) {

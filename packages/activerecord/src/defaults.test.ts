@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -42,11 +82,16 @@ describe("MysqlDefaultExpressionTest", () => {
 
 describe("DefaultNumbersTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Counter extends Base {
-      static { this.attribute("value", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("value", "integer");
+        this.adapter = adapter;
+      }
     }
     return { Counter };
   }
@@ -74,7 +119,10 @@ describe("DefaultBinaryTest", () => {
   it("default varbinary string", async () => {
     const adp = freshAdapter();
     class BinRecord extends Base {
-      static { this.attribute("data", "string"); this.adapter = adp; }
+      static {
+        this.attribute("data", "string");
+        this.adapter = adp;
+      }
     }
     const r = await BinRecord.create({ data: "binary_data" });
     expect(r.readAttribute("data")).toBe("binary_data");
@@ -82,7 +130,10 @@ describe("DefaultBinaryTest", () => {
   it("default binary string", async () => {
     const adp = freshAdapter();
     class BinRecord extends Base {
-      static { this.attribute("data", "string", { default: "" }); this.adapter = adp; }
+      static {
+        this.attribute("data", "string", { default: "" });
+        this.adapter = adp;
+      }
     }
     const r = new BinRecord({});
     expect(r.readAttribute("data")).toBe("");
@@ -90,7 +141,10 @@ describe("DefaultBinaryTest", () => {
   it("default varbinary string that looks like hex", async () => {
     const adp = freshAdapter();
     class BinRecord extends Base {
-      static { this.attribute("data", "string"); this.adapter = adp; }
+      static {
+        this.attribute("data", "string");
+        this.adapter = adp;
+      }
     }
     const r = await BinRecord.create({ data: "0xDEADBEEF" });
     expect(r.readAttribute("data")).toBe("0xDEADBEEF");
@@ -101,7 +155,10 @@ describe("DefaultTest", () => {
   it("nil defaults for not null columns", () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("title")).toBeNull();
@@ -110,7 +167,10 @@ describe("DefaultTest", () => {
   it("multiline default text", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
-      static { this.attribute("body", "string", { default: "line1\nline2\nline3" }); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string", { default: "line1\nline2\nline3" });
+        this.adapter = adapter;
+      }
     }
     const p = new Post({});
     expect(p.readAttribute("body")).toBe("line1\nline2\nline3");
@@ -118,23 +178,35 @@ describe("DefaultTest", () => {
 });
 
 describe("DefaultsTestWithoutTransactionalFixtures", () => {
-  it.skip("mysql not null defaults non strict", () => { /* fixture-dependent */ });
-  it.skip("mysql not null defaults strict", () => { /* fixture-dependent */ });
+  it.skip("mysql not null defaults non strict", () => {
+    /* fixture-dependent */
+  });
+  it.skip("mysql not null defaults strict", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("DefaultTextTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   it("default texts", async () => {
     class Post extends Base {
-      static { this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Post.create({ body: "some text" });
     expect(p.readAttribute("body")).toBe("some text");
   });
   it("default texts containing single quotes", async () => {
     class Post extends Base {
-      static { this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Post.create({ body: "it's some text" });
     expect(p.readAttribute("body")).toBe("it's some text");
@@ -143,17 +215,25 @@ describe("DefaultTextTest", () => {
 
 describe("DefaultStringsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
   it("default strings", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Post.create({ title: "hello" });
     expect(p.readAttribute("title")).toBe("hello");
   });
   it("default strings containing single quotes", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     const p = await Post.create({ title: "it's a test" });
     expect(p.readAttribute("title")).toBe("it's a test");

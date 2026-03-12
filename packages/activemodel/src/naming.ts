@@ -16,7 +16,14 @@ export class ModelName {
   readonly i18nKey: string;
   readonly namespace: string | null;
 
-  private static _uncountables: Set<string> = new Set(["sheep", "fish", "series", "species", "money", "rice"]);
+  private static _uncountables: Set<string> = new Set([
+    "sheep",
+    "fish",
+    "series",
+    "species",
+    "money",
+    "rice",
+  ]);
 
   static addUncountable(word: string): void {
     this._uncountables.add(word.toLowerCase());
@@ -27,9 +34,7 @@ export class ModelName {
     this.namespace = options?.namespace ?? null;
 
     // Handle namespace separator (e.g., "Blog::Post" -> "post")
-    const baseName = className.includes("::")
-      ? className.split("::").pop()!
-      : className;
+    const baseName = className.includes("::") ? className.split("::").pop()! : className;
 
     const lower = underscore(baseName);
     this.singular = lower;

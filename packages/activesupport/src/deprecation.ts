@@ -1,4 +1,11 @@
-export type DeprecationBehavior = "raise" | "warn" | "stderr" | "log" | "silence" | "notify" | "report";
+export type DeprecationBehavior =
+  | "raise"
+  | "warn"
+  | "stderr"
+  | "log"
+  | "silence"
+  | "notify"
+  | "report";
 
 export class DeprecationError extends Error {
   constructor(message: string) {
@@ -15,7 +22,8 @@ interface AllowContext {
 }
 
 export class Deprecation {
-  behavior: DeprecationBehavior | DeprecationBehavior[] | ((...args: unknown[]) => void) | null = "stderr";
+  behavior: DeprecationBehavior | DeprecationBehavior[] | ((...args: unknown[]) => void) | null =
+    "stderr";
   silenced = false;
   gem?: string;
   horizon?: string;
@@ -56,7 +64,7 @@ export class Deprecation {
     behaviors: (DeprecationBehavior | ((...args: unknown[]) => void) | null)[],
     msg: string,
     fullMessage: string,
-    callstack: unknown[]
+    callstack: unknown[],
   ): void {
     for (const b of behaviors) {
       if (b == null) continue;
@@ -118,7 +126,7 @@ export class Deprecation {
   allow<T>(
     matchers: AllowMatcher[],
     options: { if?: (...args: unknown[]) => boolean } = {},
-    fn: () => T
+    fn: () => T,
   ): T {
     const ctx: AllowContext = { matchers, ifFn: options.if };
     this._allowContexts.push(ctx);

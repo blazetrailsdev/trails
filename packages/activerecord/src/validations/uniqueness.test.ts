@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter, adapterType } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -49,7 +89,11 @@ describe("UniquenessValidationTest", () => {
   it("validates uniqueness with nil value", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: null });
     const p2 = new Post({ title: null });
@@ -60,7 +104,11 @@ describe("UniquenessValidationTest", () => {
   it("validates uniqueness with validates", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "hello" });
     const p2 = new Post({ title: "hello" });
@@ -72,7 +120,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness when integer out of range", async () => {
     const adp = freshAdapter();
     class Item extends Base {
-      static { this.attribute("code", "integer"); this.adapter = adp; this.validatesUniqueness("code"); }
+      static {
+        this.attribute("code", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("code");
+      }
     }
     await Item.create({ code: 999999999 });
     const i2 = new Item({ code: 999999999 });
@@ -82,7 +134,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness when integer out of range show order does not matter", async () => {
     const adp = freshAdapter();
     class Item extends Base {
-      static { this.attribute("code", "integer"); this.attribute("name", "string"); this.adapter = adp; this.validatesUniqueness("code"); }
+      static {
+        this.attribute("code", "integer");
+        this.attribute("name", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code");
+      }
     }
     await Item.create({ code: 123, name: "first" });
     const i2 = new Item({ code: 123, name: "second" });
@@ -92,7 +149,11 @@ describe("UniquenessValidationTest", () => {
   it("validates uniqueness with newline chars", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "hello world" });
     const p2 = new Post({ title: "hello world" });
@@ -104,8 +165,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "author" }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "author" });
+      }
     }
     await Post.create({ title: "hello", author: "alice" });
     // Same title, different author - valid
@@ -119,8 +184,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with aliases", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp;
-        this.aliasAttribute("heading", "title"); this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.aliasAttribute("heading", "title");
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "dup" });
     const p2 = new Post({ title: "dup" });
@@ -131,8 +200,11 @@ describe("UniquenessValidationTest", () => {
   it.skipIf(adapterType !== "memory")("validate uniqueness with scope invalid syntax", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "nonexistent_col" }); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "nonexistent_col" });
+      }
     }
     const p = new Post({ title: "ok" });
     expect(await p.save()).toBe(true);
@@ -141,8 +213,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with object scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("org_id", "integer"); this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "org_id" }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("org_id", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "org_id" });
+      }
     }
     await Post.create({ title: "hello", org_id: 1 });
     const p2 = new Post({ title: "hello", org_id: 2 });
@@ -154,9 +230,13 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with polymorphic object scope", async () => {
     const adp = freshAdapter();
     class Comment extends Base {
-      static { this.attribute("body", "string"); this.attribute("commentable_type", "string");
-        this.attribute("commentable_id", "integer"); this.adapter = adp;
-        this.validatesUniqueness("body", { scope: ["commentable_type", "commentable_id"] }); }
+      static {
+        this.attribute("body", "string");
+        this.attribute("commentable_type", "string");
+        this.attribute("commentable_id", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("body", { scope: ["commentable_type", "commentable_id"] });
+      }
     }
     await Comment.create({ body: "great", commentable_type: "Post", commentable_id: 1 });
     const c2 = new Comment({ body: "great", commentable_type: "Post", commentable_id: 2 });
@@ -168,8 +248,13 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with composed attribute scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("year", "integer"); this.attribute("month", "integer");
-        this.adapter = adp; this.validatesUniqueness("title", { scope: ["year", "month"] }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("year", "integer");
+        this.attribute("month", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: ["year", "month"] });
+      }
     }
     await Post.create({ title: "report", year: 2024, month: 1 });
     const p2 = new Post({ title: "report", year: 2024, month: 2 });
@@ -181,7 +266,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with object arg", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "taken" });
     const p2 = new Post({ title: "taken" });
@@ -192,10 +281,18 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness scoped to defining class", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     class Article extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "shared" });
     const a = new Article({ title: "shared" });
@@ -205,8 +302,13 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with scope array", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("category", "string");
-        this.adapter = adp; this.validatesUniqueness("title", { scope: ["author", "category"] }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.attribute("category", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: ["author", "category"] });
+      }
     }
     await Post.create({ title: "hello", author: "alice", category: "tech" });
     const p2 = new Post({ title: "hello", author: "alice", category: "other" });
@@ -218,7 +320,11 @@ describe("UniquenessValidationTest", () => {
   it("validate case insensitive uniqueness", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "Hello" });
     // MemoryAdapter does exact match, so different case should pass
@@ -229,7 +335,11 @@ describe("UniquenessValidationTest", () => {
   it("validate case sensitive uniqueness with special sql like chars", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "hello%" });
     const p2 = new Post({ title: "hello%" });
@@ -241,7 +351,11 @@ describe("UniquenessValidationTest", () => {
   it("validate case insensitive uniqueness with special sql like chars", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "test%" });
     const p2 = new Post({ title: "test%" });
@@ -251,7 +365,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness by default database collation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "collation_test" });
     const p2 = new Post({ title: "collation_test" });
@@ -261,7 +379,11 @@ describe("UniquenessValidationTest", () => {
   it("validate case sensitive uniqueness", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "CaseSensitive" });
     const p2 = new Post({ title: "CaseSensitive" });
@@ -273,7 +395,11 @@ describe("UniquenessValidationTest", () => {
   it("validate case sensitive uniqueness with attribute passed as integer", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("code", "integer"); this.adapter = adp; this.validatesUniqueness("code"); }
+      static {
+        this.attribute("code", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("code");
+      }
     }
     await Post.create({ code: 42 });
     const p2 = new Post({ code: 42 });
@@ -283,7 +409,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with non standard table names", async () => {
     const adp = freshAdapter();
     class SpecialPost extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await SpecialPost.create({ title: "unique" });
     const p2 = new SpecialPost({ title: "unique" });
@@ -293,8 +423,12 @@ describe("UniquenessValidationTest", () => {
   it("validates uniqueness inside scoping", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("org_id", "integer"); this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "org_id" }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("org_id", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "org_id" });
+      }
     }
     await Post.create({ title: "scoped", org_id: 1 });
     const p2 = new Post({ title: "scoped", org_id: 1 });
@@ -304,7 +438,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with columns which are sql keywords", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("order", "string"); this.adapter = adp; this.validatesUniqueness("order"); }
+      static {
+        this.attribute("order", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("order");
+      }
     }
     await Post.create({ order: "first" });
     const p2 = new Post({ order: "first" });
@@ -314,7 +452,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with limit", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "a".repeat(100) });
     const p2 = new Post({ title: "a".repeat(100) });
@@ -324,7 +466,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with limit and utf8", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "\u{1F600}".repeat(10) });
     const p2 = new Post({ title: "\u{1F600}".repeat(10) });
@@ -334,7 +480,11 @@ describe("UniquenessValidationTest", () => {
   it("validate straight inheritance uniqueness", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "inherited" });
     const p2 = new Post({ title: "inherited" });
@@ -343,8 +493,16 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with conditions", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("active", "integer"); this.adapter = adp;
-        this.validatesUniqueness("title", { conditions: function(this: any) { return this.where({ active: 1 }); } }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("active", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title", {
+          conditions: function (this: any) {
+            return this.where({ active: 1 });
+          },
+        });
+      }
     }
     // conditions limits which records count for uniqueness: only active=1 records
     await Post.create({ title: "hello", active: 1 });
@@ -360,8 +518,11 @@ describe("UniquenessValidationTest", () => {
     // Non-callable conditions should be rejected or ignored
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp;
-        this.validatesUniqueness("title", { conditions: "not a function" as any }); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { conditions: "not a function" as any });
+      }
     }
     const p = new Post({ title: "test" });
     // Should save since conditions is invalid and likely ignored
@@ -371,8 +532,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with conditions with record arg", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("active", "integer"); this.adapter = adp;
-        this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("active", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "hello", active: 1 });
     const p2 = new Post({ title: "hello", active: 0 });
@@ -383,7 +548,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness on existing relation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const post = await Post.create({ title: "unique" });
     // Record should be valid against itself (save returns true for existing record)
@@ -393,7 +562,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness on empty relation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const p = new Post({ title: "brand new" });
     expect(await p.save()).toBe(true);
@@ -402,7 +575,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness of custom primary key", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "cpk" });
     const p2 = new Post({ title: "cpk" });
@@ -412,7 +589,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness without primary key", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "nopk" });
     const p2 = new Post({ title: "nopk" });
@@ -422,7 +603,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness ignores itself when primary key changed", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const post = await Post.create({ title: "self" });
     // Re-saving existing record should not conflict with itself
@@ -432,9 +617,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with after create performing save", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("saved_count", "integer"); this.adapter = adp;
+      static {
+        this.attribute("title", "string");
+        this.attribute("saved_count", "integer");
+        this.adapter = adp;
         this.validatesUniqueness("title");
-        this.afterCreate(async function(record: any) {
+        this.afterCreate(async function (record: any) {
           record.writeAttribute("saved_count", 1);
         });
       }
@@ -446,7 +634,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness uuid", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("uuid", "string"); this.adapter = adp; this.validatesUniqueness("uuid"); }
+      static {
+        this.attribute("uuid", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("uuid");
+      }
     }
     await Post.create({ uuid: "550e8400-e29b-41d4-a716-446655440000" });
     const p2 = new Post({ uuid: "550e8400-e29b-41d4-a716-446655440000" });
@@ -456,7 +648,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness regular id", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "regular" });
     const p2 = new Post({ title: "regular" });
@@ -466,7 +662,11 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with singleton class", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "unique" });
     const p2 = new Post({ title: "unique" });
@@ -480,7 +680,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("new record", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const p = new Post({ title: "new" });
     expect(await p.save()).toBe(true);
@@ -489,8 +693,12 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("changing non unique attribute", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp;
-        this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const p = await Post.create({ title: "unique", body: "old" });
     p.writeAttribute("body", "new");
@@ -500,7 +708,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("changing unique attribute", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "taken" });
     const p = await Post.create({ title: "original" });
@@ -511,8 +723,12 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("changing non unique attribute and unique attribute is nil", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adp;
-        this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const p = await Post.create({ title: null, body: "old" });
     p.writeAttribute("body", "new");
@@ -522,8 +738,12 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("conditions", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("active", "integer"); this.adapter = adp;
-        this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("active", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "cond", active: 1 });
     const p2 = new Post({ title: "cond", active: 0 });
@@ -533,7 +753,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("case sensitive", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "CaseTest" });
     const p2 = new Post({ title: "CaseTest" });
@@ -545,8 +769,12 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("partial index", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("published", "integer"); this.adapter = adp;
-        this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "partial", published: 1 });
     const p2 = new Post({ title: "partial", published: 0 });
@@ -557,7 +785,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("non unique index", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "dup" });
     const p2 = new Post({ title: "dup" });
@@ -567,8 +799,12 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("category", "string"); this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "category" }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("category", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "category" });
+      }
     }
     await Post.create({ title: "scoped", category: "a" });
     const p2 = new Post({ title: "scoped", category: "b" });
@@ -580,7 +816,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("uniqueness on relation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     const p = await Post.create({ title: "rel" });
     expect(await p.save()).toBe(true);
@@ -589,7 +829,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("uniqueness on custom relation primary key", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("slug", "string"); this.adapter = adp; this.validatesUniqueness("slug"); }
+      static {
+        this.attribute("slug", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("slug");
+      }
     }
     await Post.create({ slug: "my-post" });
     const p2 = new Post({ slug: "my-post" });
@@ -599,8 +843,12 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("index of sublist of columns", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "author" }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: "author" });
+      }
     }
     await Post.create({ title: "sub", author: "alice" });
     const p2 = new Post({ title: "sub", author: "alice" });
@@ -610,8 +858,13 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("index of columns list and extra columns", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.attribute("year", "integer");
-        this.adapter = adp; this.validatesUniqueness("title", { scope: ["author", "year"] }); }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.attribute("year", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { scope: ["author", "year"] });
+      }
     }
     await Post.create({ title: "extra", author: "bob", year: 2024 });
     const p2 = new Post({ title: "extra", author: "bob", year: 2025 });
@@ -621,7 +874,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("expression index", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; this.validatesUniqueness("title"); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title");
+      }
     }
     await Post.create({ title: "expr" });
     const p2 = new Post({ title: "expr" });
@@ -633,8 +890,13 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation for model with composite key", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer"); this.attribute("total", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.attribute("total", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 100, total: 50 });
     const o2 = new Order({ shop_id: 1, order_num: 100, total: 75 });
@@ -644,8 +906,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation with different composite key values", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 100 });
     const o2 = new Order({ shop_id: 2, order_num: 100 });
@@ -655,8 +921,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key new record", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = new Order({ shop_id: 1, order_num: 1 });
     expect(await o.save()).toBe(true);
@@ -665,8 +935,13 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key update", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer"); this.attribute("status", "string");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.attribute("status", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = await Order.create({ shop_id: 1, order_num: 1, status: "pending" });
     o.writeAttribute("status", "shipped");
@@ -676,8 +951,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key update to conflicting value", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = await Order.create({ shop_id: 1, order_num: 2 });
@@ -688,8 +967,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with nil scope", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: null, order_num: 1 });
     const o2 = new Order({ shop_id: null, order_num: 1 });
@@ -700,8 +983,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with nil attribute", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: null });
     const o2 = new Order({ shop_id: 1, order_num: null });
@@ -712,8 +999,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key error message", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -724,8 +1015,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key custom message", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id", message: "is already used" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id", message: "is already used" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -736,8 +1031,13 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key three columns", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("region", "string"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: ["shop_id", "region"] }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("region", "string");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: ["shop_id", "region"] });
+      }
     }
     await Order.create({ shop_id: 1, region: "us", order_num: 1 });
     const o2 = new Order({ shop_id: 1, region: "eu", order_num: 1 });
@@ -749,8 +1049,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key allows same attr different scope", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("code", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, code: "ABC" });
     const o2 = new Order({ shop_id: 2, code: "ABC" });
@@ -760,8 +1064,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key multiple records same scope", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     await Order.create({ shop_id: 1, order_num: 2 });
@@ -773,8 +1081,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key resave existing", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = await Order.create({ shop_id: 1, order_num: 1 });
     expect(await o.save()).toBe(true);
@@ -783,8 +1095,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with string scope", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("tenant", "string"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("code", { scope: "tenant" }); }
+      static {
+        this.attribute("tenant", "string");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code", { scope: "tenant" });
+      }
     }
     await Order.create({ tenant: "acme", code: "X1" });
     const o2 = new Order({ tenant: "acme", code: "X1" });
@@ -796,8 +1112,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key destroy and recreate", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = await Order.create({ shop_id: 1, order_num: 1 });
     await o.destroy();
@@ -808,8 +1128,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key empty table", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = new Order({ shop_id: 1, order_num: 1 });
     expect(await o.save()).toBe(true);
@@ -818,8 +1142,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with zero values", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 0, order_num: 0 });
     const o2 = new Order({ shop_id: 0, order_num: 0 });
@@ -829,8 +1157,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with negative values", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: -1, order_num: -1 });
     const o2 = new Order({ shop_id: -1, order_num: -1 });
@@ -840,8 +1172,14 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key many scopes", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("a", "integer"); this.attribute("b", "integer"); this.attribute("c", "integer"); this.attribute("val", "string");
-        this.adapter = adp; this.validatesUniqueness("val", { scope: ["a", "b", "c"] }); }
+      static {
+        this.attribute("a", "integer");
+        this.attribute("b", "integer");
+        this.attribute("c", "integer");
+        this.attribute("val", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("val", { scope: ["a", "b", "c"] });
+      }
     }
     await Order.create({ a: 1, b: 2, c: 3, val: "x" });
     const o2 = new Order({ a: 1, b: 2, c: 4, val: "x" });
@@ -853,8 +1191,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key is valid check", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = new Order({ shop_id: 1, order_num: 1 });
     // isValid is sync, doesn't check uniqueness
@@ -864,8 +1206,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key different attribute same scope value", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 2 });
@@ -875,8 +1221,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with boolean scope", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("active", "boolean"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("code", { scope: "active" }); }
+      static {
+        this.attribute("active", "boolean");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code", { scope: "active" });
+      }
     }
     await Order.create({ active: true, code: "A" });
     const o2 = new Order({ active: false, code: "A" });
@@ -888,8 +1238,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key both attributes strings", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("tenant", "string"); this.attribute("name", "string");
-        this.adapter = adp; this.validatesUniqueness("name", { scope: "tenant" }); }
+      static {
+        this.attribute("tenant", "string");
+        this.attribute("name", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("name", { scope: "tenant" });
+      }
     }
     await Order.create({ tenant: "t1", name: "n1" });
     const o2 = new Order({ tenant: "t1", name: "n1" });
@@ -899,8 +1253,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key large number of records", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     for (let i = 0; i < 10; i++) {
       await Order.create({ shop_id: 1, order_num: i });
@@ -914,8 +1272,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with conditions", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -925,8 +1287,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key scope not matching", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     await Order.create({ shop_id: 2, order_num: 1 });
@@ -938,8 +1304,13 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key update non-unique field", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer"); this.attribute("note", "string");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.attribute("note", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = await Order.create({ shop_id: 1, order_num: 1, note: "old" });
     o.writeAttribute("note", "new");
@@ -949,8 +1320,14 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key multiple validations", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); this.validatesUniqueness("code"); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+        this.validatesUniqueness("code");
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1, code: "A" });
     const o2 = new Order({ shop_id: 2, order_num: 1, code: "A" });
@@ -960,12 +1337,20 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key different classes independent", async () => {
     const adp = freshAdapter();
     class OrderA extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     class OrderB extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await OrderA.create({ shop_id: 1, order_num: 1 });
     const ob = new OrderB({ shop_id: 1, order_num: 1 });
@@ -975,8 +1360,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key first record always valid", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     const o = new Order({ shop_id: 99, order_num: 99 });
     expect(await o.save()).toBe(true);
@@ -985,8 +1374,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key persisted record count", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     await Order.create({ shop_id: 1, order_num: 2 });
@@ -997,8 +1390,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with empty string", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "string"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("code", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "string");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: "", code: "X" });
     const o2 = new Order({ shop_id: "", code: "X" });
@@ -1008,8 +1405,13 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key scope array with two elements", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("a", "integer"); this.attribute("b", "integer"); this.attribute("val", "string");
-        this.adapter = adp; this.validatesUniqueness("val", { scope: ["a", "b"] }); }
+      static {
+        this.attribute("a", "integer");
+        this.attribute("b", "integer");
+        this.attribute("val", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("val", { scope: ["a", "b"] });
+      }
     }
     await Order.create({ a: 1, b: 1, val: "v" });
     const o2 = new Order({ a: 1, b: 2, val: "v" });
@@ -1019,8 +1421,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key error does not persist", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -1034,8 +1440,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key special characters in string", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("tenant", "string"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("code", { scope: "tenant" }); }
+      static {
+        this.attribute("tenant", "string");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code", { scope: "tenant" });
+      }
     }
     await Order.create({ tenant: "o'reilly", code: "special" });
     const o2 = new Order({ tenant: "o'reilly", code: "special" });
@@ -1045,8 +1455,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with float scope", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("price", "float"); this.attribute("code", "string");
-        this.adapter = adp; this.validatesUniqueness("code", { scope: "price" }); }
+      static {
+        this.attribute("price", "float");
+        this.attribute("code", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("code", { scope: "price" });
+      }
     }
     await Order.create({ price: 9.99, code: "A" });
     const o2 = new Order({ price: 9.99, code: "A" });
@@ -1058,8 +1472,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key save bang raises on duplicate", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -1069,8 +1487,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key valid after fixing conflict", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -1082,8 +1504,12 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key does not pollute other instances", async () => {
     const adp = freshAdapter();
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("order_num", "integer");
-        this.adapter = adp; this.validatesUniqueness("order_num", { scope: "shop_id" }); }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_num", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("order_num", { scope: "shop_id" });
+      }
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
@@ -1098,15 +1524,18 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation for model with composite key duplicate check", async () => {
     const adp = freshAdapter();
     class Entry extends Base {
-      static { this.attribute("group_id", "integer"); this.attribute("seq", "integer");
-        this.adapter = adp; this.validatesUniqueness("seq", { scope: "group_id" }); }
+      static {
+        this.attribute("group_id", "integer");
+        this.attribute("seq", "integer");
+        this.adapter = adp;
+        this.validatesUniqueness("seq", { scope: "group_id" });
+      }
     }
     await Entry.create({ group_id: 1, seq: 1 });
     const e2 = new Entry({ group_id: 1, seq: 1 });
     expect(await e2.save()).toBe(false);
   });
 });
-
 
 describe("UniquenessValidator", () => {
   it("validate uniqueness", async () => {

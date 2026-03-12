@@ -123,8 +123,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   deepMerge(other: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
     const selfObj = this.toHash();
-    const otherObj =
-      other instanceof HashWithIndifferentAccess ? other.toHash() : other;
+    const otherObj = other instanceof HashWithIndifferentAccess ? other.toHash() : other;
     const merged = deepMergeObj(selfObj, otherObj as AnyObject);
     return new HashWithIndifferentAccess<V>(merged);
   }

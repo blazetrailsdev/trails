@@ -3,7 +3,7 @@ import { Response, ResponseRaw } from "./response.js";
 
 describe("Rack::Response", () => {
   it("has standard constructor", () => {
-    const headers = { "header": "value" };
+    const headers = { header: "value" };
     const body = ["body"];
     const response = Response.create(200, headers, body);
     expect(response.status).toBe(200);
@@ -49,7 +49,9 @@ describe("Rack::Response", () => {
   it("can be written to inside finish block and it does not generate a content-length header", () => {
     const response = new Response("foo");
     response.write("bar");
-    const [, h, body] = response.finish((res) => { res.write("baz"); });
+    const [, h, body] = response.finish((res) => {
+      res.write("baz");
+    });
     const parts: string[] = [];
     body.each((part: string) => parts.push(part));
     expect(parts).toEqual(["foo", "bar", "baz"]);
@@ -58,7 +60,11 @@ describe("Rack::Response", () => {
 
   it("#write calls #<< on non-iterable body", () => {
     const content: string[] = [];
-    const body: any = { push(x: string) { content.push(x); } };
+    const body: any = {
+      push(x: string) {
+        content.push(x);
+      },
+    };
     const response = new Response(body);
     response.write("bar");
     expect(content).toEqual(["bar"]);
@@ -115,7 +121,9 @@ describe("Rack::Response", () => {
   it("formats the Cookie expiration date accordingly to RFC 6265", () => {
     const response = new Response();
     response.setCookie("foo", { value: "bar", expires: new Date(Date.now() + 10000) });
-    expect(response.headers["set-cookie"]).toMatch(/expires=..., \d\d ... \d\d\d\d \d\d:\d\d:\d\d .../);
+    expect(response.headers["set-cookie"]).toMatch(
+      /expires=..., \d\d ... \d\d\d\d \d\d:\d\d:\d\d .../,
+    );
   });
 
   it("can set secure cookies", () => {
@@ -305,7 +313,7 @@ describe("Rack::Response", () => {
     const response = new Response();
     response.deleteCookie("foo", { path: "/a", domain: "example.com" });
     expect(response.headers["set-cookie"]).toBe(
-      "foo=; domain=example.com; path=/a; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      "foo=; domain=example.com; path=/a; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT",
     );
 
     response.deleteCookie("foo", { path: "/a/b", domain: "example.com" });
@@ -332,13 +340,13 @@ describe("Rack::Response", () => {
     let r = new Response("foo");
     let body = r.finish()[2];
     let str = "";
-    body.forEach((part: string) => str += part);
+    body.forEach((part: string) => (str += part));
     expect(str).toBe("foo");
 
     r = new Response(["foo", "bar"]);
     body = r.finish()[2];
     str = "";
-    body.forEach((part: string) => str += part);
+    body.forEach((part: string) => (str += part));
     expect(str).toBe("foobar");
 
     r = new Response([], 500);
@@ -366,7 +374,7 @@ describe("Rack::Response", () => {
     r.write("baz");
     const [, header, body] = r.finish();
     let str = "";
-    body.forEach((part: string) => str += part);
+    body.forEach((part: string) => (str += part));
     expect(str).toBe("foobarbaz");
     expect(header["content-length"]).toBe("9");
   });
@@ -377,7 +385,7 @@ describe("Rack::Response", () => {
     r.write("baz");
     const [, header, body] = r.finish();
     let str = "";
-    body.forEach((part: string) => str += part);
+    body.forEach((part: string) => (str += part));
     expect(str).toBe("foobarbaz");
     expect(header["content-length"]).toBe("9");
   });
@@ -388,19 +396,24 @@ describe("Rack::Response", () => {
     r.write("baz");
     const [, header, body] = r.finish();
     let str = "";
-    body.forEach((part: string) => str += part);
+    body.forEach((part: string) => (str += part));
     expect(str).toBe("foobarbaz");
     expect(header["content-length"]).toBe("9");
   });
 
   it("correctly updates content-length when writing when initialized with object body that responds to #each", () => {
-    const obj = { each(fn: (s: string) => void) { fn("foo"); fn("bar"); } };
+    const obj = {
+      each(fn: (s: string) => void) {
+        fn("foo");
+        fn("bar");
+      },
+    };
     const r = new Response(obj);
     r.write("baz");
     r.write("baz");
     const [, header, body] = r.finish();
     let str = "";
-    body.forEach((part: string) => str += part);
+    body.forEach((part: string) => (str += part));
     expect(str).toBe("foobarbazbaz");
     expect(header["content-length"]).toBe("12");
   });
@@ -409,7 +422,7 @@ describe("Rack::Response", () => {
     const r = new Response(["foo", "bar"], 204);
     const [, header, body] = r.finish();
     let str = "";
-    if (Array.isArray(body)) body.forEach((part: string) => str += part);
+    if (Array.isArray(body)) body.forEach((part: string) => (str += part));
     expect(str).toBe("");
     expect(header["content-type"]).toBeUndefined();
     expect(header["content-length"]).toBeUndefined();
@@ -546,7 +559,12 @@ describe("Rack::Response", () => {
 
   it("calls close on #body", () => {
     const res = new Response();
-    const body = { closed: false, close() { this.closed = true; } };
+    const body = {
+      closed: false,
+      close() {
+        this.closed = true;
+      },
+    };
     res.body = body;
     res.close();
     expect(body.closed).toBe(true);
@@ -554,7 +572,12 @@ describe("Rack::Response", () => {
 
   it("calls close on #body when 204 or 304", () => {
     let res = new Response();
-    let body: any = { closed: false, close() { this.closed = true; } };
+    let body: any = {
+      closed: false,
+      close() {
+        this.closed = true;
+      },
+    };
     res.body = body;
     res.finish();
     expect(body.closed).toBe(false);
@@ -564,7 +587,12 @@ describe("Rack::Response", () => {
     expect(body.closed).toBe(true);
     expect(b).not.toBe(body);
 
-    body = { closed: false, close() { this.closed = true; } };
+    body = {
+      closed: false,
+      close() {
+        this.closed = true;
+      },
+    };
     res.body = body;
     res.status = 304;
     const [, , b2] = res.finish();
@@ -574,7 +602,12 @@ describe("Rack::Response", () => {
 
   it("doesn't call close on #body when 205", () => {
     const res = new Response();
-    const body = { closed: false, close() { this.closed = true; } };
+    const body = {
+      closed: false,
+      close() {
+        this.closed = true;
+      },
+    };
     res.body = body;
     res.status = 205;
     res.finish();

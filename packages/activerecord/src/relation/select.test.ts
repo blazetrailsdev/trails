@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -38,7 +78,11 @@ describe("SelectTest", () => {
 
   it("select with columns", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
@@ -46,7 +90,11 @@ describe("SelectTest", () => {
 
   it("reselect replaces previous select", () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("body", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = Post.select("title").reselect("body").toSql();
     expect(sql).toContain("body");
@@ -55,11 +103,17 @@ describe("SelectTest", () => {
 
 describe("SelectTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Developer extends Base {
-      static { this.attribute("name", "string"); this.attribute("salary", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("salary", "integer");
+        this.adapter = adapter;
+      }
     }
     return { Developer };
   }
@@ -211,13 +265,16 @@ describe("SelectTest", () => {
   it.skip("select with block without any arguments", () => {});
 });
 
-
 describe("select block form", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("filters loaded records with a function", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = adapter;
@@ -226,8 +283,8 @@ describe("select block form", () => {
     await Item.create({ name: "Banana" });
     await Item.create({ name: "Avocado" });
 
-    const items = await Item.all().select(
-      (r: any) => (r.readAttribute("name") as string).startsWith("A")
+    const items = await Item.all().select((r: any) =>
+      (r.readAttribute("name") as string).startsWith("A"),
     );
     expect(items).toHaveLength(2);
   });
@@ -235,7 +292,9 @@ describe("select block form", () => {
 
 describe("regroup()", () => {
   it("replaces existing GROUP BY columns", () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("category", "string");
     Item.attribute("status", "string");
@@ -250,10 +309,14 @@ describe("regroup()", () => {
 
 describe("distinct count", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("count with distinct uses COUNT(DISTINCT ...)", async () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("category", "string");
     Item.adapter = adapter;
@@ -262,17 +325,19 @@ describe("distinct count", () => {
     await Item.create({ category: "A" });
     await Item.create({ category: "B" });
 
-    const total = await Item.all().count() as number;
+    const total = (await Item.all().count()) as number;
     expect(total).toBe(3);
 
-    const distinctCount = await Item.all().distinct().count("category") as number;
+    const distinctCount = (await Item.all().distinct().count("category")) as number;
     expect(distinctCount).toBe(2);
   });
 });
 
 describe("having hash form", () => {
   it("accepts hash conditions for having", () => {
-    class Item extends Base { static _tableName = "items"; }
+    class Item extends Base {
+      static _tableName = "items";
+    }
     Item.attribute("id", "integer");
     Item.attribute("category", "string");
     Item.adapter = freshAdapter();
@@ -304,11 +369,17 @@ describe("distinctOn", () => {
 
 describe("Relation Select (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("select specific columns in SQL", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().select("name").toSql();
     expect(sql).toContain('"name"');
@@ -317,20 +388,27 @@ describe("Relation Select (Rails-guided)", () => {
 
   it("select block form filters loaded records", async () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await User.create({ name: "Apple" });
     await User.create({ name: "Banana" });
     await User.create({ name: "Avocado" });
-    const result = await User.all().select(
-      (r: any) => (r.readAttribute("name") as string).startsWith("A")
+    const result = await User.all().select((r: any) =>
+      (r.readAttribute("name") as string).startsWith("A"),
     );
     expect(result).toHaveLength(2);
   });
 
   it("reselect replaces previous select", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("email", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().select("name").reselect("email").toSql();
     expect(sql).toContain('"email"');
@@ -339,7 +417,10 @@ describe("Relation Select (Rails-guided)", () => {
 
   it("distinct generates DISTINCT SQL", () => {
     class User extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     const sql = User.all().distinct().toSql();
     expect(sql).toContain("DISTINCT");
@@ -348,20 +429,38 @@ describe("Relation Select (Rails-guided)", () => {
 
 describe("Group/Having (Rails-guided)", () => {
   it("group generates GROUP BY SQL", () => {
-    class Order extends Base { static { this.attribute("customer_id", "integer"); this.attribute("amount", "integer"); } }
+    class Order extends Base {
+      static {
+        this.attribute("customer_id", "integer");
+        this.attribute("amount", "integer");
+      }
+    }
     const sql = Order.all().group("customer_id").toSql();
     expect(sql).toContain("GROUP BY");
   });
 
   it("having generates HAVING SQL", () => {
-    class Order extends Base { static { this.attribute("customer_id", "integer"); } }
-    const sql = Order.all().select("customer_id").group("customer_id").having("COUNT(*) > 1").toSql();
+    class Order extends Base {
+      static {
+        this.attribute("customer_id", "integer");
+      }
+    }
+    const sql = Order.all()
+      .select("customer_id")
+      .group("customer_id")
+      .having("COUNT(*) > 1")
+      .toSql();
     expect(sql).toContain("HAVING");
     expect(sql).toContain("COUNT(*) > 1");
   });
 
   it("regroup replaces existing group", () => {
-    class Order extends Base { static { this.attribute("customer_id", "integer"); this.attribute("status", "string"); } }
+    class Order extends Base {
+      static {
+        this.attribute("customer_id", "integer");
+        this.attribute("status", "string");
+      }
+    }
     const sql = Order.all().group("customer_id").regroup("status").toSql();
     expect(sql).toContain("status");
     expect(sql).not.toContain("customer_id");

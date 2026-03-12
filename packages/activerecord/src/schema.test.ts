@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -70,13 +110,17 @@ describe("ActiveRecordSchemaTest", () => {
       });
     });
     // Verify table exists
-    await adapter.executeMutation(`INSERT INTO "schema_test" ("title", "count") VALUES ('hello', 1)`);
+    await adapter.executeMutation(
+      `INSERT INTO "schema_test" ("title", "count") VALUES ('hello', 1)`,
+    );
     const rows = await adapter.execute(`SELECT * FROM "schema_test"`);
     expect(rows.length).toBe(1);
     expect(rows[0].title).toBe("hello");
   });
 
-  it.skip("schema define with table name prefix", () => { /* table name prefixes not supported */ });
+  it.skip("schema define with table name prefix", () => {
+    /* table name prefixes not supported */
+  });
 
   it("schema raises an error for invalid column type", () => {
     // TableDefinition doesn't have a method for an invalid type; calling a nonexistent method should throw
@@ -137,7 +181,9 @@ describe("ActiveRecordSchemaTest", () => {
   it("timestamps with implicit default on change table", async () => {
     class TsMig extends Migration {
       async up() {
-        await this.createTable("ts_change", (t) => { t.string("name"); });
+        await this.createTable("ts_change", (t) => {
+          t.string("name");
+        });
         await this.addTimestamps("ts_change");
       }
       async down() {
@@ -148,19 +194,27 @@ describe("ActiveRecordSchemaTest", () => {
     (m as any).adapter = adapter;
     await m.up();
     // Verify timestamps were added
-    await adapter.executeMutation(`INSERT INTO "ts_change" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`);
+    await adapter.executeMutation(
+      `INSERT INTO "ts_change" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
+    );
     const rows = await adapter.execute(`SELECT * FROM "ts_change"`);
     expect(rows.length).toBe(1);
     const createdAt = rows[0].created_at;
-    expect(createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt)).toBe("2023-01-01");
+    expect(
+      createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt),
+    ).toBe("2023-01-01");
   });
 
-  it.skip("timestamps with implicit default on change table with bulk", () => { /* bulk mode not supported */ });
+  it.skip("timestamps with implicit default on change table with bulk", () => {
+    /* bulk mode not supported */
+  });
 
   it("timestamps with implicit default on add timestamps", async () => {
     class AddTsMig extends Migration {
       async up() {
-        await this.createTable("ts_add", (t) => { t.string("name"); });
+        await this.createTable("ts_add", (t) => {
+          t.string("name");
+        });
         await this.addTimestamps("ts_add", { null: false });
       }
       async down() {
@@ -171,10 +225,14 @@ describe("ActiveRecordSchemaTest", () => {
     (m as any).adapter = adapter;
     await m.up();
     // Verify timestamps were added
-    await adapter.executeMutation(`INSERT INTO "ts_add" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`);
+    await adapter.executeMutation(
+      `INSERT INTO "ts_add" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
+    );
     const rows = await adapter.execute(`SELECT * FROM "ts_add"`);
     expect(rows.length).toBe(1);
     const createdAt = rows[0].created_at;
-    expect(createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt)).toBe("2023-01-01");
+    expect(
+      createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt),
+    ).toBe("2023-01-01");
   });
 });

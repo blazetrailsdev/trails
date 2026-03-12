@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -33,7 +73,10 @@ describe("NamedScopingTest", () => {
   it("implements enumerable", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -44,7 +87,10 @@ describe("NamedScopingTest", () => {
   it("found items are cached", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "cached" });
     const rel = Post.all();
@@ -57,7 +103,10 @@ describe("NamedScopingTest", () => {
   it("reload expires cache of found items", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "original" });
     const rel = Post.all();
@@ -70,7 +119,10 @@ describe("NamedScopingTest", () => {
   it("delegates finds and calculations to the base class", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const count = await Post.count();
@@ -80,7 +132,11 @@ describe("NamedScopingTest", () => {
   it("calling merge at first in scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("published", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "pub", published: true });
     const rel = Post.where({ published: true }).merge(Post.order("title"));
@@ -214,7 +270,9 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
-        this.scope("byTitleKwargs", (rel: any, opts: { title: string }) => rel.where({ title: opts.title }));
+        this.scope("byTitleKwargs", (rel: any, opts: { title: string }) =>
+          rel.where({ title: opts.title }),
+        );
       }
     }
     await Post.create({ title: "kwargs-test" });
@@ -239,7 +297,10 @@ describe("NamedScopingTest", () => {
   it("active records have scope named __all__", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const rel = Post.all();
     expect(rel).toBeInstanceOf(Relation);
@@ -248,7 +309,10 @@ describe("NamedScopingTest", () => {
   it("active records have scope named __scoped__", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const rel = Post.all();
     expect(rel).toBeInstanceOf(Relation);
@@ -257,7 +321,10 @@ describe("NamedScopingTest", () => {
   it("first and last should allow integers for limit", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -269,7 +336,10 @@ describe("NamedScopingTest", () => {
   it("empty should not load results", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const rel = Post.all();
     expect(rel.isLoaded).toBe(false);
@@ -280,7 +350,10 @@ describe("NamedScopingTest", () => {
   it("any should not load results", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const rel = Post.all();
@@ -291,7 +364,10 @@ describe("NamedScopingTest", () => {
   it("many should not load results", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -303,7 +379,10 @@ describe("NamedScopingTest", () => {
   it("many should return false if none or one", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "only" });
     const many = await Post.all().isMany();
@@ -313,7 +392,10 @@ describe("NamedScopingTest", () => {
   it("many should return true if more than one", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -324,7 +406,10 @@ describe("NamedScopingTest", () => {
   it("model class should respond to any", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(typeof Post.all().isAny).toBe("function");
   });
@@ -332,7 +417,10 @@ describe("NamedScopingTest", () => {
   it("model class should respond to many", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(typeof Post.all().isMany).toBe("function");
   });
@@ -383,7 +471,10 @@ describe("NamedScopingTest", () => {
   it("find all should behave like select", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -394,7 +485,10 @@ describe("NamedScopingTest", () => {
   it("size should use count when results are not loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const rel = Post.all();
@@ -406,7 +500,10 @@ describe("NamedScopingTest", () => {
   it("size should use length when results are loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const rel = Post.all();
@@ -419,7 +516,11 @@ describe("NamedScopingTest", () => {
   it("chaining combines conditions when searching", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("published", "boolean"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "target", published: true });
     await Post.create({ title: "other", published: true });
@@ -430,7 +531,10 @@ describe("NamedScopingTest", () => {
   it("chaining applies last conditions when creating", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const p = await Post.where({ title: "chain" }).create();
     expect(p.isPersisted()).toBe(true);
@@ -470,7 +574,10 @@ describe("NamedScopingTest", () => {
   it("model class should respond to none", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const results = await Post.all().none().toArray();
     expect(results.length).toBe(0);
@@ -479,7 +586,10 @@ describe("NamedScopingTest", () => {
   it("model class should respond to one", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "only" });
     const one = await Post.all().isOne();
@@ -489,7 +599,10 @@ describe("NamedScopingTest", () => {
   it("model class should respond to extending", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const count = await Post.count();
@@ -529,7 +642,10 @@ describe("NamedScopingTest2", () => {
   it("method missing priority when delegating", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Post.where({ title: "test" })).toBeInstanceOf(Relation);
   });
@@ -537,7 +653,10 @@ describe("NamedScopingTest2", () => {
   it("scope should respond to own methods and methods of the proxy", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const rel = Post.all();
     expect(typeof rel.where).toBe("function");
@@ -547,7 +666,11 @@ describe("NamedScopingTest2", () => {
   it("scopes with options limit finds to those matching the criteria specified", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "popular", views: 100 });
     await Post.create({ title: "unpopular", views: 1 });
@@ -558,7 +681,11 @@ describe("NamedScopingTest2", () => {
   it("scopes are composable", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a", views: 5 });
     await Post.create({ title: "b", views: 10 });
@@ -569,7 +696,10 @@ describe("NamedScopingTest2", () => {
   it("first and last should not use query when results are loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "x" });
     const rel = Post.all();
@@ -580,7 +710,10 @@ describe("NamedScopingTest2", () => {
   it("empty should not load results", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `p2-${i}` });
     const rel = Post.all();
@@ -591,7 +724,10 @@ describe("NamedScopingTest2", () => {
   it("any should not fire query if scope loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const rel = Post.all();
@@ -604,7 +740,10 @@ describe("NamedScopingTest2", () => {
   it("any should call proxy found if using a block", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "match" });
     await Post.create({ title: "other" });
@@ -616,7 +755,11 @@ describe("NamedScopingTest2", () => {
   it("many should call proxy found if using a block", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a", views: 10 });
     await Post.create({ title: "b", views: 5 });
@@ -629,7 +772,10 @@ describe("NamedScopingTest2", () => {
   it("many should not fire query if scope loaded", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -642,7 +788,11 @@ describe("NamedScopingTest2", () => {
   it("should build new on top of scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adp;
+      }
     }
     const post = Post.where({ status: "draft" }).new({ title: "new post" }) as any;
     expect(post.readAttribute("status")).toBe("draft");
@@ -652,9 +802,13 @@ describe("NamedScopingTest2", () => {
   it("should create with bang on top of scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.where({ status: "active" }).create({ title: "bang created" }) as any;
+    const post = (await Post.where({ status: "active" }).create({ title: "bang created" })) as any;
     expect(post.readAttribute("status")).toBe("active");
     expect(post.isPersisted()).toBe(true);
   });
@@ -662,7 +816,10 @@ describe("NamedScopingTest2", () => {
   it("reserved scope names", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(typeof Post.where).toBe("function");
     expect(typeof Post.order).toBe("function");
@@ -671,7 +828,11 @@ describe("NamedScopingTest2", () => {
   it("should use where in query for scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Post.where({ status: "active" }).toSql();
     expect(sql).toContain("WHERE");
@@ -680,7 +841,10 @@ describe("NamedScopingTest2", () => {
   it("should not duplicates where values", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Post.where({ title: "a" }).where({ title: "a" }).toSql();
     expect(sql).toContain("WHERE");
@@ -689,7 +853,10 @@ describe("NamedScopingTest2", () => {
   it("chaining with duplicate joins", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     const sql = Post.where({ title: "test" }).order("title").toSql();
     expect(sql).toContain("ORDER BY");
@@ -698,7 +865,11 @@ describe("NamedScopingTest2", () => {
   it("nested scopes queries size", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("views", "integer"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = adp;
+      }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `p2-${i}`, views: i });
     expect(await Post.where({ views: 3 }).count()).toBe(1);
@@ -707,26 +878,36 @@ describe("NamedScopingTest2", () => {
   it("scopes to get newest", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "old" });
     await Post.create({ title: "new" });
-    expect((await Post.order("id DESC").first() as any).readAttribute("title")).toBe("new");
+    expect(((await Post.order("id DESC").first()) as any).readAttribute("title")).toBe("new");
   });
 
   it("test index on scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    await Post.create({ title: "a" }); await Post.create({ title: "b" });
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
     expect((await Post.all().toArray()).length).toBe(2);
   });
 
   it("test spaces in scope names", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
@@ -734,9 +915,13 @@ describe("NamedScopingTest2", () => {
   it("test rand should select a random object from proxy", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
-    await Post.create({ title: "a" }); await Post.create({ title: "b" });
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
     const results = await Post.all().toArray();
     expect(results[Math.floor(Math.random() * results.length)]).toBeTruthy();
   });
@@ -744,7 +929,10 @@ describe("NamedScopingTest2", () => {
   it("eager default scope relations are remove", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
@@ -752,10 +940,13 @@ describe("NamedScopingTest2", () => {
   it("subclass merges scopes properly", async () => {
     const adp = freshAdapter();
     class Animal extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     class Dog extends Animal {}
-    const dog = await Dog.create({ name: "Fido" }) as any;
+    const dog = (await Dog.create({ name: "Fido" })) as any;
     expect(dog.readAttribute("name")).toBe("Fido");
     expect((await Dog.where({ name: "Fido" }).toArray()).length).toBe(1);
   });
@@ -763,18 +954,25 @@ describe("NamedScopingTest2", () => {
   it("scopes are reset on association reload", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     const rel = Post.all();
-    await rel.toArray(); await rel.reload();
+    await rel.toArray();
+    await rel.reload();
     expect(rel.isLoaded).toBe(true);
   });
 
   it("scope with annotation", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     expect(Post.where({ title: "annotated" })).toBeInstanceOf(Relation);
   });
@@ -782,16 +980,24 @@ describe("NamedScopingTest2", () => {
   it("chaining applies last conditions when creating", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adp;
+      }
     }
-    const post = await Post.where({ status: "draft" }).create({ title: "chained" }) as any;
+    const post = (await Post.where({ status: "draft" }).create({ title: "chained" })) as any;
     expect(post.isPersisted()).toBe(true);
   });
 
   it("chaining combines conditions when searching", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("status", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a", status: "active" });
     await Post.create({ title: "b", status: "inactive" });
@@ -801,7 +1007,10 @@ describe("NamedScopingTest2", () => {
   it("scopes on relations", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
     }
     await Post.create({ title: "a" });
     expect((await Post.all().where({ title: "a" }).toArray()).length).toBe(1);
@@ -810,10 +1019,16 @@ describe("NamedScopingTest2", () => {
   it("class method in scope", async () => {
     const adp = freshAdapter();
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adp; }
-      static recent() { return this.order("id DESC").limit(3); }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+      static recent() {
+        return this.order("id DESC").limit(3);
+      }
     }
-    await Post.create({ title: "a" }); await Post.create({ title: "b" });
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
     expect((await (Post as any).recent().toArray()).length).toBeLessThanOrEqual(3);
   });
 });
@@ -823,19 +1038,41 @@ describe("NamedScopingTest2", () => {
 // ==========================================================================
 describe("NamedScopingTest3", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
-  it("has many associations have access to scopes", () => { expect(true).toBe(true); });
-  it("scope with STI", () => { expect(true).toBe(true); });
-  it("has many through associations have access to scopes", () => { expect(true).toBe(true); });
-  it("scopes honor current scopes from when defined", () => { expect(true).toBe(true); });
-  it("scopes body is a callable", () => { expect(true).toBe(true); });
+  it("has many associations have access to scopes", () => {
+    expect(true).toBe(true);
+  });
+  it("scope with STI", () => {
+    expect(true).toBe(true);
+  });
+  it("has many through associations have access to scopes", () => {
+    expect(true).toBe(true);
+  });
+  it("scopes honor current scopes from when defined", () => {
+    expect(true).toBe(true);
+  });
+  it("scopes body is a callable", () => {
+    expect(true).toBe(true);
+  });
   it("spaces in scope names", () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("chaining doesnt leak conditions to another scopes", async () => {
-    class Post extends Base { static { this.attribute("title", "string"); this.adapter = adapter; } }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
     const r1 = await Post.where({ title: "a" }).toArray();
@@ -843,12 +1080,19 @@ describe("NamedScopingTest3", () => {
     expect(r1.length).toBe(1);
     expect(r2.length).toBe(1);
   });
-  it("table names for chaining scopes with and without table name included", () => { expect(true).toBe(true); });
-  it("scopes are cached on associations", () => { expect(true).toBe(true); });
-  it("scopes with arguments are cached on associations", () => { expect(true).toBe(true); });
-  it("scoped are lazy loaded if table still does not exist", () => { expect(true).toBe(true); });
+  it("table names for chaining scopes with and without table name included", () => {
+    expect(true).toBe(true);
+  });
+  it("scopes are cached on associations", () => {
+    expect(true).toBe(true);
+  });
+  it("scopes with arguments are cached on associations", () => {
+    expect(true).toBe(true);
+  });
+  it("scoped are lazy loaded if table still does not exist", () => {
+    expect(true).toBe(true);
+  });
 });
-
 
 describe("Scopes", () => {
   let adapter: DatabaseAdapter;
@@ -995,15 +1239,11 @@ describe("scope with extension block", () => {
         this.attribute("name", "string");
         this.attribute("status", "string");
         this.adapter = adapter;
-        this.scope(
-          "published",
-          (rel: any) => rel.where({ status: "published" }),
-          {
-            countPublished: async function (this: any) {
-              return this.count();
-            },
-          }
-        );
+        this.scope("published", (rel: any) => rel.where({ status: "published" }), {
+          countPublished: async function (this: any) {
+            return this.count();
+          },
+        });
       }
     }
 
@@ -1014,7 +1254,9 @@ describe("scope with extension block", () => {
 
 describe("Scopes (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("named scope filters records", async () => {
     class Product extends Base {
@@ -1128,7 +1370,6 @@ describe("Scopes (Rails-guided)", () => {
   });
 });
 
-
 describe("Scopes (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
@@ -1147,9 +1388,7 @@ describe("Scopes (Rails-guided)", () => {
     // Re-register scopes for each test
     Post.scope("published", (rel: any) => rel.where({ status: "published" }));
     Post.scope("draft", (rel: any) => rel.where({ status: "draft" }));
-    Post.scope("byAuthor", (rel: any, authorId: number) =>
-      rel.where({ author_id: authorId })
-    );
+    Post.scope("byAuthor", (rel: any, authorId: number) => rel.where({ author_id: authorId }));
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {

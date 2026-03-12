@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,16 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("PrimaryKeysTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeTopic() {
     class Topic extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     return Topic;
   }
@@ -45,7 +90,11 @@ describe("PrimaryKeysTest", () => {
 
   it("to key with customized primary key", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.primaryKey = "id"; this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.primaryKey = "id";
+        this.adapter = adapter;
+      }
     }
     const i = await Item.create({ name: "x" });
     expect(i.id).toBeDefined();
@@ -163,7 +212,10 @@ describe("PrimaryKeysTest", () => {
 
   it("update counters should quote pkey and quote counter columns", async () => {
     class Counter extends Base {
-      static { this.attribute("count", "integer"); this.adapter = adapter; }
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adapter;
+      }
     }
     const c = await Counter.create({ count: 0 });
     await c.incrementBang("count");
@@ -263,7 +315,12 @@ describe("PrimaryKeysTest", () => {
   });
   it("primary key update with custom key name", async () => {
     class CustomPkTopic extends Base {
-      static { this.attribute("custom_id", "integer"); this.attribute("title", "string"); this.primaryKey = "custom_id"; this.adapter = adapter; }
+      static {
+        this.attribute("custom_id", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = "custom_id";
+        this.adapter = adapter;
+      }
     }
     const t = await CustomPkTopic.create({ custom_id: 42, title: "custom" });
     expect(t.id).toBe(42);
@@ -274,7 +331,12 @@ describe("PrimaryKeysTest", () => {
   });
   it("reconfiguring primary key resets composite primary key", () => {
     class Order extends Base {
-      static { this.attribute("shop_id", "integer"); this.attribute("id", "integer"); this.primaryKey = ["shop_id", "id"]; this.adapter = adapter; }
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
     }
     expect(Order.compositePrimaryKey).toBe(true);
     Order.primaryKey = "id";
@@ -287,7 +349,10 @@ describe("PrimaryKeyIntegerTest", () => {
   it("primary key column type with serial/integer", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ name: "gear" });
     expect(typeof w.id).toBe("number");
@@ -295,7 +360,10 @@ describe("PrimaryKeyIntegerTest", () => {
   it("primary key with serial/integer are automatically numbered", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w1 = await Widget.create({ name: "a" });
     const w2 = await Widget.create({ name: "b" });
@@ -304,7 +372,10 @@ describe("PrimaryKeyIntegerTest", () => {
   it("schema dump primary key with serial/integer", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ name: "test" });
     expect(w.id).toBeDefined();
@@ -313,7 +384,10 @@ describe("PrimaryKeyIntegerTest", () => {
   it("primary key column type with options", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ name: "test" });
     expect(w.id).not.toBeNull();
@@ -321,7 +395,10 @@ describe("PrimaryKeyIntegerTest", () => {
   it("bigint primary key with unsigned", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ name: "big" });
     expect(w.id).toBeGreaterThan(0);
@@ -332,7 +409,10 @@ describe("PrimaryKeyAnyTypeTest", () => {
   it("any type primary key", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ name: "test" });
     expect(w.id).toBeDefined();
@@ -341,7 +421,10 @@ describe("PrimaryKeyAnyTypeTest", () => {
   it("schema dump primary key includes type and options", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("label", "string"); this.adapter = adp; }
+      static {
+        this.attribute("label", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ label: "x" });
     expect(w.id).toBeDefined();
@@ -349,7 +432,10 @@ describe("PrimaryKeyAnyTypeTest", () => {
   it("schema typed primary key column", async () => {
     const adp = freshAdapter();
     class Widget extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const w = await Widget.create({ name: "typed" });
     const found = await Widget.find(w.id);
@@ -361,7 +447,10 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   it("primary key with integer", async () => {
     const adp = freshAdapter();
     class AutoItem extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const a = await AutoItem.create({ name: "first" });
     const b = await AutoItem.create({ name: "second" });
@@ -371,7 +460,10 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   it("primary key with bigint", async () => {
     const adp = freshAdapter();
     class BigItem extends Base {
-      static { this.attribute("name", "string"); this.adapter = adp; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
     }
     const a = await BigItem.create({ name: "big1" });
     const b = await BigItem.create({ name: "big2" });
@@ -384,14 +476,22 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
     // In Rails, this tests schema.rb dump format. We verify integer PK with null default works.
     const adapter = freshAdapter();
     class NilDefaultPk extends Base {
-      static { this.attribute("id", "integer", { default: null }); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "integer", { default: null });
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(NilDefaultPk.primaryKey).toBe("id");
   });
   it("schema dump primary key bigint with default nil", () => {
     const adapter = freshAdapter();
     class BigNilDefaultPk extends Base {
-      static { this.attribute("id", "big_integer", { default: null }); this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("id", "big_integer", { default: null });
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(BigNilDefaultPk.primaryKey).toBe("id");
   });
@@ -404,7 +504,11 @@ describe("Base features (Rails-guided) - primary keys", () => {
   });
 
   it("custom primary key", () => {
-    class User extends Base { static { this.primaryKey = "uuid"; } }
+    class User extends Base {
+      static {
+        this.primaryKey = "uuid";
+      }
+    }
     expect(User.primaryKey).toBe("uuid");
   });
 });

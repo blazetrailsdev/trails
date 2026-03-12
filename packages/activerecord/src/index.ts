@@ -2,12 +2,7 @@ export { Base } from "./base.js";
 export { Relation, Range } from "./relation.js";
 export { MemoryAdapter } from "./adapter.js";
 export type { DatabaseAdapter } from "./adapter.js";
-export {
-  Migration,
-  TableDefinition,
-  Schema,
-  MigrationContext,
-} from "./migration.js";
+export { Migration, TableDefinition, Schema, MigrationContext } from "./migration.js";
 export type { ColumnType, ColumnOptions } from "./migration.js";
 export { MigrationRunner } from "./migration-runner.js";
 export {
@@ -31,7 +26,13 @@ export type { AssociationOptions } from "./associations.js";
 export { Transaction, transaction, savepoint, currentTransaction } from "./transactions.js";
 export { delegate } from "./delegate.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
-export { enableSti, getInheritanceColumn, instantiateSti, registerSubclass, findStiClass } from "./sti.js";
+export {
+  enableSti,
+  getInheritanceColumn,
+  instantiateSti,
+  registerSubclass,
+  findStiClass,
+} from "./sti.js";
 export { hasSecurePassword } from "./secure-password.js";
 export { store, storeAccessor, storedAttributes } from "./store.js";
 export { SqliteAdapter } from "./adapters/sqlite-adapter.js";

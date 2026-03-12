@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "./associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
@@ -28,11 +68,17 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("SecureTokenTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(User, "token");
     return { User };
@@ -83,7 +129,11 @@ describe("SecureTokenTest", () => {
 
   it("token length cannot be less than 24 characters", async () => {
     class UserWithToken extends Base {
-      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(UserWithToken, "token", { length: 24 });
     const u = await UserWithToken.create({ name: "Frank" });
@@ -93,7 +143,9 @@ describe("SecureTokenTest", () => {
   it("token on callback", async () => {
     const { User } = makeModel();
     const log: string[] = [];
-    User.afterCreate((r: any) => { log.push("after_create"); });
+    User.afterCreate((r: any) => {
+      log.push("after_create");
+    });
     await User.create({ name: "Gina" });
     expect(log).toContain("after_create");
   });
@@ -105,16 +157,24 @@ describe("SecureTokenTest", () => {
     expect(typeof t).toBe("string");
   });
 
-  it.skip("generating token on initialize is skipped if column was not selected", () => { /* fixture-dependent */ });
+  it.skip("generating token on initialize is skipped if column was not selected", () => {
+    /* fixture-dependent */
+  });
 });
 
 describe("SecureTokenTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class User extends Base {
-      static { this.attribute("name", "string"); this.attribute("token", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(User, "token");
     return { User };
@@ -124,13 +184,16 @@ describe("SecureTokenTest", () => {
   it.skip("does not find record when token is invalid", () => {});
 });
 
-
 describe("has_secure_token", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("auto-generates a token on create", async () => {
-    class ApiKey extends Base { static _tableName = "api_keys"; }
+    class ApiKey extends Base {
+      static _tableName = "api_keys";
+    }
     ApiKey.attribute("id", "integer");
     ApiKey.attribute("token", "string");
     ApiKey.adapter = adapter;
@@ -143,7 +206,9 @@ describe("has_secure_token", () => {
   });
 
   it("allows regeneration of token", async () => {
-    class ApiKey extends Base { static _tableName = "api_keys"; }
+    class ApiKey extends Base {
+      static _tableName = "api_keys";
+    }
     ApiKey.attribute("id", "integer");
     ApiKey.attribute("token", "string");
     ApiKey.adapter = adapter;
@@ -158,7 +223,9 @@ describe("has_secure_token", () => {
   });
 
   it("supports custom attribute name", async () => {
-    class Session extends Base { static _tableName = "sessions"; }
+    class Session extends Base {
+      static _tableName = "sessions";
+    }
     Session.attribute("id", "integer");
     Session.attribute("auth_token", "string");
     Session.adapter = adapter;
@@ -168,7 +235,6 @@ describe("has_secure_token", () => {
     expect(s.readAttribute("auth_token")).toBeTruthy();
   });
 });
-
 
 describe("has_secure_token (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -180,7 +246,12 @@ describe("has_secure_token (Rails-guided)", () => {
   // Rails: test "generates a token on create"
   it("automatically generates a token on create", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("token", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(User);
 
@@ -192,7 +263,12 @@ describe("has_secure_token (Rails-guided)", () => {
   // Rails: test "does not overwrite existing token"
   it("does not overwrite an explicitly set token", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("token", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(User);
 
@@ -204,7 +280,12 @@ describe("has_secure_token (Rails-guided)", () => {
   // Rails: test "regenerate token"
   it("regenerateToken creates a new token and persists it", async () => {
     class User extends Base {
-      static { this._tableName = "users"; this.attribute("id", "integer"); this.attribute("token", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(User);
 
@@ -219,7 +300,12 @@ describe("has_secure_token (Rails-guided)", () => {
   // Rails: test "custom attribute name"
   it("supports custom attribute names", async () => {
     class Session extends Base {
-      static { this._tableName = "sessions"; this.attribute("id", "integer"); this.attribute("session_token", "string"); this.adapter = adapter; }
+      static {
+        this._tableName = "sessions";
+        this.attribute("id", "integer");
+        this.attribute("session_token", "string");
+        this.adapter = adapter;
+      }
     }
     hasSecureToken(Session, "session_token");
 

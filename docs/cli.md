@@ -10,24 +10,24 @@ This doc specs out the `@rails-ts/cli` package — a TypeScript equivalent of `r
 
 The full `rails` CLI is large. Here's what we'd map:
 
-| Rails Command | Priority | Description |
-|---|---|---|
-| `rails new` | P0 | Generate a new application |
-| `rails generate` (g) | P0 | Run code generators (model, controller, migration, scaffold) |
-| `rails server` (s) | P0 | Start the dev server |
-| `rails console` (c) | P1 | Interactive REPL with app loaded |
-| `rails db:migrate` | P0 | Run pending migrations |
-| `rails db:rollback` | P1 | Rollback last migration |
-| `rails db:seed` | P1 | Run seed file |
-| `rails db:create` / `db:drop` | P1 | Create/drop database |
-| `rails db:schema:dump` / `load` | P2 | Dump/load schema |
-| `rails routes` | P1 | Print route table |
-| `rails destroy` (d) | P2 | Undo a generator |
-| `rails test` (t) | P2 | Run tests |
-| `rails runner` | P2 | Run a script in app context |
-| `rails credentials:edit` | P3 | Manage encrypted credentials |
-| `rails initializers` | P3 | List initializers |
-| `rails middleware` | P3 | List middleware stack |
+| Rails Command                   | Priority | Description                                                  |
+| ------------------------------- | -------- | ------------------------------------------------------------ |
+| `rails new`                     | P0       | Generate a new application                                   |
+| `rails generate` (g)            | P0       | Run code generators (model, controller, migration, scaffold) |
+| `rails server` (s)              | P0       | Start the dev server                                         |
+| `rails console` (c)             | P1       | Interactive REPL with app loaded                             |
+| `rails db:migrate`              | P0       | Run pending migrations                                       |
+| `rails db:rollback`             | P1       | Rollback last migration                                      |
+| `rails db:seed`                 | P1       | Run seed file                                                |
+| `rails db:create` / `db:drop`   | P1       | Create/drop database                                         |
+| `rails db:schema:dump` / `load` | P2       | Dump/load schema                                             |
+| `rails routes`                  | P1       | Print route table                                            |
+| `rails destroy` (d)             | P2       | Undo a generator                                             |
+| `rails test` (t)                | P2       | Run tests                                                    |
+| `rails runner`                  | P2       | Run a script in app context                                  |
+| `rails credentials:edit`        | P3       | Manage encrypted credentials                                 |
+| `rails initializers`            | P3       | List initializers                                            |
+| `rails middleware`              | P3       | List middleware stack                                        |
 
 ## Package
 
@@ -44,6 +44,7 @@ Dependencies: `@rails-ts/activerecord`, `@rails-ts/actionpack`, `@rails-ts/activ
 Set up the CLI package with a main entry point that parses argv, dispatches to subcommands, and prints help.
 
 **Files:**
+
 - `packages/cli/package.json` — package manifest with `"bin": { "rails-ts": "./dist/bin.js" }`
 - `packages/cli/tsconfig.json`
 - `packages/cli/src/bin.ts` — entry point, parses argv
@@ -52,6 +53,7 @@ Set up the CLI package with a main entry point that parses argv, dispatches to s
 - `packages/cli/src/version.ts` — `rails-ts --version`
 
 **Acceptance:**
+
 - `rails-ts --help` prints available commands
 - `rails-ts --version` prints version
 - Unknown commands print error and help
@@ -62,6 +64,7 @@ Set up the CLI package with a main entry point that parses argv, dispatches to s
 Generate a new rails-ts application with a standard directory structure, package.json, tsconfig, and starter files.
 
 **Files:**
+
 - `packages/cli/src/commands/new.ts` — `new` command implementation
 - `packages/cli/src/commands/new.test.ts`
 - `packages/cli/src/generators/app-generator.ts` — template logic
@@ -69,6 +72,7 @@ Generate a new rails-ts application with a standard directory structure, package
 - `packages/cli/src/generators/templates/` — template files (gitignore, tsconfig, app entry, etc.)
 
 **Generated app structure:**
+
 ```
 my-app/
   package.json
@@ -92,6 +96,7 @@ my-app/
 ```
 
 **Acceptance:**
+
 - `rails-ts new my-app` creates directory with correct structure
 - `rails-ts new my-app --database sqlite` sets up SQLite config (default)
 - `rails-ts new my-app --database postgres` sets up PostgreSQL config
@@ -104,12 +109,14 @@ my-app/
 Generate a model file, migration, and test file.
 
 **Files:**
+
 - `packages/cli/src/commands/generate.ts` — `generate` dispatcher
 - `packages/cli/src/commands/generate.test.ts`
 - `packages/cli/src/generators/model-generator.ts`
 - `packages/cli/src/generators/model-generator.test.ts`
 
 **Acceptance:**
+
 - `rails-ts generate model User name:string email:string age:integer` creates:
   - `src/app/models/user.ts` — `User` class extending `Base` with typed attributes
   - `db/migrations/YYYYMMDDHHMMSS-create-users.ts` — migration with `createTable`
@@ -122,14 +129,16 @@ Generate a model file, migration, and test file.
 Generate a standalone migration file.
 
 **Files:**
+
 - `packages/cli/src/generators/migration-generator.ts`
 - `packages/cli/src/generators/migration-generator.test.ts`
 
 **Acceptance:**
+
 - `rails-ts generate migration AddEmailToUsers email:string` creates a timestamped migration file
 - Infers `addColumn` from "Add*To*" naming pattern
 - Infers `removeColumn` from "Remove*From*" naming pattern
-- Infers `createTable` from "Create*" naming pattern
+- Infers `createTable` from "Create\*" naming pattern
 - Plain names generate an empty migration body
 
 ### Story 5: `rails-ts generate controller` — controller generator
@@ -137,10 +146,12 @@ Generate a standalone migration file.
 Generate a controller with actions and route stubs.
 
 **Files:**
+
 - `packages/cli/src/generators/controller-generator.ts`
 - `packages/cli/src/generators/controller-generator.test.ts`
 
 **Acceptance:**
+
 - `rails-ts generate controller Posts index show create` creates:
   - `src/app/controllers/posts-controller.ts` — controller class with action methods
   - `test/controllers/posts-controller.test.ts` — test stub
@@ -151,10 +162,12 @@ Generate a controller with actions and route stubs.
 Combines model + controller + routes for a complete CRUD resource.
 
 **Files:**
+
 - `packages/cli/src/generators/scaffold-generator.ts`
 - `packages/cli/src/generators/scaffold-generator.test.ts`
 
 **Acceptance:**
+
 - `rails-ts generate scaffold Post title:string body:text published:boolean` creates model, migration, controller (with index/show/create/update/destroy), routes, and tests
 - Generated controller has working CRUD actions
 
@@ -163,12 +176,14 @@ Combines model + controller + routes for a complete CRUD resource.
 Start a dev server that loads the application and serves requests through the middleware stack and router.
 
 **Files:**
+
 - `packages/cli/src/commands/server.ts`
 - `packages/cli/src/commands/server.test.ts`
 - `packages/cli/src/server/dev-server.ts` — HTTP server using Node's `http` module + Rack middleware
 - `packages/cli/src/server/dev-server.test.ts`
 
 **Acceptance:**
+
 - `rails-ts server` starts on port 3000 (configurable with `-p`)
 - Requests flow through Rack middleware stack -> ActionDispatch router -> controller
 - Console output shows request log (method, path, status, duration)
@@ -179,10 +194,12 @@ Start a dev server that loads the application and serves requests through the mi
 Run pending migrations against the configured database.
 
 **Files:**
+
 - `packages/cli/src/commands/db.ts` — `db:*` subcommand dispatcher
 - `packages/cli/src/commands/db.test.ts`
 
 **Acceptance:**
+
 - `rails-ts db:migrate` runs pending migrations in order
 - `rails-ts db:rollback` reverts last migration
 - `rails-ts db:migrate:status` shows migration status
@@ -195,10 +212,12 @@ Run pending migrations against the configured database.
 Print the application's route table.
 
 **Files:**
+
 - `packages/cli/src/commands/routes.ts`
 - `packages/cli/src/commands/routes.test.ts`
 
 **Acceptance:**
+
 - `rails-ts routes` prints formatted route table (verb, path, controller#action, name)
 - `rails-ts routes -g pattern` greps routes
 - Output matches Rails `rake routes` format
@@ -208,10 +227,12 @@ Print the application's route table.
 Start an interactive TypeScript REPL with the application loaded.
 
 **Files:**
+
 - `packages/cli/src/commands/console.ts`
 - `packages/cli/src/commands/console.test.ts`
 
 **Acceptance:**
+
 - `rails-ts console` starts a REPL
 - Models are available (e.g., `await User.findBy({ name: "dean" })`)
 - Database connection is established
@@ -222,10 +243,12 @@ Start an interactive TypeScript REPL with the application loaded.
 Remove files created by a generator.
 
 **Files:**
+
 - `packages/cli/src/commands/destroy.ts`
 - `packages/cli/src/commands/destroy.test.ts`
 
 **Acceptance:**
+
 - `rails-ts destroy model User` removes model, migration, and test files
 - Only removes files that the generator would have created
 - Prints what was removed
@@ -237,12 +260,14 @@ Remove files created by a generator.
 The `test:compare` pipeline needs to include railties tests.
 
 **Changes to `scripts/test-compare/fetch-rails-tests.sh`:**
+
 ```bash
 git sparse-checkout add \
   railties/test
 ```
 
 **Changes to `scripts/test-compare/extract-ruby-tests.rb`:**
+
 ```ruby
 PACKAGE_TEST_DIRS = {
   # ... existing entries ...
@@ -251,6 +276,7 @@ PACKAGE_TEST_DIRS = {
 ```
 
 Add filtering to scope to the relevant test files (generators, commands):
+
 ```ruby
 # For cli package, only include generator and command tests
 when "cli"
@@ -258,6 +284,7 @@ when "cli"
 ```
 
 **Changes to `scripts/test-compare/extract-ts-tests.ts`:**
+
 ```typescript
 cli: [
   "packages/cli/src/cli.test.ts",
@@ -280,6 +307,7 @@ cli: [
 **Changes to `scripts/test-compare/test-naming-map.ts`:**
 
 Add a `cli` section to `TEST_FILE_MAP` mapping railties test files to our test files:
+
 ```typescript
 cli: {
   "generators/app_generator_test.rb": [
@@ -320,6 +348,7 @@ cli: {
 The `api:compare` pipeline should also track railties classes.
 
 **Changes to `scripts/api-compare/fetch-rails.sh`:**
+
 ```bash
 git sparse-checkout set \
   # ... existing entries ...
@@ -329,6 +358,7 @@ git sparse-checkout set \
 **Changes to `scripts/api-compare/naming-map.ts`:**
 
 Add CLI class mappings to `CLASS_MAP`:
+
 ```typescript
 // CLI / Railties
 "Rails::Generators::AppGenerator": "cli:AppGenerator",
@@ -364,6 +394,7 @@ Then integrate into the compare scripts (fetch railties source, extract tests, a
 **TypeScript-native, not a Rails port.** The CLI should feel natural for TypeScript developers. Generated code uses TypeScript idioms (imports, async/await, typed attributes). Project structure uses TypeScript conventions (tsconfig.json, src/ directory). But command names and behavior should match Rails closely enough that Rails developers feel at home.
 
 **Generators produce idiomatic TypeScript.** A generated model should look like:
+
 ```typescript
 import { Base } from "@rails-ts/activerecord";
 
@@ -386,18 +417,18 @@ Not a transliteration of Ruby.
 
 Key railties test files to match against (from `railties/test/`):
 
-| Rails test file | Est. tests | Maps to |
-|---|---|---|
-| `generators/app_generator_test.rb` | ~80 | `app-generator.test.ts` |
-| `generators/model_generator_test.rb` | ~25 | `model-generator.test.ts` |
-| `generators/migration_generator_test.rb` | ~20 | `migration-generator.test.ts` |
-| `generators/controller_generator_test.rb` | ~20 | `controller-generator.test.ts` |
-| `generators/scaffold_generator_test.rb` | ~30 | `scaffold-generator.test.ts` |
-| `commands/server_test.rb` | ~15 | `server.test.ts` |
-| `commands/routes_test.rb` | ~15 | `routes.test.ts` |
-| `commands/console_test.rb` | ~10 | `console.test.ts` |
-| `commands/dbconsole_test.rb` | ~10 | `db.test.ts` |
-| `commands/destroy_test.rb` | ~10 | `destroy.test.ts` |
-| **Total** | **~235** | |
+| Rails test file                           | Est. tests | Maps to                        |
+| ----------------------------------------- | ---------- | ------------------------------ |
+| `generators/app_generator_test.rb`        | ~80        | `app-generator.test.ts`        |
+| `generators/model_generator_test.rb`      | ~25        | `model-generator.test.ts`      |
+| `generators/migration_generator_test.rb`  | ~20        | `migration-generator.test.ts`  |
+| `generators/controller_generator_test.rb` | ~20        | `controller-generator.test.ts` |
+| `generators/scaffold_generator_test.rb`   | ~30        | `scaffold-generator.test.ts`   |
+| `commands/server_test.rb`                 | ~15        | `server.test.ts`               |
+| `commands/routes_test.rb`                 | ~15        | `routes.test.ts`               |
+| `commands/console_test.rb`                | ~10        | `console.test.ts`              |
+| `commands/dbconsole_test.rb`              | ~10        | `db.test.ts`                   |
+| `commands/destroy_test.rb`                | ~10        | `destroy.test.ts`              |
+| **Total**                                 | **~235**   |                                |
 
 These test counts are estimates — the actual numbers will be known once we add railties to the `fetch-rails-tests.sh` sparse checkout and run the extractor.

@@ -374,7 +374,9 @@ export class Attribute extends Node {
   // -- Type casting --
 
   cast(asType: string): NamedFunction {
-    return new NamedFunction("CAST", [new SqlLiteral(`${this.relation.name}.${this.name} AS ${asType}`)]);
+    return new NamedFunction("CAST", [
+      new SqlLiteral(`${this.relation.name}.${this.name} AS ${asType}`),
+    ]);
   }
 
   // -- Regexp --

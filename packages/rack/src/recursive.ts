@@ -40,9 +40,16 @@ export class Recursive {
     }
   }
 
-  private async includeRequest(env: Record<string, any>, path: string): Promise<[number, Record<string, string>, any]> {
+  private async includeRequest(
+    env: Record<string, any>,
+    path: string,
+  ): Promise<[number, Record<string, string>, any]> {
     const url = new URL(path, "http://localhost");
-    const newEnv = { ...env, [PATH_INFO]: url.pathname, [QUERY_STRING]: url.search ? url.search.substring(1) : "" };
+    const newEnv = {
+      ...env,
+      [PATH_INFO]: url.pathname,
+      [QUERY_STRING]: url.search ? url.search.substring(1) : "",
+    };
     return this.app(newEnv);
   }
 }

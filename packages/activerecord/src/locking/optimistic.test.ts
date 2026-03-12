@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -40,11 +80,17 @@ describe("OptimisticLockingTest", () => {
     return { Person, adapter };
   }
 
-  it.skip("quote value passed lock col", () => { /* needs custom locking column */ });
+  it.skip("quote value passed lock col", () => {
+    /* needs custom locking column */
+  });
 
-  it.skip("non integer lock destroy", () => { /* destroy does not check lock_version yet */ });
+  it.skip("non integer lock destroy", () => {
+    /* destroy does not check lock_version yet */
+  });
 
-  it.skip("lock destroy", () => { /* destroy does not check lock_version yet */ });
+  it.skip("lock destroy", () => {
+    /* destroy does not check lock_version yet */
+  });
 
   it("lock new when explicitly passing nil", () => {
     const { Person } = makePerson();
@@ -76,11 +122,19 @@ describe("OptimisticLockingTest", () => {
     await expect(p2.update({ name: "Changed by p2" })).rejects.toThrow("StaleObjectError");
   });
 
-  it.skip("update with dirty primary key", () => { /* primary key mutation not fully supported */ });
-  it.skip("delete with dirty primary key", () => { /* primary key mutation not fully supported */ });
-  it.skip("destroy with dirty primary key", () => { /* primary key mutation not fully supported */ });
+  it.skip("update with dirty primary key", () => {
+    /* primary key mutation not fully supported */
+  });
+  it.skip("delete with dirty primary key", () => {
+    /* primary key mutation not fully supported */
+  });
+  it.skip("destroy with dirty primary key", () => {
+    /* primary key mutation not fully supported */
+  });
 
-  it.skip("explicit update lock column raise error", () => { /* no explicit lock column update guard */ });
+  it.skip("explicit update lock column raise error", () => {
+    /* no explicit lock column update guard */
+  });
 
   it("lock column name existing", () => {
     const { Person } = makePerson();
@@ -110,14 +164,24 @@ describe("OptimisticLockingTest", () => {
     expect(ver).toBe(0);
   });
 
-  it.skip("touch existing lock without default should work with null in the database", () => { /* touch not implemented */ });
-  it.skip("touch stale object with lock without default", () => { /* touch not implemented */ });
+  it.skip("touch existing lock without default should work with null in the database", () => {
+    /* touch not implemented */
+  });
+  it.skip("touch stale object with lock without default", () => {
+    /* touch not implemented */
+  });
 
-  it.skip("lock without default should work with null in the database", () => { /* null lock_version in DB causes WHERE mismatch */ });
+  it.skip("lock without default should work with null in the database", () => {
+    /* null lock_version in DB causes WHERE mismatch */
+  });
 
-  it.skip("update with lock version without default should work on dirty value before type cast", () => { /* null lock_version causes StaleObjectError */ });
+  it.skip("update with lock version without default should work on dirty value before type cast", () => {
+    /* null lock_version causes StaleObjectError */
+  });
 
-  it.skip("destroy with lock version without default should work on dirty value before type cast", () => { /* destroy does not check lock_version */ });
+  it.skip("destroy with lock version without default should work on dirty value before type cast", () => {
+    /* destroy does not check lock_version */
+  });
 
   it("lock without default queries count", async () => {
     const adapter = freshAdapter();
@@ -135,9 +199,15 @@ describe("OptimisticLockingTest", () => {
     expect(all.length).toBe(2);
   });
 
-  it.skip("lock with custom column without default sets version to zero", () => { /* custom lock column not supported */ });
-  it.skip("lock with custom column without default should work with null in the database", () => { /* custom lock column not supported */ });
-  it.skip("lock with custom column without default queries count", () => { /* custom lock column not supported */ });
+  it.skip("lock with custom column without default sets version to zero", () => {
+    /* custom lock column not supported */
+  });
+  it.skip("lock with custom column without default should work with null in the database", () => {
+    /* custom lock column not supported */
+  });
+  it.skip("lock with custom column without default queries count", () => {
+    /* custom lock column not supported */
+  });
 
   it("readonly attributes", async () => {
     const { Person } = makePerson();
@@ -146,7 +216,9 @@ describe("OptimisticLockingTest", () => {
     await expect(p.update({ name: "Changed" })).rejects.toThrow();
   });
 
-  it.skip("quote table name reserved word references", () => { /* needs specific SQL quoting test */ });
+  it.skip("quote table name reserved word references", () => {
+    /* needs specific SQL quoting test */
+  });
 
   it("update without attributes does not only update lock version", async () => {
     const { Person } = makePerson();
@@ -162,9 +234,15 @@ describe("OptimisticLockingTest", () => {
     expect(p.readAttribute("lock_version")).toBe(versionBefore);
   });
 
-  it.skip("counter cache with touch and lock version", () => { /* counter cache with locking not fully integrated */ });
-  it.skip("polymorphic destroy with dependencies and lock version", () => { /* polymorphic + locking not supported */ });
-  it.skip("removing has and belongs to many associations upon destroy", () => { /* habtm not supported */ });
+  it.skip("counter cache with touch and lock version", () => {
+    /* counter cache with locking not fully integrated */
+  });
+  it.skip("polymorphic destroy with dependencies and lock version", () => {
+    /* polymorphic + locking not supported */
+  });
+  it.skip("removing has and belongs to many associations upon destroy", () => {
+    /* habtm not supported */
+  });
 
   it("yaml dumping with lock column", async () => {
     const { Person } = makePerson();
@@ -245,7 +323,9 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
-  it.skip("destroy dependents", () => { /* destroy does not check lock_version yet */ });
+  it.skip("destroy dependents", () => {
+    /* destroy does not check lock_version yet */
+  });
 
   it("destroy existing object with locking column value null in the database", async () => {
     const adapter = freshAdapter();
@@ -314,7 +394,9 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     await expect(p2.update({ name: "Conflict" })).rejects.toThrow("StaleObjectError");
   });
 
-  it.skip("null lock version in database allows first update", () => { /* null lock_version causes WHERE mismatch in MemoryAdapter */ });
+  it.skip("null lock version in database allows first update", () => {
+    /* null lock_version causes WHERE mismatch in MemoryAdapter */
+  });
 
   it("reloaded record has correct lock version", async () => {
     const adapter = freshAdapter();
@@ -332,7 +414,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     expect(reloaded.readAttribute("lock_version")).toBe(1);
   });
 });
-
 
 describe("optimistic locking", () => {
   let adapter: DatabaseAdapter;
@@ -376,12 +457,9 @@ describe("optimistic locking", () => {
     await post1.update({ title: "Updated by 1" });
     // post1 now has lock_version 1, but post2 still has 0
 
-    await expect(post2.update({ title: "Updated by 2" })).rejects.toThrow(
-      "StaleObjectError"
-    );
+    await expect(post2.update({ title: "Updated by 2" })).rejects.toThrow("StaleObjectError");
   });
 });
-
 
 describe("Optimistic Locking (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
@@ -393,7 +471,13 @@ describe("Optimistic Locking (Rails-guided)", () => {
   // Rails: test "lock_version is incremented on save"
   it("lock existing", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("lock_version", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
 
     const p = await Person.create({ name: "Szymon" });
@@ -406,7 +490,13 @@ describe("Optimistic Locking (Rails-guided)", () => {
   // Rails: test "stale object raises"
   it("lock exception record", async () => {
     class Person extends Base {
-      static { this._tableName = "people"; this.attribute("id", "integer"); this.attribute("name", "string"); this.attribute("lock_version", "integer", { default: 0 }); this.adapter = adapter; }
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
     }
 
     const p1 = await Person.create({ name: "Szymon" });

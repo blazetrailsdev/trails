@@ -15,27 +15,27 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 
 ### Implementation files
 
-| File | What it provides |
-|---|---|
-| `actioncontroller/abstract-controller.ts` | Action dispatch, callbacks (before/after/around), skip, only/except/if/unless/prepend, class hierarchy traversal |
-| `actioncontroller/metal.ts` | Request/Response/Params, `dispatch()`, `head()`, status codes (22 symbols), headers, `toRackResponse()` |
-| `actioncontroller/base.ts` | Rendering (json/plain/html/body/text), redirects, flash, CSRF, `rescue_from`, conditional GET (freshWhen/stale/expiresIn), `sendFile`/`sendData`, content negotiation, template resolver |
-| `actioncontroller/index.ts` | Package exports |
+| File                                      | What it provides                                                                                                                                                                         |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `actioncontroller/abstract-controller.ts` | Action dispatch, callbacks (before/after/around), skip, only/except/if/unless/prepend, class hierarchy traversal                                                                         |
+| `actioncontroller/metal.ts`               | Request/Response/Params, `dispatch()`, `head()`, status codes (22 symbols), headers, `toRackResponse()`                                                                                  |
+| `actioncontroller/base.ts`                | Rendering (json/plain/html/body/text), redirects, flash, CSRF, `rescue_from`, conditional GET (freshWhen/stale/expiresIn), `sendFile`/`sendData`, content negotiation, template resolver |
+| `actioncontroller/index.ts`               | Package exports                                                                                                                                                                          |
 
 ### Test files (263 tests, all passing)
 
-| File | Tests | Coverage area |
-|---|---|---|
-| `abstract-controller.test.ts` | 22 | Callbacks, action dispatch, inheritance, skip, conditions |
-| `metal.test.ts` | 25 | Status codes, headers, dispatch, head, params, Rack response |
-| `base.test.ts` | 44 | Rendering, redirects, flash, rescue, caching, sendData, API |
-| `filters.test.ts` | 17 | Controller-level before/after/around with only/except/if/unless/prepend/skip/inherit |
-| `rendering.test.ts` | 31 | All render variants, head, renderToString, double render, implicit render, API rendering |
-| `redirect.test.ts` | 11 | redirect_to, redirect_back, status codes, referer, fallback |
-| `caching.test.ts` | 13 | freshWhen, stale, ETag, Last-Modified, 304, expiresIn, expiresNow |
-| `rescue.test.ts` | 10 | rescue_from, subclass matching, inheritance, async handlers |
-| `test-case.test.ts` | 51 | Rails-style controller testing: HTTP verbs, params, session, flash, assertions |
-| `integration-test.test.ts` | 39 | Full-stack integration: routing, session/cookie persistence, redirects, multi-request workflows |
+| File                          | Tests | Coverage area                                                                                   |
+| ----------------------------- | ----- | ----------------------------------------------------------------------------------------------- |
+| `abstract-controller.test.ts` | 22    | Callbacks, action dispatch, inheritance, skip, conditions                                       |
+| `metal.test.ts`               | 25    | Status codes, headers, dispatch, head, params, Rack response                                    |
+| `base.test.ts`                | 44    | Rendering, redirects, flash, rescue, caching, sendData, API                                     |
+| `filters.test.ts`             | 17    | Controller-level before/after/around with only/except/if/unless/prepend/skip/inherit            |
+| `rendering.test.ts`           | 31    | All render variants, head, renderToString, double render, implicit render, API rendering        |
+| `redirect.test.ts`            | 11    | redirect_to, redirect_back, status codes, referer, fallback                                     |
+| `caching.test.ts`             | 13    | freshWhen, stale, ETag, Last-Modified, 304, expiresIn, expiresNow                               |
+| `rescue.test.ts`              | 10    | rescue_from, subclass matching, inheritance, async handlers                                     |
+| `test-case.test.ts`           | 51    | Rails-style controller testing: HTTP verbs, params, session, flash, assertions                  |
+| `integration-test.test.ts`    | 39    | Full-stack integration: routing, session/cookie persistence, redirects, multi-request workflows |
 
 ### Supporting changes
 
@@ -48,25 +48,25 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 
 ## Current state by feature area
 
-| # | Feature Area | Missing | Matched | Status |
-|---|---|---|---|---|
-| 1 | Parameters | ~100 | 201 | Comprehensive: slice/except/merge/transform/select/compact/fetch/dig/deepDup/toQuery/equality/iteration |
-| 2 | Rendering | ~107 | ~142 | Template pipeline done (action/partial/collection/layout). Streaming remains |
-| 3 | Testing harness | ~134 | 90 | TestCase (51) + IntegrationTest (39) done, more edge cases remain |
-| 4 | Routing (controller) | ~150 | 80 | Resource routing, controller routing, namespace/scope/constraints done |
-| 5 | Other (base, assertions, etc) | ~185 | ~44 | Base skeleton done, assertions/logging/helpers remain |
-| 6 | Security/Auth | ~113 | 45 | CSRF/auth impl exists, controller integration tests needed |
-| 7 | Content negotiation | ~67 | 28 | respond_to impl exists, edge cases remain |
-| 8 | Filters/Callbacks | ~15 | ~39 | Core filters done, edge cases remain |
-| 9 | AbstractController | ~10 | ~42 | Core done, Translation/Collector remain |
-| 10 | Streaming | 40 | 0 | Not started |
-| 11 | Caching | ~19 | ~13 | Conditional GET done, HTTP caching edge cases remain |
-| 12 | Error handling | ~22 | ~10 | rescue_from done, show_exceptions remain |
-| 13 | URL generation | ~30 | 29 | Mostly done |
-| 14 | Redirects | ~15 | ~39 | Core done, edge cases remain |
-| 15 | File sending | ~26 | ~0 | sendFile/sendData impl exists, needs tests |
-| 16 | Flash (controller) | ~10 | 37 | Mostly done |
-| | **TOTAL** | **~1,069** | **~843** | |
+| #   | Feature Area                  | Missing    | Matched  | Status                                                                                                  |
+| --- | ----------------------------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| 1   | Parameters                    | ~100       | 201      | Comprehensive: slice/except/merge/transform/select/compact/fetch/dig/deepDup/toQuery/equality/iteration |
+| 2   | Rendering                     | ~107       | ~142     | Template pipeline done (action/partial/collection/layout). Streaming remains                            |
+| 3   | Testing harness               | ~134       | 90       | TestCase (51) + IntegrationTest (39) done, more edge cases remain                                       |
+| 4   | Routing (controller)          | ~150       | 80       | Resource routing, controller routing, namespace/scope/constraints done                                  |
+| 5   | Other (base, assertions, etc) | ~185       | ~44      | Base skeleton done, assertions/logging/helpers remain                                                   |
+| 6   | Security/Auth                 | ~113       | 45       | CSRF/auth impl exists, controller integration tests needed                                              |
+| 7   | Content negotiation           | ~67        | 28       | respond_to impl exists, edge cases remain                                                               |
+| 8   | Filters/Callbacks             | ~15        | ~39      | Core filters done, edge cases remain                                                                    |
+| 9   | AbstractController            | ~10        | ~42      | Core done, Translation/Collector remain                                                                 |
+| 10  | Streaming                     | 40         | 0        | Not started                                                                                             |
+| 11  | Caching                       | ~19        | ~13      | Conditional GET done, HTTP caching edge cases remain                                                    |
+| 12  | Error handling                | ~22        | ~10      | rescue_from done, show_exceptions remain                                                                |
+| 13  | URL generation                | ~30        | 29       | Mostly done                                                                                             |
+| 14  | Redirects                     | ~15        | ~39      | Core done, edge cases remain                                                                            |
+| 15  | File sending                  | ~26        | ~0       | sendFile/sendData impl exists, needs tests                                                              |
+| 16  | Flash (controller)            | ~10        | 37       | Mostly done                                                                                             |
+|     | **TOTAL**                     | **~1,069** | **~843** |                                                                                                         |
 
 ## Dependency graph
 
@@ -144,6 +144,7 @@ Parameters now has 118 tests covering nested permit, expect (Rails 8), toQuery, 
 ### Stream 2: Rendering deep (~238 missing)
 
 Simple rendering is done. Remaining:
+
 - **Action-based rendering** (23) — `render :index`, implicit render
 - **Template rendering** (18) — template lookup pipeline
 - **Layout wrapping** (10) — layout around content
@@ -193,6 +194,7 @@ Simple rendering is done. Remaining:
 ### Stream 8: Testing harness (~134 remaining) — IN PROGRESS
 
 TestCase (51 tests) and IntegrationTest (39 tests) are built and passing. Remaining:
+
 - TestCase edge cases (~80) — file uploads, process method, assigns, template assertions
 - IntegrationTest edge cases (~54) — open_session, multipart, HTTPS, host setting
 

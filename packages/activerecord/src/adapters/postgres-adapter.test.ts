@@ -23,8 +23,7 @@ import {
  * To set up:
  *   createdb rails_js_test
  */
-const PG_TEST_URL =
-  process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
+const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
 let pgAvailable = false;
 
@@ -76,82 +75,49 @@ describeIfPg("PostgresAdapter", () => {
   // -- Basic adapter operations --
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {
-      await adapter.exec(
-        'CREATE TABLE "users" ("id" SERIAL PRIMARY KEY, "name" TEXT)'
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "users" ("name") VALUES ('Alice')`
-      );
+      await adapter.exec('CREATE TABLE "users" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
+      await adapter.executeMutation(`INSERT INTO "users" ("name") VALUES ('Alice')`);
       const rows = await adapter.execute('SELECT * FROM "users"');
       expect(rows).toHaveLength(1);
       expect(rows[0].name).toBe("Alice");
     });
 
     it("returns last insert id for INSERT", async () => {
-      await adapter.exec(
-        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)'
-      );
-      const id1 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('A')`
-      );
-      const id2 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('B')`
-      );
+      await adapter.exec('CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
+      const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
+      const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
       expect(id1).toBe(1);
       expect(id2).toBe(2);
     });
 
     it("returns affected rows for UPDATE", async () => {
       await adapter.exec(
-        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)'
+        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)',
       );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('A')`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('B')`
-      );
-      const affected = await adapter.executeMutation(
-        'UPDATE "items" SET "active" = 0'
-      );
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
+      const affected = await adapter.executeMutation('UPDATE "items" SET "active" = 0');
       expect(affected).toBe(2);
     });
 
     it("returns affected rows for DELETE", async () => {
-      await adapter.exec(
-        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)'
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('A')`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('B')`
-      );
-      const deleted = await adapter.executeMutation(
-        `DELETE FROM "items" WHERE "name" = 'A'`
-      );
+      await adapter.exec('CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
+      const deleted = await adapter.executeMutation(`DELETE FROM "items" WHERE "name" = 'A'`);
       expect(deleted).toBe(1);
     });
 
     it("supports parameterized queries with ? binds", async () => {
       await adapter.exec(
-        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "price" INTEGER)'
+        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "price" INTEGER)',
       );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name", "price") VALUES ('A', 10)`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name", "price") VALUES ('B', 20)`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "items" ("name", "price") VALUES ('C', 30)`
-      );
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('A', 10)`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('B', 20)`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('C', 30)`);
 
       // ? gets rewritten to $1
-      const rows = await adapter.execute(
-        'SELECT * FROM "items" WHERE "price" > ?',
-        [15]
-      );
+      const rows = await adapter.execute('SELECT * FROM "items" WHERE "price" > ?', [15]);
       expect(rows).toHaveLength(2);
     });
   });
@@ -160,17 +126,17 @@ describeIfPg("PostgresAdapter", () => {
   describe("transactions", () => {
     beforeEach(async () => {
       await adapter.exec(
-        'CREATE TABLE "accounts" ("id" SERIAL PRIMARY KEY, "name" TEXT, "balance" INTEGER)'
+        'CREATE TABLE "accounts" ("id" SERIAL PRIMARY KEY, "name" TEXT, "balance" INTEGER)',
       );
     });
 
     it("commits on success", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`,
       );
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`,
       );
       await adapter.commit();
 
@@ -181,7 +147,7 @@ describeIfPg("PostgresAdapter", () => {
     it("rolls back on failure", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`,
       );
       await adapter.rollback();
 
@@ -192,17 +158,17 @@ describeIfPg("PostgresAdapter", () => {
     it("savepoints allow partial rollback", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Alice', 100)`,
       );
 
       await adapter.createSavepoint("sp1");
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Bob', 200)`,
       );
       await adapter.rollbackToSavepoint("sp1");
 
       await adapter.executeMutation(
-        `INSERT INTO "accounts" ("name", "balance") VALUES ('Charlie', 300)`
+        `INSERT INTO "accounts" ("name", "balance") VALUES ('Charlie', 300)`,
       );
       await adapter.commit();
 
@@ -350,26 +316,18 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("chained where conditions", async () => {
-      const items = await Product.where({ category: "fruit" })
-        .where({ name: "Apple" })
-        .toArray();
+      const items = await Product.where({ category: "fruit" }).where({ name: "Apple" }).toArray();
       expect(items).toHaveLength(1);
     });
 
     it("order sorts correctly", async () => {
-      const items = await Product.all()
-        .order({ price: "desc" })
-        .toArray();
+      const items = await Product.all().order({ price: "desc" }).toArray();
       expect(items[0].readAttribute("name")).toBe("Eggplant");
       expect(items[4].readAttribute("name")).toBe("Apple");
     });
 
     it("limit and offset", async () => {
-      const items = await Product.all()
-        .order("name")
-        .limit(2)
-        .offset(1)
-        .toArray();
+      const items = await Product.all().order("name").limit(2).offset(1).toArray();
       expect(items).toHaveLength(2);
     });
 
@@ -478,9 +436,7 @@ describeIfPg("PostgresAdapter", () => {
         await Account.create({ name: "Charlie", balance: 300 });
       });
 
-      const rows = await adapter.execute(
-        'SELECT * FROM "accounts" ORDER BY "name"'
-      );
+      const rows = await adapter.execute('SELECT * FROM "accounts" ORDER BY "name"');
       expect(rows).toHaveLength(2);
       expect(rows[0].name).toBe("Alice");
       expect(rows[1].name).toBe("Charlie");
@@ -548,19 +504,11 @@ describeIfPg("PostgresAdapter", () => {
   // -- PostgreSQL-specific features --
   describe("PostgreSQL-specific features", () => {
     it("handles SERIAL auto-increment correctly", async () => {
-      await adapter.exec(
-        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)'
-      );
+      await adapter.exec('CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
 
-      const id1 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('first')`
-      );
-      const id2 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('second')`
-      );
-      const id3 = await adapter.executeMutation(
-        `INSERT INTO "items" ("name") VALUES ('third')`
-      );
+      const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('first')`);
+      const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('second')`);
+      const id3 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('third')`);
 
       expect(id1).toBe(1);
       expect(id2).toBe(2);
@@ -569,12 +517,12 @@ describeIfPg("PostgresAdapter", () => {
 
     it("handles explicit RETURNING clause", async () => {
       await adapter.exec(
-        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "code" TEXT)'
+        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "code" TEXT)',
       );
 
       // executeMutation with explicit RETURNING should return the specified column
       const result = await adapter.executeMutation(
-        `INSERT INTO "items" ("name", "code") VALUES ('test', 'ABC') RETURNING "id"`
+        `INSERT INTO "items" ("name", "code") VALUES ('test', 'ABC') RETURNING "id"`,
       );
       expect(result).toBe(1);
     });
@@ -591,7 +539,7 @@ describeIfPg("PostgresAdapter", () => {
       `);
 
       await adapter.executeMutation(
-        `INSERT INTO "items" ("name", "count", "active", "price") VALUES ('Widget', 42, true, 9.99)`
+        `INSERT INTO "items" ("name", "count", "active", "price") VALUES ('Widget', 42, true, 9.99)`,
       );
 
       const rows = await adapter.execute('SELECT * FROM "items"');
@@ -666,57 +614,37 @@ describeIfPg("PostgresAdapter", () => {
           "name" TEXT
         )
       `);
-      await adapter.executeMutation(
-        `INSERT INTO "bind_test" ("name") VALUES ('hello')`
-      );
+      await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
     });
 
     it("where with string for string column using bind parameters", async () => {
-      const rows = await adapter.execute(
-        `SELECT * FROM "bind_test" WHERE "name" = ?`,
-        ["hello"]
-      );
+      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, ["hello"]);
       expect(rows).toHaveLength(1);
       expect(rows[0].name).toBe("hello");
     });
 
     it("where with integer for string column using bind parameters", async () => {
-      const rows = await adapter.execute(
-        `SELECT * FROM "bind_test" WHERE "name" = ?`,
-        [123]
-      );
+      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [123]);
       expect(rows).toHaveLength(0);
     });
 
     it("where with float for string column using bind parameters", async () => {
-      const rows = await adapter.execute(
-        `SELECT * FROM "bind_test" WHERE "name" = ?`,
-        [1.5]
-      );
+      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [1.5]);
       expect(rows).toHaveLength(0);
     });
 
     it("where with boolean for string column using bind parameters", async () => {
-      const rows = await adapter.execute(
-        `SELECT * FROM "bind_test" WHERE "name" = ?`,
-        [true]
-      );
+      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [true]);
       expect(rows).toHaveLength(0);
     });
 
     it("where with decimal for string column using bind parameters", async () => {
-      const rows = await adapter.execute(
-        `SELECT * FROM "bind_test" WHERE "name" = ?`,
-        [99.99]
-      );
+      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [99.99]);
       expect(rows).toHaveLength(0);
     });
 
     it("where with rational for string column using bind parameters", async () => {
-      const rows = await adapter.execute(
-        `SELECT * FROM "bind_test" WHERE "name" = ?`,
-        [0.3333]
-      );
+      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [0.3333]);
       expect(rows).toHaveLength(0);
     });
   });
@@ -828,7 +756,7 @@ describeIfPg("PostgresAdapter", () => {
   describe("PostgresqlConnectionTest", () => {
     it("encoding", async () => {
       const rows = await adapter.execute(
-        `SELECT pg_encoding_to_char(encoding) AS encoding FROM pg_database WHERE datname = current_database()`
+        `SELECT pg_encoding_to_char(encoding) AS encoding FROM pg_database WHERE datname = current_database()`,
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].encoding).toBeTruthy();
@@ -836,7 +764,7 @@ describeIfPg("PostgresAdapter", () => {
 
     it("collation", async () => {
       const rows = await adapter.execute(
-        `SELECT datcollate FROM pg_database WHERE datname = current_database()`
+        `SELECT datcollate FROM pg_database WHERE datname = current_database()`,
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].datcollate).toBeTruthy();
@@ -844,7 +772,7 @@ describeIfPg("PostgresAdapter", () => {
 
     it("ctype", async () => {
       const rows = await adapter.execute(
-        `SELECT datctype FROM pg_database WHERE datname = current_database()`
+        `SELECT datctype FROM pg_database WHERE datname = current_database()`,
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].datctype).toBeTruthy();
@@ -1324,24 +1252,20 @@ describeIfPg("PostgresAdapter", () => {
 
   describe("PostgreSQLAdapterTest", () => {
     it("primary key", async () => {
-      await adapter.exec(
-        `CREATE TABLE "pk_test" ("id" SERIAL PRIMARY KEY, "name" TEXT)`
-      );
+      await adapter.exec(`CREATE TABLE "pk_test" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       const rows = await adapter.execute(
         `SELECT column_name FROM information_schema.key_column_usage
-         WHERE table_name = 'pk_test' AND constraint_name LIKE '%pkey'`
+         WHERE table_name = 'pk_test' AND constraint_name LIKE '%pkey'`,
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].column_name).toBe("id");
     });
 
     it("primary key returns nil for no pk", async () => {
-      await adapter.exec(
-        `CREATE TABLE "no_pk_test" ("name" TEXT, "value" INTEGER)`
-      );
+      await adapter.exec(`CREATE TABLE "no_pk_test" ("name" TEXT, "value" INTEGER)`);
       const rows = await adapter.execute(
         `SELECT column_name FROM information_schema.key_column_usage
-         WHERE table_name = 'no_pk_test' AND constraint_name LIKE '%pkey'`
+         WHERE table_name = 'no_pk_test' AND constraint_name LIKE '%pkey'`,
       );
       expect(rows).toHaveLength(0);
     });
@@ -1500,25 +1424,15 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("quote column name", async () => {
-      await adapter.exec(
-        `CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "quoting_test" ("select") VALUES ('works')`
-      );
-      const rows = await adapter.execute(
-        `SELECT "select" FROM "quoting_test"`
-      );
+      await adapter.exec(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`);
+      await adapter.executeMutation(`INSERT INTO "quoting_test" ("select") VALUES ('works')`);
+      const rows = await adapter.execute(`SELECT "select" FROM "quoting_test"`);
       expect(rows[0].select).toBe("works");
     });
 
     it("quote table name", async () => {
-      await adapter.exec(
-        `CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "val" TEXT)`
-      );
-      const rows = await adapter.execute(
-        `SELECT * FROM "quoting_test"`
-      );
+      await adapter.exec(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      const rows = await adapter.execute(`SELECT * FROM "quoting_test"`);
       expect(rows).toHaveLength(0);
     });
 

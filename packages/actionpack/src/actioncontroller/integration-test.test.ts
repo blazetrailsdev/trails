@@ -360,7 +360,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     });
 
     it("custom headers", async () => {
-      await app.get("/posts", { headers: { "Authorization": "Bearer token" } });
+      await app.get("/posts", { headers: { Authorization: "Bearer token" } });
       expect(app.request.getHeader("Authorization")).toBe("Bearer token");
     });
 

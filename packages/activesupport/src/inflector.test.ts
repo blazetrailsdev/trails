@@ -192,7 +192,9 @@ describe("InflectorTest", () => {
   it("underscore with slashes", () => {
     expect(underscore("Admin::Product")).toBe("admin/product");
     expect(underscore("Users::Commission::Department")).toBe("users/commission/department");
-    expect(underscore("UsersSection::CommissionDepartment")).toBe("users_section/commission_department");
+    expect(underscore("UsersSection::CommissionDepartment")).toBe(
+      "users_section/commission_department",
+    );
   });
 
   it("demodulize", () => {
@@ -225,7 +227,9 @@ describe("InflectorTest", () => {
   });
 
   it("parameterize", () => {
-    expect(parameterize("Random text with *(bad)* characters")).toBe("random-text-with-bad-characters");
+    expect(parameterize("Random text with *(bad)* characters")).toBe(
+      "random-text-with-bad-characters",
+    );
     expect(parameterize("Allow_Under_Scores")).toBe("allow_under_scores");
     expect(parameterize("Trailing bad characters!@#")).toBe("trailing-bad-characters");
     expect(parameterize("!@#Leading bad characters")).toBe("leading-bad-characters");
@@ -239,8 +243,12 @@ describe("InflectorTest", () => {
 
   it("parameterize with custom separator", () => {
     expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
-    expect(parameterize("Random text with *(bad)* characters", { separator: "_" })).toBe("random_text_with_bad_characters");
-    expect(parameterize("Trailing bad characters!@#", { separator: "_" })).toBe("trailing_bad_characters");
+    expect(parameterize("Random text with *(bad)* characters", { separator: "_" })).toBe(
+      "random_text_with_bad_characters",
+    );
+    expect(parameterize("Trailing bad characters!@#", { separator: "_" })).toBe(
+      "trailing_bad_characters",
+    );
     expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
   });
 

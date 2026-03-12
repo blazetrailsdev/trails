@@ -27,14 +27,20 @@ describe("Rack::MockResponse", () => {
   });
 
   it("provides access to session cookies", async () => {
-    const cookieApp = async () => [200, { "set-cookie": "foo=bar" }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": "foo=bar" }, ["OK"]] as [number, Record<string, string>, any];
     const res = await new MockRequest(cookieApp).get("/");
     expect(res.cookie("foo")).toBeDefined();
     expect(res.cookie("foo")!.value).toEqual(["bar"]);
   });
 
   it("provides access to persistent cookies set with max-age", async () => {
-    const cookieApp = async () => [200, { "set-cookie": "foo=bar; max-age=3600" }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": "foo=bar; max-age=3600" }, ["OK"]] as [
+        number,
+        Record<string, string>,
+        any,
+      ];
     const res = await new MockRequest(cookieApp).get("/");
     const c = res.cookie("foo");
     expect(c).toBeDefined();
@@ -44,7 +50,12 @@ describe("Rack::MockResponse", () => {
 
   it("provides access to persistent cookies set with expires", async () => {
     const future = new Date(Date.now() + 86400000).toUTCString();
-    const cookieApp = async () => [200, { "set-cookie": `foo=bar; expires=${future}` }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": `foo=bar; expires=${future}` }, ["OK"]] as [
+        number,
+        Record<string, string>,
+        any,
+      ];
     const res = await new MockRequest(cookieApp).get("/");
     const c = res.cookie("foo");
     expect(c).toBeDefined();
@@ -53,20 +64,27 @@ describe("Rack::MockResponse", () => {
 
   it("parses cookies giving max-age precedence over expires", async () => {
     const past = new Date(Date.now() - 86400000).toUTCString();
-    const cookieApp = async () => [200, { "set-cookie": `foo=bar; max-age=3600; expires=${past}` }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": `foo=bar; max-age=3600; expires=${past}` }, ["OK"]] as [
+        number,
+        Record<string, string>,
+        any,
+      ];
     const res = await new MockRequest(cookieApp).get("/");
     const c = res.cookie("foo");
     expect(c!.expires!.getTime()).toBeGreaterThan(Date.now());
   });
 
   it("provides access to secure cookies", async () => {
-    const cookieApp = async () => [200, { "set-cookie": "foo=bar; secure" }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": "foo=bar; secure" }, ["OK"]] as [number, Record<string, string>, any];
     const res = await new MockRequest(cookieApp).get("/");
     expect(res.cookie("foo")!.secure).toBe(true);
   });
 
   it("parses cookie headers with equals sign at the end", async () => {
-    const cookieApp = async () => [200, { "set-cookie": "foo=bar=" }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": "foo=bar=" }, ["OK"]] as [number, Record<string, string>, any];
     const res = await new MockRequest(cookieApp).get("/");
     expect(res.cookie("foo")).toBeDefined();
   });
@@ -77,14 +95,16 @@ describe("Rack::MockResponse", () => {
   });
 
   it("handles an empty cookie", async () => {
-    const cookieApp = async () => [200, { "set-cookie": "foo=" }, ["OK"]] as [number, Record<string, string>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": "foo=" }, ["OK"]] as [number, Record<string, string>, any];
     const res = await new MockRequest(cookieApp).get("/");
     const c = res.cookie("foo");
     expect(c).toBeDefined();
   });
 
   it("parses multiple set-cookie headers provided as hash with array value", async () => {
-    const cookieApp = async () => [200, { "set-cookie": ["foo=bar", "baz=qux"] }, ["OK"]] as [number, Record<string, any>, any];
+    const cookieApp = async () =>
+      [200, { "set-cookie": ["foo=bar", "baz=qux"] }, ["OK"]] as [number, Record<string, any>, any];
     const res = await new MockRequest(cookieApp).get("/");
     expect(res.cookie("foo")).toBeDefined();
     expect(res.cookie("baz")).toBeDefined();
@@ -106,7 +126,11 @@ describe("Rack::MockResponse", () => {
 
   it("allows calling body.close afterwards", async () => {
     let closed = false;
-    const body = { close() { closed = true; } };
+    const body = {
+      close() {
+        closed = true;
+      },
+    };
     const closeApp = async () => [200, {}, body] as any;
     await new MockRequest(closeApp).get("/");
     expect(closed).toBe(true);
@@ -126,7 +150,11 @@ describe("Rack::MockResponse", () => {
   });
 
   it("does not calculate content length for streaming body", () => {
-    const streamBody = { each(cb: any) { cb("hi"); } };
+    const streamBody = {
+      each(cb: any) {
+        cb("hi");
+      },
+    };
     const res = new MockResponse(200, {}, streamBody);
     // Streaming bodies don't get content-length set automatically
     expect(res.status).toBe(200);
@@ -141,8 +169,12 @@ describe("Rack::MockResponse", () => {
   it("closes streaming bodies that respond to close", async () => {
     let closed = false;
     const body = {
-      each(cb: any) { cb("streaming"); },
-      close() { closed = true; },
+      each(cb: any) {
+        cb("streaming");
+      },
+      close() {
+        closed = true;
+      },
     };
     const streamApp = async () => [200, {}, body] as any;
     await new MockRequest(streamApp).get("/");

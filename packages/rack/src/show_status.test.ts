@@ -9,9 +9,11 @@ describe("Rack::ShowStatus", () => {
   }
 
   it("provide a default status message", async () => {
-    const req = new MockRequest((env) => showStatus(async () =>
-      [404, { "content-type": "text/plain", "content-length": "0" }, []] as any
-    ).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(
+        async () => [404, { "content-type": "text/plain", "content-length": "0" }, []] as any,
+      ).call(env),
+    );
     const res = await req.get("/");
     expect(res.status).toBe(404);
     expect(res.bodyString.length).toBeGreaterThan(0);
@@ -21,10 +23,12 @@ describe("Rack::ShowStatus", () => {
   });
 
   it("let the app provide additional information", async () => {
-    const req = new MockRequest((env) => showStatus(async (e: any) => {
-      e["rack.showstatus.detail"] = "gone too meta.";
-      return [404, { "content-type": "text/plain", "content-length": "0" }, []] as any;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(async (e: any) => {
+        e["rack.showstatus.detail"] = "gone too meta.";
+        return [404, { "content-type": "text/plain", "content-length": "0" }, []] as any;
+      }).call(env),
+    );
     const res = await req.get("/");
     expect(res.status).toBe(404);
     expect(res.headers["content-type"]).toBe("text/html");
@@ -34,10 +38,12 @@ describe("Rack::ShowStatus", () => {
   });
 
   it("let the app provide additional information with non-String details", async () => {
-    const req = new MockRequest((env) => showStatus(async (e: any) => {
-      e["rack.showstatus.detail"] = ['gone too meta.'];
-      return [404, { "content-type": "text/plain", "content-length": "0" }, []] as any;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(async (e: any) => {
+        e["rack.showstatus.detail"] = ["gone too meta."];
+        return [404, { "content-type": "text/plain", "content-length": "0" }, []] as any;
+      }).call(env),
+    );
     const res = await req.get("/");
     expect(res.status).toBe(404);
     expect(res.headers["content-type"]).toBe("text/html");
@@ -49,10 +55,12 @@ describe("Rack::ShowStatus", () => {
 
   it("escape error", async () => {
     const detail = "<script>alert('hi \"')</script>";
-    const req = new MockRequest((env) => showStatus(async (e: any) => {
-      e["rack.showstatus.detail"] = detail;
-      return [500, { "content-type": "text/plain", "content-length": "0" }, []] as any;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(async (e: any) => {
+        e["rack.showstatus.detail"] = detail;
+        return [500, { "content-type": "text/plain", "content-length": "0" }, []] as any;
+      }).call(env),
+    );
     const res = await req.get("/");
     expect(res.headers["content-type"]).toBe("text/html");
     expect(res.bodyString).toMatch(/500/);
@@ -61,27 +69,31 @@ describe("Rack::ShowStatus", () => {
   });
 
   it("not replace existing messages", async () => {
-    const req = new MockRequest((env) => showStatus(async () =>
-      [404, { "content-type": "text/plain", "content-length": "4" }, ["foo!"]] as any
-    ).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(
+        async () => [404, { "content-type": "text/plain", "content-length": "4" }, ["foo!"]] as any,
+      ).call(env),
+    );
     const res = await req.get("/");
     expect(res.status).toBe(404);
     expect(res.bodyString).toBe("foo!");
   });
 
   it("pass on original headers", async () => {
-    const req = new MockRequest((env) => showStatus(async () =>
-      [401, { "www-authenticate": "Basic blah" }, []] as any
-    ).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(async () => [401, { "www-authenticate": "Basic blah" }, []] as any).call(env),
+    );
     const res = await req.get("/");
     expect(res.headers["www-authenticate"]).toBe("Basic blah");
   });
 
   it("replace existing messages if there is detail", async () => {
-    const req = new MockRequest((env) => showStatus(async (e: any) => {
-      e["rack.showstatus.detail"] = "gone too meta.";
-      return [404, { "content-type": "text/plain", "content-length": "4" }, ["foo!"]] as any;
-    }).call(env));
+    const req = new MockRequest((env) =>
+      showStatus(async (e: any) => {
+        e["rack.showstatus.detail"] = "gone too meta.";
+        return [404, { "content-type": "text/plain", "content-length": "4" }, ["foo!"]] as any;
+      }).call(env),
+    );
     const res = await req.get("/");
     expect(res.status).toBe(404);
     expect(res.headers["content-type"]).toBe("text/html");
@@ -94,11 +106,15 @@ describe("Rack::ShowStatus", () => {
   it("close the original body", async () => {
     let closed = false;
     const body = {
-      forEach(fn: any) { fn("s"); },
-      close() { closed = true; },
+      forEach(fn: any) {
+        fn("s");
+      },
+      close() {
+        closed = true;
+      },
     };
-    const app = new ShowStatus(async () =>
-      [404, { "content-type": "text/plain", "content-length": "0" }, body] as any
+    const app = new ShowStatus(
+      async () => [404, { "content-type": "text/plain", "content-length": "0" }, body] as any,
     );
     await app.call(MockRequest.envFor("/"));
     expect(closed).toBe(true);

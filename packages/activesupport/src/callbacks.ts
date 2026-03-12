@@ -57,7 +57,7 @@ function getCallbackChains(target: any): Map<string, CallbackChain> {
 export function defineCallbacks(
   target: any,
   name: string,
-  options: DefineCallbacksOptions = {}
+  options: DefineCallbacksOptions = {},
 ): void {
   const chains = getCallbackChains(target);
   if (!chains.has(name)) {
@@ -76,14 +76,12 @@ export function setCallback(
   name: string,
   kind: CallbackKind,
   callback: AnyCallback,
-  options: CallbackOptions = {}
+  options: CallbackOptions = {},
 ): void {
   const chains = getCallbackChains(target);
   const chain = chains.get(name);
   if (!chain) {
-    throw new Error(
-      `No callback chain "${name}" defined. Call defineCallbacks first.`
-    );
+    throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
   }
   const entry: CallbackEntry = { kind, callback, options };
   if (options.prepend) {
@@ -100,18 +98,16 @@ export function skipCallback(
   target: any,
   name: string,
   kind: CallbackKind,
-  callback?: AnyCallback
+  callback?: AnyCallback,
 ): void {
   const chains = getCallbackChains(target);
   const chain = chains.get(name);
   if (!chain) return;
-  chain.entries = chain.entries.filter(
-    (e) => {
-      if (e.kind !== kind) return true;
-      if (callback && e.callback !== callback) return true;
-      return false;
-    }
-  );
+  chain.entries = chain.entries.filter((e) => {
+    if (e.kind !== kind) return true;
+    if (callback && e.callback !== callback) return true;
+    return false;
+  });
 }
 
 /**
@@ -132,9 +128,7 @@ function shouldRun(entry: CallbackEntry, target: any): boolean {
     if (!conditions.every((cond) => cond(target))) return false;
   }
   if (options.unless) {
-    const conditions = Array.isArray(options.unless)
-      ? options.unless
-      : [options.unless];
+    const conditions = Array.isArray(options.unless) ? options.unless : [options.unless];
     if (conditions.some((cond) => cond(target))) return false;
   }
   return true;
@@ -143,11 +137,7 @@ function shouldRun(entry: CallbackEntry, target: any): boolean {
 /**
  * Execute the callback chain. Returns false if the chain was halted.
  */
-export function runCallbacks(
-  target: any,
-  name: string,
-  block?: () => void
-): boolean {
+export function runCallbacks(target: any, name: string, block?: () => void): boolean {
   const chains = getCallbackChains(target);
   const chain = chains.get(name);
   if (!chain) {

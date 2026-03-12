@@ -3,14 +3,26 @@ import { CONTENT_TYPE, CONTENT_LENGTH, TRANSFER_ENCODING } from "./constants.js"
 
 export interface DeflaterOptions {
   include?: string[];
-  if?: (env: Record<string, any>, status: number, headers: Record<string, any>, body: any) => boolean;
+  if?: (
+    env: Record<string, any>,
+    status: number,
+    headers: Record<string, any>,
+    body: any,
+  ) => boolean;
   sync?: boolean;
 }
 
 export class Deflater {
   private app: any;
   private include: string[] | null;
-  private condition: ((env: Record<string, any>, status: number, headers: Record<string, any>, body: any) => boolean) | null;
+  private condition:
+    | ((
+        env: Record<string, any>,
+        status: number,
+        headers: Record<string, any>,
+        body: any,
+      ) => boolean)
+    | null;
   private sync: boolean;
 
   constructor(app: any, opts: DeflaterOptions = {}) {
@@ -48,7 +60,7 @@ export class Deflater {
     // Check :include
     if (this.include) {
       const ct = headers[CONTENT_TYPE];
-      if (!ct || !this.include.some(t => ct.includes(t))) {
+      if (!ct || !this.include.some((t) => ct.includes(t))) {
         return [status, headers, body];
       }
     }
@@ -86,11 +98,12 @@ export class Deflater {
   }
 
   private preferredEncoding(accept: string): string | null {
-    const encodings = accept.split(",").map(s => s.trim().split(";")[0].trim().toLowerCase());
+    const encodings = accept.split(",").map((s) => s.trim().split(";")[0].trim().toLowerCase());
     if (encodings.includes("gzip") || encodings.includes("x-gzip")) return "gzip";
     if (encodings.includes("deflate")) return "deflate";
     if (encodings.includes("identity") || encodings.includes("*")) return "identity";
-    if (encodings.length === 0 || (encodings.length === 1 && encodings[0] === "")) return "identity";
+    if (encodings.length === 0 || (encodings.length === 1 && encodings[0] === ""))
+      return "identity";
     return null;
   }
 

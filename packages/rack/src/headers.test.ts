@@ -99,12 +99,20 @@ describe("Rack::Headers", () => {
 
   it("each", () => {
     let i = 0;
-    h.each(() => { i++; });
+    h.each(() => {
+      i++;
+    });
     expect(i).toBe(0);
 
-    const items: [string, string][] = [["ab", "1"], ["cd", "2"], ["3", "4"]];
+    const items: [string, string][] = [
+      ["ab", "1"],
+      ["cd", "2"],
+      ["3", "4"],
+    ];
     const found: [string, string][] = [];
-    fh.each((k, v) => { found.push([k, v]); });
+    fh.each((k, v) => {
+      found.push([k, v]);
+    });
     expect(found.length).toBe(3);
     for (const item of items) {
       expect(found).toContainEqual(item);
@@ -113,21 +121,29 @@ describe("Rack::Headers", () => {
 
   it("each_key", () => {
     let i = 0;
-    h.eachKey(() => { i++; });
+    h.eachKey(() => {
+      i++;
+    });
     expect(i).toBe(0);
 
     const keys: string[] = [];
-    fh.eachKey((k) => { keys.push(k); });
+    fh.eachKey((k) => {
+      keys.push(k);
+    });
     expect(keys.sort()).toEqual(["3", "ab", "cd"]);
   });
 
   it("each_value", () => {
     let i = 0;
-    h.eachValue(() => { i++; });
+    h.eachValue(() => {
+      i++;
+    });
     expect(i).toBe(0);
 
     const values: string[] = [];
-    fh.eachValue((v) => { values.push(v); });
+    fh.eachValue((v) => {
+      values.push(v);
+    });
     expect(values.sort()).toEqual(["1", "2", "4"]);
   });
 
@@ -260,7 +276,11 @@ describe("Rack::Headers", () => {
   it("sort", () => {
     expect(h.sort()).toEqual([]);
     const sorted = Headers.from("CD", "4", "AB", "1", "EF", "2").sort();
-    expect(sorted).toEqual([["ab", "1"], ["cd", "4"], ["ef", "2"]]);
+    expect(sorted).toEqual([
+      ["ab", "1"],
+      ["cd", "4"],
+      ["ef", "2"],
+    ]);
   });
 
   it("to_a", () => {

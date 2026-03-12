@@ -13,7 +13,9 @@ describe("ErrorReporterTest", () => {
 
   it("receives the execution context", () => {
     reporter.setContext({ user: "alice" });
-    reporter.handle([Error], () => { throw new Error("boom"); });
+    reporter.handle([Error], () => {
+      throw new Error("boom");
+    });
     expect(reports[0].context.user).toBe("alice");
   });
 
@@ -36,7 +38,9 @@ describe("ErrorReporterTest", () => {
     const sub = { report: (r: any) => reports.push({ label: "sub", ...r }) };
     reporter.subscribe(sub);
     reporter.disable(sub, () => {
-      reporter.handle([Error], () => { throw new Error("boom"); });
+      reporter.handle([Error], () => {
+        throw new Error("boom");
+      });
     });
     // Only the first subscriber should have received the report
     expect(reports.every((r) => !r.label)).toBe(true);
@@ -47,13 +51,17 @@ describe("ErrorReporterTest", () => {
     const sub = { report: (r: any) => reported.push(r) };
     reporter.subscribe(sub);
     reporter.disable([sub], () => {
-      reporter.handle([Error], () => { throw new Error("boom"); });
+      reporter.handle([Error], () => {
+        throw new Error("boom");
+      });
     });
     expect(reported).toHaveLength(0);
   });
 
   it("#handle swallow and report any unhandled error", () => {
-    reporter.handle([Error], () => { throw new Error("oops"); });
+    reporter.handle([Error], () => {
+      throw new Error("oops");
+    });
     expect(reports).toHaveLength(1);
     expect(reports[0].error.message).toBe("oops");
     expect(reports[0].handled).toBe(true);
@@ -61,20 +69,28 @@ describe("ErrorReporterTest", () => {
 
   it("#handle can be scoped to an exception class", () => {
     expect(() => {
-      reporter.handle([TypeError], () => { throw new RangeError("range"); });
+      reporter.handle([TypeError], () => {
+        throw new RangeError("range");
+      });
     }).toThrow(RangeError);
     expect(reports).toHaveLength(0);
   });
 
   it("#handle can be scoped to several exception classes", () => {
-    reporter.handle([TypeError, RangeError], () => { throw new TypeError("t"); });
+    reporter.handle([TypeError, RangeError], () => {
+      throw new TypeError("t");
+    });
     expect(reports[0].error).toBeInstanceOf(TypeError);
-    reporter.handle([TypeError, RangeError], () => { throw new RangeError("r"); });
+    reporter.handle([TypeError, RangeError], () => {
+      throw new RangeError("r");
+    });
     expect(reports[1].error).toBeInstanceOf(RangeError);
   });
 
   it("#handle swallows and reports matching errors", () => {
-    reporter.handle([TypeError], () => { throw new TypeError("matched"); });
+    reporter.handle([TypeError], () => {
+      throw new TypeError("matched");
+    });
     expect(reports).toHaveLength(1);
     expect(reports[0].handled).toBe(true);
   });
@@ -85,7 +101,9 @@ describe("ErrorReporterTest", () => {
   });
 
   it("#handle returns nil on handled raise", () => {
-    const result = reporter.handle([Error], () => { throw new Error("boom"); });
+    const result = reporter.handle([Error], () => {
+      throw new Error("boom");
+    });
     expect(result).toBeUndefined();
   });
 
@@ -106,29 +124,43 @@ describe("ErrorReporterTest", () => {
 
   it("#handle raises the error up if fallback is a proc that then also raises", () => {
     expect(() => {
-      reporter.handle([Error], { fallback: () => { throw new Error("fallback error"); } }, () => {
-        throw new Error("original");
-      });
+      reporter.handle(
+        [Error],
+        {
+          fallback: () => {
+            throw new Error("fallback error");
+          },
+        },
+        () => {
+          throw new Error("original");
+        },
+      );
     }).toThrow("fallback error");
   });
 
   it("#record report any unhandled error and re-raise them", () => {
     expect(() => {
-      reporter.record([Error], () => { throw new Error("re-raised"); });
+      reporter.record([Error], () => {
+        throw new Error("re-raised");
+      });
     }).toThrow("re-raised");
     expect(reports[0].handled).toBe(false);
   });
 
   it("#record can be scoped to an exception class", () => {
     expect(() => {
-      reporter.record([TypeError], () => { throw new RangeError("range"); });
+      reporter.record([TypeError], () => {
+        throw new RangeError("range");
+      });
     }).toThrow(RangeError);
     expect(reports).toHaveLength(0);
   });
 
   it("#record can be scoped to several exception classes", () => {
     expect(() => {
-      reporter.record([TypeError, RangeError], () => { throw new TypeError("t"); });
+      reporter.record([TypeError, RangeError], () => {
+        throw new TypeError("t");
+      });
     }).toThrow(TypeError);
     expect(reports[0].error).toBeInstanceOf(TypeError);
   });
@@ -136,7 +168,9 @@ describe("ErrorReporterTest", () => {
   it("#record report any matching, unhandled error and re-raise them", () => {
     const err = new TypeError("match");
     expect(() => {
-      reporter.record([TypeError], () => { throw err; });
+      reporter.record([TypeError], () => {
+        throw err;
+      });
     }).toThrow(TypeError);
     expect(reports[0].error).toBe(err);
     expect(reports[0].handled).toBe(false);
@@ -160,7 +194,9 @@ describe("ErrorReporterTest", () => {
   it("can have multiple subscribers", () => {
     const extra: any[] = [];
     reporter.subscribe({ report: (r) => extra.push(r) });
-    reporter.handle([Error], () => { throw new Error("multi"); });
+    reporter.handle([Error], () => {
+      throw new Error("multi");
+    });
     expect(reports).toHaveLength(1);
     expect(extra).toHaveLength(1);
   });
@@ -169,44 +205,62 @@ describe("ErrorReporterTest", () => {
     const sub = { report: (r: any) => reports.push(r) };
     reporter.subscribe(sub);
     reporter.unsubscribe(sub);
-    reporter.handle([Error], () => { throw new Error("after unsub"); });
+    reporter.handle([Error], () => {
+      throw new Error("after unsub");
+    });
     // Only the original subscriber receives it (sub was removed)
     expect(reports).toHaveLength(1); // only the first subscriber still active
   });
 
   it("handled errors default to :warning severity", () => {
-    reporter.handle([Error], () => { throw new Error("warn"); });
+    reporter.handle([Error], () => {
+      throw new Error("warn");
+    });
     expect(reports[0].severity).toBe("warning");
   });
 
   it("unhandled errors default to :error severity", () => {
     try {
-      reporter.record([Error], () => { throw new Error("err"); });
+      reporter.record([Error], () => {
+        throw new Error("err");
+      });
     } catch {}
     expect(reports[0].severity).toBe("error");
   });
 
   it("report errors only once", () => {
     const err = new Error("once");
-    reporter.handle([Error], () => { throw err; });
-    reporter.handle([Error], () => { throw err; });
+    reporter.handle([Error], () => {
+      throw err;
+    });
+    reporter.handle([Error], () => {
+      throw err;
+    });
     // Same error object should only be reported once
     expect(reports).toHaveLength(1);
   });
 
   it("can report frozen exceptions", () => {
     const err = Object.freeze(new Error("frozen"));
-    expect(() => reporter.handle([Error], () => { throw err; })).not.toThrow();
+    expect(() =>
+      reporter.handle([Error], () => {
+        throw err;
+      }),
+    ).not.toThrow();
     expect(reports[0].error).toBe(err);
   });
 
   it("subscriber errors are re-raised if no logger is set", () => {
     reporter.logger = null;
     reporter.subscribe({
-      report: () => { throw new Error("subscriber blew up"); },
+      report: () => {
+        throw new Error("subscriber blew up");
+      },
     });
     expect(() => {
-      reporter.handle([Error], () => { throw new Error("original"); });
+      reporter.handle([Error], () => {
+        throw new Error("original");
+      });
     }).toThrow("subscriber blew up");
   });
 
@@ -214,15 +268,25 @@ describe("ErrorReporterTest", () => {
     const logs: string[] = [];
     reporter.logger = { error: (msg) => logs.push(msg) };
     reporter.subscribe({
-      report: () => { throw new Error("subscriber error"); },
+      report: () => {
+        throw new Error("subscriber error");
+      },
     });
     expect(() => {
-      reporter.handle([Error], () => { throw new Error("original"); });
+      reporter.handle([Error], () => {
+        throw new Error("original");
+      });
     }).not.toThrow();
     expect(logs.some((l) => l.includes("subscriber error"))).toBe(true);
   });
 
-  it.skip("#report assigns a backtrace if it's missing", () => { /* Ruby backtrace */ });
-  it.skip("causes can't be reported again either", () => { /* Ruby exception cause chain */ });
-  it.skip("#unexpected re-raise errors in development and test", () => { /* env-specific */ });
+  it.skip("#report assigns a backtrace if it's missing", () => {
+    /* Ruby backtrace */
+  });
+  it.skip("causes can't be reported again either", () => {
+    /* Ruby exception cause chain */
+  });
+  it.skip("#unexpected re-raise errors in development and test", () => {
+    /* env-specific */
+  });
 });

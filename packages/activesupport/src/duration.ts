@@ -16,7 +16,7 @@ const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 86400;
 const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
-const SECONDS_PER_MONTH = 30.4375 * SECONDS_PER_DAY;  // 1/12 of 365.25 * 86400
+const SECONDS_PER_MONTH = 30.4375 * SECONDS_PER_DAY; // 1/12 of 365.25 * 86400
 const SECONDS_PER_YEAR = 365.2425 * SECONDS_PER_DAY;
 
 // Part ordering for inspect()
@@ -61,13 +61,27 @@ export class Duration {
   // Factory methods
   // ---------------------------------------------------------------------------
 
-  static seconds(n: number): Duration { return new Duration({ seconds: n }); }
-  static minutes(n: number): Duration { return new Duration({ minutes: n }); }
-  static hours(n: number): Duration { return new Duration({ hours: n }); }
-  static days(n: number): Duration { return new Duration({ days: n }); }
-  static weeks(n: number): Duration { return new Duration({ weeks: n }); }
-  static months(n: number): Duration { return new Duration({ months: n }); }
-  static years(n: number): Duration { return new Duration({ years: n }); }
+  static seconds(n: number): Duration {
+    return new Duration({ seconds: n });
+  }
+  static minutes(n: number): Duration {
+    return new Duration({ minutes: n });
+  }
+  static hours(n: number): Duration {
+    return new Duration({ hours: n });
+  }
+  static days(n: number): Duration {
+    return new Duration({ days: n });
+  }
+  static weeks(n: number): Duration {
+    return new Duration({ weeks: n });
+  }
+  static months(n: number): Duration {
+    return new Duration({ months: n });
+  }
+  static years(n: number): Duration {
+    return new Duration({ years: n });
+  }
 
   // ---------------------------------------------------------------------------
   // Arithmetic
@@ -292,8 +306,11 @@ export class Duration {
     }
 
     const moreInvalidPatterns = [
-      /^P\d+YT$/, /^PW$/, /^P\d+Y\d+W/,
-      /^P\d+\.\d+Y\d+\.\d+M/, /^P\d+\.\d+MT\d+\.\d+S/
+      /^P\d+YT$/,
+      /^PW$/,
+      /^P\d+Y\d+W/,
+      /^P\d+\.\d+Y\d+\.\d+M/,
+      /^P\d+\.\d+MT\d+\.\d+S/,
     ];
     for (const p of moreInvalidPatterns) {
       if (p.test(iso)) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
@@ -306,7 +323,7 @@ export class Duration {
     if (!match) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
 
     const sign = match[1] === "-" ? -1 : 1;
-    const parse = (s: string | undefined) => s ? parseFloat(s.replace(",", ".")) * sign : 0;
+    const parse = (s: string | undefined) => (s ? parseFloat(s.replace(",", ".")) * sign : 0);
 
     return new Duration({
       years: parse(match[2]),
@@ -322,7 +339,8 @@ export class Duration {
   // Build from seconds (Rails' Duration.build)
   static build(value: unknown): Duration {
     if (typeof value !== "number") {
-      const typeName = value === null ? "NilClass" : typeof value === "string" ? "String" : String(typeof value);
+      const typeName =
+        value === null ? "NilClass" : typeof value === "string" ? "String" : String(typeof value);
       throw new TypeError(`can't build an ActiveSupport::Duration from a ${typeName}`);
     }
     return new Duration({ seconds: value });
@@ -340,19 +358,33 @@ export class Duration {
 // ---------------------------------------------------------------------------
 
 /** @example seconds(30).since(date) */
-export function seconds(n: number): Duration { return Duration.seconds(n); }
+export function seconds(n: number): Duration {
+  return Duration.seconds(n);
+}
 /** @example minutes(5).ago() */
-export function minutes(n: number): Duration { return Duration.minutes(n); }
+export function minutes(n: number): Duration {
+  return Duration.minutes(n);
+}
 /** @example hours(2).fromNow() */
-export function hours(n: number): Duration { return Duration.hours(n); }
+export function hours(n: number): Duration {
+  return Duration.hours(n);
+}
 /** @example days(3).since(date) */
-export function days(n: number): Duration { return Duration.days(n); }
+export function days(n: number): Duration {
+  return Duration.days(n);
+}
 /** @example weeks(1).fromNow() */
-export function weeks(n: number): Duration { return Duration.weeks(n); }
+export function weeks(n: number): Duration {
+  return Duration.weeks(n);
+}
 /** @example months(6).ago() */
-export function months(n: number): Duration { return Duration.months(n); }
+export function months(n: number): Duration {
+  return Duration.months(n);
+}
 /** @example years(2).fromNow() */
-export function years(n: number): Duration { return Duration.years(n); }
+export function years(n: number): Duration {
+  return Duration.years(n);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -360,13 +392,20 @@ export function years(n: number): Duration { return Duration.years(n); }
 
 function singular(key: keyof DurationParts): string {
   switch (key) {
-    case "years": return "year";
-    case "months": return "month";
-    case "weeks": return "week";
-    case "days": return "day";
-    case "hours": return "hour";
-    case "minutes": return "minute";
-    case "seconds": return "second";
+    case "years":
+      return "year";
+    case "months":
+      return "month";
+    case "weeks":
+      return "week";
+    case "days":
+      return "day";
+    case "hours":
+      return "hour";
+    case "minutes":
+      return "minute";
+    case "seconds":
+      return "second";
   }
 }
 

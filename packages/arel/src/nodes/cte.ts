@@ -11,11 +11,7 @@ export class Cte extends Node {
   readonly relation: Node;
   readonly materialized?: "materialized" | "not_materialized";
 
-  constructor(
-    name: string,
-    relation: Node,
-    materialized?: "materialized" | "not_materialized"
-  ) {
+  constructor(name: string, relation: Node, materialized?: "materialized" | "not_materialized") {
     super();
     this.name = name;
     this.relation = relation;

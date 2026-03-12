@@ -5,7 +5,11 @@ export class AuthBasic {
   realm: string;
   private authenticator: (username: string, password: string) => boolean | Promise<boolean>;
 
-  constructor(app: RackApp, realmOrAuth?: string | ((u: string, p: string) => boolean | Promise<boolean>), authenticator?: (u: string, p: string) => boolean | Promise<boolean>) {
+  constructor(
+    app: RackApp,
+    realmOrAuth?: string | ((u: string, p: string) => boolean | Promise<boolean>),
+    authenticator?: (u: string, p: string) => boolean | Promise<boolean>,
+  ) {
     this.app = app;
     if (typeof realmOrAuth === "function") {
       this.realm = "Restricted Area";

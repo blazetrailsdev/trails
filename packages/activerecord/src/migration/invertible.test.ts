@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter, adapterType } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -178,10 +218,18 @@ describe("InvertibleMigrationTest", () => {
     expect(tableExists("items")).toBe(false);
   });
 
-  it.skip("migrate revert change column default", () => { /* changeColumnDefault reversal not supported */ });
-  it.skip("migrate revert change column comment", () => { /* comments not supported */ });
-  it.skip("migrate revert change table comment", () => { /* comments not supported */ });
-  it.skip("migrate enable and disable extension", () => { /* extensions not supported */ });
+  it.skip("migrate revert change column default", () => {
+    /* changeColumnDefault reversal not supported */
+  });
+  it.skip("migrate revert change column comment", () => {
+    /* comments not supported */
+  });
+  it.skip("migrate revert change table comment", () => {
+    /* comments not supported */
+  });
+  it.skip("migrate enable and disable extension", () => {
+    /* extensions not supported */
+  });
 
   it("migrate revert drop table", async () => {
     class DropMig extends Migration {
@@ -196,8 +244,12 @@ describe("InvertibleMigrationTest", () => {
   it("revert order", async () => {
     class MultiOp extends Migration {
       async change() {
-        await this.createTable("first_table", (t) => { t.string("a"); });
-        await this.createTable("second_table", (t) => { t.string("b"); });
+        await this.createTable("first_table", (t) => {
+          t.string("a");
+        });
+        await this.createTable("second_table", (t) => {
+          t.string("b");
+        });
       }
     }
     const m = makeMigration(new MultiOp());
@@ -212,7 +264,9 @@ describe("InvertibleMigrationTest", () => {
   it("legacy up", async () => {
     class LegacyUp extends Migration {
       async up() {
-        await this.createTable("legacy", (t) => { t.string("val"); });
+        await this.createTable("legacy", (t) => {
+          t.string("val");
+        });
       }
       async down() {
         await this.dropTable("legacy");
@@ -226,7 +280,9 @@ describe("InvertibleMigrationTest", () => {
   it("legacy down", async () => {
     class LegacyDown extends Migration {
       async up() {
-        await this.createTable("legacy2", (t) => { t.string("val"); });
+        await this.createTable("legacy2", (t) => {
+          t.string("val");
+        });
       }
       async down() {
         await this.dropTable("legacy2");
@@ -241,7 +297,9 @@ describe("InvertibleMigrationTest", () => {
   it("up", async () => {
     class UpMig extends Migration {
       async change() {
-        await this.createTable("up_test", (t) => { t.string("x"); });
+        await this.createTable("up_test", (t) => {
+          t.string("x");
+        });
       }
     }
     const m = makeMigration(new UpMig());
@@ -252,7 +310,9 @@ describe("InvertibleMigrationTest", () => {
   it("down", async () => {
     class DownMig extends Migration {
       async change() {
-        await this.createTable("down_test", (t) => { t.string("x"); });
+        await this.createTable("down_test", (t) => {
+          t.string("x");
+        });
       }
     }
     const m = makeMigration(new DownMig());
@@ -261,13 +321,20 @@ describe("InvertibleMigrationTest", () => {
     expect(tableExists("down_test")).toBe(false);
   });
 
-  it.skip("migrate down with table name prefix", () => { /* table name prefixes not supported */ });
+  it.skip("migrate down with table name prefix", () => {
+    /* table name prefixes not supported */
+  });
 
   it("migrations can handle foreign keys to specific tables", async () => {
     class FKMig extends Migration {
       async up() {
-        await this.createTable("authors_fk", (t) => { t.string("name"); });
-        await this.createTable("books_fk", (t) => { t.string("title"); t.integer("author_fk_id"); });
+        await this.createTable("authors_fk", (t) => {
+          t.string("name");
+        });
+        await this.createTable("books_fk", (t) => {
+          t.string("title");
+          t.integer("author_fk_id");
+        });
       }
       async down() {
         await this.dropTable("books_fk");
@@ -284,7 +351,9 @@ describe("InvertibleMigrationTest", () => {
   it("migrate revert add index with name", async () => {
     class AddIdxMig extends Migration {
       async change() {
-        await this.createTable("idx_test", (t) => { t.string("email"); });
+        await this.createTable("idx_test", (t) => {
+          t.string("email");
+        });
         await this.addIndex("idx_test", "email", { name: "my_custom_index" });
       }
     }
@@ -295,13 +364,17 @@ describe("InvertibleMigrationTest", () => {
     expect(tableExists("idx_test")).toBe(false);
   });
 
-  it.skip("migrate revert add index without name on expression", () => { /* expression indexes not supported */ });
+  it.skip("migrate revert add index without name on expression", () => {
+    /* expression indexes not supported */
+  });
 
   it("up only", async () => {
     let upOnlyCalled = false;
     class UpOnlyMig extends Migration {
       async change() {
-        await this.createTable("up_only_tbl", (t) => { t.string("name"); });
+        await this.createTable("up_only_tbl", (t) => {
+          t.string("name");
+        });
         await this.upOnly(async () => {
           upOnlyCalled = true;
         });
@@ -315,13 +388,18 @@ describe("InvertibleMigrationTest", () => {
     expect(upOnlyCalled).toBe(false);
   });
 
-  it.skip("migrate revert add unique constraint with invalid option", () => { /* unique constraints API not implemented */ });
-  it.skip("migrate revert add foreign key with invalid option", () => { /* foreign key reversal not supported */ });
-  it.skip("migrate revert add check constraint with invalid option", () => { /* check constraints not implemented */ });
+  it.skip("migrate revert add unique constraint with invalid option", () => {
+    /* unique constraints API not implemented */
+  });
+  it.skip("migrate revert add foreign key with invalid option", () => {
+    /* foreign key reversal not supported */
+  });
+  it.skip("migrate revert add check constraint with invalid option", () => {
+    /* check constraints not implemented */
+  });
 
   it.skip("migrate revert change table", () => {});
 });
-
 
 describe("Reversible Migrations", () => {
   it("change method runs up and reverses on down", async () => {
@@ -341,7 +419,7 @@ describe("Reversible Migrations", () => {
     await migration.run(adapter, "up");
     // Table should exist - insert should work
     await adapter.executeMutation(
-      `INSERT INTO "posts" ("title", "body") VALUES ('Hello', 'World')`
+      `INSERT INTO "posts" ("title", "body") VALUES ('Hello', 'World')`,
     );
     const rows = await adapter.execute(`SELECT * FROM "posts"`);
     expect(rows).toHaveLength(1);

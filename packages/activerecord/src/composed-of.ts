@@ -25,14 +25,12 @@ interface ComposedOfOptions {
 export function composedOf(
   modelClass: typeof Base,
   name: string,
-  options: ComposedOfOptions
+  options: ComposedOfOptions,
 ): void {
   // Getter: read mapped attributes and instantiate the value object
   Object.defineProperty(modelClass.prototype, name, {
     get(this: Base): unknown {
-      const args = options.mapping.map(([modelAttr]) =>
-        this.readAttribute(modelAttr)
-      );
+      const args = options.mapping.map(([modelAttr]) => this.readAttribute(modelAttr));
       // If all args are null, return null
       if (args.every((a) => a === null || a === undefined)) return null;
       return new options.className(...args);

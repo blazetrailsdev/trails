@@ -56,7 +56,8 @@ export class LengthValidator implements Validator {
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (value === null || value === undefined) return;
-    const length = typeof value === "string" ? value.length : Array.isArray(value) ? value.length : 0;
+    const length =
+      typeof value === "string" ? value.length : Array.isArray(value) ? value.length : 0;
 
     const resolveNum = (v: number | (() => number) | undefined): number | undefined => {
       if (v === undefined) return undefined;
@@ -158,7 +159,10 @@ export class NumericalityValidator implements Validator {
     if (this.options.in !== undefined) {
       const [min, max] = this.options.in;
       if (num < min || num > max) {
-        errors.add(attribute, "not_in_range", { message: this.options.message, count: `${min}..${max}` });
+        errors.add(attribute, "not_in_range", {
+          message: this.options.message,
+          count: `${min}..${max}`,
+        });
       }
     }
     if (this.options.odd && num % 2 === 0) {
@@ -183,7 +187,7 @@ export class InclusionValidator implements Validator {
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     // Rails skips when value is nil by default (allow_nil: true)
-    if ((this.options.allowNil !== false) && (value === null || value === undefined)) return;
+    if (this.options.allowNil !== false && (value === null || value === undefined)) return;
     if (this.options.allowBlank && isBlank(value)) return;
     const list = typeof this.options.in === "function" ? this.options.in() : this.options.in;
     if (!list.includes(value)) {
@@ -204,7 +208,7 @@ export class ExclusionValidator implements Validator {
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
-    if ((this.options.allowNil !== false) && (value === null || value === undefined)) return;
+    if (this.options.allowNil !== false && (value === null || value === undefined)) return;
     if (this.options.allowBlank && isBlank(value)) return;
     const list = typeof this.options.in === "function" ? this.options.in() : this.options.in;
     if (list.includes(value)) {
@@ -222,7 +226,9 @@ export interface FormatOptions extends ConditionalOptions {
 export class FormatValidator implements Validator {
   constructor(private options: FormatOptions) {
     if (options.with && options.with.multiline) {
-      throw new Error("The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or pass the `multiline: true` option?");
+      throw new Error(
+        "The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or pass the `multiline: true` option?",
+      );
     }
     if (!options.with && !options.without) {
       throw new Error("Either :with or :without must be supplied (but not both)");
@@ -271,8 +277,8 @@ export class ConfirmationValidator implements Validator {
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
-    const confirmation = record._attributes?.get(`${attribute}_confirmation`) ??
-      record[`${attribute}_confirmation`];
+    const confirmation =
+      record._attributes?.get(`${attribute}_confirmation`) ?? record[`${attribute}_confirmation`];
     if (confirmation === undefined) return;
     const caseSensitive = this.options.caseSensitive ?? true;
     let matches: boolean;
@@ -324,7 +330,10 @@ export class ComparisonValidator implements Validator {
     if (this.options.greaterThanOrEqualTo !== undefined) {
       const target = this.resolve(this.options.greaterThanOrEqualTo, record);
       if (this.compare(value, target) < 0) {
-        errors.add(attribute, "greater_than_or_equal_to", { count: target, message: this.options.message });
+        errors.add(attribute, "greater_than_or_equal_to", {
+          count: target,
+          message: this.options.message,
+        });
       }
     }
     if (this.options.lessThan !== undefined) {
@@ -336,7 +345,10 @@ export class ComparisonValidator implements Validator {
     if (this.options.lessThanOrEqualTo !== undefined) {
       const target = this.resolve(this.options.lessThanOrEqualTo, record);
       if (this.compare(value, target) > 0) {
-        errors.add(attribute, "less_than_or_equal_to", { count: target, message: this.options.message });
+        errors.add(attribute, "less_than_or_equal_to", {
+          count: target,
+          message: this.options.message,
+        });
       }
     }
     if (this.options.equalTo !== undefined) {

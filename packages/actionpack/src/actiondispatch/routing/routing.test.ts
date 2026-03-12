@@ -151,7 +151,9 @@ describe("ActionDispatch::Journey::Router", () => {
     routes.draw((r) => {
       r.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
     });
-    expect(() => routes.pathFor("post_comment", { id: 1 })).toThrow(/Missing required parameter :comment_id/);
+    expect(() => routes.pathFor("post_comment", { id: 1 })).toThrow(
+      /Missing required parameter :comment_id/,
+    );
   });
 
   it("recognize cares about get verbs", () => {
@@ -403,7 +405,9 @@ describe("ActionDispatch::Routing::RouteSet", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.urlFor("post", { id: 1 }, { host: "example.com" })).toBe("http://example.com/posts/1");
+    expect(routes.urlFor("post", { id: 1 }, { host: "example.com" })).toBe(
+      "http://example.com/posts/1",
+    );
   });
 
   it("only_path: false with *_url and global :host option", () => {
@@ -753,7 +757,9 @@ describe("ActionDispatch::Routing::Mapper", () => {
         r.resources("attachments");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/attachments")!.route.controller).toBe("attachments");
+    expect(routes.recognize("GET", "/projects/1/attachments")!.route.controller).toBe(
+      "attachments",
+    );
   });
 
   it("openid", () => {
@@ -964,7 +970,9 @@ describe("ActionDispatch::Routing::Mapper", () => {
         r.resources("participants");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/participants")!.route.controller).toBe("participants");
+    expect(routes.recognize("GET", "/projects/1/participants")!.route.controller).toBe(
+      "participants",
+    );
     expect(routes.recognize("GET", "/projects/1/participants/2")!.route.action).toBe("show");
   });
 
@@ -1516,8 +1524,9 @@ describe("ActionDispatch::Routing::Mapper", () => {
       });
     });
     expect(routes.recognize("GET", "/purchases/315004be7e/Ruby_on_Rails.pdf")).not.toBeNull();
-    expect(routes.pathFor("purchase", { token: "315004be7e", filename: "Ruby_on_Rails.pdf" }))
-      .toBe("/purchases/315004be7e/Ruby_on_Rails.pdf");
+    expect(routes.pathFor("purchase", { token: "315004be7e", filename: "Ruby_on_Rails.pdf" })).toBe(
+      "/purchases/315004be7e/Ruby_on_Rails.pdf",
+    );
   });
 
   it("resources path can be a symbol", () => {
@@ -1623,7 +1632,11 @@ describe("ActionDispatch::Routing::Mapper", () => {
       r.get("/old", { to: r.redirect({ subdomain: "api" }), as: "old" });
     });
     const m = routes.recognize("GET", "/old");
-    const { url } = m!.route.resolveRedirect(m!.params, { method: "GET", path: "/old", host: "www.example.com" });
+    const { url } = m!.route.resolveRedirect(m!.params, {
+      method: "GET",
+      path: "/old",
+      host: "www.example.com",
+    });
     expect(url).toBe("http://api.example.com/old");
   });
 
@@ -1633,7 +1646,11 @@ describe("ActionDispatch::Routing::Mapper", () => {
       r.get("/old", { to: r.redirect({ domain: "other.com", path: "/new" }), as: "old" });
     });
     const m = routes.recognize("GET", "/old");
-    const { url } = m!.route.resolveRedirect(m!.params, { method: "GET", path: "/old", host: "www.example.com" });
+    const { url } = m!.route.resolveRedirect(m!.params, {
+      method: "GET",
+      path: "/old",
+      host: "www.example.com",
+    });
     expect(url).toBe("http://www.other.com/new");
   });
 
@@ -1643,7 +1660,11 @@ describe("ActionDispatch::Routing::Mapper", () => {
       r.get("/old", { to: r.redirect({ path: "/new" }), as: "old" });
     });
     const m = routes.recognize("GET", "/old");
-    const { url } = m!.route.resolveRedirect(m!.params, { method: "GET", path: "/old", host: "www.example.com" });
+    const { url } = m!.route.resolveRedirect(m!.params, {
+      method: "GET",
+      path: "/old",
+      host: "www.example.com",
+    });
     expect(url).toBe("http://www.example.com/new");
   });
 
@@ -1653,7 +1674,11 @@ describe("ActionDispatch::Routing::Mapper", () => {
       r.get("/old", { to: r.redirect({ host: "other.com" }), as: "old" });
     });
     const m = routes.recognize("GET", "/old");
-    const { url } = m!.route.resolveRedirect(m!.params, { method: "GET", path: "/old", host: "www.example.com" });
+    const { url } = m!.route.resolveRedirect(m!.params, {
+      method: "GET",
+      path: "/old",
+      host: "www.example.com",
+    });
     expect(url).toBe("http://other.com/old");
   });
 
@@ -1663,7 +1688,11 @@ describe("ActionDispatch::Routing::Mapper", () => {
       r.get("/posts/:id", { to: r.redirect({ path: "/articles/%{id}" }), as: "old_post" });
     });
     const m = routes.recognize("GET", "/posts/42");
-    const { url } = m!.route.resolveRedirect(m!.params, { method: "GET", path: "/posts/42", host: "example.com" });
+    const { url } = m!.route.resolveRedirect(m!.params, {
+      method: "GET",
+      path: "/posts/42",
+      host: "example.com",
+    });
     expect(url).toBe("http://example.com/articles/42");
   });
 
@@ -1672,7 +1701,11 @@ describe("ActionDispatch::Routing::Mapper", () => {
       redirect: { path: "/new/%{path}" },
     });
     const m = route.match("GET", "/old/a/b/c");
-    const { url } = route.resolveRedirect(m!.params, { method: "GET", path: "/old/a/b/c", host: "example.com" });
+    const { url } = route.resolveRedirect(m!.params, {
+      method: "GET",
+      path: "/old/a/b/c",
+      host: "example.com",
+    });
     expect(url).toBe("http://example.com/new/a/b/c");
   });
 

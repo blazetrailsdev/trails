@@ -3,7 +3,42 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, Relation, Range, transaction, CollectionProxy, association, defineEnum, readEnumValue, RecordNotFound, RecordInvalid, SoleRecordExceeded, ReadOnlyRecord, StrictLoadingViolationError, StaleObjectError, columns, columnNames, reflectOnAssociation, reflectOnAllAssociations, hasSecureToken, serialize, registerModel, composedOf, acceptsNestedAttributesFor, assignNestedAttributes, generatesTokenFor, store, storedAttributes, Migration, Schema, MigrationContext, TableDefinition, delegatedType, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  transaction,
+  CollectionProxy,
+  association,
+  defineEnum,
+  readEnumValue,
+  RecordNotFound,
+  RecordInvalid,
+  SoleRecordExceeded,
+  ReadOnlyRecord,
+  StrictLoadingViolationError,
+  StaleObjectError,
+  columns,
+  columnNames,
+  reflectOnAssociation,
+  reflectOnAllAssociations,
+  hasSecureToken,
+  serialize,
+  registerModel,
+  composedOf,
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  generatesTokenFor,
+  store,
+  storedAttributes,
+  Migration,
+  Schema,
+  MigrationContext,
+  TableDefinition,
+  delegatedType,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -16,7 +51,12 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-import { OrderedOptions, InheritableOptions, Notifications, NotificationEvent } from "@rails-ts/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  Notifications,
+  NotificationEvent,
+} from "@rails-ts/activesupport";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
@@ -38,7 +78,10 @@ describe("DeleteAllTest", () => {
 
   it("delete all removes all records", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -48,7 +91,10 @@ describe("DeleteAllTest", () => {
 
   it("delete all with where", async () => {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
@@ -59,11 +105,17 @@ describe("DeleteAllTest", () => {
 
 describe("DeleteAllTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   function makeModel() {
     class Post extends Base {
-      static { this.attribute("title", "string"); this.attribute("author", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
     }
     return { Post };
   }
@@ -166,7 +218,6 @@ describe("DeleteAllTest", () => {
   });
 });
 
-
 describe("Bulk operations edge cases", () => {
   it("updateAll does not run callbacks", async () => {
     const adapter = freshAdapter();
@@ -177,8 +228,12 @@ describe("Bulk operations edge cases", () => {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
         this.adapter = adapter;
-        this.beforeSave(() => { log.push("before_save"); });
-        this.afterSave(() => { log.push("after_save"); });
+        this.beforeSave(() => {
+          log.push("before_save");
+        });
+        this.afterSave(() => {
+          log.push("after_save");
+        });
       }
     }
 
@@ -207,8 +262,9 @@ describe("Bulk operations edge cases", () => {
 
     const reloaded = await Post.find(post.id);
     // updateAll should NOT auto-bump updated_at
-    expect((reloaded.readAttribute("updated_at") as Date).getTime())
-      .toBe(originalUpdatedAt.getTime());
+    expect((reloaded.readAttribute("updated_at") as Date).getTime()).toBe(
+      originalUpdatedAt.getTime(),
+    );
   });
 
   it("deleteAll does not run callbacks", async () => {
@@ -219,7 +275,9 @@ describe("Bulk operations edge cases", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeDestroy(() => { log.push("before_destroy"); });
+        this.beforeDestroy(() => {
+          log.push("before_destroy");
+        });
       }
     }
 
@@ -238,7 +296,9 @@ describe("Bulk operations edge cases", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterDestroy((r: any) => { log.push(r.readAttribute("name")); });
+        this.afterDestroy((r: any) => {
+          log.push(r.readAttribute("name"));
+        });
       }
     }
 
@@ -284,11 +344,17 @@ describe("Bulk operations edge cases", () => {
 
 describe("Relation Delete All / Update All (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => { adapter = freshAdapter(); });
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("delete all removes all matching records", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ name: "A", active: true });
     await Item.create({ name: "B", active: false });
@@ -305,7 +371,9 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.afterDestroy((r: any) => { log.push(r.readAttribute("name")); });
+        this.afterDestroy((r: any) => {
+          log.push(r.readAttribute("name"));
+        });
       }
     }
     await Item.create({ name: "A" });
@@ -322,7 +390,9 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeDestroy(() => { log.push("destroyed"); });
+        this.beforeDestroy(() => {
+          log.push("destroyed");
+        });
       }
     }
     await Item.create({ name: "A" });
@@ -336,7 +406,9 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        this.beforeSave(() => { log.push("saved"); });
+        this.beforeSave(() => {
+          log.push("saved");
+        });
       }
     }
     await Item.create({ name: "A" });
@@ -347,7 +419,10 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
 
   it("updateAll returns count", async () => {
     class Item extends Base {
-      static { this.attribute("active", "boolean"); this.adapter = adapter; }
+      static {
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ active: true });
     await Item.create({ active: false });
@@ -357,14 +432,20 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
 
   it("deleteAll on empty table returns 0", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     expect(await Item.all().deleteAll()).toBe(0);
   });
 
   it("destroyBy destroys matching records with callbacks", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -376,7 +457,10 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
 
   it("deleteBy deletes matching records without callbacks", async () => {
     class Item extends Base {
-      static { this.attribute("name", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -386,7 +470,10 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
 
   it("static updateAll updates all records", async () => {
     class Item extends Base {
-      static { this.attribute("status", "string"); this.adapter = adapter; }
+      static {
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
     }
     await Item.create({ status: "old" });
     await Item.create({ status: "old" });
