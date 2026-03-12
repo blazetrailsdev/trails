@@ -21,7 +21,7 @@ export class SQLite extends ToSql {
 
     if (node.orders.length > 0) {
       this.collector.append(" ORDER BY ");
-      (this as any).visitArray(node.orders, ", ");
+      this.visitArray(node.orders, ", ");
     }
 
     if (node.limit) {
@@ -61,4 +61,3 @@ export class SQLite extends ToSql {
     return super.quote(value);
   }
 }
-

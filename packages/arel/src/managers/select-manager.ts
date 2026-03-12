@@ -13,6 +13,7 @@ import {
   CrossJoin,
   StringJoin,
 } from "../nodes/join.js";
+import type { Join } from "../nodes/join.js";
 import { Quoted } from "../nodes/quoted.js";
 import { Union, UnionAll, Intersect, Except } from "../nodes/set-operations.js";
 import { With, WithRecursive, TableAlias } from "../nodes/with.js";
@@ -516,19 +517,24 @@ export class SelectManager {
   /**
    * Factory: create a join node.
    */
+  private static readonly defaultJoinConstructor = InnerJoin;
+
+  private static isJoinConstructor(
+    value: unknown,
+  ): value is new (left: Node, right: Node | null) => Join {
+    return typeof value === "function";
+  }
+
   createJoin(
     to: Node,
     constraint?: Node,
-    klass?:
-      | typeof InnerJoin
-      | typeof OuterJoin
-      | typeof RightOuterJoin
-      | typeof FullOuterJoin
-      | typeof CrossJoin
-      | typeof StringJoin,
-  ): Node {
-    const JoinKlass = klass ?? InnerJoin;
-    return new JoinKlass(to, constraint ? new On(constraint) : null) as any;
+    klass?: new (left: Node, right: Node | null) => Join,
+  ): Join {
+    const JoinKlass =
+      klass && SelectManager.isJoinConstructor(klass)
+        ? klass
+        : SelectManager.defaultJoinConstructor;
+    return new JoinKlass(to, constraint ? new On(constraint) : null);
   }
 
   /**

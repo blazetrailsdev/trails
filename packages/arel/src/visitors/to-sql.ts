@@ -1084,7 +1084,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArray(nodes: Node[], separator: string): void {
+  protected visitArray(nodes: Node[], separator: string): void {
     for (let i = 0; i < nodes.length; i++) {
       if (i > 0) this.collector.append(separator);
       this.visit(nodes[i]);

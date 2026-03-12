@@ -21,6 +21,11 @@ export class PostgreSQLWithBinds extends PostgreSQL {
     return super.compile(node);
   }
 
+  override compileWithCollector(node: Node): SQLString {
+    this.bindIndex = 0;
+    return super.compileWithCollector(node);
+  }
+
   protected override visitBindParam(node: Nodes.BindParam): SQLString {
     if (node.value !== undefined) {
       this.collector.append(this.quote(node.value));

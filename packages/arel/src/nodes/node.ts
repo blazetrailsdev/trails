@@ -56,18 +56,30 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
   if (value instanceof Date) return `Date(${value.toISOString()})`;
 
   if (typeof value === "object") {
+    // Use recursion-stack cycle detection (not global "seen"), so repeated/shared references
+    // serialize consistently rather than being misclassified as circular.
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
 
     if (Array.isArray(value)) {
-      return `[${value.map((v) => stableSerialize(v, seen)).join(",")}]`;
+      try {
+        return `[${value.map((v) => stableSerialize(v, seen)).join(",")}]`;
+      } finally {
+        seen.delete(value);
+      }
     }
 
     const obj = value as Record<string, unknown>;
     const ctorName = (value as any).constructor?.name ?? "Object";
     const keys = Object.keys(obj).sort();
-    const body = keys.map((k) => `${JSON.stringify(k)}:${stableSerialize(obj[k], seen)}`).join(",");
-    return `${ctorName}{${body}}`;
+    try {
+      const body = keys
+        .map((k) => `${JSON.stringify(k)}:${stableSerialize(obj[k], seen)}`)
+        .join(",");
+      return `${ctorName}{${body}}`;
+    } finally {
+      seen.delete(value);
+    }
   }
 
   return String(value);
