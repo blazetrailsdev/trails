@@ -41,17 +41,10 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 /**
  * Convert a Ruby test filename to the expected TS filename by convention.
  * Per-package rules:
- *   activerecord: snake_case → kebab-case (finder_test.rb → finder.test.ts)
  *   rack: keep underscores, strip spec_ prefix (spec_request.rb → request.test.ts)
- *   arel: everything → arel.test.ts (single file)
- *   activemodel: everything → activemodel.test.ts (single file)
- *   actiondispatch/actioncontroller: snake_case → kebab-case
+ *   default: snake_case → kebab-case (finder_test.rb → finder.test.ts)
  */
 function rubyFileToConventionTs(rubyFile: string, pkg: string): string {
-  // Single-file packages
-  if (pkg === "arel") return "arel.test.ts";
-  if (pkg === "activemodel") return "activemodel.test.ts";
-
   // Rack: spec_foo.rb → foo.test.ts (keep underscores in basename)
   if (pkg === "rack") {
     const base = path.basename(rubyFile, ".rb");
