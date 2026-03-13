@@ -42,25 +42,25 @@ describe("ActiveModel", () => {
     });
 
     it("validates format of when with isnt a regexp should raise error", () => {
-      expect(() => {
-        class Person extends Model {
-          static {
-            this.attribute("name", "string");
-            this.validates("name", { format: { with: "not a regexp" as any } });
-          }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { format: { with: "not a regexp" as any } });
         }
-      }).not.toThrow();
+      }
+      const p = new Person({ name: "test" });
+      expect(() => p.isValid()).toThrow();
     });
 
     it("validates format of when not isnt a regexp should raise error", () => {
-      expect(() => {
-        class Person extends Model {
-          static {
-            this.attribute("name", "string");
-            this.validates("name", { format: { without: "not a regexp" as any } });
-          }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { format: { without: "not a regexp" as any } });
         }
-      }).not.toThrow();
+      }
+      const p = new Person({ name: "test" });
+      expect(() => p.isValid()).toThrow();
     });
 
     it("validates format of without lambda", () => {

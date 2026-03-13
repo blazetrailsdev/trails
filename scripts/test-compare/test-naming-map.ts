@@ -281,72 +281,142 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
   // ActiveModel — convention handles most; overrides for misc.test.ts and splits
   // ==========================================================================
   activemodel: {
-    "dirty_test.rb": ["dirty.test.ts", "misc.test.ts"],
-    "attributes_dirty_test.rb": ["attributes-dirty.test.ts", "misc.test.ts"],
-    "validations_test.rb": ["validations.test.ts", "misc.test.ts"],
-    "validations/presence_validation_test.rb": ["validations/presence-validation.test.ts"],
+    "dirty_test.rb": [
+      { file: "dirty.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "attributes_dirty_test.rb": [
+      { file: "attributes-dirty.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "validations_test.rb": [
+      { file: "validations.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "validations/presence_validation_test.rb": [
+      { file: "validations/presence-validation.test.ts", describeBlock: "" },
+    ],
     "validations/length_validation_test.rb": [
-      "validations/length-validation.test.ts",
-      "misc.test.ts",
+      { file: "validations/length-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/numericality_validation_test.rb": [
-      "validations/numericality-validation.test.ts",
-      "misc.test.ts",
+      { file: "validations/numericality-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "validations/inclusion_validation_test.rb": ["validations/inclusion-validation.test.ts"],
-    "validations/exclusion_validation_test.rb": ["validations/exclusion-validation.test.ts"],
-    "validations/format_validation_test.rb": ["validations/format-validation.test.ts"],
-    "validations/acceptance_validation_test.rb": ["validations/acceptance-validation.test.ts"],
+    "validations/inclusion_validation_test.rb": [
+      { file: "validations/inclusion-validation.test.ts", describeBlock: "" },
+    ],
+    "validations/exclusion_validation_test.rb": [
+      { file: "validations/exclusion-validation.test.ts", describeBlock: "" },
+    ],
+    "validations/format_validation_test.rb": [
+      { file: "validations/format-validation.test.ts", describeBlock: "" },
+    ],
+    "validations/acceptance_validation_test.rb": [
+      { file: "validations/acceptance-validation.test.ts", describeBlock: "" },
+    ],
     "validations/confirmation_validation_test.rb": [
-      "validations/confirmation-validation.test.ts",
-      "misc.test.ts",
+      { file: "validations/confirmation-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "validations/comparison_validation_test.rb": ["validations/comparison-validation.test.ts"],
-    "validations/callbacks_test.rb": ["validations/callbacks.test.ts"],
-    "validations/absence_validation_test.rb": ["validations/absence-validation.test.ts"],
+    "validations/comparison_validation_test.rb": [
+      { file: "validations/comparison-validation.test.ts", describeBlock: "" },
+    ],
+    "validations/callbacks_test.rb": [{ file: "validations/callbacks.test.ts", describeBlock: "" }],
+    "validations/absence_validation_test.rb": [
+      { file: "validations/absence-validation.test.ts", describeBlock: "" },
+    ],
     "validations/conditional_validation_test.rb": [
-      "validations/conditional-validation.test.ts",
-      "misc.test.ts",
+      { file: "validations/conditional-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "validations/validates_test.rb": ["validations/validates.test.ts", "misc.test.ts"],
-    "validations/validations_context_test.rb": ["validations/validations-context.test.ts"],
-    "validations/with_validation_test.rb": ["validations/with-validation.test.ts"],
+    "validations/validates_test.rb": [
+      { file: "validations/validates.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "validations/validations_context_test.rb": [
+      { file: "validations/validations-context.test.ts", describeBlock: "" },
+    ],
+    "validations/with_validation_test.rb": [
+      { file: "validations/with-validation.test.ts", describeBlock: "" },
+    ],
     "validations/i18n_generate_message_validation_test.rb": [
-      "validations/i18n-generate-message-validation.test.ts",
+      { file: "validations/i18n-generate-message-validation.test.ts", describeBlock: "" },
     ],
-    "validations/i18n_validation_test.rb": ["validations/i18n-validation.test.ts"],
-    "errors_test.rb": ["errors.test.ts", "misc.test.ts"],
-    "error_test.rb": ["error.test.ts", "misc.test.ts"],
-    "nested_error_test.rb": ["nested-error.test.ts"],
-    "callbacks_test.rb": ["callbacks.test.ts", "misc.test.ts"],
-    "naming_test.rb": ["naming.test.ts", "misc.test.ts"],
-    "serialization_test.rb": ["serialization.test.ts", "misc.test.ts"],
-    "attributes_test.rb": ["attributes.test.ts", "misc.test.ts"],
-    "attribute_test.rb": ["attribute.test.ts", "misc.test.ts"],
-    "attribute_registration_test.rb": ["attribute-registration.test.ts"],
-    "attribute_assignment_test.rb": ["attribute-assignment.test.ts", "misc.test.ts"],
-    "access_test.rb": ["access.test.ts"],
-    "model_test.rb": ["model.test.ts", "misc.test.ts"],
-    "api_test.rb": ["api.test.ts", "misc.test.ts"],
-    "conversion_test.rb": ["conversion.test.ts", "misc.test.ts"],
-    "attribute_methods_test.rb": ["attribute-methods.test.ts", "misc.test.ts"],
-    "translation_test.rb": ["translation.test.ts"],
+    "validations/i18n_validation_test.rb": [
+      { file: "validations/i18n-validation.test.ts", describeBlock: "" },
+    ],
+    "errors_test.rb": [
+      { file: "errors.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "error_test.rb": [
+      { file: "error.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "nested_error_test.rb": [{ file: "nested-error.test.ts", describeBlock: "" }],
+    "callbacks_test.rb": [
+      { file: "callbacks.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "naming_test.rb": [
+      { file: "naming.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "serialization_test.rb": [
+      { file: "serialization.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "attributes_test.rb": [
+      { file: "attributes.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "attribute_test.rb": [
+      { file: "attribute.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "attribute_registration_test.rb": [
+      { file: "attribute-registration.test.ts", describeBlock: "" },
+    ],
+    "attribute_assignment_test.rb": [
+      { file: "attribute-assignment.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "access_test.rb": [{ file: "access.test.ts", describeBlock: "" }],
+    "model_test.rb": [
+      { file: "model.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "api_test.rb": [
+      { file: "api.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "conversion_test.rb": [
+      { file: "conversion.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "attribute_methods_test.rb": [
+      { file: "attribute-methods.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
+    ],
+    "translation_test.rb": [{ file: "translation.test.ts", describeBlock: "" }],
     "serializers/json_serialization_test.rb": [
-      "serializers/json-serialization.test.ts",
-      "misc.test.ts",
+      { file: "serializers/json-serialization.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "type/string_test.rb": ["type/value.test.ts"],
-    "type/integer_test.rb": ["type/integer.test.ts"],
-    "type/boolean_test.rb": ["type/boolean.test.ts"],
-    "type/date_test.rb": ["type/date.test.ts"],
-    "type/date_time_test.rb": ["type/date-time.test.ts"],
-    "type/decimal_test.rb": ["type/decimal.test.ts"],
-    "type/registry_test.rb": ["type/registry.test.ts"],
-    "type/big_integer_test.rb": ["type/big-integer.test.ts"],
-    "type/float_test.rb": ["type/float.test.ts"],
-    "type/time_test.rb": ["type/date-time.test.ts"],
-    "type/value_test.rb": ["type/value.test.ts"],
-    "type/immutable_string_test.rb": ["type/immutable-string.test.ts"],
+    "type/string_test.rb": [{ file: "type/value.test.ts", describeBlock: "" }],
+    "type/integer_test.rb": [{ file: "type/integer.test.ts", describeBlock: "" }],
+    "type/boolean_test.rb": [{ file: "type/boolean.test.ts", describeBlock: "" }],
+    "type/date_test.rb": [{ file: "type/date.test.ts", describeBlock: "" }],
+    "type/date_time_test.rb": [{ file: "type/date-time.test.ts", describeBlock: "" }],
+    "type/decimal_test.rb": [{ file: "type/decimal.test.ts", describeBlock: "" }],
+    "type/registry_test.rb": [{ file: "type/registry.test.ts", describeBlock: "" }],
+    "type/big_integer_test.rb": [{ file: "type/big-integer.test.ts", describeBlock: "" }],
+    "type/float_test.rb": [{ file: "type/float.test.ts", describeBlock: "" }],
+    "type/time_test.rb": [{ file: "type/date-time.test.ts", describeBlock: "" }],
+    "type/value_test.rb": [{ file: "type/value.test.ts", describeBlock: "" }],
+    "type/immutable_string_test.rb": [{ file: "type/immutable-string.test.ts", describeBlock: "" }],
   },
 
   // ==========================================================================
