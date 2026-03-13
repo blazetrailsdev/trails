@@ -125,6 +125,17 @@ jobs:
         with:
           ruby-version: "3.3"
       - run: npm ci
-      - run: npm run api:compare
-      - run: npm run test:compare
-      - run: npm run convention:compare
+      - name: Fetch Rails source
+        run: bash scripts/api-compare/fetch-rails.sh
+      - name: Fetch Rails test source + Rack
+        run: bash scripts/test-compare/fetch-rails-tests.sh
+      - name: Extract Ruby API
+        run: cd scripts/api-compare && ruby extract-ruby-api.rb
+      - name: Extract Ruby tests
+        run: cd scripts/test-compare && ruby extract-ruby-tests.rb
+      - name: API comparison
+        run: cd scripts/api-compare && npx tsx extract-ts-api.ts && npx tsx compare.ts
+      - name: Test comparison
+        run: cd scripts/test-compare && npx tsx extract-ts-tests.ts && npx tsx compare.ts
+      - name: Convention comparison
+        run: cd scripts/test-compare && npx tsx convention-compare.ts
