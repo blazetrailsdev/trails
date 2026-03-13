@@ -186,7 +186,7 @@ describe("ActiveModel", () => {
       expect(new Person({ value: "5" }).isValid()).toBe(true);
       const f = new Person({ value: "5.5" });
       expect(f.isValid()).toBe(false);
-      expect(f.errors.get("value")).toContain("is not an integer");
+      expect(f.errors.get("value")).toContain("must be an integer");
     });
 
     it("validates numericality with greater than", () => {

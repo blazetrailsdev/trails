@@ -77,13 +77,13 @@ describe("Validations", () => {
       it("validates length of using minimum", () => {
         const w = new WithLength({ name: "ab" });
         expect(w.isValid()).toBe(false);
-        expect(w.errors.get("name")).toContain("is too short");
+        expect(w.errors.get("name")[0]).toMatch(/is too short/);
       });
 
       it("validates length of using maximum", () => {
         const w = new WithLength({ name: "abcdefghijk" });
         expect(w.isValid()).toBe(false);
-        expect(w.errors.get("name")).toContain("is too long");
+        expect(w.errors.get("name")[0]).toMatch(/is too long/);
       });
 
       it("validates length of using within", () => {
@@ -303,7 +303,7 @@ describe("Validations", () => {
       it("rejects mismatched password and confirmation", () => {
         const s = new Signup({ password: "secret", passwordConfirmation: "wrong" });
         expect(s.isValid()).toBe(false);
-        expect(s.errors.get("password")).toContain("doesn't match confirmation");
+        expect(s.errors.get("password")).toContain("doesn't match Password");
       });
     });
 

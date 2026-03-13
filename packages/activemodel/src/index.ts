@@ -1,4 +1,5 @@
 export { Model } from "./model.js";
+export { I18n } from "./i18n.js";
 export { Errors, NestedError } from "./errors.js";
 export { ModelName } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";

@@ -98,7 +98,7 @@ describe("ActiveModel", () => {
     });
 
     it("translated nested model attributes", () => {
-      expect(Model.humanAttributeName("parent_id")).toBe("Parent id");
+      expect(Model.humanAttributeName("parent_id")).toBe("Parent");
     });
 
     it("translated nested model attributes with namespace fallback", () => {

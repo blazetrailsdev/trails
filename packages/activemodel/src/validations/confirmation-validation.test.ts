@@ -62,7 +62,7 @@ describe("ActiveModel", () => {
       }
       const p = new Person({ title: "A", titleConfirmation: "B" });
       expect(p.isValid()).toBe(false);
-      expect(p.errors.get("title")).toContain("doesn't match confirmation");
+      expect(p.errors.get("title")).toContain("doesn't match Title");
     });
 
     it("title confirmation", () => {
