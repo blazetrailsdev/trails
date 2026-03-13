@@ -24,4 +24,22 @@ export default defineConfig(
       "no-useless-assignment": "off", // 40 violations
     },
   },
+  // Arel package: all lint rules are resolved — enforce them to prevent regressions
+  {
+    files: ["packages/arel/src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unused-expressions": "error",
+      "@typescript-eslint/no-unsafe-function-type": "error",
+      "@typescript-eslint/no-this-alias": "error",
+      "no-undef": "error",
+      "no-empty": "error",
+      "no-cond-assign": "error",
+      "no-useless-assignment": "error",
+    },
+  },
 );
