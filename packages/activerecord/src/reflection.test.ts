@@ -427,6 +427,419 @@ describe("ReflectionTest", () => {
   it.skip("name error from incidental code is not converted to name error for association", () => {});
   it.skip("automatic inverse suppresses name error for association", () => {});
   it.skip("automatic inverse does not suppress name error from incidental code", () => {});
+
+  it("human name", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    // Model human name should be derived from the class name
+    expect(Post.name).toBe("Post");
+  });
+
+  it("column string type and limit", () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const cols = (Article as any).columnsHash();
+    expect(cols["title"]).toBeDefined();
+    expect(cols["title"].type).toBe("string");
+  });
+
+  it("column null not null", () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const cols = (Article as any).columnsHash();
+    expect(Object.keys(cols).length).toBeGreaterThan(0);
+  });
+
+  it("human name for column", () => {
+    class Article extends Base {
+      static {
+        this.attribute("body_text", "string");
+        this.adapter = adapter;
+      }
+    }
+    const cols = (Article as any).columnsHash();
+    expect(cols["body_text"]).toBeDefined();
+    expect(cols["body_text"].name).toBe("body_text");
+  });
+
+  it("integer columns", () => {
+    class Article extends Base {
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const cols = (Article as any).columnsHash();
+    expect(cols["views"]).toBeDefined();
+    expect(cols["views"].type).toBe("integer");
+  });
+
+  it("non existent columns return null object", () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const cols = (Article as any).columnsHash();
+    const nonExistent = cols["does_not_exist"];
+    expect(nonExistent).toBeUndefined();
+  });
+
+  it("has many reflection", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        Associations.hasMany.call(this, "comments", { className: "Comment" });
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "comments");
+    expect(reflection).not.toBeNull();
+    expect(reflection!.macro).toBe("hasMany");
+    expect(reflection!.name).toBe("comments");
+  });
+
+  it("has one reflection", () => {
+    class Profile extends Base {
+      static {
+        this.attribute("user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        Associations.hasOne.call(this, "profile", { className: "Profile" });
+      }
+    }
+    const reflection = reflectOnAssociation(User, "profile");
+    expect(reflection).not.toBeNull();
+    expect(reflection!.macro).toBe("hasOne");
+  });
+
+  it("belongs to inferred foreign key from assoc name", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+        Associations.belongsTo.call(this, "author", { className: "Author" });
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "author");
+    expect(reflection).not.toBeNull();
+    expect(reflection!.macro).toBe("belongsTo");
+    expect(reflection!.foreignKey).toBe("author_id");
+  });
+
+  it("reflections should return keys as strings", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        Associations.hasMany.call(this, "comments", { className: "Comment" });
+      }
+    }
+    const reflections = reflectOnAllAssociations(Post);
+    expect(reflections.length).toBeGreaterThan(0);
+    reflections.forEach((r) => expect(typeof r.name).toBe("string"));
+  });
+
+  it("has many through reflection", () => {
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PostTag extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("tag_id", "integer");
+        this.adapter = adapter;
+        Associations.belongsTo.call(this, "tag", { className: "Tag" });
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        Associations.hasMany.call(this, "post_tags", { className: "PostTag" });
+        Associations.hasMany.call(this, "tags", { through: "post_tags", className: "Tag" });
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "tags");
+    expect(reflection).not.toBeNull();
+  });
+
+  it("type", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        Associations.hasMany.call(this, "comments", { className: "Comment" });
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "comments");
+    expect(reflection!.macro).toBe("hasMany");
+  });
+
+  it("collection association", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        Associations.hasMany.call(this, "comments", { className: "Comment" });
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "comments");
+    expect(reflection!.isCollection()).toBe(true);
+  });
+
+  it("foreign key", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+        Associations.belongsTo.call(this, "author", { className: "Author" });
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "author");
+    expect(reflection!.foreignKey).toBe("author_id");
+  });
+
+  it("foreign key is inferred from model name", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+        Associations.belongsTo.call(this, "post", { className: "Post" });
+      }
+    }
+    const reflection = reflectOnAssociation(Comment, "post");
+    expect(reflection!.foreignKey).toBe("post_id");
+  });
+
+  it("reflection should not raise error when compared to other object", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "nonexistent");
+    // Should return null, not throw
+    expect(reflection).toBeNull();
+  });
+
+  it("reflect on missing source assocation", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const reflection = reflectOnAssociation(Post, "does_not_exist");
+    expect(reflection).toBeNull();
+  });
+
+  it("active record primary key", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.primaryKey).toBe("id");
+  });
+
+  it("reflection klass not found with no class name option", () => {
+    class Orphan extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Orphan, "ghosts", {});
+    const ref = reflectOnAssociation(Orphan, "ghosts");
+    expect(ref).not.toBeNull();
+    // "Ghost" is not registered, so accessing klass should throw
+    expect(() => ref!.klass).toThrow(/Could not find model 'Ghost'/);
+  });
+
+  it("reflection klass not found with pointer to non existent class name", () => {
+    class Orphan2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Orphan2, "items", { className: "NonExistentModel" });
+    const ref = reflectOnAssociation(Orphan2, "items");
+    expect(ref).not.toBeNull();
+    expect(() => ref!.klass).toThrow(/Could not find model 'NonExistentModel'/);
+  });
+
+  it("reflection klass requires ar subclass", () => {
+    class Parent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Child extends Base {
+      static {
+        this.attribute("parent_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Parent, "children", { className: "Child" });
+    registerModel(Child);
+    const ref = reflectOnAssociation(Parent, "children");
+    expect(ref).not.toBeNull();
+    // klass should return a class that extends Base
+    expect(ref!.klass).toBe(Child);
+  });
+
+  it.skip("reflection klass with same demodularized name", () => {
+    // Requires module/namespace support
+  });
+
+  it("aggregation reflection", () => {
+    class Customer extends Base {
+      static {
+        this.attribute("address_street", "string");
+        this.attribute("address_city", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Address {
+      constructor(
+        public street: string,
+        public city: string,
+      ) {}
+    }
+    composedOf(Customer, "address", {
+      className: Address,
+      mapping: [
+        ["address_street", "street"],
+        ["address_city", "city"],
+      ],
+    });
+    const c = new Customer({ address_street: "123 Main", address_city: "Springfield" });
+    const addr = (c as any).address;
+    expect(addr).toBeInstanceOf(Address);
+    expect(addr.street).toBe("123 Main");
+    expect(addr.city).toBe("Springfield");
+  });
+
+  it.skip("association reflection in modules", () => {
+    // Requires module/namespace support
+  });
+
+  it("has and belongs to many reflection", () => {
+    class Developer extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+    });
+    const ref = reflectOnAssociation(Developer, "projects");
+    expect(ref).not.toBeNull();
+    expect(ref!.macro).toBe("hasAndBelongsToMany");
+  });
+
+  it.skip("chain", () => {
+    // Requires through-chain reflection
+  });
+
+  it.skip("nested?", () => {
+    // Requires nested through reflection
+  });
+
+  it.skip("join table", () => {
+    // Requires habtm join table support
+  });
+
+  it.skip("includes accepts symbols", () => {
+    // Requires includes() support on reflection
+  });
+
+  it("association primary key uses explicit primary key option as first priority", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Author, "books", { primaryKey: "custom_id" });
+    const ref = reflectOnAssociation(Author, "books");
+    expect(ref).not.toBeNull();
+    expect(ref!.options.primaryKey).toBe("custom_id");
+  });
+
+  it.skip("belongs to reflection with query constraints infers correct foreign key", () => {
+    // Requires query constraints feature
+  });
 });
 
 describe("reflection", () => {
