@@ -5,8 +5,6 @@ export * as Collectors from "./collectors/index.js";
 export { SelectManager, InsertManager, UpdateManager, DeleteManager } from "./managers/index.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
-import { NamedFunction } from "./nodes/named-function.js";
-import { Node } from "./nodes/node.js";
 
 /**
  * Arel.sql() — escape hatch for raw SQL.

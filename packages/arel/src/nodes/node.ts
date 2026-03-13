@@ -13,7 +13,11 @@ export abstract class Node {
    */
   eql(other: unknown): boolean {
     if (!other || typeof other !== "object") return false;
-    if ((other as any).constructor !== (this as any).constructor) return false;
+    if (
+      (other as { constructor: unknown }).constructor !==
+      (this as { constructor: unknown }).constructor
+    )
+      return false;
     return stableSerialize(this) === stableSerialize(other);
   }
 
@@ -70,7 +74,7 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
     }
 
     const obj = value as Record<string, unknown>;
-    const ctorName = (value as any).constructor?.name ?? "Object";
+    const ctorName = (value as { constructor?: { name?: string } }).constructor?.name ?? "Object";
     const keys = Object.keys(obj).sort();
     try {
       const body = keys

@@ -21,7 +21,8 @@ export class Case extends Node {
 
   when(condition: Node | unknown, result?: Node | unknown): Case {
     const c = new Case(this.operand ?? undefined);
-    (c as any).conditions = [...this.conditions];
+    type MutableCase = { conditions: Array<{ when: Node; then: Node }>; defaultValue: Node | null };
+    (c as unknown as MutableCase).conditions = [...this.conditions];
     const whenNode = condition instanceof Node ? condition : new SqlLiteral(String(condition));
     const thenNode =
       result instanceof Node
@@ -36,13 +37,14 @@ export class Case extends Node {
                   : String(result),
           );
     c.conditions.push({ when: whenNode, then: thenNode });
-    (c as any).defaultValue = this.defaultValue;
+    (c as unknown as MutableCase).defaultValue = this.defaultValue;
     return c;
   }
 
   else(result: Node | unknown): Case {
     const c = new Case(this.operand ?? undefined);
-    (c as any).conditions = [...this.conditions];
+    type MutableCase = { conditions: Array<{ when: Node; then: Node }>; defaultValue: Node | null };
+    (c as unknown as MutableCase).conditions = [...this.conditions];
     const elseNode =
       result instanceof Node
         ? result
@@ -55,7 +57,7 @@ export class Case extends Node {
                   ? `'${result.replace(/'/g, "''")}'`
                   : String(result),
           );
-    (c as any).defaultValue = elseNode;
+    (c as unknown as MutableCase).defaultValue = elseNode;
     return c;
   }
 

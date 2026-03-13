@@ -441,8 +441,8 @@ export class ToSql implements NodeVisitor<SQLString> {
       node.right &&
       typeof node.right === "object" &&
       !Array.isArray(node.right) &&
-      "ast" in (node.right as any) &&
-      "toSql" in (node.right as any)
+      "ast" in (node.right as unknown as Record<string, unknown>) &&
+      "toSql" in (node.right as unknown as Record<string, unknown>)
     ) {
       this.collector.append(" IN ");
       this.visitNodeOrValue(node.right);
@@ -1019,7 +1019,7 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   private visitSqlLiteral(node: Nodes.SqlLiteral): SQLString {
-    if (!(node as any).retryableFlag) {
+    if (!(node as { retryableFlag?: boolean }).retryableFlag) {
       this.collector.retryable = false;
     }
     this.collector.append(node.value);
@@ -1056,7 +1056,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     // Duck-type check for SelectManager (not a Node, but has ast/toSql)
     if (v !== null && v !== undefined && typeof v === "object" && "ast" in v && "toSql" in v) {
       this.collector.append("(");
-      this.visit((v as any).ast);
+      this.visit((v as { ast: Node }).ast);
       this.collector.append(")");
       return this.collector;
     }
@@ -1064,7 +1064,7 @@ export class ToSql implements NodeVisitor<SQLString> {
       // Duck-type check to avoid circular dependency (SelectManager → ToSql → SelectManager)
       if ("ast" in v && "toSql" in v) {
         this.collector.append("(");
-        this.visit((v as any).ast);
+        this.visit((v as unknown as { ast: Node }).ast);
         this.collector.append(")");
         return this.collector;
       }
@@ -1090,9 +1090,9 @@ export class ToSql implements NodeVisitor<SQLString> {
       typeof v === "object" &&
       v !== null &&
       "toISOString" in v &&
-      typeof (v as any).toISOString === "function"
+      typeof (v as { toISOString: unknown }).toISOString === "function"
     ) {
-      this.collector.append(`'${(v as any).toISOString()}'`);
+      this.collector.append(`'${(v as { toISOString: () => string }).toISOString()}'`);
     } else {
       this.collector.append(String(v));
     }
@@ -1121,9 +1121,9 @@ export class ToSql implements NodeVisitor<SQLString> {
       typeof value === "object" &&
       value !== null &&
       "toISOString" in value &&
-      typeof (value as any).toISOString === "function"
+      typeof (value as { toISOString: unknown }).toISOString === "function"
     ) {
-      return `'${(value as any).toISOString()}'`;
+      return `'${(value as { toISOString: () => string }).toISOString()}'`;
     }
     const escaped = String(value).replace(/'/g, "''");
     return `'${escaped}'`;

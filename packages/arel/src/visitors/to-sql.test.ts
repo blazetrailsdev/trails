@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   Table,
-  sql,
   star,
   SelectManager,
   InsertManager,
@@ -15,7 +14,6 @@ import {
 describe("Arel", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
 
   describe("to-sql", () => {
     it("should handle nil", () => {
@@ -237,7 +235,7 @@ describe("Arel", () => {
     });
 
     it("ignores excess named parameters", () => {
-      const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1, extra: 2 } as any);
+      const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1, extra: 2 });
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("1");
     });
@@ -262,7 +260,7 @@ describe("Arel", () => {
     });
 
     it("quotes nested arrays", () => {
-      const node = users.get("id").in([[1, 2] as any]);
+      const node = users.get("id").in([[1, 2] as unknown[]]);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("'1,2'");
     });
@@ -307,7 +305,7 @@ describe("Arel", () => {
     });
 
     it("requires all named bind params to be supplied", () => {
-      expect(() => new Nodes.BoundSqlLiteral("id = :id", [], {} as any)).toThrow();
+      expect(() => new Nodes.BoundSqlLiteral("id = :id", [], {})).toThrow();
     });
 
     it("requires positional binds to match the placeholders", () => {
@@ -669,7 +667,7 @@ describe("Arel", () => {
     });
 
     it("will only consider named binds starting with a letter", () => {
-      const node = new Nodes.BoundSqlLiteral("x = :_bad", [], { _bad: 1 } as any);
+      const node = new Nodes.BoundSqlLiteral("x = :_bad", [], { _bad: 1 });
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain(":_bad");
       expect(sql).not.toContain("1");
@@ -700,7 +698,7 @@ describe("Arel", () => {
     });
 
     it("works with array values", () => {
-      const node = users.get("tags").eq([1, 2] as any);
+      const node = users.get("tags").eq([1, 2]);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("'1,2'");
     });

@@ -16,7 +16,7 @@ export class Dot {
       if (existing) return existing;
       const id = `n${nextId++}`;
       seen.set(obj, id);
-      const label = (obj as any).constructor?.name ?? "Object";
+      const label = (obj as { constructor?: { name?: string } }).constructor?.name ?? "Object";
       lines.push(`  ${id} [label=${JSON.stringify(label)}];`);
       return id;
     };
@@ -31,8 +31,8 @@ export class Dot {
           lines.push(`  ${parentId} -> ${childId};`);
         }
 
-        for (const key of Object.keys(value as any)) {
-          visit((value as any)[key], value);
+        for (const key of Object.keys(value as unknown as Record<string, unknown>)) {
+          visit((value as unknown as Record<string, unknown>)[key], value);
         }
         return;
       }
@@ -43,8 +43,8 @@ export class Dot {
       }
 
       // Plain objects: walk values (best-effort).
-      for (const key of Object.keys(value as any)) {
-        visit((value as any)[key], parent);
+      for (const key of Object.keys(value as unknown as Record<string, unknown>)) {
+        visit((value as unknown as Record<string, unknown>)[key], parent);
       }
     };
 

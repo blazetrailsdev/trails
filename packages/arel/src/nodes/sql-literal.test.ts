@@ -1,22 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Table,
-  sql,
-  star,
-  SelectManager,
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Visitors,
-  Collectors,
-} from "../index.js";
+import { describe, it, expect } from "vitest";
+import { Nodes, Visitors } from "../index.js";
 
 describe("Arel", () => {
-  const users = new Table("users");
-  const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
-
   describe("sql-literal", () => {
     it("makes a sql literal node", () => {
       const node = new Nodes.SqlLiteral("NOW()");
@@ -33,7 +18,6 @@ describe("Arel", () => {
 
     it("makes a distinct node", () => {
       const lit = new Nodes.SqlLiteral("zomg");
-      const dist = new Nodes.Distinct();
       const count = new Nodes.NamedFunction("COUNT", [lit], undefined, true);
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(count)).toBe("COUNT(DISTINCT zomg)");

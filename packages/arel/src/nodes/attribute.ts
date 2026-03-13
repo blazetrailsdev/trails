@@ -123,16 +123,16 @@ export class Attribute extends Node {
     return new DoesNotMatch(this, buildQuoted(pattern), escape);
   }
 
-  in(values: unknown[] | any): In {
+  in(values: unknown[] | { ast: Node }): In {
     // Support SelectManager as subquery
     if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
-      return new In(this, values as any);
+      return new In(this, values as unknown as Node);
     }
-    return new In(this, (values as unknown[]).map(buildQuoted) as any);
+    return new In(this, values.map(buildQuoted) as unknown as Node);
   }
 
   notIn(values: unknown[]): NotIn {
-    return new NotIn(this, values.map(buildQuoted) as any);
+    return new NotIn(this, values.map(buildQuoted) as unknown as Node);
   }
 
   between(range: [unknown, unknown]): Between | LessThanOrEqual | GreaterThanOrEqual | True;
@@ -155,12 +155,12 @@ export class Attribute extends Node {
       beginOrRange !== null &&
       !Array.isArray(beginOrRange) &&
       !(beginOrRange instanceof Node) &&
-      "begin" in (beginOrRange as any) &&
-      "end" in (beginOrRange as any) &&
+      "begin" in (beginOrRange as Record<string, unknown>) &&
+      "end" in (beginOrRange as Record<string, unknown>) &&
       end === undefined
     ) {
-      beginVal = (beginOrRange as any).begin;
-      endVal = (beginOrRange as any).end;
+      beginVal = (beginOrRange as { begin: unknown; end: unknown }).begin;
+      endVal = (beginOrRange as { begin: unknown; end: unknown }).end;
     } else {
       beginVal = beginOrRange;
       endVal = end;

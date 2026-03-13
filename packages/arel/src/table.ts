@@ -2,7 +2,7 @@ import { Attribute } from "./nodes/attribute.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./managers/select-manager.js";
-import { InnerJoin, OuterJoin, StringJoin } from "./nodes/join.js";
+import { InnerJoin, StringJoin } from "./nodes/join.js";
 import { On } from "./nodes/unary.js";
 import { TableAlias } from "./nodes/with.js";
 import { True, False } from "./nodes/true-false.js";
@@ -100,7 +100,7 @@ export class Table extends Node {
    *
    * Mirrors: Arel::Table#join
    */
-  join(relation: Node | string, klass?: typeof InnerJoin): SelectManager {
+  join(relation: Node | string, _klass?: typeof InnerJoin): SelectManager {
     const manager = new SelectManager(this);
     manager.join(relation);
     return manager;

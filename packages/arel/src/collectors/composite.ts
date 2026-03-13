@@ -35,7 +35,7 @@ export class Composite {
 
   set retryable(value: boolean) {
     for (const c of this.collectors) {
-      if ("retryable" in c) (c as any).retryable = value;
+      if ("retryable" in c) (c as CollectorLike & { retryable: boolean }).retryable = value;
     }
   }
 }

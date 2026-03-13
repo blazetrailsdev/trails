@@ -1,22 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Table,
-  sql,
-  star,
-  SelectManager,
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Visitors,
-  Collectors,
-} from "../index.js";
+import { describe, it, expect } from "vitest";
+import { Nodes } from "../index.js";
 
 describe("Arel", () => {
-  const users = new Table("users");
-  const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
-
   describe("bound-sql-literal", () => {
     it("is equal with equal components", () => {
       const a = new Nodes.BoundSqlLiteral("id = ?", [1]);
