@@ -654,17 +654,8 @@ describe("CompositePrimaryKeyTest", () => {
     expect(o.isPersisted()).toBe(true);
   });
 
-  it("assigning a non array value to model with composite primary key raises", () => {
-    class Order extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
-      }
-    }
-    expect(Order.compositePrimaryKey).toBe(true);
-    expect(Order.primaryKey).toEqual(["shop_id", "id"]);
+  it.skip("assigning a non array value to model with composite primary key raises", () => {
+    // Needs id= setter to validate array values for composite PKs
   });
 
   it("composite primary key returns array id", async () => {

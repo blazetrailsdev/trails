@@ -427,192 +427,6 @@ describe("ReflectionTest", () => {
   it.skip("name error from incidental code is not converted to name error for association", () => {});
   it.skip("automatic inverse suppresses name error for association", () => {});
   it.skip("automatic inverse does not suppress name error from incidental code", () => {});
-});
-
-describe("reflection", () => {
-  it("returns columns for a model", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("email", "string");
-
-    const cols = columns(User);
-    expect(cols.length).toBe(3);
-    expect(cols.map((c) => c.name)).toEqual(["id", "name", "email"]);
-  });
-
-  it("returns column names for a model", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    expect(columnNames(User)).toEqual(["id", "name"]);
-  });
-
-  it("reflects on a specific association", () => {
-    class Author extends Base {
-      static _tableName = "authors";
-    }
-    Author.attribute("id", "integer");
-
-    class Book extends Base {
-      static _tableName = "books";
-    }
-    Book.attribute("id", "integer");
-    Book.attribute("author_id", "integer");
-    Associations.belongsTo.call(Book, "author");
-
-    const ref = reflectOnAssociation(Book, "author");
-    expect(ref).not.toBeNull();
-    expect(ref!.macro).toBe("belongsTo");
-    expect(ref!.foreignKey).toBe("author_id");
-    expect(ref!.className).toBe("Author");
-  });
-
-  it("reflects on all associations", () => {
-    const adapter = freshAdapter();
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("user_id", "integer");
-    Post.adapter = adapter;
-    Associations.belongsTo.call(Post, "user");
-    Associations.hasMany.call(Post, "comments");
-
-    const all = reflectOnAllAssociations(Post);
-    expect(all.length).toBe(2);
-
-    const belongsTos = reflectOnAllAssociations(Post, "belongsTo");
-    expect(belongsTos.length).toBe(1);
-    expect(belongsTos[0].name).toBe("user");
-  });
-});
-
-describe("Reflection (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  // Rails: test "columns"
-  it("columns", () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.attribute("active", "boolean");
-        this.adapter = adapter;
-      }
-    }
-
-    const cols = columns(Person);
-    expect(cols.length).toBe(4);
-    expect(cols.map((c) => c.name)).toEqual(["id", "name", "age", "active"]);
-  });
-
-  // Rails: test "column_names"
-  it("read attribute names", () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-
-    expect(columnNames(Person)).toEqual(["id", "name"]);
-  });
-
-  // Rails: test "reflect_on_association"
-  it("reflectOnAssociation returns metadata about a specific association", () => {
-    class Author extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-
-    class Post extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.belongsTo.call(Post, "author");
-    Associations.hasMany.call(Post, "comments");
-
-    const ref = reflectOnAssociation(Post, "author");
-    expect(ref).not.toBeNull();
-    expect(ref!.macro).toBe("belongsTo");
-    expect(ref!.foreignKey).toBe("author_id");
-    expect(ref!.className).toBe("Author");
-    expect(ref!.isBelongsTo()).toBe(true);
-
-    const commRef = reflectOnAssociation(Post, "comments");
-    expect(commRef).not.toBeNull();
-    expect(commRef!.macro).toBe("hasMany");
-    expect(commRef!.isCollection()).toBe(true);
-  });
-
-  // Rails: test "reflect_on_all_associations"
-  it("reflectOnAllAssociations returns all or filtered by macro", () => {
-    class User extends Base {
-      static {
-        this._tableName = "users";
-        this.attribute("id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(User, "posts");
-    Associations.hasMany.call(User, "comments");
-    Associations.hasOne.call(User, "profile");
-
-    const all = reflectOnAllAssociations(User);
-    expect(all.length).toBe(3);
-
-    const hasManys = reflectOnAllAssociations(User, "hasMany");
-    expect(hasManys.length).toBe(2);
-
-    const hasOnes = reflectOnAllAssociations(User, "hasOne");
-    expect(hasOnes.length).toBe(1);
-    expect(hasOnes[0].name).toBe("profile");
-  });
-
-  // Rails: test "reflect_on_association returns nil for unknown"
-  it("reflectOnAssociation returns null for non-existent association", () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    expect(reflectOnAssociation(Person, "nonexistent")).toBeNull();
-  });
-});
-
-// ==========================================================================
-// ReflectionTest — targets reflection_test.rb
-// ==========================================================================
-describe("ReflectionTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
 
   it("human name", () => {
     class Post extends Base {
@@ -1025,5 +839,180 @@ describe("ReflectionTest", () => {
 
   it.skip("belongs to reflection with query constraints infers correct foreign key", () => {
     // Requires query constraints feature
+  });
+});
+
+describe("reflection", () => {
+  it("returns columns for a model", () => {
+    class User extends Base {
+      static _tableName = "users";
+    }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+    User.attribute("email", "string");
+
+    const cols = columns(User);
+    expect(cols.length).toBe(3);
+    expect(cols.map((c) => c.name)).toEqual(["id", "name", "email"]);
+  });
+
+  it("returns column names for a model", () => {
+    class User extends Base {
+      static _tableName = "users";
+    }
+    User.attribute("id", "integer");
+    User.attribute("name", "string");
+
+    expect(columnNames(User)).toEqual(["id", "name"]);
+  });
+
+  it("reflects on a specific association", () => {
+    class Author extends Base {
+      static _tableName = "authors";
+    }
+    Author.attribute("id", "integer");
+
+    class Book extends Base {
+      static _tableName = "books";
+    }
+    Book.attribute("id", "integer");
+    Book.attribute("author_id", "integer");
+    Associations.belongsTo.call(Book, "author");
+
+    const ref = reflectOnAssociation(Book, "author");
+    expect(ref).not.toBeNull();
+    expect(ref!.macro).toBe("belongsTo");
+    expect(ref!.foreignKey).toBe("author_id");
+    expect(ref!.className).toBe("Author");
+  });
+
+  it("reflects on all associations", () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("user_id", "integer");
+    Post.adapter = adapter;
+    Associations.belongsTo.call(Post, "user");
+    Associations.hasMany.call(Post, "comments");
+
+    const all = reflectOnAllAssociations(Post);
+    expect(all.length).toBe(2);
+
+    const belongsTos = reflectOnAllAssociations(Post, "belongsTo");
+    expect(belongsTos.length).toBe(1);
+    expect(belongsTos[0].name).toBe("user");
+  });
+});
+
+describe("Reflection (Rails-guided)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  // Rails: test "columns"
+  it("columns", () => {
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
+    }
+
+    const cols = columns(Person);
+    expect(cols.length).toBe(4);
+    expect(cols.map((c) => c.name)).toEqual(["id", "name", "age", "active"]);
+  });
+
+  // Rails: test "column_names"
+  it("read attribute names", () => {
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    expect(columnNames(Person)).toEqual(["id", "name"]);
+  });
+
+  // Rails: test "reflect_on_association"
+  it("reflectOnAssociation returns metadata about a specific association", () => {
+    class Author extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Author);
+
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Post, "author");
+    Associations.hasMany.call(Post, "comments");
+
+    const ref = reflectOnAssociation(Post, "author");
+    expect(ref).not.toBeNull();
+    expect(ref!.macro).toBe("belongsTo");
+    expect(ref!.foreignKey).toBe("author_id");
+    expect(ref!.className).toBe("Author");
+    expect(ref!.isBelongsTo()).toBe(true);
+
+    const commRef = reflectOnAssociation(Post, "comments");
+    expect(commRef).not.toBeNull();
+    expect(commRef!.macro).toBe("hasMany");
+    expect(commRef!.isCollection()).toBe(true);
+  });
+
+  // Rails: test "reflect_on_all_associations"
+  it("reflectOnAllAssociations returns all or filtered by macro", () => {
+    class User extends Base {
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(User, "posts");
+    Associations.hasMany.call(User, "comments");
+    Associations.hasOne.call(User, "profile");
+
+    const all = reflectOnAllAssociations(User);
+    expect(all.length).toBe(3);
+
+    const hasManys = reflectOnAllAssociations(User, "hasMany");
+    expect(hasManys.length).toBe(2);
+
+    const hasOnes = reflectOnAllAssociations(User, "hasOne");
+    expect(hasOnes.length).toBe(1);
+    expect(hasOnes[0].name).toBe("profile");
+  });
+
+  // Rails: test "reflect_on_association returns nil for unknown"
+  it("reflectOnAssociation returns null for non-existent association", () => {
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    expect(reflectOnAssociation(Person, "nonexistent")).toBeNull();
   });
 });
