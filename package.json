@@ -14,9 +14,9 @@
     "test:db": "PG_TEST_URL=postgres://postgres:postgres@localhost:25432/rails_js_test MYSQL_TEST_URL=mysql://root@localhost:13306/rails_js_test vitest run",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "api:compare": "cd scripts/api-compare && bash fetch-rails.sh && ruby extract-ruby-api.rb && npx tsx extract-ts-api.ts && npx tsx compare.ts",
-    "test:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx compare.ts",
-    "convention:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx convention-compare.ts",
+    "api:compare": "cd scripts/api-compare && bash fetch-rails.sh && ruby extract-ruby-api.rb && pnpm tsx extract-ts-api.ts && pnpm tsx compare.ts",
+    "test:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && pnpm tsx extract-ts-tests.ts && pnpm tsx compare.ts",
+    "convention:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && pnpm tsx extract-ts-tests.ts && pnpm tsx convention-compare.ts",
     "test:stubs": "pnpm test:compare && pnpm tsx scripts/test-compare/generate-stubs.ts"
   },
   "devDependencies": {
