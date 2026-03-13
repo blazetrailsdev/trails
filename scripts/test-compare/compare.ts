@@ -6,7 +6,7 @@
  *   finder_test.rb → finder.test.ts (snake_case → kebab-case)
  *
  * A small override table handles cases where the convention doesn't hold
- * (e.g. belongs_to_associations_test.rb → belongs-to.test.ts).
+ * (e.g. has_one_associations_test.rb → has-one-habtm.test.ts).
  *
  * Test matching: for each Ruby test, search ALL tests in the mapped TS file(s)
  * by normalized description. No need to specify describe blocks.
@@ -63,9 +63,9 @@ function rubyFileToConventionTs(rubyFile: string, pkg: string): string {
  */
 const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
   activerecord: {
-    // Associations: Ruby uses long names, TS uses short names
-    "associations/belongs_to_associations_test.rb": ["belongs-to.test.ts"],
-    "associations/has_many_associations_test.rb": ["has-many.test.ts"],
+    // Associations: overrides for files not yet following convention naming
+    "associations/belongs_to_associations_test.rb": ["belongs-to-associations.test.ts"],
+    "associations/has_many_associations_test.rb": ["has-many-associations.test.ts"],
     "associations/has_one_associations_test.rb": ["has-one-habtm.test.ts", "has-one-async.test.ts"],
     "associations/has_many_through_associations_test.rb": [
       "has-many-through.test.ts",
@@ -86,8 +86,8 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     ],
     "associations/join_model_test.rb": ["has-one-habtm.test.ts"],
     "associations/nested_through_associations_test.rb": ["has-one-habtm.test.ts"],
-    "associations/inner_join_association_test.rb": ["inner-join.test.ts"],
-    "associations/left_outer_join_association_test.rb": ["left-outer-join.test.ts"],
+    "associations/inner_join_association_test.rb": ["inner-join-association.test.ts"],
+    "associations/left_outer_join_association_test.rb": ["left-outer-join-association.test.ts"],
     "associations/extension_test.rb": ["extensions.test.ts"],
     "associations/bidirectional_destroy_dependencies_test.rb": ["bidirectional-destroy.test.ts"],
     "associations/nested_error_test.rb": ["nested-attributes.test.ts"],
@@ -98,7 +98,7 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "associations/callbacks_test.rb": ["callbacks.test.ts"],
 
     // Validations: Ruby uses long names, TS uses short
-    "validations/uniqueness_validation_test.rb": ["uniqueness.test.ts"],
+    "validations/uniqueness_validation_test.rb": ["uniqueness-validation.test.ts"],
     "validations/presence_validation_test.rb": ["presence.test.ts"],
     "validations/absence_validation_test.rb": ["absence.test.ts"],
     "validations/length_validation_test.rb": ["length.test.ts"],
@@ -106,7 +106,7 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "validations/association_validation_test.rb": ["association.test.ts"],
 
     // Locking: Ruby has one file, TS splits by type
-    "locking_test.rb": ["optimistic.test.ts", "pessimistic.test.ts"],
+    "locking_test.rb": ["locking.test.ts", "pessimistic.test.ts"],
     "custom_locking_test.rb": ["custom.test.ts"],
 
     // Eager loading: Ruby eager_test.rb also maps to eager-hmthrough.test.ts
