@@ -1,21 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Table,
-  sql,
-  star,
-  SelectManager,
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Visitors,
-  Collectors,
-} from "./index.js";
+import { describe, it, expect } from "vitest";
+import { Table, sql, star, SelectManager, Nodes, Visitors } from "./index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
 
   describe("table", () => {
     it("should create join nodes", () => {
@@ -226,7 +214,7 @@ describe("Arel", () => {
       const aliased = users.as("u");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect(aliased.relation).toBe(users);
-      const sql = new Visitors.ToSql().compile(aliased.get("id") as any);
+      const sql = new Visitors.ToSql().compile(aliased.get("id"));
       expect(sql).toBe('"u"."id"');
     });
 

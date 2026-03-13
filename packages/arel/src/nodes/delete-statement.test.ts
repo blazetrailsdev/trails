@@ -1,21 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Table,
-  sql,
-  star,
-  SelectManager,
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Visitors,
-  Collectors,
-} from "../index.js";
+import { describe, it, expect } from "vitest";
+import { Table, Nodes } from "../index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
-  const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
 
   describe("delete-statement", () => {
     it("clones wheres", () => {
@@ -38,7 +25,7 @@ describe("Arel", () => {
     it("is not equal with different ivars", () => {
       const c1 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
       const c2 = new Nodes.Case(users.get("id")).when(new Nodes.Quoted("b"));
-      expect((c1.operand as any).name).not.toBe((c2.operand as any).name);
+      expect((c1.operand as Nodes.Attribute).name).not.toBe((c2.operand as Nodes.Attribute).name);
     });
   });
 });

@@ -74,7 +74,7 @@ export class InsertManager {
    *
    * Mirrors: Arel::InsertManager#create_values
    */
-  createValues(row: Node[], columns?: Node[]): ValuesList {
+  createValues(row: Node[], _columns?: Node[]): ValuesList {
     return new ValuesList([row]);
   }
 

@@ -2,7 +2,6 @@ import { Node } from "../nodes/node.js";
 import { SelectStatement } from "../nodes/select-statement.js";
 import { SelectCore } from "../nodes/select-core.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
-import { Attribute } from "../nodes/attribute.js";
 import { Distinct } from "../nodes/distinct.js";
 import { Offset, Limit, Lock, On, DistinctOn } from "../nodes/unary.js";
 import {
@@ -18,10 +17,9 @@ import { Quoted } from "../nodes/quoted.js";
 import { Union, UnionAll, Intersect, Except } from "../nodes/set-operations.js";
 import { With, WithRecursive, TableAlias } from "../nodes/with.js";
 import { Exists } from "../nodes/exists.js";
-import { Over, NamedWindow } from "../nodes/window.js";
+import { NamedWindow } from "../nodes/window.js";
 import { Table } from "../table.js";
 import { ToSql } from "../visitors/to-sql.js";
-import { InsertStatement } from "../nodes/insert-statement.js";
 import { UpdateStatement } from "../nodes/update-statement.js";
 import { Assignment } from "../nodes/binary.js";
 import { DeleteStatement } from "../nodes/delete-statement.js";
@@ -31,6 +29,7 @@ import { True, False } from "../nodes/true-false.js";
 import { And } from "../nodes/and.js";
 import { Grouping } from "../nodes/grouping.js";
 import { NamedFunction } from "../nodes/named-function.js";
+import { JoinSource } from "../nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
 
 /**
@@ -111,7 +110,7 @@ export class SelectManager {
    *
    * Mirrors: Arel::SelectManager#source
    */
-  get source(): any {
+  get source(): JoinSource {
     return this.core.source;
   }
 
@@ -379,9 +378,9 @@ export class SelectManager {
     if (joins.length > 0) {
       const lastJoin = joins[joins.length - 1];
       if (exprs.length === 1) {
-        (lastJoin as any).right = new On(exprs[0]);
+        (lastJoin as unknown as { right: Node | null }).right = new On(exprs[0]);
       } else {
-        (lastJoin as any).right = new On(new And(exprs));
+        (lastJoin as unknown as { right: Node | null }).right = new On(new And(exprs));
       }
     }
     return this;
@@ -393,7 +392,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#optimizer_hints
    */
   optimizerHints(...hints: string[]): this {
-    (this.core as any).optimizerHints = hints;
+    this.core.optimizerHints = hints;
     return this;
   }
 
@@ -449,7 +448,7 @@ export class SelectManager {
    */
   compileInsert(values: [Node, unknown][]): InsertManager {
     const im = new InsertManager();
-    im.insert(values as any);
+    im.insert(values);
     return im;
   }
 

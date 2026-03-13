@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   Table,
   sql,
@@ -6,10 +6,8 @@ import {
   SelectManager,
   InsertManager,
   UpdateManager,
-  DeleteManager,
   Nodes,
   Visitors,
-  Collectors,
 } from "./index.js";
 
 describe("Arel", () => {
@@ -325,7 +323,7 @@ describe("Arel", () => {
 
     it("noops on nil", () => {
       // Creating a SelectManager with no table
-      const mgr = new SelectManager(null as any);
+      const mgr = new SelectManager(null);
       expect(mgr).toBeInstanceOf(SelectManager);
     });
 

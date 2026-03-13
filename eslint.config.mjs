@@ -12,16 +12,57 @@ export default defineConfig(
   tseslint.configs.recommended,
   {
     rules: {
-      // Disabled rules — enable one at a time and fix
-      "@typescript-eslint/no-unused-vars": "off", // 7665 violations
-      "@typescript-eslint/no-explicit-any": "off", // 4234 violations
-      "@typescript-eslint/no-unused-expressions": "off", // 524 violations
-      "@typescript-eslint/no-unsafe-function-type": "off", // 59 violations
-      "@typescript-eslint/no-this-alias": "off", // 38 violations
-      "no-undef": "off", // 570 violations
-      "no-empty": "off", // 81 violations
-      "no-cond-assign": "off", // 70 violations
-      "no-useless-assignment": "off", // 40 violations
+      // Enable with underscore-prefix ignore pattern for intentionally unused params
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  // Per-package overrides for rules that still have violations
+  {
+    files: [
+      "packages/activerecord/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+      "packages/cli/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-undef": "off",
+    },
+  },
+  {
+    files: ["packages/activesupport/src/**/*.ts", "packages/rack/src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
+  },
+  {
+    files: ["packages/activesupport/src/**/*.ts", "packages/activerecord/src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-function-type": "off",
+      "no-empty": "off",
+      "no-useless-assignment": "off",
+    },
+  },
+  {
+    files: [
+      "packages/activesupport/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/activerecord/src/**/*.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-this-alias": "off",
+    },
+  },
+  {
+    files: ["packages/rack/src/**/*.ts"],
+    rules: {
+      "no-useless-assignment": "off",
     },
   },
 );

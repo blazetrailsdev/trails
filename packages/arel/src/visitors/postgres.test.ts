@@ -1,21 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Table,
-  sql,
-  star,
-  SelectManager,
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Visitors,
-  Collectors,
-} from "../index.js";
+import { describe, it, expect } from "vitest";
+import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
 
   describe("postgres", () => {
     it("should know how to visit", () => {
@@ -76,7 +64,7 @@ describe("Arel", () => {
     it("encloses LATERAL queries in parens", () => {
       const sub = users.project(users.get("id"));
       const lat = sub.lateral();
-      const sql = new Visitors.PostgreSQL().compile(lat as any);
+      const sql = new Visitors.PostgreSQL().compile(lat);
       expect(sql).toContain("LATERAL (");
       expect(sql).toContain(")");
     });
@@ -84,7 +72,7 @@ describe("Arel", () => {
     it("produces LATERAL queries with alias", () => {
       const sub = users.project(users.get("id"));
       const lat = sub.lateral("t");
-      const sql = new Visitors.PostgreSQL().compile(lat as any);
+      const sql = new Visitors.PostgreSQL().compile(lat);
       expect(sql).toContain("LATERAL (");
       expect(sql).toContain('"t"');
     });

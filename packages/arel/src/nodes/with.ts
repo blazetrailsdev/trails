@@ -1,5 +1,4 @@
 import { Node, NodeVisitor } from "./node.js";
-import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Cte } from "./cte.js";
 
