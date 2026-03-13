@@ -1396,7 +1396,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "associations.test.ts", describeBlock: "HasOneAssociations" },
       { file: "associations.test.ts", describeBlock: "DependentAssociations" },
       { file: "associations.test.ts", describeBlock: "StrictLoading" },
-      { file: "has-one-habtm.test.ts", describeBlock: "HasOneAssociationsTest" },
+      { file: "has-one-associations.test.ts", describeBlock: "HasOneAssociationsTest" },
     ],
     "associations/has_many_through_associations_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "Associations: has_many through" },
@@ -1406,7 +1406,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "rails-guided.test.ts", describeBlock: "Grouped Calculations (Rails-guided)" },
       { file: "associations.test.ts", describeBlock: "HasManyThroughAssociations" },
       { file: "coverage-boost.test.ts", describeBlock: "HasManyThroughTest" },
-      { file: "eager-hmthrough.test.ts", describeBlock: "HasManyThroughAssociationsTest" },
+      { file: "has-many-through-associations.test.ts", describeBlock: "HasManyThroughAssociationsTest" },
     ],
     "associations/has_and_belongs_to_many_associations_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "has_and_belongs_to_many" },
@@ -1415,7 +1415,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "rails-guided.test.ts", describeBlock: "HABTM (Rails-guided)" },
       { file: "rails-guided.test.ts", describeBlock: "Grouped Calculations (Rails-guided)" },
       { file: "associations.test.ts", describeBlock: "HasAndBelongsToManyAssociations" },
-      { file: "has-one-habtm.test.ts", describeBlock: "HasAndBelongsToManyAssociationsTest" },
+      { file: "has-and-belongs-to-many-associations.test.ts", describeBlock: "HasAndBelongsToManyAssociationsTest" },
     ],
     "associations/has_one_through_associations_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "Associations" },
@@ -1423,7 +1423,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "activerecord.test.ts", describeBlock: "Associations: dependent" },
       { file: "rails-guided.test.ts", describeBlock: "Associations (Rails-guided)" },
       { file: "rails-guided.test.ts", describeBlock: "Grouped Calculations (Rails-guided)" },
-      { file: "has-one-habtm.test.ts", describeBlock: "HasOneThroughAssociationsTest" },
+      { file: "has-one-through-associations.test.ts", describeBlock: "HasOneThroughAssociationsTest" },
     ],
     "associations/inner_join_association_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "Relation: joins and leftJoins" },
@@ -1453,7 +1453,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "rails-guided.test.ts", describeBlock: "Grouped Calculations (Rails-guided)" },
       { file: "associations.test.ts", describeBlock: "AssociationDefinitions" },
       { file: "associations.test.ts", describeBlock: "AssociationReflection" },
-      { file: "has-one-habtm.test.ts", describeBlock: "AssociationsJoinModelTest" },
+      { file: "join-model.test.ts", describeBlock: "AssociationsJoinModelTest" },
     ],
     "associations/left_outer_join_association_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "Relation: joins and leftJoins" },
@@ -1464,7 +1464,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "activerecord.test.ts", describeBlock: "Associations" },
       { file: "activerecord.test.ts", describeBlock: "has_and_belongs_to_many" },
       { file: "rails-guided.test.ts", describeBlock: "Grouped Calculations (Rails-guided)" },
-      { file: "has-one-habtm.test.ts", describeBlock: "NestedThroughAssociationsTest" },
+      { file: "nested-through-associations.test.ts", describeBlock: "NestedThroughAssociationsTest" },
     ],
     "associations/required_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "belongs_to required option" },
@@ -1490,7 +1490,7 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
       { file: "rails-guided.test.ts", describeBlock: "Grouped Calculations (Rails-guided)" },
       { file: "rails-guided.test.ts", describeBlock: "Rails-guided: New Features" },
       { file: "coverage-boost.test.ts", describeBlock: "EagerAssociationTest" },
-      { file: "eager-hmthrough.test.ts", describeBlock: "EagerAssociationTest" },
+      { file: "eager.test.ts", describeBlock: "EagerAssociationTest" },
     ],
     "associations/cascaded_eager_loading_test.rb": [
       { file: "activerecord.test.ts", describeBlock: "Eager Loading" },

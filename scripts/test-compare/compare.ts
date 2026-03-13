@@ -6,7 +6,7 @@
  *   finder_test.rb → finder.test.ts (snake_case → kebab-case)
  *
  * A small override table handles cases where the convention doesn't hold
- * (e.g. has_one_associations_test.rb → has-one-habtm.test.ts).
+ * (e.g. has_one_associations_test.rb → has-one-associations.test.ts).
  *
  * Test matching: for each Ruby test, search ALL tests in the mapped TS file(s)
  * by normalized description. No need to specify describe blocks.
@@ -66,14 +66,17 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     // Associations: overrides for files not yet following convention naming
     "associations/belongs_to_associations_test.rb": ["belongs-to-associations.test.ts"],
     "associations/has_many_associations_test.rb": ["has-many-associations.test.ts"],
-    "associations/has_one_associations_test.rb": ["has-one-habtm.test.ts", "has-one-async.test.ts"],
-    "associations/has_many_through_associations_test.rb": [
-      "has-many-through.test.ts",
-      "eager-hmthrough.test.ts",
+    "associations/has_one_associations_test.rb": [
+      "has-one-associations.test.ts",
+      "has-one-async.test.ts",
     ],
-    "associations/has_one_through_associations_test.rb": ["has-one-habtm.test.ts"],
+    "associations/has_many_through_associations_test.rb": [
+      "has-many-through-associations.test.ts",
+      "has-many-through.test.ts",
+    ],
+    "associations/has_one_through_associations_test.rb": ["has-one-through-associations.test.ts"],
     "associations/has_and_belongs_to_many_associations_test.rb": [
-      "has-one-habtm.test.ts",
+      "has-and-belongs-to-many-associations.test.ts",
       "habtm.test.ts",
     ],
     "associations/inverse_associations_test.rb": [
@@ -84,8 +87,8 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
       "inverse-automatic.test.ts",
       "inverse-polymorphic-belongs-to.test.ts",
     ],
-    "associations/join_model_test.rb": ["has-one-habtm.test.ts"],
-    "associations/nested_through_associations_test.rb": ["has-one-habtm.test.ts"],
+    "associations/join_model_test.rb": ["join-model.test.ts"],
+    "associations/nested_through_associations_test.rb": ["nested-through-associations.test.ts"],
     "associations/inner_join_association_test.rb": ["inner-join-association.test.ts"],
     "associations/left_outer_join_association_test.rb": ["left-outer-join-association.test.ts"],
     "associations/extension_test.rb": ["extensions.test.ts"],
@@ -109,8 +112,7 @@ const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
     "locking_test.rb": ["locking.test.ts", "pessimistic.test.ts"],
     "custom_locking_test.rb": ["custom.test.ts"],
 
-    // Eager loading: Ruby eager_test.rb also maps to eager-hmthrough.test.ts
-    "associations/eager_test.rb": ["eager.test.ts", "eager-hmthrough.test.ts", "preloader.test.ts"],
+    "associations/eager_test.rb": ["eager.test.ts", "preloader.test.ts"],
 
     // Associations misc
     "associations/required_test.rb": ["required.test.ts"],
