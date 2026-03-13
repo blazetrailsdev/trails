@@ -4,11 +4,30 @@ import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
 /**
- * PostgreSQL visitor — currently matches generic ToSql.
+ * PostgreSQL visitor — extends generic ToSql with PostgreSQL-specific features.
  *
  * Mirrors: Arel::Visitors::PostgreSQL
  */
-export class PostgreSQL extends ToSql {}
+export class PostgreSQL extends ToSql {
+  protected override visitDistinctOn(node: Nodes.DistinctOn): SQLString {
+    this.collector.append("DISTINCT ON (");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  protected override visitRegexp(node: Nodes.Regexp): SQLString {
+    return this.visitBinaryOp(node, "~");
+  }
+
+  protected override visitNotRegexp(node: Nodes.NotRegexp): SQLString {
+    return this.visitBinaryOp(node, "!~");
+  }
+}
 
 /**
  * PostgreSQL visitor — uses numbered bind parameters ($1, $2, ...).

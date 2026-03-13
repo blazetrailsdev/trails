@@ -1171,7 +1171,8 @@ describe("Arel", () => {
 
     it("average should be compatible with Addition", () => {
       const node = users.get("age").add(1);
-      expect(node).toBeInstanceOf(Nodes.Addition);
+      expect(node).toBeInstanceOf(Nodes.Grouping);
+      expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Addition);
     });
 
     it("count should be compatible with Addition", () => {
@@ -1191,7 +1192,8 @@ describe("Arel", () => {
 
     it("attribute node should be compatible with Subtraction", () => {
       const node = users.get("age").subtract(1);
-      expect(node).toBeInstanceOf(Nodes.Subtraction);
+      expect(node).toBeInstanceOf(Nodes.Grouping);
+      expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Subtraction);
     });
 
     it("attribute node should be compatible with Multiplication", () => {
