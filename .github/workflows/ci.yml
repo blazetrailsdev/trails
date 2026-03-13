@@ -141,8 +141,11 @@ jobs:
       - name: Extract Ruby tests
         run: cd scripts/test-compare && ruby extract-ruby-tests.rb
       - name: API comparison
-        run: cd scripts/api-compare && pnpm exec tsx extract-ts-api.ts && pnpm exec tsx compare.ts
+        working-directory: scripts/api-compare
+        run: pnpm exec tsx extract-ts-api.ts && pnpm exec tsx compare.ts
       - name: Test comparison
-        run: cd scripts/test-compare && pnpm exec tsx extract-ts-tests.ts && pnpm exec tsx compare.ts
+        working-directory: scripts/test-compare
+        run: pnpm exec tsx extract-ts-tests.ts && pnpm exec tsx compare.ts
       - name: Convention comparison
-        run: cd scripts/test-compare && pnpm exec tsx convention-compare.ts
+        working-directory: scripts/test-compare
+        run: pnpm exec tsx convention-compare.ts
