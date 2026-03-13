@@ -259,7 +259,13 @@ export class FormatValidator implements Validator {
   }
 
   private resolveRegexp(opt: RegExp | ((record: any) => RegExp), record: any): RegExp {
-    return typeof opt === "function" ? opt(record) : opt;
+    const re = typeof opt === "function" ? opt(record) : opt;
+    if (re.multiline) {
+      throw new Error(
+        "The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or pass the `multiline: true` option?",
+      );
+    }
+    return re;
   }
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {

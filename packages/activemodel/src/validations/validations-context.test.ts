@@ -7,7 +7,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.validates("name", { presence: true, on: "create" as any });
+          this.validates("name", { presence: true, on: "create" });
         }
       }
       // No context specified, so validation with on: "create" is skipped
@@ -18,7 +18,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.validates("name", { presence: true, on: "create" as any });
+          this.validates("name", { presence: true, on: "create" });
         }
       }
       expect(new Person({}).isValid("create")).toBe(false);
@@ -28,7 +28,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.validates("name", { presence: true, on: "update" as any });
+          this.validates("name", { presence: true, on: "update" });
         }
       }
       expect(new Person({}).isValid("create")).toBe(true);
@@ -40,8 +40,8 @@ describe("ActiveModel", () => {
         static {
           this.attribute("name", "string");
           this.attribute("email", "string");
-          this.validates("name", { presence: true, on: "create" as any });
-          this.validates("email", { presence: true, on: "update" as any });
+          this.validates("name", { presence: true, on: "create" });
+          this.validates("email", { presence: true, on: "update" });
         }
       }
       // On create: only name validation fires
@@ -57,7 +57,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.validates("name", { presence: true, on: "create" as any });
+          this.validates("name", { presence: true, on: "create" });
         }
       }
       // Without context, validation is skipped

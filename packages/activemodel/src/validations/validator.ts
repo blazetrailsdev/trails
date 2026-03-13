@@ -15,7 +15,7 @@ export type ConditionFn = ((record: any) => boolean) | string;
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
   unless?: ConditionFn | ConditionFn[];
-  on?: "create" | "update";
+  on?: string;
 }
 
 function evaluateCondition(record: any, cond: ConditionFn): boolean {

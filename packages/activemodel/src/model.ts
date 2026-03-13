@@ -916,40 +916,7 @@ export class Model {
       // If validation has an `on` context, only run when context matches
       if (entry.on && entry.on !== effectiveContext) continue;
       // Check if/unless conditions
-      if (entry.if !== undefined) {
-        const conds = Array.isArray(entry.if) ? entry.if : [entry.if];
-        let skip = false;
-        for (const cond of conds) {
-          const result =
-            typeof cond === "function"
-              ? cond(this)
-              : typeof (this as any)[cond] === "function"
-                ? (this as any)[cond]()
-                : (this as any)[cond];
-          if (!result) {
-            skip = true;
-            break;
-          }
-        }
-        if (skip) continue;
-      }
-      if (entry.unless !== undefined) {
-        const conds = Array.isArray(entry.unless) ? entry.unless : [entry.unless];
-        let skip = false;
-        for (const cond of conds) {
-          const result =
-            typeof cond === "function"
-              ? cond(this)
-              : typeof (this as any)[cond] === "function"
-                ? (this as any)[cond]()
-                : (this as any)[cond];
-          if (result) {
-            skip = true;
-            break;
-          }
-        }
-        if (skip) continue;
-      }
+      if (!shouldValidate(this, { if: entry.if, unless: entry.unless })) continue;
       const value = this._attributes.get(entry.attribute);
       if (entry.strict) {
         // Strict validation: collect errors into a temporary Errors, then throw
