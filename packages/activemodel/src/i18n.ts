@@ -1,3 +1,5 @@
+import { deepDup, deepMergeInPlace } from "@rails-ts/activesupport";
+
 type TranslationValue = string | { one?: string; other?: string } | TranslationTree;
 interface TranslationTree {
   [key: string]: TranslationValue;
@@ -9,41 +11,6 @@ interface TranslateOptions {
   defaults?: Array<{ key: string } | { message: string }>;
   defaultValue?: string;
   [key: string]: unknown;
-}
-
-function deepClone(obj: TranslationTree): TranslationTree {
-  const result: TranslationTree = {};
-  for (const key of Object.keys(obj)) {
-    const val = obj[key];
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      result[key] = deepClone(val as TranslationTree);
-    } else {
-      result[key] = val;
-    }
-  }
-  return result;
-}
-
-function deepMerge(target: TranslationTree, source: TranslationTree): TranslationTree {
-  for (const key of Object.keys(source)) {
-    const sv = source[key];
-    const tv = target[key];
-    if (
-      sv &&
-      typeof sv === "object" &&
-      !Array.isArray(sv) &&
-      tv &&
-      typeof tv === "object" &&
-      !Array.isArray(tv)
-    ) {
-      target[key] = deepMerge(tv as TranslationTree, sv as TranslationTree);
-    } else if (sv && typeof sv === "object" && !Array.isArray(sv)) {
-      target[key] = deepClone(sv as TranslationTree);
-    } else {
-      target[key] = sv;
-    }
-  }
-  return target;
 }
 
 function dig(obj: TranslationTree, path: string[]): TranslationValue | undefined {
@@ -109,7 +76,10 @@ class I18nService {
     if (!this._translations[locale]) {
       this._translations[locale] = {};
     }
-    deepMerge(this._translations[locale], data);
+    deepMergeInPlace(
+      this._translations[locale] as Record<string, unknown>,
+      deepDup(data) as Record<string, unknown>,
+    );
   }
 
   reset(): void {
@@ -180,12 +150,12 @@ const defaultEnTranslations: TranslationTree = {
   activemodel: {
     errors: {
       format: "%{attribute} %{message}",
-      messages: deepClone(messages),
+      messages: deepDup(messages) as TranslationTree,
     },
   },
   errors: {
     format: "%{attribute} %{message}",
-    messages: { ...messages },
+    messages: deepDup(messages) as TranslationTree,
     attributes: {},
   },
 };

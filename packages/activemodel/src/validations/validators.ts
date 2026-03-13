@@ -1,4 +1,5 @@
 import type { Errors } from "../errors.js";
+import { humanize } from "@rails-ts/activesupport";
 import type { Validator, ConditionalOptions } from "./validator.js";
 import { shouldValidate } from "./validator.js";
 
@@ -334,7 +335,7 @@ export class ConfirmationValidator implements Validator {
       const modelClass = (record as any).constructor;
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
-        : attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+        : humanize(attribute);
       errors.add(attribute, "confirmation", {
         message: this.options.message,
         attribute: humanAttr,

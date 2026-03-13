@@ -1,4 +1,5 @@
 import { Errors } from "./errors.js";
+import { humanize } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./types/registry.js";
 import { Type } from "./types/type.js";
@@ -635,7 +636,7 @@ export class Model {
     const modelKey = this.name
       ? this.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
       : undefined;
-    const fallback = attr.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+    const fallback = humanize(attr);
 
     const defaults: Array<{ key: string } | { message: string }> = [];
     if (modelKey) {

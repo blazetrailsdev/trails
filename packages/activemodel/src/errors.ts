@@ -1,3 +1,4 @@
+import { humanize } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 
 /**
@@ -25,7 +26,7 @@ export class NestedError {
     const modelClass = (this.base as any)?.constructor;
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(this.attribute)
-      : this.attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+      : humanize(this.attribute);
     const format = I18n.t("activemodel.errors.format", {
       defaultValue: "%{attribute} %{message}",
     });
@@ -309,7 +310,7 @@ export class Errors {
     const modelClass = base?.constructor;
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(attribute)
-      : attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+      : humanize(attribute);
     const format = I18n.t("activemodel.errors.format", {
       defaultValue: "%{attribute} %{message}",
     });
@@ -345,7 +346,7 @@ export class Errors {
       : undefined;
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(attribute)
-      : attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+      : humanize(attribute);
 
     const i18nOptions: Record<string, unknown> = {
       ...options,
