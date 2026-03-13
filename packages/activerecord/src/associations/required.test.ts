@@ -201,7 +201,7 @@ describe("belongs_to required option", () => {
     const saved = await book.save();
     expect(saved).toBe(false);
     expect(
-      book.errors.fullMessages.some((m: string) => m.toLowerCase().includes("author_id")),
+      book.errors.fullMessages.some((m: string) => m.toLowerCase().includes("author id")),
     ).toBe(true);
   });
 
