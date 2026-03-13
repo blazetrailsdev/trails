@@ -568,7 +568,7 @@ export class UploadedFile {
       return String(this._io);
     }
     if (this.path) {
-      return fs.readFileSync(this.path, this._binary ? undefined : "utf-8") as string;
+      return fs.readFileSync(this.path, this._binary ? "latin1" : "utf-8");
     }
     return "";
   }
