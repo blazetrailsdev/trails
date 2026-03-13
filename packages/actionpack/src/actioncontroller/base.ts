@@ -5,6 +5,8 @@
  * flash, CSRF, content negotiation, caching, rescue, and more.
  */
 
+import * as fs from "fs";
+import * as path from "path";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../actiondispatch/flash.js";
 import {
@@ -385,8 +387,6 @@ export class Base extends Metal {
     filePath: string,
     options: { type?: string; disposition?: string; filename?: string } = {},
   ): void {
-    const fs = require("fs");
-    const path = require("path");
     const content = fs.readFileSync(filePath);
     const filename = options.filename ?? path.basename(filePath);
     const ext = path.extname(filename).toLowerCase();

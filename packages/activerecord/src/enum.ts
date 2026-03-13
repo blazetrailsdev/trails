@@ -112,7 +112,7 @@ export function defineEnum(
     });
 
     // Setter: record.draft() or record.statusDraft() — sets the value in memory
-    if (!modelClass.prototype.hasOwnProperty(fullName)) {
+    if (!Object.hasOwn(modelClass.prototype, fullName)) {
       Object.defineProperty(modelClass.prototype, fullName, {
         value: function (this: Base) {
           this.writeAttribute(attribute, value);

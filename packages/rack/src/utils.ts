@@ -129,7 +129,7 @@ function normalizeParams(params: any, name: string, v: string | null, depth: num
   }
 
   // Parse bracket notation
-  const match = name.match(/^([^\[]*)((?:\[[^\]]*\])*)$/);
+  const match = name.match(/^([^[]*)((?:\[[^\]]*\])*)$/);
   if (!match || !match[1]) {
     // Keys like "[]", "[a]" etc with no prefix
     params[name] = v;

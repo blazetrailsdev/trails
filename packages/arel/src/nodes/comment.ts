@@ -1,7 +1,7 @@
 import { Node, NodeVisitor } from "./node.js";
 
 /**
- * SQL comment — appended as /* ... *​/ to a query.
+ * SQL comment -- appended as `/* ... *\/` to a query.
  *
  * Mirrors: Arel::Nodes::Comment
  */

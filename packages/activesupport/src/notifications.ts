@@ -88,12 +88,12 @@ export class Notifications {
     pattern: string | RegExp | null | undefined,
     callback: (event: Event) => void,
   ): NotificationSubscriber {
-    let sub: Subscriber;
+    const sub: Subscriber = { pattern: pattern ?? null, callback: null! };
     const wrapped = (event: Event) => {
       this._subscribers.delete(sub);
       callback(event);
     };
-    sub = { pattern: pattern ?? null, callback: wrapped };
+    sub.callback = wrapped;
     this._subscribers.add(sub);
     return sub as NotificationSubscriber;
   }

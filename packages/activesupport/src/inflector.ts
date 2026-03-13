@@ -167,6 +167,7 @@ export function parameterize(
   const { separator = "-", preserveCase = false } = options;
 
   // Transliterate (basic - strip non-ASCII)
+  // eslint-disable-next-line no-control-regex
   let result = str.replace(/[^\x00-\x7F]/g, "");
 
   if (separator === "") {

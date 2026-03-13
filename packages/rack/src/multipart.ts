@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { parseNestedQuery } from "./utils.js";
 
 export class MultipartPartLimitError extends Error {
@@ -335,7 +337,7 @@ function normalizeAndSet(params: Record<string, any>, name: string, value: any):
   // Use nested query normalization for bracket notation
   if (name.includes("[")) {
     // Simple nested assignment
-    const match = name.match(/^([^\[]+)((?:\[[^\]]*\])*)$/);
+    const match = name.match(/^([^[]+)((?:\[[^\]]*\])*)$/);
     if (match) {
       const prefix = match[1];
       const brackets = match[2];
@@ -391,7 +393,7 @@ function normalizeFilename(filename: string): string {
   }
 
   // Strip IE full paths - take last component after / or \
-  const parts = filename.split(/[\/\\]/);
+  const parts = filename.split(/[/\\]/);
   return parts[parts.length - 1] || "";
 }
 
@@ -543,13 +545,12 @@ export class UploadedFile {
     opts: { binary?: boolean; content_type?: string } = {},
   ) {
     if (typeof pathOrOpts === "string") {
-      const fs = require("fs");
       if (!fs.existsSync(pathOrOpts)) {
         throw new Error(`no such file to load -- ${pathOrOpts}`);
       }
       this.path = pathOrOpts;
       this._io = null;
-      this.filename = require("path").basename(pathOrOpts);
+      this.filename = path.basename(pathOrOpts);
       this.contentType = opts.content_type || "text/plain";
       this._binary = opts.binary || false;
     } else {
@@ -567,8 +568,7 @@ export class UploadedFile {
       return String(this._io);
     }
     if (this.path) {
-      const fs = require("fs");
-      return fs.readFileSync(this.path, this._binary ? undefined : "utf-8");
+      return fs.readFileSync(this.path, this._binary ? undefined : "utf-8") as string;
     }
     return "";
   }

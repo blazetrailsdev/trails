@@ -469,6 +469,7 @@ export class SelectManager {
   compileUpdate(values: [Node, unknown][], key?: Node): UpdateStatement {
     const stmt = new UpdateStatement();
     stmt.relation = this.core.source.left;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Assignment } = require("../nodes/binary.js");
     stmt.values = values.map(([col, val]) => {
       const right = val instanceof Node ? val : new Quoted(val);
