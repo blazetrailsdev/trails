@@ -116,8 +116,8 @@ describe("SQLite3QuotingTest", () => {
 
   it("quote float nan", async () => {
     adapter.exec(`CREATE TABLE "nan_test" ("id" INTEGER PRIMARY KEY, "val" REAL)`);
-    // SQLite stores NaN as NULL
-    await adapter.executeMutation(`INSERT INTO "nan_test" ("val") VALUES (NULL)`);
+    // SQLite stores NaN as NULL when passed through binds
+    await adapter.executeMutation(`INSERT INTO "nan_test" ("val") VALUES (?)`, [NaN]);
     const rows = await adapter.execute(`SELECT "val" FROM "nan_test"`);
     expect(rows[0].val).toBeNull();
   });

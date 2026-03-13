@@ -25,17 +25,14 @@ describe("SQLite3AdapterTest", () => {
     const fs = await import("fs");
     const path = await import("path");
     const os = await import("os");
-    const nested = path.join(os.tmpdir(), `sqlite-nested-${Date.now()}`, "sub", "dir");
+    const baseDir = path.join(os.tmpdir(), `sqlite-nested-${Date.now()}`);
+    const nested = path.join(baseDir, "sub", "dir");
     fs.mkdirSync(nested, { recursive: true });
     const dbPath = path.join(nested, "test.db");
     const a = new SqliteAdapter(dbPath);
     expect(a.isOpen).toBe(true);
     a.close();
-    fs.unlinkSync(dbPath);
-    fs.rmSync(path.join(os.tmpdir(), `sqlite-nested-${Date.now()}`), {
-      recursive: true,
-      force: true,
-    });
+    fs.rmSync(baseDir, { recursive: true, force: true });
   });
 
   it("database exists returns false when the database does not exist", async () => {
@@ -102,10 +99,15 @@ describe("SQLite3AdapterTest", () => {
     expect(pkCols).toHaveLength(0);
   });
 
-  it("connection no db", () => {
+  it("connection no db", async () => {
     // Attempting to open a non-existent file in readonly mode throws
+    const os = await import("os");
+    const path = await import("path");
     expect(
-      () => new SqliteAdapter("/tmp/nonexistent-path-12345/no.db", { readonly: true }),
+      () =>
+        new SqliteAdapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
+          readonly: true,
+        }),
     ).toThrow();
   });
 
@@ -485,9 +487,8 @@ describe("SQLite3AdapterTest", () => {
     expect(id).toBe(3);
   });
 
-  it("supports extensions", () => {
-    // SQLite in better-sqlite3 does not support extensions by default
-    expect(false).toBe(false);
+  it.skip("supports extensions", () => {
+    // better-sqlite3 does not support loadExtension by default
   });
 
   it("respond to enable extension", () => {

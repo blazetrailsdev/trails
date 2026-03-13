@@ -2,26 +2,11 @@
  * Mirrors Rails activerecord/test/cases/adapters/mysql2/check_constraint_quoting_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import mysql from "mysql2/promise";
-import { MysqlAdapter } from "../mysql-adapter.js";
-
-const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";
-
-let mysqlAvailable = false;
-
-async function checkMysql(): Promise<boolean> {
-  try {
-    const conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
-    await conn.query("SELECT 1");
-    await conn.end();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-mysqlAvailable = await checkMysql();
-const describeIfMysql = mysqlAvailable ? describe : describe.skip;
+import {
+  describeIfMysql,
+  MysqlAdapter,
+  MYSQL_TEST_URL,
+} from "../abstract-mysql-adapter/test-helper.js";
 
 describeIfMysql("MysqlAdapter", () => {
   let adapter: MysqlAdapter;
