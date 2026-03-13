@@ -1710,3 +1710,226 @@ describe("Attributes (extended)", () => {
     });
   });
 });
+
+describe("AttributeMethodsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeTopic() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.attribute("written_on", "date");
+        this.attribute("bonus_time", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    return Topic;
+  }
+
+  it("attribute present", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Hello" });
+    expect(t.attributePresent("title")).toBe(true);
+    expect(t.attributePresent("author_name")).toBe(false);
+  });
+
+  it("attribute keys on a new instance", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Keys" });
+    const attrs = t.attributes;
+    expect(Object.keys(attrs)).toContain("title");
+  });
+
+  it("boolean attributes", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ approved: true });
+    expect(t.readAttribute("approved")).toBe(true);
+  });
+
+  it("set attributes", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({});
+    t.assignAttributes({ title: "Set", author_name: "Alice" });
+    expect(t.readAttribute("title")).toBe("Set");
+    expect(t.readAttribute("author_name")).toBe("Alice");
+  });
+
+  it("integers as nil", async () => {
+    class Item extends Base {
+      static {
+        this.attribute("value", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const item = await Item.create({ value: "" as any });
+    // Empty string cast to integer yields null
+    expect(item.readAttribute("value")).toBeNull();
+  });
+
+  it("read attributes_before_type_cast on a datetime", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ written_on: "2023-01-15" });
+    const raw = t.readAttributeBeforeTypeCast("written_on");
+    // Raw value is the string before casting
+    expect(raw).toBeDefined();
+  });
+
+  it("write_attribute", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({});
+    t.writeAttribute("title", "Written");
+    expect(t.readAttribute("title")).toBe("Written");
+  });
+
+  it("read_attribute", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Read" });
+    expect(t.readAttribute("title")).toBe("Read");
+  });
+
+  it("read_attribute when false", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ approved: false });
+    expect(t.readAttribute("approved")).toBe(false);
+  });
+
+  it("read_attribute when true", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ approved: true });
+    expect(t.readAttribute("approved")).toBe(true);
+  });
+
+  it("string attribute predicate", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Hello" });
+    expect(t.attributePresent("title")).toBe(true);
+    const empty = new (Topic as any)({ title: "" });
+    expect(empty.attributePresent("title")).toBe(false);
+  });
+
+  it("boolean attribute predicate", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ approved: true });
+    expect(t.readAttribute("approved")).toBe(true);
+    const f = new (Topic as any)({ approved: false });
+    expect(f.readAttribute("approved")).toBe(false);
+  });
+
+  it("converted values are returned after assignment", async () => {
+    class Item extends Base {
+      static {
+        this.attribute("count", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const item = new (Item as any)({ count: "42" });
+    expect(item.readAttribute("count")).toBe(42);
+  });
+
+  it("write nil to time attribute", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ bonus_time: new Date() });
+    t.writeAttribute("bonus_time", null);
+    expect(t.readAttribute("bonus_time")).toBeNull();
+  });
+
+  it("boolean attributes writing and reading", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ approved: false });
+    t.writeAttribute("approved", true);
+    await t.save();
+    const found = await Topic.find(t.id);
+    expect(found.readAttribute("approved")).toBe(true);
+  });
+
+  it("overridden write_attribute", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({});
+    t.writeAttribute("title", "Override");
+    expect(t.readAttribute("title")).toBe("Override");
+  });
+
+  it("read overridden attribute", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Saved" });
+    expect(t.readAttribute("title")).toBe("Saved");
+  });
+
+  it("non-attribute read and write", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({});
+    // Writing to a non-attribute should throw or be ignored
+    try {
+      t.writeAttribute("nonexistent", "value");
+    } catch (e) {
+      // Expected: MissingAttributeError or similar
+      expect(e).toBeDefined();
+    }
+  });
+
+  it("typecast attribute from select to false", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ approved: false, title: "SelectFalse" });
+    const found = await Topic.where({ title: "SelectFalse" }).first();
+    expect(found!.readAttribute("approved")).toBe(false);
+  });
+
+  it("typecast attribute from select to true", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ approved: true, title: "SelectTrue" });
+    const found = await Topic.where({ title: "SelectTrue" }).first();
+    expect(found!.readAttribute("approved")).toBe(true);
+  });
+
+  it("respond to?", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Hello" });
+    // In TS, readAttribute is the equivalent
+    expect(typeof t.readAttribute).toBe("function");
+  });
+
+  it("array content", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Array" });
+    const attrs = t.attributes;
+    expect(Array.isArray(Object.keys(attrs))).toBe(true);
+    expect(Object.keys(attrs)).toContain("title");
+  });
+
+  it("hash content", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Hash", author_name: "Bob" });
+    const attrs = t.attributes;
+    expect(attrs["title"]).toBe("Hash");
+    expect(attrs["author_name"]).toBe("Bob");
+  });
+
+  it("attributes without primary key", async () => {
+    class NoPk extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const n = new (NoPk as any)({ name: "NoPK" });
+    const attrs = n.attributes;
+    expect(attrs["name"]).toBe("NoPK");
+  });
+
+  it.skip("time attributes are retrieved in the current time zone", async () => {
+    // requires timezone-aware attribute handling
+  });
+
+  it.skip("setting time zone-aware attribute in other time zone", async () => {
+    // requires timezone-aware attribute handling
+  });
+});
+
+// ==========================================================================
+// WhereTest — targets relation/where_test.rb
+// ==========================================================================

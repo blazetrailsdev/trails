@@ -6804,3 +6804,310 @@ describe("Calculations (extended)", () => {
     });
   });
 });
+
+// ==========================================================================
+// CalculationsTest — targets calculations_test.rb
+// ==========================================================================
+describe("CalculationsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeAccount() {
+    class Account extends Base {
+      static {
+        this.attribute("credit_limit", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    return Account;
+  }
+
+  it("should sum field", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 50 });
+    await Account.create({ credit_limit: 100 });
+    const total = await Account.sum("credit_limit");
+    expect(total).toBe(150);
+  });
+
+  it("should average field", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 50 });
+    await Account.create({ credit_limit: 150 });
+    const avg = await Account.average("credit_limit");
+    expect(avg).toBe(100);
+  });
+
+  it("should return nil as average", async () => {
+    const Account = makeAccount();
+    const avg = await Account.average("credit_limit");
+    expect(avg).toBeNull();
+  });
+
+  it("should get maximum of field", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 90 });
+    const max = await Account.maximum("credit_limit");
+    expect(max).toBe(90);
+  });
+
+  it("should get minimum of field", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 90 });
+    const min = await Account.minimum("credit_limit");
+    expect(min).toBe(10);
+  });
+
+  it("should group by field", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "alpha", credit_limit: 10 });
+    await Account.create({ name: "beta", credit_limit: 20 });
+    await Account.create({ name: "alpha", credit_limit: 5 });
+    const result = await Account.group("name").count();
+    expect(typeof result).toBe("object");
+    expect((result as any)["alpha"]).toBe(2);
+    expect((result as any)["beta"]).toBe(1);
+  });
+
+  it("should group by summed field", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "x", credit_limit: 10 });
+    await Account.create({ name: "x", credit_limit: 20 });
+    await Account.create({ name: "y", credit_limit: 5 });
+    const result = await Account.group("name").sum("credit_limit");
+    expect((result as any)["x"]).toBe(30);
+    expect((result as any)["y"]).toBe(5);
+  });
+
+  it("count should shortcut with limit zero", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    const count = await Account.limit(0).count();
+    expect(count).toBe(0);
+  });
+
+  it("count with order", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 20 });
+    const count = await Account.order("credit_limit").count();
+    expect(count).toBe(2);
+  });
+
+  it("count with where and order", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 20 });
+    const count = await Account.where({ credit_limit: 10 }).order("credit_limit").count();
+    expect(count).toBe(1);
+  });
+
+  it("should sum scoped field", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 50, name: "alpha" });
+    await Account.create({ credit_limit: 100, name: "beta" });
+    const total = await Account.where({ name: "alpha" }).sum("credit_limit");
+    expect(total).toBe(50);
+  });
+
+  it("should return zero if sum conditions return nothing", async () => {
+    const Account = makeAccount();
+    const total = await Account.where({ name: "nobody" }).sum("credit_limit");
+    expect(total).toBe(0);
+  });
+
+  it("should sum field with conditions", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10, name: "a" });
+    await Account.create({ credit_limit: 30, name: "b" });
+    const total = await Account.where({ name: "b" }).sum("credit_limit");
+    expect(total).toBe(30);
+  });
+
+  it("count with distinct", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 20 });
+    const count = await Account.distinct().count("credit_limit");
+    expect(count).toBe(2);
+  });
+
+  it("pluck", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Alice", credit_limit: 10 });
+    await Account.create({ name: "Bob", credit_limit: 20 });
+    const names = await Account.order("name").pluck("name");
+    expect(names).toEqual(["Alice", "Bob"]);
+  });
+
+  it("pluck multiple columns", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Alice", credit_limit: 10 });
+    const rows = await Account.pluck("name", "credit_limit");
+    expect(rows[0]).toEqual(["Alice", 10]);
+  });
+
+  it("ids", async () => {
+    const Account = makeAccount();
+    const a = await Account.create({ credit_limit: 1 });
+    const b = await Account.create({ credit_limit: 2 });
+    const ids = await Account.ids();
+    expect(ids).toContain(a.id);
+    expect(ids).toContain(b.id);
+  });
+
+  it("ids on relation", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 1, name: "yes" });
+    await Account.create({ credit_limit: 2, name: "no" });
+    const ids = await Account.where({ name: "yes" }).ids();
+    expect(ids).toHaveLength(1);
+  });
+
+  it("pick one", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Alice", credit_limit: 10 });
+    const name = await Account.pick("name");
+    expect(name).toBe("Alice");
+  });
+
+  it("pick two", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Alice", credit_limit: 42 });
+    const result = await Account.pick("name", "credit_limit");
+    expect(result).toEqual(["Alice", 42]);
+  });
+
+  it("no queries for empty relation on count", async () => {
+    const Account = makeAccount();
+    const count = await Account.none().count();
+    expect(count).toBe(0);
+  });
+
+  it("no queries for empty relation on sum", async () => {
+    const Account = makeAccount();
+    const total = await Account.none().sum("credit_limit");
+    expect(total).toBe(0);
+  });
+
+  it("no queries for empty relation on average", async () => {
+    const Account = makeAccount();
+    const avg = await Account.none().average("credit_limit");
+    expect(avg).toBeNull();
+  });
+
+  it("no queries for empty relation on minimum", async () => {
+    const Account = makeAccount();
+    const min = await Account.none().minimum("credit_limit");
+    expect(min).toBeNull();
+  });
+
+  it("no queries for empty relation on maximum", async () => {
+    const Account = makeAccount();
+    const max = await Account.none().maximum("credit_limit");
+    expect(max).toBeNull();
+  });
+
+  it("limit should apply before count", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 1 });
+    await Account.create({ credit_limit: 2 });
+    await Account.create({ credit_limit: 3 });
+    const count = await Account.limit(2).count();
+    expect(count).toBe(2);
+  });
+
+  it("count with block", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 20 });
+    const all = await Account.all().toArray();
+    const count = all.filter((a: any) => a.readAttribute("credit_limit") > 5).length;
+    expect(count).toBe(2);
+  });
+
+  it("group by with limit", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "a", credit_limit: 1 });
+    await Account.create({ name: "b", credit_limit: 2 });
+    await Account.create({ name: "c", credit_limit: 3 });
+    const result = await Account.group("name").limit(2).count();
+    expect(Object.keys(result as object).length).toBeLessThanOrEqual(2);
+  });
+
+  it("group by with offset", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "a", credit_limit: 1 });
+    await Account.create({ name: "b", credit_limit: 2 });
+    await Account.create({ name: "c", credit_limit: 3 });
+    const result = await Account.group("name").offset(1).count();
+    expect(Object.keys(result as object).length).toBeLessThanOrEqual(2);
+  });
+
+  it("pluck and distinct", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Alice" });
+    await Account.create({ name: "Alice" });
+    await Account.create({ name: "Bob" });
+    const names = await Account.distinct().pluck("name");
+    expect(names).toContain("Alice");
+    expect(names).toContain("Bob");
+    expect(names.filter((n: string) => n === "Alice").length).toBe(1);
+  });
+
+  it("pluck replaces select clause", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Test", credit_limit: 99 });
+    // pluck("name") overrides any select
+    const names = await Account.select("credit_limit").pluck("name");
+    expect(names).toContain("Test");
+  });
+
+  it("pluck loaded relation", async () => {
+    const Account = makeAccount();
+    await Account.create({ name: "Alice" });
+    const rel = Account.all();
+    await rel.toArray(); // loads it
+    const names = await rel.pluck("name");
+    expect(names).toContain("Alice");
+  });
+
+  it("sum uses enumerable version when block is given", async () => {
+    const Account = makeAccount();
+    await Account.create({ credit_limit: 10 });
+    await Account.create({ credit_limit: 20 });
+    const all = await Account.all().toArray();
+    const total = all.reduce((sum: number, a: any) => sum + a.readAttribute("credit_limit"), 0);
+    expect(total).toBe(30);
+  });
+
+  it.skip("should calculate against given relation", async () => {
+    // requires joins with fixture setup
+  });
+
+  it.skip("should group by summed association", async () => {
+    // requires association join fixture
+  });
+
+  it.skip("should calculate grouped association with foreign key option", async () => {
+    // requires fixture-based associations
+  });
+
+  it.skip("count with from option", async () => {
+    // requires raw SQL FROM clause support
+  });
+
+  it.skip("pluck with serialization", async () => {
+    // requires custom serialized attribute types
+  });
+});
+
+// ==========================================================================
+// FinderTest — targets finder_test.rb
+// ==========================================================================

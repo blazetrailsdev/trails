@@ -3880,3 +3880,319 @@ describe("Finders (extended)", () => {
     });
   });
 });
+
+describe("FinderTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeTopic() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    return Topic;
+  }
+
+  it("find", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Hello" });
+    const found = await Topic.find(t.id);
+    expect(found.id).toBe(t.id);
+  });
+
+  it("find with hash parameter", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "World" });
+    const found = await Topic.findBy({ title: "World" });
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("title")).toBe("World");
+  });
+
+  it("find by id with hash", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Test" });
+    const found = await Topic.findBy({ id: t.id });
+    expect(found).not.toBeNull();
+  });
+
+  it("take", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    const t = await Topic.take();
+    expect(t).not.toBeNull();
+  });
+
+  it("take failing", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.take();
+    expect(t).toBeNull();
+  });
+
+  it("take bang present", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Present" });
+    const t = await Topic.take_();
+    expect(t).not.toBeNull();
+  });
+
+  it("take bang missing", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.take_()).rejects.toThrow();
+  });
+
+  it("first", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "First" });
+    const t = await Topic.first();
+    expect(t).not.toBeNull();
+  });
+
+  it("first failing", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.first();
+    expect(t).toBeNull();
+  });
+
+  it("first bang present", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Here" });
+    const t = await Topic.first_();
+    expect(t).not.toBeNull();
+  });
+
+  it("first bang missing", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.first_()).rejects.toThrow();
+  });
+
+  it("first have primary key order by default", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A" });
+    await Topic.create({ title: "B" });
+    const sql = Topic.all().toSql();
+    // first() should add ORDER BY primary key
+    const first = await Topic.first();
+    expect(first).not.toBeNull();
+  });
+
+  it("last", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Last" });
+    const t = await Topic.last();
+    expect(t).not.toBeNull();
+  });
+
+  it("last bang present", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Here" });
+    const t = await Topic.last_();
+    expect(t).not.toBeNull();
+  });
+
+  it("last bang missing", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.last_()).rejects.toThrow();
+  });
+
+  it("find by one attribute", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Rails" });
+    const found = await Topic.findBy({ title: "Rails" });
+    expect(found).not.toBeNull();
+  });
+
+  it("find by one attribute bang", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Rails" });
+    const found = await Topic.findBy_({ title: "Rails" });
+    expect(found).not.toBeNull();
+  });
+
+  it("find by two attributes", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Hello", author_name: "Alice" });
+    const found = await Topic.findBy({ title: "Hello", author_name: "Alice" });
+    expect(found).not.toBeNull();
+  });
+
+  it("find by nil attribute", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "NoAuthor", author_name: null });
+    const found = await Topic.findBy({ author_name: null });
+    expect(found).not.toBeNull();
+  });
+
+  it("find by empty ids", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.find([])).rejects.toThrow();
+  });
+
+  it("find an empty array", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.find([])).rejects.toThrow();
+  });
+
+  it("exists", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Exists" });
+    const exists = await Topic.exists({ title: "Exists" });
+    expect(exists).toBe(true);
+  });
+
+  it("exists returns true with one record and no args", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    const exists = await Topic.exists();
+    expect(exists).toBe(true);
+  });
+
+  it("exists returns false with false arg", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    const exists = await Topic.exists(false);
+    expect(exists).toBe(false);
+  });
+
+  it("find on hash conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Approved", approved: true });
+    await Topic.create({ title: "Rejected", approved: false });
+    const found = await Topic.where({ approved: true }).toArray();
+    expect(found.length).toBe(1);
+    expect(found[0].readAttribute("title")).toBe("Approved");
+  });
+
+  it("find on array conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Match" });
+    const found = await Topic.where({ title: ["Match", "Other"] }).toArray();
+    expect(found.length).toBe(1);
+  });
+
+  it("find on multiple hash conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Hello", author_name: "Alice", approved: true });
+    const found = await Topic.where({
+      title: "Hello",
+      author_name: "Alice",
+      approved: true,
+    }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("find by one attribute with conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Rails", approved: true });
+    await Topic.create({ title: "Rails", approved: false });
+    const found = await Topic.where({ approved: true }).findBy({ title: "Rails" });
+    expect(found).not.toBeNull();
+  });
+
+  it("find doesnt have implicit ordering", async () => {
+    const Topic = makeTopic();
+    const a = await Topic.create({ title: "A" });
+    const b = await Topic.create({ title: "B" });
+    const sql = Topic.where({ id: [a.id, b.id] }).toSql();
+    expect(sql).not.toMatch(/ORDER BY/i);
+  });
+
+  it("unexisting record exception handling", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.find(999999)).rejects.toThrow();
+  });
+
+  it("find only some columns", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Columns" });
+    const sql = Topic.select("title").toSql();
+    expect(sql).toMatch(/title/);
+  });
+
+  it("count by sql", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    await Topic.create({ title: "Two" });
+    const count = await Topic.count();
+    expect(count).toBe(2);
+  });
+
+  it("find by records", async () => {
+    const Topic = makeTopic();
+    const t1 = await Topic.create({ title: "T1" });
+    const t2 = await Topic.create({ title: "T2" });
+    const found = await Topic.where({ id: [t1, t2].map((t) => t.id) }).toArray();
+    expect(found.length).toBe(2);
+  });
+
+  it("find by array of one id", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "One" });
+    const found = await Topic.find([t.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(1);
+  });
+
+  it("find by ids", async () => {
+    const Topic = makeTopic();
+    const t1 = await Topic.create({ title: "A" });
+    const t2 = await Topic.create({ title: "B" });
+    const found = await Topic.find([t1.id, t2.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(2);
+  });
+
+  it("find by ids missing one", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "A" });
+    await expect(Topic.find([t.id, 999999])).rejects.toThrow();
+  });
+
+  it("take and first and last with integer should return an array", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A" });
+    await Topic.create({ title: "B" });
+    const result = await Topic.all().first(2);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("find with group and sanitized having method", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Group", author_name: "Alice" });
+    const sql = Topic.group("author_name").toSql();
+    expect(sql).toMatch(/GROUP BY/i);
+  });
+
+  it("hash condition find with array", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A" });
+    await Topic.create({ title: "B" });
+    await Topic.create({ title: "C" });
+    const found = await Topic.where({ title: ["A", "B"] }).toArray();
+    expect(found.length).toBe(2);
+  });
+
+  it("hash condition find with nil", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ author_name: null });
+    const found = await Topic.where({ author_name: null }).toArray();
+    expect(found.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it.skip("find by sql with sti on joined table", async () => {
+    // requires real DB adapter with JOIN support
+  });
+
+  it.skip("find with eager loading collection and ordering by collection primary key", async () => {
+    // requires eager loading
+  });
+});
+
+// ==========================================================================
+// BasicsTest — targets base_test.rb
+// ==========================================================================

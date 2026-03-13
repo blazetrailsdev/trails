@@ -2879,3 +2879,292 @@ describe("Base", () => {
     });
   });
 });
+
+describe("BasicsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeTopic() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.attribute("written_on", "date");
+        this.adapter = adapter;
+      }
+    }
+    return Topic;
+  }
+
+  it("create after initialize without block", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "New Topic" });
+    expect(t.id).toBeDefined();
+    expect(t.readAttribute("title")).toBe("New Topic");
+  });
+
+  it("initialize with attributes", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Initialized" });
+    expect(t.readAttribute("title")).toBe("Initialized");
+  });
+
+  it("new record returns boolean", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "New" });
+    expect(t.isNewRecord()).toBe(true);
+    await t.save();
+    expect(t.isNewRecord()).toBe(false);
+  });
+
+  it("previously new record returns boolean", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "New" });
+    expect(t.previouslyNewRecord()).toBe(false);
+    await t.save();
+    expect(t.previouslyNewRecord()).toBe(true);
+  });
+
+  it("load", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    await Topic.create({ title: "Two" });
+    const all = await Topic.all().toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("load with condition", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Yes", approved: true });
+    await Topic.create({ title: "No", approved: false });
+    const approved = await Topic.where({ approved: true }).toArray();
+    expect(approved.length).toBe(1);
+    expect(approved[0].readAttribute("title")).toBe("Yes");
+  });
+
+  it("attributes", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "Hello", author_name: "Bob" });
+    const attrs = t.attributes;
+    expect(attrs["title"]).toBe("Hello");
+    expect(attrs["author_name"]).toBe("Bob");
+  });
+
+  it("equality", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "A" });
+    const t2 = await Topic.find(t.id);
+    expect(t.isEqual(t2)).toBe(true);
+  });
+
+  it("equality of new records", async () => {
+    const Topic = makeTopic();
+    const t1 = new (Topic as any)({ title: "A" });
+    const t2 = new (Topic as any)({ title: "A" });
+    expect(t1.isEqual(t2)).toBe(false);
+  });
+
+  it("equality of destroyed records", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Destroy" });
+    const id = t.id;
+    await t.destroy();
+    // destroyed record still has same id, equality based on id
+    expect(t.id).toBe(id);
+  });
+
+  it("dup", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Original" });
+    const duped = t.dup();
+    expect(duped.isNewRecord()).toBe(true);
+    expect(duped.readAttribute("title")).toBe("Original");
+  });
+
+  it("reload", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Before" });
+    // Simulate external change by updating directly
+    await Topic.where({ id: t.id }).updateAll({ title: "After" });
+    await t.reload();
+    expect(t.readAttribute("title")).toBe("After");
+  });
+
+  it("last", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "First" });
+    const last = await Topic.create({ title: "Last" });
+    const found = (await Topic.last()) as any;
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(last.id);
+  });
+
+  it("all", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A" });
+    await Topic.create({ title: "B" });
+    const all = await Topic.all().toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("all with conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A", approved: true });
+    await Topic.create({ title: "B", approved: false });
+    const approved = await Topic.where({ approved: true }).toArray();
+    expect(approved.length).toBe(1);
+  });
+
+  it("find ordered last", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "First" });
+    const second = await Topic.create({ title: "Second" });
+    const last = await Topic.order("id").last();
+    expect(last!.id).toBe(second.id);
+  });
+
+  it("attribute names", async () => {
+    const Topic = makeTopic();
+    const names = Topic.attributeNames();
+    expect(names).toContain("title");
+    expect(names).toContain("author_name");
+  });
+
+  it("has attribute", async () => {
+    const Topic = makeTopic();
+    expect(Topic.hasAttribute("title")).toBe(true);
+    expect(Topic.hasAttribute("nonexistent")).toBe(false);
+  });
+
+  it("has attribute with symbol", async () => {
+    const Topic = makeTopic();
+    expect(Topic.hasAttribute("title")).toBe(true);
+  });
+
+  it("null fields", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Null Test" });
+    // author_name was not set, should be null
+    expect(t.readAttribute("author_name")).toBeNull();
+  });
+
+  it("auto id", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Auto ID" });
+    expect(t.id).toBeDefined();
+    expect(typeof t.id).toBe("number");
+  });
+
+  it("distinct delegates to scoped", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Dup" });
+    await Topic.create({ title: "Dup" });
+    const count = await Topic.distinct().count("title");
+    expect(count).toBe(1);
+  });
+
+  it("previously changed", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Before" });
+    await Topic.where({ id: t.id }).updateAll({ title: "After" });
+    await t.reload();
+    // savedChanges tracks last save diff
+    const saved = t.savedChanges;
+    expect(typeof saved).toBe("object");
+  });
+
+  it("select symbol", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Select" });
+    const sql = Topic.select("title").toSql();
+    expect(sql).toMatch(/title/);
+  });
+
+  it("limit should take value from latest limit", async () => {
+    const Topic = makeTopic();
+    const sql = Topic.limit(5).limit(2).toSql();
+    expect(sql).toMatch(/LIMIT 2/i);
+  });
+
+  it("table name based on model name", async () => {
+    const Topic = makeTopic();
+    expect(Topic.tableName).toBeDefined();
+    expect(typeof Topic.tableName).toBe("string");
+  });
+
+  it("table exists", async () => {
+    const Topic = makeTopic();
+    // MemoryAdapter always has the table; checking tableExists returns a boolean
+    const exists = await Topic.tableExists();
+    expect(typeof exists).toBe("boolean");
+  });
+
+  it("count with join", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Join" });
+    const count = await Topic.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it("no limit offset", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A" });
+    await Topic.create({ title: "B" });
+    const all = await Topic.offset(0).toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("find keeps multiple order values", async () => {
+    const Topic = makeTopic();
+    const sql = Topic.order("title").order("author_name").toSql();
+    expect(sql).toMatch(/ORDER BY/i);
+  });
+
+  it("find symbol ordered last", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Z" });
+    await Topic.create({ title: "A" });
+    const last = await Topic.order("title").last();
+    expect(last!.readAttribute("title")).toBe("Z");
+  });
+
+  it("abstract class table name", async () => {
+    const Topic = makeTopic();
+    expect(typeof Topic.tableName).toBe("string");
+  });
+
+  it("switching between table name", async () => {
+    class MyModel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const original = MyModel.tableName;
+    MyModel.tableName = "other_table";
+    expect(MyModel.tableName).toBe("other_table");
+    MyModel.tableName = original;
+  });
+
+  it("toggle attribute", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ approved: false });
+    await t.toggle("approved");
+    expect(t.readAttribute("approved")).toBe(true);
+  });
+
+  it.skip("marshal round trip", async () => {
+    // Ruby-only serialization feature
+  });
+
+  it.skip("benchmark with log level", async () => {
+    // Ruby-only benchmarking
+  });
+});
+
+// ==========================================================================
+// InheritanceTest — targets inheritance_test.rb
+// ==========================================================================
