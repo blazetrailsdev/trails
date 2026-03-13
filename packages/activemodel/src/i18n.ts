@@ -62,11 +62,19 @@ function interpolate(str: string, options: Record<string, unknown>): string {
 }
 
 class I18nService {
-  locale: string = "en";
-  translations: Translations = {};
+  private _locale: string = "en";
+  private _translations: Translations = {};
+
+  get locale(): string {
+    return this._locale;
+  }
+
+  set locale(value: string) {
+    this._locale = value;
+  }
 
   constructor() {
-    this.storeTranslations("en", defaultEnTranslations);
+    this._storeTranslations("en", defaultEnTranslations);
   }
 
   t(key: string, options?: TranslateOptions): string {
@@ -94,20 +102,24 @@ class I18nService {
   }
 
   storeTranslations(locale: string, data: TranslationTree): void {
-    if (!this.translations[locale]) {
-      this.translations[locale] = {};
+    this._storeTranslations(locale, data);
+  }
+
+  private _storeTranslations(locale: string, data: TranslationTree): void {
+    if (!this._translations[locale]) {
+      this._translations[locale] = {};
     }
-    deepMerge(this.translations[locale], data);
+    deepMerge(this._translations[locale], data);
   }
 
   reset(): void {
-    this.translations = {};
-    this.locale = "en";
-    this.storeTranslations("en", defaultEnTranslations);
+    this._translations = {};
+    this._locale = "en";
+    this._storeTranslations("en", defaultEnTranslations);
   }
 
   private lookup(key: string): TranslationValue | undefined {
-    const localeData = this.translations[this.locale];
+    const localeData = this._translations[this._locale];
     if (!localeData) return undefined;
     return dig(localeData, key.split("."));
   }
@@ -124,7 +136,6 @@ class I18nService {
         return interpolate(str, options);
       }
     }
-    if (typeof value === "string") return value;
     return "";
   }
 }
@@ -169,7 +180,7 @@ const defaultEnTranslations: TranslationTree = {
   activemodel: {
     errors: {
       format: "%{attribute} %{message}",
-      messages: { ...messages },
+      messages: deepClone(messages),
     },
   },
   errors: {

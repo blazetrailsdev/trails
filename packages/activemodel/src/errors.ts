@@ -105,11 +105,9 @@ export class Errors {
 
   private interpolateMessage(msg: string, options?: Record<string, unknown>): string {
     if (!options) return msg;
-    let result = msg;
-    for (const [key, val] of Object.entries(options)) {
-      result = result.replace(`%{${key}}`, String(val));
-    }
-    return result;
+    return msg.replace(/%\{(\w+)\}/g, (_, key) => {
+      return options[key] !== undefined ? String(options[key]) : `%{${key}}`;
+    });
   }
 
   /**
