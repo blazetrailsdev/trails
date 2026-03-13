@@ -100,8 +100,17 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
 
-    it.skip("title confirmation with i18n attribute", () => {
-      // i18n not implemented yet
+    it("title confirmation with i18n attribute", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { confirmation: true });
+        }
+      }
+      const p = new Person({ title: "We the People" });
+      p._attributes.set("titleConfirmation", "We the Robots");
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("title")[0]).toMatch(/doesn't match Title/);
     });
   });
 });

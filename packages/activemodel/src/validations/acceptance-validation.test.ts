@@ -110,8 +110,14 @@ describe("ActiveModel", () => {
       expect(new Terms({ terms: true }).isValid()).toBe(true);
     });
 
-    it.skip("validates acceptance of for ruby class", () => {
-      // Ruby-specific class validation concept
+    it("validates acceptance of for ruby class", () => {
+      class Person extends Model {}
+      Person.attribute("terms", "string");
+      Person.validates("terms", { acceptance: true });
+      const p = new Person({ terms: "no" });
+      expect(p.isValid()).toBe(false);
+      const p2 = new Person({ terms: "1" });
+      expect(p2.isValid()).toBe(true);
     });
   });
 });

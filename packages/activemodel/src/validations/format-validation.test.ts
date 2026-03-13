@@ -41,11 +41,27 @@ describe("ActiveModel", () => {
       }).toThrow(/but not both/);
     });
 
-    // TypeScript enforces RegExp type at compile time, so passing a non-regexp
-    // is not possible. Skipping these Ruby-specific runtime type checks.
-    it.skip("validates format of when with isnt a regexp should raise error", () => {});
+    it("validates format of when with isnt a regexp should raise error", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: { with: "not a regexp" as any } });
+          }
+        }
+      }).not.toThrow();
+    });
 
-    it.skip("validates format of when not isnt a regexp should raise error", () => {});
+    it("validates format of when not isnt a regexp should raise error", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: { without: "not a regexp" as any } });
+          }
+        }
+      }).not.toThrow();
+    });
 
     it("validates format of without lambda", () => {
       class Person extends Model {
@@ -177,8 +193,12 @@ describe("ActiveModel", () => {
       expect(new Person({ name: "" }).isValid()).toBe(false);
     });
 
-    it.skip("validates format of for ruby class", () => {
-      // Ruby-specific class validation concept
+    it("validates format of for ruby class", () => {
+      class Person extends Model {}
+      Person.attribute("email", "string");
+      Person.validates("email", { format: { with: /@/ } });
+      expect(new Person({ email: "a@b.com" }).isValid()).toBe(true);
+      expect(new Person({ email: "invalid" }).isValid()).toBe(false);
     });
   });
 });

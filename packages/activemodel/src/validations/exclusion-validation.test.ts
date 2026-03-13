@@ -104,8 +104,12 @@ describe("ActiveModel", () => {
       expect(new Person({ status: "banned" }).isValid()).toBe(false);
     });
 
-    it.skip("validates exclusion of for ruby class", () => {
-      // Ruby-specific class validation concept
+    it("validates exclusion of for ruby class", () => {
+      class Person extends Model {}
+      Person.attribute("username", "string");
+      Person.validates("username", { exclusion: { in: ["admin", "root"] } });
+      expect(new Person({ username: "dean" }).isValid()).toBe(true);
+      expect(new Person({ username: "admin" }).isValid()).toBe(false);
     });
 
     it("validates exclusion of with range", () => {

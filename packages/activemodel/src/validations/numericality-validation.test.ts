@@ -397,8 +397,16 @@ describe("ActiveModel", () => {
       expect(new Person({ value: 101 }).isValid()).toBe(false);
     });
 
-    it.skip("validates numericality of with numeric only", () => {
-      // Ruby-specific Numeric class check — no clear TS equivalent
+    it("validates numericality of with numeric only", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: true });
+        }
+      }
+      expect(new Person({ value: "123" }).isValid()).toBe(true);
+      expect(new Person({ value: "123.45" }).isValid()).toBe(true);
+      expect(new Person({ value: "abc" }).isValid()).toBe(false);
     });
 
     it("validates numericality of with numeric only and nil allowed", () => {

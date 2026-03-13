@@ -747,6 +747,20 @@ export class Model {
     }
   }
 
+  static undefineAttributeMethods(): void {
+    for (const [name] of this._attributeDefinitions) {
+      for (const prefix of this._attributeMethodPrefixes) {
+        delete (this.prototype as any)[`${prefix}${name}`];
+      }
+      for (const suffix of this._attributeMethodSuffixes) {
+        delete (this.prototype as any)[`${name}${suffix}`];
+      }
+      for (const { prefix, suffix } of this._attributeMethodAffixes) {
+        delete (this.prototype as any)[`${prefix}${name}${suffix}`];
+      }
+    }
+  }
+
   // -- Naming (Phase 1300) --
 
   static get modelName(): ModelName {
