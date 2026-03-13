@@ -36,19 +36,13 @@ export default defineConfig(
     },
   },
   {
-    files: [
-      "packages/activesupport/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
-    ],
+    files: ["packages/activesupport/src/**/*.ts", "packages/rack/src/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unused-expressions": "off",
     },
   },
   {
-    files: [
-      "packages/activesupport/src/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
-    ],
+    files: ["packages/activesupport/src/**/*.ts", "packages/activerecord/src/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unsafe-function-type": "off",
       "no-empty": "off",
