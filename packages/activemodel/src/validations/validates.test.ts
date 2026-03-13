@@ -240,7 +240,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("ValidatesTest (missing)", () => {
+  describe("ValidatesTest", () => {
     it("validates with if as shared conditions", () => {
       class Person extends Model {
         static {

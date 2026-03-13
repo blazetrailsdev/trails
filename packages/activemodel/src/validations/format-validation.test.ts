@@ -98,7 +98,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("FormatValidationTest (missing)", () => {
+  describe("FormatValidationTest", () => {
     it("validate format with allow blank", () => {
       class Person extends Model {
         static {

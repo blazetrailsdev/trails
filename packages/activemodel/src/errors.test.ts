@@ -711,5 +711,65 @@ describe("ActiveModel", () => {
       expect(u.errors.added("name", "blank")).toBe(true);
       expect(u.errors.added("name", "invalid")).toBe(false);
     });
+
+    it("attribute_names only returns unique attribute names", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      e.add("name", "too_short");
+      e.add("age", "invalid");
+      expect(e.attributeNames).toEqual(["name", "age"]);
+      // Should not have duplicates
+      expect(e.attributeNames.length).toBe(2);
+    });
+
+    it("add, with type as symbol", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      expect(e.details[0].type).toBe("blank");
+      expect(e.get("name")).toContain("can't be blank");
+    });
+
+    it("added? handles symbol message", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      expect(e.added("name", "blank")).toBe(true);
+      expect(e.added("name", "invalid")).toBe(false);
+    });
+
+    it("added? returns false when checking for an error, but not providing message argument", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      // When checking with default type "invalid", should return false since we added "blank"
+      expect(e.added("name")).toBe(false);
+    });
+
+    it("added? returns false when checking for an error with an incorrect or missing option", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      expect(e.added("name", "too_short")).toBe(false);
+      expect(e.added("age", "blank")).toBe(false);
+    });
+
+    it("added? returns false when checking for an error by symbol and a different error with same message is present", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      // Even if the rendered message might be similar, type must match
+      expect(e.added("name", "present")).toBe(false);
+    });
+
+    it("of_kind? handles symbol message", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      expect(e.ofKind("name", "blank")).toBe(true);
+      expect(e.ofKind("name", "invalid")).toBe(false);
+    });
+
+    it("full_messages doesn't require the base object to respond to :errors", () => {
+      // Base object is a plain object without an errors property
+      const base = { name: "test" };
+      const errors = new Errors(base);
+      errors.add("name", "blank");
+      expect(errors.fullMessages).toEqual(["Name can't be blank"]);
+    });
   });
 });

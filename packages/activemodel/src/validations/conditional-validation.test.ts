@@ -66,7 +66,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("ConditionalValidationTest (missing)", () => {
+  describe("ConditionalValidationTest", () => {
     it("if validation using method true", () => {
       class Person extends Model {
         static {

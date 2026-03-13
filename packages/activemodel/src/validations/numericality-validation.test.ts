@@ -335,7 +335,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("NumericalityValidationTest (missing)", () => {
+  describe("NumericalityValidationTest", () => {
     it("validates numericality of with blank allowed", () => {
       class Person extends Model {
         static {
