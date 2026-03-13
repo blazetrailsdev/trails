@@ -1,12 +1,5 @@
 /**
- * Tests mirroring Rails activerecord/test/cases/associations/:
- *   - has_one_associations_test.rb
- *   - has_and_belongs_to_many_associations_test.rb
- *   - join_model_test.rb
- *   - nested_through_associations_test.rb
- *
- * Most tests use it.skip because they depend on a real database with fixtures.
- * A small subset of structural/in-memory tests run fully.
+ * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import {

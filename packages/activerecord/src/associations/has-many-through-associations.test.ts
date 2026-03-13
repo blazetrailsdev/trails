@@ -1,11 +1,5 @@
 /**
- * Tests for EagerAssociationTest and HasManyThroughAssociationsTest.
- * Mirrors Rails activerecord/test/cases/associations/eager_test.rb and
- * activerecord/test/cases/associations/has_many_through_associations_test.rb
- *
- * Tests that require a full SQL database (joins, STI, polymorphic, composite
- * primary keys, HABTM join tables, etc.) are skipped with it.skip.
- * Tests that can be meaningfully exercised with MemoryAdapter are implemented.
+ * Mirrors Rails activerecord/test/cases/associations/has_many_through_associations_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
