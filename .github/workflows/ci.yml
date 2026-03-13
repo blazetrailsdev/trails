@@ -12,47 +12,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run typecheck
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm typecheck
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
   prettier:
     name: Prettier
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run format:check
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
 
   sqlite-tests:
     name: SQLite Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx vitest run --no-file-parallelism
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run --no-file-parallelism
 
   postgres-tests:
     name: PostgreSQL Tests
@@ -73,12 +85,15 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx vitest run --no-file-parallelism
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run --no-file-parallelism
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
@@ -100,15 +115,18 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Set MariaDB to case-sensitive collation
         run: |
           mysql -h 127.0.0.1 -u root -e "ALTER DATABASE rails_js_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
-      - run: npx vitest run --no-file-parallelism
+      - run: pnpm vitest run --no-file-parallelism
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
 
@@ -117,14 +135,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       - name: Fetch Rails source
         run: bash scripts/api-compare/fetch-rails.sh
       - name: Fetch Rails test source + Rack
@@ -134,8 +155,8 @@ jobs:
       - name: Extract Ruby tests
         run: cd scripts/test-compare && ruby extract-ruby-tests.rb
       - name: API comparison
-        run: cd scripts/api-compare && npx tsx extract-ts-api.ts && npx tsx compare.ts
+        run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
       - name: Test comparison
-        run: cd scripts/test-compare && npx tsx extract-ts-tests.ts && npx tsx compare.ts
+        run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts
       - name: Convention comparison
-        run: cd scripts/test-compare && npx tsx convention-compare.ts
+        run: pnpm exec tsx scripts/test-compare/convention-compare.ts

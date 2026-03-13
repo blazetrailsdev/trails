@@ -13,6 +13,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@rails-ts/rack": "*"
+    "@rails-ts/rack": "workspace:*"
   }
 }

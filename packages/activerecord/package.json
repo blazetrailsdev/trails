@@ -9,9 +9,9 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@rails-ts/activesupport": "0.1.0",
-    "@rails-ts/arel": "0.1.0",
-    "@rails-ts/activemodel": "0.1.0"
+    "@rails-ts/activesupport": "workspace:*",
+    "@rails-ts/arel": "workspace:*",
+    "@rails-ts/activemodel": "workspace:*"
   },
   "files": [
     "dist"

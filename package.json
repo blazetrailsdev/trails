@@ -1,14 +1,12 @@
 {
   "name": "rails-ts",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.27.0",
   "scripts": {
     "build": "tsc --build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky install",
+    "prepare": "husky",
     "typecheck": "node scripts/typecheck.mjs",
     "lint": "eslint .",
     "test": "vitest run",
@@ -16,10 +14,10 @@
     "test:db": "PG_TEST_URL=postgres://postgres:postgres@localhost:25432/rails_js_test MYSQL_TEST_URL=mysql://root@localhost:13306/rails_js_test vitest run",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "api:compare": "cd scripts/api-compare && bash fetch-rails.sh && ruby extract-ruby-api.rb && npx tsx extract-ts-api.ts && npx tsx compare.ts",
-    "test:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx compare.ts",
-    "convention:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx convention-compare.ts",
-    "test:stubs": "npm run test:compare && npx tsx scripts/test-compare/generate-stubs.ts"
+    "api:compare": "cd scripts/api-compare && bash fetch-rails.sh && ruby extract-ruby-api.rb && pnpm tsx extract-ts-api.ts && pnpm tsx compare.ts",
+    "test:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && pnpm tsx extract-ts-tests.ts && pnpm tsx compare.ts",
+    "convention:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && pnpm tsx extract-ts-tests.ts && pnpm tsx convention-compare.ts",
+    "test:stubs": "pnpm test:compare && pnpm tsx scripts/test-compare/generate-stubs.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -48,5 +46,11 @@
     "commander": "^14.0.3",
     "mysql2": "^3.18.2",
     "pg": "^8.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
   }
 }
