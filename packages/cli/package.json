@@ -12,9 +12,9 @@
     "dist"
   ],
   "dependencies": {
-    "@rails-ts/activerecord": "*",
-    "@rails-ts/activesupport": "*",
-    "@rails-ts/rack": "*",
-    "@rails-ts/actionpack": "*"
+    "@rails-ts/activerecord": "workspace:*",
+    "@rails-ts/activesupport": "workspace:*",
+    "@rails-ts/rack": "workspace:*",
+    "@rails-ts/actionpack": "workspace:*"
   }
 }

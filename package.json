@@ -1,14 +1,12 @@
 {
   "name": "rails-ts",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.27.0",
   "scripts": {
     "build": "tsc --build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky install",
+    "prepare": "husky",
     "typecheck": "node scripts/typecheck.mjs",
     "lint": "eslint .",
     "test": "vitest run",
@@ -19,7 +17,7 @@
     "api:compare": "cd scripts/api-compare && bash fetch-rails.sh && ruby extract-ruby-api.rb && npx tsx extract-ts-api.ts && npx tsx compare.ts",
     "test:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx compare.ts",
     "convention:compare": "cd scripts/test-compare && bash fetch-rails-tests.sh && ruby extract-ruby-tests.rb && npx tsx extract-ts-tests.ts && npx tsx convention-compare.ts",
-    "test:stubs": "npm run test:compare && npx tsx scripts/test-compare/generate-stubs.ts"
+    "test:stubs": "pnpm test:compare && pnpm tsx scripts/test-compare/generate-stubs.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
