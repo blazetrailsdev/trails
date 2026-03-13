@@ -278,314 +278,145 @@ export const TEST_FILE_MAP: Record<string, FileMap> = {
   },
 
   // ==========================================================================
-  // ActiveModel
+  // ActiveModel — convention handles most; overrides for misc.test.ts and splits
   // ==========================================================================
   activemodel: {
     "dirty_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Dirty Tracking" },
-      { file: "activemodel.test.ts", describeBlock: "Dirty (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Dirty (advanced)" },
-      { file: "activemodel.test.ts", describeBlock: "Dirty JSON tests" },
-      { file: "activemodel.test.ts", describeBlock: "clearChangesInformation" },
-      { file: "activemodel.test.ts", describeBlock: "clearAttributeChanges" },
-      { file: "activemodel.test.ts", describeBlock: "changesToSave" },
-      { file: "activemodel.test.ts", describeBlock: "attributesInDatabase" },
-      { file: "activemodel.test.ts", describeBlock: "hasChangesToSave" },
-      { file: "activemodel.test.ts", describeBlock: "attributeChanged with from/to options" },
-      { file: "activemodel.test.ts", describeBlock: "willSaveChangeToAttribute" },
-      {
-        file: "activemodel.test.ts",
-        describeBlock:
-          "attributeInDatabase / attributeBeforeLastSave / changedAttributeNamesToSave",
-      },
-      {
-        file: "activemodel.test.ts",
-        describeBlock: "attributePreviouslyChanged / attributePreviouslyWas",
-      },
-      { file: "activemodel.test.ts", describeBlock: "DirtyTest" },
+      { file: "dirty.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "attributes_dirty_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Dirty (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Dirty (advanced)" },
-      { file: "activemodel.test.ts", describeBlock: "Dirty Tracking" },
-      { file: "activemodel.test.ts", describeBlock: "AttributesDirtyTest" },
+      { file: "attributes-dirty.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "Validators (extended)" },
-      { file: "activemodel.test.ts", describeBlock: "conditional validates (if/unless)" },
-      { file: "activemodel.test.ts", describeBlock: "validates_*_of shorthand methods" },
-      { file: "activemodel.test.ts", describeBlock: "strict validations" },
-      { file: "activemodel.test.ts", describeBlock: "custom validation contexts" },
-      { file: "activemodel.test.ts", describeBlock: "ValidationsTest" },
+      { file: "validations.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/presence_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Presence (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "PresenceValidationTest" },
+      { file: "validations/presence-validation.test.ts", describeBlock: "" },
     ],
     "validations/length_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Length (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "LengthValidationTest" },
+      { file: "validations/length-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/numericality_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Numericality (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validators (extended)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "numericality with in: range" },
-      { file: "activemodel.test.ts", describeBlock: "NumericalityValidationTest" },
+      { file: "validations/numericality-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/inclusion_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Inclusion (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "InclusionValidationTest" },
+      { file: "validations/inclusion-validation.test.ts", describeBlock: "" },
     ],
     "validations/exclusion_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Exclusion (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "ExclusionValidationTest" },
+      { file: "validations/exclusion-validation.test.ts", describeBlock: "" },
     ],
     "validations/format_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Format (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "FormatValidationTest" },
+      { file: "validations/format-validation.test.ts", describeBlock: "" },
     ],
     "validations/acceptance_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Acceptance (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "AcceptanceValidationTest" },
+      { file: "validations/acceptance-validation.test.ts", describeBlock: "" },
     ],
     "validations/confirmation_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Confirmation (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "ConfirmationValidator caseSensitive" },
-      { file: "activemodel.test.ts", describeBlock: "ConfirmationValidationTest" },
+      { file: "validations/confirmation-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/comparison_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "ComparisonValidator" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Comparison (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "ComparisonValidationTest" },
+      { file: "validations/comparison-validation.test.ts", describeBlock: "" },
     ],
-    "validations/callbacks_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Callbacks" },
-      { file: "activemodel.test.ts", describeBlock: "Callbacks (extended)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Callbacks (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Callbacks (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "CallbacksWithMethodNamesShouldBeCalled" },
-    ],
+    "validations/callbacks_test.rb": [{ file: "validations/callbacks.test.ts", describeBlock: "" }],
     "validations/absence_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Absence (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "validates_*_of shorthand methods" },
-      { file: "activemodel.test.ts", describeBlock: "AbsenceValidationTest" },
+      { file: "validations/absence-validation.test.ts", describeBlock: "" },
     ],
     "validations/conditional_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "conditional validates (if/unless)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Conditional (ported)" },
+      { file: "validations/conditional-validation.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/validates_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Validations" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Validates (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Validations (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "Validators (extended)" },
-      { file: "activemodel.test.ts", describeBlock: "validates_*_of shorthand methods" },
-      { file: "activemodel.test.ts", describeBlock: "withOptions()" },
-      { file: "activemodel.test.ts", describeBlock: "ValidatesTest" },
+      { file: "validations/validates.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "validations/validations_context_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "custom validation contexts" },
-      { file: "activemodel.test.ts", describeBlock: "Validations Context (ported)" },
+      { file: "validations/validations-context.test.ts", describeBlock: "" },
     ],
     "validations/with_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "validatesWith" },
-      { file: "activemodel.test.ts", describeBlock: "validatesEach" },
-      { file: "activemodel.test.ts", describeBlock: "Validations With Validation (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "ValidatesWithTest" },
+      { file: "validations/with-validation.test.ts", describeBlock: "" },
     ],
     "validations/i18n_generate_message_validation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Errors#generateMessage" },
+      { file: "validations/i18n-generate-message-validation.test.ts", describeBlock: "" },
+    ],
+    "validations/i18n_validation_test.rb": [
+      { file: "validations/i18n-validation.test.ts", describeBlock: "" },
     ],
     "errors_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Errors" },
-      { file: "activemodel.test.ts", describeBlock: "Errors (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Errors (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "Errors.on()" },
-      { file: "activemodel.test.ts", describeBlock: "Errors enhancements" },
-      { file: "activemodel.test.ts", describeBlock: "Errors#generateMessage" },
-      { file: "activemodel.test.ts", describeBlock: "errors.fullMessagesFor()" },
-      { file: "activemodel.test.ts", describeBlock: "errors.ofKind()" },
-      { file: "activemodel.test.ts", describeBlock: "ErrorsTest" },
+      { file: "errors.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "error_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Errors" },
-      { file: "activemodel.test.ts", describeBlock: "Error (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Errors (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "Errors enhancements" },
-      { file: "activemodel.test.ts", describeBlock: "Errors#generateMessage" },
-      { file: "activemodel.test.ts", describeBlock: "ErrorTest" },
+      { file: "error.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "nested_error_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Errors" },
-      { file: "activemodel.test.ts", describeBlock: "NestedError" },
-      { file: "activemodel.test.ts", describeBlock: "NestedErrorTest" },
-      { file: "activemodel.test.ts", describeBlock: "Errors enhancements" },
-    ],
+    "nested_error_test.rb": [{ file: "nested-error.test.ts", describeBlock: "" }],
     "callbacks_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Callbacks" },
-      { file: "activemodel.test.ts", describeBlock: "Callbacks (extended)" },
-      { file: "activemodel.test.ts", describeBlock: "Callbacks (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Callbacks (advanced features)" },
-      { file: "activemodel.test.ts", describeBlock: "callbacks with prepend option" },
-      { file: "activemodel.test.ts", describeBlock: "CallbacksTest" },
+      { file: "callbacks.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "naming_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Naming" },
-      { file: "activemodel.test.ts", describeBlock: "Naming (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Naming (advanced)" },
-      { file: "activemodel.test.ts", describeBlock: "humanAttributeName()" },
-      { file: "activemodel.test.ts", describeBlock: "NamingWithSuppliedModelNameTest" },
-      { file: "activemodel.test.ts", describeBlock: "NamingWithSuppliedLocaleTest" },
-      { file: "activemodel.test.ts", describeBlock: "NamingUsingRelativeModelNameTest" },
-      {
-        file: "activemodel.test.ts",
-        describeBlock: "NamingWithNamespacedModelInIsolatedNamespaceTest",
-      },
-      { file: "activemodel.test.ts", describeBlock: "OverridingAccessorsTest" },
-      { file: "activemodel.test.ts", describeBlock: "NamingHelpersTest" },
-      { file: "activemodel.test.ts", describeBlock: "NamingTest" },
-      {
-        file: "activemodel.test.ts",
-        describeBlock: "NamingWithNamespacedModelInSharedNamespaceTest",
-      },
+      { file: "naming.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "serialization_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Serialization" },
-      { file: "activemodel.test.ts", describeBlock: "Serialization (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "toXml()" },
-      { file: "activemodel.test.ts", describeBlock: "fromJson" },
-      { file: "activemodel.test.ts", describeBlock: "SerializationTest" },
+      { file: "serialization.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "attributes_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Attributes (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Types" },
-      { file: "activemodel.test.ts", describeBlock: "attributeBeforeTypeCast" },
-      { file: "activemodel.test.ts", describeBlock: "attributesBeforeTypeCast" },
-      { file: "activemodel.test.ts", describeBlock: "hasAttribute" },
-      { file: "activemodel.test.ts", describeBlock: "attributeNames (instance)" },
-      { file: "activemodel.test.ts", describeBlock: "AttributesTest" },
+      { file: "attributes.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "attribute_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Attribute Object API" },
-      { file: "activemodel.test.ts", describeBlock: "attributeBeforeTypeCast" },
-      { file: "activemodel.test.ts", describeBlock: "Dirty Tracking" },
-      { file: "activemodel.test.ts", describeBlock: "AttributeTest" },
+      { file: "attribute.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "attribute_registration_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Attribute Registration" },
-      { file: "activemodel.test.ts", describeBlock: "Types" },
-      { file: "activemodel.test.ts", describeBlock: "TypeRegistry" },
-      { file: "activemodel.test.ts", describeBlock: "typeForAttribute" },
-      { file: "activemodel.test.ts", describeBlock: "AttributeRegistrationTest" },
+      { file: "attribute-registration.test.ts", describeBlock: "" },
     ],
     "attribute_assignment_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Attribute Assignment (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "AttributeAssignmentTest" },
+      { file: "attribute-assignment.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "access_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Access" },
-    ],
+    "access_test.rb": [{ file: "access.test.ts", describeBlock: "" }],
     "model_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Model (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "API tests" },
-      { file: "activemodel.test.ts", describeBlock: "isPersisted" },
-      { file: "activemodel.test.ts", describeBlock: "ModelTest" },
+      { file: "model.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "api_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "API tests" },
-      { file: "activemodel.test.ts", describeBlock: "Model (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "isPersisted" },
-      { file: "activemodel.test.ts", describeBlock: "APITest" },
+      { file: "api.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "conversion_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "toModel" },
-      { file: "activemodel.test.ts", describeBlock: "Conversion (toKey/toParam)" },
-      { file: "activemodel.test.ts", describeBlock: "Conversion (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "Naming" },
-      { file: "activemodel.test.ts", describeBlock: "isPersisted" },
-      { file: "activemodel.test.ts", describeBlock: "ConversionTest" },
+      { file: "conversion.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
     "attribute_methods_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "respondTo" },
-      { file: "activemodel.test.ts", describeBlock: "Attribute Methods" },
-      { file: "activemodel.test.ts", describeBlock: "attribute method prefix/suffix/affix" },
-      { file: "activemodel.test.ts", describeBlock: "attributeMissing" },
-      { file: "activemodel.test.ts", describeBlock: "AttributeMethodsTest" },
+      { file: "attribute-methods.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "translation_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "humanAttributeName()" },
-      { file: "activemodel.test.ts", describeBlock: "Naming" },
-      { file: "activemodel.test.ts", describeBlock: "Translation (basic)" },
-      { file: "activemodel.test.ts", describeBlock: "i18nScope" },
-      { file: "activemodel.test.ts", describeBlock: "ActiveModelI18nTests" },
-    ],
+    "translation_test.rb": [{ file: "translation.test.ts", describeBlock: "" }],
     "serializers/json_serialization_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "JSON Serialization (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "JSON Serialization (root in JSON)" },
-      { file: "activemodel.test.ts", describeBlock: "Serialization (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "JsonSerializationTest" },
+      { file: "serializers/json-serialization.test.ts", describeBlock: "" },
+      { file: "misc.test.ts", describeBlock: "" },
     ],
-    "type/string_test.rb": [{ file: "activemodel.test.ts", describeBlock: "Types" }],
-    "type/integer_test.rb": [{ file: "activemodel.test.ts", describeBlock: "Attributes" }],
-    "type/boolean_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Attributes" },
-      { file: "activemodel.test.ts", describeBlock: "Type Boolean (ported)" },
-    ],
-    "type/date_test.rb": [{ file: "activemodel.test.ts", describeBlock: "DateType" }],
-    "type/date_time_test.rb": [{ file: "activemodel.test.ts", describeBlock: "DateTimeType" }],
-    "type/decimal_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "DecimalType" },
-      { file: "activemodel.test.ts", describeBlock: "Type Decimal (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "DecimalTest" },
-    ],
-    "type/registry_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "TypeRegistry" },
-      { file: "activemodel.test.ts", describeBlock: "Type Registry (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "RegistryTest" },
-    ],
-    "type/big_integer_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Types" },
-      { file: "activemodel.test.ts", describeBlock: "Type BigInteger" },
-    ],
-    "type/float_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Types" },
-      { file: "activemodel.test.ts", describeBlock: "Type Float (ported)" },
-      { file: "activemodel.test.ts", describeBlock: "FloatTest" },
-    ],
-    "type/time_test.rb": [{ file: "activemodel.test.ts", describeBlock: "Types" }],
-    "type/value_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Types" },
-      { file: "activemodel.test.ts", describeBlock: "Type Value" },
-    ],
-    "type/immutable_string_test.rb": [
-      { file: "activemodel.test.ts", describeBlock: "Types" },
-      { file: "activemodel.test.ts", describeBlock: "Type ImmutableString" },
-    ],
+    "type/string_test.rb": [{ file: "type/value.test.ts", describeBlock: "" }],
+    "type/integer_test.rb": [{ file: "type/integer.test.ts", describeBlock: "" }],
+    "type/boolean_test.rb": [{ file: "type/boolean.test.ts", describeBlock: "" }],
+    "type/date_test.rb": [{ file: "type/date.test.ts", describeBlock: "" }],
+    "type/date_time_test.rb": [{ file: "type/date-time.test.ts", describeBlock: "" }],
+    "type/decimal_test.rb": [{ file: "type/decimal.test.ts", describeBlock: "" }],
+    "type/registry_test.rb": [{ file: "type/registry.test.ts", describeBlock: "" }],
+    "type/big_integer_test.rb": [{ file: "type/big-integer.test.ts", describeBlock: "" }],
+    "type/float_test.rb": [{ file: "type/float.test.ts", describeBlock: "" }],
+    "type/time_test.rb": [{ file: "type/date-time.test.ts", describeBlock: "" }],
+    "type/value_test.rb": [{ file: "type/value.test.ts", describeBlock: "" }],
+    "type/immutable_string_test.rb": [{ file: "type/immutable-string.test.ts", describeBlock: "" }],
   },
 
   // ==========================================================================
@@ -2590,7 +2421,6 @@ export const SKIP_FILES: string[] = [
   "railtie_test.rb",
   "forbidden_attributes_protection_test.rb",
   "type/serialize_cast_value_test.rb",
-  "validations/i18n_validation_test.rb",
   "secure_password_test.rb",
   "attribute_set_test.rb",
   "type/binary_test.rb",
@@ -2957,982 +2787,7 @@ export const TEST_OVERRIDES: Record<string, string | null> = {
   "AttributeTest > can be constructed with an exclusive range":
     "Arel > Attribute between (range variants) > can be constructed with an exclusive range",
 
-  // ==========================================================================
-  // ActiveModel overrides
-  // ==========================================================================
-  "AccessTest > slice": "ActiveModel > Access > slice",
-  "AccessTest > slice with array": "ActiveModel > Access > slice with array",
-  "AccessTest > values_at": "ActiveModel > Access > values_at",
-  "AccessTest > values_at with array": "ActiveModel > Access > values_at with array",
-  "APITest > initialize with params": "ActiveModel > Model (ported) > initialize with params",
-  "APITest > initialize with nil or empty hash params does not explode":
-    "ActiveModel > Model (ported) > initialize with nil or empty hash params does not explode",
-  "APITest > mixin inclusion chain": "ActiveModel > API tests > mixin inclusion chain",
-  "AttributeAssignmentTest > simple assignment":
-    "ActiveModel > Attribute Assignment (ported) > simple assignment",
-  "AttributeAssignmentTest > regular hash should still be used for mass assignment":
-    "ActiveModel > Attribute Assignment (ported) > regular hash should still be used for mass assignment",
-  "AttributeMethodsTest > method missing works correctly even if attributes method is not defined":
-    "ActiveModel > Attribute Methods > method missing works correctly even if attributes method is not defined",
-  "AttributeMethodsTest > unrelated classes should not share attribute method matchers":
-    "ActiveModel > Attribute Methods > unrelated classes should not share attribute method matchers",
-  "AttributeMethodsTest > #define_attribute_method generates attribute method":
-    "ActiveModel > Attribute Methods > #define_attribute_method generates attribute method",
-  "AttributeMethodsTest > #define_attribute_methods defines alias attribute methods after undefining":
-    "ActiveModel > Attribute Methods > #define_attribute_methods defines alias attribute methods after undefining",
-  "AttributeMethodsTest > #undefine_attribute_methods removes attribute methods":
-    "ActiveModel > Attribute Methods > #undefine_attribute_methods removes attribute methods",
-  "AttributeMethodsTest > accessing a suffixed attribute":
-    "ActiveModel > Attribute Methods > accessing a suffixed attribute",
-  "AttributeMethodsTest > should not interfere with method_missing if the attr has a private/protected method":
-    "ActiveModel > Attribute Methods > should not interfere with method_missing if the attr has a private/protected method",
-  "AttributeMethodsTest > should use attribute_missing to dispatch a missing attribute":
-    "ActiveModel > Attribute Methods > should use attribute_missing to dispatch a missing attribute",
-  "AttributeMethodsTest > name clashes are handled":
-    "ActiveModel > Attribute Methods > name clashes are handled",
-  "AttributeRegistrationTest > the default type is used when type is omitted":
-    "ActiveModel > Attribute Registration > the default type is used when type is omitted",
-  "AttributeRegistrationTest > type is resolved when specified by name":
-    "ActiveModel > Attribute Registration > type is resolved when specified by name",
-  "AttributeRegistrationTest > .attribute_types reflects registered attribute types":
-    "ActiveModel > Attribute Registration > .attribute_types reflects registered attribute types",
-  "AttributeRegistrationTest > .decorate_attributes decorates specified attributes":
-    "ActiveModel > Attribute Registration > .decorate_attributes decorates specified attributes",
-  "AttributeRegistrationTest > .decorate_attributes stacks decorators":
-    "ActiveModel > Attribute Registration > .decorate_attributes stacks decorators",
-  "AttributeRegistrationTest > re-registering an attribute overrides previous decorators":
-    "ActiveModel > Attribute Registration > re-registering an attribute overrides previous decorators",
-  "AttributeTest > from_database + read type casts from database":
-    "ActiveModel > Attribute Object API > from_database + read type casts from database",
-  "AttributeTest > from_user + read type casts from user":
-    "ActiveModel > Attribute Object API > from_user + read type casts from user",
-  "AttributeTest > reading memoizes the value":
-    "ActiveModel > Attribute Object API > reading memoizes the value",
-  "AttributeTest > reading memoizes falsy values":
-    "ActiveModel > Attribute Object API > reading memoizes falsy values",
-  "AttributeTest > from_database + value_for_database type casts to and from database":
-    "ActiveModel > Attribute Object API > from_database + value_for_database type casts to and from database",
-  "AttributeTest > duping dups the value":
-    "ActiveModel > Attribute Object API > duping dups the value",
-  "AttributeTest > with_value_from_user returns a new attribute with the value from the user":
-    "ActiveModel > Attribute Object API > with_value_from_user returns a new attribute with the value from the user",
-  "AttributeTest > with_value_from_database returns a new attribute with the value from the database":
-    "ActiveModel > Attribute Object API > with_value_from_database returns a new attribute with the value from the database",
-  "AttributeTest > uninitialized attributes have no value":
-    "ActiveModel > Attribute Object API > uninitialized attributes have no value",
-  "AttributeTest > attributes equal other attributes with the same constructor arguments":
-    "ActiveModel > Attribute Object API > attributes equal other attributes with the same constructor arguments",
-  "AttributeTest > an attribute has not been read by default":
-    "ActiveModel > Attribute Object API > an attribute has not been read by default",
-  "AttributeTest > with_type preserves mutations":
-    "ActiveModel > Attribute Object API > with_type preserves mutations",
-  "AttributesDirtyTest > checking if an attribute has changed to a particular value":
-    "ActiveModel > Dirty (ported) > checking if an attribute has changed to a particular value",
-  "AttributesDirtyTest > attribute mutation": "ActiveModel > Dirty (advanced) > attribute mutation",
-  "AttributesDirtyTest > saving should reset model's changed status":
-    "ActiveModel > Dirty (ported) > saving should reset model's changed status",
-  "AttributesDirtyTest > saving should preserve model's previous changed status":
-    "ActiveModel > Dirty (ported) > saving should preserve model's previous changed status",
-  "AttributesDirtyTest > previous value is preserved when changed after save":
-    "ActiveModel > Dirty (ported) > previous value is preserved when changed after save",
-  "AttributesDirtyTest > using attribute_will_change! with a symbol":
-    "ActiveModel > Dirty (advanced) > using attribute_will_change! with a symbol",
-  "AttributesTest > properties assignment":
-    "ActiveModel > Attributes (ported) > properties assignment",
-  "AttributesTest > reading attributes": "ActiveModel > Attributes (ported) > reading attributes",
-  "AttributesTest > reading attribute names":
-    "ActiveModel > Attributes (ported) > reading attribute names",
-  "AttributesTest > children can override parents":
-    "ActiveModel > Attributes (ported) > children can override parents",
-  "AttributesTest > attributes can be dup-ed":
-    "ActiveModel > Attributes (ported) > attributes can be dup-ed",
-  "BooleanTest > type cast boolean": "ActiveModel > Type Boolean (ported) > type cast boolean",
-  "BigIntegerTest > type cast big integer": "ActiveModel > Type BigInteger > type cast big integer",
-  "BigIntegerTest > BigInteger small values":
-    "ActiveModel > Type BigInteger > BigInteger small values",
-  "CallbacksTest > the callback chain is not halted when around or after callbacks return false":
-    "ActiveModel > Callbacks (advanced features) > the callback chain is not halted when around or after callbacks return false",
-  "CallbacksTest > the callback chain is halted when a callback throws :abort":
-    "ActiveModel > Callbacks (ported) > the callback chain is halted when a callback throws :abort",
-  "CallbacksTest > only selects which types of callbacks should be created":
-    "ActiveModel > Callbacks (ported) > only selects which types of callbacks should be created",
-  "CallbacksTest > the :if option array should not be mutated by an after callback":
-    "ActiveModel > Callbacks (advanced features) > the :if option array should not be mutated by an after callback",
-  "CallbacksTest > after_create callbacks with both callbacks declared in one line":
-    "ActiveModel > Callbacks (ported) > after_create callbacks with both callbacks declared in one line",
-  "CallbacksWithMethodNamesShouldBeCalled > before validation and after validation callbacks should be called in declared order":
-    "ActiveModel > Validations Callbacks (ported) > before validation and after validation callbacks should be called in declared order",
-  "CallbacksWithMethodNamesShouldBeCalled > further callbacks should not be called if before validation throws abort":
-    "ActiveModel > Validations Callbacks (ported) > further callbacks should not be called if before validation throws abort",
-  "CallbacksWithMethodNamesShouldBeCalled > if condition is respected for before validation":
-    "ActiveModel > Callbacks (advanced features) > if condition is respected for before validation",
-  "CallbacksWithMethodNamesShouldBeCalled > on condition is respected for validation with matching context":
-    "ActiveModel > Callbacks (advanced features) > on condition is respected for validation with matching context",
-  "CallbacksWithMethodNamesShouldBeCalled > validation test should be done":
-    "ActiveModel > Validations Callbacks (ported) > validation test should be done",
-  "ComparisonValidationTest > validates comparison of multiple values":
-    "ActiveModel > Validations Comparison (ported) > validates comparison of multiple values",
-  "ComparisonValidationTest > validates comparison with equal to using numeric":
-    "ActiveModel > Validations Comparison (ported) > validates comparison with equal to using numeric",
-  "ComparisonValidationTest > validates comparison with greater than or equal to using numeric":
-    "ActiveModel > Validations Comparison (ported) > validates comparison with greater than or equal to using numeric",
-  "ComparisonValidationTest > validates comparison with less than or equal to using numeric":
-    "ActiveModel > Validations Comparison (ported) > validates comparison with less than or equal to using numeric",
-  "ComparisonValidationTest > validates comparison with nil allowed":
-    "ActiveModel > Validations Comparison (ported) > validates comparison with nil allowed",
-  "ComparisonValidationTest > validates comparison with other than using numeric":
-    "ActiveModel > Validations Comparison (ported) > validates comparison with other than using numeric",
-  "ComparisonValidationTest > validates comparison with proc":
-    "ActiveModel > Validations Comparison (ported) > validates comparison with proc",
-  "ConditionalValidationTest > if validation using block false":
-    "ActiveModel > Validations Conditional (ported) > if validation using block false",
-  "ConditionalValidationTest > if validation using block true":
-    "ActiveModel > Validations Conditional (ported) > if validation using block true",
-  "ConditionalValidationTest > unless validation using block false":
-    "ActiveModel > Validations Conditional (ported) > unless validation using block false",
-  "ConditionalValidationTest > unless validation using block true":
-    "ActiveModel > Validations Conditional (ported) > unless validation using block true",
-  "ConditionalValidationTest > validation using combining if true and unless false conditions":
-    "ActiveModel > Validations Conditional (ported) > validation using combining if true and unless false conditions",
-  "ConditionalValidationTest > validation using combining if true and unless true conditions":
-    "ActiveModel > Validations Conditional (ported) > validation using combining if true and unless true conditions",
-  "ConfirmationValidationTest > title confirmation":
-    "ActiveModel > Validations Confirmation (ported) > title confirmation",
-  "ConfirmationValidationTest > no title confirmation":
-    "ActiveModel > Validations Confirmation (ported) > no title confirmation",
-  "ConfirmationValidationTest > title confirmation with case sensitive option true":
-    "ActiveModel > Validations Confirmation (ported) > title confirmation with case sensitive option true",
-  "ConfirmationValidationTest > title confirmation with case sensitive option false":
-    "ActiveModel > Validations Confirmation (ported) > title confirmation with case sensitive option false",
-  "ConversionTest > to_key default implementation returns nil for new records":
-    "ActiveModel > Conversion (ported) > to_key default implementation returns nil for new records",
-  "ConversionTest > to_key default implementation returns the id in an array for persisted records":
-    "ActiveModel > Conversion (toKey/toParam) > to_key default implementation returns the id in an array for persisted records",
-  "ConversionTest > to_param default implementation returns a string of ids for persisted records":
-    "ActiveModel > Conversion (toKey/toParam) > to_param default implementation returns a string of ids for persisted records",
-  "ConversionTest > to_param default implementation returns nil for new records":
-    "ActiveModel > Conversion (ported) > to_param default implementation returns nil for new records",
-  "ConversionTest > to_param returns the string joined by '-'":
-    "ActiveModel > Conversion (toKey/toParam) > to_param returns the string joined by '-'",
-  "ConversionTest > to_partial_path default implementation returns a string giving a relative path":
-    "ActiveModel > Conversion (ported) > to_partial_path default implementation returns a string giving a relative path",
-  "DecimalTest > type cast decimal": "ActiveModel > Type Decimal (ported) > type cast decimal",
-  "DecimalTest > type cast decimal from invalid string":
-    "ActiveModel > Type Decimal (ported) > type cast decimal from invalid string",
-  "DirtyTest > setting attribute will result in change":
-    "ActiveModel > Dirty (ported) > setting attribute will result in change",
-  "DirtyTest > list of changed attribute keys":
-    "ActiveModel > Dirty (ported) > list of changed attribute keys",
-  "DirtyTest > changes to attribute values":
-    "ActiveModel > Dirty (ported) > changes to attribute values",
-  "DirtyTest > changing the same attribute multiple times retains the correct original value":
-    "ActiveModel > Dirty (ported) > changing the same attribute multiple times retains the correct original value",
-  "DirtyTest > checking if an attribute was previously changed to a particular value":
-    "ActiveModel > Dirty (ported) > checking if an attribute was previously changed to a particular value",
-  "DirtyTest > clear_changes_information should reset all changes":
-    "ActiveModel > Dirty (ported) > clear_changes_information should reset all changes",
-  "DirtyTest > model can be dup-ed without Attributes":
-    "ActiveModel > Dirty (advanced) > model can be dup-ed without Attributes",
-  "DirtyTest > resetting attribute": "ActiveModel > Dirty (ported) > resetting attribute",
-  "DirtyTest > restore_attributes should restore all previous data":
-    "ActiveModel > Dirty (ported) > restore_attributes should restore all previous data",
-  "DirtyTest > saving should preserve previous changes":
-    "ActiveModel > Dirty (ported) > saving should preserve previous changes",
-  "DirtyTest > saving should preserve model's previous changed status":
-    "ActiveModel > Dirty (ported) > saving should preserve model's previous changed status",
-  "DirtyTest > saving should reset model's changed status":
-    "ActiveModel > Dirty (ported) > saving should reset model's changed status",
-  "DirtyTest > setting color to same value should not result in change being recorded":
-    "ActiveModel > Dirty (ported) > setting color to same value should not result in change being recorded",
-  "DirtyTest > setting new attributes should not affect previous changes":
-    "ActiveModel > Dirty (ported) > setting new attributes should not affect previous changes",
-  "DirtyTest > previous value is preserved when changed after save":
-    "ActiveModel > Dirty (ported) > previous value is preserved when changed after save",
-  "DirtyTest > attribute mutation": "ActiveModel > Dirty (advanced) > attribute mutation",
-  "DirtyTest > using attribute_will_change! with a symbol":
-    "ActiveModel > Dirty (advanced) > using attribute_will_change! with a symbol",
-  "DirtyTest > to_json should work on model":
-    "ActiveModel > Dirty JSON tests > to_json should work on model",
-  "DirtyTest > to_json should work on model after save":
-    "ActiveModel > Dirty JSON tests > to_json should work on model after save",
-  "DirtyTest > to_json should work on model with :except array option":
-    "ActiveModel > Dirty JSON tests > to_json should work on model with :except array option",
-  "DirtyTest > to_json should work on model with :except string option":
-    "ActiveModel > Dirty JSON tests > to_json should work on model with :except string option",
-  "ErrorTest > initialize": "ActiveModel > Error (ported) > initialize",
-  "ErrorTest > initialize without type": "ActiveModel > Error (ported) > initialize without type",
-  "ErrorTest > match? handles attribute match":
-    "ActiveModel > Error (ported) > match? handles attribute match",
-  "ErrorTest > match? handles error type match":
-    "ActiveModel > Error (ported) > match? handles error type match",
-  "ErrorTest > message with type as custom message":
-    "ActiveModel > Error (ported) > message with type as custom message",
-  "ErrorTest > message with options[:message] as custom message":
-    "ActiveModel > Error (ported) > message with options[:message] as custom message",
-  "ErrorTest > message renders lazily using current locale":
-    "ActiveModel > Errors (advanced features) > message renders lazily using current locale",
-  "ErrorTest > message uses current locale":
-    "ActiveModel > Errors (advanced features) > message uses current locale",
-  "ErrorTest > equality by base attribute, type and options":
-    "ActiveModel > Error (ported) > equality by base attribute, type and options",
-  "ErrorTest > inequality": "ActiveModel > Error (ported) > inequality",
-  "ErrorTest > full_message returns the given message when the attribute contains base":
-    "ActiveModel > Error (ported) > full_message returns the given message when the attribute contains base",
-  "ErrorTest > details which ignores callback and message options":
-    "ActiveModel > Error (ported) > details which ignores callback and message options",
-  "ErrorsTest > delete": "ActiveModel > Errors (ported) > delete",
-  "ErrorsTest > each when arity is negative":
-    "ActiveModel > Errors (ported) > each when arity is negative",
-  "ErrorsTest > any?": "ActiveModel > Errors (ported) > any?",
-  "ErrorsTest > has key?": "ActiveModel > Errors (ported) > has key?",
-  "ErrorsTest > has no key": "ActiveModel > Errors (ported) > has no key",
-  "ErrorsTest > attribute_names returns an empty array after try to get a message only":
-    "ActiveModel > Errors (ported) > attribute_names returns an empty array after try to get a message only",
-  "ErrorsTest > include? does not add a key to messages hash":
-    "ActiveModel > Errors (ported) > include? does not add a key to messages hash",
-  "ErrorsTest > add, with type as String":
-    "ActiveModel > Errors (ported) > add, with type as String",
-  "ErrorsTest > added? detects indifferent if a specific error was added to the object":
-    "ActiveModel > Errors (ported) > added? detects indifferent if a specific error was added to the object",
-  "ErrorsTest > added? handles proc messages":
-    "ActiveModel > Errors (advanced features) > added? handles proc messages",
-  "ErrorsTest > added? ignores callback option":
-    "ActiveModel > Errors (advanced features) > added? ignores callback option",
-  "ErrorsTest > added? matches the given message when several errors are present for the same attribute":
-    "ActiveModel > Errors (ported) > added? matches the given message when several errors are present for the same attribute",
-  "ErrorsTest > added? returns false when checking a nonexisting error and other errors are present for the given attribute":
-    "ActiveModel > Errors (ported) > added? returns false when checking a nonexisting error and other errors are present for the given attribute",
-  "ErrorsTest > added? returns false when no errors are present":
-    "ActiveModel > Errors (ported) > added? returns false when no errors are present",
-  "ErrorsTest > as_json creates a json formatted representation of the errors hash":
-    "ActiveModel > Errors (ported) > as_json creates a json formatted representation of the errors hash",
-  "ErrorsTest > clear removes details": "ActiveModel > Errors (ported) > clear removes details",
-  "ErrorsTest > copy errors": "ActiveModel > Errors (ported) > copy errors",
-  "ErrorsTest > count calculates the number of error messages":
-    "ActiveModel > Errors (ported) > count calculates the number of error messages",
-  "ErrorsTest > delete returns nil when no errors were deleted":
-    "ActiveModel > Errors (ported) > delete returns nil when no errors were deleted",
-  "ErrorsTest > details do not include message option":
-    "ActiveModel > Errors (ported) > details do not include message option",
-  "ErrorsTest > details retains original type as error":
-    "ActiveModel > Errors (ported) > details retains original type as error",
-  "ErrorsTest > details returns added error detail with custom option":
-    "ActiveModel > Errors (ported) > details returns added error detail with custom option",
-  "ErrorsTest > dup duplicates details":
-    "ActiveModel > Errors (advanced features) > dup duplicates details",
-  "ErrorsTest > errors are marshalable":
-    "ActiveModel > Errors (advanced features) > errors are marshalable",
-  "ErrorsTest > full_message returns the given message when attribute is :base":
-    "ActiveModel > Errors (ported) > full_message returns the given message when attribute is :base",
-  "ErrorsTest > full_message returns the given message with the attribute name included":
-    "ActiveModel > Errors (ported) > full_message returns the given message with the attribute name included",
-  "ErrorsTest > full_messages doesn't require the base object to respond to `:errors":
-    "ActiveModel > Errors (advanced features) > full_messages doesn't require the base object to respond to :errors",
-  "ErrorsTest > full_messages_for contains all the error messages for the given attribute indifferent":
-    "ActiveModel > Errors (ported) > full_messages_for contains all the error messages for the given attribute indifferent",
-  "ErrorsTest > full_messages_for does not contain error messages from other attributes":
-    "ActiveModel > Errors (ported) > full_messages_for does not contain error messages from other attributes",
-  "ErrorsTest > full_messages_for returns an empty list in case there are no errors for the given attribute":
-    "ActiveModel > Errors (ported) > full_messages_for returns an empty list in case there are no errors for the given attribute",
-  "ErrorsTest > generate_message works without i18n_scope":
-    "ActiveModel > Errors (ported) > generate_message works without i18n_scope",
-  "ErrorsTest > group_by_attribute": "ActiveModel > Errors (ported) > group_by_attribute",
-  "ErrorsTest > inspect": "ActiveModel > Errors (advanced features) > inspect",
-  "ErrorsTest > merge does not import errors when merging with self":
-    "ActiveModel > Errors (advanced features) > merge does not import errors when merging with self",
-  "ErrorsTest > messages returns empty frozen array when accessed with non-existent attribute":
-    "ActiveModel > Errors (ported) > messages returns empty frozen array when accessed with non-existent attribute",
-  "ErrorsTest > of_kind? defaults message to :invalid":
-    "ActiveModel > Errors (ported) > of_kind? defaults message to :invalid",
-  "ErrorsTest > of_kind? detects indifferent if a specific error was added to the object":
-    "ActiveModel > Errors (ported) > of_kind? detects indifferent if a specific error was added to the object",
-  "ErrorsTest > of_kind? handles proc messages":
-    "ActiveModel > Errors (advanced features) > of_kind? handles proc messages",
-  "ErrorsTest > of_kind? ignores options":
-    "ActiveModel > Errors (advanced features) > of_kind? ignores options",
-  "ErrorsTest > of_kind? matches the given message when several errors are present for the same attribute":
-    "ActiveModel > Errors (ported) > of_kind? matches the given message when several errors are present for the same attribute",
-  "ErrorsTest > of_kind? returns false when checking a nonexisting error and other errors are present for the given attribute":
-    "ActiveModel > Errors (ported) > of_kind? returns false when checking a nonexisting error and other errors are present for the given attribute",
-  "ErrorsTest > of_kind? returns false when checking for an error by symbol and a different error with same message is present":
-    "ActiveModel > Errors (ported) > of_kind? returns false when checking for an error by symbol and a different error with same message is present",
-  "ErrorsTest > of_kind? returns false when no errors are present":
-    "ActiveModel > Errors (ported) > of_kind? returns false when no errors are present",
-  "ErrorsTest > to_a returns the list of errors with complete messages containing the attribute names":
-    "ActiveModel > Errors (ported) > to_a returns the list of errors with complete messages containing the attribute names",
-  "ExclusionValidationTest > validates exclusion of with formatted message":
-    "ActiveModel > Validations Exclusion (ported) > validates exclusion of with formatted message",
-  "ExclusionValidationTest > validates exclusion of with lambda":
-    "ActiveModel > Validations (advanced features) > validates exclusion of with lambda",
-  "FloatTest > type cast float from invalid string":
-    "ActiveModel > Type Float (ported) > type cast float from invalid string",
-  "FormatValidationTest > validate format of with multiline regexp should raise error":
-    "ActiveModel > Validations (advanced features) > validates format of with multiline regexp should raise error",
-  "FormatValidationTest > validate format of without any regexp should raise error":
-    "ActiveModel > Validations (advanced features) > validates format of without any regexp should raise error",
-  "FormatValidationTest > validate format with formatted message":
-    "ActiveModel > Validations Format (ported) > validate format with formatted message",
-  "FormatValidationTest > validate format with not option":
-    "ActiveModel > Validations Format (ported) > validate format with not option",
-  "ImmutableStringTest > cast strings are frozen":
-    "ActiveModel > Type ImmutableString > cast strings are frozen",
-  "ImmutableStringTest > immutable strings are not duped coming out":
-    "ActiveModel > Type ImmutableString > immutable strings are not duped coming out",
-  "InclusionValidationTest > validates inclusion of":
-    "ActiveModel > Validations Inclusion (ported) > validates inclusion of",
-  "InclusionValidationTest > validates inclusion of with allow nil":
-    "ActiveModel > Validations Inclusion (ported) > validates inclusion of with allow nil",
-  "InclusionValidationTest > validates inclusion of with formatted message":
-    "ActiveModel > Validations Inclusion (ported) > validates inclusion of with formatted message",
-  "InclusionValidationTest > validates inclusion of with lambda":
-    "ActiveModel > Validations (advanced features) > validates inclusion of with lambda",
-  "JsonSerializationTest > as_json should allow attribute filtering with except":
-    "ActiveModel > JSON Serialization (ported) > as_json should allow attribute filtering with except",
-  "JsonSerializationTest > as_json should allow attribute filtering with only":
-    "ActiveModel > JSON Serialization (ported) > as_json should allow attribute filtering with only",
-  "JsonSerializationTest > as_json should return a hash if include_root_in_json is true":
-    "ActiveModel > JSON Serialization (root in JSON) > as_json should return a hash if include_root_in_json is true",
-  "JsonSerializationTest > from_json should work with a root (method parameter)":
-    "ActiveModel > JSON Serialization (ported) > from_json should work with a root (method parameter)",
-  "JsonSerializationTest > from_json should work without a root (class attribute)":
-    "ActiveModel > JSON Serialization (ported) > from_json should work without a root (class attribute)",
-  "JsonSerializationTest > serializable_hash should not modify options passed in argument":
-    "ActiveModel > Serialization (ported) > serializable_hash should not modify options passed in argument",
-  "JsonSerializationTest > should allow attribute filtering with except":
-    "ActiveModel > JSON Serialization (ported) > should allow attribute filtering with except",
-  "JsonSerializationTest > should allow attribute filtering with only":
-    "ActiveModel > JSON Serialization (ported) > should allow attribute filtering with only",
-  "JsonSerializationTest > should encode all encodable attributes":
-    "ActiveModel > JSON Serialization (ported) > should encode all encodable attributes",
-  "JsonSerializationTest > should include root in JSON if include_root_in_json is true":
-    "ActiveModel > JSON Serialization (root in JSON) > should include root in JSON if include_root_in_json is true",
-  "LengthValidationTest > validates length of custom errors for both too short and too long":
-    "ActiveModel > Validations Length (ported) > validates length of custom errors for both too short and too long",
-  "LengthValidationTest > validates length of custom errors for is with wrong length":
-    "ActiveModel > Validations Length (ported) > validates length of custom errors for is with wrong length",
-  "LengthValidationTest > validates length of custom errors for maximum with too long":
-    "ActiveModel > Validations Length (ported) > validates length of custom errors for maximum with too long",
-  "LengthValidationTest > validates length of custom errors for minimum with too short":
-    "ActiveModel > Validations Length (ported) > validates length of custom errors for minimum with too short",
-  "LengthValidationTest > validates length of using is":
-    "ActiveModel > Validations Length (ported) > validates length of using is",
-  "LengthValidationTest > validates length of using maximum":
-    "ActiveModel > Validations Length (ported) > validates length of using maximum",
-  "LengthValidationTest > validates length of using maximum should allow nil":
-    "ActiveModel > Validations Length (ported) > validates length of using maximum should allow nil",
-  "LengthValidationTest > validates length of using proc as maximum":
-    "ActiveModel > Validations (advanced features) > validates length of using proc as maximum",
-  "LengthValidationTest > validates length of using within":
-    "ActiveModel > Validations Length (ported) > validates length of using within",
-  "ModelTest > load hook is called": "ActiveModel > API tests > load hook is called",
-  "ModelTest > persisted is always false":
-    "ActiveModel > Model (ported) > persisted is always false",
-  "NameWithAnonymousClassTest > anonymous class without name argument":
-    "ActiveModel > Naming (advanced) > anonymous class without name argument",
-  "NamingHelpersTest > to model called on record":
-    "ActiveModel > Naming (ported) > to model called on record",
-  "NamingMethodDelegationTest > model name": "ActiveModel > Naming (ported) > model name",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > collection":
-    "ActiveModel > Naming (ported) > collection",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > element":
-    "ActiveModel > Naming (ported) > element",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > i18n key":
-    "ActiveModel > Naming (ported) > i18n key",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > param key":
-    "ActiveModel > Naming (ported) > param key",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > plural":
-    "ActiveModel > Naming (ported) > plural",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > route key":
-    "ActiveModel > Naming (ported) > route key",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > singular":
-    "ActiveModel > Naming (ported) > singular",
-  "NamingWithNamespacedModelTest > singular":
-    "ActiveModel > Naming (advanced) > NamingWithNamespacedModel singular",
-  "NamingWithNamespacedModelTest > plural":
-    "ActiveModel > Naming (advanced) > NamingWithNamespacedModel plural",
-  "NestedErrorTest > NestedError initialize": "ActiveModel > NestedError > NestedError initialize",
-  "NestedErrorTest > NestedError message": "ActiveModel > NestedError > NestedError message",
-  "NestedErrorTest > NestedError full message":
-    "ActiveModel > NestedError > NestedError full message",
-  "NumericalityValidationTest > validates numericality with equal to":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with equal to",
-  "NumericalityValidationTest > validates numericality with even":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with even",
-  "NumericalityValidationTest > validates numericality with greater than":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with greater than",
-  "NumericalityValidationTest > validates numericality with greater than less than and even":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with greater than less than and even",
-  "NumericalityValidationTest > validates numericality with greater than or equal":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with greater than or equal",
-  "NumericalityValidationTest > validates numericality with in":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with in",
-  "NumericalityValidationTest > validates numericality with less than":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with less than",
-  "NumericalityValidationTest > validates numericality with less than or equal to":
-    "ActiveModel > Validators (extended) > numericality comparison operators > validates numericality with less than or equal to",
-  "NumericalityValidationTest > validates numericality with odd":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with odd",
-  "NumericalityValidationTest > validates numericality with other than":
-    "ActiveModel > Validations Numericality (ported) > validates numericality with other than",
-  "NumericalityValidationTest > validates numericality with proc":
-    "ActiveModel > Validations (advanced features) > validates numericality with proc",
-  "NumericalityValidationTest > validates numericality with symbol":
-    "ActiveModel > Validations (advanced features) > validates numericality with symbol",
-  "PresenceValidationTest > validate presences":
-    "ActiveModel > Validations Presence (ported) > validate presences",
-  "PresenceValidationTest > validates acceptance of with custom error using quotes":
-    "ActiveModel > Validations Presence (ported) > validates acceptance of with custom error using quotes",
-  "RegistryTest > a reasonable error is given when no type is found":
-    "ActiveModel > Type Registry (ported) > a reasonable error is given when no type is found",
-  "RegistryTest > a class can be registered for a symbol":
-    "ActiveModel > Type Registry (ported) > a class can be registered for a symbol",
-  "SerializationTest > method serializable hash should work with except and methods":
-    "ActiveModel > Serialization (ported) > method serializable hash should work with except and methods",
-  "AbsenceValidationTest > validates absence of with custom error using quotes":
-    "ActiveModel > Validations Absence (ported) > validates absence of with custom error using quotes",
-  "AcceptanceValidationTest > validates acceptance of true":
-    "ActiveModel > Validations Acceptance (ported) > validates acceptance of true",
-  "AcceptanceValidationTest > terms of service agreement with multiple accept values":
-    "ActiveModel > Validations Acceptance (ported) > terms of service agreement with multiple accept values",
-  "ActiveModelI18nTests > translated model attributes":
-    "ActiveModel > Translation (basic) > translated model attributes",
-  "ActiveModelI18nTests > translated model attributes with default":
-    "ActiveModel > Translation (basic) > translated model attributes with default",
-  "ActiveModelI18nTests > translated model when missing translation":
-    "ActiveModel > Translation (basic) > translated model when missing translation",
-  "ValidatesTest > validates with built in validation":
-    "ActiveModel > Validations Validates (ported) > validates with built in validation",
-  "ValidatesTest > validates with if as local conditions":
-    "ActiveModel > Validations Validates (ported) > validates with if as local conditions",
-  "ValidatesTest > validates with unless as local conditions":
-    "ActiveModel > Validations Validates (ported) > validates with unless as local conditions",
-  "ValidatesTest > validates with validator class":
-    "ActiveModel > Validations (advanced features) > validates with validator class",
-  "ValidatesTest > validates with namespaced validator class":
-    "ActiveModel > Validations (advanced features) > validates with namespaced validator class",
-  "ValidatesTest > validates with unknown validator":
-    "ActiveModel > Validations (advanced features) > validates with unknown validator",
-  "ValidatesTest > validates with disabled unknown validator":
-    "ActiveModel > Validations (advanced features) > validates with disabled unknown validator",
-  "ValidatesWithTest > with a class that returns valid":
-    "ActiveModel > Validations With Validation (ported) > with a class that returns valid",
-  "ValidationsContextTest > with a class that adds errors on create and validating a new model":
-    "ActiveModel > Validations Context (ported) > with a class that adds errors on create and validating a new model",
-  "ValidationsTest > single field validation":
-    "ActiveModel > Validations (ported) > single field validation",
-  "ValidationsTest > single attr validation and error msg":
-    "ActiveModel > Validations (ported) > single attr validation and error msg",
-  "ValidationsTest > double attr validation and error msg":
-    "ActiveModel > Validations (ported) > double attr validation and error msg",
-  "ValidationsTest > errors on base": "ActiveModel > Validations (ported) > errors on base",
-  "ValidationsTest > errors empty after errors on check":
-    "ActiveModel > Validations (ported) > errors empty after errors on check",
-  "ValidationsTest > validates each": "ActiveModel > Validations (ported) > validates each",
-  "ValidationsTest > validate block": "ActiveModel > Validations (ported) > validate block",
-  "ValidationsTest > validate block with params":
-    "ActiveModel > Validations (ported) > validate block with params",
-  "ValidationsTest > invalid should be the opposite of valid":
-    "ActiveModel > Validations (ported) > invalid should be the opposite of valid",
-  "ValidationsTest > validation order": "ActiveModel > Validations (ported) > validation order",
-  "ValidationsTest > validation with if and on":
-    "ActiveModel > Validations (ported) > validation with if and on",
-  "ValidationsTest > list of validators for model":
-    "ActiveModel > Validations (ported) > list of validators for model",
-  "ValidationsTest > list of validators on an attribute":
-    "ActiveModel > Validations (ported) > list of validators on an attribute",
-  "ValidationsTest > list of validators will be empty when empty":
-    "ActiveModel > Validations (ported) > list of validators will be empty when empty",
-  "ValidationsTest > validate with bang": "ActiveModel > Validations (ported) > validate with bang",
-  "ValidationsTest > errors to json": "ActiveModel > Validations (ported) > errors to json",
-  "ValidationsTest > does not modify options argument":
-    "ActiveModel > Validations (ported) > does not modify options argument",
-  "ValidationsTest > validates with false hash value":
-    "ActiveModel > Validations (ported) > validates with false hash value",
-  "ValidationsTest > dup validity is independent":
-    "ActiveModel > Validations (advanced features) > dup validity is independent",
-  "ValidationsTest > frozen models can be validated":
-    "ActiveModel > Validations (advanced features) > frozen models can be validated",
-  "ValidationsTest > validations on the instance level":
-    "ActiveModel > Validations (advanced features) > validations on the instance level",
-  "ValidationsTest > validate with except on":
-    "ActiveModel > Validations (advanced features) > validate with except on",
-  "ValidationsTest > validation with message as proc":
-    "ActiveModel > Validations (advanced features) > validation with message as proc",
-  "ValueTest > type equality": "ActiveModel > Type Value > type equality",
-  "ValueTest > as json not defined": "ActiveModel > Type Value > as json not defined",
-  "APITest > initialize with params and mixins reversed":
-    "ActiveModel > APITest > initialize with params and mixins reversed",
-  "APITest > mixin initializer when args exist":
-    "ActiveModel > APITest > mixin initializer when args exist",
-  "APITest > mixin initializer when args dont exist":
-    "ActiveModel > APITest > mixin initializer when args dont exist",
-  "AttributeAssignmentTest > simple assignment alias":
-    "ActiveModel > AttributeAssignmentTest > simple assignment alias",
-  "AttributeAssignmentTest > assign non-existing attribute":
-    "ActiveModel > AttributeAssignmentTest > assign non-existing attribute",
-  "AttributeAssignmentTest > assign non-existing attribute by overriding #attribute_writer_missing":
-    "ActiveModel > AttributeAssignmentTest > assign non-existing attribute by overriding #attribute_writer_missing",
-  "AttributeAssignmentTest > assign private attribute":
-    "ActiveModel > AttributeAssignmentTest > assign private attribute",
-  "AttributeAssignmentTest > does not swallow errors raised in an attribute writer":
-    "ActiveModel > AttributeAssignmentTest > does not swallow errors raised in an attribute writer",
-  "AttributeAssignmentTest > an ArgumentError is raised if a non-hash-like object is passed":
-    "ActiveModel > AttributeAssignmentTest > an ArgumentError is raised if a non-hash-like object is passed",
-  "AttributeAssignmentTest > forbidden attributes cannot be used for mass assignment":
-    "ActiveModel > AttributeAssignmentTest > forbidden attributes cannot be used for mass assignment",
-  "AttributeAssignmentTest > permitted attributes can be used for mass assignment":
-    "ActiveModel > AttributeAssignmentTest > permitted attributes can be used for mass assignment",
-  "AttributeAssignmentTest > assigning no attributes should not raise, even if the hash is un-permitted":
-    "ActiveModel > AttributeAssignmentTest > assigning no attributes should not raise, even if the hash is un-permitted",
-  "AttributeAssignmentTest > passing an object with each_pair but without each":
-    "ActiveModel > AttributeAssignmentTest > passing an object with each_pair but without each",
-  "AttributeMethodsTest > #define_attribute_method does not generate attribute method if already defined in attribute module":
-    "ActiveModel > AttributeMethodsTest > #define_attribute_method does not generate attribute method if already defined in attribute module",
-  "AttributeMethodsTest > #define_attribute_method generates a method that is already defined on the host":
-    "ActiveModel > AttributeMethodsTest > #define_attribute_method generates a method that is already defined on the host",
-  "AttributeMethodsTest > #define_attribute_method generates attribute method with invalid identifier characters":
-    "ActiveModel > AttributeMethodsTest > #define_attribute_method generates attribute method with invalid identifier characters",
-  "AttributeMethodsTest > #define_attribute_methods works passing multiple arguments":
-    "ActiveModel > AttributeMethodsTest > #define_attribute_methods works passing multiple arguments",
-  "AttributeMethodsTest > #define_attribute_methods generates attribute methods":
-    "ActiveModel > AttributeMethodsTest > #define_attribute_methods generates attribute methods",
-  "AttributeMethodsTest > #alias_attribute generates attribute_aliases lookup hash":
-    "ActiveModel > AttributeMethodsTest > #alias_attribute generates attribute_aliases lookup hash",
-  "AttributeMethodsTest > #define_attribute_methods generates attribute methods with spaces in their names":
-    "ActiveModel > AttributeMethodsTest > #define_attribute_methods generates attribute methods with spaces in their names",
-  "AttributeMethodsTest > #alias_attribute works with attributes with spaces in their names":
-    "ActiveModel > AttributeMethodsTest > #alias_attribute works with attributes with spaces in their names",
-  "AttributeMethodsTest > #alias_attribute works with attributes named as a ruby keyword":
-    "ActiveModel > AttributeMethodsTest > #alias_attribute works with attributes named as a ruby keyword",
-  "AttributeMethodsTest > #undefine_attribute_methods undefines alias attribute methods":
-    "ActiveModel > AttributeMethodsTest > #undefine_attribute_methods undefines alias attribute methods",
-  "AttributeMethodsTest > defined attribute doesn't expand positional hash argument":
-    "ActiveModel > AttributeMethodsTest > defined attribute doesn't expand positional hash argument",
-  "AttributeMethodsTest > should not interfere with respond_to? if the attribute has a private/protected method":
-    "ActiveModel > AttributeMethodsTest > should not interfere with respond_to? if the attribute has a private/protected method",
-  "AttributeMethodsTest > alias attribute respects user defined method":
-    "ActiveModel > AttributeMethodsTest > alias attribute respects user defined method",
-  "AttributeMethodsTest > alias attribute respects user defined method in parent classes":
-    "ActiveModel > AttributeMethodsTest > alias attribute respects user defined method in parent classes",
-  "AttributeRegistrationTest > attributes can be registered":
-    "ActiveModel > AttributeRegistrationTest > attributes can be registered",
-  "AttributeRegistrationTest > type options are forwarded when type is specified by name":
-    "ActiveModel > AttributeRegistrationTest > type options are forwarded when type is specified by name",
-  "AttributeRegistrationTest > default value can be specified":
-    "ActiveModel > AttributeRegistrationTest > default value can be specified",
-  "AttributeRegistrationTest > default value can be nil":
-    "ActiveModel > AttributeRegistrationTest > default value can be nil",
-  "AttributeRegistrationTest > .type_for_attribute returns the default type when an unregistered attribute is specified":
-    "ActiveModel > AttributeRegistrationTest > .type_for_attribute returns the default type when an unregistered attribute is specified",
-  "AttributeRegistrationTest > new attributes can be registered at any time":
-    "ActiveModel > AttributeRegistrationTest > new attributes can be registered at any time",
-  "AttributeRegistrationTest > attributes are inherited":
-    "ActiveModel > AttributeRegistrationTest > attributes are inherited",
-  "AttributeRegistrationTest > subclass attributes do not affect superclass":
-    "ActiveModel > AttributeRegistrationTest > subclass attributes do not affect superclass",
-  "AttributeRegistrationTest > new superclass attributes are inherited even after subclass attributes are registered":
-    "ActiveModel > AttributeRegistrationTest > new superclass attributes are inherited even after subclass attributes are registered",
-  "AttributeRegistrationTest > new superclass attributes do not override subclass attributes":
-    "ActiveModel > AttributeRegistrationTest > new superclass attributes do not override subclass attributes",
-  "AttributeRegistrationTest > superclass attributes can be overridden":
-    "ActiveModel > AttributeRegistrationTest > superclass attributes can be overridden",
-  "AttributeRegistrationTest > superclass default values can be overridden":
-    "ActiveModel > AttributeRegistrationTest > superclass default values can be overridden",
-  "AttributeRegistrationTest > .decorate_attributes decorates all attributes when none are specified":
-    "ActiveModel > AttributeRegistrationTest > .decorate_attributes decorates all attributes when none are specified",
-  "AttributeRegistrationTest > .decorate_attributes supports conditional decoration":
-    "ActiveModel > AttributeRegistrationTest > .decorate_attributes supports conditional decoration",
-  "AttributeRegistrationTest > superclass attribute types can be decorated":
-    "ActiveModel > AttributeRegistrationTest > superclass attribute types can be decorated",
-  "AttributeTest > reading memoizes falsy values":
-    "ActiveModel > AttributeTest > reading memoizes falsy values",
-  "AttributeTest > from_user + value_for_database type casts from the user to the database":
-    "ActiveModel > AttributeTest > from_user + value_for_database type casts from the user to the database",
-  "AttributeTest > from_user + value_for_database uses serialize_cast_value when possible":
-    "ActiveModel > AttributeTest > from_user + value_for_database uses serialize_cast_value when possible",
-  "AttributeTest > value_for_database is memoized":
-    "ActiveModel > AttributeTest > value_for_database is memoized",
-  "AttributeTest > value_for_database is recomputed when value changes in place":
-    "ActiveModel > AttributeTest > value_for_database is recomputed when value changes in place",
-  "AttributeTest > duping does not dup the value if it is not dupable":
-    "ActiveModel > AttributeTest > duping does not dup the value if it is not dupable",
-  "AttributeTest > duping does not eagerly type cast if we have not yet type cast":
-    "ActiveModel > AttributeTest > duping does not eagerly type cast if we have not yet type cast",
-  "AttributeTest > uninitialized attributes yield their name if a block is given to value":
-    "ActiveModel > AttributeTest > uninitialized attributes yield their name if a block is given to value",
-  "AttributeTest > attributes do not equal attributes with different names":
-    "ActiveModel > AttributeTest > attributes do not equal attributes with different names",
-  "AttributeTest > attributes do not equal attributes with different types":
-    "ActiveModel > AttributeTest > attributes do not equal attributes with different types",
-  "AttributeTest > attributes do not equal attributes with different values":
-    "ActiveModel > AttributeTest > attributes do not equal attributes with different values",
-  "AttributeTest > attributes do not equal attributes of other classes":
-    "ActiveModel > AttributeTest > attributes do not equal attributes of other classes",
-  "AttributeTest > an attribute has been read when its value is calculated":
-    "ActiveModel > AttributeTest > an attribute has been read when its value is calculated",
-  "AttributeTest > an attribute is not changed if it hasn't been assigned or mutated":
-    "ActiveModel > AttributeTest > an attribute is not changed if it hasn't been assigned or mutated",
-  "AttributeTest > an attribute is changed if it's been assigned a new value":
-    "ActiveModel > AttributeTest > an attribute is changed if it's been assigned a new value",
-  "AttributeTest > an attribute is not changed if it's assigned the same value":
-    "ActiveModel > AttributeTest > an attribute is not changed if it's assigned the same value",
-  "AttributeTest > an attribute cannot be mutated if it has not been read,\n      and skips expensive calculations":
-    "ActiveModel > AttributeTest > an attribute cannot be mutated if it has not been read, and skips expensive calculations",
-  "AttributeTest > an attribute is changed if it has been mutated":
-    "ActiveModel > AttributeTest > an attribute is changed if it has been mutated",
-  "AttributeTest > an attribute can forget its changes":
-    "ActiveModel > AttributeTest > an attribute can forget its changes",
-  "AttributeTest > #forgetting_assignment on an unchanged .from_database attribute re-deserializes its value":
-    "ActiveModel > AttributeTest > #forgetting_assignment on an unchanged .from_database attribute re-deserializes its value",
-  "AttributeTest > with_value_from_user validates the value":
-    "ActiveModel > AttributeTest > with_value_from_user validates the value",
-  "AttributesDirtyTest > changes accessible through both strings and symbols":
-    "ActiveModel > AttributesDirtyTest > changes accessible through both strings and symbols",
-  "AttributesDirtyTest > be consistent with symbols arguments after the changes are applied":
-    "ActiveModel > AttributesDirtyTest > be consistent with symbols arguments after the changes are applied",
-  "AttributesDirtyTest > restore_attributes can restore only some attributes":
-    "ActiveModel > AttributesDirtyTest > restore_attributes can restore only some attributes",
-  "AttributesDirtyTest > changing the attribute reports a change only when the cast value changes":
-    "ActiveModel > AttributesDirtyTest > changing the attribute reports a change only when the cast value changes",
-  "AttributesTest > models that proxy attributes do not conflict with models with generated methods":
-    "ActiveModel > AttributesTest > models that proxy attributes do not conflict with models with generated methods",
-  "AttributesTest > nonexistent attribute": "ActiveModel > AttributesTest > nonexistent attribute",
-  "AttributesTest > attributes with proc defaults can be marshalled":
-    "ActiveModel > AttributesTest > attributes with proc defaults can be marshalled",
-  "AttributesTest > can't modify attributes if frozen":
-    "ActiveModel > AttributesTest > can't modify attributes if frozen",
-  "AttributesTest > attributes can be frozen again":
-    "ActiveModel > AttributesTest > attributes can be frozen again",
-  "AttributesTest > .type_for_attribute supports attribute aliases":
-    "ActiveModel > AttributesTest > .type_for_attribute supports attribute aliases",
-  "NamingWithSuppliedModelNameTest > singular":
-    "ActiveModel > NamingWithSuppliedModelNameTest > singular",
-  "NamingWithSuppliedModelNameTest > plural":
-    "ActiveModel > NamingWithSuppliedModelNameTest > plural",
-  "NamingWithSuppliedModelNameTest > element":
-    "ActiveModel > NamingWithSuppliedModelNameTest > element",
-  "NamingWithSuppliedModelNameTest > collection":
-    "ActiveModel > NamingWithSuppliedModelNameTest > collection",
-  "NamingWithSuppliedModelNameTest > human":
-    "ActiveModel > NamingWithSuppliedModelNameTest > human",
-  "NamingWithSuppliedModelNameTest > route key":
-    "ActiveModel > NamingWithSuppliedModelNameTest > route key",
-  "NamingWithSuppliedModelNameTest > param key":
-    "ActiveModel > NamingWithSuppliedModelNameTest > param key",
-  "NamingWithSuppliedModelNameTest > i18n key":
-    "ActiveModel > NamingWithSuppliedModelNameTest > i18n key",
-  "NamingWithSuppliedLocaleTest > singular":
-    "ActiveModel > NamingWithSuppliedLocaleTest > singular",
-  "NamingWithSuppliedLocaleTest > plural": "ActiveModel > NamingWithSuppliedLocaleTest > plural",
-  "NamingUsingRelativeModelNameTest > singular":
-    "ActiveModel > NamingUsingRelativeModelNameTest > singular",
-  "NamingUsingRelativeModelNameTest > plural":
-    "ActiveModel > NamingUsingRelativeModelNameTest > plural",
-  "NamingUsingRelativeModelNameTest > element":
-    "ActiveModel > NamingUsingRelativeModelNameTest > element",
-  "NamingUsingRelativeModelNameTest > collection":
-    "ActiveModel > NamingUsingRelativeModelNameTest > collection",
-  "NamingUsingRelativeModelNameTest > human":
-    "ActiveModel > NamingUsingRelativeModelNameTest > human",
-  "NamingUsingRelativeModelNameTest > route key":
-    "ActiveModel > NamingUsingRelativeModelNameTest > route key",
-  "NamingUsingRelativeModelNameTest > param key":
-    "ActiveModel > NamingUsingRelativeModelNameTest > param key",
-  "NamingUsingRelativeModelNameTest > i18n key":
-    "ActiveModel > NamingUsingRelativeModelNameTest > i18n key",
-  "NamingWithNamespacedModelInIsolatedNamespaceTest > human":
-    "ActiveModel > NamingWithNamespacedModelInIsolatedNamespaceTest > human",
-  "OverridingAccessorsTest > overriding accessors keys":
-    "ActiveModel > OverridingAccessorsTest > overriding accessors keys",
-  "CallbacksTest > after callbacks are not executed if the block returns false":
-    "ActiveModel > CallbacksTest > after callbacks are not executed if the block returns false",
-  "CallbacksTest > only selects which types of callbacks should be created from an array list":
-    "ActiveModel > CallbacksTest > only selects which types of callbacks should be created from an array list",
-  "CallbacksTest > no callbacks should be created":
-    "ActiveModel > CallbacksTest > no callbacks should be created",
-  "CallbacksTest > after_create callbacks with both callbacks declared in different lines":
-    "ActiveModel > CallbacksTest > after_create callbacks with both callbacks declared in different lines",
-  "CallbacksWithMethodNamesShouldBeCalled > on condition is respected for validation without matching context":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > on condition is respected for validation without matching context",
-  "CallbacksWithMethodNamesShouldBeCalled > on condition is respected for validation without context":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > on condition is respected for validation without context",
-  "CallbacksWithMethodNamesShouldBeCalled > on multiple condition is respected for validation with matching context":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > on multiple condition is respected for validation with matching context",
-  "CallbacksWithMethodNamesShouldBeCalled > on multiple condition is respected for validation without matching context":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > on multiple condition is respected for validation without matching context",
-  "CallbacksWithMethodNamesShouldBeCalled > on multiple condition is respected for validation without context":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > on multiple condition is respected for validation without context",
-  "CallbacksWithMethodNamesShouldBeCalled > further callbacks should be called if before validation returns false":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > further callbacks should be called if before validation returns false",
-  "CallbacksWithMethodNamesShouldBeCalled > further callbacks should be called if after validation returns false":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > further callbacks should be called if after validation returns false",
-  "CallbacksWithMethodNamesShouldBeCalled > before validation does not mutate the if options array":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > before validation does not mutate the if options array",
-  "CallbacksWithMethodNamesShouldBeCalled > after validation does not mutate the if options array":
-    "ActiveModel > CallbacksWithMethodNamesShouldBeCalled > after validation does not mutate the if options array",
-  "ConversionTest > to_key doesn't double-wrap composite `id`s":
-    "ActiveModel > ConversionTest > to_key doesn't double-wrap composite `id`s",
-  "ConversionTest > to_param returns nil if composite id is incomplete":
-    "ActiveModel > ConversionTest > to_param returns nil if composite id is incomplete",
-  "ConversionTest > to_partial_path handles non-standard model_name":
-    "ActiveModel > ConversionTest > to_partial_path handles non-standard model_name",
-  "ConversionTest > #to_param_delimiter is defined per class":
-    "ActiveModel > ConversionTest > #to_param_delimiter is defined per class",
-  "DirtyTest > changes accessible through both strings and symbols":
-    "ActiveModel > DirtyTest > changes accessible through both strings and symbols",
-  "DirtyTest > be consistent with symbols arguments after the changes are applied":
-    "ActiveModel > DirtyTest > be consistent with symbols arguments after the changes are applied",
-  "DirtyTest > restore_attributes can restore only some attributes":
-    "ActiveModel > DirtyTest > restore_attributes can restore only some attributes",
-  "ErrorTest > match? handles extra options match":
-    "ActiveModel > ErrorTest > match? handles extra options match",
-  "ErrorTest > message handles lambda in messages and option values, and i18n interpolation":
-    "ActiveModel > ErrorTest > message handles lambda in messages and option values, and i18n interpolation",
-  "ErrorTest > message with type as a symbol and indexed attribute can lookup without index in attribute key":
-    "ActiveModel > ErrorTest > message with type as a symbol and indexed attribute can lookup without index in attribute key",
-  "ErrorsTest > add, type being Proc, which evaluates to Symbol":
-    "ActiveModel > ErrorsTest > add, type being Proc, which evaluates to Symbol",
-  "ErrorsTest > add, with options[:message] as Proc, which evaluates to String, where type is nil":
-    "ActiveModel > ErrorsTest > add, with options[:message] as Proc, which evaluates to String, where type is nil",
-  "ErrorsTest > errors are compatible with YAML dumped from Rails 6.x":
-    "ActiveModel > ErrorsTest > errors are compatible with YAML dumped from Rails 6.x",
-  "SerializationTest > should raise NoMethodError for non existing method":
-    "ActiveModel > SerializationTest > should raise NoMethodError for non existing method",
-  "SerializationTest > multiple includes": "ActiveModel > SerializationTest > multiple includes",
-  "SerializationTest > nested include": "ActiveModel > SerializationTest > nested include",
-  "SerializationTest > multiple includes with options":
-    "ActiveModel > SerializationTest > multiple includes with options",
-  "SerializationTest > all includes with options":
-    "ActiveModel > SerializationTest > all includes with options",
-  "JsonSerializationTest > should return Hash for errors":
-    "ActiveModel > JsonSerializationTest > should return Hash for errors",
-  "JsonSerializationTest > custom as_json should be honored when generating json":
-    "ActiveModel > JsonSerializationTest > custom as_json should be honored when generating json",
-  "JsonSerializationTest > custom as_json options should be extensible":
-    "ActiveModel > JsonSerializationTest > custom as_json options should be extensible",
-  "ActiveModelI18nTests > translated model attributes using default option":
-    "ActiveModel > ActiveModelI18nTests > translated model attributes using default option",
-  "ActiveModelI18nTests > translated model attributes using default option as symbol":
-    "ActiveModel > ActiveModelI18nTests > translated model attributes using default option as symbol",
-  "ActiveModelI18nTests > translated model attributes falling back to default":
-    "ActiveModel > ActiveModelI18nTests > translated model attributes falling back to default",
-  "ActiveModelI18nTests > translated model attributes using default option as symbol and falling back to default":
-    "ActiveModel > ActiveModelI18nTests > translated model attributes using default option as symbol and falling back to default",
-  "ActiveModelI18nTests > translated model attributes with ancestors fallback":
-    "ActiveModel > ActiveModelI18nTests > translated model attributes with ancestors fallback",
-  "ActiveModelI18nTests > translated model attributes with attribute matching namespaced model name":
-    "ActiveModel > ActiveModelI18nTests > translated model attributes with attribute matching namespaced model name",
-  "ActiveModelI18nTests > translated deeply nested model attributes":
-    "ActiveModel > ActiveModelI18nTests > translated deeply nested model attributes",
-  "ActiveModelI18nTests > translated nested model attributes":
-    "ActiveModel > ActiveModelI18nTests > translated nested model attributes",
-  "ActiveModelI18nTests > translated nested model attributes with namespace fallback":
-    "ActiveModel > ActiveModelI18nTests > translated nested model attributes with namespace fallback",
-  "ActiveModelI18nTests > translated model with namespace":
-    "ActiveModel > ActiveModelI18nTests > translated model with namespace",
-  "ActiveModelI18nTests > translated subclass model":
-    "ActiveModel > ActiveModelI18nTests > translated subclass model",
-  "ActiveModelI18nTests > translated subclass model when ancestor translation":
-    "ActiveModel > ActiveModelI18nTests > translated subclass model when ancestor translation",
-  "ActiveModelI18nTests > translated attributes when nil":
-    "ActiveModel > ActiveModelI18nTests > translated attributes when nil",
-  "ActiveModelI18nTests > translated deeply nested attributes when nil":
-    "ActiveModel > ActiveModelI18nTests > translated deeply nested attributes when nil",
-  "ActiveModelI18nTests > translated subclass model when missing translation":
-    "ActiveModel > ActiveModelI18nTests > translated subclass model when missing translation",
-  "ActiveModelI18nTests > translated model with default value when missing translation":
-    "ActiveModel > ActiveModelI18nTests > translated model with default value when missing translation",
-  "ActiveModelI18nTests > translated model with default key when missing both translations":
-    "ActiveModel > ActiveModelI18nTests > translated model with default key when missing both translations",
-  "ActiveModelI18nTests > human does not modify options":
-    "ActiveModel > ActiveModelI18nTests > human does not modify options",
-  "ActiveModelI18nTests > human attribute name does not modify options":
-    "ActiveModel > ActiveModelI18nTests > human attribute name does not modify options",
-  "ActiveModelI18nTests > raise on missing translations":
-    "ActiveModel > ActiveModelI18nTests > raise on missing translations",
-  "DecimalTest > type cast from float with unspecified precision":
-    "ActiveModel > DecimalTest > type cast from float with unspecified precision",
-  "DecimalTest > type cast decimal from rational with precision and scale":
-    "ActiveModel > DecimalTest > type cast decimal from rational with precision and scale",
-  "DecimalTest > type cast decimal from rational without precision defaults to 18 36":
-    "ActiveModel > DecimalTest > type cast decimal from rational without precision defaults to 18 36",
-  "DecimalTest > type cast decimal from object responding to d":
-    "ActiveModel > DecimalTest > type cast decimal from object responding to d",
-  "DecimalTest > changed?": "ActiveModel > DecimalTest > changed?",
-  "DecimalTest > scale is applied before precision to prevent rounding errors":
-    "ActiveModel > DecimalTest > scale is applied before precision to prevent rounding errors",
-  "FloatTest > changing float": "ActiveModel > FloatTest > changing float",
-  "RegistryTest > a block can be registered":
-    "ActiveModel > RegistryTest > a block can be registered",
-  "AbsenceValidationTest > validates absence of for ruby class with custom reader":
-    "ActiveModel > AbsenceValidationTest > validates absence of for ruby class with custom reader",
-  "AcceptanceValidationTest > lazy attribute module included only once":
-    "ActiveModel > AcceptanceValidationTest > lazy attribute module included only once",
-  "AcceptanceValidationTest > lazy attributes module included again if needed":
-    "ActiveModel > AcceptanceValidationTest > lazy attributes module included again if needed",
-  "AcceptanceValidationTest > lazy attributes respond to?":
-    "ActiveModel > AcceptanceValidationTest > lazy attributes respond to?",
-  "ComparisonValidationTest > validates comparison with less than or equal to using time":
-    "ActiveModel > ComparisonValidationTest > validates comparison with less than or equal to using time",
-  "ComparisonValidationTest > validates comparison with less than or equal to using string":
-    "ActiveModel > ComparisonValidationTest > validates comparison with less than or equal to using string",
-  "ComparisonValidationTest > validates comparison with other than using date":
-    "ActiveModel > ComparisonValidationTest > validates comparison with other than using date",
-  "ComparisonValidationTest > validates comparison with other than using time":
-    "ActiveModel > ComparisonValidationTest > validates comparison with other than using time",
-  "ComparisonValidationTest > validates comparison with other than using string":
-    "ActiveModel > ComparisonValidationTest > validates comparison with other than using string",
-  "ComparisonValidationTest > validates comparison with custom compare":
-    "ActiveModel > ComparisonValidationTest > validates comparison with custom compare",
-  "ComparisonValidationTest > validates comparison of incomparables":
-    "ActiveModel > ComparisonValidationTest > validates comparison of incomparables",
-  "ComparisonValidationTest > validates comparison of no options":
-    "ActiveModel > ComparisonValidationTest > validates comparison of no options",
-  "ComparisonValidationTest > validates comparison with blank allowed":
-    "ActiveModel > ComparisonValidationTest > validates comparison with blank allowed",
-  "ConfirmationValidationTest > does not override confirmation reader if present":
-    "ActiveModel > ConfirmationValidationTest > does not override confirmation reader if present",
-  "ConfirmationValidationTest > does not override confirmation writer if present":
-    "ActiveModel > ConfirmationValidationTest > does not override confirmation writer if present",
-  "ExclusionValidationTest > validates exclusion of beginless numeric range":
-    "ActiveModel > ExclusionValidationTest > validates exclusion of beginless numeric range",
-  "ExclusionValidationTest > validates exclusion of endless numeric range":
-    "ActiveModel > ExclusionValidationTest > validates exclusion of endless numeric range",
-  "ExclusionValidationTest > validates exclusion of with time range":
-    "ActiveModel > ExclusionValidationTest > validates exclusion of with time range",
-  "FormatValidationTest > validates format of with both regexps should raise error":
-    "ActiveModel > FormatValidationTest > validates format of with both regexps should raise error",
-  "FormatValidationTest > validates format of when with isnt a regexp should raise error":
-    "ActiveModel > FormatValidationTest > validates format of when with isnt a regexp should raise error",
-  "FormatValidationTest > validates format of when not isnt a regexp should raise error":
-    "ActiveModel > FormatValidationTest > validates format of when not isnt a regexp should raise error",
-  "FormatValidationTest > validates format of without lambda":
-    "ActiveModel > FormatValidationTest > validates format of without lambda",
-  "FormatValidationTest > validates format of without lambda without arguments":
-    "ActiveModel > FormatValidationTest > validates format of without lambda without arguments",
-  "InclusionValidationTest > validates inclusion of date time range":
-    "ActiveModel > InclusionValidationTest > validates inclusion of date time range",
-  "InclusionValidationTest > validates inclusion of beginless numeric range":
-    "ActiveModel > InclusionValidationTest > validates inclusion of beginless numeric range",
-  "InclusionValidationTest > validates inclusion of endless numeric range":
-    "ActiveModel > InclusionValidationTest > validates inclusion of endless numeric range",
-  "LengthValidationTest > validates length of using bignum":
-    "ActiveModel > LengthValidationTest > validates length of using bignum",
-  "LengthValidationTest > validates length of nasty params":
-    "ActiveModel > LengthValidationTest > validates length of nasty params",
-  "LengthValidationTest > optionally validates length of using within utf8":
-    "ActiveModel > LengthValidationTest > optionally validates length of using within utf8",
-  "LengthValidationTest > validates length of using is utf8":
-    "ActiveModel > LengthValidationTest > validates length of using is utf8",
-  "LengthValidationTest > validates length of for ruby class":
-    "ActiveModel > LengthValidationTest > validates length of for ruby class",
-  "LengthValidationTest > validates length of using maximum should not allow nil and empty string when blank not allowed":
-    "ActiveModel > LengthValidationTest > validates length of using maximum should not allow nil and empty string when blank not allowed",
-  "LengthValidationTest > validates length of using minimum 0 should not allow nil":
-    "ActiveModel > LengthValidationTest > validates length of using minimum 0 should not allow nil",
-  "LengthValidationTest > validates length of using is 0 should not allow nil":
-    "ActiveModel > LengthValidationTest > validates length of using is 0 should not allow nil",
-  "LengthValidationTest > validates with diff in option":
-    "ActiveModel > LengthValidationTest > validates with diff in option",
-  "LengthValidationTest > validates length of using symbol as maximum":
-    "ActiveModel > LengthValidationTest > validates length of using symbol as maximum",
-  "NumericalityValidationTest > validates numericality with less than using differing numeric types":
-    "ActiveModel > NumericalityValidationTest > validates numericality with less than using differing numeric types",
-  "NumericalityValidationTest > validates numericality with less than or equal to using differing numeric types":
-    "ActiveModel > NumericalityValidationTest > validates numericality with less than or equal to using differing numeric types",
-  "NumericalityValidationTest > validates numericality of for ruby class":
-    "ActiveModel > NumericalityValidationTest > validates numericality of for ruby class",
-  "NumericalityValidationTest > validates numericality using value before type cast if possible":
-    "ActiveModel > NumericalityValidationTest > validates numericality using value before type cast if possible",
-  "NumericalityValidationTest > validates numericality with object acting as numeric":
-    "ActiveModel > NumericalityValidationTest > validates numericality with object acting as numeric",
-  "NumericalityValidationTest > validates numericality with invalid args":
-    "ActiveModel > NumericalityValidationTest > validates numericality with invalid args",
-  "NumericalityValidationTest > validates numericality equality for float and big decimal":
-    "ActiveModel > NumericalityValidationTest > validates numericality equality for float and big decimal",
-  "PresenceValidationTest > validates presence of for ruby class with custom reader":
-    "ActiveModel > PresenceValidationTest > validates presence of for ruby class with custom reader",
-  "PresenceValidationTest > validates presence of with allow nil option":
-    "ActiveModel > PresenceValidationTest > validates presence of with allow nil option",
-  "PresenceValidationTest > validates presence of with allow blank option":
-    "ActiveModel > PresenceValidationTest > validates presence of with allow blank option",
-  "ValidatesTest > validates with messages empty":
-    "ActiveModel > ValidatesTest > validates with messages empty",
-  "ValidatesTest > validates with attribute specified as string":
-    "ActiveModel > ValidatesTest > validates with attribute specified as string",
-  "ValidatesTest > validates with unless shared conditions":
-    "ActiveModel > ValidatesTest > validates with unless shared conditions",
-  "ValidatesTest > validates with regexp": "ActiveModel > ValidatesTest > validates with regexp",
-  "ValidatesTest > validates with array": "ActiveModel > ValidatesTest > validates with array",
-  "ValidatesTest > validates with range": "ActiveModel > ValidatesTest > validates with range",
-  "ValidatesTest > validates with included validator":
-    "ActiveModel > ValidatesTest > validates with included validator",
-  "ValidatesTest > validates with included validator and options":
-    "ActiveModel > ValidatesTest > validates with included validator and options",
-  "ValidatesTest > validates with included validator and wildcard shortcut":
-    "ActiveModel > ValidatesTest > validates with included validator and wildcard shortcut",
-  "ValidatesTest > defining extra default keys for validates":
-    "ActiveModel > ValidatesTest > defining extra default keys for validates",
-  "ValidatesWithTest > validates_with preserves standard options":
-    "ActiveModel > ValidatesWithTest > validates_with preserves standard options",
-  "ValidatesWithTest > validates_with preserves validator options":
-    "ActiveModel > ValidatesWithTest > validates_with preserves validator options",
-  "ValidatesWithTest > instance validates_with method preserves validator options":
-    "ActiveModel > ValidatesWithTest > instance validates_with method preserves validator options",
-  "ValidatesWithTest > each validator checks validity":
-    "ActiveModel > ValidatesWithTest > each validator checks validity",
-  "ValidatesWithTest > each validator expects attributes to be given":
-    "ActiveModel > ValidatesWithTest > each validator expects attributes to be given",
-  "ValidatesWithTest > each validator skip nil values if :allow_nil is set to true":
-    "ActiveModel > ValidatesWithTest > each validator skip nil values if :allow_nil is set to true",
-  "ValidatesWithTest > each validator skip blank values if :allow_blank is set to true":
-    "ActiveModel > ValidatesWithTest > each validator skip blank values if :allow_blank is set to true",
-  "ValidatesWithTest > validates_with can validate with an instance method":
-    "ActiveModel > ValidatesWithTest > validates_with can validate with an instance method",
-  "ValidatesWithTest > optionally pass in the attribute being validated when validating with an instance method":
-    "ActiveModel > ValidatesWithTest > optionally pass in the attribute being validated when validating with an instance method",
-  "ValidationsTest > errors on nested attributes expands name":
-    "ActiveModel > ValidationsTest > errors on nested attributes expands name",
-  "ValidationsTest > validates each custom reader":
-    "ActiveModel > ValidationsTest > validates each custom reader",
-  "ValidationsTest > validates with array condition does not mutate the array":
-    "ActiveModel > ValidationsTest > validates with array condition does not mutate the array",
-  "ValidationsTest > invalid validator": "ActiveModel > ValidationsTest > invalid validator",
-  "ValidationsTest > invalid options to validate":
-    "ActiveModel > ValidationsTest > invalid options to validate",
-  "ValidationsTest > callback options to validate":
-    "ActiveModel > ValidationsTest > callback options to validate",
-  "ValidationsTest > accessing instance of validator on an attribute":
-    "ActiveModel > ValidationsTest > accessing instance of validator on an attribute",
-  "ValidationsTest > strict validation in custom validator helper":
-    "ActiveModel > ValidationsTest > strict validation in custom validator helper",
-  "ValidationsTest > validation with message as proc that takes record and data as a parameters":
-    "ActiveModel > ValidationsTest > validation with message as proc that takes record and data as a parameters",
-  "ValidationsTest > validations some with except":
-    "ActiveModel > ValidationsTest > validations some with except",
-  "ModelTest > initialize with params and mixins reversed":
-    "ActiveModel > ModelTest > initialize with params and mixins reversed",
-  "ModelTest > mixin inclusion chain": "ActiveModel > ModelTest > mixin inclusion chain",
-  "ModelTest > mixin initializer when args exist":
-    "ActiveModel > ModelTest > mixin initializer when args exist",
-  "ModelTest > mixin initializer when args dont exist":
-    "ActiveModel > ModelTest > mixin initializer when args dont exist",
-
-  // ==========================================================================
-  // Rack overrides
-  // ==========================================================================
-  // Ruby .ru file parsing features — not applicable to TypeScript
-  "raises if parses commented options": null,
-  "removes __END__ before evaluating app": null,
-  "supports multi-line comments": null,
-  "requires an_underscore_app not ending in .ru": null,
-  "sets __LINE__ correctly": null,
-  "strips leading unicode byte order mark when present": null,
-  "respects the frozen_string_literal magic comment": null,
-  "builds a rack app from string": null,
-  // Prevent fuzzy mismatch — this Ruby test should match the TS test inside Rack::Multipart describe
-  "parses content-disposition with escaped parameter values in name":
-    "Rack::Multipart > parses content-disposition with escaped parameter values in name",
+  // ActiveModel: convention + description matching handles all tests
 
   // ==========================================================================
   // ActiveRecord overrides

@@ -28,8 +28,24 @@ describe("ActiveModel", () => {
       expect(p.readAttribute("unknown_attr")).toBe("value");
     });
 
-    // TODO: implement attributeWriterMissing hook
-    it.skip("assign non-existing attribute by overriding #attribute_writer_missing", () => {});
+    it("assign non-existing attribute by overriding #attribute_writer_missing", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+        _customAttrs: Record<string, unknown> = {};
+        writeAttribute(name: string, value: unknown): void {
+          if (!(this.constructor as typeof Model)._attributeDefinitions.has(name)) {
+            this._customAttrs[name] = value;
+          } else {
+            super.writeAttribute(name, value);
+          }
+        }
+      }
+      const p = new Person({});
+      p.assignAttributes({ unknown_field: "hello" });
+      expect(p._customAttrs["unknown_field"]).toBe("hello");
+    });
 
     it("assign private attribute", () => {
       class Person extends Model {

@@ -161,8 +161,12 @@ describe("ActiveModel", () => {
       expect(new Schedule({ day: "saturday" }).isValid()).toBe(false);
     });
 
-    it.skip("validates inclusion of for ruby class", () => {
-      // Ruby-specific class validation concept
+    it("validates inclusion of for ruby class", () => {
+      class Person extends Model {}
+      Person.attribute("role", "string");
+      Person.validates("role", { inclusion: { in: ["admin", "user"] } });
+      expect(new Person({ role: "admin" }).isValid()).toBe(true);
+      expect(new Person({ role: "hacker" }).isValid()).toBe(false);
     });
 
     it("validates inclusion of with symbol", () => {

@@ -103,8 +103,19 @@ describe("ActiveModel", () => {
       expect((p as any).className).toBe("Admin");
     });
 
-    // TODO: implement undefineAttributeMethods
-    it.skip("#undefine_attribute_methods undefines alias attribute methods", () => {});
+    it("#undefine_attribute_methods undefines alias attribute methods", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attributeMethodPrefix("clear_");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(typeof (p as any).clear_name).toBe("function");
+      Person.undefineAttributeMethods();
+      const p2 = new Person({ name: "Bob" });
+      expect((p2 as any).clear_name).toBeUndefined();
+    });
 
     it("defined attribute doesn't expand positional hash argument", () => {
       class Person extends Model {
@@ -197,8 +208,19 @@ describe("ActiveModel", () => {
       expect(p.readAttribute("name")).toBe("Bob");
     });
 
-    // TODO: implement undefineAttributeMethods
-    it.skip("#undefine_attribute_methods removes attribute methods", () => {});
+    it("#undefine_attribute_methods removes attribute methods", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attributeMethodSuffix("_changed");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(typeof (p as any).name_changed).toBe("function");
+      Person.undefineAttributeMethods();
+      const p2 = new Person({ name: "Bob" });
+      expect((p2 as any).name_changed).toBeUndefined();
+    });
 
     it("accessing a suffixed attribute", () => {
       class Person extends Model {

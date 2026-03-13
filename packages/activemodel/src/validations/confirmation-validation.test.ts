@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "../index.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Model, Errors, Types, NestedError, I18n } from "../index.js";
 import { ModelName } from "../naming.js";
 import { CallbackChain } from "../callbacks.js";
 
@@ -100,8 +100,27 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
 
-    it.skip("title confirmation with i18n attribute", () => {
-      // i18n not implemented yet
+    it("title confirmation with i18n attribute", () => {
+      I18n.storeTranslations("en", {
+        activemodel: {
+          attributes: {
+            person: {
+              title: "Custom Title",
+            },
+          },
+        },
+      });
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { confirmation: true });
+        }
+      }
+      const p = new Person({ title: "We the People" });
+      p._attributes.set("titleConfirmation", "We the Robots");
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("title")[0]).toBe("doesn't match Custom Title");
+      I18n.reset();
     });
   });
 });
