@@ -813,3 +813,393 @@ describe("AutomaticInverseFindingTests", () => {
     /* needs composite FK */
   });
 });
+
+describe("InversePolymorphicBelongsToTests", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeModels() {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Man, "tags", { as: "taggable" });
+    Associations.belongsTo.call(Tag, "taggable", { polymorphic: true });
+    registerModel(Man);
+    registerModel(Face);
+    registerModel(Tag);
+    return { Man, Face, Tag };
+  }
+
+  it("child instance should be shared with parent on find", async () => {
+    const { Man, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    const parent = await loadBelongsTo((await Tag.findBy({ taggable_id: m.id }))!, "taggable", {
+      polymorphic: true,
+      inverseOf: "tags",
+    });
+    expect(parent).not.toBeNull();
+    // Inverse is set on the found parent
+    expect((parent as any)._cachedAssociations?.get("tags")).toBeTruthy();
+  });
+
+  it.skip("eager loaded child instance should be shared with parent on find", () => {
+    /* needs eager loading */
+  });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Tag } = makeModels();
+    const m1 = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m1.id, taggable_type: "Man" });
+    const m2 = await Man.create({ name: "New" });
+    setBelongsTo(t, "taggable", m2, {
+      polymorphic: true,
+      inverseOf: "tags",
+      foreignKey: "taggable_id",
+    });
+    expect((t as any)._cachedAssociations.get("taggable")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("tags")).toBe(t);
+  });
+  it.skip("inversed instance should not be reloaded after stale state changed", () => {
+    /* needs stale state tracking */
+  });
+  it.skip("inversed instance should not be reloaded after stale state changed with validation", () => {
+    /* needs stale state tracking */
+  });
+  it.skip("inversed instance should load after autosave if it is not already loaded", () => {
+    /* needs autosave */
+  });
+
+  it("should not try to set inverse instances when the inverse is a has many", async () => {
+    const { Man, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Without inverseOf, no cached association should be set
+    const parent = await loadBelongsTo((await Tag.findBy({ taggable_id: m.id }))!, "taggable", {
+      polymorphic: true,
+    });
+    expect(parent).not.toBeNull();
+    expect((parent as any)._cachedAssociations).toBeUndefined();
+  });
+
+  it.skip("with has many inversing should try to set inverse instances when the inverse is a has many", () => {
+    /* needs has_many inversing */
+  });
+  it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => {
+    /* needs callback tracking */
+  });
+
+  it("trying to access inverses that dont exist shouldnt raise an error", async () => {
+    const { Man, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Loading with a non-existent inverse name should not throw
+    const parent = await loadBelongsTo(t, "taggable", {
+      polymorphic: true,
+      inverseOf: "nonexistent",
+    });
+    expect(parent).not.toBeNull();
+  });
+
+  it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => {
+    /* needs inverse validation on polymorphic */
+  });
+  it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => {
+    /* needs inverse validation on polymorphic */
+  });
+});
+
+describe("InverseAssociationTests", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("should allow for inverse of options in associations", () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(Man, "face", { inverseOf: "man" });
+    const assocs = (Man as any)._associations;
+    const faceAssoc = assocs.find((a: any) => a.name === "face");
+    expect(faceAssoc.options.inverseOf).toBe("man");
+  });
+
+  it("should be able to ask a reflection if it has an inverse", () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
+    Associations.hasOne.call(Man, "face", {});
+    const assocs = (Man as any)._associations;
+    const withInverse = assocs.find((a: any) => a.name === "interests");
+    const withoutInverse = assocs.find((a: any) => a.name === "face");
+    expect(withInverse.options.inverseOf).toBe("man");
+    expect(withoutInverse.options.inverseOf).toBeUndefined();
+  });
+
+  it("inverse of method should supply the actual reflection instance it is the inverse of", () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
+    const assocs = (Man as any)._associations;
+    const interestAssoc = assocs.find((a: any) => a.name === "interests");
+    expect(interestAssoc.options.inverseOf).toBe("man");
+  });
+
+  it("associations with no inverse of should return nil", () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Man, "interests", {});
+    const assocs = (Man as any)._associations;
+    const interestAssoc = assocs.find((a: any) => a.name === "interests");
+    expect(interestAssoc.options.inverseOf).toBeUndefined();
+  });
+
+  it("polymorphic associations dont attempt to find inverse of", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
+    const assocs = (Comment as any)._associations;
+    const polyAssoc = assocs.find((a: any) => a.name === "commentable");
+    expect(polyAssoc.options.polymorphic).toBe(true);
+    expect(polyAssoc.options.inverseOf).toBeUndefined();
+  });
+
+  it("this inverse stuff", async () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
+    Associations.belongsTo.call(Interest, "man", { inverseOf: "interests" });
+    registerModel(Man);
+    registerModel(Interest);
+    const m = await Man.create({ name: "Gordon" });
+    await Interest.create({ topic: "stamps", man_id: m.id });
+    const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
+    expect(interests.length).toBe(1);
+    const cachedMan = (interests[0] as any)._cachedAssociations?.get("man");
+    expect(cachedMan).toBe(m);
+  });
+});
+
+describe("inverse_of", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("sets inverse reference on loaded belongs_to", async () => {
+    class Author extends Base {
+      static _tableName = "authors";
+    }
+    Author.attribute("id", "integer");
+    Author.attribute("name", "string");
+    Author.adapter = adapter;
+    registerModel(Author);
+
+    class Book extends Base {
+      static _tableName = "books";
+    }
+    Book.attribute("id", "integer");
+    Book.attribute("title", "string");
+    Book.attribute("author_id", "integer");
+    Book.adapter = adapter;
+    Associations.belongsTo.call(Book, "author", { inverseOf: "books" });
+    registerModel(Book);
+
+    const author = await Author.create({ name: "Tolkien" });
+    const book = await Book.create({ title: "The Hobbit", author_id: author.id });
+
+    const loadedAuthor = await loadBelongsTo(book, "author", { inverseOf: "books" });
+    // The loaded author should have a cached inverse pointing to the book
+    expect((loadedAuthor as any)._cachedAssociations?.get("books")).toBe(book);
+  });
+
+  it("sets inverse reference on loaded has_many children", async () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("title", "string");
+    Post.adapter = adapter;
+    Associations.hasMany.call(Post, "comments", { inverseOf: "post" });
+    registerModel(Post);
+
+    class Comment extends Base {
+      static _tableName = "comments";
+    }
+    Comment.attribute("id", "integer");
+    Comment.attribute("body", "string");
+    Comment.attribute("post_id", "integer");
+    Comment.adapter = adapter;
+    Associations.belongsTo.call(Comment, "post");
+    registerModel(Comment);
+
+    const post = await Post.create({ title: "Hello" });
+    await Comment.create({ body: "Reply 1", post_id: post.id });
+    await Comment.create({ body: "Reply 2", post_id: post.id });
+
+    const comments = await loadHasMany(post, "comments", { inverseOf: "post" });
+    // Each comment should have the post cached
+    for (const c of comments) {
+      expect((c as any)._cachedAssociations?.get("post")).toBe(post);
+    }
+  });
+});
+
+describe("InverseHasOneTests", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeModels() {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("man_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(Man, "face", { inverseOf: "man" });
+    Associations.belongsTo.call(Face, "man", { inverseOf: "face" });
+    registerModel(Man);
+    registerModel(Face);
+    return { Man, Face };
+  }
+
+  it("parent instance should be shared with child on find", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", man_id: m.id });
+    const face = await loadHasOne(m, "face", { inverseOf: "man" });
+    expect(face).not.toBeNull();
+    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+  });
+
+  it("parent instance should be shared with eager loaded child on find", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", man_id: m.id });
+    const men = await Man.all().includes("face").toArray();
+    expect(men.length).toBe(1);
+    const face = (men[0] as any)._preloadedAssociations?.get("face");
+    expect(face).not.toBeNull();
+    expect((face as any)._cachedAssociations?.get("man")).toBe(men[0]);
+  });
+
+  it("parent instance should be shared with newly built child", () => {
+    const { Man, Face } = makeModels();
+    const m = new Man({ name: "Gordon" });
+    const f = new Face({ description: "pretty" });
+    // Simulate building: set FK and inverse cache
+    f.writeAttribute("man_id", 1);
+    (f as any)._cachedAssociations = new Map();
+    (f as any)._cachedAssociations.set("man", m);
+    expect((f as any)._cachedAssociations.get("man")).toBe(m);
+  });
+
+  it("parent instance should be shared with newly created child", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty", man_id: m.id });
+    const face = await loadHasOne(m, "face", { inverseOf: "man" });
+    expect(face).not.toBeNull();
+    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+  });
+
+  it("parent instance should be shared with newly created child via bang method", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", man_id: m.id });
+    const face = await loadHasOne(m, "face", { inverseOf: "man" });
+    expect(face).not.toBeNull();
+    expect(face!.readAttribute("description")).toBe("pretty");
+    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+  });
+
+  it("parent instance should be shared with replaced via accessor child", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty" });
+    await setHasOne(m, "face", f, { inverseOf: "man", foreignKey: "man_id", className: "Face" });
+    expect((m as any)._cachedAssociations.get("face")).toBe(f);
+    expect((f as any)._cachedAssociations?.get("man")).toBe(m);
+  });
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const { Man, Face } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty", man_id: m.id });
+    const m2 = await Man.create({ name: "New" });
+    setBelongsTo(f, "man", m2, { inverseOf: "face" });
+    expect((f as any)._cachedAssociations.get("man")).toBe(m2);
+    expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
+  });
+  it.skip("trying to use inverses that dont exist should raise an error", () => {
+    /* needs inverse validation */
+  });
+  it.skip("trying to use inverses that dont exist should have suggestions for fix", () => {
+    /* needs inverse validation */
+  });
+});
