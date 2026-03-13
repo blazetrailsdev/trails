@@ -11,6 +11,9 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - `packages/arel` — Query building and AST (Arel)
 - `packages/activemodel` — Validations, callbacks, dirty tracking, serialization (ActiveModel)
 - `packages/activerecord` — ORM layer tying Arel and ActiveModel together (ActiveRecord)
+- `packages/activesupport` — Core utilities, inflection, caching, notifications, encryption (ActiveSupport)
+- `packages/rack` — Web server interface, middleware, request/response (Rack)
+- `packages/actionpack` — ActionDispatch (routing, cookies, sessions) and ActionController
 
 ## Design Principles
 
@@ -23,8 +26,8 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   where they improve the developer experience without breaking Rails parity.
 - **No magic strings where types work**: Prefer typed column references over
   raw strings when possible, but always support the string form for parity.
-- **Incremental delivery**: The project is built in phases (see `docs/phases/`).
-  Each phase should produce a usable, tested subset of functionality.
+- **Test-driven against Rails**: Progress is measured by `convention:compare`,
+  which matches our test files and test names against the actual Rails test suite.
 
 ## Conventions
 
@@ -32,8 +35,39 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - Do NOT add "Co-Authored-By" lines to commit messages.
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules over large files.
+- Do NOT use subagents unless explicitly requested. Do the work directly.
+- Do NOT add code comments that just describe what the line does. Only add
+  comments when they provide additional value — a potential bug hidden, or
+  explanation about the larger context.
+- **NEVER rename or reword test names.** Test names are derived from the Rails
+  test suite and are how `convention:compare` matches our tests to Rails tests.
+  If a test is failing or the behavior doesn't match the name, fix the test body
+  (the implementation under test), not the test name. Always look at the
+  corresponding Rails test to understand the expected behavior before changing
+  anything.
 
-## Phase Tracking
+## Measuring Progress
 
-Phases are documented in `docs/phases/`. Each phase file is numbered with sparse
-IDs (100, 200, ...) to allow insertion of intermediate phases later.
+The primary measure of progress is the `convention:compare` script output.
+It compares our test files and test names against the Rails test suite:
+
+```bash
+npm run convention:compare
+```
+
+Current status (5881/16982 tests = 34.6%):
+
+| Package          | Tests | Files  | Misplaced |
+| ---------------- | ----- | ------ | --------- |
+| arel             | 100%  | 59/59  | 0         |
+| activemodel      | 68.1% | 45/56  | 5         |
+| activerecord     | 39%   | 74/342 | 3119      |
+| activesupport    | 18.9% | 17/157 | 2189      |
+| rack             | 91.2% | 40/40  | 3         |
+| actiondispatch   | 0%    | 0/60   | 433       |
+| actioncontroller | 0%    | 0/91   | 236       |
+
+"Misplaced" means tests that exist but are in the wrong file according to
+Rails conventions. These need to be moved, not rewritten.
+
+CI runs `convention:compare` on every push to track regressions.

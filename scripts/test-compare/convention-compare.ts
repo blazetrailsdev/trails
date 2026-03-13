@@ -228,12 +228,14 @@ function main() {
     });
   }
 
+  // Always write JSON output
+  const outPath = path.join(OUTPUT_DIR, "convention-comparison.json");
+  fs.writeFileSync(
+    outPath,
+    JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
+  );
+
   if (jsonOutput) {
-    const outPath = path.join(OUTPUT_DIR, "convention-comparison.json");
-    fs.writeFileSync(
-      outPath,
-      JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
-    );
     console.log(`Written to ${outPath}`);
     return;
   }

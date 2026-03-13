@@ -6,26 +6,19 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 
 ## Packages
 
-### Data Layer
+| Package                      | Rails Equivalent                                                              | Convention Compare | Description                                                |
+| ---------------------------- | ----------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------- |
+| `@rails-ts/arel`             | [Arel](https://api.rubyonrails.org/classes/Arel.html)                         | **100%**           | SQL AST builder and query generation                       |
+| `@rails-ts/rack`             | [Rack](https://rack.github.io/)                                               | **91.2%**          | Modular web server interface, request/response, middleware |
+| `@rails-ts/activemodel`      | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)           | **68.1%**          | Attributes, validations, callbacks, dirty tracking         |
+| `@rails-ts/activerecord`     | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)         | **39%**            | ORM — persistence, querying, associations, migrations      |
+| `@rails-ts/activesupport`    | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **18.9%**          | Core utilities, inflection, caching, notifications         |
+| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **0%**             | Routing, middleware stack, cookies, sessions, security     |
+| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0%**             | Controller layer, rendering, filters, parameters           |
 
-| Package                   | Rails Equivalent                                                        | Status    | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------------- | --------- | ----------------------------------------------------------------- |
-| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.3%** | SQL AST builder and query generation                              |
-| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **98.4%** | Attributes, validations, callbacks, dirty tracking, serialization |
-| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **65.4%** | ORM — persistence, querying, associations, migrations             |
-| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **21.4%** | Core utilities, inflection, caching, notifications, encryption    |
+**34.6%** complete — 5,881 tests matched against 16,982 Rails tests.
 
-**57.5%** complete — 5,729 tests matched against 9,960 Rails tests.
-
-### Web Layer
-
-| Package                      | Rails Equivalent                                                              | Status    | Description                                                |
-| ---------------------------- | ----------------------------------------------------------------------------- | --------- | ---------------------------------------------------------- |
-| `@rails-ts/rack`             | [Rack](https://rack.github.io/)                                               | **99%**   | Modular web server interface, request/response, middleware |
-| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **27.9%** | Routing, middleware stack, cookies, sessions, security     |
-| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **17.9%** | Controller layer, rendering, filters, parameters           |
-
-**37%** complete — 1,527 tests matched against 4,127 Rails tests.
+Progress is measured by `npm run convention:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.
 
 ## Quick Example
 
@@ -51,67 +44,6 @@ const query = users
 query.toSql();
 // => SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC
 ```
-
-## What's Implemented
-
-### Arel — SQL AST and Query Building (99.3%)
-
-Full SQL AST with nodes for SELECT, INSERT, UPDATE, DELETE, JOINs, subqueries, CTEs, window functions, set operations (UNION/INTERSECT/EXCEPT), and CASE expressions. Visitor pattern generates SQL strings. Essentially complete.
-
-### ActiveModel — Model Layer (98.4%)
-
-Attribute definitions with type casting, a full validation framework (presence, length, format, numericality, inclusion, exclusion, custom validators), lifecycle callbacks (before/after/around for validation and save), dirty tracking (changes, previous changes, changed attributes), and serialization.
-
-### ActiveSupport — Core Utilities (21.4%)
-
-String inflection (pluralize, singularize, camelize, underscore, tableize, etc.), Duration arithmetic, TimeZone and TimeWithZone (DST-aware timezone handling with 150+ Rails named zones), HashWithIndifferentAccess, OrderedOptions, CurrentAttributes, concern/mixin pattern, callback system, lazy load hooks, caching (MemoryStore, FileStore, NullStore), notifications/instrumentation, MessageVerifier/MessageEncryptor, parameter filtering, number helpers, deprecation warnings, and safe buffers. Remaining work is mostly date/time extensions and some Ruby-specific features.
-
-### ActiveRecord — ORM (65.4%)
-
-**Complete (100% test coverage) — 334 tests across 28 files:**
-
-- Primary keys and composite primary keys — 60 tests
-- Belongs-to associations (polymorphic, touch, counter cache, optional/required, autosave) — 153 tests
-- Custom properties, JSON serialization, mutation, explain — 96 tests
-- Validations (presence, length, numericality, absence, custom) — 42 tests
-- Nested attributes, suppressor, boolean, structural compatibility, and more
-
-**Near-complete (90%+):**
-
-- Has-many associations (98%) — collection operations, dependent destroy/nullify, polymorphic, scoped
-- Calculations (91%) — count, sum, average, minimum, maximum, grouped aggregates, pluck, pick, ids
-- Attribute methods (95%) — read/write, dirty tracking, before_type_cast, inspect
-- Default scoping (92%), relation scoping (97%), timestamps (98%), merging (97%)
-- Uniqueness validation (98%), inner joins (90%), or clauses (96%)
-
-**Solid progress (70–89%):**
-
-- Relations (84%) — chaining, merge, extending, spawn, readonly, distinct
-- Finders (85%) — find, find_by, exists?, take, first/last, sole
-- Persistence (80%) — create/save/update/destroy, becomes, increment/decrement/toggle, reload
-- Enum (77%), batches (80%), transactions (82%), named scoping (84%)
-- Nested attributes (61%), inheritance (89%), dirty tracking (81%)
-
-**Working:**
-
-- Where clauses, associations (has_one, HABTM, has_many :through), eager loading, inverse_of
-- Callbacks, optimistic locking, counter cache, autosave, store accessors
-- insertAll/upsertAll, serialized attributes, secure tokens, signed IDs, delegated types
-- Database adapters: MemoryAdapter (for tests), SQLite, PostgreSQL, MySQL/MariaDB
-
-**In progress:** Where chain (where.not/missing/associated), eager loading through associations, autosave edge cases, HABTM collection operations, strict loading, pessimistic locking. See [docs/activerecord-100-percent.md](docs/activerecord-100-percent.md) for the full breakdown.
-
-### Rack — Web Server Interface (99%)
-
-Request/Response objects, multipart parsing (file uploads), Builder (middleware composition), middleware (ContentType, ContentLength, ETag, ConditionalGet, Deflater, Head, MethodOverride, Runtime, Sendfile, Lock, Static, ShowExceptions, ShowStatus, CommonLogger, Cascade, URLMap), MIME type registry, MockRequest/MockResponse for testing, HTTP Basic auth, Headers, Events, Logger, and RewindableInput. Essentially complete — the only skipped tests are Ruby-specific `.ru` config file parsing features.
-
-### ActionDispatch — Routing and Middleware (27.9%)
-
-Route DSL (resources, resource, namespace, scope, member, collection, concerns, constraints, shallow routes), route matching and URL generation, route helpers (\_path/\_url), middleware stack, cookies (signed, encrypted, permanent), flash messages, session handling (CookieStore), CSRF protection, content negotiation (respond_to), Content Security Policy, Permissions Policy, SSL enforcement, Host Authorization, HTTP authentication (Basic, Token, Digest), request ID tracking, and redirect helpers. Early stage — routing core works, but controller integration and many middleware edge cases remain.
-
-### ActionController — Controllers (17.9%)
-
-Base controller with rendering (templates, JSON, plain text, status codes), filters (before/after/around), strong parameters, redirect, head, send_file/send_data, and route helper injection. Early stage — basic request/response cycle works.
 
 ## Ruby to TypeScript Conventions
 
@@ -146,22 +78,19 @@ npm run build
 
 ### Measuring Progress Against Rails
 
-Two compare scripts measure how closely we track the real Rails codebase:
-
 ```bash
+# Compare test coverage against the Rails test suite
+# Matches our test file names and it()/it.skip() descriptions against Ruby test names
+npm run convention:compare
+
 # Compare public API surface against Rails
-# Extracts Ruby method signatures from Rails source and diffs against our TS exports
 npm run api:compare
 
-# Compare test coverage against the Rails test suite
-# Matches our it()/it.skip() descriptions against Ruby test names
-npm run test:compare
-
 # Generate stub tests for any unmatched Rails tests
-npm run test:generate-stubs
+npm run test:stubs
 ```
 
-Both scripts fetch the Rails source, extract Ruby definitions, extract our TypeScript equivalents, and produce a comparison report. CI runs both on every push to ensure we don't regress.
+CI runs `convention:compare` on every push to ensure we don't regress.
 
 ### Database Adapters
 
