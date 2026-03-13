@@ -2,6 +2,12 @@ import { Node, NodeVisitor } from "./node.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { As } from "./binary.js";
 
+/** Writable view of Case for internal mutation during construction. */
+type MutableCase = Case & {
+  conditions: Array<{ when: Node; then: Node }>;
+  defaultValue: Node | null;
+};
+
 /**
  * Represents a CASE WHEN ... THEN ... ELSE ... END expression.
  *
@@ -20,9 +26,8 @@ export class Case extends Node {
   }
 
   when(condition: Node | unknown, result?: Node | unknown): Case {
-    const c = new Case(this.operand ?? undefined);
-    type MutableCase = { conditions: Array<{ when: Node; then: Node }>; defaultValue: Node | null };
-    (c as unknown as MutableCase).conditions = [...this.conditions];
+    const c = new Case(this.operand ?? undefined) as MutableCase;
+    c.conditions = [...this.conditions];
     const whenNode = condition instanceof Node ? condition : new SqlLiteral(String(condition));
     const thenNode =
       result instanceof Node
@@ -37,14 +42,13 @@ export class Case extends Node {
                   : String(result),
           );
     c.conditions.push({ when: whenNode, then: thenNode });
-    (c as unknown as MutableCase).defaultValue = this.defaultValue;
+    c.defaultValue = this.defaultValue;
     return c;
   }
 
   else(result: Node | unknown): Case {
-    const c = new Case(this.operand ?? undefined);
-    type MutableCase = { conditions: Array<{ when: Node; then: Node }>; defaultValue: Node | null };
-    (c as unknown as MutableCase).conditions = [...this.conditions];
+    const c = new Case(this.operand ?? undefined) as MutableCase;
+    c.conditions = [...this.conditions];
     const elseNode =
       result instanceof Node
         ? result
@@ -57,7 +61,7 @@ export class Case extends Node {
                   ? `'${result.replace(/'/g, "''")}'`
                   : String(result),
           );
-    (c as unknown as MutableCase).defaultValue = elseNode;
+    c.defaultValue = elseNode;
     return c;
   }
 

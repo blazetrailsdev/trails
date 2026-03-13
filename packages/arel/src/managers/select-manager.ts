@@ -392,7 +392,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#optimizer_hints
    */
   optimizerHints(...hints: string[]): this {
-    (this.core as unknown as Record<string, unknown>).optimizerHints = hints;
+    this.core.optimizerHints = hints;
     return this;
   }
 
