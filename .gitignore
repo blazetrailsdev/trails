@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 vendor/rails/
+scripts/test-compare/output/
+scripts/api-compare/output/
