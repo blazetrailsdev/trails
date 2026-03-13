@@ -51,4 +51,53 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
   });
+
+  describe("ConfirmationValidationTest (ported)", () => {
+    it("no title confirmation", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { confirmation: true });
+        }
+      }
+      const p = new Person({ title: "A", titleConfirmation: "B" });
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("title")).toContain("doesn't match confirmation");
+    });
+
+    it("title confirmation", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { confirmation: true });
+        }
+      }
+      const p = new Person({ title: "A", titleConfirmation: "A" });
+      expect(p.isValid()).toBe(true);
+    });
+
+    it("title confirmation with case sensitive option true", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { confirmation: { caseSensitive: true } });
+        }
+      }
+      const p = new Person({ title: "Hello" });
+      p._attributes.set("titleConfirmation", "hello");
+      expect(p.isValid()).toBe(false);
+    });
+
+    it("title confirmation with case sensitive option false", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { confirmation: { caseSensitive: false } });
+        }
+      }
+      const p = new Person({ title: "Hello" });
+      p._attributes.set("titleConfirmation", "hello");
+      expect(p.isValid()).toBe(true);
+    });
+  });
 });

@@ -69,4 +69,31 @@ describe("ActiveModel", () => {
       expect(p.errors.count).toBeGreaterThan(0);
     });
   });
+
+  describe("Validations Presence (ported)", () => {
+    it("validate presences", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+          this.validatesPresenceOf("name", "age");
+        }
+      }
+      const p = new Person({});
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("name").length).toBeGreaterThan(0);
+    });
+
+    it("validates acceptance of with custom error using quotes", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: { message: "is required!" } });
+        }
+      }
+      const p = new Person({});
+      p.isValid();
+      expect(p.errors.get("name")).toContain("is required!");
+    });
+  });
 });

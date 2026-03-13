@@ -233,4 +233,132 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
   });
+
+  describe("Validations Length (ported)", () => {
+    it("validates length of using minimum", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 5 } });
+        }
+      }
+      expect(new Person({ title: "abcde" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcd" }).isValid()).toBe(false);
+    });
+
+    it("validates length of using maximum", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { maximum: 5 } });
+        }
+      }
+      expect(new Person({ title: "abcde" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcdef" }).isValid()).toBe(false);
+    });
+
+    it("validates length of using maximum should allow nil", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { maximum: 5 } });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+    });
+
+    it("validates length of using within", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { in: [3, 5] } });
+        }
+      }
+      expect(new Person({ title: "ab" }).isValid()).toBe(false);
+      expect(new Person({ title: "abc" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcde" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcdef" }).isValid()).toBe(false);
+    });
+
+    it("validates length of using is", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { is: 4 } });
+        }
+      }
+      expect(new Person({ title: "abcd" }).isValid()).toBe(true);
+      expect(new Person({ title: "abc" }).isValid()).toBe(false);
+      expect(new Person({ title: "abcde" }).isValid()).toBe(false);
+    });
+
+    it("validates length of custom errors for minimum with too short", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 5, tooShort: "is way too short" } });
+        }
+      }
+      const p = new Person({ title: "ab" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("is way too short");
+    });
+
+    it("validates length of custom errors for maximum with too long", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { maximum: 5, tooLong: "is way too long" } });
+        }
+      }
+      const p = new Person({ title: "abcdefgh" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("is way too long");
+    });
+
+    it("validates length of custom errors for both too short and too long", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", {
+            length: { minimum: 3, maximum: 5, tooShort: "short!", tooLong: "long!" },
+          });
+        }
+      }
+      const short = new Person({ title: "ab" });
+      short.isValid();
+      expect(short.errors.get("title")).toContain("short!");
+
+      const long = new Person({ title: "abcdef" });
+      long.isValid();
+      expect(long.errors.get("title")).toContain("long!");
+    });
+
+    it("validates length of custom errors for is with wrong length", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { is: 4, wrongLength: "wrong size!" } });
+        }
+      }
+      const p = new Person({ title: "abc" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("wrong size!");
+    });
+  });
+
+  describe("LengthValidationTest (ported)", () => {
+    it("validates length of using proc as maximum", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { length: { maximum: () => 5 } });
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.isValid()).toBe(true);
+      const p2 = new Person({ name: "Alicia" });
+      expect(p2.isValid()).toBe(false);
+    });
+  });
 });

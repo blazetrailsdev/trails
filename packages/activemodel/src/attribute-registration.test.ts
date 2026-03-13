@@ -183,4 +183,88 @@ describe("ActiveModel", () => {
       expect(c.readAttribute("name")).toBe("test");
     });
   });
+
+  describe("Attribute Registration", () => {
+    it("the default type is used when type is omitted", () => {
+      // When using a registered type, lookups use the registry
+      const stringType = Types.typeRegistry.lookup("string");
+      expect(stringType.name).toBe("string");
+      expect(stringType.cast("hello")).toBe("hello");
+    });
+
+    it("type is resolved when specified by name", () => {
+      class Person extends Model {
+        static {
+          this.attribute("age", "integer");
+        }
+      }
+      const p = new Person({ age: "25" });
+      expect(p.readAttribute("age")).toBe(25);
+    });
+
+    it(".attribute_types reflects registered attribute types", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const defs = Person._attributeDefinitions;
+      expect(defs.get("name")!.type.name).toBe("string");
+      expect(defs.get("age")!.type.name).toBe("integer");
+    });
+
+    it(".decorate_attributes decorates specified attributes", () => {
+      // We can use normalizes as the TS equivalent of decorate_attributes
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toUpperCase() : v));
+        }
+      }
+      const p = new Person({ name: "alice" });
+      expect(p.readAttribute("name")).toBe("ALICE");
+    });
+
+    it(".decorate_attributes stacks decorators", () => {
+      // Multiple normalizations: last one wins since normalizes replaces
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.normalizes("name", (v: unknown) =>
+            typeof v === "string" ? v.trim().toUpperCase() : v,
+          );
+        }
+      }
+      const p = new Person({ name: "  alice  " });
+      expect(p.readAttribute("name")).toBe("ALICE");
+    });
+
+    it("re-registering an attribute overrides previous decorators", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toUpperCase() : v));
+          // Re-register normalization
+          this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toLowerCase() : v));
+        }
+      }
+      const p = new Person({ name: "ALICE" });
+      expect(p.readAttribute("name")).toBe("alice");
+    });
+  });
+
+  describe("AttributeRegistrationTest (ported)", () => {
+    it(".type_for_attribute returns the registered attribute type", () => {
+      class User extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const u = new User({ name: "Alice", age: 25 });
+      expect(u.typeForAttribute("name")?.name).toBe("string");
+      expect(u.typeForAttribute("age")?.name).toBe("integer");
+    });
+  });
 });

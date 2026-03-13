@@ -75,4 +75,42 @@ describe("ActiveModel", () => {
       expect(p.errors.count).toBeGreaterThan(0);
     });
   });
+
+  describe("Validations Format (ported)", () => {
+    it("validate format", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { format: { with: /^[A-Z]/ } });
+        }
+      }
+      expect(new Person({ title: "Hello" }).isValid()).toBe(true);
+      expect(new Person({ title: "hello" }).isValid()).toBe(false);
+    });
+
+    it("validate format with not option", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { format: { without: /\d/ } });
+        }
+      }
+      expect(new Person({ title: "hello" }).isValid()).toBe(true);
+      expect(new Person({ title: "hello123" }).isValid()).toBe(false);
+    });
+
+    it("validate format with formatted message", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", {
+            format: { with: /^[A-Z]/, message: "must start with uppercase" },
+          });
+        }
+      }
+      const p = new Person({ title: "hello" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("must start with uppercase");
+    });
+  });
 });

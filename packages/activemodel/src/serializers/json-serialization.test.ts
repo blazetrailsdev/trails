@@ -148,4 +148,120 @@ describe("ActiveModel", () => {
       expect(json).toHaveProperty("name", "test");
     });
   });
+
+  describe("JSON Serialization (ported)", () => {
+    class JsonPerson extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+
+    it("should encode all encodable attributes", () => {
+      const p = new JsonPerson({ name: "Alice", age: 30 });
+      const json = p.toJson();
+      const parsed = JSON.parse(json);
+      expect(parsed.name).toBe("Alice");
+      expect(parsed.age).toBe(30);
+    });
+
+    it("should allow attribute filtering with only", () => {
+      const p = new JsonPerson({ name: "Alice", age: 30 });
+      const json = JSON.parse(p.toJson({ only: ["name"] }));
+      expect(json.name).toBe("Alice");
+      expect(json.age).toBeUndefined();
+    });
+
+    it("should allow attribute filtering with except", () => {
+      const p = new JsonPerson({ name: "Alice", age: 30 });
+      const json = JSON.parse(p.toJson({ except: ["age"] }));
+      expect(json.name).toBe("Alice");
+      expect(json.age).toBeUndefined();
+    });
+
+    it("as_json should allow attribute filtering with only", () => {
+      const p = new JsonPerson({ name: "Alice", age: 30 });
+      const json = p.asJson({ only: ["name"] });
+      expect(json.name).toBe("Alice");
+      expect(json.age).toBeUndefined();
+    });
+
+    it("as_json should allow attribute filtering with except", () => {
+      const p = new JsonPerson({ name: "Alice", age: 30 });
+      const json = p.asJson({ except: ["age"] });
+      expect(json.name).toBe("Alice");
+      expect(json.age).toBeUndefined();
+    });
+
+    it("from_json should work without a root (class attribute)", () => {
+      const p = new JsonPerson({});
+      p.fromJson('{"name":"Alice","age":30}');
+      expect(p.readAttribute("name")).toBe("Alice");
+      expect(p.readAttribute("age")).toBe(30);
+    });
+
+    it("from_json should work with a root (method parameter)", () => {
+      const p = new JsonPerson({});
+      p.fromJson('{"json_person":{"name":"Alice","age":30}}', true);
+      expect(p.readAttribute("name")).toBe("Alice");
+    });
+  });
+
+  describe("JSON Serialization (root in JSON)", () => {
+    it("should include root in JSON if include_root_in_json is true", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.includeRootInJson = true;
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      const json = JSON.parse(p.toJson());
+      expect(json).toEqual({ person: { name: "Alice" } });
+      // Reset
+      Person.includeRootInJson = false;
+    });
+
+    it("should include custom root in JSON", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.includeRootInJson = "human";
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      const json = JSON.parse(p.toJson());
+      expect(json).toEqual({ human: { name: "Alice" } });
+      Person.includeRootInJson = false;
+    });
+
+    it("as_json should return a hash if include_root_in_json is true", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.includeRootInJson = true;
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      const result = p.asJson();
+      expect(result).toEqual({ person: { name: "Alice" } });
+      Person.includeRootInJson = false;
+    });
+  });
+
+  describe("JsonSerializationTest (ported)", () => {
+    it("serializable_hash should not modify options passed in argument", () => {
+      class SerPerson extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+          this.attribute("email", "string");
+        }
+      }
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const opts = { only: ["name"] };
+      p.serializableHash(opts);
+      expect(opts).toEqual({ only: ["name"] });
+    });
+  });
 });

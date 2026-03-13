@@ -116,4 +116,48 @@ describe("ActiveModel", () => {
       expect(new Person({ name: "Alice" }).toPartialPath()).toBe("people/_person");
     });
   });
+
+  describe("Conversion (toKey/toParam)", () => {
+    it("to_key default implementation returns the id in an array for persisted records", () => {
+      class Person extends Model {
+        static {
+          this.attribute("id", "integer");
+        }
+        isPersisted() {
+          return true;
+        }
+      }
+      const p = new Person({ id: 1 });
+      expect(p.toKey()).toEqual([1]);
+    });
+
+    it("to_param default implementation returns a string of ids for persisted records", () => {
+      class Person extends Model {
+        static {
+          this.attribute("id", "integer");
+        }
+        isPersisted() {
+          return true;
+        }
+      }
+      const p = new Person({ id: 1 });
+      expect(p.toParam()).toBe("1");
+    });
+
+    it("to_param returns the string joined by '-'", () => {
+      class Person extends Model {
+        static {
+          this.attribute("id", "integer");
+        }
+        isPersisted() {
+          return true;
+        }
+        toKey() {
+          return [1, 2, 3];
+        }
+      }
+      const p = new Person({ id: 1 });
+      expect(p.toParam()).toBe("1-2-3");
+    });
+  });
 });

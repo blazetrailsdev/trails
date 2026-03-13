@@ -212,4 +212,61 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name").length).toBeGreaterThan(0);
     });
   });
+
+  describe("Validations With Validation (ported)", () => {
+    it("validation with class that adds errors", () => {
+      class CustomValidator {
+        validate(record: any) {
+          const val = record.readAttribute("name");
+          if (!val || val === "") {
+            record.errors.add("name", "blank");
+          }
+        }
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(CustomValidator);
+        }
+      }
+      expect(new Person({}).isValid()).toBe(false);
+      expect(new Person({ name: "Alice" }).isValid()).toBe(true);
+    });
+
+    it("with a class that returns valid", () => {
+      class PassValidator {
+        validate(_record: any) {}
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(PassValidator);
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+    });
+
+    it("passes all configuration options to the validator class", () => {
+      class MinLenValidator {
+        min: number;
+        constructor(opts: any = {}) {
+          this.min = opts.minimum ?? 0;
+        }
+        validate(record: any) {
+          const val = record.readAttribute("name");
+          if (typeof val === "string" && val.length < this.min) {
+            record.errors.add("name", "too_short");
+          }
+        }
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(MinLenValidator, { minimum: 5 });
+        }
+      }
+      expect(new Person({ name: "ab" }).isValid()).toBe(false);
+      expect(new Person({ name: "abcde" }).isValid()).toBe(true);
+    });
+  });
 });

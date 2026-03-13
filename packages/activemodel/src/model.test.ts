@@ -71,4 +71,29 @@ describe("ActiveModel", () => {
       expect(p.readAttribute("name")).toBeNull();
     });
   });
+
+  describe("ModelTest (ported)", () => {
+    it("persisted is always false", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      expect(new Person({ name: "Alice" }).isPersisted()).toBe(false);
+    });
+
+    it("load hook is called", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.afterInitialize((r: any) => {
+            log.push("initialized");
+          });
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(log).toEqual(["initialized"]);
+    });
+  });
 });

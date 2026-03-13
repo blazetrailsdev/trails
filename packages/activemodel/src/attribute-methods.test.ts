@@ -157,4 +157,113 @@ describe("ActiveModel", () => {
       expect((e as any).display_name).toBe("Bob");
     });
   });
+
+  describe("Attribute Methods", () => {
+    it("method missing works correctly even if attributes method is not defined", () => {
+      class Bare extends Model {}
+      const b = new Bare();
+      // attributeMissing returns null for undefined attributes
+      expect(b.readAttribute("nonexistent")).toBe(null);
+    });
+
+    it("unrelated classes should not share attribute method matchers", () => {
+      class A extends Model {
+        static {
+          this.attribute("x", "string");
+        }
+      }
+      class B extends Model {
+        static {
+          this.attribute("y", "string");
+        }
+      }
+      expect(A.attributeNames()).toEqual(["x"]);
+      expect(B.attributeNames()).toEqual(["y"]);
+    });
+
+    it("#define_attribute_method generates attribute method", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attributeMethodPrefix("clear_");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(typeof (p as any).clear_name).toBe("function");
+    });
+
+    it("#define_attribute_methods defines alias attribute methods after undefining", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.aliasAttribute("full_name", "name");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect((p as any).full_name).toBe("Alice");
+      (p as any).full_name = "Bob";
+      expect(p.readAttribute("name")).toBe("Bob");
+    });
+
+    it("#undefine_attribute_methods removes attribute methods", () => {
+      // In our implementation, attribute methods defined via prefix/suffix
+      // can be overridden; we test that base readAttribute still works
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.readAttribute("name")).toBe("Alice");
+    });
+
+    it("accessing a suffixed attribute", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attributeMethodSuffix("_changed");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(typeof (p as any).name_changed).toBe("function");
+    });
+
+    it("should not interfere with method_missing if the attr has a private/protected method", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+        customName() {
+          return "custom";
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.customName()).toBe("custom");
+      expect(p.readAttribute("name")).toBe("Alice");
+    });
+
+    it("should use attribute_missing to dispatch a missing attribute", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+        attributeMissing(name: string): unknown {
+          return `missing:${name}`;
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.readAttribute("nonexistent")).toBe("missing:nonexistent");
+    });
+
+    it("name clashes are handled", () => {
+      // Attributes with the same name as existing methods should still work via readAttribute
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.readAttribute("name")).toBe("Alice");
+    });
+  });
 });

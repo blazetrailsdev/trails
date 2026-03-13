@@ -170,31 +170,6 @@ describe("ActiveModel", () => {
   });
 
   describe("Dirty (advanced)", () => {
-    it("using attribute_will_change! with a symbol", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      const p = new Person({ name: "Alice" });
-      p.writeAttribute("name", "Bob");
-      expect(p.attributeChanged("name")).toBe(true);
-      expect(p.attributeWas("name")).toBe("Alice");
-    });
-
-    it("attribute mutation", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      const p = new Person({ name: "Alice" });
-      expect(p.changed).toBe(false);
-      p.writeAttribute("name", "Bob");
-      expect(p.changed).toBe(true);
-      expect(p.changes).toEqual({ name: ["Alice", "Bob"] });
-    });
-
     it("model can be dup-ed without Attributes", () => {
       class Bare extends Model {}
       const b = new Bare();

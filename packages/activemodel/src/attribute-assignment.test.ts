@@ -117,4 +117,30 @@ describe("ActiveModel", () => {
       expect(p.readAttribute("name")).toBe("test");
     });
   });
+
+  describe("AttributeAssignmentTest (ported)", () => {
+    it("simple assignment", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const p = new Person({});
+      p.assignAttributes({ name: "Alice", age: 30 });
+      expect(p.readAttribute("name")).toBe("Alice");
+      expect(p.readAttribute("age")).toBe(30);
+    });
+
+    it("regular hash should still be used for mass assignment", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({});
+      p.assignAttributes({ name: "Bob" });
+      expect(p.readAttribute("name")).toBe("Bob");
+    });
+  });
 });

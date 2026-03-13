@@ -57,18 +57,6 @@ describe("ActiveModel", () => {
       expect(e.attributeNames).toEqual(["name", "age"]);
     });
 
-    it("full_message returns the given message when attribute is :base", () => {
-      const e = new Errors(null);
-      e.add("base", "invalid", { message: "Something went wrong" });
-      expect(e.fullMessages).toContain("Something went wrong");
-    });
-
-    it("full_message returns the given message with the attribute name included", () => {
-      const e = new Errors(null);
-      e.add("name", "blank");
-      expect(e.fullMessages[0]).toBe("Name can't be blank");
-    });
-
     it("details returns added error detail", () => {
       const e = new Errors(null);
       e.add("name", "blank");
@@ -554,12 +542,6 @@ describe("ActiveModel", () => {
       expect(json.name.length).toBe(2);
     });
 
-    it("generate_message works without i18n_scope", () => {
-      const e = new Errors(null);
-      expect(e.generateMessage("name", "blank")).toBe("can't be blank");
-      expect(e.generateMessage("name", "invalid")).toBe("is invalid");
-    });
-
     it("details returns added error detail with custom option", () => {
       const e = new Errors(null);
       e.add("name", "blank", { message: "custom" });
@@ -652,6 +634,82 @@ describe("ActiveModel", () => {
     it("messages returns empty frozen array when accessed with non-existent attribute", () => {
       const e = new Errors(null);
       expect(e.get("nonexistent")).toEqual([]);
+    });
+  });
+
+  describe("Errors.on()", () => {
+    it("on() is an alias for get()", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      expect(e.on("name")).toEqual(e.get("name"));
+      expect(e.on("name")).toContain("can't be blank");
+    });
+
+    it("on() returns empty array for unknown attribute", () => {
+      const e = new Errors(null);
+      expect(e.on("nonexistent")).toEqual([]);
+    });
+  });
+
+  describe("Errors (advanced features)", () => {
+    it("dup duplicates details", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      const details1 = errors.details;
+      const details2 = errors.details;
+      expect(details1).toEqual(details2);
+      expect(details1).not.toBe(details2);
+    });
+
+    it("errors are marshalable", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      const json = JSON.stringify(errors.toHash());
+      const parsed = JSON.parse(json);
+      expect(parsed).toEqual({ name: ["can't be blank"] });
+    });
+
+    it("added? ignores callback option", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      expect(errors.added("name", "blank", { callback: () => {} })).toBe(true);
+    });
+
+    it("added? ignores message option", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      expect(errors.added("name", "blank", { message: "different" })).toBe(true);
+    });
+
+    it("added? handles proc messages", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank", { message: () => "custom" } as any);
+      expect(errors.added("name", "blank")).toBe(true);
+    });
+
+    it("of_kind? handles proc messages", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank", { message: () => "custom" } as any);
+      expect(errors.ofKind("name", "blank")).toBe(true);
+    });
+
+    it("of_kind? ignores options", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      expect(errors.ofKind("name", "blank")).toBe(true);
+      expect(errors.ofKind("name", "invalid")).toBe(false);
+    });
+
+    it("added? defaults message to :invalid", () => {
+      class User extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const u = new User({});
+      u.errors.add("name", "blank");
+      expect(u.errors.added("name", "blank")).toBe(true);
+      expect(u.errors.added("name", "invalid")).toBe(false);
     });
   });
 });

@@ -129,4 +129,92 @@ describe("ActiveModel", () => {
       expect(hash).toHaveProperty("age", 25);
     });
   });
+
+  describe("Serialization (ported)", () => {
+    class SerPerson extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.attribute("email", "string");
+      }
+      get greeting(): string {
+        return `Hi ${this.readAttribute("name")}`;
+      }
+    }
+
+    it("method serializable hash should work", () => {
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const hash = p.serializableHash();
+      expect(hash.name).toBe("Alice");
+      expect(hash.age).toBe(30);
+      expect(hash.email).toBe("a@b.com");
+    });
+
+    it("method serializable hash should work with only option", () => {
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const hash = p.serializableHash({ only: ["name"] });
+      expect(hash.name).toBe("Alice");
+      expect(hash.age).toBeUndefined();
+    });
+
+    it("method serializable hash should work with except option", () => {
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const hash = p.serializableHash({ except: ["email"] });
+      expect(hash.name).toBe("Alice");
+      expect(hash.email).toBeUndefined();
+    });
+
+    it("method serializable hash should work with methods option", () => {
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const hash = p.serializableHash({ methods: ["greeting"] });
+      expect(hash.greeting).toBe("Hi Alice");
+    });
+
+    it("method serializable hash should work with only and methods", () => {
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const hash = p.serializableHash({ only: ["name"], methods: ["greeting"] });
+      expect(Object.keys(hash).sort()).toEqual(["greeting", "name"]);
+    });
+
+    it("method serializable hash should work with except and methods", () => {
+      const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
+      const hash = p.serializableHash({ except: ["email", "age"], methods: ["greeting"] });
+      expect(hash.name).toBe("Alice");
+      expect(hash.email).toBeUndefined();
+      expect(hash.greeting).toBe("Hi Alice");
+    });
+  });
+
+  describe("SerializationTest (ported)", () => {
+    class Post extends Model {
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.attribute("rating", "integer");
+      }
+    }
+
+    it("include option with singular association", () => {
+      const p = new Post({ title: "Hello", body: "World", rating: 5 });
+      const comment = { _attributes: new Map([["text", "Great!"]]) };
+      (p as any)._preloadedAssociations = new Map([["comments", [comment]]]);
+      const result = p.serializableHash({ include: ["comments"] });
+      expect(Array.isArray(result.comments)).toBe(true);
+      expect((result.comments as any[])[0].text).toBe("Great!");
+    });
+
+    it("include with options", () => {
+      const p = new Post({ title: "Hello", body: "World", rating: 5 });
+      const comment = {
+        _attributes: new Map([
+          ["text", "Great!"],
+          ["author", "Bob"],
+        ]),
+      };
+      (p as any)._preloadedAssociations = new Map([["comments", [comment]]]);
+      const result = p.serializableHash({ include: { comments: { only: ["text"] } } });
+      expect((result.comments as any[])[0].text).toBe("Great!");
+      expect((result.comments as any[])[0].author).toBeUndefined();
+    });
+  });
 });

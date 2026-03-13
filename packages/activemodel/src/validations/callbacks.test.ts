@@ -83,4 +83,157 @@ describe("ActiveModel", () => {
       expect(p2.isValid()).toBe(false);
     });
   });
+
+  describe("CallbacksWithMethodNamesShouldBeCalled", () => {
+    it("on condition is respected for validation without matching context", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" });
+        }
+      }
+      const p = new Person({ name: "" });
+      // Without context, the on:create validation should not fire
+      expect(p.isValid()).toBe(true);
+    });
+
+    it("on condition is respected for validation without context", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "update" });
+        }
+      }
+      const p = new Person({ name: "" });
+      expect(p.isValid()).toBe(true);
+    });
+
+    it("on multiple condition is respected for validation with matching context", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" });
+        }
+      }
+      const p = new Person({ name: "" });
+      expect(p.isValid("create")).toBe(false);
+    });
+
+    it("on multiple condition is respected for validation without matching context", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" });
+        }
+      }
+      const p = new Person({ name: "" });
+      expect(p.isValid("update")).toBe(true);
+    });
+
+    it("on multiple condition is respected for validation without context", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" });
+        }
+      }
+      const p = new Person({ name: "" });
+      expect(p.isValid()).toBe(true);
+    });
+
+    it("further callbacks should be called if before validation returns false", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.afterValidation(() => {
+            log.push("after");
+          });
+        }
+      }
+      const p = new Person({ name: "test" });
+      p.isValid();
+      expect(log).toContain("after");
+    });
+
+    it("further callbacks should be called if after validation returns false", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.afterValidation(() => {
+            log.push("first");
+            return false;
+          });
+          this.afterValidation(() => {
+            log.push("second");
+          });
+        }
+      }
+      const p = new Person({ name: "test" });
+      p.isValid();
+      expect(log).toContain("first");
+    });
+
+    it("before validation does not mutate the if options array", () => {
+      const conditions = [(r: any) => true];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.beforeValidation(() => {}, { if: conditions[0] });
+        }
+      }
+      expect(conditions.length).toBe(1);
+    });
+
+    it("after validation does not mutate the if options array", () => {
+      const conditions = [(r: any) => true];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.afterValidation(() => {}, { if: conditions[0] });
+        }
+      }
+      expect(conditions.length).toBe(1);
+    });
+  });
+
+  describe("Callbacks (advanced features)", () => {
+    it("if condition is respected for before validation", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.beforeValidation(
+            (r: any) => {
+              log.push("before");
+            },
+            { if: (r: any) => r.readAttribute("name") === "trigger" },
+          );
+        }
+      }
+      const p1 = new Person({ name: "Alice" });
+      p1.isValid();
+      expect(log).toEqual([]);
+
+      const p2 = new Person({ name: "trigger" });
+      p2.isValid();
+      expect(log).toEqual(["before"]);
+    });
+
+    it("on condition is respected for validation with matching context", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" });
+        }
+      }
+      const p = new Person();
+      expect(p.isValid()).toBe(true); // no context, skipped
+      expect(p.isValid("create")).toBe(false); // matching context
+      expect(p.isValid("update")).toBe(true); // non-matching context
+    });
+  });
 });

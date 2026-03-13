@@ -120,4 +120,123 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
   });
+
+  describe("Validations Validates (ported)", () => {
+    it("validates with built in validation", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { presence: true });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(false);
+      expect(new Person({ title: "Hello" }).isValid()).toBe(true);
+    });
+
+    it("validates with built in validation and options", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { presence: true, length: { minimum: 3 } });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(false);
+      expect(new Person({ title: "ab" }).isValid()).toBe(false);
+      expect(new Person({ title: "abc" }).isValid()).toBe(true);
+    });
+
+    it("validates with if as local conditions", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("active", "boolean");
+          this.validates("name", {
+            presence: true,
+            if: (r: any) => r.readAttribute("active") === true,
+          });
+        }
+      }
+      expect(new Person({ active: false }).isValid()).toBe(true);
+      expect(new Person({ active: true }).isValid()).toBe(false);
+    });
+
+    it("validates with unless as local conditions", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("skip", "boolean");
+          this.validates("name", {
+            presence: true,
+            unless: (r: any) => r.readAttribute("skip") === true,
+          });
+        }
+      }
+      expect(new Person({ skip: true }).isValid()).toBe(true);
+      expect(new Person({ skip: false }).isValid()).toBe(false);
+    });
+  });
+
+  describe("ValidatesTest (ported)", () => {
+    it("validates with validator class", () => {
+      class MyValidator {
+        validate(record: any) {
+          if (!record.readAttribute("name")) {
+            record.errors.add("name", "blank", { message: "must be present" });
+          }
+        }
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(MyValidator);
+        }
+      }
+      const p = new Person();
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("name")).toEqual(["must be present"]);
+    });
+
+    it("validates with namespaced validator class", () => {
+      const Validators = {
+        NameValidator: class {
+          validate(record: any) {
+            if (!record.readAttribute("name")) {
+              record.errors.add("name", "blank", { message: "is required" });
+            }
+          }
+        },
+      };
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(Validators.NameValidator);
+        }
+      }
+      const p = new Person();
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("name")).toEqual(["is required"]);
+    });
+
+    it("validates with unknown validator", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { unknownValidator: true } as any);
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.isValid()).toBe(true);
+    });
+
+    it("validates with disabled unknown validator", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { foobar: false } as any);
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      expect(p.isValid()).toBe(true);
+    });
+  });
 });

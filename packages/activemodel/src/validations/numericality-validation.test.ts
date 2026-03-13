@@ -152,4 +152,186 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
   });
+
+  describe("Validations Numericality (ported)", () => {
+    it("default validates numericality of", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: true });
+        }
+      }
+      expect(new Person({ value: "42" }).isValid()).toBe(true);
+      expect(new Person({ value: "3.14" }).isValid()).toBe(true);
+      expect(new Person({ value: "abc" }).isValid()).toBe(false);
+    });
+
+    it("validates numericality of with nil allowed", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: true });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+    });
+
+    it("validates numericality of with integer only", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { onlyInteger: true } });
+        }
+      }
+      expect(new Person({ value: "5" }).isValid()).toBe(true);
+      const f = new Person({ value: "5.5" });
+      expect(f.isValid()).toBe(false);
+      expect(f.errors.get("value")).toContain("is not an integer");
+    });
+
+    it("validates numericality with greater than", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { greaterThan: 0 } });
+        }
+      }
+      expect(new Person({ value: 1 }).isValid()).toBe(true);
+      expect(new Person({ value: 0 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with greater than or equal", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { greaterThanOrEqualTo: 18 } });
+        }
+      }
+      expect(new Person({ value: 18 }).isValid()).toBe(true);
+      expect(new Person({ value: 17 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with equal to", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { equalTo: 42 } });
+        }
+      }
+      expect(new Person({ value: 42 }).isValid()).toBe(true);
+      expect(new Person({ value: 43 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with less than", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { lessThan: 10 } });
+        }
+      }
+      expect(new Person({ value: 9 }).isValid()).toBe(true);
+      expect(new Person({ value: 10 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with less than or equal to", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { lessThanOrEqualTo: 5 } });
+        }
+      }
+      expect(new Person({ value: 5 }).isValid()).toBe(true);
+      expect(new Person({ value: 6 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with odd", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { odd: true } });
+        }
+      }
+      expect(new Person({ value: 3 }).isValid()).toBe(true);
+      expect(new Person({ value: 4 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with even", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { even: true } });
+        }
+      }
+      expect(new Person({ value: 4 }).isValid()).toBe(true);
+      expect(new Person({ value: 3 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with other than", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { otherThan: 0 } });
+        }
+      }
+      expect(new Person({ value: 1 }).isValid()).toBe(true);
+      expect(new Person({ value: 0 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with greater than less than and even", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { greaterThan: 0, lessThan: 10, even: true } });
+        }
+      }
+      expect(new Person({ value: 4 }).isValid()).toBe(true);
+      expect(new Person({ value: 3 }).isValid()).toBe(false); // odd
+      expect(new Person({ value: 0 }).isValid()).toBe(false); // not > 0
+      expect(new Person({ value: 10 }).isValid()).toBe(false); // not < 10
+    });
+
+    it("validates numericality with in", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { in: [1, 10] } });
+        }
+      }
+      expect(new Person({ value: 5 }).isValid()).toBe(true);
+      expect(new Person({ value: 0 }).isValid()).toBe(false);
+      expect(new Person({ value: 11 }).isValid()).toBe(false);
+    });
+  });
+
+  describe("NumericalityValidationTest (ported)", () => {
+    it("validates numericality with proc", () => {
+      class Person extends Model {
+        static {
+          this.attribute("age", "integer");
+          this.validates("age", { numericality: { greaterThan: (r: any) => 0 } });
+        }
+      }
+      const p = new Person({ age: 1 });
+      expect(p.isValid()).toBe(true);
+      const p2 = new Person({ age: 0 });
+      expect(p2.isValid()).toBe(false);
+    });
+
+    it("validates numericality with symbol", () => {
+      class Person extends Model {
+        static {
+          this.attribute("age", "integer");
+          this.attribute("min_age", "integer");
+          this.validates("age", { numericality: { greaterThan: "getMinAge" } });
+        }
+        getMinAge() {
+          return 18;
+        }
+      }
+      const p = new Person({ age: 25, min_age: 18 });
+      expect(p.isValid()).toBe(true);
+      const p2 = new Person({ age: 10, min_age: 18 });
+      expect(p2.isValid()).toBe(false);
+    });
+  });
 });

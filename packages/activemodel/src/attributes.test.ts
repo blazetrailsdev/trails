@@ -201,4 +201,68 @@ describe("ActiveModel", () => {
       expect(m.typeForAttribute("name")).not.toBeNull();
     });
   });
+
+  describe("AttributesTest (ported)", () => {
+    it("properties assignment", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const p = new Person({ name: "Alice", age: 30 });
+      expect(p.readAttribute("name")).toBe("Alice");
+      expect(p.readAttribute("age")).toBe(30);
+    });
+
+    it("reading attributes", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const p = new Person({ name: "Alice", age: 30 });
+      const attrs = p.attributes;
+      expect(attrs.name).toBe("Alice");
+      expect(attrs.age).toBe(30);
+    });
+
+    it("reading attribute names", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      expect(Person.attributeNames()).toEqual(["name", "age"]);
+    });
+
+    it("children can override parents", () => {
+      class Parent extends Model {
+        static {
+          this.attribute("name", "string", { default: "parent" });
+        }
+      }
+      class Child extends Parent {
+        static {
+          this.attribute("name", "string", { default: "child" });
+        }
+      }
+      expect(new Child().readAttribute("name")).toBe("child");
+      expect(new Parent().readAttribute("name")).toBe("parent");
+    });
+
+    it("attributes can be dup-ed", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      const attrs = { ...p.attributes };
+      attrs.name = "Bob";
+      expect(p.readAttribute("name")).toBe("Alice");
+    });
+  });
 });

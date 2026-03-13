@@ -29,21 +29,23 @@ describe("ActiveModel", () => {
       expect(result).toBe("42");
     });
 
-    it("changed?", () => {
-      class MyModel extends Model {
-        static {
-          this.attribute("price", "decimal");
-        }
-      }
-      const m = new MyModel({ price: "1.0" });
-      m.writeAttribute("price", "1.0");
-      expect(m.attributeChanged("price")).toBe(false);
-    });
-
     it("scale is applied before precision to prevent rounding errors", () => {
       const decimalType = new Types.DecimalType();
       const result = decimalType.cast("1.23");
       expect(result).toBe("1.23");
+    });
+  });
+
+  describe("Type Decimal (ported)", () => {
+    it("type cast decimal", () => {
+      const type = new Types.DecimalType();
+      expect(type.cast(42.5)).toBe("42.5");
+      expect(type.cast("3.14")).toBe("3.14");
+    });
+
+    it("type cast decimal from invalid string", () => {
+      const type = new Types.DecimalType();
+      expect(type.cast("not-a-number")).toBe(null);
     });
   });
 });

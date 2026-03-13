@@ -845,4 +845,102 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(false);
     });
   });
+
+  describe("Validations (advanced features)", () => {
+    it("validates format of with multiline regexp should raise error", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: { with: /^test$/m } });
+          }
+        }
+      }).toThrow(/multiline/i);
+    });
+
+    it("validates format of without any regexp should raise error", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: {} });
+          }
+        }
+      }).toThrow(/with.*without/i);
+    });
+
+    it("validations on the instance level", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validate(function (record: any) {
+            if (record.readAttribute("name") === "invalid") {
+              record.errors.add("name", "invalid", { message: "is not allowed" });
+            }
+          });
+        }
+      }
+      const p = new Person({ name: "invalid" });
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("name")).toEqual(["is not allowed"]);
+    });
+
+    it("validate with except on", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" });
+        }
+      }
+      const p = new Person();
+      // Without context, "on: create" validations should not run
+      expect(p.isValid()).toBe(true);
+      // With matching context, they should run
+      expect(p.isValid("create")).toBe(false);
+    });
+
+    it("frozen models can be validated", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      // Object.freeze doesn't prevent our validation from reading
+      // (we can't truly freeze a Model, but we can test that validation works)
+      expect(p.isValid()).toBe(true);
+    });
+
+    it("dup validity is independent", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+        }
+      }
+      const p1 = new Person({ name: "Alice" });
+      const p2 = new Person();
+      expect(p1.isValid()).toBe(true);
+      expect(p2.isValid()).toBe(false);
+      // p1's validity should not be affected by p2
+      expect(p1.errors.empty).toBe(true);
+    });
+
+    it("validation with message as proc", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", {
+            presence: {
+              message: (record: any) => `name is required for record`,
+            },
+          });
+        }
+      }
+      const p = new Person();
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.get("name")).toEqual(["name is required for record"]);
+    });
+  });
 });

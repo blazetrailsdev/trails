@@ -51,4 +51,44 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
   });
+
+  describe("Validations Exclusion (ported)", () => {
+    it("validates exclusion of", () => {
+      class Person extends Model {
+        static {
+          this.attribute("karma", "string");
+          this.validates("karma", { exclusion: { in: ["ow", "ar"] } });
+        }
+      }
+      expect(new Person({ karma: "ow" }).isValid()).toBe(false);
+      expect(new Person({ karma: "other" }).isValid()).toBe(true);
+    });
+
+    it("validates exclusion of with formatted message", () => {
+      class Person extends Model {
+        static {
+          this.attribute("karma", "string");
+          this.validates("karma", { exclusion: { in: ["ow"], message: "is not allowed" } });
+        }
+      }
+      const p = new Person({ karma: "ow" });
+      p.isValid();
+      expect(p.errors.get("karma")).toContain("is not allowed");
+    });
+  });
+
+  describe("ExclusionValidationTest (ported)", () => {
+    it("validates exclusion of with lambda", () => {
+      class Person extends Model {
+        static {
+          this.attribute("status", "string");
+          this.validates("status", { exclusion: { in: () => ["banned", "suspended"] } });
+        }
+      }
+      const p = new Person({ status: "banned" });
+      expect(p.isValid()).toBe(false);
+      const p2 = new Person({ status: "active" });
+      expect(p2.isValid()).toBe(true);
+    });
+  });
 });

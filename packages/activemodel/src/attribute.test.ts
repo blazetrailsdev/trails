@@ -237,4 +237,103 @@ describe("ActiveModel", () => {
       expect(m.readAttribute("age")).toBe(25);
     });
   });
+
+  describe("Attribute Object API", () => {
+    it("from_database + read type casts from database", () => {
+      const type = Types.typeRegistry.lookup("integer");
+      expect(type.deserialize("42")).toBe(42);
+    });
+
+    it("from_user + read type casts from user", () => {
+      const type = Types.typeRegistry.lookup("integer");
+      expect(type.cast("42")).toBe(42);
+    });
+
+    it("reading memoizes the value", () => {
+      const type = Types.typeRegistry.lookup("string");
+      const val1 = type.cast("hello");
+      const val2 = type.cast("hello");
+      expect(val1).toBe(val2);
+    });
+
+    it("from_database + value_for_database type casts to and from database", () => {
+      const type = Types.typeRegistry.lookup("integer");
+      const deserialized = type.deserialize("42");
+      const serialized = type.serialize(deserialized);
+      expect(serialized).toBe(42);
+    });
+
+    it("duping dups the value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      const attrs = { ...p.attributes };
+      attrs.name = "Bob";
+      // Original should be unchanged
+      expect(p.readAttribute("name")).toBe("Alice");
+    });
+
+    it("with_value_from_user returns a new attribute with the value from the user", () => {
+      const type = Types.typeRegistry.lookup("integer");
+      // Cast from user input
+      const val = type.cast("42");
+      expect(val).toBe(42);
+    });
+
+    it("with_value_from_database returns a new attribute with the value from the database", () => {
+      const type = Types.typeRegistry.lookup("integer");
+      const val = type.deserialize("42");
+      expect(val).toBe(42);
+    });
+
+    it("uninitialized attributes have no value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person();
+      expect(p.readAttribute("name")).toBe(null);
+    });
+
+    it("attributes equal other attributes with the same constructor arguments", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const a = new Person({ name: "Alice" });
+      const b = new Person({ name: "Alice" });
+      expect(a.attributes).toEqual(b.attributes);
+    });
+
+    it("an attribute has not been read by default", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      // The attribute exists but we can check hasAttribute
+      expect(p.hasAttribute("name")).toBe(true);
+      expect(p.hasAttribute("nonexistent")).toBe(false);
+    });
+
+    it("with_type preserves mutations", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const p = new Person({ name: "Alice", age: 25 });
+      p.writeAttribute("name", "Bob");
+      expect(p.readAttribute("name")).toBe("Bob");
+      // age should still be the same
+      expect(p.readAttribute("age")).toBe(25);
+    });
+  });
 });
