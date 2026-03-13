@@ -190,7 +190,7 @@ function countAssertions(node: ts.Node): string[] {
       const exp = n.expression;
       if (ts.isIdentifier(exp) && exp.text === "expect") {
         // Find the matcher
-        let parent = n.parent;
+        const parent = n.parent;
         if (parent && ts.isPropertyAccessExpression(parent)) {
           // expect(x).toBe(y) -> parent is .toBe
           assertions.push(parent.name.text);

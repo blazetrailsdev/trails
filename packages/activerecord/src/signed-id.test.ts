@@ -175,6 +175,7 @@ describe("SignedIdTest", () => {
       }
     }
     class Dog extends Animal {
+      // eslint-disable-next-line no-empty-static-block
       static {}
     }
     const d = await Dog.create({ name: "Rex" });
@@ -201,6 +202,7 @@ describe("SignedIdTest", () => {
       }
     }
     class Car extends Vehicle {
+      // eslint-disable-next-line no-empty-static-block
       static {}
     }
     const c = await Car.create({ name: "Sedan" });

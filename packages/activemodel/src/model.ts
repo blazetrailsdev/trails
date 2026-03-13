@@ -176,7 +176,7 @@ export class Model {
    */
   static normalizeValueFor(name: string, value: unknown): unknown {
     const def = this._attributeDefinitions.get(name);
-    let result = def ? def.type.cast(value) : value;
+    const result = def ? def.type.cast(value) : value;
     return this._applyNormalization(name, result);
   }
 
@@ -624,7 +624,7 @@ export class Model {
    * Mirrors: ActiveModel::AttributeMethods.attribute_method_prefix
    */
   static attributeMethodPrefix(...prefixes: string[]): void {
-    if (!this.hasOwnProperty("_attributeMethodPrefixes")) {
+    if (!Object.hasOwn(this, "_attributeMethodPrefixes")) {
       this._attributeMethodPrefixes = [...(this._attributeMethodPrefixes || [])];
     }
     this._attributeMethodPrefixes.push(...prefixes);
@@ -638,7 +638,7 @@ export class Model {
    * Mirrors: ActiveModel::AttributeMethods.attribute_method_suffix
    */
   static attributeMethodSuffix(...suffixes: string[]): void {
-    if (!this.hasOwnProperty("_attributeMethodSuffixes")) {
+    if (!Object.hasOwn(this, "_attributeMethodSuffixes")) {
       this._attributeMethodSuffixes = [...(this._attributeMethodSuffixes || [])];
     }
     this._attributeMethodSuffixes.push(...suffixes);
@@ -651,7 +651,7 @@ export class Model {
    * Mirrors: ActiveModel::AttributeMethods.attribute_method_affix
    */
   static attributeMethodAffix(...affixes: Array<{ prefix: string; suffix: string }>): void {
-    if (!this.hasOwnProperty("_attributeMethodAffixes")) {
+    if (!Object.hasOwn(this, "_attributeMethodAffixes")) {
       this._attributeMethodAffixes = [...(this._attributeMethodAffixes || [])];
     }
     this._attributeMethodAffixes.push(...affixes);

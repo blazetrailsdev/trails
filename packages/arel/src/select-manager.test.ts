@@ -845,7 +845,11 @@ describe("Arel", () => {
 
     it("should create join nodes with a full outer join klass", () => {
       const mgr = new SelectManager(users);
-      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.FullOuterJoin);
+      const join = mgr.createJoin(
+        posts,
+        users.get("id").eq(posts.get("user_id")),
+        Nodes.FullOuterJoin,
+      );
       expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
     });
 
@@ -857,7 +861,11 @@ describe("Arel", () => {
 
     it("should create join nodes with a right outer join klass", () => {
       const mgr = new SelectManager(users);
-      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.RightOuterJoin);
+      const join = mgr.createJoin(
+        posts,
+        users.get("id").eq(posts.get("user_id")),
+        Nodes.RightOuterJoin,
+      );
       expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
     });
 
@@ -917,7 +925,9 @@ describe("Arel", () => {
 
     it("takes a partition with multiple columns", () => {
       const mgr = new SelectManager(users);
-      mgr.project(users.get("id").over(mgr.window("w").partition(users.get("name"), users.get("age"))));
+      mgr.project(
+        users.get("id").over(mgr.window("w").partition(users.get("name"), users.get("age"))),
+      );
       const sql = mgr.toSql();
       expect(sql).toContain("PARTITION BY");
       expect(sql).toContain(",");

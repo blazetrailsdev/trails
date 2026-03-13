@@ -100,7 +100,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // Strip trailing lock clause (FOR UPDATE, etc.) before parsing
-    let cleanedSql = sql.replace(
+    const cleanedSql = sql.replace(
       /\s+FOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)(\s+.*)?$/i,
       "",
     );

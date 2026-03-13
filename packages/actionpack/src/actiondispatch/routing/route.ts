@@ -190,7 +190,7 @@ export class Route {
 
     // RedirectOptions
     const status = target.status ?? 301;
-    let path = target.path ? interpolateRedirect(target.path, params) : request.path;
+    const path = target.path ? interpolateRedirect(target.path, params) : request.path;
     let host = target.host ?? request.host ?? "www.example.com";
     if (target.subdomain) {
       const hostParts = host.split(".");

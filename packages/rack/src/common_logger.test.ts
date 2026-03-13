@@ -114,8 +114,8 @@ describe("Rack::CommonLogger", () => {
       QUERY_STRING: "bar\nbaz",
     });
     expect(logdev.str[logdev.str.length - 1]).toBe("\n");
-    expect(logdev.str).toContain("foo\\xabar");
-    expect(logdev.str).toContain("bar\\xabaz");
+    expect(logdev.str).toContain("foo\\x0abar");
+    expect(logdev.str).toContain("bar\\x0abaz");
   });
 
   it("log path with PATH_INFO", async () => {

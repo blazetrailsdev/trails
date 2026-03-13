@@ -53,6 +53,7 @@ export function transliterate(str: string | null | undefined, replacement = "?")
   result = result.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   // Replace any remaining non-ASCII chars with replacement
+  // eslint-disable-next-line no-control-regex
   result = result.replace(/[^\x00-\x7F]/g, replacement);
 
   return result;

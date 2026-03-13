@@ -176,7 +176,7 @@ export function numberToRounded(number: unknown, options: NumberToRoundedOptions
     if (Math.abs(num) >= 1e13) {
       const magnitude = Math.floor(Math.log10(Math.abs(num)));
       const coeff = num / Math.pow(10, magnitude);
-      let coeffStr = preciseRound(coeff, 2)
+      const coeffStr = preciseRound(coeff, 2)
         .toFixed(2)
         .replace(/\.?0+$/, "");
       return `${coeffStr} x 10^${magnitude}`;

@@ -62,7 +62,7 @@ export class MockResponse extends Response {
 
   private _parseCookiesFromHeader(): Record<string, MockCookie> {
     const cookies: Record<string, MockCookie> = {};
-    let setCookie = this.headers[SET_COOKIE];
+    const setCookie = this.headers[SET_COOKIE];
     if (!setCookie) return cookies;
     const cookieHeaders = Array.isArray(setCookie) ? setCookie : [setCookie];
 

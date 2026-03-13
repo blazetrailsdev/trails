@@ -54,7 +54,7 @@ export class Builder {
   }
 
   toApp(): RackApp {
-    let app = this._generateApp();
+    const app = this._generateApp();
     if (this._warmupBlock) {
       this._warmupBlock(app);
     }

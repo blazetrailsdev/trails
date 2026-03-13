@@ -2,7 +2,12 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 const repoRoot = process.cwd();
-const tscPath = path.join(repoRoot, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
+const tscPath = path.join(
+  repoRoot,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "tsc.cmd" : "tsc",
+);
 
 const projects = [
   "packages/activesupport/tsconfig.json",

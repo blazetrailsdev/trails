@@ -411,7 +411,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no difference pass", () => {
-    let count = 5;
+    const count = 5;
     assertNoDifference(
       () => count,
       () => {
@@ -445,7 +445,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no difference with multiple expressions pass", () => {
-    let a = 1,
+    const a = 1,
       b = 2;
     assertNoDifference(
       () => a,
@@ -712,7 +712,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert changes with to option but no change has special message", () => {
-    let val = "same";
+    const val = "same";
     expect(() => {
       assertChanges(
         () => val,
@@ -819,7 +819,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no changes pass", () => {
-    let val = "stable";
+    const val = "stable";
     assertNoDifference(
       () => val,
       () => {
@@ -829,14 +829,14 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no changes with from option", () => {
-    let val = "x";
+    const val = "x";
     expect(val).toBe("x");
     // no change
     expect(val).toBe("x");
   });
 
   it("assert no changes with from option with wrong value", () => {
-    let val = "actual";
+    const val = "actual";
     expect(() => {
       // Simulate: from says "wrong" but val is "actual"
       expect(val).toBe("wrong");
@@ -844,7 +844,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no changes with from option with nil", () => {
-    let val: string | null = null;
+    const val: string | null = null;
     assertNoDifference(
       () => val,
       () => {},
@@ -858,7 +858,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no changes with message", () => {
-    let val = "constant";
+    const val = "constant";
     assertNoDifference(
       () => val,
       () => {},
@@ -873,7 +873,7 @@ describe("AssertionsTest", () => {
   });
 
   it("assert no changes message with multi line lambda", () => {
-    let count = 0;
+    const count = 0;
     const expr = () => {
       return count;
     };
@@ -921,7 +921,7 @@ describe("MultibyteCharsTest", () => {
   });
 
   it("forwarded bang method calls should return the original chars instance when result is not nil", () => {
-    let str = "hello";
+    const str = "hello";
     const result = str.toUpperCase();
     expect(result).toBe("HELLO");
   });

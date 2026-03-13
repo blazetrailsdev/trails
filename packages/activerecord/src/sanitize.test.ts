@@ -262,7 +262,7 @@ describe("SanitizeTest", () => {
         this.adapter = adapter;
       }
     }
-    const sql = Post.sanitizeSqlArray("title = ?", "it\'s");
+    const sql = Post.sanitizeSqlArray("title = ?", "it's");
     expect(sql).toBeDefined();
     expect(typeof sql).toBe("string");
   });

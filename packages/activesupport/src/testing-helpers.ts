@@ -7,7 +7,7 @@
 
 let _frozenTime: Date | null = null;
 let _timeOffset: number = 0;
-let _usingFakeTimers = false;
+const _usingFakeTimers = false;
 
 /**
  * travelTo — sets the current time to the given Date.
@@ -82,7 +82,7 @@ export function assertCalled<T extends object>(
   const calls: CallRecord[] = [];
   const original = object[method] as unknown as (...a: unknown[]) => unknown;
 
-  let returnValue = options.returns;
+  const returnValue = options.returns;
   (object as any)[method] = (...args: unknown[]) => {
     const rv = returnValue !== undefined ? returnValue : original?.call(object, ...args);
     calls.push({ args, returnValue: rv });

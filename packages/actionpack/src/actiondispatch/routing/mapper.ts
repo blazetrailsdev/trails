@@ -419,7 +419,8 @@ export class Mapper {
       redirectTarget = options.redirect;
     }
 
-    let [controller, action] = redirectTarget ? ["", ""] : parseEndpoint(endpoint);
+    const [parsedController, action] = redirectTarget ? ["", ""] : parseEndpoint(endpoint);
+    let controller = parsedController;
     if (scopeController && controller && !controller.includes("/")) {
       controller = scopeController + "/" + controller;
     }

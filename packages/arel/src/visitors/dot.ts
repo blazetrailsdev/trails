@@ -54,4 +54,3 @@ export class Dot {
     return lines.join("\n");
   }
 }
-

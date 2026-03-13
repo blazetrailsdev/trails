@@ -439,7 +439,7 @@ describe("KernelSuppressTest", () => {
     const log: string[] = [];
     suppress(() => {
       throw new TypeError("boom");
-      log.push("should not reach");
+      log.push("should not reach"); // intentionally unreachable
     }, TypeError);
     expect(log).toEqual([]); // exception was suppressed
   });

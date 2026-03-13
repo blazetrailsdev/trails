@@ -571,7 +571,7 @@ describe("Rack::Response", () => {
   });
 
   it("calls close on #body when 204 or 304", () => {
-    let res = new Response();
+    const res = new Response();
     let body: any = {
       closed: false,
       close() {
