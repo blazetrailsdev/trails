@@ -39,7 +39,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-
 describe("HasOneThroughAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -653,4 +652,3 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(loaded!.readAttribute("club_id")).toBe(club.id);
   });
 });
-

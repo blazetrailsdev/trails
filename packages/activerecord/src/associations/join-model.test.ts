@@ -39,7 +39,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-
 // ==========================================================================
 // AssociationsJoinModelTest — mirrors join_model_test.rb
 // ==========================================================================
@@ -1691,4 +1690,3 @@ describe("AssociationsJoinModelTest", () => {
 // ==========================================================================
 // NestedThroughAssociationsTest — mirrors nested_through_associations_test.rb
 // ==========================================================================
-

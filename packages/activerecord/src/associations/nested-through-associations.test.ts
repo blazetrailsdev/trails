@@ -39,7 +39,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-
 describe("NestedThroughAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -590,4 +589,3 @@ describe("NestedThroughAssociationsTest", () => {
 // ==========================================================================
 // HasOneThroughAssociationsTest — mirrors has_one_through_associations_test.rb
 // ==========================================================================
-

@@ -39,7 +39,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-
 // ==========================================================================
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
@@ -1163,4 +1162,3 @@ describe("HasOneAssociationsTest", () => {
     expect(CpkOwner2.compositePrimaryKey).toBe(true);
   });
 });
-

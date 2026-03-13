@@ -39,7 +39,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-
 // ==========================================================================
 // HasAndBelongsToManyAssociationsTest — mirrors has_and_belongs_to_many_associations_test.rb
 // ==========================================================================
@@ -1029,4 +1028,3 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it.skip("destroying many", () => {});
   it.skip("destroy associations destroys multiple associations", () => {});
 });
-

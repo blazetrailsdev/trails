@@ -3394,4 +3394,3 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("has many inherited", () => {});
   it.skip("polymorphic has many going through join model", () => {});
 });
-
