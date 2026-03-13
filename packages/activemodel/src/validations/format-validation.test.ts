@@ -97,4 +97,88 @@ describe("ActiveModel", () => {
       expect(p.errors.get("title")).toContain("must start with uppercase");
     });
   });
+
+  describe("FormatValidationTest (missing)", () => {
+    it("validate format with allow blank", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { format: { with: /^[A-Z]/, allowBlank: true } });
+        }
+      }
+      expect(new Person({ title: "" }).isValid()).toBe(true);
+      expect(new Person({ title: "Hello" }).isValid()).toBe(true);
+      expect(new Person({ title: "hello" }).isValid()).toBe(false);
+    });
+
+    it("validate format numeric", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { format: { with: /^\d+$/ } });
+        }
+      }
+      expect(new Person({ value: "123" }).isValid()).toBe(true);
+      expect(new Person({ value: "abc" }).isValid()).toBe(false);
+    });
+
+    it("validate format of with multiline regexp should raise error", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: { with: /^foo$/m } });
+          }
+        }
+      }).toThrow(/multiline/i);
+    });
+
+    it("validate format of with multiline regexp and option", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: { with: new RegExp("^foo$", "m") } });
+          }
+        }
+      }).toThrow(/multiline/i);
+    });
+
+    it("validate format of without any regexp should raise error", () => {
+      expect(() => {
+        class Person extends Model {
+          static {
+            this.attribute("name", "string");
+            this.validates("name", { format: {} as any });
+          }
+        }
+      }).toThrow(/Either :with or :without must be supplied/);
+    });
+
+    it("validates format of with lambda", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { format: { with: () => /^[a-z]+$/ } });
+        }
+      }
+      expect(new Person({ name: "alice" }).isValid()).toBe(true);
+      expect(new Person({ name: "Alice123" }).isValid()).toBe(false);
+    });
+
+    it("validates format of with lambda without arguments", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { format: { with: () => /^\w+$/ } });
+        }
+      }
+      expect(new Person({ name: "alice" }).isValid()).toBe(true);
+      expect(new Person({ name: "" }).isValid()).toBe(false);
+    });
+
+    it.skip("validates format of for ruby class", () => {
+      // Ruby-specific class validation concept
+    });
+  });
 });

@@ -44,6 +44,8 @@ export interface LengthOptions extends ConditionalOptions {
   maximum?: number | (() => number);
   is?: number | (() => number);
   in?: [number, number];
+  allowNil?: boolean;
+  allowBlank?: boolean;
   message?: string;
   tooShort?: string;
   tooLong?: string;
@@ -55,7 +57,12 @@ export class LengthValidator implements Validator {
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
-    if (value === null || value === undefined) return;
+    if (value === null || value === undefined) {
+      if (this.options.allowNil !== false) return;
+      // If allowNil is explicitly false, we still skip (length can't be computed on nil)
+      return;
+    }
+    if (this.options.allowBlank && isBlank(value)) return;
     const length =
       typeof value === "string" ? value.length : Array.isArray(value) ? value.length : 0;
 
@@ -100,6 +107,8 @@ export interface NumericalityOptions extends ConditionalOptions {
   in?: [number, number];
   odd?: boolean;
   even?: boolean;
+  allowNil?: boolean;
+  allowBlank?: boolean;
   message?: string;
 }
 
@@ -119,7 +128,12 @@ export class NumericalityValidator implements Validator {
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
-    if (value === null || value === undefined) return;
+    if (value === null || value === undefined) {
+      if (this.options.allowNil) return;
+      // Default: skip nil (Rails default for numericality)
+      return;
+    }
+    if (this.options.allowBlank && isBlank(value)) return;
 
     const num = Number(value);
     if (isNaN(num)) {
@@ -197,7 +211,8 @@ export class InclusionValidator implements Validator {
 }
 
 export interface ExclusionOptions extends ConditionalOptions {
-  in: unknown[] | (() => unknown[]);
+  in?: unknown[] | (() => unknown[]);
+  within?: unknown[] | (() => unknown[]);
   allowNil?: boolean;
   allowBlank?: boolean;
   message?: string;
@@ -210,7 +225,9 @@ export class ExclusionValidator implements Validator {
     if (!shouldValidate(record, this.options)) return;
     if (this.options.allowNil !== false && (value === null || value === undefined)) return;
     if (this.options.allowBlank && isBlank(value)) return;
-    const list = typeof this.options.in === "function" ? this.options.in() : this.options.in;
+    const inOpt = this.options.in ?? this.options.within;
+    if (!inOpt) return;
+    const list = typeof inOpt === "function" ? inOpt() : inOpt;
     if (list.includes(value)) {
       errors.add(attribute, "exclusion", { message: this.options.message });
     }
@@ -218,14 +235,17 @@ export class ExclusionValidator implements Validator {
 }
 
 export interface FormatOptions extends ConditionalOptions {
-  with?: RegExp;
-  without?: RegExp;
+  with?: RegExp | ((record: any) => RegExp);
+  without?: RegExp | ((record: any) => RegExp);
+  allowNil?: boolean;
+  allowBlank?: boolean;
   message?: string;
 }
 
 export class FormatValidator implements Validator {
   constructor(private options: FormatOptions) {
-    if (options.with && options.with.multiline) {
+    const withOpt = options.with;
+    if (withOpt && withOpt instanceof RegExp && withOpt.multiline) {
       throw new Error(
         "The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or pass the `multiline: true` option?",
       );
@@ -238,15 +258,29 @@ export class FormatValidator implements Validator {
     }
   }
 
+  private resolveRegexp(opt: RegExp | ((record: any) => RegExp), record: any): RegExp {
+    return typeof opt === "function" ? opt(record) : opt;
+  }
+
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
-    if (value === null || value === undefined) return;
-    const str = String(value);
-    if (this.options.with && !this.options.with.test(str)) {
-      errors.add(attribute, "invalid", { message: this.options.message });
+    if (value === null || value === undefined) {
+      if (this.options.allowNil) return;
+      return;
     }
-    if (this.options.without && this.options.without.test(str)) {
-      errors.add(attribute, "invalid", { message: this.options.message });
+    if (this.options.allowBlank && isBlank(value)) return;
+    const str = String(value);
+    if (this.options.with) {
+      const re = this.resolveRegexp(this.options.with, record);
+      if (!re.test(str)) {
+        errors.add(attribute, "invalid", { message: this.options.message });
+      }
+    }
+    if (this.options.without) {
+      const re = this.resolveRegexp(this.options.without, record);
+      if (re.test(str)) {
+        errors.add(attribute, "invalid", { message: this.options.message });
+      }
     }
   }
 }

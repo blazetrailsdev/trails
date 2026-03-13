@@ -200,6 +200,28 @@ describe("ActiveModel", () => {
     });
   });
 
+  describe("Callbacks (proc)", () => {
+    it("before validation and after validation callbacks should be called with proc", () => {
+      const log: string[] = [];
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+          this.beforeValidation((r: any) => {
+            log.push("before_proc");
+          });
+          this.afterValidation((r: any) => {
+            log.push("after_proc");
+          });
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      p.isValid();
+      expect(log).toContain("before_proc");
+      expect(log).toContain("after_proc");
+    });
+  });
+
   describe("Callbacks (advanced features)", () => {
     it("if condition is respected for before validation", () => {
       const log: string[] = [];

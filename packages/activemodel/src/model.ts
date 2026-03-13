@@ -26,13 +26,15 @@ interface AttributeDefinition {
   defaultValue: unknown;
 }
 
+type ConditionEntry = ((record: any) => boolean) | string;
+
 interface ValidationEntry {
   attribute: string;
   validator: Validator;
   on?: string;
   strict?: boolean;
-  if?: ((record: any) => boolean) | string;
-  unless?: ((record: any) => boolean) | string;
+  if?: ConditionEntry | ConditionEntry[];
+  unless?: ConditionEntry | ConditionEntry[];
 }
 
 interface CustomValidationEntry {
@@ -255,9 +257,11 @@ export class Model {
     }
 
     const onContext = rules.on as string | undefined;
-    const ifCond = rules.if as ((record: any) => boolean) | string | undefined;
-    const unlessCond = rules.unless as ((record: any) => boolean) | string | undefined;
+    const ifCond = rules.if as ConditionEntry | ConditionEntry[] | undefined;
+    const unlessCond = rules.unless as ConditionEntry | ConditionEntry[] | undefined;
     const isStrict = rules.strict as boolean | undefined;
+    const sharedAllowNil = rules.allowNil as boolean | undefined;
+    const sharedAllowBlank = rules.allowBlank as boolean | undefined;
 
     const push = (validator: Validator) => {
       this._validations.push({
@@ -281,24 +285,48 @@ export class Model {
     }
 
     if (rules.length) {
-      push(new LengthValidator(rules.length as any));
+      const opts = { ...(rules.length as any) };
+      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
+        opts.allowNil = sharedAllowNil;
+      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
+        opts.allowBlank = sharedAllowBlank;
+      push(new LengthValidator(opts));
     }
 
     if (rules.numericality) {
-      const opts = rules.numericality === true ? {} : (rules.numericality as any);
+      const opts = rules.numericality === true ? {} : { ...(rules.numericality as any) };
+      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
+        opts.allowNil = sharedAllowNil;
+      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
+        opts.allowBlank = sharedAllowBlank;
       push(new NumericalityValidator(opts));
     }
 
     if (rules.inclusion) {
-      push(new InclusionValidator(rules.inclusion as any));
+      const opts = { ...(rules.inclusion as any) };
+      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
+        opts.allowNil = sharedAllowNil;
+      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
+        opts.allowBlank = sharedAllowBlank;
+      push(new InclusionValidator(opts));
     }
 
     if (rules.exclusion) {
-      push(new ExclusionValidator(rules.exclusion as any));
+      const opts = { ...(rules.exclusion as any) };
+      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
+        opts.allowNil = sharedAllowNil;
+      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
+        opts.allowBlank = sharedAllowBlank;
+      push(new ExclusionValidator(opts));
     }
 
     if (rules.format) {
-      push(new FormatValidator(rules.format as any));
+      const opts = { ...(rules.format as any) };
+      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
+        opts.allowNil = sharedAllowNil;
+      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
+        opts.allowBlank = sharedAllowBlank;
+      push(new FormatValidator(opts));
     }
 
     if (rules.acceptance) {
@@ -889,22 +917,38 @@ export class Model {
       if (entry.on && entry.on !== effectiveContext) continue;
       // Check if/unless conditions
       if (entry.if !== undefined) {
-        const result =
-          typeof entry.if === "function"
-            ? entry.if(this)
-            : typeof (this as any)[entry.if] === "function"
-              ? (this as any)[entry.if]()
-              : (this as any)[entry.if];
-        if (!result) continue;
+        const conds = Array.isArray(entry.if) ? entry.if : [entry.if];
+        let skip = false;
+        for (const cond of conds) {
+          const result =
+            typeof cond === "function"
+              ? cond(this)
+              : typeof (this as any)[cond] === "function"
+                ? (this as any)[cond]()
+                : (this as any)[cond];
+          if (!result) {
+            skip = true;
+            break;
+          }
+        }
+        if (skip) continue;
       }
       if (entry.unless !== undefined) {
-        const result =
-          typeof entry.unless === "function"
-            ? entry.unless(this)
-            : typeof (this as any)[entry.unless] === "function"
-              ? (this as any)[entry.unless]()
-              : (this as any)[entry.unless];
-        if (result) continue;
+        const conds = Array.isArray(entry.unless) ? entry.unless : [entry.unless];
+        let skip = false;
+        for (const cond of conds) {
+          const result =
+            typeof cond === "function"
+              ? cond(this)
+              : typeof (this as any)[cond] === "function"
+                ? (this as any)[cond]()
+                : (this as any)[cond];
+          if (result) {
+            skip = true;
+            break;
+          }
+        }
+        if (skip) continue;
       }
       const value = this._attributes.get(entry.attribute);
       if (entry.strict) {

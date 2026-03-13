@@ -34,5 +34,38 @@ describe("ActiveModel", () => {
       expect(new Person({}).isValid("create")).toBe(true);
       expect(new Person({}).isValid("update")).toBe(false);
     });
+
+    it("with a class that adds errors on multiple contexts and validating a new model", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("email", "string");
+          this.validates("name", { presence: true, on: "create" as any });
+          this.validates("email", { presence: true, on: "update" as any });
+        }
+      }
+      // On create: only name validation fires
+      const p1 = new Person({});
+      expect(p1.isValid("create")).toBe(false);
+      expect(p1.errors.get("name").length).toBeGreaterThan(0);
+
+      const p2 = new Person({ name: "Alice" });
+      expect(p2.isValid("create")).toBe(true);
+    });
+
+    it("with a class that validating a model for a multiple contexts", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: "create" as any });
+        }
+      }
+      // Without context, validation is skipped
+      expect(new Person({}).isValid()).toBe(true);
+      // With matching context, validation runs
+      expect(new Person({}).isValid("create")).toBe(false);
+      // With non-matching context, validation is skipped
+      expect(new Person({}).isValid("update")).toBe(true);
+    });
   });
 });

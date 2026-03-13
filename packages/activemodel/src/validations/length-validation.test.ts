@@ -361,4 +361,142 @@ describe("ActiveModel", () => {
       expect(p2.isValid()).toBe(false);
     });
   });
+
+  describe("LengthValidationTest (missing)", () => {
+    it("validates length of with allow nil", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 3, allowNil: true } });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+      expect(new Person({ title: "abc" }).isValid()).toBe(true);
+      expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    });
+
+    it("validates length of with allow blank", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 3, allowBlank: true } });
+        }
+      }
+      expect(new Person({ title: "" }).isValid()).toBe(true);
+      expect(new Person({ title: "abc" }).isValid()).toBe(true);
+      expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    });
+
+    it("optionally validates length of using minimum", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 2 } });
+        }
+      }
+      expect(new Person({ title: "ab" }).isValid()).toBe(true);
+      expect(new Person({ title: "a" }).isValid()).toBe(false);
+    });
+
+    it("optionally validates length of using maximum", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { maximum: 5 } });
+        }
+      }
+      expect(new Person({ title: "abcde" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcdef" }).isValid()).toBe(false);
+    });
+
+    it("validates length of using within with exclusive range", () => {
+      // TS doesn't have Ruby's exclusive range syntax, but we can simulate
+      // by using minimum/maximum with appropriate bounds
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          // Exclusive range (3...5) means 3 <= length < 5, so max is 4
+          this.validates("title", { length: { minimum: 3, maximum: 4 } });
+        }
+      }
+      expect(new Person({ title: "abc" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcd" }).isValid()).toBe(true);
+      expect(new Person({ title: "abcde" }).isValid()).toBe(false);
+      expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    });
+
+    it("validates length of using within with infinite ranges", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 0, maximum: Infinity } });
+        }
+      }
+      expect(new Person({ title: "" }).isValid()).toBe(true);
+      expect(new Person({ title: "a".repeat(10000) }).isValid()).toBe(true);
+    });
+
+    it("validates length of custom errors for minimum with message", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { minimum: 5, message: "is too short!" } });
+        }
+      }
+      const p = new Person({ title: "ab" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("is too short!");
+    });
+
+    it("validates length of custom errors for maximum with message", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { maximum: 3, message: "is too long!" } });
+        }
+      }
+      const p = new Person({ title: "abcde" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("is too long!");
+    });
+
+    it("validates length of custom errors for in", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { in: [3, 5], tooShort: "short!", tooLong: "long!" } });
+        }
+      }
+      const short = new Person({ title: "ab" });
+      short.isValid();
+      expect(short.errors.get("title")).toContain("short!");
+      const long = new Person({ title: "abcdef" });
+      long.isValid();
+      expect(long.errors.get("title")).toContain("long!");
+    });
+
+    it("validates length of custom errors for is with message", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { is: 5, message: "wrong length!" } });
+        }
+      }
+      const p = new Person({ title: "abc" });
+      p.isValid();
+      expect(p.errors.get("title")).toContain("wrong length!");
+    });
+
+    it("validates length of for integer", () => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { is: 5 } });
+        }
+      }
+      // Length is checked as string length
+      expect(new Person({ title: "12345" }).isValid()).toBe(true);
+      expect(new Person({ title: "1234" }).isValid()).toBe(false);
+    });
+  });
 });
