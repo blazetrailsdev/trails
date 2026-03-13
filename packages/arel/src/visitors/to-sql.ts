@@ -600,15 +600,21 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   protected visitDistinctOn(_node: Nodes.DistinctOn): SQLString {
-    throw new NotImplementedError("DISTINCT ON not implemented for this db");
+    throw new NotImplementedError(
+      "DISTINCT ON is not supported by the base ToSql visitor. Use the PostgreSQL visitor instead.",
+    );
   }
 
   protected visitRegexp(_node: Nodes.Regexp): SQLString {
-    throw new NotImplementedError("~ not implemented for this db");
+    throw new NotImplementedError(
+      "Regexp (~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
+    );
   }
 
   protected visitNotRegexp(_node: Nodes.NotRegexp): SQLString {
-    throw new NotImplementedError("!~ not implemented for this db");
+    throw new NotImplementedError(
+      "NotRegexp (!~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
+    );
   }
 
   protected visitBin(node: Nodes.Bin): SQLString {
