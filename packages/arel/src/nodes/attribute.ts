@@ -30,7 +30,14 @@ import { Extract } from "./extract.js";
 import { Regexp as RegexpNode, NotRegexp } from "./regexp.js";
 import { IsDistinctFrom, IsNotDistinctFrom } from "./distinct-from.js";
 import { Case } from "./case.js";
-import { InfixOperation } from "./infix-operation.js";
+import {
+  InfixOperation,
+  BitwiseAnd,
+  BitwiseOr,
+  BitwiseXor,
+  BitwiseShiftLeft,
+  BitwiseShiftRight,
+} from "./infix-operation.js";
 import { Over, NamedWindow, Window } from "./window.js";
 import { True } from "./true-false.js";
 
@@ -281,12 +288,12 @@ export class Attribute extends Node {
 
   // -- Math --
 
-  add(other: unknown): Addition {
-    return new Addition(this, buildQuoted(other));
+  add(other: unknown): Grouping {
+    return new Grouping(new Addition(this, buildQuoted(other)));
   }
 
-  subtract(other: unknown): Subtraction {
-    return new Subtraction(this, buildQuoted(other));
+  subtract(other: unknown): Grouping {
+    return new Grouping(new Subtraction(this, buildQuoted(other)));
   }
 
   multiply(other: unknown): Multiplication {
@@ -295,6 +302,26 @@ export class Attribute extends Node {
 
   divide(other: unknown): Division {
     return new Division(this, buildQuoted(other));
+  }
+
+  bitwiseAnd(other: unknown): Grouping {
+    return new Grouping(new BitwiseAnd(this, buildQuoted(other)));
+  }
+
+  bitwiseOr(other: unknown): Grouping {
+    return new Grouping(new BitwiseOr(this, buildQuoted(other)));
+  }
+
+  bitwiseXor(other: unknown): Grouping {
+    return new Grouping(new BitwiseXor(this, buildQuoted(other)));
+  }
+
+  bitwiseShiftLeft(other: unknown): Grouping {
+    return new Grouping(new BitwiseShiftLeft(this, buildQuoted(other)));
+  }
+
+  bitwiseShiftRight(other: unknown): Grouping {
+    return new Grouping(new BitwiseShiftRight(this, buildQuoted(other)));
   }
 
   // -- Aliasing --

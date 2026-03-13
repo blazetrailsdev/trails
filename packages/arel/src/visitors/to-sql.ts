@@ -10,6 +10,13 @@ export class UnsupportedVisitError extends Error {
   }
 }
 
+export class NotImplementedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotImplementedError";
+  }
+}
+
 /**
  * ToSql visitor — walks the AST and produces SQL strings.
  *
@@ -70,8 +77,8 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.In) return this.visitIn(node);
     if (node instanceof Nodes.NotIn) return this.visitNotIn(node);
     if (node instanceof Nodes.Between) return this.visitBetween(node);
-    if (node instanceof Nodes.Regexp) return this.visitBinaryOp(node, "~");
-    if (node instanceof Nodes.NotRegexp) return this.visitBinaryOp(node, "!~");
+    if (node instanceof Nodes.Regexp) return this.visitRegexp(node);
+    if (node instanceof Nodes.NotRegexp) return this.visitNotRegexp(node);
     if (node instanceof Nodes.IsDistinctFrom) return this.visitBinaryOp(node, "IS DISTINCT FROM");
     if (node instanceof Nodes.IsNotDistinctFrom)
       return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
@@ -415,7 +422,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitBinaryOp(node: Nodes.Binary, op: string): SQLString {
+  protected visitBinaryOp(node: Nodes.Binary, op: string): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(` ${op} `);
     this.visitNodeOrValue(node.right);
@@ -592,15 +599,22 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  protected visitDistinctOn(node: Nodes.DistinctOn): SQLString {
-    this.collector.append("DISTINCT ON (");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (node.expr !== null) {
-      this.collector.append(String(node.expr));
-    }
-    this.collector.append(")");
-    return this.collector;
+  protected visitDistinctOn(_node: Nodes.DistinctOn): SQLString {
+    throw new NotImplementedError(
+      "DISTINCT ON is not supported by the base ToSql visitor. Use the PostgreSQL visitor instead.",
+    );
+  }
+
+  protected visitRegexp(_node: Nodes.Regexp): SQLString {
+    throw new NotImplementedError(
+      "Regexp (~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
+    );
+  }
+
+  protected visitNotRegexp(_node: Nodes.NotRegexp): SQLString {
+    throw new NotImplementedError(
+      "NotRegexp (!~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
+    );
   }
 
   protected visitBin(node: Nodes.Bin): SQLString {

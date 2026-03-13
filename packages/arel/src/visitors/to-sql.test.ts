@@ -61,13 +61,13 @@ describe("Arel", () => {
 
     it("should handle Addition", () => {
       expect(users.project(users.get("age").add(1).as("next")).toSql()).toBe(
-        'SELECT "users"."age" + 1 AS next FROM "users"',
+        'SELECT ("users"."age" + 1) AS next FROM "users"',
       );
     });
 
     it("should handle Subtraction", () => {
       expect(users.project(users.get("age").subtract(1).as("prev")).toSql()).toBe(
-        'SELECT "users"."age" - 1 AS prev FROM "users"',
+        'SELECT ("users"."age" - 1) AS prev FROM "users"',
       );
     });
 
@@ -267,7 +267,7 @@ describe("Arel", () => {
       expect(sql).toContain("'1,2'");
     });
 
-    it("raises UnsupportedVisitError for unsupported nodes", () => {
+    it("unsupported input should raise UnsupportedVisitError", () => {
       class Unknown extends Nodes.Node {
         accept<T>(visitor: Nodes.NodeVisitor<T>): T {
           return visitor.visit(this);
@@ -276,6 +276,28 @@ describe("Arel", () => {
       expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(
         Visitors.UnsupportedVisitError,
       );
+    });
+
+    describe("distinct on", () => {
+      it("raises not implemented error", () => {
+        const core = new Nodes.SelectCore();
+        core.setQuantifier = new Nodes.DistinctOn(new Nodes.SqlLiteral("aaron"));
+        expect(() => new Visitors.ToSql().compile(core)).toThrow(Visitors.NotImplementedError);
+      });
+    });
+
+    describe("Nodes::Regexp", () => {
+      it("raises not implemented error", () => {
+        const node = new Nodes.Regexp(users.get("name"), new Nodes.Quoted("foo%"));
+        expect(() => new Visitors.ToSql().compile(node)).toThrow(Visitors.NotImplementedError);
+      });
+    });
+
+    describe("Nodes::NotRegexp", () => {
+      it("raises not implemented error", () => {
+        const node = new Nodes.NotRegexp(users.get("name"), new Nodes.Quoted("foo%"));
+        expect(() => new Visitors.ToSql().compile(node)).toThrow(Visitors.NotImplementedError);
+      });
     });
 
     it("refuses mixed binds", () => {
