@@ -439,6 +439,8 @@ describe("KernelSuppressTest", () => {
     const log: string[] = [];
     suppress(() => {
       throw new TypeError("boom");
+      // eslint-disable-next-line no-unreachable
+      log.push("should not reach");
     }, TypeError);
     expect(log).toEqual([]); // exception was suppressed
   });
