@@ -331,7 +331,14 @@ export class ConfirmationValidator implements Validator {
       matches = value === confirmation;
     }
     if (!matches) {
-      errors.add(attribute, "confirmation", { message: this.options.message });
+      const modelClass = (record as any).constructor;
+      const humanAttr = modelClass?.humanAttributeName
+        ? modelClass.humanAttributeName(attribute)
+        : attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+      errors.add(attribute, "confirmation", {
+        message: this.options.message,
+        attribute: humanAttr,
+      });
     }
   }
 }

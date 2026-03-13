@@ -198,13 +198,13 @@ describe("ActiveModel", () => {
       it("validates length of using minimum", () => {
         const w = new WithLength({ name: "ab" });
         expect(w.isValid()).toBe(false);
-        expect(w.errors.get("name")).toContain("is too short");
+        expect(w.errors.get("name")[0]).toMatch(/is too short/);
       });
 
       it("validates length of using maximum", () => {
         const w = new WithLength({ name: "abcdefghijk" });
         expect(w.isValid()).toBe(false);
-        expect(w.errors.get("name")).toContain("is too long");
+        expect(w.errors.get("name")[0]).toMatch(/is too long/);
       });
 
       it("validates length of using within", () => {
@@ -275,7 +275,7 @@ describe("ActiveModel", () => {
         expect(new IntOnly({ count: "5" }).isValid()).toBe(true);
         const f = new IntOnly({ count: "5.5" });
         expect(f.isValid()).toBe(false);
-        expect(f.errors.get("count")).toContain("is not an integer");
+        expect(f.errors.get("count")).toContain("must be an integer");
       });
 
       it("validates numericality with greater than", () => {
@@ -447,7 +447,7 @@ describe("ActiveModel", () => {
           passwordConfirmation: "wrong",
         });
         expect(w.isValid()).toBe(false);
-        expect(w.errors.get("password")).toContain("doesn't match confirmation");
+        expect(w.errors.get("password")).toContain("doesn't match Password");
       });
     });
 

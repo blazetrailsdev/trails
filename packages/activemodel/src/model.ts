@@ -1,4 +1,5 @@
 import { Errors } from "./errors.js";
+import { I18n } from "./i18n.js";
 import { typeRegistry } from "./types/registry.js";
 import { Type } from "./types/type.js";
 import { ModelName } from "./naming.js";
@@ -631,7 +632,23 @@ export class Model {
    * Mirrors: ActiveModel::Translation.human_attribute_name
    */
   static humanAttributeName(attr: string): string {
-    return attr.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+    const modelKey = this.name
+      ? this.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
+      : undefined;
+    const fallback = attr.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+
+    const defaults: Array<{ key: string } | { message: string }> = [];
+    if (modelKey) {
+      defaults.push({ key: `${this.i18nScope}.attributes.${modelKey}.${attr}` });
+    }
+    defaults.push({ key: `attributes.${attr}` });
+    defaults.push({ message: fallback });
+
+    const primaryKey = modelKey
+      ? `${this.i18nScope}.attributes.${modelKey}.${attr}`
+      : `attributes.${attr}`;
+
+    return I18n.t(primaryKey, { defaults: defaults.slice(1) });
   }
 
   /**

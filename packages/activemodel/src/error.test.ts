@@ -101,7 +101,7 @@ describe("ActiveModel", () => {
     it("full_message returns the given message when the attribute contains base", () => {
       // A field named "base_price" should still get a prefix
       const e = new Errors(null);
-      expect(e.fullMessage("base_price", "is invalid")).toBe("Base_price is invalid");
+      expect(e.fullMessage("base_price", "is invalid")).toBe("Base price is invalid");
     });
 
     it("details which ignores callback and message options", () => {

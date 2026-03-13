@@ -1,3 +1,5 @@
+import { I18n } from "./i18n.js";
+
 /**
  * NestedError — wraps an error from an associated model.
  *
@@ -20,8 +22,11 @@ export class NestedError {
 
   get fullMessage(): string {
     if (this.attribute === "base") return this.message;
-    const attr = this.attribute.charAt(0).toUpperCase() + this.attribute.slice(1);
-    return `${attr} ${this.message}`;
+    const attr = this.attribute.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+    const format = I18n.t("activemodel.errors.format", {
+      defaultValue: "%{attribute} %{message}",
+    });
+    return format.replace("%{attribute}", attr).replace("%{message}", this.message);
   }
 
   get type(): string {
@@ -82,8 +87,10 @@ export class Errors {
     let message: string;
     if (typeof options?.message === "function") {
       message = options.message(this._base);
+    } else if (options?.message) {
+      message = this.interpolateMessage(options.message as string, options);
     } else {
-      message = options?.message ?? this.defaultMessage(type, options);
+      message = this.generateMessage(attribute, type, options);
     }
     this._errors.push({
       attribute,
@@ -91,6 +98,15 @@ export class Errors {
       message,
       options: options ? { ...options, message: message } : undefined,
     });
+  }
+
+  private interpolateMessage(msg: string, options?: Record<string, unknown>): string {
+    if (!options) return msg;
+    let result = msg;
+    for (const [key, val] of Object.entries(options)) {
+      result = result.replace(`%{${key}}`, String(val));
+    }
+    return result;
   }
 
   /**
@@ -120,11 +136,7 @@ export class Errors {
    * All full messages: "Attribute message".
    */
   get fullMessages(): string[] {
-    return this._errors.map((e) => {
-      if (e.attribute === "base") return e.message;
-      const attr = e.attribute.charAt(0).toUpperCase() + e.attribute.slice(1);
-      return `${attr} ${e.message}`;
-    });
+    return this._errors.map((e) => this.fullMessage(e.attribute, e.message));
   }
 
   /**
@@ -178,11 +190,7 @@ export class Errors {
   fullMessagesFor(attribute: string): string[] {
     return this._errors
       .filter((e) => e.attribute === attribute)
-      .map((e) => {
-        if (e.attribute === "base") return e.message;
-        const attr = e.attribute.charAt(0).toUpperCase() + e.attribute.slice(1);
-        return `${attr} ${e.message}`;
-      });
+      .map((e) => this.fullMessage(e.attribute, e.message));
   }
 
   /**
@@ -296,8 +304,15 @@ export class Errors {
    */
   fullMessage(attribute: string, message: string): string {
     if (attribute === "base") return message;
-    const attr = attribute.charAt(0).toUpperCase() + attribute.slice(1);
-    return `${attr} ${message}`;
+    const base = this._base as any;
+    const modelClass = base?.constructor;
+    const humanAttr = modelClass?.humanAttributeName
+      ? modelClass.humanAttributeName(attribute)
+      : attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+    const format = I18n.t("activemodel.errors.format", {
+      defaultValue: "%{attribute} %{message}",
+    });
+    return format.replace("%{attribute}", humanAttr).replace("%{message}", message);
   }
 
   /**
@@ -319,7 +334,45 @@ export class Errors {
     type: string = "invalid",
     options?: Record<string, unknown>,
   ): string {
-    return this.defaultMessage(type, options);
+    if (options?.message && typeof options.message === "string") {
+      return this.interpolateMessage(options.message, options);
+    }
+    const base = this._base as any;
+    const modelClass = base?.constructor;
+    const modelKey = modelClass?.name
+      ? modelClass.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
+      : undefined;
+    const humanAttr = modelClass?.humanAttributeName
+      ? modelClass.humanAttributeName(attribute)
+      : attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+
+    const i18nOptions: Record<string, unknown> = {
+      ...options,
+      model: modelKey,
+      attribute: humanAttr,
+      value: base && attribute !== "base" ? base[attribute] : undefined,
+    };
+
+    const defaults: Array<{ key: string } | { message: string }> = [];
+    if (modelKey) {
+      defaults.push({
+        key: `activemodel.errors.models.${modelKey}.attributes.${attribute}.${type}`,
+      });
+      defaults.push({ key: `activemodel.errors.models.${modelKey}.${type}` });
+    }
+    defaults.push({ key: `activemodel.errors.messages.${type}` });
+    defaults.push({ key: `errors.attributes.${attribute}.${type}` });
+    defaults.push({ key: `errors.messages.${type}` });
+
+    const primaryKey = modelKey
+      ? `activemodel.errors.models.${modelKey}.attributes.${attribute}.${type}`
+      : `activemodel.errors.messages.${type}`;
+
+    return I18n.t(primaryKey, {
+      ...i18nOptions,
+      defaults: modelKey ? defaults.slice(1) : defaults.slice(0),
+      defaultValue: type,
+    });
   }
 
   /**
@@ -376,38 +429,5 @@ export class Errors {
       return `#<ActiveModel::Error attribute=${e.attribute}, type=${e.type}, message="${e.message}">`;
     });
     return `#<ActiveModel::Errors [${details.join(", ")}]>`;
-  }
-
-  private defaultMessage(type: string, _options?: Record<string, unknown>): string {
-    const messages: Record<string, string> = {
-      invalid: "is invalid",
-      blank: "can't be blank",
-      present: "must be blank",
-      too_short: "is too short",
-      too_long: "is too long",
-      wrong_length: "is the wrong length",
-      not_a_number: "is not a number",
-      not_an_integer: "is not an integer",
-      greater_than: "must be greater than %{count}",
-      greater_than_or_equal_to: "must be greater than or equal to %{count}",
-      less_than: "must be less than %{count}",
-      less_than_or_equal_to: "must be less than or equal to %{count}",
-      equal_to: "must be equal to %{count}",
-      other_than: "must be other than %{count}",
-      odd: "must be odd",
-      even: "must be even",
-      inclusion: "is not included in the list",
-      exclusion: "is reserved",
-      taken: "has already been taken",
-      confirmation: "doesn't match confirmation",
-      accepted: "must be accepted",
-    };
-    let msg = messages[type] ?? type;
-    if (_options) {
-      for (const [key, val] of Object.entries(_options)) {
-        msg = msg.replace(`%{${key}}`, String(val));
-      }
-    }
-    return msg;
   }
 }
