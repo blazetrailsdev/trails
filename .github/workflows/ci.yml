@@ -52,8 +52,8 @@ jobs:
       - run: npm ci
       - run: npm run format:check
 
-  unit-tests:
-    name: Unit Tests (SQLite)
+  sqlite-tests:
+    name: SQLite Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
