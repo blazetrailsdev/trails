@@ -1,0 +1,25 @@
+/**
+ * Mirrors Rails activerecord/test/cases/adapters/postgresql/xml_test.rb
+ */
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+
+describeIfPg("PostgresAdapter", () => {
+  let adapter: PostgresAdapter;
+  beforeEach(async () => {
+    adapter = new PostgresAdapter(PG_TEST_URL);
+  });
+  afterEach(async () => {
+    await adapter.close();
+  });
+
+  describe("PostgresqlXmlTest", () => {
+    it.skip("xml column", async () => {});
+    it.skip("xml default", async () => {});
+    it.skip("xml type cast", async () => {});
+    it.skip("xml write", async () => {});
+    it.skip("xml schema dump", async () => {});
+    it.skip("null xml", async () => {});
+    it.skip("round trip", async () => {});
+  });
+});

@@ -1,0 +1,27 @@
+/**
+ * Mirrors Rails activerecord/test/cases/adapters/postgresql/transaction_test.rb
+ */
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+
+describeIfPg("PostgresAdapter", () => {
+  let adapter: PostgresAdapter;
+  beforeEach(async () => {
+    adapter = new PostgresAdapter(PG_TEST_URL);
+  });
+  afterEach(async () => {
+    await adapter.close();
+  });
+
+  describe("PostgresqlTransactionTest", () => {
+    it.skip("transaction isolation read committed", async () => {});
+    it.skip("transaction isolation repeatable read", async () => {});
+    it.skip("transaction isolation serializable", async () => {});
+    it.skip("transaction read only", async () => {});
+    it.skip("transaction deferrable", async () => {});
+    it.skip("transaction rollback on exception", async () => {});
+    it.skip("raises SerializationFailure when a serialization failure occurs", async () => {});
+    it.skip("raises QueryCanceled when statement timeout exceeded", async () => {});
+    it.skip("raises Interrupt when canceling statement via interrupt", async () => {});
+  });
+});
