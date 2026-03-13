@@ -38,7 +38,7 @@ import {
   delegatedType,
   enableSti,
   registerSubclass,
-} from "../index.js";
+} from "./index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -50,16 +50,16 @@ import {
   setBelongsTo,
   setHasOne,
   setHasMany,
-} from "../associations.js";
+} from "./associations.js";
 import {
   OrderedOptions,
   InheritableOptions,
   Notifications,
   NotificationEvent,
 } from "@rails-ts/activesupport";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
-import { markForDestruction, isMarkedForDestruction, isDestroyable } from "../autosave.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
+import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
