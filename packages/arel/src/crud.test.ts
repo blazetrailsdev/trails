@@ -26,7 +26,10 @@ describe("Arel", () => {
 
     it("should call update on the connection", () => {
       const mgr = new UpdateManager();
-      mgr.table(users).set([[users.get("name"), "sam"]]).where(users.get("id").eq(1));
+      mgr
+        .table(users)
+        .set([[users.get("name"), "sam"]])
+        .where(users.get("id").eq(1));
       expect(mgr.toSql()).toContain('UPDATE "users"');
     });
 

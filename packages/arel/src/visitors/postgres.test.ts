@@ -123,9 +123,7 @@ describe("Arel", () => {
     });
 
     it("should know how to generate parenthesis when supplied with many Dimensions", () => {
-      const mgr = users
-        .project(star)
-        .group(new Nodes.Cube([users.get("id"), users.get("name")]));
+      const mgr = users.project(star).group(new Nodes.Cube([users.get("id"), users.get("name")]));
       const sql = new Visitors.PostgreSQL().compile(mgr.ast);
       expect(sql).toContain('CUBE("users"."id", "users"."name")');
     });

@@ -21,4 +21,3 @@ export class Fragments extends Node {
     return visitor.visit(this);
   }
 }
-
