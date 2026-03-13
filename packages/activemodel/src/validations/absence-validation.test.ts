@@ -1,0 +1,60 @@
+import { describe, it, expect } from "vitest";
+import { Model, Errors, Types, NestedError } from "../index.js";
+import { ModelName } from "../naming.js";
+import { CallbackChain } from "../callbacks.js";
+
+describe("ActiveModel", () => {
+  describe("AbsenceValidationTest", () => {
+    it("validates absence of for ruby class", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { absence: true });
+        }
+      }
+      const p = new Person();
+      expect(p.isValid()).toBe(true);
+      const p2 = new Person({ name: "Alice" });
+      expect(p2.isValid()).toBe(false);
+    });
+  });
+
+  describe("AbsenceValidationTest", () => {
+    it("validates absence of for ruby class with custom reader", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { absence: true });
+        }
+      }
+      const p = new Person({});
+      expect(p.isValid()).toBe(true);
+    });
+  });
+
+  describe("Validations Absence (ported)", () => {
+    it("validates absence of", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { absence: true });
+        }
+      }
+      expect(new Person({ name: "Alice" }).isValid()).toBe(false);
+      expect(new Person({ name: "" }).isValid()).toBe(true);
+      expect(new Person({}).isValid()).toBe(true);
+    });
+
+    it("validates absence of with custom error using quotes", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { absence: { message: "must not be given" } });
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      p.isValid();
+      expect(p.errors.get("name")).toContain("must not be given");
+    });
+  });
+});

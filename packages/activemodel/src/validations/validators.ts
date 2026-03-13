@@ -233,6 +233,9 @@ export class FormatValidator implements Validator {
     if (!options.with && !options.without) {
       throw new Error("Either :with or :without must be supplied (but not both)");
     }
+    if (options.with && options.without) {
+      throw new Error("Either :with or :without must be supplied (but not both)");
+    }
   }
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
@@ -277,8 +280,8 @@ export class ConfirmationValidator implements Validator {
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
-    const confirmation =
-      record._attributes?.get(`${attribute}_confirmation`) ?? record[`${attribute}_confirmation`];
+    const confirmationAttr = `${attribute}Confirmation`;
+    const confirmation = record._attributes?.get(confirmationAttr) ?? record[confirmationAttr];
     if (confirmation === undefined) return;
     const caseSensitive = this.options.caseSensitive ?? true;
     let matches: boolean;
