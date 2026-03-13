@@ -60,6 +60,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("quote column name", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test"`);
       await adapter.exec(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "quoting_test" ("select") VALUES ('works')`);
       const rows = await adapter.execute(`SELECT "select" FROM "quoting_test"`);
@@ -67,6 +68,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("quote table name", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test"`);
       await adapter.exec(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
       const rows = await adapter.execute(`SELECT * FROM "quoting_test"`);
       expect(rows).toHaveLength(0);

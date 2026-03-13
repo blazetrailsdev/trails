@@ -35,6 +35,7 @@ describeIfPg("PostgresAdapter", () => {
 
   describe("PostgresqlBindParameterTest", () => {
     beforeEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "bind_test"`);
       await adapter.exec(`
         CREATE TABLE "bind_test" (
           "id" SERIAL PRIMARY KEY,
