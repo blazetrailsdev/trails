@@ -123,7 +123,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("InclusionValidationTest (missing)", () => {
+  describe("InclusionValidationTest", () => {
     it("validates inclusion of range", () => {
       // TS doesn't have Ruby ranges, so use an array of all values in the range
       class Person extends Model {

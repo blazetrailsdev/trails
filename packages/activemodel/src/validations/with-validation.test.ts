@@ -213,7 +213,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("ValidatesWithTest (missing)", () => {
+  describe("ValidatesWithTest", () => {
     it("validates_with each validator", () => {
       class Person extends Model {
         static {

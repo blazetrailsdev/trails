@@ -15,9 +15,7 @@ describe("ActiveModel", () => {
       m.writeAttribute("price", "1.0");
       expect(m.attributeChanged("price")).toBe(false);
     });
-  });
 
-  describe("IntegerTest (missing)", () => {
     it("simple values", () => {
       expect(type.cast(1)).toBe(1);
       expect(type.cast(0)).toBe(0);

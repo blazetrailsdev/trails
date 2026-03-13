@@ -92,7 +92,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("ExclusionValidationTest (missing)", () => {
+  describe("ExclusionValidationTest", () => {
     it("validates exclusion of with within option", () => {
       class Person extends Model {
         static {

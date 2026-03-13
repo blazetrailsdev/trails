@@ -711,9 +711,7 @@ describe("ActiveModel", () => {
       expect(u.errors.added("name", "blank")).toBe(true);
       expect(u.errors.added("name", "invalid")).toBe(false);
     });
-  });
 
-  describe("ErrorsTest (missing)", () => {
     it("attribute_names only returns unique attribute names", () => {
       const e = new Errors(null);
       e.add("name", "blank");

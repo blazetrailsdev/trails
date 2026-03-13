@@ -362,7 +362,7 @@ describe("ActiveModel", () => {
     });
   });
 
-  describe("LengthValidationTest (missing)", () => {
+  describe("LengthValidationTest", () => {
     it("validates length of with allow nil", () => {
       class Person extends Model {
         static {
