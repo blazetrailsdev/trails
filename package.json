@@ -46,5 +46,11 @@
     "commander": "^14.0.3",
     "mysql2": "^3.18.2",
     "pg": "^8.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
   }
 }

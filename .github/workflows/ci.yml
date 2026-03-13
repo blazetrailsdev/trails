@@ -56,7 +56,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm rebuild better-sqlite3
       - run: pnpm vitest run --no-file-parallelism
 
   postgres-tests:
@@ -84,7 +83,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm rebuild better-sqlite3
       - run: pnpm vitest run --no-file-parallelism
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
@@ -113,7 +111,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm rebuild better-sqlite3
       - name: Set MariaDB to case-sensitive collation
         run: |
           mysql -h 127.0.0.1 -u root -e "ALTER DATABASE rails_js_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
