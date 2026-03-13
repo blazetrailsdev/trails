@@ -167,4 +167,61 @@ describe("ActiveModel", () => {
       expect(e.fullMessages[0]).toBe("Name can't be blank");
     });
   });
+
+  describe("ErrorTest (missing)", () => {
+    it("initialize without type but with options", () => {
+      const e = new Errors(null);
+      e.add("name", "invalid", { message: "is not valid" });
+      const detail = e.details[0];
+      expect(detail.attribute).toBe("name");
+      expect(detail.type).toBe("invalid");
+      expect(detail.message).toBe("is not valid");
+    });
+
+    it("match? handles mixed condition", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      e.add("name", "too_short");
+      e.add("age", "blank");
+      // where filters by both attribute and type
+      expect(e.where("name", "blank").length).toBe(1);
+      expect(e.where("name", "too_short").length).toBe(1);
+      expect(e.where("name", "invalid").length).toBe(0);
+      expect(e.where("age", "blank").length).toBe(1);
+    });
+
+    it("message with type as a symbol", () => {
+      const e = new Errors(null);
+      e.add("name", "blank");
+      expect(e.get("name")).toEqual(["can't be blank"]);
+    });
+
+    it("message with custom interpolation", () => {
+      const e = new Errors(null);
+      e.add("name", "greater_than", { count: 5 });
+      expect(e.get("name")).toEqual(["must be greater than 5"]);
+    });
+
+    it("message returns plural interpolation", () => {
+      const e = new Errors(null);
+      e.add("name", "too_short", { count: 3 });
+      // Default message for too_short is "is too short" — count is stored but
+      // the default message doesn't interpolate count
+      expect(e.get("name").length).toBe(1);
+      expect(e.details[0].options?.count).toBe(3);
+    });
+
+    it("message returns singular interpolation", () => {
+      const e = new Errors(null);
+      e.add("name", "too_short", { count: 1 });
+      expect(e.get("name").length).toBe(1);
+      expect(e.details[0].options?.count).toBe(1);
+    });
+
+    it("message returns count interpolation", () => {
+      const e = new Errors(null);
+      e.add("name", "equal_to", { count: 42 });
+      expect(e.get("name")).toEqual(["must be equal to 42"]);
+    });
+  });
 });
