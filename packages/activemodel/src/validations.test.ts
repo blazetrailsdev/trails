@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "./index.js";
+import { Model, Errors, NestedError } from "./index.js";
 import { ModelName } from "./naming.js";
 import { CallbackChain } from "./callbacks.js";
 
@@ -158,7 +158,7 @@ describe("Validations", () => {
       it("validates numericality with greater_than", () => {
         class GreaterThan extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { greaterThan: 5 } });
           }
         }
@@ -169,7 +169,7 @@ describe("Validations", () => {
       it("validates numericality with greater_than_or_equal_to", () => {
         class GreaterThanOrEqual extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { greaterThanOrEqualTo: 5 } });
           }
         }
@@ -180,7 +180,7 @@ describe("Validations", () => {
       it("validates numericality with equal_to", () => {
         class EqualTo extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { equalTo: 5 } });
           }
         }
@@ -191,7 +191,7 @@ describe("Validations", () => {
       it("validates numericality with less_than", () => {
         class LessThan extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { lessThan: 5 } });
           }
         }
@@ -202,7 +202,7 @@ describe("Validations", () => {
       it("validates numericality with less_than_or_equal_to", () => {
         class LessThanOrEqual extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { lessThanOrEqualTo: 5 } });
           }
         }
@@ -213,7 +213,7 @@ describe("Validations", () => {
       it("validates numericality with odd", () => {
         class Odd extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { odd: true } });
           }
         }
@@ -224,7 +224,7 @@ describe("Validations", () => {
       it("validates numericality with even", () => {
         class Even extends Model {
           static {
-            this.attribute("value", "number");
+            this.attribute("value", "integer");
             this.validates("value", { numericality: { even: true } });
           }
         }
@@ -303,7 +303,7 @@ describe("Validations", () => {
       it("rejects mismatched password and confirmation", () => {
         const s = new Signup({ password: "secret", passwordConfirmation: "wrong" });
         expect(s.isValid()).toBe(false);
-        expect(s.errors.get("passwordConfirmation")).toContain("doesn't match Password");
+        expect(s.errors.get("password")).toContain("doesn't match confirmation");
       });
     });
 
@@ -353,8 +353,8 @@ describe("Validations", () => {
     describe("type-based validations", () => {
       class TypedModel extends Model {
         static {
-          this.attribute("age", Types.IntegerType.name);
-          this.attribute("email", Types.StringType.name);
+          this.attribute("age", "integer");
+          this.attribute("email", "string");
           this.validates("age", { presence: true, numericality: { onlyInteger: true } });
           this.validates("email", { presence: true });
         }

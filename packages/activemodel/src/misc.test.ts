@@ -436,7 +436,7 @@ describe("ActiveModel", () => {
         expect(
           new WithConfirm({
             password: "secret",
-            password_confirmation: "secret",
+            passwordConfirmation: "secret",
           }).isValid(),
         ).toBe(true);
       });
@@ -444,7 +444,7 @@ describe("ActiveModel", () => {
       it("no title confirmation", () => {
         const w = new WithConfirm({
           password: "secret",
-          password_confirmation: "wrong",
+          passwordConfirmation: "wrong",
         });
         expect(w.isValid()).toBe(false);
         expect(w.errors.get("password")).toContain("doesn't match confirmation");
@@ -2314,7 +2314,7 @@ describe("ActiveModel", () => {
         }
       }
       const u = new User({ email: "Alice@example.com" });
-      u._attributes.set("email_confirmation", "alice@example.com");
+      u._attributes.set("emailConfirmation", "alice@example.com");
       expect(u.isValid()).toBe(false);
     });
 
@@ -2326,7 +2326,7 @@ describe("ActiveModel", () => {
         }
       }
       const u = new User({ email: "Alice@example.com" });
-      u._attributes.set("email_confirmation", "alice@example.com");
+      u._attributes.set("emailConfirmation", "alice@example.com");
       expect(u.isValid()).toBe(true);
     });
 
@@ -2338,7 +2338,7 @@ describe("ActiveModel", () => {
         }
       }
       const u = new User({ email: "alice@example.com" });
-      u._attributes.set("email_confirmation", "bob@example.com");
+      u._attributes.set("emailConfirmation", "bob@example.com");
       expect(u.isValid()).toBe(false);
     });
   });
@@ -2785,7 +2785,7 @@ describe("ActiveModel", () => {
           this.validatesConfirmationOf("password");
         }
       }
-      const u = new User({ password: "secret", password_confirmation: "mismatch" });
+      const u = new User({ password: "secret", passwordConfirmation: "mismatch" });
       expect(u.isValid()).toBe(false);
     });
   });
@@ -3394,7 +3394,7 @@ describe("ActiveModel", () => {
           this.validates("title", { confirmation: true });
         }
       }
-      const p = new Person({ title: "A", title_confirmation: "B" });
+      const p = new Person({ title: "A", titleConfirmation: "B" });
       expect(p.isValid()).toBe(false);
       expect(p.errors.get("title")).toContain("doesn't match confirmation");
     });
@@ -3406,7 +3406,7 @@ describe("ActiveModel", () => {
           this.validates("title", { confirmation: true });
         }
       }
-      const p = new Person({ title: "A", title_confirmation: "A" });
+      const p = new Person({ title: "A", titleConfirmation: "A" });
       expect(p.isValid()).toBe(true);
     });
 
@@ -3418,7 +3418,7 @@ describe("ActiveModel", () => {
         }
       }
       const p = new Person({ title: "Hello" });
-      p._attributes.set("title_confirmation", "hello");
+      p._attributes.set("titleConfirmation", "hello");
       expect(p.isValid()).toBe(false);
     });
 
@@ -3430,7 +3430,7 @@ describe("ActiveModel", () => {
         }
       }
       const p = new Person({ title: "Hello" });
-      p._attributes.set("title_confirmation", "hello");
+      p._attributes.set("titleConfirmation", "hello");
       expect(p.isValid()).toBe(true);
     });
   });

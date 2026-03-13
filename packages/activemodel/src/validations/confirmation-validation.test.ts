@@ -12,7 +12,7 @@ describe("ActiveModel", () => {
           this.validates("password", { confirmation: true });
         }
       }
-      const p = new Person({ password: "secret", password_confirmation: "wrong" });
+      const p = new Person({ password: "secret", passwordConfirmation: "wrong" });
       expect(p.isValid()).toBe(false);
     });
 
@@ -23,7 +23,7 @@ describe("ActiveModel", () => {
           this.validates("email", { confirmation: true });
         }
       }
-      const p = new Person({ email: "a@b.com", email_confirmation: "a@b.com" });
+      const p = new Person({ email: "a@b.com", emailConfirmation: "a@b.com" });
       expect(p.isValid()).toBe(true);
     });
   });
