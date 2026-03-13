@@ -22,11 +22,14 @@ export class NestedError {
 
   get fullMessage(): string {
     if (this.attribute === "base") return this.message;
-    const attr = this.attribute.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+    const modelClass = (this.base as any)?.constructor;
+    const humanAttr = modelClass?.humanAttributeName
+      ? modelClass.humanAttributeName(this.attribute)
+      : this.attribute.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
     const format = I18n.t("activemodel.errors.format", {
       defaultValue: "%{attribute} %{message}",
     });
-    return format.replace("%{attribute}", attr).replace("%{message}", this.message);
+    return format.replace("%{attribute}", humanAttr).replace("%{message}", this.message);
   }
 
   get type(): string {
@@ -370,7 +373,7 @@ export class Errors {
 
     return I18n.t(primaryKey, {
       ...i18nOptions,
-      defaults: modelKey ? defaults.slice(1) : defaults.slice(0),
+      defaults: defaults.slice(1),
       defaultValue: type,
     });
   }
