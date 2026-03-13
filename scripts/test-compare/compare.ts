@@ -6,7 +6,7 @@
  *   finder_test.rb → finder.test.ts (snake_case → kebab-case)
  *
  * A small override table handles cases where the convention doesn't hold
- * (e.g. belongs_to_associations_test.rb → belongs-to.test.ts).
+ * (e.g. has_one_associations_test.rb → has-one-habtm.test.ts).
  *
  * Test matching: for each Ruby test, search ALL tests in the mapped TS file(s)
  * by normalized description. No need to specify describe blocks.
@@ -63,7 +63,7 @@ function rubyFileToConventionTs(rubyFile: string, pkg: string): string {
  */
 const FILE_OVERRIDES: Record<string, Record<string, string[]>> = {
   activerecord: {
-    // Associations: Ruby uses long names, TS uses short names
+    // Associations: overrides for files not yet following convention naming
     "associations/belongs_to_associations_test.rb": ["belongs-to-associations.test.ts"],
     "associations/has_many_associations_test.rb": ["has-many-associations.test.ts"],
     "associations/has_one_associations_test.rb": ["has-one-habtm.test.ts", "has-one-async.test.ts"],
