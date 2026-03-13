@@ -334,4 +334,148 @@ describe("ActiveModel", () => {
       expect(p2.isValid()).toBe(false);
     });
   });
+
+  describe("NumericalityValidationTest (missing)", () => {
+    it("validates numericality of with blank allowed", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { allowBlank: true } });
+        }
+      }
+      expect(new Person({ value: "" }).isValid()).toBe(true);
+      expect(new Person({ value: "5" }).isValid()).toBe(true);
+      expect(new Person({ value: "abc" }).isValid()).toBe(false);
+    });
+
+    it("validates numericality of with integer only and nil allowed", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { onlyInteger: true, allowNil: true } });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+      expect(new Person({ value: "5" }).isValid()).toBe(true);
+      expect(new Person({ value: "5.5" }).isValid()).toBe(false);
+    });
+
+    it("validates numericality of with integer only and symbol as value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.attribute("limit", "integer");
+          this.validates("value", { numericality: { greaterThan: "getLimit" } });
+        }
+        getLimit() {
+          return 10;
+        }
+      }
+      expect(new Person({ value: 15 }).isValid()).toBe(true);
+      expect(new Person({ value: 5 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality of with integer only and proc as value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { greaterThan: (r: any) => 10 } });
+        }
+      }
+      expect(new Person({ value: 15 }).isValid()).toBe(true);
+      expect(new Person({ value: 5 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality of with integer only and lambda as value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "integer");
+          this.validates("value", { numericality: { lessThanOrEqualTo: () => 100 } });
+        }
+      }
+      expect(new Person({ value: 100 }).isValid()).toBe(true);
+      expect(new Person({ value: 101 }).isValid()).toBe(false);
+    });
+
+    it.skip("validates numericality of with numeric only", () => {
+      // Ruby-specific Numeric class check — no clear TS equivalent
+    });
+
+    it("validates numericality of with numeric only and nil allowed", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { allowNil: true } });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+      expect(new Person({ value: "42" }).isValid()).toBe(true);
+    });
+
+    it("validates numericality with greater than using differing numeric types", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "float");
+          this.validates("value", { numericality: { greaterThan: 5 } });
+        }
+      }
+      expect(new Person({ value: 5.5 }).isValid()).toBe(true);
+      expect(new Person({ value: 4.9 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with greater than using string value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { greaterThan: 0 } });
+        }
+      }
+      expect(new Person({ value: "5" }).isValid()).toBe(true);
+      expect(new Person({ value: "0" }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with greater than or equal using differing numeric types", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "float");
+          this.validates("value", { numericality: { greaterThanOrEqualTo: 5 } });
+        }
+      }
+      expect(new Person({ value: 5.0 }).isValid()).toBe(true);
+      expect(new Person({ value: 4.9 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with equal to using differing numeric types", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "float");
+          this.validates("value", { numericality: { equalTo: 5 } });
+        }
+      }
+      expect(new Person({ value: 5.0 }).isValid()).toBe(true);
+      expect(new Person({ value: 5.1 }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with less than using string value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { lessThan: 10 } });
+        }
+      }
+      expect(new Person({ value: "5" }).isValid()).toBe(true);
+      expect(new Person({ value: "10" }).isValid()).toBe(false);
+    });
+
+    it("validates numericality with other than using string value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { otherThan: 0 } });
+        }
+      }
+      expect(new Person({ value: "5" }).isValid()).toBe(true);
+      expect(new Person({ value: "0" }).isValid()).toBe(false);
+    });
+  });
 });

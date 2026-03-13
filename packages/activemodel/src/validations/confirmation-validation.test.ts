@@ -99,5 +99,9 @@ describe("ActiveModel", () => {
       p._attributes.set("titleConfirmation", "hello");
       expect(p.isValid()).toBe(true);
     });
+
+    it.skip("title confirmation with i18n attribute", () => {
+      // i18n not implemented yet
+    });
   });
 });

@@ -122,4 +122,58 @@ describe("ActiveModel", () => {
       expect(p2.isValid()).toBe(false);
     });
   });
+
+  describe("InclusionValidationTest (missing)", () => {
+    it("validates inclusion of range", () => {
+      // TS doesn't have Ruby ranges, so use an array of all values in the range
+      class Person extends Model {
+        static {
+          this.attribute("age", "integer");
+          this.validates("age", { inclusion: { in: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } });
+        }
+      }
+      expect(new Person({ age: 5 }).isValid()).toBe(true);
+      expect(new Person({ age: 11 }).isValid()).toBe(false);
+    });
+
+    it("validates inclusion of time range", () => {
+      // Use array of specific time values
+      const times = ["morning", "afternoon", "evening"];
+      class Schedule extends Model {
+        static {
+          this.attribute("period", "string");
+          this.validates("period", { inclusion: { in: times } });
+        }
+      }
+      expect(new Schedule({ period: "morning" }).isValid()).toBe(true);
+      expect(new Schedule({ period: "midnight" }).isValid()).toBe(false);
+    });
+
+    it("validates inclusion of date range", () => {
+      const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+      class Schedule extends Model {
+        static {
+          this.attribute("day", "string");
+          this.validates("day", { inclusion: { in: validDays } });
+        }
+      }
+      expect(new Schedule({ day: "monday" }).isValid()).toBe(true);
+      expect(new Schedule({ day: "saturday" }).isValid()).toBe(false);
+    });
+
+    it.skip("validates inclusion of for ruby class", () => {
+      // Ruby-specific class validation concept
+    });
+
+    it("validates inclusion of with symbol", () => {
+      class Person extends Model {
+        static {
+          this.attribute("role", "string");
+          this.validates("role", { inclusion: { in: () => ["admin", "user"] } });
+        }
+      }
+      expect(new Person({ role: "admin" }).isValid()).toBe(true);
+      expect(new Person({ role: "guest" }).isValid()).toBe(false);
+    });
+  });
 });

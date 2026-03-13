@@ -239,4 +239,63 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(true);
     });
   });
+
+  describe("ValidatesTest (missing)", () => {
+    it("validates with if as shared conditions", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("active", "boolean");
+          this.validates("name", {
+            presence: true,
+            length: { minimum: 3 },
+            if: (r: any) => r.readAttribute("active") === true,
+          });
+        }
+      }
+      // When inactive, both validations should be skipped
+      expect(new Person({ active: false }).isValid()).toBe(true);
+      // When active, both validations should run
+      expect(new Person({ active: true }).isValid()).toBe(false);
+      expect(new Person({ active: true, name: "abc" }).isValid()).toBe(true);
+    });
+
+    it("validates with allow nil shared conditions", () => {
+      class Person extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", {
+            numericality: true,
+            allowNil: true,
+          });
+        }
+      }
+      expect(new Person({}).isValid()).toBe(true);
+      expect(new Person({ value: "42" }).isValid()).toBe(true);
+      expect(new Person({ value: "abc" }).isValid()).toBe(false);
+    });
+
+    it("validates with validator class and options", () => {
+      class CustomValidator {
+        private min: number;
+        constructor(options: any = {}) {
+          this.min = options.minimum ?? 0;
+        }
+        validate(record: any) {
+          const val = record.readAttribute("name");
+          if (typeof val === "string" && val.length < this.min) {
+            record.errors.add("name", "too_short", { message: "is too short" });
+          }
+        }
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(CustomValidator, { minimum: 5 });
+        }
+      }
+      expect(new Person({ name: "ab" }).isValid()).toBe(false);
+      expect(new Person({ name: "alice" }).isValid()).toBe(true);
+    });
+  });
 });

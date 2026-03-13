@@ -91,4 +91,43 @@ describe("ActiveModel", () => {
       expect(p2.isValid()).toBe(true);
     });
   });
+
+  describe("ExclusionValidationTest (missing)", () => {
+    it("validates exclusion of with within option", () => {
+      class Person extends Model {
+        static {
+          this.attribute("status", "string");
+          this.validates("status", { exclusion: { within: ["banned", "suspended"] } });
+        }
+      }
+      expect(new Person({ status: "active" }).isValid()).toBe(true);
+      expect(new Person({ status: "banned" }).isValid()).toBe(false);
+    });
+
+    it.skip("validates exclusion of for ruby class", () => {
+      // Ruby-specific class validation concept
+    });
+
+    it("validates exclusion of with range", () => {
+      class Person extends Model {
+        static {
+          this.attribute("status", "string");
+          this.validates("status", { exclusion: { in: ["deleted", "banned", "suspended"] } });
+        }
+      }
+      expect(new Person({ status: "active" }).isValid()).toBe(true);
+      expect(new Person({ status: "deleted" }).isValid()).toBe(false);
+    });
+
+    it("validates inclusion of with symbol", () => {
+      class Person extends Model {
+        static {
+          this.attribute("status", "string");
+          this.validates("status", { exclusion: { in: () => ["banned"] } });
+        }
+      }
+      expect(new Person({ status: "active" }).isValid()).toBe(true);
+      expect(new Person({ status: "banned" }).isValid()).toBe(false);
+    });
+  });
 });

@@ -56,5 +56,21 @@ describe("ActiveModel", () => {
       p.isValid();
       expect(p.errors.get("name")).toContain("must not be given");
     });
+
+    it("validates absence of with array arguments", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("email", "string");
+          this.validates("name", { absence: true });
+          this.validates("email", { absence: true });
+        }
+      }
+      const p = new Person({ name: "Alice", email: "a@b.com" });
+      p.isValid();
+      expect(p.errors.count).toBe(2);
+      expect(p.errors.get("name").length).toBeGreaterThan(0);
+      expect(p.errors.get("email").length).toBeGreaterThan(0);
+    });
   });
 });

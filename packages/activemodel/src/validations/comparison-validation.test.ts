@@ -240,6 +240,160 @@ describe("ActiveModel", () => {
       expect(new Item({}).isValid()).toBe(true);
     });
 
+    it("validates comparison with greater than using time", () => {
+      const baseTime = new Date("2024-01-01T12:00:00Z");
+      class Event extends Model {
+        static {
+          this.attribute("startTime", "datetime");
+          this.validates("startTime", { comparison: { greaterThan: baseTime } });
+        }
+      }
+      expect(new Event({ startTime: new Date("2024-01-01T13:00:00Z") }).isValid()).toBe(true);
+      expect(new Event({ startTime: new Date("2024-01-01T11:00:00Z") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with greater than or equal to using date", () => {
+      const baseDate = new Date("2024-06-01");
+      class Event extends Model {
+        static {
+          this.attribute("date", "date");
+          this.validates("date", { comparison: { greaterThanOrEqualTo: baseDate } });
+        }
+      }
+      expect(new Event({ date: new Date("2024-06-01") }).isValid()).toBe(true);
+      expect(new Event({ date: new Date("2024-05-31") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with greater than or equal to using time", () => {
+      const baseTime = new Date("2024-01-01T12:00:00Z");
+      class Event extends Model {
+        static {
+          this.attribute("time", "datetime");
+          this.validates("time", { comparison: { greaterThanOrEqualTo: baseTime } });
+        }
+      }
+      expect(new Event({ time: new Date("2024-01-01T12:00:00Z") }).isValid()).toBe(true);
+      expect(new Event({ time: new Date("2024-01-01T11:59:59Z") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with greater than or equal to using string", () => {
+      class Item extends Model {
+        static {
+          this.attribute("code", "string");
+          this.validates("code", { comparison: { greaterThanOrEqualTo: "B" } });
+        }
+      }
+      expect(new Item({ code: "B" }).isValid()).toBe(true);
+      expect(new Item({ code: "C" }).isValid()).toBe(true);
+      expect(new Item({ code: "A" }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with equal to using date", () => {
+      const target = new Date("2024-06-15");
+      class Event extends Model {
+        static {
+          this.attribute("date", "date");
+          this.validates("date", { comparison: { equalTo: target } });
+        }
+      }
+      expect(new Event({ date: new Date("2024-06-15") }).isValid()).toBe(true);
+      expect(new Event({ date: new Date("2024-06-16") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with equal to using time", () => {
+      const target = new Date("2024-01-01T12:00:00Z");
+      class Event extends Model {
+        static {
+          this.attribute("time", "datetime");
+          this.validates("time", { comparison: { equalTo: target } });
+        }
+      }
+      expect(new Event({ time: new Date("2024-01-01T12:00:00Z") }).isValid()).toBe(true);
+      expect(new Event({ time: new Date("2024-01-01T12:00:01Z") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with equal to using string", () => {
+      class Item extends Model {
+        static {
+          this.attribute("code", "string");
+          this.validates("code", { comparison: { equalTo: "ABC" } });
+        }
+      }
+      expect(new Item({ code: "ABC" }).isValid()).toBe(true);
+      expect(new Item({ code: "ABD" }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with less than using date", () => {
+      const limit = new Date("2025-01-01");
+      class Event extends Model {
+        static {
+          this.attribute("date", "date");
+          this.validates("date", { comparison: { lessThan: limit } });
+        }
+      }
+      expect(new Event({ date: new Date("2024-12-31") }).isValid()).toBe(true);
+      expect(new Event({ date: new Date("2025-01-01") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with less than using time", () => {
+      const limit = new Date("2024-01-01T12:00:00Z");
+      class Event extends Model {
+        static {
+          this.attribute("time", "datetime");
+          this.validates("time", { comparison: { lessThan: limit } });
+        }
+      }
+      expect(new Event({ time: new Date("2024-01-01T11:59:59Z") }).isValid()).toBe(true);
+      expect(new Event({ time: new Date("2024-01-01T12:00:00Z") }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with less than using string", () => {
+      class Item extends Model {
+        static {
+          this.attribute("code", "string");
+          this.validates("code", { comparison: { lessThan: "Z" } });
+        }
+      }
+      expect(new Item({ code: "A" }).isValid()).toBe(true);
+      expect(new Item({ code: "Z" }).isValid()).toBe(false);
+    });
+
+    it("validates comparison with lambda", () => {
+      class Event extends Model {
+        static {
+          this.attribute("startDate", "date");
+          this.attribute("endDate", "date");
+          this.validates("endDate", {
+            comparison: { greaterThan: (r: any) => r.readAttribute("startDate") },
+          });
+        }
+      }
+      expect(
+        new Event({ startDate: new Date("2024-01-01"), endDate: new Date("2024-02-01") }).isValid(),
+      ).toBe(true);
+      expect(
+        new Event({ startDate: new Date("2024-02-01"), endDate: new Date("2024-01-01") }).isValid(),
+      ).toBe(false);
+    });
+
+    it("validates comparison with method", () => {
+      class Event extends Model {
+        static {
+          this.attribute("startDate", "date");
+          this.attribute("endDate", "date");
+          this.validates("endDate", {
+            comparison: { greaterThan: (r: any) => r.getStartDate() },
+          });
+        }
+        getStartDate() {
+          return this.readAttribute("startDate");
+        }
+      }
+      expect(
+        new Event({ startDate: new Date("2024-01-01"), endDate: new Date("2024-02-01") }).isValid(),
+      ).toBe(true);
+    });
+
     it("validates comparison of multiple values", () => {
       class Score extends Model {
         static {

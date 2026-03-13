@@ -109,5 +109,9 @@ describe("ActiveModel", () => {
       }
       expect(new Terms({ terms: true }).isValid()).toBe(true);
     });
+
+    it.skip("validates acceptance of for ruby class", () => {
+      // Ruby-specific class validation concept
+    });
   });
 });

@@ -213,6 +213,27 @@ describe("ActiveModel", () => {
     });
   });
 
+  describe("ValidatesWithTest (missing)", () => {
+    it("validates_with each validator", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      Person.validatesEach(["name", "age"], (record, attr, value) => {
+        if (value === null || value === undefined) {
+          record.errors.add(attr, "blank");
+        }
+      });
+      const p = new Person({});
+      p.isValid();
+      expect(p.errors.count).toBe(2);
+      expect(p.errors.get("name").length).toBeGreaterThan(0);
+      expect(p.errors.get("age").length).toBeGreaterThan(0);
+    });
+  });
+
   describe("Validations With Validation (ported)", () => {
     it("validation with class that adds errors", () => {
       class CustomValidator {
