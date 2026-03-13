@@ -23,6 +23,7 @@ import { Table } from "../table.js";
 import { ToSql } from "../visitors/to-sql.js";
 import { InsertStatement } from "../nodes/insert-statement.js";
 import { UpdateStatement } from "../nodes/update-statement.js";
+import { Assignment } from "../nodes/binary.js";
 import { DeleteStatement } from "../nodes/delete-statement.js";
 import { Comment } from "../nodes/comment.js";
 import { Lateral } from "../nodes/lateral.js";
@@ -469,8 +470,6 @@ export class SelectManager {
   compileUpdate(values: [Node, unknown][], key?: Node): UpdateStatement {
     const stmt = new UpdateStatement();
     stmt.relation = this.core.source.left;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Assignment } = require("../nodes/binary.js");
     stmt.values = values.map(([col, val]) => {
       const right = val instanceof Node ? val : new Quoted(val);
       return new Assignment(col, right);
