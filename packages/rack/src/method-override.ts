@@ -32,7 +32,7 @@ export class MethodOverride {
   }
 
   private methodOverride(env: Record<string, any>): string | null {
-    let method = this.methodOverrideParam(env) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
+    const method = this.methodOverrideParam(env) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
     if (method) {
       try {
         return method.toString().toUpperCase();

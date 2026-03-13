@@ -173,7 +173,7 @@ export class ContentSecurityPolicy {
       }
 
       // Add nonce to script/style sources
-      let allSources = [...resolved];
+      const allSources = [...resolved];
       if (nonce && (directive.startsWith("script-src") || directive.startsWith("style-src"))) {
         allSources.push(`'nonce-${nonce}'`);
       }

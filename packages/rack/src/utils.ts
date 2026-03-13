@@ -566,7 +566,7 @@ export function getByteRanges(
   for (const spec of match[1].split(/,[ \t]*/)) {
     if (!spec.includes("-")) return null;
     const parts = spec.split("-");
-    let r0s = parts[0],
+    const r0s = parts[0],
       r1s = parts[1];
     let r0: number, r1: number;
 

@@ -2454,7 +2454,7 @@ export class Relation<T extends Base> {
     let lastId: unknown = null;
 
     while (true) {
-      let rel = this._clone();
+      const rel = this._clone();
       if (lastId !== null) {
         const pkQuoted = typeof lastId === "number" ? String(lastId) : `'${lastId}'`;
         rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${pk}" > ${pkQuoted}`);

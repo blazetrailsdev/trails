@@ -176,7 +176,7 @@ export class Model {
    */
   static normalizeValueFor(name: string, value: unknown): unknown {
     const def = this._attributeDefinitions.get(name);
-    let result = def ? def.type.cast(value) : value;
+    const result = def ? def.type.cast(value) : value;
     return this._applyNormalization(name, result);
   }
 
