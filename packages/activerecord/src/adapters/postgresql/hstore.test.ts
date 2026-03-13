@@ -1,0 +1,120 @@
+/**
+ * Mirrors Rails activerecord/test/cases/adapters/postgresql/hstore_test.rb
+ */
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import pg from "pg";
+import { PostgresAdapter } from "../postgres-adapter.js";
+
+const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
+
+let pgAvailable = false;
+
+async function checkPg(): Promise<boolean> {
+  try {
+    const client = new pg.Client({ connectionString: PG_TEST_URL });
+    await client.connect();
+    await client.query("SELECT 1");
+    await client.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+pgAvailable = await checkPg();
+const describeIfPg = pgAvailable ? describe : describe.skip;
+
+describeIfPg("PostgresAdapter", () => {
+  let adapter: PostgresAdapter;
+  beforeEach(async () => {
+    adapter = new PostgresAdapter(PG_TEST_URL);
+  });
+  afterEach(async () => {
+    await adapter.close();
+  });
+
+  describe("PostgresqlHstoreTest", () => {
+    it.skip("column", async () => {});
+    it.skip("default", async () => {});
+    it.skip("change column default with hstore", async () => {});
+    it.skip("type cast hstore", async () => {});
+    it.skip("hstore nil", async () => {});
+    it.skip("hstore with empty string", async () => {});
+    it.skip("hstore with single quotes", async () => {});
+    it.skip("hstore with double quotes", async () => {});
+    it.skip("hstore with commas", async () => {});
+    it.skip("hstore with special chars", async () => {});
+    it.skip("hstore with unicode", async () => {});
+    it.skip("hstore select", async () => {});
+    it.skip("hstore rewrite", async () => {});
+    it.skip("hstore with store accessors", async () => {});
+    it.skip("hstore dirty tracking", async () => {});
+    it.skip("hstore duplication", async () => {});
+    it.skip("hstore mutate", async () => {});
+    it.skip("hstore nested", async () => {});
+    it.skip("hstore where", async () => {});
+    it.skip("hstore where key", async () => {});
+    it.skip("hstore where value", async () => {});
+    it.skip("hstore contains", async () => {});
+    it.skip("hstore contained", async () => {});
+    it.skip("hstore keys", async () => {});
+    it.skip("hstore values", async () => {});
+    it.skip("hstore merge", async () => {});
+    it.skip("hstore delete key", async () => {});
+    it.skip("hstore delete keys", async () => {});
+    it.skip("hstore concat", async () => {});
+    it.skip("hstore replace", async () => {});
+    it.skip("hstore to array", async () => {});
+    it.skip("hstore each", async () => {});
+    it.skip("hstore exists", async () => {});
+    it.skip("hstore defined", async () => {});
+    it.skip("hstore akeys", async () => {});
+    it.skip("hstore avals", async () => {});
+    it.skip("hstore skeys", async () => {});
+    it.skip("hstore svals", async () => {});
+    it.skip("hstore to json", async () => {});
+    it.skip("hstore populate", async () => {});
+    it.skip("hstore schema dump", async () => {});
+    it.skip("hstore migration", async () => {});
+    it.skip("hstore gen random uuid", async () => {});
+    it.skip("hstore gen random uuid default", async () => {});
+    it.skip("hstore fixture", async () => {});
+    it.skip("hstore included in extensions", () => {});
+    it.skip("disable enable hstore", () => {});
+    it.skip("change table supports hstore", () => {});
+    it.skip("cast value on write", () => {});
+    it.skip("with store accessors", () => {});
+    it.skip("duplication with store accessors", () => {});
+    it.skip("yaml round trip with store accessors", () => {});
+    it.skip("changes with store accessors", () => {});
+    it.skip("changes in place", () => {});
+    it.skip("dirty from user equal", () => {});
+    it.skip("hstore dirty from database equal", () => {});
+    it.skip("spaces", () => {});
+    it.skip("commas", () => {});
+    it.skip("signs", () => {});
+    it.skip("various null", () => {});
+    it.skip("equal signs", () => {});
+    it.skip("parse5", () => {});
+    it.skip("parse6", () => {});
+    it.skip("parse7", () => {});
+    it.skip("rewrite", () => {});
+    it.skip("array cycle", () => {});
+    it.skip("array strings with quotes", () => {});
+    it.skip("array strings with commas", () => {});
+    it.skip("array strings with array delimiters", () => {});
+    it.skip("array strings with null strings", () => {});
+    it.skip("select multikey", () => {});
+    it.skip("nil", () => {});
+    it.skip("quotes", () => {});
+    it.skip("whitespace", () => {});
+    it.skip("backslash", () => {});
+    it.skip("comma", () => {});
+    it.skip("arrow", () => {});
+    it.skip("quoting special characters", () => {});
+    it.skip("multiline", () => {});
+    it.skip("hstore with serialized attributes", () => {});
+    it.skip("clone hstore with serialized attributes", () => {});
+    it.skip("supports to unsafe h values", () => {});
+  });
+});
