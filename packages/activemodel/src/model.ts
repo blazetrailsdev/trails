@@ -5,7 +5,7 @@ import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
-import type { Validator, ConditionalOptions } from "./validations/validator.js";
+import type { Validator, ConditionalOptions, ConditionFn } from "./validations/validator.js";
 import { shouldValidate } from "./validations/validator.js";
 import {
   PresenceValidator,
@@ -26,15 +26,13 @@ interface AttributeDefinition {
   defaultValue: unknown;
 }
 
-type ConditionEntry = ((record: any) => boolean) | string;
-
 interface ValidationEntry {
   attribute: string;
   validator: Validator;
   on?: string;
   strict?: boolean;
-  if?: ConditionEntry | ConditionEntry[];
-  unless?: ConditionEntry | ConditionEntry[];
+  if?: ConditionFn | ConditionFn[];
+  unless?: ConditionFn | ConditionFn[];
 }
 
 interface CustomValidationEntry {
@@ -257,8 +255,8 @@ export class Model {
     }
 
     const onContext = rules.on as string | undefined;
-    const ifCond = rules.if as ConditionEntry | ConditionEntry[] | undefined;
-    const unlessCond = rules.unless as ConditionEntry | ConditionEntry[] | undefined;
+    const ifCond = rules.if as ConditionFn | ConditionFn[] | undefined;
+    const unlessCond = rules.unless as ConditionFn | ConditionFn[] | undefined;
     const isStrict = rules.strict as boolean | undefined;
     const sharedAllowNil = rules.allowNil as boolean | undefined;
     const sharedAllowBlank = rules.allowBlank as boolean | undefined;
