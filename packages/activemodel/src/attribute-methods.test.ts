@@ -103,16 +103,8 @@ describe("ActiveModel", () => {
       expect((p as any).className).toBe("Admin");
     });
 
-    it("#undefine_attribute_methods undefines alias attribute methods", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.aliasAttribute("fullName", "name");
-        }
-      }
-      const p = new Person({ name: "Alice" });
-      expect((p as any).fullName).toBe("Alice");
-    });
+    // TODO: implement undefineAttributeMethods
+    it.skip("#undefine_attribute_methods undefines alias attribute methods", () => {});
 
     it("defined attribute doesn't expand positional hash argument", () => {
       class Person extends Model {
@@ -205,17 +197,8 @@ describe("ActiveModel", () => {
       expect(p.readAttribute("name")).toBe("Bob");
     });
 
-    it("#undefine_attribute_methods removes attribute methods", () => {
-      // In our implementation, attribute methods defined via prefix/suffix
-      // can be overridden; we test that base readAttribute still works
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      const p = new Person({ name: "Alice" });
-      expect(p.readAttribute("name")).toBe("Alice");
-    });
+    // TODO: implement undefineAttributeMethods
+    it.skip("#undefine_attribute_methods removes attribute methods", () => {});
 
     it("accessing a suffixed attribute", () => {
       class Person extends Model {

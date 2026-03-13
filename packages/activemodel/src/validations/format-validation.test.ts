@@ -38,30 +38,14 @@ describe("ActiveModel", () => {
             this.validates("email", { format: { with: /@/, without: /test/ } });
           }
         }
-      }).not.toThrow();
+      }).toThrow(/but not both/);
     });
 
-    it("validates format of when with isnt a regexp should raise error", () => {
-      class Person extends Model {
-        static {
-          this.attribute("email", "string");
-          this.validates("email", { format: { with: /.+@.+/ } });
-        }
-      }
-      const p = new Person({ email: "test@test.com" });
-      expect(p.isValid()).toBe(true);
-    });
+    // TypeScript enforces RegExp type at compile time, so passing a non-regexp
+    // is not possible. Skipping these Ruby-specific runtime type checks.
+    it.skip("validates format of when with isnt a regexp should raise error", () => {});
 
-    it("validates format of when not isnt a regexp should raise error", () => {
-      class Person extends Model {
-        static {
-          this.attribute("email", "string");
-          this.validates("email", { format: { without: /banned/ } });
-        }
-      }
-      const p = new Person({ email: "test@test.com" });
-      expect(p.isValid()).toBe(true);
-    });
+    it.skip("validates format of when not isnt a regexp should raise error", () => {});
 
     it("validates format of without lambda", () => {
       class Person extends Model {

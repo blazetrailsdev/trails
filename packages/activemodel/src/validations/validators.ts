@@ -233,6 +233,9 @@ export class FormatValidator implements Validator {
     if (!options.with && !options.without) {
       throw new Error("Either :with or :without must be supplied (but not both)");
     }
+    if (options.with && options.without) {
+      throw new Error("Either :with or :without must be supplied (but not both)");
+    }
   }
 
   validate(record: any, attribute: string, value: unknown, errors: Errors): void {

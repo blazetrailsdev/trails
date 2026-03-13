@@ -27,8 +27,8 @@ describe("ActiveModel", () => {
 
     it("slice with array", () => {
       const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-      const sliced = m.slice("name");
-      expect(Object.keys(sliced)).toEqual(["name"]);
+      const sliced = m.slice(["name", "age"]);
+      expect(sliced).toEqual({ name: "Alice", age: 30 });
     });
 
     it("values_at", () => {
@@ -38,7 +38,7 @@ describe("ActiveModel", () => {
 
     it("values_at with array", () => {
       const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-      expect(m.valuesAt("email")).toEqual(["a@b.com"]);
+      expect(m.valuesAt(["name", "age"])).toEqual(["Alice", 30]);
     });
   });
 });

@@ -12,11 +12,14 @@ describe("ActiveModel", () => {
         }
       }
       Person.includeRootInJson = true;
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
-      expect(json["person"]).toBeDefined();
-      expect(json["person"]["name"]).toBe("Alice");
-      Person.includeRootInJson = false;
+      try {
+        const p = new Person({ name: "Alice" });
+        const json = JSON.parse(p.toJson());
+        expect(json["person"]).toBeDefined();
+        expect(json["person"]["name"]).toBe("Alice");
+      } finally {
+        Person.includeRootInJson = false;
+      }
     });
 
     it("should include custom root in JSON", () => {
@@ -26,11 +29,14 @@ describe("ActiveModel", () => {
         }
       }
       Person.includeRootInJson = "human";
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
-      expect(json["human"]).toBeDefined();
-      expect(json["human"]["name"]).toBe("Alice");
-      Person.includeRootInJson = false;
+      try {
+        const p = new Person({ name: "Alice" });
+        const json = JSON.parse(p.toJson());
+        expect(json["human"]).toBeDefined();
+        expect(json["human"]["name"]).toBe("Alice");
+      } finally {
+        Person.includeRootInJson = false;
+      }
     });
 
     it("methods are called on object", () => {
@@ -215,11 +221,13 @@ describe("ActiveModel", () => {
           this.includeRootInJson = true;
         }
       }
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
-      expect(json).toEqual({ person: { name: "Alice" } });
-      // Reset
-      Person.includeRootInJson = false;
+      try {
+        const p = new Person({ name: "Alice" });
+        const json = JSON.parse(p.toJson());
+        expect(json).toEqual({ person: { name: "Alice" } });
+      } finally {
+        Person.includeRootInJson = false;
+      }
     });
 
     it("should include custom root in JSON", () => {
@@ -229,10 +237,13 @@ describe("ActiveModel", () => {
           this.includeRootInJson = "human";
         }
       }
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
-      expect(json).toEqual({ human: { name: "Alice" } });
-      Person.includeRootInJson = false;
+      try {
+        const p = new Person({ name: "Alice" });
+        const json = JSON.parse(p.toJson());
+        expect(json).toEqual({ human: { name: "Alice" } });
+      } finally {
+        Person.includeRootInJson = false;
+      }
     });
 
     it("as_json should return a hash if include_root_in_json is true", () => {
@@ -242,10 +253,13 @@ describe("ActiveModel", () => {
           this.includeRootInJson = true;
         }
       }
-      const p = new Person({ name: "Alice" });
-      const result = p.asJson();
-      expect(result).toEqual({ person: { name: "Alice" } });
-      Person.includeRootInJson = false;
+      try {
+        const p = new Person({ name: "Alice" });
+        const result = p.asJson();
+        expect(result).toEqual({ person: { name: "Alice" } });
+      } finally {
+        Person.includeRootInJson = false;
+      }
     });
   });
 

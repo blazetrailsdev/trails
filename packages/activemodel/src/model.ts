@@ -1360,9 +1360,9 @@ export class Model {
    *
    * Mirrors: ActiveModel::Access#slice
    */
-  slice(...methods: string[]): Record<string, unknown> {
+  slice(...methods: (string | string[])[]): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const m of methods) {
+    for (const m of methods.flat()) {
       result[m] = this.readAttribute(m);
     }
     return result;
@@ -1373,8 +1373,8 @@ export class Model {
    *
    * Mirrors: ActiveModel::Access#values_at
    */
-  valuesAt(...methods: string[]): unknown[] {
-    return methods.map((m) => this.readAttribute(m));
+  valuesAt(...methods: (string | string[])[]): unknown[] {
+    return methods.flat().map((m) => this.readAttribute(m));
   }
 
   // -- Callbacks helper for subclasses --

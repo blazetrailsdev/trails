@@ -37,6 +37,10 @@ export function serializableHash(
         result[method] = record[method]();
       } else if (method in record) {
         result[method] = record[method];
+      } else {
+        throw new Error(
+          `undefined method '${method}' for an instance of ${record.constructor.name}`,
+        );
       }
     }
   }

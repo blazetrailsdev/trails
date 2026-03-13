@@ -76,9 +76,9 @@ describe("ActiveModel", () => {
         }
       }
       const p = new Person({ name: "test" });
-      const hash = p.serializableHash({ methods: ["nonexistent"] });
-      // nonexistent method is simply not included
-      expect(hash).toHaveProperty("name", "test");
+      expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(
+        /undefined method 'nonexistent'/,
+      );
     });
 
     it("multiple includes", () => {
