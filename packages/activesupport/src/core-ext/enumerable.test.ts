@@ -1,14 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { exclude } from "../string-utils.js";
-
-import { compactBlankObj } from "../hash-utils.js";
-
 import {
+  exclude,
+  excluding,
+  without,
   sum,
   indexBy,
   many,
-  excluding,
-  without,
   pluck,
   pick,
   compactBlank,
@@ -17,6 +14,7 @@ import {
   minimum,
   maximum,
 } from "../enumerable-utils.js";
+import { compactBlankObj } from "../hash-utils.js";
 
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {

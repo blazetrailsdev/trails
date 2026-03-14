@@ -261,8 +261,7 @@ describe("CachingKeyGeneratorTest", () => {
 
   it("Does not cache key for different salts and lengths that are different but are equal when concatenated", () => {
     const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
-    // "salt|16" vs "sal|t16" would both map to same string with naive join
-    // But our implementation uses "|" separator which should still differentiate
+    // Different salts with same length must produce different keys
     const k1 = gen.generateKey("salt", 16);
     const k2 = gen.generateKey("sal", 16);
     expect(k1.equals(k2)).toBe(false);

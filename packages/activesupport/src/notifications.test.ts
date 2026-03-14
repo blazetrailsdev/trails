@@ -24,7 +24,7 @@ describe("InstrumenterTest", () => {
     Notifications.subscribe("foo", (e) => {
       received = e.payload;
     });
-    Notifications.instrument("foo", { key: "original" });
+    Notifications.instrument("foo", { key: "original" }, () => {});
     expect(received.key).toBe("original");
   });
 
@@ -60,7 +60,7 @@ describe("InstrumenterTest", () => {
   it("record yields the payload for further modification", () => {
     const events: Event[] = [];
     Notifications.subscribe("modify.test", (e) => events.push(e));
-    Notifications.instrument("modify.test", { original: true });
+    Notifications.instrument("modify.test", { original: true }, () => {});
     expect(events[0].payload.original).toBe(true);
   });
 
