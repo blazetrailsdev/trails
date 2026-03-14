@@ -156,5 +156,15 @@ describe("ActiveModel", () => {
       // humanAttributeName always returns a default, never raises
       expect(Model.humanAttributeName("missing_field")).toBe("Missing field");
     });
+
+    it("translated model attributes with symbols", () => {
+      expect(Model.humanAttributeName("first_name")).toBe("First name");
+    });
+
+    it("translated model attributes with ancestor", () => {
+      class Parent extends Model {}
+      class Child extends Parent {}
+      expect(Child.humanAttributeName("first_name")).toBe("First name");
+    });
   });
 });

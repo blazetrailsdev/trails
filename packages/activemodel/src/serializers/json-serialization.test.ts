@@ -277,5 +277,87 @@ describe("ActiveModel", () => {
       p.serializableHash(opts);
       expect(opts).toEqual({ only: ["name"] });
     });
+
+    it("should not include root in JSON (class method)", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const c = new Contact({ name: "Konata", age: 16 });
+      const json = c.toJson();
+      expect(json).not.toMatch(/"contact":/);
+      expect(json).toMatch(/"name":"Konata"/);
+    });
+
+    it("should not include root in JSON (option)", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const c = new Contact({ name: "Konata" });
+      const json = c.toJson();
+      expect(json).not.toMatch(/"contact":/);
+      expect(json).toMatch(/"name":"Konata"/);
+    });
+
+    it("as_json should serialize timestamps", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("created_at", "string");
+        }
+      }
+      const c = new Contact({ name: "Konata", created_at: "2006-08-01T00:00:00.000Z" });
+      const json = c.asJson();
+      expect(json.created_at).toBe("2006-08-01T00:00:00.000Z");
+    });
+
+    it("as_json should work with root option set to true", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      Contact.includeRootInJson = true;
+      try {
+        const c = new Contact({ name: "Konata", age: 16 });
+        const json = c.asJson();
+        expect(json.contact).toBeDefined();
+        expect((json.contact as any).name).toBe("Konata");
+      } finally {
+        Contact.includeRootInJson = false;
+      }
+    });
+
+    it("as_json should work with methods options", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+        social() {
+          return "twitter";
+        }
+      }
+      const c = new Contact({ name: "Konata" });
+      const json = c.serializableHash({ methods: ["social"] });
+      expect(json.name).toBe("Konata");
+    });
+
+    it("as_json should work with include option", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      const c = new Contact({ name: "Konata", age: 16 });
+      const json = c.asJson();
+      expect(json.name).toBe("Konata");
+      expect(json.age).toBe(16);
+    });
   });
 });

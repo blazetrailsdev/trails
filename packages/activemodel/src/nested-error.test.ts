@@ -5,6 +5,15 @@ import { CallbackChain } from "./callbacks.js";
 
 describe("ActiveModel", () => {
   describe("NestedErrorTest", () => {
+    it("initialize", () => {
+      const base = {};
+      const innerError = { attribute: "title", type: "not_enough", message: "not enough" };
+      const nested = new NestedError(base, innerError);
+      expect(nested.base).toBe(base);
+      expect(nested.attribute).toBe("title");
+      expect(nested.type).toBe("not_enough");
+    });
+
     it("initialize with overriding attribute and type", () => {
       const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
       const nested = new NestedError({}, inner, { attribute: "author" });
@@ -16,6 +25,12 @@ describe("ActiveModel", () => {
       const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
       const nested = new NestedError({}, inner);
       expect(nested.message).toBe("can't be blank");
+    });
+
+    it("full message", () => {
+      const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
+      const nested = new NestedError({}, inner);
+      expect(nested.fullMessage).toBe("Name can't be blank");
     });
   });
 

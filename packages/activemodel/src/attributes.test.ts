@@ -264,5 +264,26 @@ describe("ActiveModel", () => {
       attrs.name = "Bob";
       expect(p.readAttribute("name")).toBe("Alice");
     });
+
+    it("children inherit attributes", () => {
+      class Parent extends Model {
+        static {
+          this.attribute("integer_field", "integer");
+        }
+      }
+      class Child extends Parent {}
+      const data = new Child({ integer_field: "4.4" });
+      expect(data.readAttribute("integer_field")).toBe(4);
+    });
+
+    it("unknown type error is raised", () => {
+      expect(() => {
+        class BadModel extends Model {
+          static {
+            this.attribute("foo", "unknown_type_xyz");
+          }
+        }
+      }).toThrow();
+    });
   });
 });

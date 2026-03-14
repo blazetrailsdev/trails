@@ -764,12 +764,17 @@ describe("ActiveModel", () => {
       expect(e.ofKind("name", "invalid")).toBe(false);
     });
 
-    it("full_messages doesn't require the base object to respond to :errors", () => {
-      // Base object is a plain object without an errors property
-      const base = { name: "test" };
+    it("full_messages doesn't require the base object to respond to `:errors", () => {
+      const base = {
+        constructor: {
+          humanAttributeName() {
+            return "foo";
+          },
+        },
+      };
       const errors = new Errors(base);
-      errors.add("name", "blank");
-      expect(errors.fullMessages).toEqual(["Name can't be blank"]);
+      errors.add("name", "invalid", { message: "bar" });
+      expect(errors.fullMessages).toEqual(["foo bar"]);
     });
   });
 });

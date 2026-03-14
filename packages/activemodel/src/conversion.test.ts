@@ -159,5 +159,20 @@ describe("ActiveModel", () => {
       const p = new Person({ id: 1 });
       expect(p.toParam()).toBe("1-2-3");
     });
+
+    it("to_param returns nil if to_key is nil", () => {
+      class Contact extends Model {
+        static {
+          this.attribute("id", "integer");
+        }
+        isPersisted() {
+          return true;
+        }
+        toKey() {
+          return null;
+        }
+      }
+      expect(new Contact({}).toParam()).toBeNull();
+    });
   });
 });

@@ -171,9 +171,6 @@ describe("ActiveModel", () => {
       p.writeAttribute("name", "Alice");
       expect(p.changed).toBe(false);
     });
-  });
-
-  describe("AttributesDirtyTest (ported)", () => {
     it("attribute mutation", () => {
       class Person extends Model {
         static {

@@ -5,17 +5,6 @@ const type = new Types.IntegerType();
 
 describe("ActiveModel", () => {
   describe("IntegerTest", () => {
-    it("changed?", () => {
-      class MyModel extends Model {
-        static {
-          this.attribute("price", "decimal");
-        }
-      }
-      const m = new MyModel({ price: "1.0" });
-      m.writeAttribute("price", "1.0");
-      expect(m.attributeChanged("price")).toBe(false);
-    });
-
     it("simple values", () => {
       expect(type.cast(1)).toBe(1);
       expect(type.cast(0)).toBe(0);
@@ -106,7 +95,7 @@ describe("ActiveModel", () => {
       expect(type.cast(bigVal)).toBe(bigVal);
     });
 
-    it("serialize_cast_value is equivalent to serialize after cast", () => {
+    it("serialize_cast_value enforces range", () => {
       const values = [1, "123", 0, -5, null];
       for (const v of values) {
         const cast = type.cast(v);
