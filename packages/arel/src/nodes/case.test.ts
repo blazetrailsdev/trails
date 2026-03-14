@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
+describe("NodesTest", () => {
   const users = new Table("users");
-
-  describe("case", () => {
+  describe("Case", () => {
     it("sets case expression from first argument", () => {
       const caseNode = new Nodes.Case(users.get("status"));
       expect(caseNode.operand).toBeInstanceOf(Nodes.Attribute);

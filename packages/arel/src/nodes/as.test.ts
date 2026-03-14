@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Table, SelectManager, Nodes } from "../index.js";
 
-describe("Arel", () => {
+describe("As", () => {
   const users = new Table("users");
-
-  describe("as", () => {
+  describe("#as", () => {
     it("makes an AS node", () => {
       const node = users.get("name").as("n");
       expect(node).toBeInstanceOf(Nodes.As);
@@ -16,7 +15,9 @@ describe("Arel", () => {
       const sql = mgr.toSql();
       expect(sql).toContain("raw_table");
     });
+  });
 
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const a = new Nodes.Not(users.get("id").eq(1));
       const b = new Nodes.Not(users.get("id").eq(1));
@@ -28,7 +29,9 @@ describe("Arel", () => {
       const b = new Nodes.Extract(users.get("created_at"), "MONTH");
       expect(a.field).not.toBe(b.field);
     });
+  });
 
+  describe("#to_cte", () => {
     it("returns a Cte node using the LHS's name and the RHS as the relation", () => {
       const selectAst = users.project(users.get("id")).ast;
       const asNode = new Nodes.As(selectAst, new Nodes.SqlLiteral("cte_name"));

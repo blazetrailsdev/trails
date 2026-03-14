@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "../index.js";
 
-describe("Arel", () => {
+describe("NodesTest", () => {
   const users = new Table("users");
-
-  describe("binary", () => {
+  describe("Binary", () => {
     it("generates a hash based on its value", () => {
       const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
       const b = new Nodes.Equality(users.get("id"), new Nodes.Quoted(2));

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
-describe("Arel", () => {
-  describe("comment", () => {
+describe("CommentTest", () => {
+  describe("equality", () => {
     it("is not equal with different contents", () => {
       const a = new Nodes.SqlLiteral("NOW()");
       const b = new Nodes.SqlLiteral("CURRENT_TIMESTAMP");

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
-describe("Arel", () => {
-  describe("bound-sql-literal", () => {
+describe("BoundSqlLiteralTest", () => {
+  describe("equality", () => {
     it("is equal with equal components", () => {
       const a = new Nodes.BoundSqlLiteral("id = ?", [1]);
       const b = new Nodes.BoundSqlLiteral("id = ?", [1]);

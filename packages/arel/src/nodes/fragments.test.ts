@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
-  describe("fragments", () => {
+describe("FragmentsTest", () => {
+  describe("equality", () => {
     it("fails if joined with something that is not an Arel node", () => {
       const lit = new Nodes.SqlLiteral("foo");
       // SqlLiteral is a Node, verifying it works correctly

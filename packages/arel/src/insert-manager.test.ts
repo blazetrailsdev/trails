@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Table, sql, InsertManager, Nodes } from "./index.js";
 
-describe("Arel", () => {
+describe("InsertManagerTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-
-  describe("insert-manager", () => {
+  describe("insert", () => {
     it("can create a ValuesList node", () => {
       const mgr = new InsertManager();
       mgr.into(users);
@@ -88,13 +87,17 @@ describe("Arel", () => {
       const sql = im.toSql();
       expect(sql).toContain("INSERT INTO");
     });
+  });
 
+  describe("into", () => {
     it("takes a Table and chains", () => {
       const im = new InsertManager();
       const result = im.into(users);
       expect(result).toBe(im);
     });
+  });
 
+  describe("values", () => {
     it("converts to sql", () => {
       const mgr = new InsertManager();
       mgr.into(users);
@@ -121,7 +124,9 @@ describe("Arel", () => {
       const sql = im.toSql();
       expect(sql).toContain("DEFAULT");
     });
+  });
 
+  describe("combo", () => {
     it("combines columns and values list in order", () => {
       const mgr = new InsertManager();
       mgr.into(users);
@@ -131,7 +136,9 @@ describe("Arel", () => {
       ]);
       expect(mgr.columns.length).toBe(2);
     });
+  });
 
+  describe("select", () => {
     it("accepts a select query in place of a VALUES clause", () => {
       const mgr = new InsertManager();
       mgr.into(users);
@@ -140,17 +147,19 @@ describe("Arel", () => {
       mgr.select(selectMgr);
       expect(mgr.toSql()).toContain("SELECT");
     });
+  });
 
-    it("generates INSERT", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([
-        [users.get("name"), "dean"],
-        [users.get("age"), 30],
-      ]);
-      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES ('dean', 30)`);
-    });
+  it("generates INSERT", () => {
+    const mgr = new InsertManager();
+    mgr.into(users);
+    mgr.insert([
+      [users.get("name"), "dean"],
+      [users.get("age"), 30],
+    ]);
+    expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES ('dean', 30)`);
+  });
 
+  describe("insert", () => {
     it("inserts null", () => {
       const mgr = new InsertManager();
       mgr.into(users);
@@ -172,22 +181,14 @@ describe("Arel", () => {
         `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
       );
     });
+  });
 
-    it("returns empty array before insert", () => {
-      const manager = new InsertManager();
-      expect(manager.columns).toEqual([]);
-    });
+  it("returns empty array before insert", () => {
+    const manager = new InsertManager();
+    expect(manager.columns).toEqual([]);
+  });
 
-    it("combines columns and values list in order", () => {
-      const manager = new InsertManager();
-      manager.into(users);
-      manager.insert([
-        [users.attr("name"), "Alice"],
-        [users.attr("email"), "alice@example.com"],
-      ]);
-      expect(manager.columns.length).toBe(2);
-    });
-
+  describe("insert", () => {
     it("inserts false", () => {
       const mgr = new InsertManager();
       mgr.into(users);

@@ -1,17 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "./index.js";
 
-describe("Arel", () => {
+describe("Attributes", () => {
   const users = new Table("users");
+  it("responds to lower", () => {
+    const name = users.get("name");
+    const fn = name.lower();
+    expect(fn).toBeInstanceOf(Nodes.NamedFunction);
+    expect(fn.name).toBe("LOWER");
+  });
 
-  describe("attributes", () => {
-    it("responds to lower", () => {
-      const name = users.get("name");
-      const fn = name.lower();
-      expect(fn).toBeInstanceOf(Nodes.NamedFunction);
-      expect(fn.name).toBe("LOWER");
-    });
-
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
       const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);

@@ -1,22 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
+describe("Arel::Nodes::CountTest", () => {
   const users = new Table("users");
-
-  describe("count", () => {
+  describe("as", () => {
     it("should alias the count", () => {
       const count = users.get("id").count();
       const aliased = count.as("user_count");
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(aliased)).toBe('COUNT("users"."id") AS user_count');
     });
+  });
 
+  describe("eq", () => {
     it("should compare the count", () => {
       const count = users.get("id").count();
       expect(count.name).toBe("COUNT");
     });
+  });
 
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const rel = users.project(users.get("id")).ast;
       const a = new Nodes.Cte("cte", rel);

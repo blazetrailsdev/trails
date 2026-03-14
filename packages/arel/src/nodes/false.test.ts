@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
-describe("Arel", () => {
-  describe("false", () => {
+describe("False", () => {
+  describe("equality", () => {
     it("is equal to other false nodes", () => {
       const a = new Nodes.False();
       const b = new Nodes.False();

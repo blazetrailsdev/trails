@@ -1,32 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { Table, sql, star, SelectManager, Nodes, Visitors } from "./index.js";
 
-describe("Arel", () => {
+describe("TableTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
+  it("should create join nodes", () => {
+    const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
+    expect(join).toBeInstanceOf(Nodes.InnerJoin);
+  });
 
-  describe("table", () => {
-    it("should create join nodes", () => {
-      const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(join).toBeInstanceOf(Nodes.InnerJoin);
-    });
+  it("should create join nodes with a klass", () => {
+    const join = users.createJoin(posts);
+    expect(join).toBeInstanceOf(Nodes.InnerJoin);
+  });
 
-    it("should create join nodes with a klass", () => {
-      const join = users.createJoin(posts);
-      expect(join).toBeInstanceOf(Nodes.InnerJoin);
-    });
-
+  describe("skip", () => {
     it("should add an offset", () => {
       const mgr = users.project(star);
       mgr.skip(10);
       expect(mgr.toSql()).toContain("OFFSET 10");
     });
+  });
 
+  describe("having", () => {
     it("adds a having clause", () => {
       const mgr = users.having(sql("COUNT(*) > 1")).project(star);
       expect(mgr.toSql()).toContain("HAVING");
     });
+  });
 
+  describe("backwards compat", () => {
     it("noops on nil", () => {
       const mgr = new SelectManager(users);
       mgr.where(users.get("id").eq(1));
@@ -49,12 +52,16 @@ describe("Arel", () => {
       const mgr = users.outerJoin(posts);
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
+  describe("group", () => {
     it("should create a group", () => {
       const mgr = users.group(users.get("age")).project(star);
       expect(mgr.toSql()).toContain("GROUP BY");
     });
+  });
 
+  describe("new", () => {
     it("should accept a hash", () => {
       // Table where accepts node conditions
       const mgr = users.where(users.get("id").eq(1));
@@ -78,17 +85,23 @@ describe("Arel", () => {
       const result = mgr.toSql();
       expect(result).toContain('"users"."id"');
     });
+  });
 
+  describe("order", () => {
     it("should take an order", () => {
       const mgr = users.order(users.get("name").asc()).project(star);
       expect(mgr.toSql()).toContain("ORDER BY");
     });
+  });
 
+  describe("take", () => {
     it("should add a limit", () => {
       const mgr = users.take(10).project(star);
       expect(mgr.toSql()).toContain("LIMIT 10");
     });
+  });
 
+  describe("project", () => {
     it("can project", () => {
       const mgr = users.project(users.get("name"));
       expect(mgr.toSql()).toContain('"name"');
@@ -99,19 +112,25 @@ describe("Arel", () => {
       expect(mgr.toSql()).toContain('"name"');
       expect(mgr.toSql()).toContain('"email"');
     });
+  });
 
+  describe("where", () => {
     it("returns a tree manager", () => {
       const mgr = users.project(star);
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
+  describe("[]", () => {
     it("manufactures an attribute if the symbol names an attribute within the relation", () => {
       const attr = users.get("id");
       expect(attr).toBeInstanceOf(Nodes.Attribute);
       expect(attr.name).toBe("id");
       expect(attr.relation).toBe(users);
     });
+  });
 
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const a = new Nodes.And([users.get("id").eq(1)]);
       const b = new Nodes.And([users.get("id").eq(1)]);
@@ -123,93 +142,81 @@ describe("Arel", () => {
       const b = users.get("email");
       expect(a.name).not.toBe(b.name);
     });
+  });
 
-    it("has a name", () => {
-      expect(users.name).toBe("users");
-    });
+  it("has a name", () => {
+    expect(users.name).toBe("users");
+  });
 
-    it("manufactures an Attribute via attr()", () => {
-      expect(users.attr("email").name).toBe("email");
-    });
+  it("manufactures an Attribute via attr()", () => {
+    expect(users.attr("email").name).toBe("email");
+  });
 
-    it("accepts :as option for table alias", () => {
-      const aliased = new Table("users", { as: "u" });
-      expect(aliased.tableAlias).toBe("u");
-    });
+  it("accepts :as option for table alias", () => {
+    const aliased = new Table("users", { as: "u" });
+    expect(aliased.tableAlias).toBe("u");
+  });
 
-    it("star returns table.*", () => {
-      expect(users.star.value).toBe('"users".*');
-    });
+  it("star returns table.*", () => {
+    expect(users.star.value).toBe('"users".*');
+  });
 
-    it("alias references use the alias in SQL", () => {
-      const u = new Table("users", { as: "u" });
-      const result = u.project(u.get("name")).toSql();
-      expect(result).toBe('SELECT "u"."name" FROM "users" "u"');
-    });
+  it("alias references use the alias in SQL", () => {
+    const u = new Table("users", { as: "u" });
+    const result = u.project(u.get("name")).toSql();
+    expect(result).toBe('SELECT "u"."name" FROM "users" "u"');
+  });
 
-    it("returns a SelectManager with the table as source", () => {
-      const mgr = users.from();
-      expect(mgr).toBeInstanceOf(SelectManager);
-      mgr.project(star);
-      expect(mgr.toSql()).toBe('SELECT * FROM "users"');
-    });
+  it("returns a SelectManager with the table as source", () => {
+    const mgr = users.from();
+    expect(mgr).toBeInstanceOf(SelectManager);
+    mgr.project(star);
+    expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+  });
 
-    it("alias() defaults name to table_2", () => {
-      const aliased = users.alias();
-      expect(aliased.name).toBe("users_2");
-    });
+  it("alias() defaults name to table_2", () => {
+    const aliased = users.alias();
+    expect(aliased.name).toBe("users_2");
+  });
 
-    it("createTableAlias() creates a TableAlias node", () => {
-      const alias = users.createTableAlias(users, "u");
-      expect(alias).toBeInstanceOf(Nodes.TableAlias);
-      expect(alias.name).toBe("u");
-    });
+  it("createTableAlias() creates a TableAlias node", () => {
+    const alias = users.createTableAlias(users, "u");
+    expect(alias).toBeInstanceOf(Nodes.TableAlias);
+    expect(alias.name).toBe("u");
+  });
 
-    it("should create a node that proxies to a table (alias)", () => {
-      const aliased = users.alias("u");
-      expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect(aliased.name).toBe("u");
-    });
+  it("should create a node that proxies to a table (alias)", () => {
+    const aliased = users.alias("u");
+    expect(aliased).toBeInstanceOf(Nodes.TableAlias);
+    expect(aliased.name).toBe("u");
+  });
 
-    it("should accept a hash (constructor options)", () => {
-      const t = new Table("users", { as: "u" });
-      expect(t.tableAlias).toBe("u");
-    });
+  it("should accept a hash (constructor options)", () => {
+    const t = new Table("users", { as: "u" });
+    expect(t.tableAlias).toBe("u");
+  });
 
+  describe("where", () => {
     it("returns a tree manager", () => {
       const mgr = users.project(star);
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
-    it("manufactures an attribute", () => {
-      const attr = users.get("id");
-      expect(attr).toBeInstanceOf(Nodes.Attribute);
-      expect(attr.name).toBe("id");
-      expect(attr.relation).toBe(users);
-    });
+  it("manufactures an attribute", () => {
+    const attr = users.get("id");
+    expect(attr).toBeInstanceOf(Nodes.Attribute);
+    expect(attr.name).toBe("id");
+    expect(attr.relation).toBe(users);
+  });
 
-    it("is equal with equal ivars (same name)", () => {
-      const a = new Table("users");
-      const b = new Table("users");
-      expect(a.name).toBe(b.name);
-    });
+  it("is equal with equal ivars (same name)", () => {
+    const a = new Table("users");
+    const b = new Table("users");
+    expect(a.name).toBe(b.name);
+  });
 
-    it("should accept a hash (constructor options)", () => {
-      const t = new Table("users", { as: "u" });
-      expect(t.tableAlias).toBe("u");
-    });
-
-    it("returns a tree manager", () => {
-      const mgr = users.from();
-      expect(mgr).toBeInstanceOf(SelectManager);
-    });
-
-    it("manufactures an attribute", () => {
-      const attr = users.get("id");
-      expect(attr).toBeInstanceOf(Nodes.Attribute);
-      expect(attr.name).toBe("id");
-    });
-
+  describe("alias", () => {
     it("should create a node that proxies to a table", () => {
       const aliased = users.as("u");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
@@ -217,10 +224,10 @@ describe("Arel", () => {
       const sql = new Visitors.ToSql().compile(aliased.get("id"));
       expect(sql).toBe('"u"."id"');
     });
+  });
 
-    it("should have a name", () => {
-      const t = new Table("widgets");
-      expect(t.name).toBe("widgets");
-    });
+  it("should have a name", () => {
+    const t = new Table("widgets");
+    expect(t.name).toBe("widgets");
   });
 });

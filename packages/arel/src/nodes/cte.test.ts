@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "../index.js";
 
-describe("Arel", () => {
+describe("Cte", () => {
   const users = new Table("users");
-
-  describe("cte", () => {
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const c1 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
       const c2 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
@@ -19,13 +18,17 @@ describe("Arel", () => {
       const b = new Nodes.Cte("cte2", rel);
       expect(a.name).not.toBe(b.name);
     });
+  });
 
+  describe("#to_cte", () => {
     it("returns self", () => {
       const rel = users.project(users.get("id")).ast;
       const cte = new Nodes.Cte("cte", rel);
       expect(cte).toBeInstanceOf(Nodes.Cte);
     });
+  });
 
+  describe("#to_table", () => {
     it("returns an Arel::Table using the Cte's name", () => {
       const rel = users.project(users.get("id")).ast;
       const cte = new Nodes.Cte("cte_table", rel);

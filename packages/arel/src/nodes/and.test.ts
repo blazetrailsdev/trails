@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
-  describe("and", () => {
+describe("And", () => {
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const s1 = new Nodes.DeleteStatement();
       const s2 = new Nodes.DeleteStatement();
@@ -15,7 +15,9 @@ describe("Arel", () => {
       const b = new Table("posts");
       expect(a.name).not.toBe(b.name);
     });
+  });
 
+  describe("functions as node expression", () => {
     it("allows aliasing", () => {
       const caseNode = new Nodes.Case()
         .when(new Nodes.SqlLiteral("1 = 1"), new Nodes.SqlLiteral("'yes'"))

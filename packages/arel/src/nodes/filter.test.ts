@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
+describe("FilterTest", () => {
   const users = new Table("users");
-
-  describe("filter", () => {
+  describe("Filter", () => {
     it("should add filter to expression", () => {
       const count = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const filter = new Nodes.Filter(count, users.get("active").eq(true));

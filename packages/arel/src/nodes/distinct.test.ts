@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
-describe("Arel", () => {
-  describe("distinct", () => {
+describe("Distinct", () => {
+  describe("equality", () => {
     it("is equal to other distinct nodes", () => {
       const a = new Nodes.Distinct();
       const b = new Nodes.Distinct();

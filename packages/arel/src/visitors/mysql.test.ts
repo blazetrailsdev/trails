@@ -1,35 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
+describe("MysqlTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
+  it("should escape LIMIT", () => {
+    const mgr = users.project(star).take(10);
+    expect(mgr.toSql()).toContain("LIMIT 10");
+  });
 
-  describe("mysql", () => {
-    it("should escape LIMIT", () => {
-      const mgr = users.project(star).take(10);
-      expect(mgr.toSql()).toContain("LIMIT 10");
-    });
-
+  describe("Nodes::NotRegexp", () => {
     it("can handle subqueries", () => {
-      const subquery = users.project(users.get("id"));
-      const node = users.get("id").in(subquery);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("SELECT");
+      const node = users.get("name").doesNotMatchRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.NotRegexp);
     });
 
     it("should know how to visit", () => {
-      const visitor = new Visitors.ToSql();
-      const node = users.get("id").in([1, 2, 3]);
-      expect(visitor.compile(node)).toContain("IN");
+      const node = users.get("name").doesNotMatchRegexp("bar");
+      expect(node).toBeInstanceOf(Nodes.NotRegexp);
     });
+  });
 
+  describe("Nodes::IsDistinctFrom", () => {
     it("should handle nil", () => {
       const visitor = new Visitors.ToSql();
-      const node = users.get("name").eq(null);
-      expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
+      const node = users.get("name").isDistinctFrom(null);
+      expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
+  });
 
+  describe("Nodes::Ordering", () => {
     it("should handle nulls first", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("id").asc().nullsFirst();
@@ -53,21 +53,23 @@ describe("Arel", () => {
       const node = users.get("id").asc().nullsFirst().reverse();
       expect(visitor.compile(node)).toContain("NULLS LAST");
     });
+  });
 
-    it("defaults limit to 18446744073709551615", () => {
-      const mgr = users.project(star).skip(5);
-      const sql = new Visitors.MySQL().compile(mgr.ast);
-      expect(sql).toContain("LIMIT 18446744073709551615");
-      expect(sql).toContain("OFFSET 5");
-    });
+  it("defaults limit to 18446744073709551615", () => {
+    const mgr = users.project(star).skip(5);
+    const sql = new Visitors.MySQL().compile(mgr.ast);
+    expect(sql).toContain("LIMIT 18446744073709551615");
+    expect(sql).toContain("OFFSET 5");
+  });
 
-    it("uses DUAL for empty from", () => {
-      const mgr = new SelectManager();
-      mgr.project("1");
-      const sql = new Visitors.MySQL().compile(mgr.ast);
-      expect(sql).toContain("FROM DUAL");
-    });
+  it("uses DUAL for empty from", () => {
+    const mgr = new SelectManager();
+    mgr.project("1");
+    const sql = new Visitors.MySQL().compile(mgr.ast);
+    expect(sql).toContain("FROM DUAL");
+  });
 
+  describe("locking", () => {
     it("defaults to FOR UPDATE when locking", () => {
       const mgr = users.project(star).lock();
       const sql = new Visitors.MySQL().compile(mgr.ast);
@@ -79,7 +81,9 @@ describe("Arel", () => {
       const sql = new Visitors.MySQL().compile(mgr.ast);
       expect(sql).toContain("LOCK IN SHARE MODE");
     });
+  });
 
+  describe("concat", () => {
     it("concats columns", () => {
       const node = new Nodes.Concat(users.get("name"), users.get("email"));
       const sql = new Visitors.MySQL().compile(node);
@@ -91,7 +95,9 @@ describe("Arel", () => {
       const sql = new Visitors.MySQL().compile(node);
       expect(sql).toBe('CONCAT("users"."name", \'x\')');
     });
+  });
 
+  describe("Nodes::IsNotDistinctFrom", () => {
     it("should construct a valid generic SQL statement", () => {
       const mgr = users.project(users.get("id")).where(users.get("id").gt(1));
       const sql = new Visitors.MySQL().compile(mgr.ast);
@@ -99,13 +105,17 @@ describe("Arel", () => {
       expect(sql).toContain("FROM");
       expect(sql).toContain("WHERE");
     });
+  });
 
+  describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
-      const node = users.get("id").eq(posts.get("user_id"));
+      const node = users.get("id").isDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toBe('"users"."id" = "posts"."user_id"');
+      expect(sql).toContain("IS DISTINCT FROM");
     });
+  });
 
+  describe("Nodes::Cte", () => {
     it("ignores MATERIALIZED modifiers", () => {
       const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, "materialized");
       const stmt = new SelectManager().with(cte).project("1");

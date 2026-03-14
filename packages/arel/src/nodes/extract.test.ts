@@ -1,18 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
 
-describe("Arel", () => {
+describe("Arel::Nodes::ExtractTest", () => {
   const users = new Table("users");
+  it("should extract field", () => {
+    const createdAt = users.get("created_at");
+    const node = new Nodes.Extract(createdAt, "YEAR");
+    const visitor = new Visitors.ToSql();
+    const sql = visitor.compile(node);
+    expect(sql).toBe('EXTRACT(YEAR FROM "users"."created_at")');
+  });
 
-  describe("extract", () => {
-    it("should extract field", () => {
-      const createdAt = users.get("created_at");
-      const node = new Nodes.Extract(createdAt, "YEAR");
-      const visitor = new Visitors.ToSql();
-      const sql = visitor.compile(node);
-      expect(sql).toBe('EXTRACT(YEAR FROM "users"."created_at")');
-    });
-
+  describe("as", () => {
     it("should alias the extract", () => {
       const createdAt = users.get("created_at");
       const node = new Nodes.Extract(createdAt, "MONTH").as("birth_month");
@@ -28,7 +27,9 @@ describe("Arel", () => {
       expect(original).toBeInstanceOf(Nodes.Extract);
       expect(aliased).toBeInstanceOf(Nodes.As);
     });
+  });
 
+  describe("equality", () => {
     it("is equal with equal ivars", () => {
       const a = new Nodes.TableAlias(users, "u");
       const b = new Nodes.TableAlias(users, "u");

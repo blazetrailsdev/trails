@@ -10,17 +10,16 @@ import {
   Visitors,
 } from "./index.js";
 
-describe("Arel", () => {
+describe("SelectManagerTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
   const visitor = new Visitors.ToSql();
+  it("join sources", () => {
+    const mgr = users.project(star);
+    expect(mgr.joinSources).toEqual([]);
+  });
 
-  describe("select-manager", () => {
-    it("join sources", () => {
-      const mgr = users.project(star);
-      expect(mgr.joinSources).toEqual([]);
-    });
-
+  describe("backwards compatibility", () => {
     it("accepts symbols as sql literals", () => {
       const mgr = new SelectManager(users);
       mgr.project("id");
@@ -111,7 +110,9 @@ describe("Arel", () => {
       expect(sql).toContain("foo");
       expect(sql).toContain("bar");
     });
+  });
 
+  describe("clone", () => {
     it("creates new cores", () => {
       const mgr = new SelectManager(users);
       expect(mgr.ast.cores.length).toBe(1);
@@ -125,7 +126,9 @@ describe("Arel", () => {
       expect(sql).toContain("WHERE");
       expect(sql).toContain("*");
     });
+  });
 
+  describe("initialize", () => {
     it("uses alias in sql", () => {
       const aliased = users.alias("u");
       const mgr = new SelectManager();
@@ -133,7 +136,9 @@ describe("Arel", () => {
       mgr.project(new Nodes.SqlLiteral("*"));
       expect(mgr.toSql()).toContain('"u"');
     });
+  });
 
+  describe("offset", () => {
     it("should add an offset", () => {
       const mgr = users.project(star).skip(5);
       expect(mgr.toSql()).toContain("OFFSET 5");
@@ -156,7 +161,9 @@ describe("Arel", () => {
       const mgr = users.project(star).skip(5);
       expect(mgr.offset).not.toBeNull();
     });
+  });
 
+  describe("exists", () => {
     it("should create an exists clause", () => {
       const mgr = users.project(star).where(users.get("age").gt(21));
       const exists = mgr.exists();
@@ -169,7 +176,9 @@ describe("Arel", () => {
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect(aliased.name).toBe("sub");
     });
+  });
 
+  describe("union", () => {
     it("should union two managers", () => {
       const q1 = users.project(users.get("name")).where(users.get("age").gt(21));
       const q2 = users.project(users.get("name")).where(users.get("age").lt(18));
@@ -185,21 +194,27 @@ describe("Arel", () => {
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(q1.unionAll(q2))).toContain("UNION ALL");
     });
+  });
 
+  describe("intersect", () => {
     it("should intersect two managers", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(q1.intersect(q2))).toContain("INTERSECT");
     });
+  });
 
+  describe("except", () => {
     it("should except two managers", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(q1.except(q2))).toContain("EXCEPT");
     });
+  });
 
+  describe("with", () => {
     it("should support basic WITH", () => {
       const cte = users.project(users.get("name")).where(users.get("age").gt(21));
       const alias = new Nodes.TableAlias(cte.ast, "adults");
@@ -221,43 +236,59 @@ describe("Arel", () => {
       main.project(sql("*"));
       expect(main.toSql()).toContain("WITH RECURSIVE");
     });
+  });
 
+  describe("ast", () => {
     it("should return the ast", () => {
       const mgr = users.project(star);
       expect(mgr.ast).toBeInstanceOf(Nodes.SelectStatement);
     });
+  });
 
+  describe("taken", () => {
     it("should return limit", () => {
       const mgr = users.project(star).take(10);
       expect(mgr.limit).not.toBeNull();
     });
+  });
 
+  describe("lock", () => {
     it("adds a lock node", () => {
       const mgr = users.project(star).lock();
       expect(mgr.toSql()).toContain("FOR UPDATE");
     });
+  });
 
+  describe("orders", () => {
     it("returns order clauses", () => {
       const mgr = users.project(star).order(users.get("name").asc());
       expect(mgr.orders.length).toBe(1);
     });
+  });
 
+  describe("order", () => {
     it("generates order clauses", () => {
       const mgr = users.project(star).order(users.get("name").asc());
       expect(mgr.toSql()).toContain("ORDER BY");
     });
+  });
 
+  describe("comment", () => {
     it("chains", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
     });
+  });
 
+  describe("order", () => {
     it("has order attributes", () => {
       const mgr = users.project(star).order(users.get("name").asc());
       expect(mgr.orders[0]).toBeInstanceOf(Nodes.Ascending);
     });
+  });
 
+  describe("on", () => {
     it("takes two params", () => {
       const mgr = new SelectManager(users);
       mgr.project(users.get("id"), users.get("name"));
@@ -274,59 +305,71 @@ describe("Arel", () => {
       expect(sql).toContain('"name"');
       expect(sql).toContain('"email"');
     });
+  });
 
-    it("should hand back froms", () => {
-      const mgr = users.project(star);
-      expect(mgr.froms.length).toBe(1);
-    });
+  it("should hand back froms", () => {
+    const mgr = users.project(star);
+    expect(mgr.froms.length).toBe(1);
+  });
 
-    it("should create and nodes", () => {
-      const mgr = new SelectManager(users);
-      const and = mgr.createAnd([users.get("id").eq(1), users.get("name").eq("dean")]);
-      expect(and).toBeInstanceOf(Nodes.And);
-    });
+  it("should create and nodes", () => {
+    const mgr = new SelectManager(users);
+    const and = mgr.createAnd([users.get("id").eq(1), users.get("name").eq("dean")]);
+    expect(and).toBeInstanceOf(Nodes.And);
+  });
 
-    it("should create insert managers", () => {
-      const mgr = new SelectManager(users);
-      const insert = mgr.createInsert();
-      expect(insert).toBeInstanceOf(InsertManager);
-    });
+  it("should create insert managers", () => {
+    const mgr = new SelectManager(users);
+    const insert = mgr.createInsert();
+    expect(insert).toBeInstanceOf(InsertManager);
+  });
 
-    it("should create join nodes", () => {
-      const mgr = new SelectManager(users);
-      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(join).toBeInstanceOf(Nodes.InnerJoin);
-    });
+  it("should create join nodes", () => {
+    const mgr = new SelectManager(users);
+    const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")));
+    expect(join).toBeInstanceOf(Nodes.InnerJoin);
+  });
 
+  describe("outer join", () => {
     it("responds to join", () => {
       const mgr = users.project(star);
       expect(mgr).toHaveProperty("join");
     });
+  });
 
+  describe("join", () => {
     it("takes a class", () => {
       // In Rails, SelectManager can take a class. We take a Table.
       const mgr = new SelectManager(users);
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
+  describe("outer join", () => {
     it("noops on nil", () => {
       // Table.join with a null-like argument - the manager still works
       const mgr = users.from();
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
+  describe("join", () => {
     it("raises EmptyJoinError on empty", () => {
       // Joining with empty string
       const mgr = users.join("");
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
+  describe("outer join", () => {
     it("noops on nil", () => {
       // Creating a SelectManager with no table
       const mgr = new SelectManager(null);
       expect(mgr).toBeInstanceOf(SelectManager);
     });
+  });
 
+  describe("joins", () => {
     it("returns inner join sql", () => {
       const mgr = users
         .project(users.get("name"), posts.get("title"))
@@ -366,18 +409,24 @@ describe("Arel", () => {
       );
       expect(mgr.toSql()).toContain('JOIN "posts"');
     });
+  });
 
+  describe("comment", () => {
     it("chains", () => {
       const mgr = users.project(star);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
     });
+  });
 
+  describe("project", () => {
     it("takes multiple args", () => {
       const mgr = users.project(users.get("id"), users.get("name"));
       expect(mgr.toSql()).toContain('"users"."id"');
       expect(mgr.toSql()).toContain('"users"."name"');
     });
+  });
 
+  describe("window definition", () => {
     it("can be empty", () => {
       const mgr = new SelectManager();
       expect(mgr.toSql()).toBeDefined();
@@ -485,14 +534,18 @@ describe("Arel", () => {
       expect(sql).toContain("ROWS");
       expect(sql).toContain("UNBOUNDED PRECEDING");
     });
+  });
 
+  describe("delete", () => {
     it("copies from", () => {
       const mgr = new SelectManager(users);
       mgr.from(posts);
       const sql = mgr.toSql();
       expect(sql).toContain('"posts"');
     });
+  });
 
+  describe("where_sql", () => {
     it("gives me back the where sql", () => {
       const mgr = users
         .project(star)
@@ -515,7 +568,9 @@ describe("Arel", () => {
       const sql = mgr.toSql();
       expect(sql).toContain("FOR UPDATE");
     });
+  });
 
+  describe("update", () => {
     it("creates an update statement", () => {
       const mgr = users.project(star);
       mgr.where(users.get("id").eq(1));
@@ -552,7 +607,9 @@ describe("Arel", () => {
       expect(result).toContain('"users"."id" = 1');
       expect(result).toContain("AND");
     });
+  });
 
+  describe("project", () => {
     it("takes sql literals", () => {
       const mgr = users.project(new Nodes.SqlLiteral("*"));
       expect(mgr.toSql()).toBe('SELECT * FROM "users"');
@@ -564,76 +621,98 @@ describe("Arel", () => {
       expect(result).toContain("id");
       expect(result).toContain("name");
     });
+  });
 
+  describe("projections", () => {
     it("reads projections", () => {
       const mgr = users.project(users.get("name"), users.get("age"));
       expect(mgr.projections.length).toBe(2);
     });
+  });
 
+  describe("projections=", () => {
     it("overwrites projections", () => {
       const mgr = users.project(users.get("name"));
       mgr.projections = [users.get("age")];
       expect(mgr.projections.length).toBe(1);
       expect(mgr.toSql()).toContain('"age"');
     });
+  });
 
+  describe("comment", () => {
     it("chains", () => {
       const um = new UpdateManager();
       const result = um.table(users);
       expect(result).toBe(um);
     });
+  });
 
+  describe("take", () => {
     it("removes LIMIT when nil is passed", () => {
       const mgr = users.project(star).take(10);
       expect(mgr.toSql()).toContain("LIMIT 10");
     });
+  });
 
+  describe("where", () => {
     it("knows where", () => {
       const mgr = users.project(star).where(users.get("id").eq(1));
       expect(mgr.toSql()).toContain("WHERE");
     });
+  });
 
+  describe("comment", () => {
     it("chains", () => {
       const mgr = new SelectManager(users);
       const result = mgr.project(star);
       expect(result).toBe(mgr);
     });
+  });
 
+  describe("from", () => {
     it("makes sql", () => {
       const mgr = users.project(star);
       expect(mgr.toSql()).toBe('SELECT * FROM "users"');
     });
+  });
 
+  describe("source", () => {
     it("returns the join source of the select core", () => {
       const mgr = users.project(star);
       expect(mgr.source).toBeDefined();
     });
+  });
 
+  describe("distinct_on", () => {
     it("sets the quantifier", () => {
       const mgr = users.project(star);
       mgr.distinct();
       expect(mgr.toSql()).toContain("DISTINCT");
     });
+  });
 
+  describe("comment", () => {
     it("appends a comment to the generated query", () => {
       const mgr = users.project(star).comment("load users");
       expect(mgr.toSql()).toContain("/* load users */");
     });
+  });
 
-    it("chains where + order + limit + offset", () => {
-      expect(
-        users
-          .project(users.get("name"))
-          .where(users.get("age").gt(21))
-          .order(users.get("name").asc())
-          .take(10)
-          .skip(5)
-          .toSql(),
-      ).toBe(
-        'SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC LIMIT 10 OFFSET 5',
-      );
-    });
+  it("chains where + order + limit + offset", () => {
+    expect(
+      users
+        .project(users.get("name"))
+        .where(users.get("age").gt(21))
+        .order(users.get("name").asc())
+        .take(10)
+        .skip(5)
+        .toSql(),
+    ).toBe(
+      'SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC LIMIT 10 OFFSET 5',
+    );
+  });
 
+  describe("joins", () => {
     it("returns inner join sql", () => {
       expect(
         users
@@ -653,97 +732,103 @@ describe("Arel", () => {
           .toSql(),
       ).toBe('SELECT * FROM "users" LEFT OUTER JOIN "posts" ON "users"."id" = "posts"."user_id"');
     });
+  });
 
-    it("group by and having", () => {
-      expect(
-        users
-          .project(users.get("age"), sql("COUNT(*)"))
-          .group(users.get("age"))
-          .having(sql("COUNT(*) > 1"))
-          .toSql(),
-      ).toBe(
-        'SELECT "users"."age", COUNT(*) FROM "users" GROUP BY "users"."age" HAVING COUNT(*) > 1',
-      );
-    });
+  it("group by and having", () => {
+    expect(
+      users
+        .project(users.get("age"), sql("COUNT(*)"))
+        .group(users.get("age"))
+        .having(sql("COUNT(*) > 1"))
+        .toSql(),
+    ).toBe(
+      'SELECT "users"."age", COUNT(*) FROM "users" GROUP BY "users"."age" HAVING COUNT(*) > 1',
+    );
+  });
 
-    it("distinct", () => {
-      expect(users.project(users.get("name")).distinct().toSql()).toBe(
-        'SELECT DISTINCT "users"."name" FROM "users"',
-      );
-    });
+  it("distinct", () => {
+    expect(users.project(users.get("name")).distinct().toSql()).toBe(
+      'SELECT DISTINCT "users"."name" FROM "users"',
+    );
+  });
 
+  describe("lock", () => {
     it("adds a lock node", () => {
       expect(users.project(star).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
     });
+  });
 
-    it("chaining returns the manager", () => {
-      const mgr = users.project(star);
-      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
-      expect(mgr.order(users.get("id").asc())).toBe(mgr);
-      expect(mgr.take(10)).toBe(mgr);
-      expect(mgr.skip(5)).toBe(mgr);
-      expect(mgr.group(users.get("id"))).toBe(mgr);
-    });
+  it("chaining returns the manager", () => {
+    const mgr = users.project(star);
+    expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+    expect(mgr.order(users.get("id").asc())).toBe(mgr);
+    expect(mgr.take(10)).toBe(mgr);
+    expect(mgr.skip(5)).toBe(mgr);
+    expect(mgr.group(users.get("id"))).toBe(mgr);
+  });
 
-    it("rightOuterJoin generates RIGHT OUTER JOIN", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.rightOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
-      expect(mgr.toSql()).toContain('"posts"');
-    });
+  it("rightOuterJoin generates RIGHT OUTER JOIN", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    mgr.rightOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+    expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
+    expect(mgr.toSql()).toContain('"posts"');
+  });
 
-    it("fullOuterJoin generates FULL OUTER JOIN", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.fullOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(mgr.toSql()).toContain("FULL OUTER JOIN");
-    });
+  it("fullOuterJoin generates FULL OUTER JOIN", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    mgr.fullOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+    expect(mgr.toSql()).toContain("FULL OUTER JOIN");
+  });
 
-    it("crossJoin generates CROSS JOIN", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.crossJoin(posts);
-      expect(mgr.toSql()).toContain("CROSS JOIN");
-      expect(mgr.toSql()).toContain('"posts"');
-    });
+  it("crossJoin generates CROSS JOIN", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    mgr.crossJoin(posts);
+    expect(mgr.toSql()).toContain("CROSS JOIN");
+    expect(mgr.toSql()).toContain('"posts"');
+  });
 
-    it("window creates a named window", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      const win = mgr.window("w");
-      win.order(users.get("created_at").asc());
-      // The window should be in core.windows
-      expect(mgr.toSql()).toContain("WINDOW");
-    });
+  it("window creates a named window", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    const win = mgr.window("w");
+    win.order(users.get("created_at").asc());
+    // The window should be in core.windows
+    expect(mgr.toSql()).toContain("WINDOW");
+  });
 
-    it("rightOuterJoin with string table name", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.rightOuterJoin("posts");
-      expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
-    });
+  it("rightOuterJoin with string table name", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    mgr.rightOuterJoin("posts");
+    expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
+  });
 
-    it("fullOuterJoin with string table name", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.fullOuterJoin("posts");
-      expect(mgr.toSql()).toContain("FULL OUTER JOIN");
-    });
+  it("fullOuterJoin with string table name", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    mgr.fullOuterJoin("posts");
+    expect(mgr.toSql()).toContain("FULL OUTER JOIN");
+  });
 
-    it("crossJoin with string table name", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.crossJoin("posts");
-      expect(mgr.toSql()).toContain("CROSS JOIN");
-    });
+  it("crossJoin with string table name", () => {
+    const mgr = new SelectManager(users);
+    mgr.project(star);
+    mgr.crossJoin("posts");
+    expect(mgr.toSql()).toContain("CROSS JOIN");
+  });
 
+  describe("projections", () => {
     it("reads projections", () => {
       const users = new Table("users");
       const manager = users.project(users.attr("name"), users.attr("age"));
       expect(manager.projections.length).toBe(2);
     });
+  });
 
+  describe("projections=", () => {
     it("overwrites projections", () => {
       const users = new Table("users");
       const manager = users.project(users.attr("name"));
@@ -754,7 +839,9 @@ describe("Arel", () => {
       expect(sql).toContain('"age"');
       expect(sql).not.toContain('"name"');
     });
+  });
 
+  describe("where_sql", () => {
     it("gives me back the where sql", () => {
       const users = new Table("users");
       const manager = users
@@ -763,19 +850,23 @@ describe("Arel", () => {
         .where(users.attr("age").gt(18));
       expect(manager.constraints.length).toBe(2);
     });
+  });
 
-    it("should hand back froms", () => {
-      const users = new Table("users");
-      const manager = users.project("*");
-      expect(manager.source).toBeDefined();
-    });
+  it("should hand back froms", () => {
+    const users = new Table("users");
+    const manager = users.project("*");
+    expect(manager.source).toBeDefined();
+  });
 
+  describe("orders", () => {
     it("returns order clauses", () => {
       const users = new Table("users");
       const manager = users.project("*").order(users.attr("name").asc());
       expect(manager.orders.length).toBe(1);
     });
+  });
 
+  describe("exists", () => {
     it("can be aliased", () => {
       const users = new Table("users");
       const subquery = users.project(users.attr("id"));
@@ -783,36 +874,38 @@ describe("Arel", () => {
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect(aliased.name).toBe("sub");
     });
+  });
 
-    it("returns empty array when no joins", () => {
-      const manager = users.project("*");
-      expect(manager.joinSources).toEqual([]);
-    });
+  it("returns empty array when no joins", () => {
+    const manager = users.project("*");
+    expect(manager.joinSources).toEqual([]);
+  });
 
-    it("returns join nodes after join()", () => {
-      const manager = users.project("*").join(posts, users.attr("id").eq(posts.attr("user_id")));
-      expect(manager.joinSources.length).toBe(1);
-      expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
-    });
+  it("returns join nodes after join()", () => {
+    const manager = users.project("*").join(posts, users.attr("id").eq(posts.attr("user_id")));
+    expect(manager.joinSources.length).toBe(1);
+    expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
+  });
 
-    it("returns multiple join nodes", () => {
-      const comments = new Table("comments");
-      const manager = users
-        .project("*")
-        .join(posts, users.attr("id").eq(posts.attr("user_id")))
-        .outerJoin(comments, posts.attr("id").eq(comments.attr("post_id")));
-      expect(manager.joinSources.length).toBe(2);
-      expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
-      expect(manager.joinSources[1]).toBeInstanceOf(Nodes.OuterJoin);
-    });
+  it("returns multiple join nodes", () => {
+    const comments = new Table("comments");
+    const manager = users
+      .project("*")
+      .join(posts, users.attr("id").eq(posts.attr("user_id")))
+      .outerJoin(comments, posts.attr("id").eq(comments.attr("post_id")));
+    expect(manager.joinSources.length).toBe(2);
+    expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
+    expect(manager.joinSources[1]).toBeInstanceOf(Nodes.OuterJoin);
+  });
 
-    it("returns the FROM source", () => {
-      const manager = users.project("*");
-      const froms = manager.froms;
-      expect(froms.length).toBe(1);
-      expect(froms[0]).toBe(users);
-    });
+  it("returns the FROM source", () => {
+    const manager = users.project("*");
+    const froms = manager.froms;
+    expect(froms.length).toBe(1);
+    expect(froms[0]).toBe(users);
+  });
 
+  describe("window definition", () => {
     it("takes a range frame, current row", () => {
       const mgr = new SelectManager(users);
       mgr.project(users.get("id"));
@@ -822,51 +915,57 @@ describe("Arel", () => {
       expect(sql).toContain("RANGE");
       expect(sql).toContain("CURRENT ROW");
     });
+  });
 
-    it("should take an order", () => {
-      const mgr = users.order(users.get("name").asc()).project(star);
-      expect(mgr.toSql()).toContain("ORDER BY");
-    });
+  it("should take an order", () => {
+    const mgr = users.order(users.get("name").asc()).project(star);
+    expect(mgr.toSql()).toContain("ORDER BY");
+  });
 
+  describe("skip", () => {
     it("should chain", () => {
       const mgr = new SelectManager(users);
       expect(mgr.project(star)).toBe(mgr);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
       expect(mgr.order(users.get("id").asc())).toBe(mgr);
     });
+  });
 
+  describe("order", () => {
     it("takes *args", () => {
       const mgr = users.project(star).order(users.get("id").asc(), users.get("name").desc());
       expect(mgr.orders.length).toBe(2);
       expect(mgr.toSql()).toContain("ORDER BY");
     });
+  });
 
-    it("should create join nodes with a full outer join klass", () => {
-      const mgr = new SelectManager(users);
-      const join = mgr.createJoin(
-        posts,
-        users.get("id").eq(posts.get("user_id")),
-        Nodes.FullOuterJoin,
-      );
-      expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
-    });
+  it("should create join nodes with a full outer join klass", () => {
+    const mgr = new SelectManager(users);
+    const join = mgr.createJoin(
+      posts,
+      users.get("id").eq(posts.get("user_id")),
+      Nodes.FullOuterJoin,
+    );
+    expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
+  });
 
-    it("should create join nodes with an outer join klass", () => {
-      const mgr = new SelectManager(users);
-      const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.OuterJoin);
-      expect(join).toBeInstanceOf(Nodes.OuterJoin);
-    });
+  it("should create join nodes with an outer join klass", () => {
+    const mgr = new SelectManager(users);
+    const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.OuterJoin);
+    expect(join).toBeInstanceOf(Nodes.OuterJoin);
+  });
 
-    it("should create join nodes with a right outer join klass", () => {
-      const mgr = new SelectManager(users);
-      const join = mgr.createJoin(
-        posts,
-        users.get("id").eq(posts.get("user_id")),
-        Nodes.RightOuterJoin,
-      );
-      expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
-    });
+  it("should create join nodes with a right outer join klass", () => {
+    const mgr = new SelectManager(users);
+    const join = mgr.createJoin(
+      posts,
+      users.get("id").eq(posts.get("user_id")),
+      Nodes.RightOuterJoin,
+    );
+    expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
+  });
 
+  describe("join", () => {
     it("takes the full outer join class", () => {
       const mgr = users
         .project(star)
@@ -882,7 +981,9 @@ describe("Arel", () => {
       expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.RightOuterJoin);
       expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
     });
+  });
 
+  describe("group", () => {
     it("takes an attribute", () => {
       const mgr = new SelectManager(users);
       mgr.project(users.get("id").over(mgr.window("w")));
@@ -896,7 +997,9 @@ describe("Arel", () => {
       expect(mgr.froms[0]).toBeInstanceOf(Nodes.SqlLiteral);
       expect(mgr.toSql()).toContain("FROM users");
     });
+  });
 
+  describe("window definition", () => {
     it("takes an order", () => {
       const mgr = new SelectManager(users);
       mgr.project(users.get("id").over(mgr.window("w").order(users.get("id").asc())));
@@ -940,7 +1043,9 @@ describe("Arel", () => {
       expect(sql).toContain("RANGE");
       expect(sql).toContain("UNBOUNDED FOLLOWING");
     });
+  });
 
+  describe("delete", () => {
     it("copies where", () => {
       const mgr = new SelectManager(users);
       mgr.project(star).where(users.get("id").eq(1)).where(users.get("name").eq("Alice"));
@@ -949,12 +1054,16 @@ describe("Arel", () => {
       expect(whereSql).toContain("AND");
       expect(mgr.constraints.length).toBe(2);
     });
+  });
 
+  describe("where_sql", () => {
     it("returns nil when there are no wheres", () => {
       const mgr = new SelectManager(users).project(star);
       expect(mgr.whereSql()).toBeNull();
     });
+  });
 
+  describe("take", () => {
     it("knows take", () => {
       const mgr = new SelectManager(users).project(star).take(5);
       expect(mgr.limit).toBeInstanceOf(Nodes.Limit);
