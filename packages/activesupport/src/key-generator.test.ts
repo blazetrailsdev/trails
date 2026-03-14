@@ -218,21 +218,21 @@ describe("BacktraceCleanerFilterAndSilencerTest", () => {
 });
 
 describe("KeyGeneratorTest", () => {
-  it.skip("Generating a key of the default length", () => {});
-  it.skip("Generating a key of an alternative length", () => {});
-  it.skip("Expected results", () => {});
-  it.skip("With custom hash digest class", () => {});
-  it.skip("Raises if given a non digest instance", () => {});
-  it.skip("inspect does not show secrets", () => {});
+  it.skip("Generating a key of the default length");
+  it.skip("Generating a key of an alternative length");
+  it.skip("Expected results");
+  it.skip("With custom hash digest class");
+  it.skip("Raises if given a non digest instance");
+  it.skip("inspect does not show secrets");
 });
 
 describe("SecureRandomTest", () => {
-  it.skip("base58", () => {});
-  it.skip("base58 with length", () => {});
-  it.skip("base58 with nil", () => {});
-  it.skip("base36", () => {});
-  it.skip("base36 with length", () => {});
-  it.skip("base36 with nil", () => {});
+  it.skip("base58");
+  it.skip("base58 with length");
+  it.skip("base58 with nil");
+  it.skip("base36");
+  it.skip("base36 with length");
+  it.skip("base36 with nil");
 });
 
 describe("CachingKeyGeneratorTest", () => {

@@ -105,21 +105,21 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCFullYear()).toBe(2036);
   });
 
-  it.skip("time helper travel to with time zone", () => {});
-  it.skip("time helper travel to with different system and application time zones", () => {});
-  it.skip("time helper travel to with string for time zone", () => {});
-  it.skip("time helper travel to with string and milliseconds", () => {});
-  it.skip("time helper travel to with separate class", () => {});
-  it.skip("time helper travel to with usec", () => {});
-  it.skip("time helper with usec true", () => {});
-  it.skip("time helper travel to with datetime and usec", () => {});
-  it.skip("time helper travel to with datetime and usec true", () => {});
-  it.skip("time helper travel to with string and usec", () => {});
-  it.skip("time helper travel to with string and usec true", () => {});
-  it.skip("time helper freeze time with usec true", () => {});
-  it.skip("time helper travel with subsequent block", () => {});
-  it.skip("travel to will reset the usec to avoid mysql rounding", () => {});
-  it.skip("time helper travel with time subclass", () => {});
+  it.skip("time helper travel to with time zone");
+  it.skip("time helper travel to with different system and application time zones");
+  it.skip("time helper travel to with string for time zone");
+  it.skip("time helper travel to with string and milliseconds");
+  it.skip("time helper travel to with separate class");
+  it.skip("time helper travel to with usec");
+  it.skip("time helper with usec true");
+  it.skip("time helper travel to with datetime and usec");
+  it.skip("time helper travel to with datetime and usec true");
+  it.skip("time helper travel to with string and usec");
+  it.skip("time helper travel to with string and usec true");
+  it.skip("time helper freeze time with usec true");
+  it.skip("time helper travel with subsequent block");
+  it.skip("travel to will reset the usec to avoid mysql rounding");
+  it.skip("time helper travel with time subclass");
 });
 
 describe("MethodCallAssertionsTest", () => {
@@ -315,9 +315,9 @@ describe("MethodCallAssertionsTest", () => {
     }).toThrow();
   });
 
-  it.skip("assert called on instance of nesting", () => {});
-  it.skip("assert not called on instance of nesting", () => {});
-  it.skip("stub any instance", () => {});
-  it.skip("stub any instance with instance", () => {});
-  it.skip("assert changes when assertions are included", () => {});
+  it.skip("assert called on instance of nesting");
+  it.skip("assert not called on instance of nesting");
+  it.skip("stub any instance");
+  it.skip("stub any instance with instance");
+  it.skip("assert changes when assertions are included");
 });

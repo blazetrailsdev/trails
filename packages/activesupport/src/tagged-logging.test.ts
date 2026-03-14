@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { Logger, BroadcastLogger, taggedLogging } from "./logger.js";
 
 describe("TaggedLoggingWithoutBlockTest", () => {
-  it.skip("shares tags across threads", () => {});
-  it.skip("keeps formatter singleton class methods", () => {});
-  it.skip("accepts non-String objects", () => {});
+  it.skip("shares tags across threads");
+  it.skip("keeps formatter singleton class methods");
+  it.skip("accepts non-String objects");
 });
 
 describe("TaggedLoggingTest", () => {

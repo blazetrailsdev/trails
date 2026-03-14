@@ -24,7 +24,7 @@ describe("InstrumenterTest", () => {
     Notifications.subscribe("foo", (e) => {
       received = e.payload;
     });
-    Notifications.instrument("foo", { key: "original" }, () => {});
+    Notifications.instrument("foo", { key: "original" });
     expect(received.key).toBe("original");
   });
 
@@ -39,28 +39,28 @@ describe("InstrumenterTest", () => {
   it("start", () => {
     const events: Event[] = [];
     Notifications.subscribe("start.test", (e) => events.push(e));
-    Notifications.instrument("start.test", { phase: "start" }, () => {});
+    Notifications.instrument("start.test", { phase: "start" });
     expect(events[0].payload.phase).toBe("start");
   });
 
   it("finish", () => {
     const events: Event[] = [];
     Notifications.subscribe("finish.test", (e) => events.push(e));
-    Notifications.instrument("finish.test", {}, () => {});
+    Notifications.instrument("finish.test", {});
     expect(events[0].end).toBeInstanceOf(Date);
   });
 
   it("record", () => {
     const events: Event[] = [];
     Notifications.subscribe("record.test", (e) => events.push(e));
-    Notifications.instrument("record.test", { data: "value" }, () => {});
+    Notifications.instrument("record.test", { data: "value" });
     expect(events[0].payload.data).toBe("value");
   });
 
   it("record yields the payload for further modification", () => {
     const events: Event[] = [];
     Notifications.subscribe("modify.test", (e) => events.push(e));
-    Notifications.instrument("modify.test", { original: true }, () => {});
+    Notifications.instrument("modify.test", { original: true });
     expect(events[0].payload.original).toBe(true);
   });
 
@@ -113,9 +113,9 @@ describe("EventedTest", () => {
     expect(names).toContain("beta");
   });
 
-  it.skip("listen start multiple exception consistency", () => {});
-  it.skip("listen finish multiple exception consistency", () => {});
-  it.skip("evented listener priority", () => {});
+  it.skip("listen start multiple exception consistency");
+  it.skip("listen finish multiple exception consistency");
+  it.skip("evented listener priority");
 
   it("listen to regexp", () => {
     const names: string[] = [];
@@ -125,7 +125,7 @@ describe("EventedTest", () => {
     expect(names).toEqual(["sql.active_record"]);
   });
 
-  it.skip("listen to regexp with exclusions", () => {});
+  it.skip("listen to regexp with exclusions");
 });
 
 describe("SubscribeEventObjectsTest", () => {
@@ -141,7 +141,7 @@ describe("SubscribeEventObjectsTest", () => {
   it("subscribe to events where payload is changed during instrumentation", () => {
     const captured: unknown[] = [];
     Notifications.subscribe("foo", (e) => captured.push(e.payload));
-    Notifications.instrument("foo", { status: "pending" }, () => {});
+    Notifications.instrument("foo", { status: "pending" });
     expect((captured[0] as any).status).toBe("pending");
   });
 
@@ -180,14 +180,14 @@ describe("TimedAndMonotonicTimedSubscriberTest", () => {
   it("subscribe", () => {
     const events: Event[] = [];
     Notifications.subscribe("timed.event", (e) => events.push(e));
-    Notifications.instrument("timed.event", {}, () => {});
+    Notifications.instrument("timed.event", {});
     expect(events[0].duration).toBeGreaterThanOrEqual(0);
   });
 
   it("monotonic subscribe", () => {
     const events: Event[] = [];
     Notifications.subscribe("monotonic.event", (e) => events.push(e));
-    Notifications.instrument("monotonic.event", {}, () => {});
+    Notifications.instrument("monotonic.event", {});
     expect(events[0].duration).toBeGreaterThanOrEqual(0);
   });
 });
@@ -197,7 +197,7 @@ describe("BuildHandleTest", () => {
     const events: Event[] = [];
     Notifications.subscribe("interleaved", (e) => events.push(e));
     Notifications.instrument("interleaved", {}, () => {
-      Notifications.instrument("inner.interleaved", {}, () => {});
+      Notifications.instrument("inner.interleaved", {});
     });
     expect(events.length).toBeGreaterThanOrEqual(1);
   });
@@ -376,7 +376,7 @@ describe("InstrumentationTest", () => {
   it("instrument yields the payload for further modification", () => {
     const events: Event[] = [];
     Notifications.subscribe("modify", (e) => events.push(e));
-    Notifications.instrument("modify", { original: true }, () => {});
+    Notifications.instrument("modify", { original: true });
     expect(events[0].payload.original).toBe(true);
   });
 
@@ -396,7 +396,7 @@ describe("InstrumentationTest", () => {
       outerEvent = e;
     });
     Notifications.instrument("outer", {}, () => {
-      Notifications.instrument("inner", {}, () => {});
+      Notifications.instrument("inner", {});
     });
     expect(outerEvent.children).toHaveLength(1);
     expect(outerEvent.children[0].name).toBe("inner");
@@ -517,7 +517,7 @@ describe("ActiveSupport::Notifications", () => {
       Notifications.subscribe("work", (e) => {
         event = e;
       });
-      Notifications.instrument("work", {}, () => {});
+      Notifications.instrument("work", {});
       expect(event.time).toBeInstanceOf(Date);
       expect(event.end).toBeInstanceOf(Date);
       expect(event.end!.getTime()).toBeGreaterThanOrEqual(event.time.getTime());
@@ -649,7 +649,7 @@ describe("ActiveSupport::Notifications", () => {
         outerEvent = e;
       });
       Notifications.instrument("outer", {}, () => {
-        Notifications.instrument("inner", {}, () => {});
+        Notifications.instrument("inner", {});
       });
       expect(outerEvent.children).toHaveLength(1);
       expect(outerEvent.children[0].name).toBe("inner");

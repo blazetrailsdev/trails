@@ -111,5 +111,5 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(callCount).toBe(3);
   });
 
-  it.skip("declaring attributes on singleton errors", () => {});
+  it.skip("declaring attributes on singleton errors");
 });

@@ -3,38 +3,40 @@ import { Logger } from "./logger.js";
 import { defineCallbacks, setCallback, resetCallbacks, runCallbacks } from "./callbacks.js";
 
 describe("RequireDependencyTest", () => {
-  it.skip("require_dependency looks autoload paths up", () => {});
-  it.skip("require_dependency looks autoload paths up (idempotent)", () => {});
-  it.skip("require_dependency handles absolute paths correctly", () => {});
-  it.skip("require_dependency handles absolute paths correctly (idempotent)", () => {});
-  it.skip("require_dependency supports arguments that respond to to_path", () => {});
-  it.skip("require_dependency supports arguments that respond to to_path (idempotent)", () => {});
-  it.skip("require_dependency fallback to Kernel#require", () => {});
-  it.skip("require_dependency fallback to Kernel#require (idempotent)", () => {});
-  it.skip("require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path", () => {});
-  it.skip("require_dependency raises LoadError if the given argument is not found", () => {});
+  it.skip("require_dependency looks autoload paths up");
+  it.skip("require_dependency looks autoload paths up (idempotent)");
+  it.skip("require_dependency handles absolute paths correctly");
+  it.skip("require_dependency handles absolute paths correctly (idempotent)");
+  it.skip("require_dependency supports arguments that respond to to_path");
+  it.skip("require_dependency supports arguments that respond to to_path (idempotent)");
+  it.skip("require_dependency fallback to Kernel#require");
+  it.skip("require_dependency fallback to Kernel#require (idempotent)");
+  it.skip(
+    "require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path",
+  );
+  it.skip("require_dependency raises LoadError if the given argument is not found");
 });
 
 describe("InitializationTest", () => {
-  it.skip("omitted URL uses Redis client with default settings", () => {});
-  it.skip("no URLs uses Redis client with default settings", () => {});
-  it.skip("singular URL uses Redis client", () => {});
-  it.skip("one URL uses Redis client", () => {});
-  it.skip("multiple URLs uses Redis::Distributed client", () => {});
-  it.skip("block argument uses yielded client", () => {});
-  it.skip("instance of Redis uses given instance", () => {});
-  it.skip("validate pool arguments", () => {});
-  it.skip("instantiating the store doesn't connect to Redis", () => {});
+  it.skip("omitted URL uses Redis client with default settings");
+  it.skip("no URLs uses Redis client with default settings");
+  it.skip("singular URL uses Redis client");
+  it.skip("one URL uses Redis client");
+  it.skip("multiple URLs uses Redis::Distributed client");
+  it.skip("block argument uses yielded client");
+  it.skip("instance of Redis uses given instance");
+  it.skip("validate pool arguments");
+  it.skip("instantiating the store doesn't connect to Redis");
 });
 
 describe("ForkTrackerTest", () => {
-  it.skip("object fork", () => {});
-  it.skip("object fork without block", () => {});
-  it.skip("process fork", () => {});
-  it.skip("process fork without block", () => {});
-  it.skip("kernel fork", () => {});
-  it.skip("kernel fork without block", () => {});
-  it.skip("basic object with kernel fork", () => {});
+  it.skip("object fork");
+  it.skip("object fork without block");
+  it.skip("process fork");
+  it.skip("process fork without block");
+  it.skip("kernel fork");
+  it.skip("kernel fork without block");
+  it.skip("basic object with kernel fork");
 });
 
 describe("AtomicWriteTest", () => {
@@ -225,21 +227,21 @@ describe("MethodWrappersTest", () => {
 });
 
 describe("TestAutoloadModule", () => {
-  it.skip("the autoload module works like normal autoload", () => {});
-  it.skip("when specifying an :eager constant it still works like normal autoload by default", () => {});
-  it.skip("the location of autoloaded constants defaults to :name.underscore", () => {});
-  it.skip("the location of :eager autoloaded constants defaults to :name.underscore", () => {});
-  it.skip("a directory for a block of autoloads can be specified", () => {});
-  it.skip("a path for a block of autoloads can be specified", () => {});
+  it.skip("the autoload module works like normal autoload");
+  it.skip("when specifying an :eager constant it still works like normal autoload by default");
+  it.skip("the location of autoloaded constants defaults to :name.underscore");
+  it.skip("the location of :eager autoloaded constants defaults to :name.underscore");
+  it.skip("a directory for a block of autoloads can be specified");
+  it.skip("a path for a block of autoloads can be specified");
 });
 
 describe("ProxyWrappersTest", () => {
-  it.skip("deprecated object proxy doesnt wrap falsy objects", () => {});
-  it.skip("deprecated instance variable proxy doesnt wrap falsy objects", () => {});
-  it.skip("deprecated constant proxy doesnt wrap falsy objects", () => {});
-  it.skip("including proxy module", () => {});
-  it.skip("prepending proxy module", () => {});
-  it.skip("extending proxy module", () => {});
+  it.skip("deprecated object proxy doesnt wrap falsy objects");
+  it.skip("deprecated instance variable proxy doesnt wrap falsy objects");
+  it.skip("deprecated constant proxy doesnt wrap falsy objects");
+  it.skip("including proxy module");
+  it.skip("prepending proxy module");
+  it.skip("extending proxy module");
 });
 
 describe("BenchmarkableTest", () => {
@@ -300,12 +302,12 @@ describe("BenchmarkableTest", () => {
 });
 
 describe("TimeExtMarshalingTest", () => {
-  it.skip("marshalling with utc instance", () => {});
-  it.skip("marshalling with local instance", () => {});
-  it.skip("marshalling with frozen utc instance", () => {});
-  it.skip("marshalling with frozen local instance", () => {});
-  it.skip("marshalling preserves fractional seconds", () => {});
-  it.skip("last quarter on 31st", () => {});
+  it.skip("marshalling with utc instance");
+  it.skip("marshalling with local instance");
+  it.skip("marshalling with frozen utc instance");
+  it.skip("marshalling with frozen local instance");
+  it.skip("marshalling preserves fractional seconds");
+  it.skip("last quarter on 31st");
 });
 
 describe("ReloaderTest", () => {
@@ -396,11 +398,11 @@ describe("ReloaderTest", () => {
 });
 
 describe("ConstantLookupTest", () => {
-  it.skip("find bar from foo", () => {});
-  it.skip("find module", () => {});
-  it.skip("returns nil when cant find foo", () => {});
-  it.skip("returns nil when cant find module", () => {});
-  it.skip("does not shallow ordinary exceptions", () => {});
+  it.skip("find bar from foo");
+  it.skip("find module");
+  it.skip("returns nil when cant find foo");
+  it.skip("returns nil when cant find module");
+  it.skip("does not shallow ordinary exceptions");
 });
 
 describe("DigestUUIDExt", () => {
@@ -445,19 +447,19 @@ describe("DigestUUIDExt", () => {
 });
 
 describe("AttrInternalTest", () => {
-  it.skip("reader", () => {});
-  it.skip("writer", () => {});
-  it.skip("accessor", () => {});
-  it.skip("invalid naming format", () => {});
-  it.skip("naming format", () => {});
+  it.skip("reader");
+  it.skip("writer");
+  it.skip("accessor");
+  it.skip("invalid naming format");
+  it.skip("naming format");
 });
 
 describe("EventedFileUpdateCheckerTest", () => {
-  it.skip("notifies forked processes", () => {});
-  it.skip("can be garbage collected", () => {});
-  it.skip("should detect changes through symlink", () => {});
-  it.skip("updated should become true when nonexistent directory is added later", () => {});
-  it.skip("does not stop other checkers when nonexistent directory is added later", () => {});
+  it.skip("notifies forked processes");
+  it.skip("can be garbage collected");
+  it.skip("should detect changes through symlink");
+  it.skip("updated should become true when nonexistent directory is added later");
+  it.skip("does not stop other checkers when nonexistent directory is added later");
 });
 
 describe("ObjectInstanceVariableTest", () => {
@@ -531,51 +533,51 @@ describe("ObjectInstanceVariableTest", () => {
 });
 
 describe("DescendantsTrackerTest", () => {
-  it.skip(".descendants", () => {});
-  it.skip(".descendants with garbage collected classes", () => {});
-  it.skip(".subclasses", () => {});
-  it.skip(".clear(classes) deletes the given classes only", () => {});
+  it.skip(".descendants");
+  it.skip(".descendants with garbage collected classes");
+  it.skip(".subclasses");
+  it.skip(".clear(classes) deletes the given classes only");
 });
 
 describe("ExecutionContextTest", () => {
-  it.skip("#set restore the modified keys when the block exits", () => {});
-  it.skip("#set coerce keys to symbol", () => {});
-  it.skip("#[]= coerce keys to symbol", () => {});
-  it.skip("#to_h returns a copy of the context", () => {});
+  it.skip("#set restore the modified keys when the block exits");
+  it.skip("#set coerce keys to symbol");
+  it.skip("#[]= coerce keys to symbol");
+  it.skip("#to_h returns a copy of the context");
 });
 
 describe("MiddlewareTest", () => {
-  it.skip("local cache cleared on close", () => {});
-  it.skip("local cache cleared and response should be present on invalid parameters error", () => {});
-  it.skip("local cache cleared on exception", () => {});
-  it.skip("local cache cleared on throw", () => {});
+  it.skip("local cache cleared on close");
+  it.skip("local cache cleared and response should be present on invalid parameters error");
+  it.skip("local cache cleared on exception");
+  it.skip("local cache cleared on throw");
 });
 
 describe("GzipTest", () => {
-  it.skip("compress should decompress to the same value", () => {});
-  it.skip("compress should return a binary string", () => {});
-  it.skip("compress should return gzipped string by compression level", () => {});
-  it.skip("decompress checks crc", () => {});
+  it.skip("compress should decompress to the same value");
+  it.skip("compress should return a binary string");
+  it.skip("compress should return gzipped string by compression level");
+  it.skip("decompress checks crc");
 });
 
 describe("ActionableErrorTest", () => {
-  it.skip("returns all action of an actionable error", () => {});
-  it.skip("returns no actions for non-actionable errors", () => {});
-  it.skip("dispatches actions from error and name", () => {});
-  it.skip("cannot dispatch missing actions", () => {});
+  it.skip("returns all action of an actionable error");
+  it.skip("returns no actions for non-actionable errors");
+  it.skip("dispatches actions from error and name");
+  it.skip("cannot dispatch missing actions");
 });
 
 describe("TestLoadError", () => {
-  it.skip("with require", () => {});
-  it.skip("with load", () => {});
-  it.skip("path", () => {});
-  it.skip("is missing with nil path", () => {});
+  it.skip("with require");
+  it.skip("with load");
+  it.skip("path");
+  it.skip("is missing with nil path");
 });
 
 describe("DigestTest", () => {
-  it.skip("with default hash digest class", () => {});
-  it.skip("with custom hash digest class", () => {});
-  it.skip("should raise argument error if custom digest is missing hexdigest method", () => {});
+  it.skip("with default hash digest class");
+  it.skip("with custom hash digest class");
+  it.skip("should raise argument error if custom digest is missing hexdigest method");
 });
 
 describe("CleanLoggerTest", () => {
@@ -604,39 +606,39 @@ describe("CleanLoggerTest", () => {
 });
 
 describe("REXMLEngineTest", () => {
-  it.skip("default is rexml", () => {});
-  it.skip("parse from empty string", () => {});
-  it.skip("parse from frozen string", () => {});
+  it.skip("default is rexml");
+  it.skip("parse from empty string");
+  it.skip("parse from frozen string");
 });
 
 describe("ClearTest", () => {
-  it.skip("clear all cache key", () => {});
-  it.skip("only clear namespace cache key", () => {});
-  it.skip("clear all cache key with Redis::Distributed", () => {});
+  it.skip("clear all cache key");
+  it.skip("only clear namespace cache key");
+  it.skip("clear all cache key with Redis::Distributed");
 });
 
 describe("BenchmarkTest", () => {
-  it.skip("realtime", () => {});
-  it.skip("realtime millisecond", () => {});
-  it.skip("is deprecated", () => {});
+  it.skip("realtime");
+  it.skip("realtime millisecond");
+  it.skip("is deprecated");
 });
 
 describe("JDOMEngineTest", () => {
-  it.skip("not allowed to expand entities to files", () => {});
-  it.skip("not allowed to expand parameter entities to files", () => {});
-  it.skip("not allowed to load external doctypes", () => {});
+  it.skip("not allowed to expand entities to files");
+  it.skip("not allowed to expand parameter entities to files");
+  it.skip("not allowed to load external doctypes");
 });
 
 describe("ConfigurationFileTest", () => {
-  it.skip("backtrace contains YAML path", () => {});
-  it.skip("backtrace contains YAML path (when Pathname given)", () => {});
-  it.skip("load raw YAML", () => {});
+  it.skip("backtrace contains YAML path");
+  it.skip("backtrace contains YAML path (when Pathname given)");
+  it.skip("load raw YAML");
 });
 
 describe("IsolatedExecutionStateTest", () => {
-  it.skip("#[] when isolation level is :fiber", () => {});
-  it.skip("#[] when isolation level is :thread", () => {});
-  it.skip("changing the isolation level clear the old store", () => {});
+  it.skip("#[] when isolation level is :fiber");
+  it.skip("#[] when isolation level is :thread");
+  it.skip("changing the isolation level clear the old store");
 });
 
 describe("JsonCherryPickTest", () => {
@@ -753,8 +755,8 @@ describe("LoggerSilenceTest", () => {
 });
 
 describe("WithBackendTest", () => {
-  it.skip("#with_backend should switch backend and then switch back", () => {});
-  it.skip("backend switch inside #with_backend block", () => {});
+  it.skip("#with_backend should switch backend and then switch back");
+  it.skip("backend switch inside #with_backend block");
 });
 
 describe("JsonGemEncodingTest", () => {
@@ -779,18 +781,18 @@ describe("JsonGemEncodingTest", () => {
 });
 
 describe("ThreadSafetyTest", () => {
-  it.skip("#with_backend should be thread-safe", () => {});
-  it.skip("nested #with_backend should be thread-safe", () => {});
+  it.skip("#with_backend should be thread-safe");
+  it.skip("nested #with_backend should be thread-safe");
 });
 
 describe("EnvironmentInquirerTest", () => {
-  it.skip("local predicate", () => {});
-  it.skip("prevent local from being used as an actual environment name", () => {});
+  it.skip("local predicate");
+  it.skip("prevent local from being used as an actual environment name");
 });
 
 describe("FileFixturesTest", () => {
-  it.skip("#file_fixture returns Pathname to file fixture", () => {});
-  it.skip("raises an exception when the fixture file does not exist", () => {});
+  it.skip("#file_fixture returns Pathname to file fixture");
+  it.skip("raises an exception when the fixture file does not exist");
 });
 
 describe("AttributeAliasingTest", () => {
@@ -852,7 +854,7 @@ describe("SymbolStartsEndsWithTest", () => {
 });
 
 describe("MessagePackSerializerTest", () => {
-  it.skip("raises friendly error when dumping an unsupported object", () => {});
+  it.skip("raises friendly error when dumping an unsupported object");
 });
 
 describe("ToFsTest", () => {
@@ -874,23 +876,23 @@ describe("RegexpExtAccessTests", () => {
 });
 
 describe("AfterTeardownAssertionTest", () => {
-  it.skip("teardown raise but all after teardown method are called", () => {});
+  it.skip("teardown raise but all after teardown method are called");
 });
 
 describe("PathnameExistenceTest", () => {
-  it.skip("existence", () => {});
+  it.skip("existence");
 });
 
 describe("ThreadLoadInterlockAwareMonitorTest", () => {
-  it.skip("lock owned by thread", () => {});
+  it.skip("lock owned by thread");
 });
 
 describe("FileFixturesPathnameDirectoryTest", () => {
-  it.skip("#file_fixture_path returns Pathname to file fixture", () => {});
+  it.skip("#file_fixture_path returns Pathname to file fixture");
 });
 
 describe("PathnameBlankTest", () => {
-  it.skip("blank", () => {});
+  it.skip("blank");
 });
 
 describe("CallbackFalseTerminatorTest", () => {
@@ -914,15 +916,15 @@ describe("CallbackFalseTerminatorTest", () => {
 });
 
 describe("LookupTest", () => {
-  it.skip("may be looked up as :redis_cache_store", () => {});
+  it.skip("may be looked up as :redis_cache_store");
 });
 
 describe("AfterTeardownTest", () => {
-  it.skip("teardown raise but all after teardown method are called", () => {});
+  it.skip("teardown raise but all after teardown method are called");
 });
 
 describe("CallbackTerminatorTest", () => {
-  it.skip("termination invokes hook", () => {});
+  it.skip("termination invokes hook");
 });
 
 describe("ExcludingDuplicatesCallbackTest", () => {
@@ -934,7 +936,7 @@ describe("ExcludingDuplicatesCallbackTest", () => {
     setCallback(proto, "action", "before", cb);
     setCallback(proto, "action", "before", cb); // duplicate
     // Only one unique callback should run
-    runCallbacks(proto, "action", () => {});
+    runCallbacks(proto, "action");
     // The callback was registered twice (no dedup in our impl);
     // just verify it runs at least once
     expect(log.length).toBeGreaterThanOrEqual(1);
@@ -985,13 +987,13 @@ describe("RawTest", () => {
 });
 
 describe("entering with blocking", () => {
-  it.skip("entering with blocking", () => {});
+  it.skip("entering with blocking");
 });
 
 describe("entering with no blocking", () => {
-  it.skip("entering with no blocking", () => {});
+  it.skip("entering with no blocking");
 });
 
 describe("without assertions", () => {
-  it.skip("without assertions", () => {});
+  it.skip("without assertions");
 });

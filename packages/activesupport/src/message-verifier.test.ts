@@ -3,15 +3,15 @@ import { describe, it, expect } from "vitest";
 import { MessageVerifier } from "./message-verifier.js";
 
 describe("MessagesSerializerWithFallbackTest", () => {
-  it.skip(":marshal serializer dumps objects using Marshal format", () => {});
-  it.skip(":json serializer dumps objects using JSON format", () => {});
-  it.skip(":message_pack serializer dumps objects using MessagePack format", () => {});
-  it.skip("every serializer can load every non-Marshal format", () => {});
-  it.skip("only :marshal and :*_allow_marshal serializers can load Marshal format", () => {});
-  it.skip(":json serializer recognizes regular JSON", () => {});
-  it.skip(":json serializer can load irregular JSON", () => {});
-  it.skip("notifies when serializer falls back to loading an alternate format", () => {});
-  it.skip("raises on invalid format name", () => {});
+  it.skip(":marshal serializer dumps objects using Marshal format");
+  it.skip(":json serializer dumps objects using JSON format");
+  it.skip(":message_pack serializer dumps objects using MessagePack format");
+  it.skip("every serializer can load every non-Marshal format");
+  it.skip("only :marshal and :*_allow_marshal serializers can load Marshal format");
+  it.skip(":json serializer recognizes regular JSON");
+  it.skip(":json serializer can load irregular JSON");
+  it.skip("notifies when serializer falls back to loading an alternate format");
+  it.skip("raises on invalid format name");
 });
 
 describe("MessageVerifierMetadataTest", () => {
@@ -54,16 +54,16 @@ describe("MessageVerifierMetadataTest", () => {
 });
 
 describe("MessageVerifiersTest", () => {
-  it.skip("can override secret generator", () => {});
-  it.skip("supports arbitrary secret generator kwargs", () => {});
-  it.skip("supports arbitrary secret generator kwargs when using #rotate block", () => {});
+  it.skip("can override secret generator");
+  it.skip("supports arbitrary secret generator kwargs");
+  it.skip("supports arbitrary secret generator kwargs when using #rotate block");
 });
 
 describe("MessagesRotationConfiguration", () => {
-  it.skip("signed configurations", () => {});
-  it.skip("encrypted configurations", () => {});
+  it.skip("signed configurations");
+  it.skip("encrypted configurations");
 });
 
 describe("MessageVerifierRotatorTest", () => {
-  it.skip("rotate digest", () => {});
+  it.skip("rotate digest");
 });

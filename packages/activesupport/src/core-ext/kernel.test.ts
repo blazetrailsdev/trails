@@ -86,5 +86,5 @@ describe("KernelSuppressTest", () => {
 });
 
 describe("KernelConcernTest", () => {
-  it.skip("may be defined at toplevel", () => {});
+  it.skip("may be defined at toplevel");
 });

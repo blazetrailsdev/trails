@@ -1153,9 +1153,9 @@ describe("ModuleTest", () => {
     expect(c.color).toBe("red");
   });
 
-  it.skip("delegation to index get method", () => {});
+  it.skip("delegation to index get method");
 
-  it.skip("delegation to index set method", () => {});
+  it.skip("delegation to index set method");
 
   it("delegation down hierarchy", () => {
     class GrandParent {
@@ -1301,9 +1301,9 @@ describe("ModuleTest", () => {
     expect(proj.name).toBeUndefined();
   });
 
-  it.skip("delegation with allow nil and false value", () => {});
+  it.skip("delegation with allow nil and false value");
 
-  it.skip("delegation with allow nil and invalid value", () => {});
+  it.skip("delegation with allow nil and invalid value");
 
   it("delegation with allow nil and nil value and prefix", () => {
     class Project {
@@ -1333,7 +1333,7 @@ describe("ModuleTest", () => {
     expect(() => c.toString()).toThrow();
   });
 
-  it.skip("delegation to method that exists on nil when allowing nil", () => {});
+  it.skip("delegation to method that exists on nil when allowing nil");
 
   it("delegation does not raise error when removing singleton instance methods", () => {
     class Foo {}
@@ -1348,7 +1348,7 @@ describe("ModuleTest", () => {
     expect(() => delegate(Foo.prototype, "bar", { to: "baz", allowNil: true })).not.toThrow();
   });
 
-  it.skip("delegate line with nil", () => {});
+  it.skip("delegate line with nil");
 
   it("delegation exception backtrace", () => {
     class Someone {
@@ -1467,7 +1467,7 @@ describe("ModuleTest", () => {
     expect(typeof delegate).toBe("function");
   });
 
-  it.skip("delegate missing to does not delegate to fake methods", () => {});
+  it.skip("delegate missing to does not delegate to fake methods");
 
   it("delegate missing to raises delegation error if target nil", () => {
     class Container {
@@ -1623,7 +1623,7 @@ describe("ModuleTest", () => {
     expect(names).toEqual(["bar", "baz"]);
   });
 
-  it.skip("module nesting is empty", () => {});
+  it.skip("module nesting is empty");
 
   it("delegation unreacheable module", () => {
     class Container {

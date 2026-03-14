@@ -105,8 +105,8 @@ describe("CurrentAttributesTest", () => {
     expect(inst.user?.name).toBe("david");
   });
 
-  it.skip("resets auxiliary classes via callback", () => {});
-  it.skip("set auxiliary class based on current attributes via before callback", () => {});
+  it.skip("resets auxiliary classes via callback");
+  it.skip("set auxiliary class based on current attributes via before callback");
 
   it("set attribute only via scope", () => {
     const inst = Current.instance();
@@ -176,8 +176,8 @@ describe("CurrentAttributesTest", () => {
     expect(CurrentB.instance().user).toBe("B");
   });
 
-  it.skip("CurrentAttributes use fiber-local variables", () => {});
-  it.skip("CurrentAttributes can use thread-local variables", () => {});
+  it.skip("CurrentAttributes use fiber-local variables");
+  it.skip("CurrentAttributes can use thread-local variables");
 
   it("CurrentAttributes doesn't populate #attributes when not using defaults", () => {
     const inst = Current.instance();
@@ -186,6 +186,6 @@ describe("CurrentAttributesTest", () => {
     expect(inst.attributes).toHaveProperty("user", "david");
   });
 
-  it.skip("CurrentAttributes restricted attribute names", () => {});
-  it.skip("method_added hook doesn't reach the instance. Fix for #54646", () => {});
+  it.skip("CurrentAttributes restricted attribute names");
+  it.skip("method_added hook doesn't reach the instance. Fix for #54646");
 });

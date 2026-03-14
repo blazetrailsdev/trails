@@ -288,8 +288,8 @@ describe("RangeTest", () => {
     expect(typeof result).toBe("string");
   });
 
-  it.skip("each on time with zone", () => {});
-  it.skip("step on time with zone", () => {});
-  it.skip("cover on time with zone", () => {});
-  it.skip("case equals on time with zone", () => {});
+  it.skip("each on time with zone");
+  it.skip("step on time with zone");
+  it.skip("cover on time with zone");
+  it.skip("case equals on time with zone");
 });
