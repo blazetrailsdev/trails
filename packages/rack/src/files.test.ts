@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { it, expect, beforeAll, afterAll } from "vitest";
 import { Files } from "./files.js";
 import { MockRequest } from "./mock-request.js";
 import * as fs from "fs";
@@ -118,159 +118,157 @@ it("returns 404 and empty body for a HEAD request when the file is not found", a
   expect(res.status).toBe(404);
 });
 
-describe("Rack::Files", () => {
-  it("can be used without root", async () => {
-    const app = new Files("");
-    const res = await new MockRequest((env) => app.call(env)).get(testFile);
-    expect(res.status).toBe(200);
-    expect(res.bodyString).toBe("Hello World");
-  });
+it("can be used without root", async () => {
+  const app = new Files("");
+  const res = await new MockRequest((env) => app.call(env)).get(testFile);
+  expect(res.status).toBe(200);
+  expect(res.bodyString).toBe("Hello World");
+});
 
-  it("serves files with + in the file name", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test+plus.txt");
-    expect(res.status).toBe(200);
-    expect(res.bodyString).toBe("plus file");
-  });
+it("serves files with + in the file name", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test+plus.txt");
+  expect(res.status).toBe(200);
+  expect(res.bodyString).toBe("plus file");
+});
 
-  it("serves the correct file content for a GET request", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
-    expect(res.status).toBe(200);
-    expect(res.bodyString).toBe("Hello World");
-  });
+it("serves the correct file content for a GET request", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
+  expect(res.status).toBe(200);
+  expect(res.bodyString).toBe("Hello World");
+});
 
-  it("does not serve directories", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/subdir");
-    expect(res.status).toBe(404);
-  });
+it("does not serve directories", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/subdir");
+  expect(res.status).toBe(404);
+});
 
-  it("sets the last-modified header", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
-    expect(res.headers["last-modified"]).toBeDefined();
-  });
+it("sets the last-modified header", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
+  expect(res.headers["last-modified"]).toBeDefined();
+});
 
-  it("returns 304 if file isn't modified since last serve", async () => {
-    const app = makeApp();
-    const futureDate = new Date(Date.now() + 86400000).toUTCString();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
-      HTTP_IF_MODIFIED_SINCE: futureDate,
-    });
-    expect(res.status).toBe(304);
+it("returns 304 if file isn't modified since last serve", async () => {
+  const app = makeApp();
+  const futureDate = new Date(Date.now() + 86400000).toUTCString();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
+    HTTP_IF_MODIFIED_SINCE: futureDate,
   });
+  expect(res.status).toBe(304);
+});
 
-  it("returns the file if it has been modified since last serve", async () => {
-    const app = makeApp();
-    const pastDate = new Date(0).toUTCString();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
-      HTTP_IF_MODIFIED_SINCE: pastDate,
-    });
-    expect(res.status).toBe(200);
+it("returns the file if it has been modified since last serve", async () => {
+  const app = makeApp();
+  const pastDate = new Date(0).toUTCString();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
+    HTTP_IF_MODIFIED_SINCE: pastDate,
   });
+  expect(res.status).toBe(200);
+});
 
-  it("serves files with URL encoded filenames", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test%20space.txt");
-    expect(res.status).toBe(200);
-    expect(res.bodyString).toBe("space file");
-  });
+it("serves files with URL encoded filenames", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test%20space.txt");
+  expect(res.status).toBe(200);
+  expect(res.bodyString).toBe("space file");
+});
 
-  it("serves uri with URL encoded null byte (%00) in filenames", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test%00.txt");
-    expect(res.status).toBe(400);
-  });
+it("serves uri with URL encoded null byte (%00) in filenames", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test%00.txt");
+  expect(res.status).toBe(400);
+});
 
-  it("allows safe directory traversal", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/subdir/../test.txt");
-    expect(res.status).toBe(200);
-  });
+it("allows safe directory traversal", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/subdir/../test.txt");
+  expect(res.status).toBe(200);
+});
 
-  it("does not allow unsafe directory traversal", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/../../../etc/passwd");
-    expect(res.status).toBe(404);
-  });
+it("does not allow unsafe directory traversal", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/../../../etc/passwd");
+  expect(res.status).toBe(404);
+});
 
-  it("allows files with .. in their name", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test..dots.txt");
-    expect(res.status).toBe(200);
-    expect(res.bodyString).toBe("dots");
-  });
+it("allows files with .. in their name", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test..dots.txt");
+  expect(res.status).toBe(200);
+  expect(res.bodyString).toBe("dots");
+});
 
-  it("does not allow unsafe directory traversal with encoded periods", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/%2E%2E/%2E%2E/etc/passwd");
-    expect(res.status).toBe(404);
-  });
+it("does not allow unsafe directory traversal with encoded periods", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/%2E%2E/%2E%2E/etc/passwd");
+  expect(res.status).toBe(404);
+});
 
-  it("allows safe directory traversal with encoded periods", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/subdir/%2E%2E/test.txt");
-    expect(res.status).toBe(200);
-  });
+it("allows safe directory traversal with encoded periods", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/subdir/%2E%2E/test.txt");
+  expect(res.status).toBe(200);
+});
 
-  it("returns 404 if it can't find the file", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/nonexistent.txt");
-    expect(res.status).toBe(404);
-  });
+it("returns 404 if it can't find the file", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/nonexistent.txt");
+  expect(res.status).toBe(404);
+});
 
-  it("detects SystemCallErrors", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/nonexistent");
-    expect(res.status).toBe(404);
-  });
+it("detects SystemCallErrors", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/nonexistent");
+  expect(res.status).toBe(404);
+});
 
-  it("returns bodies that respond to #to_path", async () => {
-    const app = makeApp();
-    const env = MockRequest.envFor("/test.txt");
-    const [status, headers, body] = app.serving(env, "/test.txt");
-    expect(status).toBe(200);
-    expect(typeof body.toPath).toBe("function");
-    expect(body.toPath()).toBe(path.join(tmpDir, "test.txt"));
-  });
+it("returns bodies that respond to #to_path", async () => {
+  const app = makeApp();
+  const env = MockRequest.envFor("/test.txt");
+  const [status, headers, body] = app.serving(env, "/test.txt");
+  expect(status).toBe(200);
+  expect(typeof body.toPath).toBe("function");
+  expect(body.toPath()).toBe(path.join(tmpDir, "test.txt"));
+});
 
-  it("returns bodies that do not respond to #to_path if a byte range is requested", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
-      HTTP_RANGE: "bytes=0-4",
-    });
-    expect(res.status).toBe(206);
-    expect(res.bodyString).toBe("Hello");
+it("returns bodies that do not respond to #to_path if a byte range is requested", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
+    HTTP_RANGE: "bytes=0-4",
   });
+  expect(res.status).toBe(206);
+  expect(res.bodyString).toBe("Hello");
+});
 
-  it("returns correct byte range in body", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
-      HTTP_RANGE: "bytes=6-10",
-    });
-    expect(res.status).toBe(206);
-    expect(res.bodyString).toBe("World");
-    expect(res.headers["content-range"]).toBe("bytes 6-10/11");
+it("returns correct byte range in body", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
+    HTTP_RANGE: "bytes=6-10",
   });
+  expect(res.status).toBe(206);
+  expect(res.bodyString).toBe("World");
+  expect(res.headers["content-range"]).toBe("bytes 6-10/11");
+});
 
-  it("handles cases where the file is truncated during request", async () => {
-    // If a file shrinks between stat and read, the server should handle gracefully
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
-    expect(res.status).toBe(200);
-    // File content should still be served correctly
-    expect(res.bodyString).toBe("Hello World");
-  });
+it("handles cases where the file is truncated during request", async () => {
+  // If a file shrinks between stat and read, the server should handle gracefully
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
+  expect(res.status).toBe(200);
+  // File content should still be served correctly
+  expect(res.bodyString).toBe("Hello World");
+});
 
-  it("returns correct multiple byte ranges in body", async () => {
-    const app = makeApp();
-    const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
-      HTTP_RANGE: "bytes=0-4,6-10",
-    });
-    expect(res.status).toBe(206);
-    expect(res.headers["content-type"]).toContain("multipart/byteranges");
-    expect(res.bodyString).toContain("Hello");
-    expect(res.bodyString).toContain("World");
+it("returns correct multiple byte ranges in body", async () => {
+  const app = makeApp();
+  const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
+    HTTP_RANGE: "bytes=0-4,6-10",
   });
+  expect(res.status).toBe(206);
+  expect(res.headers["content-type"]).toContain("multipart/byteranges");
+  expect(res.bodyString).toContain("Hello");
+  expect(res.bodyString).toContain("World");
 });

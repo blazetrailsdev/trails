@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Headers } from "./headers.js";
 
-describe("Rack::Headers", () => {
+describe("RackHeadersTest", () => {
   let h: Headers;
   let fh: Headers;
 

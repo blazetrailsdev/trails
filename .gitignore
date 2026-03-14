@@ -4,3 +4,5 @@ dist/
 vendor/rails/
 scripts/test-compare/output/
 scripts/api-compare/output/
+scripts/api-compare/.rack-source
+scripts/api-compare/.rails-source

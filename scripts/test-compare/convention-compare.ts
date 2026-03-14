@@ -35,7 +35,8 @@ function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack") {
     const dir = path.dirname(rubyFile);
     const base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
-    const tsFile = base + ".test.ts";
+    const kebab = base.replace(/_/g, "-");
+    const tsFile = kebab + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 

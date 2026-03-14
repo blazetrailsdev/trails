@@ -34,7 +34,7 @@ async function consumeBody(body: RackBody): Promise<string[]> {
   return chunks;
 }
 
-describe("Rack::Events", () => {
+describe("TestEvents", () => {
   it("events fire in correct order", async () => {
     const events: [any, string][] = [];
     const appMarker = { name: "app" };
