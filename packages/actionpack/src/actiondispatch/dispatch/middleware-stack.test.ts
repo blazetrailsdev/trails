@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MiddlewareStack } from "./stack.js";
+import { MiddlewareStack } from "../middleware/stack.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString } from "@rails-ts/rack";
 
@@ -47,7 +47,7 @@ class QuxMiddleware {
   }
 }
 
-describe("ActionDispatch::MiddlewareStack", () => {
+describe("MiddlewareStackTest", () => {
   it("use should push middleware as class onto the stack", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);

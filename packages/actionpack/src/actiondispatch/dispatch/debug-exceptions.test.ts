@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DebugExceptions, type Logger } from "./debug-exceptions.js";
+import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString, bodyToString } from "@rails-ts/rack";
 

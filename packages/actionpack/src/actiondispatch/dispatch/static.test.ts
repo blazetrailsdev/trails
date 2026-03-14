@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Static } from "./static.js";
+import { Static } from "../middleware/static.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString, bodyToString } from "@rails-ts/rack";
 import * as fs from "fs";
@@ -49,7 +49,7 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-describe("ActionDispatch::Static", () => {
+describe("StaticTest", () => {
   it("serves dynamic content", async () => {
     const mw = new Static(dynamicApp, { root: tmpDir });
     const [status, _, body] = await mw.call({ PATH_INFO: "/missing", REQUEST_METHOD: "GET" });

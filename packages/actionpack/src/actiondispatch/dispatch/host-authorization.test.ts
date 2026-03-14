@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HostAuthorization } from "./host-authorization.js";
+import { HostAuthorization } from "../middleware/host-authorization.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString, bodyToString } from "@rails-ts/rack";
 
@@ -9,7 +9,7 @@ const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   bodyFromString("OK"),
 ];
 
-describe("ActionDispatch::HostAuthorization", () => {
+describe("HostAuthorizationTest", () => {
   it("allows request when host matches exactly", async () => {
     const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
     const [status] = await mw.call({

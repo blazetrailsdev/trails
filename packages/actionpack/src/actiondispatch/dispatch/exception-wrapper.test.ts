@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { ExceptionWrapper } from "./exception-wrapper.js";
+import { ExceptionWrapper } from "../exception-wrapper.js";
 
 // ==========================================================================
 // dispatch/exception_wrapper_test.rb
 // ==========================================================================
-describe("ActionDispatch::ExceptionWrapper", () => {
+describe("ExceptionWrapperTest", () => {
   it("status code for standard error", () => {
     const wrapper = new ExceptionWrapper(new Error("boom"));
     expect(wrapper.statusCode).toBe(500);

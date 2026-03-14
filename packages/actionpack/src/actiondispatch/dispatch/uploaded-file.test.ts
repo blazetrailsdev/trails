@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { UploadedFile } from "./uploaded-file.js";
+import { UploadedFile } from "../uploaded-file.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -20,7 +20,7 @@ afterAll(() => {
 // ==========================================================================
 // dispatch/uploaded_file_test.rb
 // ==========================================================================
-describe("ActionDispatch::Http::UploadedFile", () => {
+describe("UploadedFileTest", () => {
   it("original filename", () => {
     const file = new UploadedFile({ filename: "photo.jpg" });
     expect(file.originalFilename).toBe("photo.jpg");

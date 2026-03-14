@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RequestId } from "./request-id.js";
+import { RequestId } from "../middleware/request-id.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString } from "@rails-ts/rack";
 
