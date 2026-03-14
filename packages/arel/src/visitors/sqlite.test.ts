@@ -36,6 +36,12 @@ describe("SqliteTest", () => {
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
+    it("should handle column names on both sides", () => {
+      const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+    });
+
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
       const sql = new Visitors.SQLite().compile(node);
