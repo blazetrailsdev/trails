@@ -131,18 +131,10 @@ describe("the to_sql visitor", () => {
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
-    it("should construct a valid generic SQL statement", () => {
-      const mgr = users
-        .project(users.get("id"), users.get("name"))
-        .where(users.get("id").gt(1))
-        .order(users.get("id").desc())
-        .take(5);
-      const sql = new Visitors.ToSql().compile(mgr.ast);
-      expect(sql).toContain("SELECT");
-      expect(sql).toContain("FROM");
-      expect(sql).toContain("WHERE");
-      expect(sql).toContain("ORDER BY");
-      expect(sql).toContain("LIMIT 5");
+    it("should handle nil", () => {
+      const node = users.get("name").isNotDistinctFrom(null);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
     });
   });
 
@@ -181,7 +173,7 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  describe("Nodes::NotIn", () => {
+  describe("Nodes::Between", () => {
     it("can handle ranges bounded by infinity", () => {
       const a = users.get("id").between(-Infinity, 10);
       const b = users.get("id").between(10, Infinity);

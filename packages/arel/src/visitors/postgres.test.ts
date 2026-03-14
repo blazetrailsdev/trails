@@ -132,12 +132,10 @@ describe("PostgresTest", () => {
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
-    it("should construct a valid generic SQL statement", () => {
-      const mgr = users.project(users.get("id")).where(users.get("id").gt(1));
-      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
-      expect(sql).toContain("SELECT");
-      expect(sql).toContain("FROM");
-      expect(sql).toContain("WHERE");
+    it("should handle nil", () => {
+      const node = users.get("name").isNotDistinctFrom(null);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
     });
   });
 
