@@ -27,8 +27,8 @@ describe("MysqlTest", () => {
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle nil", () => {
       const visitor = new Visitors.ToSql();
-      const node = users.get("name").eq(null);
-      expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
+      const node = users.get("name").isDistinctFrom(null);
+      expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
   });
 

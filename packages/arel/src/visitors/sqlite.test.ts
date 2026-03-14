@@ -6,9 +6,9 @@ describe("SqliteTest", () => {
   const posts = new Table("posts");
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle nil", () => {
-      const visitor = new Visitors.ToSql();
-      const node = users.get("name").eq(null);
-      expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
+      const node = users.get("name").isDistinctFrom(null);
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toContain("IS DISTINCT FROM");
     });
   });
 
@@ -36,19 +36,19 @@ describe("SqliteTest", () => {
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
-    it("should construct a valid generic SQL statement", () => {
-      const mgr = users.project(users.get("id"));
-      const sql = new Visitors.SQLite().compile(mgr.ast);
-      expect(sql).toContain("SELECT");
-      expect(sql).toContain("FROM");
+    it("should handle nil", () => {
+      const node = users.get("name").isNotDistinctFrom(null);
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
     });
   });
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
-      const node = users.get("id").eq(posts.get("user_id"));
+      const node = users.get("id").isDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('"users"."id" = "posts"."user_id"');
+      expect(sql).toContain('"users"."id"');
+      expect(sql).toContain('"posts"."user_id"');
     });
   });
 });

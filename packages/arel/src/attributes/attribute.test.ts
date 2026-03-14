@@ -19,16 +19,14 @@ describe("AttributeTest", () => {
 
   describe("#eq_all", () => {
     it("should create a Grouping node", () => {
-      expect(users.get("id").gtAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
+      expect(users.get("id").eqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
-  });
 
-  describe("#not_in_any", () => {
-    it("should generate ORs in sql", () => {
+    it("should generate ANDs in sql", () => {
       const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").gtAny([1, 2]));
+      mgr.where(users.get("id").eqAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" > 1 OR "users"."id" > 2)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
       );
     });
   });

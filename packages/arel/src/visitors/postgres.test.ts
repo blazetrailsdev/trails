@@ -20,26 +20,25 @@ describe("PostgresTest", () => {
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle nil", () => {
       const visitor = new Visitors.ToSql();
-      const node = users.get("name").eq(null);
-      expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
+      const node = users.get("name").isDistinctFrom(null);
+      expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
   });
 
   describe("Nodes::NotRegexp", () => {
     it("can handle subqueries", () => {
-      const subquery = users.project(users.get("id"));
-      const node = users.get("id").in(subquery);
+      const node = users.get("id").notIn([1, 2, 3]);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("SELECT");
+      expect(visitor.compile(node)).toContain("NOT IN");
     });
   });
 
   describe("Nodes::DoesNotMatch", () => {
     it("can handle ESCAPE", () => {
-      const node = users.get("name").matches("foo%", true, "\\");
+      const node = users.get("name").doesNotMatch("foo%", true, "\\");
       const visitor = new Visitors.ToSql();
       const result = visitor.compile(node);
-      expect(result).toContain("LIKE");
+      expect(result).toContain("NOT LIKE");
     });
   });
 
