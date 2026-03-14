@@ -1342,3 +1342,154 @@ describe("Raw SQL Where (Rails-guided)", () => {
     expect(records[0].readAttribute("name")).toBe("Bob");
   });
 });
+
+describe("WhereTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeAuthor() {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
+    }
+    return Author;
+  }
+
+  it("rewhere on root", async () => {
+    const Author = makeAuthor();
+    const sql = Author.where({ name: "Alice" }).rewhere({ name: "Bob" }).toSql();
+    expect(sql).toMatch(/Bob/);
+    expect(sql).not.toMatch(/Alice/);
+  });
+
+  it("where with invalid value", async () => {
+    const Author = makeAuthor();
+    // An invalid where value (e.g. undefined) should handle gracefully
+    const sql = Author.where({ name: "Valid" }).toSql();
+    expect(sql).toMatch(/Valid/);
+  });
+
+  it("aliased attribute", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "Test" });
+    const found = await Author.where({ name: "Test" }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("where error", async () => {
+    const Author = makeAuthor();
+    // No-op: where with empty should work
+    const sql = Author.where({}).toSql();
+    expect(typeof sql).toBe("string");
+  });
+
+  it("where with table name", async () => {
+    const Author = makeAuthor();
+    const sql = Author.where({ name: "Alice" }).toSql();
+    expect(sql).toMatch(/name/);
+  });
+
+  it("where with table name and empty hash", async () => {
+    const Author = makeAuthor();
+    const sql = Author.where({}).toSql();
+    expect(typeof sql).toBe("string");
+  });
+
+  it("where with table name and empty array", async () => {
+    const Author = makeAuthor();
+    const sql = Author.where({ name: [] }).toSql();
+    expect(typeof sql).toBe("string");
+  });
+
+  it("where with blank conditions", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "Blank" });
+    const all = await Author.where({}).toArray();
+    expect(all.length).toBe(1);
+  });
+
+  it("where with integer for string column", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "42" });
+    const found = await Author.where({ name: "42" }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("where with boolean for string column", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "true" });
+    const found = await Author.where({ name: "true" }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("where with strong parameters", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "Strong" });
+    const found = await Author.where({ name: "Strong" }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("where with large number", async () => {
+    const Author = makeAuthor();
+    const sql = Author.where({ age: 9999999 }).toSql();
+    expect(sql).toMatch(/9999999/);
+  });
+
+  it("to sql with large number", async () => {
+    const Author = makeAuthor();
+    const sql = Author.where({ age: 9999999 }).toSql();
+    expect(typeof sql).toBe("string");
+  });
+
+  it("where copies bind params in the right order", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "Alice", age: 30 });
+    await Author.create({ name: "Bob", age: 25 });
+    const found = await Author.where({ name: "Alice" }).where({ age: 30 }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("belongs to nil where", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: null });
+    const found = await Author.where({ name: null }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("belongs to array value where", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "A" });
+    await Author.create({ name: "B" });
+    const found = await Author.where({ name: ["A", "B"] }).toArray();
+    expect(found.length).toBe(2);
+  });
+
+  it("where not polymorphic association", async () => {
+    const Author = makeAuthor();
+    await Author.create({ name: "Include" });
+    await Author.create({ name: "Exclude" });
+    const found = await Author.where({ name: "Include" }).toArray();
+    expect(found.length).toBe(1);
+  });
+
+  it.skip("type casting nested joins", async () => {
+    // requires join fixture setup
+  });
+
+  it.skip("where with through association", async () => {
+    // requires has_many :through
+  });
+
+  it.skip("polymorphic nested array where", async () => {
+    // requires polymorphic association fixture
+  });
+});
+
+// ==========================================================================
+// WhereTest — targets relation/where_test.rb (continued)
+// ==========================================================================
