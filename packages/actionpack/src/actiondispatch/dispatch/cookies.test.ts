@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CookieJar } from "../cookies.js";
 
-describe("ActionDispatch::Cookies", () => {
+describe("CookieJarTest", () => {
   it("fetch", () => {
     const jar = CookieJar.parse("foo=bar");
     expect(jar.fetch("foo")).toBe("bar");
@@ -65,7 +65,9 @@ describe("ActionDispatch::Cookies", () => {
     jar.set("test", { value: null as any });
     expect(jar.has("test")).toBe(false);
   });
+});
 
+describe("CookiesMiddlewareTest", () => {
   it("sets expected cookie header", () => {
     const jar = new CookieJar();
     jar.set("user_name", "david");
@@ -74,7 +76,9 @@ describe("ActionDispatch::Cookies", () => {
     expect(headers[0]).toContain("user_name=david");
     expect(headers[0]).toContain("path=/");
   });
+});
 
+describe("CookiesTest", () => {
   it("setting cookie with same site strict", () => {
     const jar = new CookieJar();
     jar.set("foo", { value: "bar", sameSite: "strict" });

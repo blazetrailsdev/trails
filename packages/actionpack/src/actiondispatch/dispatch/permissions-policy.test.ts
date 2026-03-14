@@ -4,7 +4,7 @@ import { PermissionsPolicy } from "../permissions-policy.js";
 // ==========================================================================
 // dispatch/permissions_policy_test.rb
 // ==========================================================================
-describe("ActionDispatch::PermissionsPolicy", () => {
+describe("PermissionsPolicyTest", () => {
   it("empty policy", () => {
     const policy = new PermissionsPolicy();
     expect(policy.empty).toBe(true);

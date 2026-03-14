@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Request } from "../request.js";
 
-describe("ActionDispatch::Request", () => {
-  // --- URL / Host ---
-
+describe("RequestUrlFor", () => {
   it("url_for class method", () => {
     const req = new Request({
       HTTP_HOST: "www.example.com",
@@ -12,7 +10,9 @@ describe("ActionDispatch::Request", () => {
     });
     expect(req.url).toBe("http://www.example.com/posts");
   });
+});
 
+describe("RequestIP", () => {
   it("remote ip", () => {
     const req = new Request({ REMOTE_ADDR: "1.2.3.4" });
     expect(req.remoteIp).toBe("1.2.3.4");
@@ -27,7 +27,9 @@ describe("ActionDispatch::Request", () => {
     const req = new Request({ REMOTE_ADDR: "::1" });
     expect(req.remoteIp).toBe("::1");
   });
+});
 
+describe("RequestDomain", () => {
   it("domains", () => {
     const req = new Request({ HTTP_HOST: "www.example.com" });
     expect(req.domain()).toBe("example.com");
@@ -37,7 +39,9 @@ describe("ActionDispatch::Request", () => {
     const req = new Request({ HTTP_HOST: "app.staging.example.com" });
     expect(req.subdomains()).toEqual(["app", "staging"]);
   });
+});
 
+describe("RequestPort", () => {
   it("standard_port", () => {
     const req = new Request({ "rack.url_scheme": "http" });
     expect(req.standardPort).toBe(80);
@@ -70,7 +74,9 @@ describe("ActionDispatch::Request", () => {
     const req = new Request({ SERVER_PORT: "3000" });
     expect(req.serverPort).toBe(3000);
   });
+});
 
+describe("RequestPath", () => {
   it("full path", () => {
     const req = new Request({ PATH_INFO: "/posts", QUERY_STRING: "page=1" });
     expect(req.fullpath).toBe("/posts?page=1");
@@ -97,7 +103,9 @@ describe("ActionDispatch::Request", () => {
     const req = new Request({ PATH_INFO: "/posts", QUERY_STRING: "a=1" });
     expect(req.originalFullpath).toBe("/posts?a=1");
   });
+});
 
+describe("RequestHost", () => {
   it("host without specifying port", () => {
     const req = new Request({ SERVER_NAME: "example.com" });
     expect(req.host).toBe("example.com");
@@ -166,8 +174,17 @@ describe("ActionDispatch::Request", () => {
     expect(req.port).toBe(3000);
   });
 
-  // --- Request method ---
+  it("proxy request", () => {
+    const req = new Request({
+      HTTP_X_FORWARDED_PROTO: "https",
+      HTTP_HOST: "example.com",
+    });
+    expect(req.scheme).toBe("https");
+    expect(req.ssl).toBe(true);
+  });
+});
 
+describe("RequestMethod", () => {
   it("method returns environment's request method when it has not been overridden by middleware", () => {
     const req = new Request({ REQUEST_METHOD: "GET" });
     expect(req.method).toBe("GET");
@@ -207,9 +224,9 @@ describe("ActionDispatch::Request", () => {
     expect(req.method).toBe("PUT");
     expect(req.isPut).toBe(true);
   });
+});
 
-  // --- Content type ---
-
+describe("RequestMimeType", () => {
   it("content type", () => {
     const req = new Request({ CONTENT_TYPE: "application/json" });
     expect(req.contentType).toBe("application/json");
@@ -230,13 +247,49 @@ describe("ActionDispatch::Request", () => {
     expect(req.contentType).toBe("text/html");
   });
 
+  it("user agent", () => {
+    const req = new Request({ HTTP_USER_AGENT: "Mozilla/5.0" });
+    expect(req.userAgent).toBe("Mozilla/5.0");
+  });
+
+  it("negotiate_mime", () => {
+    const req = new Request({ HTTP_ACCEPT: "text/html" });
+    expect(req.format).toBe("html");
+  });
+
+  it("negotiate_mime with content_type", () => {
+    const req = new Request({
+      HTTP_ACCEPT: "application/json",
+      CONTENT_TYPE: "application/xml",
+    });
+    expect(req.format).toBe("json");
+    expect(req.contentType).toBe("application/xml");
+  });
+});
+
+describe("RequestParamsParsing", () => {
   it("doesn't break when content type has charset", () => {
     const req = new Request({ CONTENT_TYPE: "text/html; charset=utf-8" });
     expect(req.contentType).toBe("text/html");
   });
 
-  // --- Format ---
+  it("doesn't interpret request uri as query string when missing", () => {
+    const req = new Request({ PATH_INFO: "/posts" });
+    expect(req.queryString).toBe("");
+  });
 
+  it("content length", () => {
+    const req = new Request({ CONTENT_LENGTH: "42" });
+    expect(req.contentLength).toBe(42);
+  });
+
+  it("content length when missing", () => {
+    const req = new Request({});
+    expect(req.contentLength).toBeUndefined();
+  });
+});
+
+describe("RequestFormat", () => {
   it("xml format", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xml" });
     expect(req.format).toBe("xml");
@@ -276,23 +329,28 @@ describe("ActionDispatch::Request", () => {
     expect(req.format).toBe("xml");
   });
 
-  // --- User agent ---
-
-  it("user agent", () => {
-    const req = new Request({ HTTP_USER_AGENT: "Mozilla/5.0" });
-    expect(req.userAgent).toBe("Mozilla/5.0");
-  });
-
-  // --- XMLHttpRequest ---
-
   it("XMLHttpRequest", () => {
     const req = new Request({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" });
     expect(req.isXmlHttpRequest).toBe(true);
     expect(req.xhr).toBe(true);
   });
 
-  // --- SSL ---
+  it("format is not nil with unknown format", () => {
+    const req = new Request({ HTTP_ACCEPT: "application/octet-stream" });
+    // Unknown format returns undefined
+    expect(req.format).toBeUndefined();
+  });
 
+  it("can override format with parameter positive", () => {
+    const req = new Request({
+      HTTP_ACCEPT: "text/html",
+      "action_dispatch.request.parameters": { format: "json" },
+    });
+    expect(req.format).toBe("json");
+  });
+});
+
+describe("RequestProtocol", () => {
   it("reports ssl", () => {
     const req = new Request({ "rack.url_scheme": "https" });
     expect(req.ssl).toBe(true);
@@ -308,34 +366,46 @@ describe("ActionDispatch::Request", () => {
     expect(req.scheme).toBe("https");
   });
 
-  // --- Server software ---
-
   it("server software", () => {
     const req = new Request({ SERVER_SOFTWARE: "Apache/2.4.41" });
     expect(req.serverSoftware).toBe("Apache");
   });
+});
 
-  // --- Body ---
-
+describe("RequestRewind", () => {
   it("raw_post rewinds rack.input if RAW_POST_DATA is nil", () => {
     const req = new Request({ "rack.input": "body content" });
     expect(req.rawPost).toBe("body content");
   });
+});
 
+describe("RequestParameters", () => {
   it("raw_post does not raise when rack.input is nil", () => {
     const req = new Request({});
     expect(req.rawPost).toBe("");
   });
 
-  // --- IPs ---
+  it("path parameters", () => {
+    const req = new Request({
+      "action_dispatch.request.path_parameters": { controller: "posts", action: "show", id: "1" },
+    });
+    expect(req.pathParameters).toEqual({ controller: "posts", action: "show", id: "1" });
+  });
 
+  it("path parameters default empty", () => {
+    const req = new Request({});
+    expect(req.pathParameters).toEqual({});
+  });
+});
+
+describe("LocalhostTest", () => {
   it("IPs that match localhost", () => {
     const req = new Request({ REMOTE_ADDR: "127.0.0.1" });
     expect(req.ip).toBe("127.0.0.1");
   });
+});
 
-  // --- ETag ---
-
+describe("RequestEtag", () => {
   it("doesn't match absent If-None-Match", () => {
     const req = new Request({});
     expect(req.ifNoneMatch).toBeUndefined();
@@ -347,8 +417,13 @@ describe("ActionDispatch::Request", () => {
     expect(req.ifNoneMatchEtags).toEqual(['"abc"', '"def"']);
   });
 
-  // --- Variant ---
+  it("always matches *", () => {
+    const req = new Request({ HTTP_ACCEPT: "*/*" });
+    expect(req.format).toBe("html");
+  });
+});
 
+describe("RequestVariant", () => {
   it("setting variant to a symbol", () => {
     const req = new Request({});
     const mobile = Symbol("mobile");
@@ -384,9 +459,9 @@ describe("ActionDispatch::Request", () => {
       req.variant = ["mobile"] as any;
     }).toThrow(TypeError);
   });
+});
 
-  // --- Media type ---
-
+describe("RequestFormData", () => {
   it("media_type is from the FORM_DATA_MEDIA_TYPES array", () => {
     const req = new Request({ CONTENT_TYPE: "application/x-www-form-urlencoded" });
     expect(req.mediaType).toBe("application/x-www-form-urlencoded");
@@ -402,16 +477,16 @@ describe("ActionDispatch::Request", () => {
     expect(req.contentType).toBeUndefined();
     expect(req.isPost).toBe(true);
   });
+});
 
-  // --- Inspect ---
-
+describe("RequestInspectTest", () => {
   it("inspect", () => {
     const req = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/posts" });
     expect(req.inspect()).toBe('#<ActionDispatch::Request GET "/posts">');
   });
+});
 
-  // --- Session ---
-
+describe("RequestSession", () => {
   it("#session", () => {
     const req = new Request({ "rack.session": { user_id: 1 } });
     expect(req.session).toEqual({ user_id: 1 });
@@ -421,90 +496,9 @@ describe("ActionDispatch::Request", () => {
     const req = new Request({});
     expect(req.session).toEqual({});
   });
+});
 
-  // --- negotiate_mime ---
-
-  it("negotiate_mime", () => {
-    const req = new Request({ HTTP_ACCEPT: "text/html" });
-    expect(req.format).toBe("html");
-  });
-
-  it("negotiate_mime with content_type", () => {
-    const req = new Request({
-      HTTP_ACCEPT: "application/json",
-      CONTENT_TYPE: "application/xml",
-    });
-    expect(req.format).toBe("json");
-    expect(req.contentType).toBe("application/xml");
-  });
-
-  // --- Query string ---
-
-  it("doesn't interpret request uri as query string when missing", () => {
-    const req = new Request({ PATH_INFO: "/posts" });
-    expect(req.queryString).toBe("");
-  });
-
-  // --- Path parameters ---
-
-  it("path parameters", () => {
-    const req = new Request({
-      "action_dispatch.request.path_parameters": { controller: "posts", action: "show", id: "1" },
-    });
-    expect(req.pathParameters).toEqual({ controller: "posts", action: "show", id: "1" });
-  });
-
-  it("path parameters default empty", () => {
-    const req = new Request({});
-    expect(req.pathParameters).toEqual({});
-  });
-
-  // --- Content length ---
-
-  it("content length", () => {
-    const req = new Request({ CONTENT_LENGTH: "42" });
-    expect(req.contentLength).toBe(42);
-  });
-
-  it("content length when missing", () => {
-    const req = new Request({});
-    expect(req.contentLength).toBeUndefined();
-  });
-
-  // --- Proxy ---
-
-  it("proxy request", () => {
-    const req = new Request({
-      HTTP_X_FORWARDED_PROTO: "https",
-      HTTP_HOST: "example.com",
-    });
-    expect(req.scheme).toBe("https");
-    expect(req.ssl).toBe(true);
-  });
-
-  // --- Format edge cases ---
-
-  it("format is not nil with unknown format", () => {
-    const req = new Request({ HTTP_ACCEPT: "application/octet-stream" });
-    // Unknown format returns undefined
-    expect(req.format).toBeUndefined();
-  });
-
-  it("can override format with parameter positive", () => {
-    const req = new Request({
-      HTTP_ACCEPT: "text/html",
-      "action_dispatch.request.parameters": { format: "json" },
-    });
-    expect(req.format).toBe("json");
-  });
-
-  it("always matches *", () => {
-    const req = new Request({ HTTP_ACCEPT: "*/*" });
-    expect(req.format).toBe("html");
-  });
-
-  // --- Cookie syntax resilience ---
-
+describe("RequestCookie", () => {
   it("cookie syntax resilience", () => {
     const req = new Request({
       HTTP_COOKIE: "foo=bar; baz=qux",

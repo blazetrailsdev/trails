@@ -15,7 +15,7 @@ const cookieApp = async (_env: RackEnv): Promise<RackResponse> => [
   bodyFromString("OK"),
 ];
 
-describe("ActionDispatch::SSL", () => {
+describe("RedirectSSLTest", () => {
   it("redirects HTTP to HTTPS", async () => {
     const ssl = new SSL(okApp);
     const [status, headers] = await ssl.call({

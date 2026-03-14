@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ContentSecurityPolicy } from "../content-security-policy.js";
 
-describe("ActionDispatch::ContentSecurityPolicy", () => {
+describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("'self'");
@@ -127,33 +127,6 @@ describe("ActionDispatch::ContentSecurityPolicy", () => {
     expect(() => policy.build()).toThrow(/Missing context/);
   });
 
-  it("adds nonce to script src content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.scriptSrc("'self'");
-    const header = policy.build(undefined, "abc123");
-    expect(header).toContain("'nonce-abc123'");
-  });
-
-  it("adds nonce to script src content security policy only once", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.scriptSrc("'self'");
-    const header = policy.build(undefined, "abc123");
-    const matches = header.match(/nonce-abc123/g);
-    expect(matches?.length).toBe(1);
-  });
-
-  it("adds nonce to style src content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.styleSrc("'self'");
-    const header = policy.build(undefined, "xyz789");
-    expect(header).toContain("'nonce-xyz789'");
-  });
-
-  it("generates no content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    expect(policy.build()).toBe("");
-  });
-
   it("has directive check", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("'self'");
@@ -237,5 +210,36 @@ describe("ActionDispatch::ContentSecurityPolicy", () => {
     const policy = new ContentSecurityPolicy();
     policy.trustedTypes("default");
     expect(policy.build()).toBe("trusted-types default");
+  });
+});
+
+describe("ContentSecurityPolicyIntegrationTest", () => {
+  it("adds nonce to script src content security policy", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("'self'");
+    const header = policy.build(undefined, "abc123");
+    expect(header).toContain("'nonce-abc123'");
+  });
+
+  it("adds nonce to style src content security policy", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.styleSrc("'self'");
+    const header = policy.build(undefined, "xyz789");
+    expect(header).toContain("'nonce-xyz789'");
+  });
+
+  it("generates no content security policy", () => {
+    const policy = new ContentSecurityPolicy();
+    expect(policy.build()).toBe("");
+  });
+});
+
+describe("DefaultContentSecurityPolicyIntegrationTest", () => {
+  it("adds nonce to script src content security policy only once", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("'self'");
+    const header = policy.build(undefined, "abc123");
+    const matches = header.match(/nonce-abc123/g);
+    expect(matches?.length).toBe(1);
   });
 });

@@ -8,7 +8,7 @@ import { bodyToString } from "@rails-ts/rack";
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Journey::Route", () => {
+describe("TestRoute", () => {
   it("initialize", () => {
     const route = new Route("GET", "/:controller/:action/:id", "pages", "show", {
       name: "name",
@@ -87,7 +87,7 @@ describe("ActionDispatch::Journey::Route", () => {
 // ==========================================================================
 // Journey::Router tests (journey/router_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Journey::Router", () => {
+describe("TestRouter", () => {
   it("dashes", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -301,7 +301,7 @@ describe("ActionDispatch::Journey::Router", () => {
 // ==========================================================================
 // Journey::Router::Utils tests (journey/router/utils_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Journey::Router::Utils", () => {
+describe("Router", () => {
   it("path escape", () => {
     expect(escapePath("a/b c+d%")).toBe("a/b%20c+d%25");
   });
@@ -326,7 +326,7 @@ describe("ActionDispatch::Journey::Router::Utils", () => {
 // ==========================================================================
 // ActionDispatch::Routing::RouteSet tests (dispatch/routing/route_set_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Routing::RouteSet", () => {
+describe("RouteSetTest", () => {
   it("not being empty when route is added", () => {
     const routes = new RouteSet();
     expect(routes.getRoutes().length).toBe(0);
@@ -459,7 +459,7 @@ describe("ActionDispatch::Routing::RouteSet", () => {
 // ==========================================================================
 // dispatch/routing_test.rb (TestRoutingMapper)
 // ==========================================================================
-describe("ActionDispatch::Routing::Mapper", () => {
+describe("TestRoutingMapper", () => {
   it("logout", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -1185,42 +1185,6 @@ describe("ActionDispatch::Routing::Mapper", () => {
     expect(routes.recognize("GET", "/articles/abc")).toBeNull();
   });
 
-  it("recognizes tilde path", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/~user", { to: "users#show" });
-    });
-    expect(routes.recognize("GET", "/~user")).not.toBeNull();
-  });
-
-  it("recognizes minus path", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/young-and-fine", { to: "pages#show" });
-    });
-    expect(routes.recognize("GET", "/young-and-fine")).not.toBeNull();
-  });
-
-  it("recognizes unicode path", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/%E3%81%BB%E3%81%92", { to: "pages#show" });
-    });
-    expect(routes.recognize("GET", "/%E3%81%BB%E3%81%92")).not.toBeNull();
-  });
-
-  it("hash constraints dont leak between routes", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hash/:foo", { to: "pages#show", constraints: { foo: /foo/ } });
-      r.get("/hash/:bar", { to: "pages#show_bar" });
-    });
-    const m = routes.recognize("GET", "/hash/bar");
-    expect(m).not.toBeNull();
-    expect(m!.route.action).toBe("show_bar");
-    expect(m!.params.bar).toBe("bar");
-  });
-
   it("appending routes", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -1442,67 +1406,12 @@ describe("ActionDispatch::Routing::Mapper", () => {
     expect(routes.recognize("GET", "/lists/abc/todos/2")).toBeNull();
   });
 
-  it("goodbye should be available", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/goodbye", { to: "goodbye#index" });
-    });
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#index" });
-    });
-    expect(routes.recognize("GET", "/goodbye")).not.toBeNull();
-  });
-
-  it("hello should not be overwritten", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#first" });
-    });
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#second" });
-    });
-    // First match wins
-    expect(routes.recognize("GET", "/hello")!.route.action).toBe("first");
-  });
-
-  it("missing routes are still missing", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#index" });
-    });
-    expect(routes.recognize("GET", "/random")).toBeNull();
-  });
-
-  it("default scope", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("api", { as: "api" }, (r) => {
-        r.resources("posts");
-      });
-    });
-    expect(routes.recognize("GET", "/api/posts")).not.toBeNull();
-    expect(routes.pathFor("api_posts")).toBe("/api/posts");
-  });
-
   it("URL helpers raise a missing keys error for a nil param", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     expect(() => routes.pathFor("post")).toThrow(/Missing required parameter/);
-  });
-
-  it("URL helpers raise message with mixed parameters when generation fails", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
-    });
-    expect(() => routes.pathFor("post_comment", { id: 1 })).toThrow(/comment_id/);
-  });
-
-  it("correct for empty UrlGenerationError", () => {
-    const routes = new RouteSet();
-    expect(() => routes.pathFor("nonexistent")).toThrow(/No route matches name/);
   });
 
   it("resource with slugs in ids", () => {
@@ -1870,7 +1779,7 @@ describe("ActionDispatch::Routing::Mapper", () => {
 // ==========================================================================
 // dispatch/routing/inspector_test.rb
 // ==========================================================================
-describe("ActionDispatch::Routing::Inspector", () => {
+describe("RoutesInspectorTest", () => {
   it("displaying routes for engines", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -2062,5 +1971,108 @@ describe("ActionDispatch::Routing::Assertions", () => {
     // After the block, routes are discarded (simulated by clearing)
     routes.clear();
     expect(() => routes.pathFor("temp")).toThrow();
+  });
+});
+
+describe("TestAppendingRoutes", () => {
+  it("goodbye should be available", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/goodbye", { to: "goodbye#index" });
+    });
+    routes.draw((r) => {
+      r.get("/hello", { to: "hello#index" });
+    });
+    expect(routes.recognize("GET", "/goodbye")).not.toBeNull();
+  });
+
+  it("hello should not be overwritten", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/hello", { to: "hello#first" });
+    });
+    routes.draw((r) => {
+      r.get("/hello", { to: "hello#second" });
+    });
+    // First match wins
+    expect(routes.recognize("GET", "/hello")!.route.action).toBe("first");
+  });
+
+  it("missing routes are still missing", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/hello", { to: "hello#index" });
+    });
+    expect(routes.recognize("GET", "/random")).toBeNull();
+  });
+});
+
+describe("TestDefaultScope", () => {
+  it("default scope", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.scope("api", { as: "api" }, (r) => {
+        r.resources("posts");
+      });
+    });
+    expect(routes.recognize("GET", "/api/posts")).not.toBeNull();
+    expect(routes.pathFor("api_posts")).toBe("/api/posts");
+  });
+});
+
+describe("TestRecognizePath", () => {
+  it("hash constraints dont leak between routes", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/hash/:foo", { to: "pages#show", constraints: { foo: /foo/ } });
+      r.get("/hash/:bar", { to: "pages#show_bar" });
+    });
+    const m = routes.recognize("GET", "/hash/bar");
+    expect(m).not.toBeNull();
+    expect(m!.route.action).toBe("show_bar");
+    expect(m!.params.bar).toBe("bar");
+  });
+});
+
+describe("TestTildeAndMinusPaths", () => {
+  it("recognizes tilde path", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/~user", { to: "users#show" });
+    });
+    expect(routes.recognize("GET", "/~user")).not.toBeNull();
+  });
+
+  it("recognizes minus path", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/young-and-fine", { to: "pages#show" });
+    });
+    expect(routes.recognize("GET", "/young-and-fine")).not.toBeNull();
+  });
+});
+
+describe("TestUnicodePaths", () => {
+  it("recognizes unicode path", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/%E3%81%BB%E3%81%92", { to: "pages#show" });
+    });
+    expect(routes.recognize("GET", "/%E3%81%BB%E3%81%92")).not.toBeNull();
+  });
+});
+
+describe("TestUrlGenerationErrors", () => {
+  it("URL helpers raise message with mixed parameters when generation fails", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
+    });
+    expect(() => routes.pathFor("post_comment", { id: 1 })).toThrow(/comment_id/);
+  });
+
+  it("correct for empty UrlGenerationError", () => {
+    const routes = new RouteSet();
+    expect(() => routes.pathFor("nonexistent")).toThrow(/No route matches name/);
   });
 });
