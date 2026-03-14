@@ -3166,5 +3166,5 @@ describe("BasicsTest", () => {
 });
 
 // ==========================================================================
-// InheritanceTest — targets inheritance_test.rb
+// BasicsTest — targets base_test.rb (continued)
 // ==========================================================================

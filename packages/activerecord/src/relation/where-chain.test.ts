@@ -431,5 +431,5 @@ describe("WhereChainTest", () => {
 });
 
 // ==========================================================================
-// InsertAllTest — targets insert_all_test.rb
+// WhereChainTest — targets relation/where_chain_test.rb (continued)
 // ==========================================================================

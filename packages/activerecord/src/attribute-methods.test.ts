@@ -1931,5 +1931,5 @@ describe("AttributeMethodsTest", () => {
 });
 
 // ==========================================================================
-// WhereTest — targets relation/where_test.rb
+// AttributeMethodsTest — targets attribute_methods_test.rb (continued)
 // ==========================================================================

@@ -1491,5 +1491,5 @@ describe("WhereTest", () => {
 });
 
 // ==========================================================================
-// WhereChainTest — targets relation/where_chain_test.rb
+// WhereTest — targets relation/where_test.rb (continued)
 // ==========================================================================

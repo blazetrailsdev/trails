@@ -7109,5 +7109,5 @@ describe("CalculationsTest", () => {
 });
 
 // ==========================================================================
-// FinderTest — targets finder_test.rb
+// CalculationsTest — targets calculations_test.rb (continued)
 // ==========================================================================

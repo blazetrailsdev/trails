@@ -2248,5 +2248,5 @@ describe("InheritanceTest", () => {
 });
 
 // ==========================================================================
-// AttributeMethodsTest — targets attribute_methods_test.rb
+// InheritanceTest — targets inheritance_test.rb (continued)
 // ==========================================================================
