@@ -355,15 +355,4 @@ describe("Static shorthands (Rails-guided)", () => {
   it.skip("scoping applies to all queries on has many when set", () => {
     /* TODO: needs helpers from original file */
   });
-  it.skip("forwarding of static methods", () => {
-    /* TODO: needs helpers from original file */
-  });
-
-  it.skip("nested scope finder", () => {
-    /* TODO: needs helpers from original file */
-  });
-
-  it.skip("none scoping", () => {
-    /* TODO: needs helpers from original file */
-  });
 });
