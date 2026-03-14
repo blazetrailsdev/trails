@@ -102,6 +102,8 @@ class TestExtractor
     return unless node.is_a?(Array)
 
     case node[0]
+    when :method_add_block
+      process_method_add_block(node)
     when :command
       process_command(node)
     when :method_add_arg
@@ -117,6 +119,63 @@ class TestExtractor
     else
       node.each { |child| walk(child) if child.is_a?(Array) }
     end
+  end
+
+  # Handle :method_add_block — wraps a command/fcall with a do_block/brace_block.
+  # This is how `describe "foo" do ... end` is parsed: the :command is child [1]
+  # and the :do_block with the body is child [2].
+  def process_method_add_block(node)
+    inner = node[1]
+    block = node[2]
+
+    # Check if inner is a command (describe/it/test)
+    if inner.is_a?(Array) && inner[0] == :command
+      cmd_name = ident_name(inner[1])
+      case cmd_name
+      when "describe"
+        desc = extract_first_string(inner[2])
+        if desc
+          @describe_stack.push(desc)
+          walk(block) if block.is_a?(Array)
+          @describe_stack.pop
+          return
+        end
+      when "it"
+        # Pass outer node so assertion extraction can walk the block body
+        process_it(inner[2], node)
+        return
+      when "test"
+        process_test_macro(inner[2], node)
+        return
+      end
+    end
+
+    # Check if inner is a method_add_arg (parenthesized form)
+    if inner.is_a?(Array) && inner[0] == :method_add_arg
+      if inner[1].is_a?(Array) && inner[1][0] == :fcall
+        cmd_name = ident_name(inner[1][1])
+        case cmd_name
+        when "describe"
+          desc = extract_string_from_arg_paren(inner[2])
+          if desc
+            @describe_stack.push(desc)
+            walk(block) if block.is_a?(Array)
+            @describe_stack.pop
+            return
+          end
+        when "it"
+          # Pass inner for desc extraction, outer node includes block for assertions
+          process_it_paren(inner, node)
+          return
+        when "test"
+          process_test_macro_paren(inner, node)
+          return
+        end
+      end
+    end
+
+    # Fallback: walk children
+    node.each { |child| walk(child) if child.is_a?(Array) }
   end
 
   def process_class(node)
@@ -206,12 +265,12 @@ class TestExtractor
     }
   end
 
-  def process_it_paren(node)
+  def process_it_paren(node, outer_node = nil)
     desc = extract_string_from_arg_paren(node[2])
     return unless desc
 
     line = extract_line(node)
-    assertions = extract_assertions_from_node(node)
+    assertions = extract_assertions_from_node(outer_node || node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -246,12 +305,12 @@ class TestExtractor
     }
   end
 
-  def process_test_macro_paren(node)
+  def process_test_macro_paren(node, outer_node = nil)
     desc = extract_string_from_arg_paren(node[2])
     return unless desc
 
     line = extract_line(node)
-    assertions = extract_assertions_from_node(node)
+    assertions = extract_assertions_from_node(outer_node || node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
