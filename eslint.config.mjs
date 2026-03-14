@@ -17,13 +17,14 @@ export default defineConfig(
       "unused-imports": unusedImports,
     },
     rules: {
-      // Enable with underscore-prefix ignore pattern for intentionally unused params
-      "@typescript-eslint/no-unused-vars": [
+      // Use unused-imports plugin for imports (auto-fixable) and vars
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      // Auto-fixable unused imports
-      "unused-imports/no-unused-imports": "error",
+      // Disable the built-in rule to avoid duplicate reports
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
   // Vitest-specific rules for activemodel test files only (other packages have too many violations)
@@ -49,10 +50,10 @@ export default defineConfig(
       "packages/cli/src/**/*.ts",
     ],
     rules: {
-      "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "no-undef": "off",
       "unused-imports/no-unused-imports": "off",
+      "unused-imports/no-unused-vars": "off",
     },
   },
   {
@@ -64,7 +65,7 @@ export default defineConfig(
       },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
