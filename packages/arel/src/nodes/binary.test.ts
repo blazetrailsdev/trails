@@ -3,15 +3,17 @@ import { Table, Nodes } from "../index.js";
 
 describe("NodesTest", () => {
   const users = new Table("users");
-  it("generates a hash based on its value", () => {
-    const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
-    const b = new Nodes.Equality(users.get("id"), new Nodes.Quoted(2));
-    expect(a.hash()).not.toBe(b.hash());
-  });
+  describe("Binary", () => {
+    it("generates a hash based on its value", () => {
+      const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
+      const b = new Nodes.Equality(users.get("id"), new Nodes.Quoted(2));
+      expect(a.hash()).not.toBe(b.hash());
+    });
 
-  it("generates a hash specific to its class", () => {
-    const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
-    const b = new Nodes.NotEqual(users.get("id"), new Nodes.Quoted(1));
-    expect(a.hash()).not.toBe(b.hash());
+    it("generates a hash specific to its class", () => {
+      const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
+      const b = new Nodes.NotEqual(users.get("id"), new Nodes.Quoted(1));
+      expect(a.hash()).not.toBe(b.hash());
+    });
   });
 });

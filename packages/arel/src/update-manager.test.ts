@@ -12,83 +12,95 @@ describe("UpdateManagerTest", () => {
     expect(sql).not.toContain("'NOW()'");
   });
 
-  it("sets having", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.having(users.get("id").gt(0));
-    expect(um.ast.havings.length).toBe(1);
+  describe("having", () => {
+    it("sets having", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.having(users.get("id").gt(0));
+      expect(um.ast.havings.length).toBe(1);
+    });
   });
 
-  it("adds columns to the AST when group value is a String", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.group("name");
-    expect(um.ast.groups.length).toBe(1);
+  describe("group", () => {
+    it("adds columns to the AST when group value is a String", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.group("name");
+      expect(um.ast.groups.length).toBe(1);
+    });
+
+    it("adds columns to the AST when group value is a Symbol", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.group(users.get("name"));
+      expect(um.ast.groups.length).toBe(1);
+    });
   });
 
-  it("adds columns to the AST when group value is a Symbol", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.group(users.get("name"));
-    expect(um.ast.groups.length).toBe(1);
+  describe("set", () => {
+    it("updates with null", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([[users.get("name"), null]]);
+      mgr.where(users.get("id").eq(1));
+      expect(mgr.toSql()).toContain("= NULL");
+    });
+
+    it("takes a string", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([[users.get("name"), "test"]]);
+      expect(mgr.toSql()).toContain("test");
+    });
   });
 
-  it("updates with null", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    mgr.set([[users.get("name"), null]]);
-    mgr.where(users.get("id").eq(1));
-    expect(mgr.toSql()).toContain("= NULL");
+  describe("table", () => {
+    it("generates an update statement", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([[users.get("name"), "dean"]]);
+      expect(mgr.toSql()).toContain("UPDATE");
+    });
+
+    it("generates an update statement with joins", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.set([[users.get("name"), "bob"]]);
+      const sql = um.toSql();
+      expect(sql).toContain("UPDATE");
+      expect(sql).toContain("SET");
+    });
   });
 
-  it("takes a string", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    mgr.set([[users.get("name"), "test"]]);
-    expect(mgr.toSql()).toContain("test");
+  describe("where", () => {
+    it("generates a where clause", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([
+        [users.get("name"), "dean"],
+        [users.get("age"), 31],
+      ]);
+      mgr.where(users.get("id").eq(1));
+      expect(mgr.toSql()).toBe(
+        `UPDATE "users" SET "users"."name" = 'dean', "users"."age" = 31 WHERE "users"."id" = 1`,
+      );
+    });
   });
 
-  it("generates an update statement", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    mgr.set([[users.get("name"), "dean"]]);
-    expect(mgr.toSql()).toContain("UPDATE");
-  });
+  describe("key", () => {
+    it("can be set", () => {
+      const manager = new UpdateManager();
+      manager.table(users);
+      manager.key(users.attr("id").eq(1));
+      expect(manager.ast.key).not.toBeNull();
+    });
 
-  it("generates an update statement with joins", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.set([[users.get("name"), "bob"]]);
-    const sql = um.toSql();
-    expect(sql).toContain("UPDATE");
-    expect(sql).toContain("SET");
-  });
-
-  it("generates a where clause", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    mgr.set([
-      [users.get("name"), "dean"],
-      [users.get("age"), 31],
-    ]);
-    mgr.where(users.get("id").eq(1));
-    expect(mgr.toSql()).toBe(
-      `UPDATE "users" SET "users"."name" = 'dean', "users"."age" = 31 WHERE "users"."id" = 1`,
-    );
-  });
-
-  it("can be set", () => {
-    const manager = new UpdateManager();
-    manager.table(users);
-    manager.key(users.attr("id").eq(1));
-    expect(manager.ast.key).not.toBeNull();
-  });
-
-  it("can be accessed", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.where(users.get("id").eq(1));
-    expect(um.wheres.length).toBe(1);
+    it("can be accessed", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.where(users.get("id").eq(1));
+      expect(um.wheres.length).toBe(1);
+    });
   });
 
   it("UPDATE with ORDER BY and LIMIT", () => {
@@ -125,21 +137,25 @@ describe("UpdateManagerTest", () => {
     expect(um.toSql()).toContain("LIMIT 10");
   });
 
-  it("takes a list of lists", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.set([
-      [users.get("id"), 1],
-      [users.get("name"), "hello"],
-    ]);
-    const sql = um.toSql();
-    expect(sql).toContain('"users"."id" = 1');
-    expect(sql).toContain('"users"."name" =');
+  describe("set", () => {
+    it("takes a list of lists", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.set([
+        [users.get("id"), 1],
+        [users.get("name"), "hello"],
+      ]);
+      const sql = um.toSql();
+      expect(sql).toContain('"users"."id" = 1');
+      expect(sql).toContain('"users"."name" =');
+    });
   });
 
-  it("chains", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+  describe("where", () => {
+    it("chains", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+    });
   });
 });

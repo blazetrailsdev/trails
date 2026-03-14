@@ -3,23 +3,27 @@ import { Table, DeleteManager } from "./index.js";
 
 describe("DeleteManagerTest", () => {
   const users = new Table("users");
-  it("uses from", () => {
-    const mgr = new DeleteManager();
-    mgr.from(users);
-    expect(mgr.toSql()).toContain('DELETE FROM "users"');
+  describe("from", () => {
+    it("uses from", () => {
+      const mgr = new DeleteManager();
+      mgr.from(users);
+      expect(mgr.toSql()).toContain('DELETE FROM "users"');
+    });
   });
 
-  it("uses where values", () => {
-    const mgr = new DeleteManager();
-    mgr.from(users);
-    mgr.where(users.get("id").eq(1));
-    expect(mgr.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = 1');
-  });
+  describe("where", () => {
+    it("uses where values", () => {
+      const mgr = new DeleteManager();
+      mgr.from(users);
+      mgr.where(users.get("id").eq(1));
+      expect(mgr.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = 1');
+    });
 
-  it("chains", () => {
-    const mgr = new DeleteManager();
-    expect(mgr.from(users)).toBe(mgr);
-    expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+    it("chains", () => {
+      const mgr = new DeleteManager();
+      expect(mgr.from(users)).toBe(mgr);
+      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+    });
   });
 
   it("handles limit properly", () => {

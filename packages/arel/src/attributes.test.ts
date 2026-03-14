@@ -10,15 +10,17 @@ describe("Attributes", () => {
     expect(fn.name).toBe("LOWER");
   });
 
-  it("is equal with equal ivars", () => {
-    const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-    const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-    expect(c1.name).toBe(c2.name);
-  });
+  describe("equality", () => {
+    it("is equal with equal ivars", () => {
+      const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
+      const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
+      expect(c1.name).toBe(c2.name);
+    });
 
-  it("is not equal with different ivars", () => {
-    const a = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-    const b = new Nodes.NamedFunction("COUNT", [users.get("name")]);
-    expect(a).not.toEqual(b);
+    it("is not equal with different ivars", () => {
+      const a = new Nodes.NamedFunction("COUNT", [users.get("id")]);
+      const b = new Nodes.NamedFunction("COUNT", [users.get("name")]);
+      expect(a).not.toEqual(b);
+    });
   });
 });
