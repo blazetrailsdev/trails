@@ -26,6 +26,12 @@ describe("ActiveModel", () => {
       const nested = new NestedError({}, inner);
       expect(nested.message).toBe("can't be blank");
     });
+
+    it("full message", () => {
+      const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
+      const nested = new NestedError({}, inner);
+      expect(nested.fullMessage).toBe("Name can't be blank");
+    });
   });
 
   describe("NestedError", () => {

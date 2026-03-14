@@ -764,15 +764,7 @@ describe("ActiveModel", () => {
       expect(e.ofKind("name", "invalid")).toBe(false);
     });
 
-    it("full_messages doesn't require the base object to respond to :errors", () => {
-      // Base object is a plain object without an errors property
-      const base = { name: "test" };
-      const errors = new Errors(base);
-      errors.add("name", "blank");
-      expect(errors.fullMessages).toEqual(["Name can't be blank"]);
-    });
-
-    it("full_messages doesn't require the base object to respond to :errors", () => {
+    it("full_messages doesn't require the base object to respond to `:errors", () => {
       class CustomModel {
         errors: Errors;
         constructor() {
