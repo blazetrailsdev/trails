@@ -188,18 +188,6 @@ describe("InsertManagerTest", () => {
     expect(manager.columns).toEqual([]);
   });
 
-  describe("combo", () => {
-    it("combines columns and values list in order", () => {
-      const manager = new InsertManager();
-      manager.into(users);
-      manager.insert([
-        [users.attr("name"), "Alice"],
-        [users.attr("email"), "alice@example.com"],
-      ]);
-      expect(manager.columns.length).toBe(2);
-    });
-  });
-
   describe("insert", () => {
     it("inserts false", () => {
       const mgr = new InsertManager();

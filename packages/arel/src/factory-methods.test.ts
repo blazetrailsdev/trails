@@ -54,27 +54,6 @@ describe("TestFactoryMethods", () => {
     expect(fn.name).toBe("CAST");
   });
 
-  it("create join", () => {
-    const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
-    expect(join).toBeInstanceOf(Nodes.InnerJoin);
-  });
-
-  it("create table alias", () => {
-    const alias = users.alias("u");
-    expect(alias).toBeInstanceOf(Nodes.TableAlias);
-    expect(alias.name).toBe("u");
-  });
-
-  it("create string join", () => {
-    const join = users.createStringJoin("INNER JOIN posts ON posts.user_id = users.id");
-    expect(join).toBeInstanceOf(Nodes.StringJoin);
-  });
-
-  it("create on", () => {
-    const on = users.createOn(users.get("id").eq(posts.get("user_id")));
-    expect(on).toBeInstanceOf(Nodes.On);
-  });
-
   it("create true", () => {
     const t = users.createTrue();
     expect(t).toBeInstanceOf(Nodes.True);

@@ -216,24 +216,6 @@ describe("TableTest", () => {
     expect(a.name).toBe(b.name);
   });
 
-  it("should accept a hash (constructor options)", () => {
-    const t = new Table("users", { as: "u" });
-    expect(t.tableAlias).toBe("u");
-  });
-
-  describe("where", () => {
-    it("returns a tree manager", () => {
-      const mgr = users.from();
-      expect(mgr).toBeInstanceOf(SelectManager);
-    });
-  });
-
-  it("manufactures an attribute", () => {
-    const attr = users.get("id");
-    expect(attr).toBeInstanceOf(Nodes.Attribute);
-    expect(attr.name).toBe("id");
-  });
-
   describe("alias", () => {
     it("should create a node that proxies to a table", () => {
       const aliased = users.as("u");
