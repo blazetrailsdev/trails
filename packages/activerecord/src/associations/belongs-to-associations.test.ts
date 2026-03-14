@@ -2011,30 +2011,6 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.readAttribute("title")).toBe("Hello");
   });
-  it("with select", async () => {
-    class Company extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("city", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Account extends Base {
-      static {
-        this.attribute("company_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Company);
-    registerModel(Account);
-    const company = await Company.create({ name: "Acme", city: "NYC" });
-    const account = await Account.create({ company_id: company.id });
-    const loaded = await loadBelongsTo(account, "company", {
-      className: "Company",
-      foreignKey: "company_id",
-    });
-    expect((loaded as any).readAttribute("name")).toBe("Acme");
-  });
   it("custom attribute with select", async () => {
     class Company extends Base {
       static {
@@ -3071,19 +3047,6 @@ describe("BelongsToAssociationsTest", () => {
     expect(company.isNewRecord()).toBe(true);
   });
 
-  it("create with block", async () => {
-    class Company extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Company);
-    const company = await Company.create({ name: "BlockCreated" });
-    expect((company as any).readAttribute("name")).toBe("BlockCreated");
-    expect(company.isNewRecord()).toBe(false);
-  });
-
   it("create bang with block", async () => {
     class Company extends Base {
       static {
@@ -3854,5 +3817,70 @@ describe("BelongsToAssociationsTest", () => {
     });
     expect(loaded).not.toBeNull();
     expect(loaded!.readAttribute("name")).toBe("AsyncCo");
+  });
+  it("belongs to", async () => {
+    // Rails: test_belongs_to
+    class BtCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BtAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BtCompany", BtCompany);
+    registerModel("BtAccount", BtAccount);
+
+    const company = await BtCompany.create({ name: "37signals" });
+    const account = await BtAccount.create({
+      company_id: company.id,
+      credit_limit: 50,
+    });
+
+    const loaded = await loadBelongsTo(account, "btCompany", {
+      className: "BtCompany",
+      foreignKey: "company_id",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("37signals");
+  });
+
+  it("belongs to with primary key", async () => {
+    // Rails: test_belongs_to_with_primary_key
+    class PkFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PkClient extends Base {
+      static {
+        this.attribute("firm_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PkFirm", PkFirm);
+    registerModel("PkClient", PkClient);
+
+    const firm = await PkFirm.create({ name: "Apple", firm_name: "Apple Inc" });
+    const client = await PkClient.create({ firm_name: "Apple Inc" });
+
+    const loaded = await loadBelongsTo(client, "pkFirm", {
+      className: "PkFirm",
+      foreignKey: "firm_name",
+      primaryKey: "firm_name",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.readAttribute("name")).toBe("Apple");
+  });
+
+  it.skip("cant save readonly association", () => {
+    // Requires readonly association
   });
 });

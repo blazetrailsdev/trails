@@ -14,10 +14,7 @@ describeIfMysql("MysqlAdapter", () => {
   });
 
   describe("TransactionTest", () => {
-    it.skip("raises Deadlocked when a deadlock is encountered", () => {});
-    it.skip("raises LockWaitTimeout when lock wait timeout exceeded", () => {});
     it.skip("raises StatementTimeout when statement timeout exceeded", () => {});
-    it.skip("raises QueryCanceled when canceling statement due to user request", () => {});
     it.skip("reconnect preserves isolation level", () => {});
   });
 });

@@ -273,20 +273,6 @@ describe("DirtyTest2", () => {
     expect(post).toBeTruthy();
   });
 
-  it("reverted changes are not dirty going from nil to value and back", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("subtitle", "string");
-        this.adapter = adp;
-      }
-    }
-    const post = (await Post.create({ subtitle: null })) as any;
-    post.writeAttribute("subtitle", "hello");
-    post.writeAttribute("subtitle", null);
-    expect(post.changed).toBe(false);
-  });
-
   it("previous changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {

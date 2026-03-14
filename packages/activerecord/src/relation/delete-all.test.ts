@@ -481,4 +481,39 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
     const items = await Item.all().toArray();
     expect(items.every((i: any) => i.readAttribute("status") === "new")).toBe(true);
   });
+  it.skip("destroy all", () => {
+    /* TODO: needs helpers from original file */
+  });
+
+  it("delete all", async () => {
+    class DeleteAllAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DeleteAllPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(DeleteAllAuthor);
+    registerModel(DeleteAllPost);
+    Associations.hasMany.call(DeleteAllAuthor, "delete_all_posts", {
+      className: "DeleteAllPost",
+      foreignKey: "author_id",
+      dependent: "delete",
+    });
+    const author = await DeleteAllAuthor.create({ name: "Alice" });
+    await DeleteAllPost.create({ author_id: author.id, title: "A" });
+    await DeleteAllPost.create({ author_id: author.id, title: "B" });
+    await processDependentAssociations(author);
+    const remaining = await loadHasMany(author, "delete_all_posts", {
+      className: "DeleteAllPost",
+      foreignKey: "author_id",
+    });
+    expect(remaining.length).toBe(0);
+  });
 });

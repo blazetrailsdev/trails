@@ -568,4 +568,378 @@ describe("afterCommit / afterRollback", () => {
     });
     expect(log).toContain("invoice committed");
   });
+  it("after commit callbacks with optimistic locking", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("title", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+        this.afterCreate(function () {
+          log.push("created");
+        });
+        this.afterUpdate(function () {
+          log.push("updated");
+        });
+      }
+    }
+    const p = await Post.create({ title: "test" });
+    expect(log).toContain("created");
+    await p.update({ title: "changed" });
+    expect(log).toContain("updated");
+    expect(p.readAttribute("lock_version")).toBe(1);
+  });
+
+  it("after commit on multiple actions", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.afterCreate(function () {
+          log.push("created");
+        });
+        this.afterUpdate(function () {
+          log.push("updated");
+        });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
+      }
+    }
+    const p = await Post.create({ title: "a" });
+    expect(log).toContain("created");
+    p.writeAttribute("title", "b");
+    await p.save();
+    expect(log).toContain("updated");
+    await p.destroy();
+    expect(log).toContain("destroyed");
+  });
+
+  it.skip("before commit actions", () => {
+    /* fixture-dependent */
+  });
+
+  it.skip("before commit update in same transaction", () => {
+    /* fixture-dependent */
+  });
+
+  it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeCreate(function () {
+          log.push("first");
+        });
+        this.beforeCreate(function () {
+          log.push("second");
+        });
+        this.afterCreate(function () {
+          log.push("after");
+        });
+      }
+    }
+    await Post.create({ title: "test" });
+    expect(log[0]).toBe("first");
+    expect(log[1]).toBe("second");
+    expect(log[2]).toBe("after");
+  });
+
+  it("trigger once on multiple deletion within transaction", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterDestroy((record: any) => {
+          log.push("destroyed:" + record.readAttribute("title"));
+        });
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    await transaction(Topic, async () => {
+      await t1.destroy();
+    });
+    expect(log.filter((l) => l === "destroyed:a").length).toBe(1);
+  });
+
+  it("trigger once on multiple deletions", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterDestroy((record: any) => {
+          log.push("destroyed:" + record.readAttribute("title"));
+        });
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    await t1.destroy();
+    await t2.destroy();
+    expect(log.length).toBe(2);
+  });
+
+  it("trigger once on multiple deletions in a transaction", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterDestroy((record: any) => {
+          log.push("destroyed:" + record.readAttribute("title"));
+        });
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    await transaction(Topic, async () => {
+      await t1.destroy();
+      await t2.destroy();
+    });
+    expect(log.length).toBe(2);
+    expect(log).toContain("destroyed:a");
+    expect(log).toContain("destroyed:b");
+  });
+
+  it("rollback on multiple deletions", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterDestroy((record: any) => {
+          log.push("destroyed");
+        });
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const rollbackLog: string[] = [];
+    try {
+      await transaction(Topic, async (tx) => {
+        tx.afterRollback(() => {
+          rollbackLog.push("rollback");
+        });
+        await t1.destroy();
+        await t2.destroy();
+        throw new Error("rollback");
+      });
+    } catch {}
+    expect(rollbackLog.length).toBeGreaterThan(0);
+  });
+
+  it("trigger on update where row was deleted", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterUpdate(function () {
+          log.push("updated");
+        });
+        this.afterDestroy(function () {
+          log.push("destroyed");
+        });
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    await t1.destroy();
+    expect(log).toContain("destroyed");
+  });
+
+  it("callback on action with condition", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean", { default: false });
+        this.adapter = adapter;
+        this.beforeSave(function (record: any) {
+          if (record.readAttribute("published")) {
+            log.push("published_save");
+          }
+        });
+      }
+    }
+    await Post.create({ title: "draft", published: false });
+    expect(log).not.toContain("published_save");
+    await Post.create({ title: "live", published: true });
+    expect(log).toContain("published_save");
+  });
+
+  it("created callback called on last to save of separate instances in a transaction", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCreate((record: any) => {
+          log.push("created:" + record.readAttribute("title"));
+        });
+      }
+    }
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "first" });
+      await Topic.create({ title: "second" });
+    });
+    expect(log).toContain("created:first");
+    expect(log).toContain("created:second");
+    expect(log.length).toBe(2);
+  });
+
+  it("created callback called on first to save in transaction with old configuration", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCreate((record: any) => {
+          log.push("created:" + record.readAttribute("title"));
+        });
+      }
+    }
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "first" });
+      await Topic.create({ title: "second" });
+    });
+    expect(log[0]).toBe("created:first");
+  });
+
+  it("updated callback called on last to save of separate instances in a transaction", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const log: string[] = [];
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
+    await transaction(Topic, async () => {
+      await t1.update({ title: "a2" });
+      await t2.update({ title: "b2" });
+    });
+    expect(log).toContain("updated:a2");
+    expect(log).toContain("updated:b2");
+    expect(log.length).toBe(2);
+  });
+
+  it("updated callback called on first to save in transaction with old configuration", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const log: string[] = [];
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
+    await transaction(Topic, async () => {
+      await t1.update({ title: "a2" });
+      await t2.update({ title: "b2" });
+    });
+    expect(log[0]).toBe("updated:a2");
+  });
+
+  it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const log: string[] = [];
+    Topic.afterDestroy((record: any) => {
+      log.push("destroyed:" + record.readAttribute("title"));
+    });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
+    await transaction(Topic, async () => {
+      await t1.update({ title: "a2" });
+      await t2.destroy();
+    });
+    expect(log).toContain("destroyed:b");
+    expect(log).toContain("updated:a2");
+  });
+
+  it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => {
+    /* fixture-dependent */
+  });
+
+  it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const log: string[] = [];
+    Topic.afterDestroy((record: any) => {
+      log.push("destroyed:" + record.readAttribute("title"));
+    });
+    Topic.afterUpdate((record: any) => {
+      log.push("updated:" + record.readAttribute("title"));
+    });
+    await transaction(Topic, async () => {
+      await t1.destroy();
+      await t2.update({ title: "b2" });
+    });
+    expect(log).toContain("destroyed:a");
+    expect(log).toContain("updated:b2");
+  });
+
+  it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => {
+    /* fixture-dependent */
+  });
+
+  it("set callback with on", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeCreate(function () {
+          log.push("before_create");
+        });
+        this.beforeSave(function () {
+          log.push("before_save");
+        });
+      }
+    }
+    await Post.create({ title: "test" });
+    expect(log).toContain("before_create");
+    expect(log).toContain("before_save");
+  });
 });

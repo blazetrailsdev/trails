@@ -667,24 +667,6 @@ describe("Aggregations", () => {
 
     expect(await Order.all().none().average("amount")).toBeNull();
   });
-
-  it("count with column parameter", async () => {
-    const adapter = freshAdapter();
-
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.adapter = adapter;
-      }
-    }
-
-    await User.create({ name: "Alice", email: "a@b.com" });
-    await User.create({ name: "Bob" }); // email is null
-
-    expect(await User.all().count()).toBe(2);
-    expect(await User.all().count("email")).toBe(1);
-  });
 });
 
 describe("Aggregation edge cases", () => {
@@ -740,25 +722,6 @@ describe("Aggregation edge cases", () => {
 
     await Order.create({ amount: 10 });
     expect(await Order.all().none().maximum("amount")).toBeNull();
-  });
-
-  it("should sum scoped field with conditions", async () => {
-    const adapter = freshAdapter();
-
-    class Order extends Base {
-      static {
-        this.attribute("amount", "integer");
-        this.attribute("status", "string");
-        this.adapter = adapter;
-      }
-    }
-
-    await Order.create({ amount: 10, status: "paid" });
-    await Order.create({ amount: 20, status: "pending" });
-    await Order.create({ amount: 30, status: "paid" });
-
-    expect(await Order.where({ status: "paid" }).sum("amount")).toBe(40);
-    expect(await Order.where({ status: "pending" }).sum("amount")).toBe(20);
   });
 });
 

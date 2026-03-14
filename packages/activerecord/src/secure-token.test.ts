@@ -162,28 +162,6 @@ describe("SecureTokenTest", () => {
   });
 });
 
-describe("SecureTokenTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  function makeModel() {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("token", "string");
-        this.adapter = adapter;
-      }
-    }
-    hasSecureToken(User, "token");
-    return { User };
-  }
-
-  it.skip("finds record by token", () => {});
-  it.skip("does not find record when token is invalid", () => {});
-});
-
 describe("has_secure_token", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {

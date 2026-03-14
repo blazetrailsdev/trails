@@ -25,4 +25,5 @@ describe("SQLite3ExplainTest", () => {
 
   // null-overridden: needs eager loading + explain integration
   // it.skip("explain with eager loading", () => {});
+  it.skip("explain with eager loading", () => {});
 });

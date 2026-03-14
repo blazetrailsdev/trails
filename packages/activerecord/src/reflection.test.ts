@@ -1015,4 +1015,7 @@ describe("Reflection (Rails-guided)", () => {
     }
     expect(reflectOnAssociation(Person, "nonexistent")).toBeNull();
   });
+  it.skip("using query constraints warns about changing behavior", () => {
+    /* fixture-dependent */
+  });
 });

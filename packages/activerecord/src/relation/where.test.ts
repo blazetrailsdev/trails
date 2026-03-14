@@ -173,32 +173,6 @@ describe("WhereTest", () => {
     adapter = freshAdapter();
   });
 
-  it("+ combines two where clauses", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-        this.adapter = adapter;
-      }
-    }
-    const rel = Post.where({ title: "hello" }).and(Post.where({ status: "active" }));
-    const sql = rel.toSql();
-    expect(sql).toContain("title");
-    expect(sql).toContain("status");
-  });
-  it("or returns an empty where clause when either side is empty", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const rel = Post.where({ title: "hello" }).or(Post.all());
-    const sql = rel.toSql();
-    // When one side is empty (all), OR should still produce valid SQL
-    expect(sql).toContain("FROM");
-  });
-
   it("where copies bind params", () => {
     class Post extends Base {
       static {

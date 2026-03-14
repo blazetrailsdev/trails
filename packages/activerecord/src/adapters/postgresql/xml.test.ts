@@ -22,4 +22,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("null xml", async () => {});
     it.skip("round trip", async () => {});
   });
+  it.skip("update all", () => {
+    /* TODO: needs imports from original file */
+  });
 });

@@ -325,4 +325,7 @@ describe("generatesTokenFor()", () => {
     const found = await (User as any).findByTokenFor("confirm", "invalid-token");
     expect(found).toBeNull();
   });
+  it.skip("finds record by token", () => {});
+
+  it.skip("does not find record when token is invalid", () => {});
 });

@@ -3385,6 +3385,46 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("create with conditions hash on through association", () => {});
   it.skip("has many through associations on new records use null relations", () => {});
 
-  it.skip("has many inherited", () => {});
-  it.skip("polymorphic has many going through join model", () => {});
+  it.skip("associate existing", () => {
+    /* TODO: needs helpers from original file */
+  });
+
+  it.skip("size of through association should increase correctly when has many association is added", () => {
+    /* TODO: needs helpers from original file */
+  });
+
+  it("delete all on association clears scope", async () => {
+    class ClearScopeAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ClearScopePost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(ClearScopeAuthor);
+    registerModel(ClearScopePost);
+    Associations.hasMany.call(ClearScopeAuthor, "clear_scope_posts", {
+      className: "ClearScopePost",
+      foreignKey: "author_id",
+      dependent: "destroy",
+    });
+    const author = await ClearScopeAuthor.create({ name: "Alice" });
+    await ClearScopePost.create({ author_id: author.id, title: "A" });
+    await processDependentAssociations(author);
+    const remaining = await loadHasMany(author, "clear_scope_posts", {
+      className: "ClearScopePost",
+      foreignKey: "author_id",
+    });
+    expect(remaining.length).toBe(0);
+  });
+
+  it.skip("get ids", () => {
+    /* TODO: needs helpers from original file */
+  });
 });

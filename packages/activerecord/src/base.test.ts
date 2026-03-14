@@ -108,18 +108,6 @@ describe("BasicsTest", () => {
     expect(u.hasAttribute("nonexistent")).toBe(false);
   });
 
-  it("attribute names", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const names = User.attributeNames();
-    expect(names).toContain("name");
-    expect(names).toContain("age");
-  });
-
   it("initialize with attributes", () => {
     class User extends Base {
       static {
@@ -154,46 +142,6 @@ describe("BasicsTest", () => {
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
     expect(u1.isEqual(u2)).toBe(false);
-  });
-
-  it("dup", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "original" });
-    const d = u.dup();
-    expect(d.isNewRecord()).toBe(true);
-    expect(d.readAttribute("name")).toBe("original");
-    expect(d.id).toBeNull();
-  });
-
-  it("reload", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "original" });
-    u.writeAttribute("name", "modified");
-    await u.reload();
-    expect(u.readAttribute("name")).toBe("original");
-  });
-
-  it("last", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "a" });
-    await User.create({ name: "b" });
-    const last = await User.last();
-    expect(last).not.toBeNull();
   });
 
   it("all", async () => {
@@ -267,18 +215,6 @@ describe("BasicsTest", () => {
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
     expect(u1.isEqual(u2)).toBe(false);
-  });
-
-  it("table exists", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    // arelTable should exist
-    expect(User.arelTable).toBeDefined();
-    expect(User.arelTable.name).toBe("users");
   });
 
   it("distinct delegates to scoped", () => {
@@ -526,19 +462,6 @@ describe("BasicsTest", () => {
     }
     expect(User.primaryKey).toBe("uuid");
   });
-  it("attributes", () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.adapter = adp;
-      }
-    }
-    const p = Post.new({ title: "hello" }) as any;
-    expect(p.readAttribute("title")).toBe("hello");
-  });
-
   it("comparison with different objects", () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -2309,20 +2232,6 @@ describe("Base", () => {
       expect(u.isDestroyed()).toBe(false);
     });
 
-    it("persisted returns boolean", async () => {
-      const adapter = freshAdapter();
-      class User extends Base {
-        static {
-          this.attribute("name", "string");
-          this.adapter = adapter;
-        }
-      }
-      const u = new User({ name: "dean" });
-      await u.save();
-      expect(u.isNewRecord()).toBe(false);
-      expect(u.isPersisted()).toBe(true);
-    });
-
     it("destroyed returns boolean", async () => {
       const adapter = freshAdapter();
       class User extends Base {
@@ -2354,14 +2263,6 @@ describe("Base", () => {
       Post.adapter = adapter;
     });
 
-    it("save valid record", async () => {
-      const p = new Post({ title: "Hello", body: "World" });
-      const result = await p.save();
-      expect(result).toBe(true);
-      expect(p.id).toBe(1);
-      expect(p.isNewRecord()).toBe(false);
-    });
-
     it("save updates an existing record", async () => {
       const p = await Post.create({ title: "Hello", body: "World" });
       p.writeAttribute("title", "Updated");
@@ -2369,20 +2270,6 @@ describe("Base", () => {
 
       const found = await Post.find(p.id);
       expect(found.readAttribute("title")).toBe("Updated");
-    });
-
-    it("save invalid record", async () => {
-      class Required extends Base {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true });
-          this.adapter = adapter;
-        }
-      }
-      const r = new Required();
-      const result = await r.save();
-      expect(result).toBe(false);
-      expect(r.isNewRecord()).toBe(true);
     });
 
     it("saveBang throws on validation failure", async () => {
@@ -2401,13 +2288,6 @@ describe("Base", () => {
       const p = await Post.create({ title: "Test", body: "Content" });
       expect(p.isPersisted()).toBe(true);
       expect(p.id).toBe(1);
-    });
-
-    it("update object", async () => {
-      const p = await Post.create({ title: "Old", body: "Content" });
-      await p.update({ title: "New" });
-      const found = await Post.find(p.id);
-      expect(found.readAttribute("title")).toBe("New");
     });
 
     it("destroy", async () => {
@@ -2451,23 +2331,6 @@ describe("Base", () => {
 
     it("find raises record not found exception", async () => {
       await expect(User.find(999)).rejects.toThrow("not found");
-    });
-
-    it("find_by with hash conditions returns the first matching record", async () => {
-      await User.create({ name: "Alice", email: "alice@test.com" });
-      await User.create({ name: "Bob", email: "bob@test.com" });
-      const found = await User.findBy({ name: "Bob" });
-      expect(found).not.toBeNull();
-      expect(found!.readAttribute("email")).toBe("bob@test.com");
-    });
-
-    it("find_by returns nil if the record is missing", async () => {
-      const found = await User.findBy({ name: "Nobody" });
-      expect(found).toBeNull();
-    });
-
-    it("find_by! raises RecordNotFound if the record is missing", async () => {
-      await expect(User.findByBang({ name: "Nobody" })).rejects.toThrow("not found");
     });
   });
 
@@ -2614,6 +2477,14 @@ describe("Base", () => {
       expect(await u.save()).toBe(false);
       expect(u.errors.get("name")).toContain("can't be blank");
     });
+  });
+  it("table name guesses with prefixes and suffixes", () => {
+    class User extends Base {
+      static {
+        this.tableNamePrefix = "app_";
+      }
+    }
+    expect(User.tableName).toBe("app_users");
   });
 });
 

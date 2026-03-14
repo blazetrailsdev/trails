@@ -1678,6 +1678,9 @@ describe("AssociationsJoinModelTest", () => {
   it.skip("eager association with scope with string joins", () => {
     // Requires string joins in scope
   });
+  it.skip("has many inherited", () => {});
+
+  it.skip("polymorphic has many going through join model", () => {});
 });
 
 // ==========================================================================

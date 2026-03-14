@@ -38,9 +38,7 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows[0].datctype).toBeTruthy();
     });
 
-    it.skip("tables logs name", async () => {});
     it.skip("indexes logs name", async () => {});
-    it.skip("table exists logs name", async () => {});
     it.skip("table alias length logs name", async () => {});
     it.skip("current database logs name", async () => {});
     it.skip("encoding logs name", async () => {});
@@ -67,4 +65,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("prepare false with binds", async () => {});
     it.skip("reconnection after actual disconnection with verify", async () => {});
   });
+  it.skip("get and release advisory lock", () => {});
+
+  it.skip("release non existent advisory lock", () => {});
 });

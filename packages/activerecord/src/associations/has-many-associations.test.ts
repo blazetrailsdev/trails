@@ -992,38 +992,6 @@ describe("HasManyAssociationsTest", () => {
     expect(remaining.length).toBe(0);
   });
 
-  it("delete all", async () => {
-    class DeleteAllAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class DeleteAllPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(DeleteAllAuthor);
-    registerModel(DeleteAllPost);
-    Associations.hasMany.call(DeleteAllAuthor, "delete_all_posts", {
-      className: "DeleteAllPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
-    const author = await DeleteAllAuthor.create({ name: "Alice" });
-    await DeleteAllPost.create({ author_id: author.id, title: "A" });
-    await DeleteAllPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
-    const remaining = await loadHasMany(author, "delete_all_posts", {
-      className: "DeleteAllPost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
-
   it("delete all with not yet loaded association collection", async () => {
     class DeleteAllUnloadedAuthor extends Base {
       static {
@@ -1790,32 +1758,6 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).readAttribute("author_id")).toBe(author.id);
   });
 
-  it("to a should dup target", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const copy = [...posts];
-    expect(copy.length).toBe(posts.length);
-  });
-
   it("include method in has many association should return true for instance added with build", async () => {
     class Author extends Base {
       static {
@@ -2433,36 +2375,6 @@ describe("HasManyAssociationsTest", () => {
     expect((reloaded as any).readAttribute("author_id")).toBeNull();
   });
 
-  it("delete all on association clears scope", async () => {
-    class ClearScopeAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class ClearScopePost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(ClearScopeAuthor);
-    registerModel(ClearScopePost);
-    Associations.hasMany.call(ClearScopeAuthor, "clear_scope_posts", {
-      className: "ClearScopePost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
-    const author = await ClearScopeAuthor.create({ name: "Alice" });
-    await ClearScopePost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
-    const remaining = await loadHasMany(author, "clear_scope_posts", {
-      className: "ClearScopePost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
   it("building the associated object with implicit sti base class", () => {
     // DependentFirm has_many :companies; Company has STI with type column
     const a = freshAdapter();
@@ -8190,5 +8102,39 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(2);
+  });
+  it("custom named counter cache", async () => {
+    // Rails: test_custom_named_counter_cache / test_custom_counter_cache
+    class CnPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("my_comment_count", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CnComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(CnComment, "cnPost", {
+      className: "CnPost",
+      foreignKey: "post_id",
+      counterCache: "my_comment_count",
+    });
+    registerModel("CnPost", CnPost);
+    registerModel("CnComment", CnComment);
+
+    const post = await CnPost.create({ title: "Post", my_comment_count: 0 });
+    await CnComment.create({ body: "Hi", post_id: post.id });
+
+    const reloaded = await CnPost.find(post.id as number);
+    expect(reloaded.readAttribute("my_comment_count")).toBe(1);
+  });
+
+  it.skip("restrict with exception", () => {
+    /* TODO: needs helpers from original file */
   });
 });

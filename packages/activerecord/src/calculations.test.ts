@@ -167,19 +167,6 @@ describe("CalculationsTest", () => {
     expect(ids.length).toBe(1);
   });
 
-  it("count with distinct", async () => {
-    class Account extends Base {
-      static {
-        this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
-      }
-    }
-    await Account.create({ credit_limit: 50 });
-    await Account.create({ credit_limit: 50 });
-    const sql = Account.all().distinct().toSql();
-    expect(sql).toContain("DISTINCT");
-  });
-
   it("pick one", async () => {
     class Account extends Base {
       static {
@@ -812,21 +799,6 @@ describe("CalculationsTest", () => {
     // Should generate SQL even for non-existent columns (runtime error from DB)
     const sql = Account.where({ credit_limit: 50 }).toSql();
     expect(sql).toBeDefined();
-  });
-
-  it("count with block", async () => {
-    const adp = freshAdapter();
-    class Account extends Base {
-      static tableName = "block_accounts";
-      static {
-        this.attribute("credit_limit", "integer");
-        this.adapter = adp;
-      }
-    }
-    await Account.create({ credit_limit: 50 });
-    await Account.create({ credit_limit: 100 });
-    const records = await Account.all().toArray();
-    expect(records.length).toBe(2);
   });
 
   it("should group by summed field through association and having", () => {
@@ -6936,6 +6908,42 @@ describe("Calculations (extended)", () => {
     it("count returns 0", async () => {
       expect(await Product.all().none().count()).toBe(0);
     });
+  });
+  it("should sum scoped field with conditions", async () => {
+    const adapter = freshAdapter();
+
+    class Order extends Base {
+      static {
+        this.attribute("amount", "integer");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    await Order.create({ amount: 10, status: "paid" });
+    await Order.create({ amount: 20, status: "pending" });
+    await Order.create({ amount: 30, status: "paid" });
+
+    expect(await Order.where({ status: "paid" }).sum("amount")).toBe(40);
+    expect(await Order.where({ status: "pending" }).sum("amount")).toBe(20);
+  });
+
+  it("count with column parameter", async () => {
+    const adapter = freshAdapter();
+
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    await User.create({ name: "Alice", email: "a@b.com" });
+    await User.create({ name: "Bob" }); // email is null
+
+    expect(await User.all().count()).toBe(2);
+    expect(await User.all().count("email")).toBe(1);
   });
 });
 

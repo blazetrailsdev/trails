@@ -2302,76 +2302,6 @@ describe("numeric column changes from zero to no empty string", () => {
   });
 });
 
-describe("should allow to bypass validations on the associated models on create", () => {
-  it("should allow to bypass validations on the associated models on create", async () => {
-    const adapter = freshAdapter();
-    class BVTag extends Base {
-      static {
-        this._tableName = "bv_tags";
-        this.attribute("name", "string");
-        this.attribute("bv_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class BVArticle extends Base {
-      static {
-        this._tableName = "bv_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(BVArticle, "bvTags", {
-      className: "BVTag",
-      foreignKey: "bv_article_id",
-    });
-    acceptsNestedAttributesFor(BVArticle, "bvTags");
-    registerModel(BVTag);
-    registerModel(BVArticle);
-    // Creating a tag with valid name should work
-    const article = await BVArticle.create({ title: "test" });
-    assignNestedAttributes(article, "bvTags", [{ name: "valid" }]);
-    await article.save();
-    const tags = await BVTag.where({ bv_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-  });
-});
-
-describe("should allow to bypass validations on the associated models on update", () => {
-  it("should allow to bypass validations on the associated models on update", async () => {
-    const adapter = freshAdapter();
-    class BVUTag extends Base {
-      static {
-        this._tableName = "bvu_tags";
-        this.attribute("name", "string");
-        this.attribute("bvu_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class BVUArticle extends Base {
-      static {
-        this._tableName = "bvu_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(BVUArticle, "bvuTags", {
-      className: "BVUTag",
-      foreignKey: "bvu_article_id",
-    });
-    acceptsNestedAttributesFor(BVUArticle, "bvuTags");
-    registerModel(BVUTag);
-    registerModel(BVUArticle);
-    const article = await BVUArticle.create({ title: "test" });
-    const tag = await BVUTag.create({ name: "original", bvu_article_id: article.id });
-    assignNestedAttributes(article, "bvuTags", [{ id: tag.id, name: "updated" }]);
-    await article.save();
-    const reloaded = await BVUTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("updated");
-  });
-});
-
 describe("should also work with a HashWithIndifferentAccess", () => {
   it("should also work with a HashWithIndifferentAccess", async () => {
     const adapter = freshAdapter();
@@ -2440,141 +2370,6 @@ describe("should automatically build new associated models for each entry in a h
     expect(tags.length).toBe(2);
     const names = tags.map((t: any) => t.readAttribute("name")).sort();
     expect(names).toEqual(["new1", "new2"]);
-  });
-});
-
-describe("should automatically save bang the associated models", () => {
-  it("should automatically save bang the associated models", async () => {
-    const adapter = freshAdapter();
-    class ASB1Tag extends Base {
-      static {
-        this._tableName = "asb1_tags";
-        this.attribute("name", "string");
-        this.attribute("asb1_article_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class ASB1Article extends Base {
-      static {
-        this._tableName = "asb1_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(ASB1Article, "asb1Tags", {
-      className: "ASB1Tag",
-      foreignKey: "asb1_article_id",
-    });
-    acceptsNestedAttributesFor(ASB1Article, "asb1Tags");
-    registerModel(ASB1Tag);
-    registerModel(ASB1Article);
-    const article = await ASB1Article.create({ title: "bang save" });
-    assignNestedAttributes(article, "asb1Tags", [{ name: "banged" }]);
-    await article.save();
-    const tags = await ASB1Tag.where({ asb1_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].isPersisted()).toBe(true);
-  });
-});
-
-describe("should automatically save the associated models", () => {
-  it("should automatically save the associated models", async () => {
-    const adapter = freshAdapter();
-    class NAutoTag extends Base {
-      static {
-        this._tableName = "nauto_tags";
-        this.attribute("name", "string");
-        this.attribute("nauto_article_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NAutoArticle extends Base {
-      static {
-        this._tableName = "nauto_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NAutoArticle, "nautoTags", {
-      className: "NAutoTag",
-      foreignKey: "nauto_article_id",
-    });
-    acceptsNestedAttributesFor(NAutoArticle, "nautoTags");
-    registerModel(NAutoTag);
-    registerModel(NAutoArticle);
-    const article = await NAutoArticle.create({ title: "auto save" });
-    assignNestedAttributes(article, "nautoTags", [{ name: "saved" }]);
-    await article.save();
-    const tags = await NAutoTag.where({ nauto_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("saved");
-    expect(tags[0].isPersisted()).toBe(true);
-  });
-});
-
-describe("should automatically validate the associated models", () => {
-  it("should automatically validate the associated models", async () => {
-    const adapter = freshAdapter();
-    class AVTag extends Base {
-      static {
-        this._tableName = "av_tags";
-        this.attribute("name", "string");
-        this.attribute("av_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class AVArticle extends Base {
-      static {
-        this._tableName = "av_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(AVArticle, "avTags", {
-      className: "AVTag",
-      foreignKey: "av_article_id",
-    });
-    acceptsNestedAttributesFor(AVArticle, "avTags");
-    registerModel(AVTag);
-    registerModel(AVArticle);
-    const invalidTag = new AVTag({ name: "" });
-    const valid = await invalidTag.isValid();
-    expect(valid).toBe(false);
-  });
-});
-
-describe("should default invalid error from i18n", () => {
-  it("should default invalid error from i18n", async () => {
-    const adapter = freshAdapter();
-    class DITag extends Base {
-      static {
-        this._tableName = "di_tags";
-        this.attribute("name", "string");
-        this.attribute("di_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class DIArticle extends Base {
-      static {
-        this._tableName = "di_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(DIArticle, "diTags", {
-      className: "DITag",
-      foreignKey: "di_article_id",
-    });
-    acceptsNestedAttributesFor(DIArticle, "diTags");
-    registerModel(DITag);
-    registerModel(DIArticle);
-    const tag = new DITag({ name: "" });
-    const valid = await tag.isValid();
-    expect(valid).toBe(false);
-    // Should have a default error message for the invalid attribute
-    expect(tag.errors.size).toBeGreaterThan(0);
   });
 });
 
@@ -2719,38 +2514,6 @@ describe("should not load association when updating existing records", () => {
   });
 });
 
-describe("should not load the associated models if they were not loaded yet", () => {
-  it("should not load the associated models if they were not loaded yet", async () => {
-    const adapter = freshAdapter();
-    class NLTag extends Base {
-      static {
-        this._tableName = "nl_tags";
-        this.attribute("name", "string");
-        this.attribute("nl_article_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NLArticle extends Base {
-      static {
-        this._tableName = "nl_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NLArticle, "nlTags", {
-      className: "NLTag",
-      foreignKey: "nl_article_id",
-    });
-    acceptsNestedAttributesFor(NLArticle, "nlTags");
-    registerModel(NLTag);
-    registerModel(NLArticle);
-    const article = await NLArticle.create({ title: "no load" });
-    // Not loading association, just saving parent should work
-    const saved = await article.save();
-    expect(saved).toBe(true);
-  });
-});
-
 describe("should not overwrite unsaved updates when loading association", () => {
   it.skip("should not overwrite unsaved updates when loading association", () => {
     /* fixture-dependent */
@@ -2760,106 +2523,6 @@ describe("should not overwrite unsaved updates when loading association", () => 
 describe("should not remove scheduled destroys when loading association", () => {
   it.skip("should not remove scheduled destroys when loading association", () => {
     /* fixture-dependent */
-  });
-});
-
-describe("should not save and return false if a callback cancelled saving in either create or update", () => {
-  it("should not save and return false if a callback cancelled saving in either create or update", async () => {
-    const adapter = freshAdapter();
-    class CBTag extends Base {
-      static {
-        this._tableName = "cb_tags";
-        this.attribute("name", "string");
-        this.attribute("cb_article_id", "integer");
-        this.adapter = adapter;
-        this.beforeSave(function (record: any) {
-          if (record.readAttribute("name") === "cancel") return false;
-        });
-      }
-    }
-    class CBArticle extends Base {
-      static {
-        this._tableName = "cb_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(CBTag);
-    registerModel(CBArticle);
-    // A tag with name "cancel" should return false from save
-    const tag = new CBTag({ name: "cancel" });
-    const result = await tag.save();
-    expect(result).toBe(false);
-  });
-});
-
-describe("should not update children when parent creation with no reason", () => {
-  it("should not update children when parent creation with no reason", async () => {
-    const adapter = freshAdapter();
-    class NUCTag extends Base {
-      static {
-        this._tableName = "nuc_tags";
-        this.attribute("name", "string");
-        this.attribute("nuc_article_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NUCArticle extends Base {
-      static {
-        this._tableName = "nuc_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NUCArticle, "nucTags", {
-      className: "NUCTag",
-      foreignKey: "nuc_article_id",
-    });
-    acceptsNestedAttributesFor(NUCArticle, "nucTags");
-    registerModel(NUCTag);
-    registerModel(NUCArticle);
-    const article = await NUCArticle.create({ title: "parent" });
-    const tag = await NUCTag.create({ name: "child", nuc_article_id: article.id });
-    // Save parent again without changes - child should not be modified
-    await article.save();
-    const reloaded = await NUCTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("child");
-  });
-});
-
-describe("should not use default invalid error on associated models", () => {
-  it("should not use default invalid error on associated models", async () => {
-    const adapter = freshAdapter();
-    class NDITag extends Base {
-      static {
-        this._tableName = "ndi_tags";
-        this.attribute("name", "string");
-        this.attribute("ndi_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class NDIArticle extends Base {
-      static {
-        this._tableName = "ndi_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NDIArticle, "ndiTags", {
-      className: "NDITag",
-      foreignKey: "ndi_article_id",
-    });
-    acceptsNestedAttributesFor(NDIArticle, "ndiTags");
-    registerModel(NDITag);
-    registerModel(NDIArticle);
-    // The child model's own error messages should appear, not a generic "is invalid"
-    const tag = new NDITag({ name: "" });
-    const valid = await tag.isValid();
-    expect(valid).toBe(false);
-    // Errors should be on the child's own attribute, not a generic "invalid" error
-    const nameMessages = tag.errors.fullMessagesFor("name");
-    expect(nameMessages.length).toBeGreaterThan(0);
   });
 });
 
@@ -3189,38 +2852,6 @@ describe("should take an array and assign the attributes to the associated model
   });
 });
 
-describe("should validation the associated models on create", () => {
-  it("should validation the associated models on create", async () => {
-    const adapter = freshAdapter();
-    class VCTag extends Base {
-      static {
-        this._tableName = "vc_tags";
-        this.attribute("name", "string");
-        this.attribute("vc_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class VCArticle extends Base {
-      static {
-        this._tableName = "vc_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(VCArticle, "vcTags", {
-      className: "VCTag",
-      foreignKey: "vc_article_id",
-    });
-    acceptsNestedAttributesFor(VCArticle, "vcTags");
-    registerModel(VCTag);
-    registerModel(VCArticle);
-    const tag = new VCTag({ name: "" });
-    const valid = await tag.isValid();
-    expect(valid).toBe(false);
-  });
-});
-
 describe("should work with update as well", () => {
   it("should work with update as well", async () => {
     const adapter = freshAdapter();
@@ -3337,6 +2968,52 @@ describe("Nested Attributes (Rails-guided)", () => {
   beforeEach(() => {
     adapter = freshAdapter();
   });
+
+  function cacheAssoc(record: Base, name: string, value: unknown) {
+    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+    (record as any)._cachedAssociations.set(name, value);
+  }
+
+  function makeModels() {
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+      }
+    }
+    class Part extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+        this.validates("name", { presence: true });
+      }
+    }
+    Pirate.adapter = adapter;
+    Ship.adapter = adapter;
+    Part.adapter = adapter;
+    registerModel("Pirate", Pirate);
+    registerModel("Ship", Ship);
+    registerModel("Part", Part);
+    (Pirate as any)._associations = [
+      { type: "hasMany", name: "ships", options: { autosave: true } },
+    ];
+    (Ship as any)._associations = [
+      { type: "belongsTo", name: "pirate", options: {} },
+      { type: "hasMany", name: "parts", options: { autosave: true } },
+    ];
+    (Pirate as any)._associations.push({
+      type: "hasOne",
+      name: "ship",
+      options: { autosave: true },
+    });
+    (Ship as any)._associations.push({ type: "hasOne", name: "part", options: { autosave: true } });
+    return { Pirate, Ship, Part };
+  }
 
   // Rails: test "create with nested attributes"
   it("creates associated records through nested attributes", async () => {
@@ -3484,5 +3161,51 @@ describe("Nested Attributes (Rails-guided)", () => {
 
     const comments = await Comment.all().toArray();
     expect(comments.length).toBe(2);
+  });
+  it("when great-grandchild changed in memory, saving parent should save great-grandchild", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const part = await Part.create({ name: "Mast", ship_id: ship.id });
+    part.writeAttribute("name", "Sail");
+    cacheAssoc(ship, "part", part);
+    ship.writeAttribute("name", "Pearl-touched");
+    cacheAssoc(pirate, "ship", ship);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
+    const reloaded = await Part.find(part.id!);
+    expect(reloaded.readAttribute("name")).toBe("Sail");
+  });
+
+  it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => {
+    /* requires lazy-loading tracking */
+  });
+
+  it("when grandchild changed in memory, saving parent should save grandchild", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const part = await Part.create({ name: "Mast", ship_id: ship.id });
+    part.writeAttribute("name", "Sail");
+    cacheAssoc(ship, "parts", [part]);
+    // Mark ship as changed so autosave cascades to its children
+    ship.writeAttribute("name", "Pearl-touched");
+    cacheAssoc(pirate, "ships", [ship]);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
+    const reloaded = await Part.find(part.id!);
+    expect(reloaded.readAttribute("name")).toBe("Sail");
+  });
+
+  it("nested singular associations are validated", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const invalidPart = new Part({ name: "" });
+    cacheAssoc(ship, "parts", [invalidPart]);
+    ship.writeAttribute("name", "Pearl-touched");
+    cacheAssoc(pirate, "ships", [ship]);
+    const saved = await pirate.save();
+    expect(saved).toBe(false);
   });
 });

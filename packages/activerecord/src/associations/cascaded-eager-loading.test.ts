@@ -262,9 +262,6 @@ describe("CascadedEagerLoadingTest", () => {
   it.skip("eager association loading with multiple stis and order", () => {
     /* fixture-dependent */
   });
-  it.skip("eager association loading of stis with multiple references", () => {
-    /* fixture-dependent */
-  });
   it("eager association loading where first level returns nil", async () => {
     const adapter = freshAdapter();
     class EFParent extends Base {

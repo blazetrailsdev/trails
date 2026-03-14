@@ -231,4 +231,7 @@ describe("Null Relation (Rails-guided)", () => {
     await Item.create({ name: "A" });
     expect(await Item.all().none().deleteAll()).toBe(0);
   });
+  it.skip("none", () => {
+    /* TODO: needs helpers from original file */
+  });
 });

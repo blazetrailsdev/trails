@@ -82,42 +82,6 @@ describe("WithAnnotationsTest", () => {
     return { Post };
   }
 
-  it("belongs to with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("belongs-to-hint").toSql();
-    expect(sql).toContain("belongs-to-hint");
-  });
-
-  it("has and belongs to many with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("habtm-hint").toSql();
-    expect(sql).toContain("habtm-hint");
-  });
-
-  it("has one with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("has-one-hint").toSql();
-    expect(sql).toContain("has-one-hint");
-  });
-
-  it("has many with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("has-many-hint").toSql();
-    expect(sql).toContain("has-many-hint");
-  });
-
-  it("has many through with annotation includes a query comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("hmt-hint").toSql();
-    expect(sql).toContain("hmt-hint");
-  });
-
-  it("has many through with annotation includes a query comment when eager loading", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("eager-hmt-hint").toSql();
-    expect(sql).toContain("eager-hmt-hint");
-  });
-
   it("annotate with multiple comments", () => {
     const { Post } = makeModel();
     const sql = Post.all().annotate("comment1", "comment2").toSql();

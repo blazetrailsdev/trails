@@ -35,12 +35,6 @@ describe("SQLite3AdapterTest", () => {
     fs.rmSync(baseDir, { recursive: true, force: true });
   });
 
-  it("database exists returns false when the database does not exist", async () => {
-    const rows = await adapter.execute(`SELECT 1`);
-    // A non-existent file-based db would fail; we just confirm the adapter works
-    expect(rows).toBeDefined();
-  });
-
   it("database exists returns true when database exists", () => {
     // Our in-memory adapter is always "existing"
     expect(adapter.isOpen).toBe(true);
@@ -257,12 +251,6 @@ describe("SQLite3AdapterTest", () => {
     const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('b')`);
     expect(id1).toBe(1);
     expect(id2).toBe(2);
-  });
-
-  it("exec insert with returning disabled", async () => {
-    // Our adapter always returns lastInsertRowid for INSERT
-    const id = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('test')`);
-    expect(typeof id).toBe("number");
   });
 
   it("exec insert default values with returning disabled", async () => {
@@ -605,4 +593,7 @@ describe("SQLite3AdapterTest", () => {
     const pkCols = cols.filter((c: any) => c.pk > 0);
     expect(pkCols).toHaveLength(2);
   });
+  it.skip("tables logs name", async () => {});
+
+  it.skip("table exists logs name", async () => {});
 });

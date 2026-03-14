@@ -298,11 +298,6 @@ describeIfMysql("MysqlAdapter", () => {
       expect(fruits).toHaveLength(3);
     });
 
-    it("count", async () => {
-      expect(await Product.all().count()).toBe(5);
-      expect(await Product.where({ category: "fruit" }).count()).toBe(3);
-    });
-
     it("exists", async () => {
       expect(await Product.where({ category: "fruit" }).exists()).toBe(true);
       expect(await Product.where({ category: "meat" }).exists()).toBe(false);

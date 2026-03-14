@@ -267,4 +267,17 @@ describe("becomes()", () => {
     expect(dog.readAttribute("name")).toBe("Rex");
     expect(dog.isPersisted()).toBe(true);
   });
+  it("dup", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "original" });
+    const d = u.dup();
+    expect(d.isNewRecord()).toBe(true);
+    expect(d.readAttribute("name")).toBe("original");
+    expect(d.id).toBeNull();
+  });
 });
