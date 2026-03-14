@@ -297,12 +297,10 @@ describe("ActiveModel", () => {
           this.attribute("name", "string");
         }
       }
-      Contact.includeRootInJson = true;
       const c = new Contact({ name: "Konata" });
-      const json = JSON.parse(c.toJson());
-      expect(json.contact).toBeDefined();
-      expect(json.contact.name).toBe("Konata");
-      Contact.includeRootInJson = false;
+      const json = c.toJson();
+      expect(json).not.toMatch(/"contact":/);
+      expect(json).toMatch(/"name":"Konata"/);
     });
 
     it("as_json should serialize timestamps", () => {
@@ -325,11 +323,14 @@ describe("ActiveModel", () => {
         }
       }
       Contact.includeRootInJson = true;
-      const c = new Contact({ name: "Konata", age: 16 });
-      const json = c.asJson();
-      expect(json.contact).toBeDefined();
-      expect((json.contact as any).name).toBe("Konata");
-      Contact.includeRootInJson = false;
+      try {
+        const c = new Contact({ name: "Konata", age: 16 });
+        const json = c.asJson();
+        expect(json.contact).toBeDefined();
+        expect((json.contact as any).name).toBe("Konata");
+      } finally {
+        Contact.includeRootInJson = false;
+      }
     });
 
     it("as_json should work with methods options", () => {

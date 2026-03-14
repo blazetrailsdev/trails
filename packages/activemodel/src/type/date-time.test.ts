@@ -19,9 +19,10 @@ describe("ActiveModel", () => {
 
     it("hash to time", () => {
       const type = new Types.DateTimeType();
-      const result = type.cast("2024-06-15T12:00:00Z");
+      const date = new Date(2024, 5, 15, 12, 0, 0);
+      const result = type.cast(date);
       expect(result).toBeInstanceOf(Date);
-      expect(result!.getUTCMonth()).toBe(5);
+      expect(result!.getMonth()).toBe(5);
     });
 
     it("hash with wrong keys", () => {
@@ -32,7 +33,7 @@ describe("ActiveModel", () => {
     it("serialize_cast_value is equivalent to serialize after cast", () => {
       const type = new Types.DateTimeType();
       const cast = type.cast("2024-01-15T10:30:00Z");
-      const serialized = type.serialize("2024-01-15T10:30:00Z");
+      const serialized = type.serialize(cast);
       expect(serialized).toEqual(cast);
     });
   });

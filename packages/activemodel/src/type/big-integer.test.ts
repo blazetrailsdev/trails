@@ -25,7 +25,9 @@ describe("ActiveModel", () => {
     it("serialize_cast_value is equivalent to serialize after cast", () => {
       const type = Types.typeRegistry.lookup("big_integer");
       const cast = type.cast("123");
+      const serialized = type.serialize(cast);
       expect(cast).toBe(123n);
+      expect(String(serialized)).toBe(String(cast));
     });
 
     it("small values", () => {

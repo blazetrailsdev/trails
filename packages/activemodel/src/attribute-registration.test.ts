@@ -273,8 +273,9 @@ describe("ActiveModel", () => {
           this.attribute("name", "string");
         }
       }
-      expect(Person._attributeDefinitions.has("name")).toBe(true);
-      expect(Person._attributeDefinitions.has("missing")).toBe(false);
+      const p = new Person({});
+      expect(p.typeForAttribute("name")).not.toBeNull();
+      expect(p.typeForAttribute("missing_key")).toBeNull();
     });
   });
 });
