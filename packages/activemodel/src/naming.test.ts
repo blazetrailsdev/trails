@@ -56,7 +56,7 @@ describe("NamingTest", () => {
 
   it("human", () => {
     const name = new ModelName("Post");
-    expect(name.singular).toBe("post");
+    expect(name.human).toBe("Post");
   });
 
   it("uncountable", () => {
@@ -166,7 +166,7 @@ describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
 
   it("human", () => {
     const name = new ModelName("Blog::Post");
-    expect(name.singular).toBe("post");
+    expect(name.human).toBe("Post");
   });
 
   it("route key", () => {
@@ -204,7 +204,7 @@ describe("NamingWithSuppliedModelNameTest", () => {
   });
   it("human", () => {
     const name = new ModelName("Article");
-    expect(name.singular).toBe("article");
+    expect(name.human).toBe("Article");
   });
   it("route key", () => {
     const name = new ModelName("Article");
@@ -250,7 +250,7 @@ describe("NamingUsingRelativeModelNameTest", () => {
   });
   it("human", () => {
     const name = new ModelName("Post", { namespace: "Blog" });
-    expect(name.singular).toBe("post");
+    expect(name.human).toBe("Post");
   });
   it("route key", () => {
     const name = new ModelName("Post", { namespace: "Blog" });
@@ -273,7 +273,7 @@ describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
   });
   it("human", () => {
     const name = new ModelName("Admin::Post");
-    expect(name.singular).toBe("post");
+    expect(name.human).toBe("Post");
   });
   it("plural", () => {
     const name = new ModelName("Admin::Post");

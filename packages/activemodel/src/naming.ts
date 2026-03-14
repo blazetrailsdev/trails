@@ -3,13 +3,14 @@
  *
  * Mirrors: ActiveModel::Name
  */
-import { underscore, pluralize } from "@rails-ts/activesupport";
+import { underscore, pluralize, humanize } from "@rails-ts/activesupport";
 
 export class ModelName {
   readonly name: string;
   readonly singular: string;
   readonly plural: string;
   readonly element: string;
+  readonly human: string;
   readonly collection: string;
   readonly paramKey: string;
   readonly routeKey: string;
@@ -40,6 +41,7 @@ export class ModelName {
     this.singular = lower;
     this.plural = ModelName._uncountables.has(lower) ? lower : pluralize(lower);
     this.element = lower;
+    this.human = humanize(lower);
     this.collection = this.plural;
     this.paramKey = lower;
     this.routeKey = this.plural;
