@@ -42,13 +42,10 @@ it("handles invalid POST data exceptions", async () => {
       throw new Error("RuntimeError");
     }).call(env),
   );
-  // Post with bad params that will throw on read
-  const badInput = {
-    read() {
-      throw new Error("parse error");
-    },
-  };
-  const res = await req.post("/", { HTTP_ACCEPT: "text/html" });
+  const res = await req.post("/", {
+    HTTP_ACCEPT: "text/html",
+    "rack.input": "(%bad-params%)",
+  });
   expect(res.status).toBe(500);
   expect(res.bodyString).toContain("Error");
   expect(res.bodyString).toContain("ShowExceptions");
