@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SSL } from "./ssl.js";
+import { SSL } from "../middleware/ssl.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString } from "@rails-ts/rack";
 

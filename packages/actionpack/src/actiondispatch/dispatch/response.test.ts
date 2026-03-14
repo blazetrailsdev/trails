@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Response } from "./response.js";
+import { Response } from "../response.js";
 
 describe("ActionDispatch::Response", () => {
   it("simple output", () => {

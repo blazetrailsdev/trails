@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { RouteSet } from "./route-set.js";
-import { Route } from "./route.js";
-import { escapePath, escapeSegment, escapeFragment, unescapeUri } from "./utils.js";
-import { RoutesInspector } from "./inspector.js";
+import { RouteSet } from "../routing/route-set.js";
+import { Route } from "../routing/route.js";
+import { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../routing/utils.js";
+import { RoutesInspector } from "../routing/inspector.js";
 import { bodyToString } from "@rails-ts/rack";
 
 // ==========================================================================

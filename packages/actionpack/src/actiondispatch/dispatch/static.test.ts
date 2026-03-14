@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Static } from "./static.js";
+import { Static } from "../middleware/static.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString, bodyToString } from "@rails-ts/rack";
 import * as fs from "fs";

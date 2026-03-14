@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HostAuthorization } from "./host-authorization.js";
+import { HostAuthorization } from "../middleware/host-authorization.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
 import { bodyFromString, bodyToString } from "@rails-ts/rack";
 

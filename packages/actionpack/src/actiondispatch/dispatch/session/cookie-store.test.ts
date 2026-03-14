@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CookieStore, CookieOverflow, type SessionData } from "./cookie-store.js";
+import { CookieStore, CookieOverflow, type SessionData } from "../../session/cookie-store.js";
 
 const SECRET = "a]ekdlFa9/4|BjRU*OJ-3o5qK!Z+]WI2"; // 32+ chars
 

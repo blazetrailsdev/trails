@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ContentSecurityPolicy } from "./content-security-policy.js";
+import { ContentSecurityPolicy } from "../content-security-policy.js";
 
 describe("ActionDispatch::ContentSecurityPolicy", () => {
   it("build", () => {

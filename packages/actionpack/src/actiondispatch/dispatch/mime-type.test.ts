@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MimeType } from "./mime-type.js";
+import { MimeType } from "../mime-type.js";
 
 describe("ActionDispatch::Mime::Type", () => {
   it("parse single", () => {

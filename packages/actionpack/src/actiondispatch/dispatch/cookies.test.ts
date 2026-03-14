@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CookieJar } from "./cookies.js";
+import { CookieJar } from "../cookies.js";
 
 describe("ActionDispatch::Cookies", () => {
   it("fetch", () => {

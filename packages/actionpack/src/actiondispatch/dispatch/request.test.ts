@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Request } from "./request.js";
+import { Request } from "../request.js";
 
 describe("ActionDispatch::Request", () => {
   // --- URL / Host ---

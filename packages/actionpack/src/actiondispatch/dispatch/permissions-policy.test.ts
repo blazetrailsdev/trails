@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PermissionsPolicy } from "./permissions-policy.js";
+import { PermissionsPolicy } from "../permissions-policy.js";
 
 // ==========================================================================
 // dispatch/permissions_policy_test.rb

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ExceptionWrapper } from "./exception-wrapper.js";
+import { ExceptionWrapper } from "../exception-wrapper.js";
 
 // ==========================================================================
 // dispatch/exception_wrapper_test.rb
