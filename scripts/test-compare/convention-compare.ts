@@ -68,6 +68,12 @@ interface MisplacedTest {
   conventionTsFile: string;
 }
 
+interface WrongDescribeTest {
+  description: string;
+  rubyPath: string;
+  tsPath: string;
+}
+
 interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
@@ -75,10 +81,12 @@ interface ConventionFileResult {
   rubyTestCount: number;
   matched: number;
   matchedSkipped: number;
+  wrongDescribe: number;
   misplaced: number;
   missing: number;
   missingTests?: string[];
   misplacedTests?: MisplacedTest[];
+  wrongDescribeTests?: WrongDescribeTest[];
 }
 
 interface ConventionPackageResult {
@@ -89,6 +97,7 @@ interface ConventionPackageResult {
   totalRubyTests: number;
   totalMatched: number;
   totalMatchedSkipped: number;
+  totalWrongDescribe: number;
   totalMisplaced: number;
   percent: number;
   files: ConventionFileResult[];
@@ -229,6 +238,7 @@ function main() {
     let totalRuby = 0;
     let totalMatched = 0;
     let totalMatchedSkipped = 0;
+    let totalWrongDescribe = 0;
     let totalMisplaced = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
@@ -244,16 +254,18 @@ function main() {
 
       let matched = 0;
       let matchedSkipped = 0;
+      let wrongDescribe = 0;
       let misplaced = 0;
       const missingTests: string[] = [];
       const misplacedTests: MisplacedTest[] = [];
+      const wrongDescribeTests: WrongDescribeTest[] = [];
 
       for (const tc of file.testCases) {
         totalRuby++;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        // Step 1: Try path match in convention file
+        // Step 1: Try path match in convention file (right file, right describe)
         if (tsPaths && tsPaths.has(np)) {
           matched++;
           totalMatched++;
@@ -264,14 +276,32 @@ function main() {
           continue;
         }
 
-        // Step 2: Try description-only match in convention file
+        // Step 2: Try description-only match in convention file (right file, wrong describe)
         if (tsDescs && tsDescs.has(nd)) {
           matched++;
           totalMatched++;
+          wrongDescribe++;
+          totalWrongDescribe++;
           if (lookup.pendingDescs.has(`${conventionTs}:${nd}`)) {
             matchedSkipped++;
             totalMatchedSkipped++;
           }
+          // Find what describe block the TS test is actually in
+          const tsPathsInFile = lookup.byFilePath.get(conventionTs);
+          let actualTsPath = nd;
+          if (tsPathsInFile) {
+            for (const tp of tsPathsInFile) {
+              if (tp.endsWith(` > ${nd}`)) {
+                actualTsPath = tp;
+                break;
+              }
+            }
+          }
+          wrongDescribeTests.push({
+            description: tc.description,
+            rubyPath: np,
+            tsPath: actualTsPath,
+          });
           continue;
         }
 
@@ -318,10 +348,12 @@ function main() {
         rubyTestCount: file.testCases.length,
         matched,
         matchedSkipped,
+        wrongDescribe,
         misplaced,
         missing: file.testCases.length - matched - misplaced,
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
+        ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
       });
     }
 
@@ -341,6 +373,7 @@ function main() {
       totalRubyTests: totalRuby,
       totalMatched,
       totalMatchedSkipped,
+      totalWrongDescribe,
       totalMisplaced,
       percent,
       files: fileResults,
@@ -363,6 +396,7 @@ function main() {
   let grandRuby = 0;
   let grandMatched = 0;
   let grandMatchedSkipped = 0;
+  let grandWrongDescribe = 0;
   let grandMisplaced = 0;
   let grandFiles = 0;
   let grandMapped = 0;
@@ -371,14 +405,18 @@ function main() {
     grandRuby += pkg.totalRubyTests;
     grandMatched += pkg.totalMatched;
     grandMatchedSkipped += pkg.totalMatchedSkipped;
+    grandWrongDescribe += pkg.totalWrongDescribe;
     grandMisplaced += pkg.totalMisplaced;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
 
-    const skippedStr = pkg.totalMatchedSkipped > 0 ? ` (${pkg.totalMatchedSkipped} skipped)` : "";
+    const details: string[] = [];
+    if (pkg.totalMatchedSkipped > 0) details.push(`${pkg.totalMatchedSkipped} skipped`);
+    if (pkg.totalWrongDescribe > 0) details.push(`${pkg.totalWrongDescribe} wrong describe`);
+    const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
-      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)${skippedStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
+      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
     );
     console.log(`${"=".repeat(90)}\n`);
 
@@ -409,18 +447,37 @@ function main() {
       console.log("");
     }
 
+    // Show tests in wrong describe block
+    const filesWithWrongDescribe = pkg.files.filter(
+      (f) => f.wrongDescribeTests && f.wrongDescribeTests.length > 0,
+    );
+    if (filesWithWrongDescribe.length > 0) {
+      console.log(`  WRONG DESCRIBE (right file, wrong describe block):`);
+      console.log(`  ${"-".repeat(86)}`);
+
+      for (const f of filesWithWrongDescribe) {
+        console.log(`\n  ${f.conventionTsFile}  (${f.wrongDescribeTests!.length} tests)`);
+        for (const wt of f.wrongDescribeTests!) {
+          console.log(`    - "${wt.description}"`);
+          console.log(`        ruby:  ${wt.rubyPath}`);
+          console.log(`        ts:    ${wt.tsPath}`);
+        }
+      }
+      console.log("");
+    }
+
     console.log(
-      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
+      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
     );
     console.log(
-      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
+      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
     );
 
     for (const f of pkg.files) {
       const pct = f.rubyTestCount > 0 ? Math.round((f.matched / f.rubyTestCount) * 100) : 0;
-      const marker = !f.tsFileExists ? " ✗" : pct === 100 ? " ✓" : "";
+      const marker = !f.tsFileExists ? " ✗" : pct === 100 && f.wrongDescribe === 0 ? " ✓" : "";
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
+        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {
@@ -432,10 +489,13 @@ function main() {
   }
 
   const grandPct = grandRuby > 0 ? Math.round((grandMatched / grandRuby) * 1000) / 10 : 0;
-  const grandSkipStr = grandMatchedSkipped > 0 ? ` (${grandMatchedSkipped} skipped)` : "";
+  const grandDetails: string[] = [];
+  if (grandMatchedSkipped > 0) grandDetails.push(`${grandMatchedSkipped} skipped`);
+  if (grandWrongDescribe > 0) grandDetails.push(`${grandWrongDescribe} wrong describe`);
+  const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
-    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)${grandSkipStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
+    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
 }
