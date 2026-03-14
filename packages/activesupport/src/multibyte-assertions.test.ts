@@ -1062,14 +1062,9 @@ describe("MultibyteCharsExtrasTest", () => {
 // ==========================================================================
 describe("ExceptionsInsideAssertionsTest", () => {
   it("warning is logged if caught internally", () => {
-    // In JS, catching errors and re-checking is straightforward
-    let caught = false;
-    try {
+    expect(() => {
       throw new Error("internal error");
-    } catch (e) {
-      caught = true;
-    }
-    expect(caught).toBe(true);
+    }).toThrow("internal error");
   });
 
   it("warning is not logged if caught correctly by user", () => {

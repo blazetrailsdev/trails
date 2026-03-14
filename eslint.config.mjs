@@ -16,23 +16,44 @@ export default defineConfig(
     plugins: {
       "unused-imports": unusedImports,
     },
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        process: "readonly",
+        console: "readonly",
+        performance: "readonly",
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+        btoa: "readonly",
+        atob: "readonly",
+        Blob: "readonly",
+        URL: "readonly",
+      },
+    },
     rules: {
-      // Use unused-imports plugin for imports (auto-fixable) and vars
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      // Disable the built-in rule to avoid duplicate reports
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
-  // Vitest + activemodel test file overrides
+
+  // ── activemodel ──
+  {
+    files: ["packages/activemodel/src/**/*.ts"],
+    rules: {
+      "unused-imports/no-unused-vars": "off",
+    },
+  },
   {
     files: ["packages/activemodel/src/**/*.test.ts"],
-    plugins: {
-      vitest,
-    },
+    plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,
       "vitest/no-disabled-tests": "off",
@@ -41,79 +62,58 @@ export default defineConfig(
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
-  // Per-package overrides for rules that still have violations
-  {
-    files: [
-      "packages/rack/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/cli/src/**/*.ts",
-    ],
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-      "no-undef": "off",
-      "unused-imports/no-unused-vars": "off",
-    },
-  },
+
+  // ── activerecord ──
   {
     files: ["packages/activerecord/src/**/*.ts"],
-    languageOptions: {
-      globals: {
-        Buffer: "readonly",
-        setTimeout: "readonly",
-        process: "readonly",
-        console: "readonly",
-        btoa: "readonly",
-        atob: "readonly",
-        TextEncoder: "readonly",
-        TextDecoder: "readonly",
-      },
-    },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      "unused-imports/no-unused-vars": "off",
-    },
-  },
-  {
-    files: ["packages/activemodel/src/**/*.ts"],
-    languageOptions: {
-      globals: {
-        TextEncoder: "readonly",
-        TextDecoder: "readonly",
-      },
-    },
-    rules: {
-      "unused-imports/no-unused-vars": "off",
-    },
-  },
-  {
-    files: ["packages/activesupport/src/**/*.ts", "packages/rack/src/**/*.ts"],
-    rules: {
-      "@typescript-eslint/no-unused-expressions": "off",
-    },
-  },
-  {
-    files: ["packages/activesupport/src/**/*.ts", "packages/activerecord/src/**/*.ts"],
-    rules: {
       "@typescript-eslint/no-unsafe-function-type": "off",
+      "@typescript-eslint/no-this-alias": "off",
+      "unused-imports/no-unused-vars": "off",
       "no-empty": "off",
       "no-useless-assignment": "off",
     },
   },
+
+  // ── activesupport ──
   {
-    files: [
-      "packages/activesupport/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
-    ],
+    files: ["packages/activesupport/src/**/*.ts"],
     rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unsafe-function-type": "off",
       "@typescript-eslint/no-this-alias": "off",
+      "unused-imports/no-unused-vars": "off",
+      "no-empty": "off",
     },
   },
   {
+    files: ["packages/activesupport/src/**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
+  },
+
+  // ── rack ──
+  {
     files: ["packages/rack/src/**/*.ts"],
     rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/no-this-alias": "off",
+      "unused-imports/no-unused-vars": "off",
+      "no-undef": "off",
       "no-useless-assignment": "off",
+    },
+  },
+
+  // ── actionpack + cli ──
+  {
+    files: ["packages/actionpack/src/**/*.ts", "packages/cli/src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "unused-imports/no-unused-vars": "off",
+      "no-undef": "off",
     },
   },
 );

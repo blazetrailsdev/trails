@@ -66,16 +66,6 @@ describe("LoggerTest", () => {
   it("should not evaluate block if message wont be logged", () => {
     logger.level = Logger.INFO;
     let evaluated = false;
-    logger.add(
-      Logger.DEBUG,
-      (() => {
-        evaluated = true;
-        return "x";
-      })(),
-    );
-    // Message was evaluated above in the call expression (JS eagerness).
-    // Better test: use log() with a lambda
-    evaluated = false;
     logger.log(Logger.DEBUG, () => {
       evaluated = true;
       return "x";
