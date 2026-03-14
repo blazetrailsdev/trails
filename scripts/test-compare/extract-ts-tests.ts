@@ -83,7 +83,7 @@ function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo 
 
 function extractFileTests(filePath: string): TestFileInfo {
   const content = fs.readFileSync(filePath, "utf-8");
-  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.ESNext, true);
+  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.ESNext, false);
 
   const relativePath = path.relative(ROOT_DIR, filePath);
   const fileInfo: TestFileInfo = {
