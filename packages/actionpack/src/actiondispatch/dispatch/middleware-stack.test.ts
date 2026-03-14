@@ -47,7 +47,7 @@ class QuxMiddleware {
   }
 }
 
-describe("ActionDispatch::MiddlewareStack", () => {
+describe("MiddlewareStackTest", () => {
   it("use should push middleware as class onto the stack", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);

@@ -49,7 +49,7 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-describe("ActionDispatch::Static", () => {
+describe("StaticTest", () => {
   it("serves dynamic content", async () => {
     const mw = new Static(dynamicApp, { root: tmpDir });
     const [status, _, body] = await mw.call({ PATH_INFO: "/missing", REQUEST_METHOD: "GET" });

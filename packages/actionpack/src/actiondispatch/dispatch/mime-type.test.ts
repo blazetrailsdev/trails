@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MimeType } from "../mime-type.js";
 
-describe("ActionDispatch::Mime::Type", () => {
+describe("MimeTypeTest", () => {
   it("parse single", () => {
     const types = MimeType.parse("text/html");
     expect(types.length).toBe(1);

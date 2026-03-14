@@ -20,7 +20,7 @@ afterAll(() => {
 // ==========================================================================
 // dispatch/uploaded_file_test.rb
 // ==========================================================================
-describe("ActionDispatch::Http::UploadedFile", () => {
+describe("UploadedFileTest", () => {
   it("original filename", () => {
     const file = new UploadedFile({ filename: "photo.jpg" });
     expect(file.originalFilename).toBe("photo.jpg");

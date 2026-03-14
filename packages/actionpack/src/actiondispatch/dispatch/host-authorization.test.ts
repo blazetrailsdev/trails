@@ -9,7 +9,7 @@ const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   bodyFromString("OK"),
 ];
 
-describe("ActionDispatch::HostAuthorization", () => {
+describe("HostAuthorizationTest", () => {
   it("allows request when host matches exactly", async () => {
     const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
     const [status] = await mw.call({
