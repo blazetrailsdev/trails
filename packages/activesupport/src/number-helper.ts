@@ -145,7 +145,7 @@ export function numberToRounded(number: unknown, options: NumberToRoundedOptions
   const num = Number(number);
 
   let rounded: number;
-  let effectivePrecision = precision;
+  let effectivePrecision: number;
   let str: string;
 
   if (significant && precision > 0) {
