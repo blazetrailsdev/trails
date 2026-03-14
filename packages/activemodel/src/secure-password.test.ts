@@ -345,5 +345,21 @@ describe("ActiveModel", () => {
       expect((u as any).authenticate("newpassword")).toBe(u);
       expect((u as any).authenticate("secret")).toBe(false);
     });
+
+    it("constructor mass-assignment hashes password and removes plaintext", () => {
+      const User = createUserClass();
+      const u = new User({ name: "test", password: "secret" });
+      expect(u.readAttribute("password_digest")).not.toBe(null);
+      expect(u.attributes.password).toBeUndefined();
+      expect((u as any).authenticate("secret")).toBe(u);
+    });
+
+    it("assignAttributes sets password via property setter", () => {
+      const User = createUserClass();
+      const u = new User({ name: "test" });
+      (u as any).password = "secret";
+      expect(u.readAttribute("password_digest")).not.toBe(null);
+      expect((u as any).authenticate("secret")).toBe(u);
+    });
   });
 });
