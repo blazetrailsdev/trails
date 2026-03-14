@@ -764,6 +764,12 @@ describe("ActiveModel", () => {
       expect(e.ofKind("name", "invalid")).toBe(false);
     });
 
+    it("generate_message works without i18n_scope", () => {
+      const e = new Errors(null);
+      expect(e.generateMessage("name", "blank")).toBe("can't be blank");
+      expect(e.generateMessage("name", "invalid")).toBe("is invalid");
+    });
+
     it("full_messages doesn't require the base object to respond to `:errors", () => {
       const base = {
         constructor: {
