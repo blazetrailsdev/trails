@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { wrapParameters, applyParamsWrapper, deriveWrapperKey } from "./params-wrapper.js";
-import { Parameters } from "../actiondispatch/parameters.js";
+import { wrapParameters, applyParamsWrapper, deriveWrapperKey } from "../params-wrapper.js";
+import { Parameters } from "../../actiondispatch/parameters.js";
 
 // ==========================================================================
 // action_controller/params_wrapper_test.rb
 // ==========================================================================
-describe("ActionController::ParamsWrapper", () => {
+describe("ParamsWrapperTest", () => {
   describe("wrapParameters", () => {
     it("creates config with key", () => {
       const config = wrapParameters("user");

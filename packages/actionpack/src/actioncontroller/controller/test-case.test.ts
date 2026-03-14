@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { TestCase } from "./test-case.js";
-import { Base } from "./base.js";
-import { Metal } from "./metal.js";
+import { TestCase } from "../test-case.js";
+import { Base } from "../base.js";
+import { Metal } from "../metal.js";
 
 // ==========================================================================
 // Test controllers
@@ -80,7 +80,7 @@ class PostsController extends Base {
 // ==========================================================================
 // action_controller/test_case_test.rb
 // ==========================================================================
-describe("ActionController::TestCase", () => {
+describe("TestCaseTest", () => {
   let tc: TestCase;
 
   beforeEach(() => {
