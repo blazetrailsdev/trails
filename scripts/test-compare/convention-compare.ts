@@ -160,6 +160,21 @@ function main() {
     const pendingSet = tsPendingTests.get(pkg) || new Set<string>();
     const fileResults: ConventionFileResult[] = [];
 
+    // Build Ruby-side lookup: which test names appear in multiple Ruby files?
+    // These are shared concepts (e.g., "connection error" in both mysql and pg adapters)
+    // and shouldn't be flagged as misplaced when found in another adapter's TS file.
+    const rubyDescToFileCount = new Map<string, number>();
+    for (const file of pkgInfo.files) {
+      const seen = new Set<string>();
+      for (const tc of file.testCases) {
+        const norm = normalize(tc.description);
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          rubyDescToFileCount.set(norm, (rubyDescToFileCount.get(norm) || 0) + 1);
+        }
+      }
+    }
+
     let totalRuby = 0;
     let totalMatched = 0;
     let totalMatchedSkipped = 0;
@@ -195,10 +210,14 @@ function main() {
           // Check if it exists in a different TS file
           const locations = descToFile.get(norm);
           if (locations && locations.length > 0) {
-            // Filter to locations that are NOT the convention file
             const otherLocations = locations.filter((l) => l !== conventionTs);
-            if (otherLocations.length === 1) {
-              // Exists in exactly one other file — genuinely misplaced
+            // A test name that appears in multiple Ruby files (e.g., "connection error"
+            // in both mysql and pg adapter tests) is a shared concept — finding it in
+            // any adapter TS file is fine, not a misplacement.
+            const isSharedAcrossRubyFiles = (rubyDescToFileCount.get(norm) || 0) > 1;
+
+            if (otherLocations.length >= 1 && !isSharedAcrossRubyFiles) {
+              // Exists in other file(s) and is unique to this Ruby file — genuinely misplaced
               misplaced++;
               totalMisplaced++;
               misplacedTests.push({
@@ -206,9 +225,8 @@ function main() {
                 currentTsFile: otherLocations[0],
                 conventionTsFile: conventionTs,
               });
-            } else if (otherLocations.length > 1) {
-              // Exists in multiple files — shared test name, not misplaced.
-              // Count as matched if any location has it (it's implemented somewhere).
+            } else if (otherLocations.length >= 1) {
+              // Shared test name across Ruby files — count as matched
               matched++;
               totalMatched++;
               if (otherLocations.every((l) => pendingSet.has(`${l}:${norm}`))) {
@@ -216,7 +234,6 @@ function main() {
                 totalMatchedSkipped++;
               }
             } else {
-              // Only exists in the convention file (already counted above) — shouldn't happen
               missingTests.push(tc.description);
             }
           } else {
