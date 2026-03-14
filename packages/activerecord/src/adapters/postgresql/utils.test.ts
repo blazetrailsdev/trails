@@ -14,10 +14,8 @@ describeIfPg("PostgresAdapter", () => {
   });
 
   describe("PostgresqlUtilsTest", () => {
-    it.skip("reset pk sequence", async () => {});
     it.skip("reset pk sequence on empty table", async () => {});
     it.skip("reset pk sequence with custom pk", async () => {});
-    it.skip("pk and sequence for", async () => {});
     it.skip("distinct zero", async () => {});
     it.skip("distinct one", async () => {});
     it.skip("distinct multiple", async () => {});

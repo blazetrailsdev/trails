@@ -1020,4 +1020,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it.skip("deleting all", () => {});
   it.skip("destroying many", () => {});
   it.skip("destroy associations destroys multiple associations", () => {});
+  it.skip("destroying", () => {
+    /* TODO: needs helpers from original file */
+  });
 });

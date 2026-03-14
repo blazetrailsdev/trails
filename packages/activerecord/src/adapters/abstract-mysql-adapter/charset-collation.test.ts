@@ -21,6 +21,5 @@ describeIfMysql("MysqlAdapter", () => {
     it.skip("change column doesn't preserve collation for string to binary types", () => {});
     it.skip("change column doesn't preserve collation for string to non-string types", () => {});
     it.skip("change column preserves collation for string to text", () => {});
-    it.skip("schema dump includes collation", () => {});
   });
 });

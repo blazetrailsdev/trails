@@ -109,21 +109,6 @@ describe("HasManyThroughTest", () => {
     return { Tag: HmtTag, Tagging: HmtTagging, Post: HmtPost, adapter };
   }
 
-  it("associate existing", async () => {
-    const { Tag, Tagging, Post } = makeModels();
-    const post = await Post.create({ title: "Hello" });
-    const tag = await Tag.create({ name: "ruby" });
-    // Associate existing tag via join model
-    await Tagging.create({ post_id: post.id, tag_id: tag.id });
-    const tags = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings",
-      className: "HmtTag",
-      source: "tag",
-    });
-    expect(tags).toHaveLength(1);
-    expect(tags[0].readAttribute("name")).toBe("ruby");
-  });
-
   it("get ids", async () => {
     const { Tag, Tagging, Post } = makeModels();
     const post = await Post.create({ title: "Post" });
@@ -139,30 +124,6 @@ describe("HasManyThroughTest", () => {
     const ids = tags.map((t) => t.id);
     expect(ids).toContain(t1.id);
     expect(ids).toContain(t2.id);
-  });
-
-  it("size of through association should increase correctly when has many association is added", async () => {
-    const { Tag, Tagging, Post } = makeModels();
-    const post = await Post.create({ title: "Post" });
-    const t1 = await Tag.create({ name: "first" });
-    await Tagging.create({ post_id: post.id, tag_id: t1.id });
-
-    const before = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings",
-      className: "HmtTag",
-      source: "tag",
-    });
-    expect(before).toHaveLength(1);
-
-    const t2 = await Tag.create({ name: "second" });
-    await Tagging.create({ post_id: post.id, tag_id: t2.id });
-
-    const after = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtTaggings",
-      className: "HmtTag",
-      source: "tag",
-    });
-    expect(after).toHaveLength(2);
   });
 });
 

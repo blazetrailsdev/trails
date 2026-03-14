@@ -14,7 +14,6 @@ describeIfMysql("MysqlAdapter", () => {
   });
 
   describe("ConnectionTest", () => {
-    it.skip("bad connection", () => {});
     it.skip("no automatic reconnection after timeout", () => {});
     it.skip("successful reconnection after timeout with manual reconnect", () => {});
     it.skip("successful reconnection after timeout with verify", () => {});
@@ -41,8 +40,6 @@ describeIfMysql("MysqlAdapter", () => {
     it.skip("mysql set session variable to default", () => {});
     it.skip("logs name show variable", () => {});
     it.skip("logs name rename column for alter", () => {});
-    it.skip("get and release advisory lock", () => {});
-    it.skip("release non existent advisory lock", () => {});
     it.skip("version string", () => {});
     it.skip("version string with mariadb", () => {});
     it.skip("version string invalid", () => {});

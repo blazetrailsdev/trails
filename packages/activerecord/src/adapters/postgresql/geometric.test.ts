@@ -68,4 +68,11 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("creating column with polygon type", () => {});
     it.skip("creating column with circle type", () => {});
   });
+  it.skip("column", async () => {});
+
+  it.skip("default", async () => {});
+
+  it.skip("schema dumping", () => {});
+
+  it.skip("roundtrip", async () => {});
 });

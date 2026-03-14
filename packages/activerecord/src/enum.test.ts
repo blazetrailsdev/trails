@@ -1540,4 +1540,17 @@ describe("Enum (extended)", () => {
       expect(highTasks).toHaveLength(1);
     });
   });
+  it("reverted changes are not dirty going from nil to value and back", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("subtitle", "string");
+        this.adapter = adp;
+      }
+    }
+    const post = (await Post.create({ subtitle: null })) as any;
+    post.writeAttribute("subtitle", "hello");
+    post.writeAttribute("subtitle", null);
+    expect(post.changed).toBe(false);
+  });
 });

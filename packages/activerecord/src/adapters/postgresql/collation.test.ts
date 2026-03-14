@@ -20,4 +20,21 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("collation schema dump", async () => {});
     it.skip("collation default", async () => {});
   });
+  it.skip("string column with collation", () => {
+    /* needs PostgreSQL-specific collation syntax */
+  });
+
+  it.skip("text column with collation", () => {
+    /* needs PostgreSQL-specific collation syntax */
+  });
+
+  it.skip("add column with collation", () => {
+    /* needs PostgreSQL-specific collation syntax */
+  });
+
+  it.skip("change column with collation", () => {
+    /* needs PostgreSQL-specific collation syntax */
+  });
+
+  it.skip("schema dump includes collation", () => {});
 });

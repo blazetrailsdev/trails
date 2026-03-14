@@ -14,16 +14,9 @@ describeIfMysql("MysqlAdapter", () => {
   });
 
   describe("AdapterPreventWritesTest", () => {
-    it.skip("errors when an insert query is called while preventing writes", () => {});
-    it.skip("errors when an update query is called while preventing writes", () => {});
-    it.skip("errors when a delete query is called while preventing writes", () => {});
     it.skip("errors when a replace query is called while preventing writes", () => {});
-    it.skip("doesnt error when a select query is called while preventing writes", () => {});
-    it.skip("doesnt error when a show query is called while preventing writes", () => {});
-    it.skip("doesnt error when a set query is called while preventing writes", () => {});
     it.skip("doesnt error when a describe query is called while preventing writes", () => {});
     it.skip("doesnt error when a desc query is called while preventing writes", () => {});
-    it.skip("doesnt error when a read query with leading chars is called while preventing writes", () => {});
     it.skip("doesnt error when a use query is called while preventing writes", () => {});
     it.skip("doesnt error when a kill query is called while preventing writes", () => {});
   });

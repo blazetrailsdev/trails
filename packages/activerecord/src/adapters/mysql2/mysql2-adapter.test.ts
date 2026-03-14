@@ -18,19 +18,10 @@ describeIfMysql("MysqlAdapter", () => {
   });
 
   describe("Mysql2AdapterTest", () => {
-    it.skip("connection error", () => {});
-    it.skip("reconnection error", () => {});
     it.skip("mysql2 default prepared statements", () => {});
     it.skip("exec query with prepared statements", () => {});
     it.skip("exec query nothing raises with no result queries", () => {});
     it.skip("database exists returns false if database does not exist", () => {});
-    it.skip("database exists returns true when the database exists", () => {});
-    it.skip("columns for distinct zero orders", () => {});
-    it.skip("columns for distinct one order", () => {});
-    it.skip("columns for distinct few orders", () => {});
-    it.skip("columns for distinct with case", () => {});
-    it.skip("columns for distinct blank not nil orders", () => {});
-    it.skip("columns for distinct with arel order", () => {});
     it.skip("errors for bigint fks on integer pk table in alter table", () => {});
     it.skip("errors for multiple fks on mismatched types for pk table in alter table", () => {});
     it.skip("errors for bigint fks on integer pk table in create table", () => {});

@@ -685,55 +685,6 @@ describe("FinderTest", () => {
     expect(results.length).toBe(1);
   });
 
-  it("find_by with multi-arg conditions returns the first matching record", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    await Topic.create({ title: "a", body: "x" });
-    const found = await Topic.findBy({ title: "a", body: "x" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find_by doesn't have implicit ordering", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    await Topic.create({ title: "a" });
-    const found = await Topic.findBy({ title: "a" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find_by! with multi-arg conditions returns the first matching record", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    await Topic.create({ title: "target" });
-    const found = await Topic.findByBang({ title: "target" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find_by! doesn't have implicit ordering", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    await Topic.create({ title: "a" });
-    const found = await Topic.findByBang({ title: "a" });
-    expect(found).not.toBeNull();
-  });
-
   it("find doesnt have implicit ordering", async () => {
     class Topic extends Base {
       static {
@@ -1713,12 +1664,6 @@ describe("FinderTest", () => {
     const found = await Post.findBy({ title: "valid" });
     expect(found).toBeDefined();
   });
-  it("joins with string array", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "join_str" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
   it("find with order on included associations with construct finder sql for association limiting and is distinct", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "ordered_assoc" });
@@ -2483,15 +2428,6 @@ describe("FinderTest", () => {
     await Topic.create({ title: "One" });
     const exists = await Topic.exists(false);
     expect(exists).toBe(false);
-  });
-
-  it("find on hash conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Approved", approved: true });
-    await Topic.create({ title: "Rejected", approved: false });
-    const found = await Topic.where({ approved: true }).toArray();
-    expect(found.length).toBe(1);
-    expect(found[0].readAttribute("title")).toBe("Approved");
   });
 
   it("find on array conditions", async () => {
@@ -3961,6 +3897,19 @@ describe("Finders (extended)", () => {
       await User.deleteBy({ name: "Alice" });
       expect(await User.count()).toBe(2);
     });
+  });
+  it("find_by with non-hash conditions returns the first matching record", async () => {
+    const adp = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    await Item.create({ name: "Apple" });
+    const item = await Item.findBy({ name: "Apple" });
+    expect(item).not.toBeNull();
+    expect(item!.readAttribute("name")).toBe("Apple");
   });
 });
 

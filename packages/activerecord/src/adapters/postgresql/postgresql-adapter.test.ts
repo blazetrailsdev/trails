@@ -154,4 +154,33 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("disable extension with schema", async () => {});
     it.skip("disable extension without schema", async () => {});
   });
+  it.skip("connection error", () => {});
+
+  it.skip("reconnection error", () => {});
+
+  it.skip("database exists returns true when the database exists", () => {});
+
+  it.skip("columns for distinct zero orders", () => {});
+
+  it.skip("columns for distinct one order", () => {});
+
+  it.skip("columns for distinct few orders", () => {});
+
+  it.skip("columns for distinct with case", () => {});
+
+  it.skip("columns for distinct blank not nil orders", () => {});
+
+  it.skip("columns for distinct with arel order", () => {});
+
+  it.skip("bad connection", () => {});
+
+  it.skip("database exists returns false when the database does not exist", () => {
+    /* needs adapter.databaseExists() API */
+  });
+
+  it.skip("exec insert with returning disabled", () => {
+    /* needs table setup and RETURNING-disabled adapter mode */
+  });
+
+  it.skip("pk and sequence for", async () => {});
 });

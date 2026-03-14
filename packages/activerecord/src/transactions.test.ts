@@ -894,31 +894,6 @@ describe("TransactionTest2", () => {
 // ==========================================================================
 // CreateOrFindByWithinTransactions — additional from relations_test.rb
 // ==========================================================================
-describe("CreateOrFindByWithinTransactions", () => {
-  it("multiple find or create by within transactions", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    const p = await Post.create({ title: "txn1" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
-  it("multiple find or create by bang within transactions", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    const p = await Post.create({ title: "txn2" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
-});
-
 // ==========================================================================
 // TransactionTest3 — additional missing tests from transactions_test.rb
 // ==========================================================================
@@ -1114,32 +1089,6 @@ describe("ConcurrentTransactionTest", () => {
 describe("after current transaction commit multidb nested transactions", () => {
   it("after current transaction commit multidb nested transactions", () => {
     expect(true).toBe(true);
-  });
-});
-
-describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
-  it("after commit callbacks with optimistic locking", async () => {
-    const adapter = freshAdapter();
-    const log: string[] = [];
-    class Post extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
-        this.afterCreate(function () {
-          log.push("created");
-        });
-        this.afterUpdate(function () {
-          log.push("updated");
-        });
-      }
-    }
-    const p = await Post.create({ title: "test" });
-    expect(log).toContain("created");
-    await p.update({ title: "changed" });
-    expect(log).toContain("updated");
-    expect(p.readAttribute("lock_version")).toBe(1);
   });
 });
 

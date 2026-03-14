@@ -20,4 +20,11 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("optimizer hints with update all", async () => {});
     it.skip("optimizer hints with pluck", async () => {});
   });
+  it.skip("optimizer hints with count subquery", () => {});
+
+  it.skip("optimizer hints is sanitized", () => {});
+
+  it.skip("optimizer hints with unscope", () => {});
+
+  it.skip("optimizer hints with or", () => {});
 });

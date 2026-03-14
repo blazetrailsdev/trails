@@ -106,20 +106,6 @@ describe("HasManyScopingTest", () => {
     expect(posts.length).toBe(2);
   });
 
-  it("forwarding to scoped", async () => {
-    const { Author, Post } = makeModels();
-    const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "Scoped", author_id: a.id });
-    const proxy = new CollectionProxy(a, "posts", {
-      type: "hasMany",
-      name: "posts",
-      options: {},
-    } as any);
-    const posts = await proxy.toArray();
-    expect(posts.length).toBe(1);
-    expect(posts[0].readAttribute("title")).toBe("Scoped");
-  });
-
   it("nested scope finder", async () => {
     const { Author, Post } = makeModels();
     const a = await Author.create({ name: "Alice" });
@@ -142,47 +128,5 @@ describe("HasManyScopingTest", () => {
     const noneRel = Post.none();
     const results = await noneRel.toArray();
     expect(results.length).toBe(0);
-  });
-
-  it("should default scope on associations is overridden by association conditions", async () => {
-    const { Author, Post } = makeModels();
-    const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "P1", author_id: a.id });
-    await Post.create({ title: "P2", author_id: (a.id as number) + 999 });
-    const proxy = new CollectionProxy(a, "posts", {
-      type: "hasMany",
-      name: "posts",
-      options: {},
-    } as any);
-    const posts = await proxy.toArray();
-    expect(posts.length).toBe(1);
-    expect(posts[0].readAttribute("title")).toBe("P1");
-  });
-
-  it("should maintain default scope on eager loaded associations", async () => {
-    const { Author, Post } = makeModels();
-    const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "P1", author_id: a.id });
-    const proxy = new CollectionProxy(a, "posts", {
-      type: "hasMany",
-      name: "posts",
-      options: {},
-    } as any);
-    const posts = await proxy.toArray();
-    expect(posts.length).toBe(1);
-  });
-
-  it("scoping applies to all queries on has many when set", async () => {
-    const { Author, Post } = makeModels();
-    const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "X", author_id: a.id });
-    await Post.create({ title: "Y", author_id: a.id });
-    const proxy = new CollectionProxy(a, "posts", {
-      type: "hasMany",
-      name: "posts",
-      options: {},
-    } as any);
-    const count = await proxy.count();
-    expect(count).toBe(2);
   });
 });

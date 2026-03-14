@@ -14,10 +14,8 @@ describeIfPg("PostgresAdapter", () => {
   });
 
   describe("PostgresqlArrayTest", () => {
-    it.skip("column", async () => {});
     it.skip("not compatible with serialize array", async () => {});
     it.skip("array with serialized attributes", async () => {});
-    it.skip("default", async () => {});
     it.skip("default strings", async () => {});
     it.skip("change column with array", async () => {});
     it.skip("change column from non array to array", async () => {});
@@ -25,7 +23,6 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("change column default with array", async () => {});
     it.skip("type cast array", async () => {});
     it.skip("type cast integers", async () => {});
-    it.skip("schema dump with shorthand", async () => {});
     it.skip("select with strings", async () => {});
     it.skip("rewrite with strings", async () => {});
     it.skip("select with integers", async () => {});
@@ -39,7 +36,6 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("strings with commas", async () => {});
     it.skip("strings with array delimiters", async () => {});
     it.skip("strings with null strings", async () => {});
-    it.skip("contains nils", async () => {});
     it.skip("insert fixture", async () => {});
     it.skip("attribute for inspect for array field", async () => {});
     it.skip("attribute for inspect for array field for large array", async () => {});

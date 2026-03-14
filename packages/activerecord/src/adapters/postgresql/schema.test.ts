@@ -86,4 +86,9 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("multiple inherited table options is dumped", () => {});
     it.skip("no partition options are dumped", () => {});
   });
+  it.skip("data source exists?", () => {});
+
+  it.skip("data source exists wrong schema", () => {});
+
+  it.skip("reset pk sequence", async () => {});
 });

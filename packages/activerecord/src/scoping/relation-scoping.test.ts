@@ -682,4 +682,61 @@ describe("Static shorthands (Rails-guided)", () => {
     await User.create({ name: "Bob" });
     expect(await User.ids()).toEqual([1, 2]);
   });
+  it("forwarding of static methods", async () => {
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Tag);
+    await Tag.create({ name: "ruby" });
+    await Tag.create({ name: "typescript" });
+    const all = await Tag.all().toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("nested scope finder", async () => {
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Tag);
+    await Tag.create({ name: "ruby" });
+    await Tag.create({ name: "typescript" });
+    const results = await Tag.where({ name: "ruby" }).toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].readAttribute("name")).toBe("ruby");
+  });
+
+  it("none scoping", async () => {
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Tag);
+    await Tag.create({ name: "ruby" });
+    const results = await Tag.none().toArray();
+    expect(results.length).toBe(0);
+  });
+
+  it.skip("forwarding to scoped", () => {
+    /* TODO: needs helpers from original file */
+  });
+
+  it.skip("should default scope on associations is overridden by association conditions", () => {
+    /* TODO: needs helpers from original file */
+  });
+
+  it.skip("should maintain default scope on eager loaded associations", () => {
+    /* TODO: needs helpers from original file */
+  });
+
+  it.skip("scoping applies to all queries on has many when set", () => {
+    /* TODO: needs helpers from original file */
+  });
 });

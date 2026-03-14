@@ -33,4 +33,11 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("null xml", async () => {});
     it.skip("round trip", async () => {});
   });
+  it.skip("virtual column with full inserts", () => {
+    /* needs PostgreSQL GENERATED ALWAYS AS ... STORED syntax (no VIRTUAL in PG) */
+  });
+
+  it.skip("stored column", () => {});
+
+  it.skip("change table", () => {});
 });

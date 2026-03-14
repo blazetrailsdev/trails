@@ -41,4 +41,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("adds column as timestamptz if datetime type changed", () => {});
     it.skip("adds column as custom type", () => {});
   });
+  it.skip("load infinity and beyond", async () => {});
+
+  it.skip("save infinity and beyond", async () => {});
 });

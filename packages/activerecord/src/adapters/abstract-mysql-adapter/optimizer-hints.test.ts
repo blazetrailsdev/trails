@@ -15,9 +15,5 @@ describeIfMysql("MysqlAdapter", () => {
 
   describe("OptimizerHintsTest", () => {
     it.skip("optimizer hints", () => {});
-    it.skip("optimizer hints with count subquery", () => {});
-    it.skip("optimizer hints is sanitized", () => {});
-    it.skip("optimizer hints with unscope", () => {});
-    it.skip("optimizer hints with or", () => {});
   });
 });

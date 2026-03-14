@@ -23,6 +23,5 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("bit string column", async () => {});
     it.skip("bit string varying column", async () => {});
     it.skip("assigning invalid hex string raises exception", async () => {});
-    it.skip("roundtrip", async () => {});
   });
 });

@@ -527,15 +527,6 @@ describe("Base features (Rails-guided) - core", () => {
 });
 
 describe("table_name_prefix and table_name_suffix", () => {
-  it("table name guesses with prefixes and suffixes", () => {
-    class User extends Base {
-      static {
-        this.tableNamePrefix = "app_";
-      }
-    }
-    expect(User.tableName).toBe("app_users");
-  });
-
   it("applies suffix to inferred table name", () => {
     class User extends Base {
       static {

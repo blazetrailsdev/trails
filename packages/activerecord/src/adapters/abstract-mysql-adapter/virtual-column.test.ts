@@ -15,8 +15,6 @@ describeIfMysql("MysqlAdapter", () => {
 
   describe("VirtualColumnTest", () => {
     it.skip("virtual column", () => {});
-    it.skip("stored column", () => {});
-    it.skip("change table", () => {});
     it.skip("schema dumping", () => {});
   });
 });

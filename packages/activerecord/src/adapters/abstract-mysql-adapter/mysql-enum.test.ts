@@ -16,7 +16,6 @@ describeIfMysql("MysqlAdapter", () => {
   describe("MysqlEnumTest", () => {
     it.skip("should not be unsigned", () => {});
     it.skip("should not be bigint", () => {});
-    it.skip("schema dumping", () => {});
     it.skip("enum with attribute", () => {});
   });
 });

@@ -19,6 +19,5 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("ltree query", async () => {});
     it.skip("ltree schema dump", async () => {});
     it.skip("write", async () => {});
-    it.skip("select", async () => {});
   });
 });

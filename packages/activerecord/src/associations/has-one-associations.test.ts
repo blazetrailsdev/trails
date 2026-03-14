@@ -842,10 +842,6 @@ describe("HasOneAssociationsTest", () => {
     expect(firm.isNewRecord()).toBe(false);
   });
 
-  it.skip("cant save readonly association", () => {
-    // Requires readonly association
-  });
-
   it.skip("has one proxy should not respond to private methods", () => {
     // Requires proxy method visibility checks
   });
@@ -1153,5 +1149,62 @@ describe("HasOneAssociationsTest", () => {
       className: "CpkTarget2",
     });
     expect(CpkOwner2.compositePrimaryKey).toBe(true);
+  });
+  it("with select", async () => {
+    class Company extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("city", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Account extends Base {
+      static {
+        this.attribute("company_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Company);
+    registerModel(Account);
+    const company = await Company.create({ name: "Acme", city: "NYC" });
+    const account = await Account.create({ company_id: company.id });
+    const loaded = await loadBelongsTo(account, "company", {
+      className: "Company",
+      foreignKey: "company_id",
+    });
+    expect((loaded as any).readAttribute("name")).toBe("Acme");
+  });
+
+  it("async load has one", async () => {
+    const adapter = freshAdapter();
+    class AHFirm extends Base {
+      static {
+        this._tableName = "ah_firms";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class AHAccount extends Base {
+      static {
+        this._tableName = "ah_accounts";
+        this.attribute("credit_limit", "integer");
+        this.attribute("ah_firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(AHFirm, "ahAccount", {
+      foreignKey: "ah_firm_id",
+      className: "AHAccount",
+    });
+    registerModel("AHFirm", AHFirm);
+    registerModel("AHAccount", AHAccount);
+    const firm = await AHFirm.create({ name: "Test Corp" });
+    await AHAccount.create({ credit_limit: 100, ah_firm_id: firm.id });
+    const account = await loadHasOne(firm, "ahAccount", {
+      className: "AHAccount",
+      foreignKey: "ah_firm_id",
+    });
+    expect(account).not.toBeNull();
+    expect(account!.readAttribute("credit_limit")).toBe(100);
   });
 });

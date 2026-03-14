@@ -21,7 +21,6 @@ describeIfMysql("MysqlAdapter", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it.skip("explain with eager loading", () => {});
     it.skip("explain with options as symbol", () => {});
     it.skip("explain with options as strings", () => {});
     it.skip("explain options with eager loading", () => {});
