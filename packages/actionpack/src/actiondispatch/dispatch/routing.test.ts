@@ -8,7 +8,7 @@ import { bodyToString } from "@rails-ts/rack";
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Journey::Route", () => {
+describe("TestRoute", () => {
   it("initialize", () => {
     const route = new Route("GET", "/:controller/:action/:id", "pages", "show", {
       name: "name",
@@ -87,7 +87,7 @@ describe("ActionDispatch::Journey::Route", () => {
 // ==========================================================================
 // Journey::Router tests (journey/router_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Journey::Router", () => {
+describe("TestRouter", () => {
   it("dashes", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -301,7 +301,7 @@ describe("ActionDispatch::Journey::Router", () => {
 // ==========================================================================
 // Journey::Router::Utils tests (journey/router/utils_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Journey::Router::Utils", () => {
+describe("Router", () => {
   it("path escape", () => {
     expect(escapePath("a/b c+d%")).toBe("a/b%20c+d%25");
   });
@@ -326,7 +326,7 @@ describe("ActionDispatch::Journey::Router::Utils", () => {
 // ==========================================================================
 // ActionDispatch::Routing::RouteSet tests (dispatch/routing/route_set_test.rb)
 // ==========================================================================
-describe("ActionDispatch::Routing::RouteSet", () => {
+describe("RouteSetTest", () => {
   it("not being empty when route is added", () => {
     const routes = new RouteSet();
     expect(routes.getRoutes().length).toBe(0);
@@ -459,7 +459,7 @@ describe("ActionDispatch::Routing::RouteSet", () => {
 // ==========================================================================
 // dispatch/routing_test.rb (TestRoutingMapper)
 // ==========================================================================
-describe("ActionDispatch::Routing::Mapper", () => {
+describe("TestRoutingMapper", () => {
   it("logout", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -1870,7 +1870,7 @@ describe("ActionDispatch::Routing::Mapper", () => {
 // ==========================================================================
 // dispatch/routing/inspector_test.rb
 // ==========================================================================
-describe("ActionDispatch::Routing::Inspector", () => {
+describe("RoutesInspectorTest", () => {
   it("displaying routes for engines", () => {
     const routes = new RouteSet();
     routes.draw((r) => {

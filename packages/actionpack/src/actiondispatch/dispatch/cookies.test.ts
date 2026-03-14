@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CookieJar } from "../cookies.js";
 
-describe("ActionDispatch::Cookies", () => {
+describe("CookiesTest", () => {
   it("fetch", () => {
     const jar = CookieJar.parse("foo=bar");
     expect(jar.fetch("foo")).toBe("bar");

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Response } from "../response.js";
 
-describe("ActionDispatch::Response", () => {
+describe("ResponseTest", () => {
   it("simple output", () => {
     const res = Response.create(200, { "content-type": "text/html" }, "Hello");
     expect(res.status).toBe(200);

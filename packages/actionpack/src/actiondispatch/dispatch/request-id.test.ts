@@ -12,7 +12,7 @@ const echoApp = async (env: RackEnv): Promise<RackResponse> => [
 // ==========================================================================
 // dispatch/request_id_test.rb
 // ==========================================================================
-describe("ActionDispatch::RequestId", () => {
+describe("RequestIdTest", () => {
   it("generates a request id if none provided", async () => {
     const mw = new RequestId(echoApp);
     const [, headers] = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/" });
