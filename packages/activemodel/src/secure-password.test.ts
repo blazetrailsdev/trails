@@ -43,8 +43,8 @@ describe("ActiveModel", () => {
     it("create a new user with validation and a spaces only password", () => {
       const User = createUserClass();
       const u = new User({ name: "test" });
-      (u as any).password = "   ";
-      expect(u.isValid()).toBe(false);
+      (u as any).password = " ".repeat(72);
+      expect(u.isValid()).toBe(true);
     });
 
     it("create a new user with validation and a blank password", () => {
@@ -131,9 +131,9 @@ describe("ActiveModel", () => {
 
     it("updating an existing user with validation and a spaces only password", () => {
       const User = createUserClass();
-      const u = new User({ name: "test", password_digest: "$2a$04$existing" });
-      (u as any).password = "   ";
-      expect(u.readAttribute("password_digest")).toBe("$2a$04$existing");
+      const u = new User({ name: "test" });
+      (u as any).password = " ".repeat(72);
+      expect(u.isValid()).toBe(true);
     });
 
     it("updating an existing user with validation and a blank password and password_confirmation", () => {

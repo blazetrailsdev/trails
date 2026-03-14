@@ -35,8 +35,7 @@ export function hasSecurePassword(
         return;
       }
       const str = String(value);
-      if (str === "" || str.trim() === "") {
-        passwordCache.delete(this);
+      if (str === "") {
         return;
       }
       passwordCache.set(this, str);
