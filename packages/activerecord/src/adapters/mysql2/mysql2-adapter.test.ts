@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/mysql2/mysql2_adapter_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, beforeEach, afterEach } from "vitest";
 import {
   describeIfMysql,
   MysqlAdapter,

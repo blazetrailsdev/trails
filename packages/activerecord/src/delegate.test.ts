@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel, association, delegate } from "./index.js";
+import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";

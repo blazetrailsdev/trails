@@ -7,7 +7,6 @@ import { Base, registerModel } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
-import { Associations } from "./associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();

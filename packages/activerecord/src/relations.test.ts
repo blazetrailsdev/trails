@@ -1,14 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Base,
-  Relation,
-  Range,
-  RecordNotFound,
-  SoleRecordExceeded,
-  transaction,
-  association,
-  columns,
-} from "./index.js";
+import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 

@@ -5,13 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import {
-  Associations,
-  loadHasMany,
-  loadHasManyThrough,
-  loadBelongsTo,
-  processDependentAssociations,
-} from "../associations.js";
+import { Associations, loadHasMany, loadHasManyThrough } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();

@@ -9,7 +9,6 @@ import {
   Associations,
   loadHasMany,
   loadHasManyThrough,
-  loadBelongsTo,
   processDependentAssociations,
 } from "../associations.js";
 

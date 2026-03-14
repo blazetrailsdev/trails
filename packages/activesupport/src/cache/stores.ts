@@ -8,7 +8,7 @@ import {
   statSync,
   rmdirSync,
 } from "node:fs";
-import { join, dirname, basename } from "node:path";
+import { join, dirname } from "node:path";
 import type { CacheOptions, CacheStore } from "./index.js";
 
 interface CacheEntry {

@@ -2,9 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SqliteAdapter } from "./sqlite-adapter.js";
 import {
   Base,
-  Relation,
   Migration,
-  Schema,
   transaction,
   savepoint,
   registerModel,

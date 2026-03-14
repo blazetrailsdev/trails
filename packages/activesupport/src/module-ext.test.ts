@@ -11,8 +11,6 @@ import {
   registerSubclass,
   subclasses,
   descendants,
-  rescueFrom,
-  handleRescue,
 } from "./module-ext.js";
 
 describe("ModuleTest", () => {

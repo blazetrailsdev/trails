@@ -9,10 +9,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../actiondispatch/flash.js";
-import {
-  RequestForgeryProtection,
-  InvalidAuthenticityToken,
-} from "../actiondispatch/request-forgery-protection.js";
+import { RequestForgeryProtection } from "../actiondispatch/request-forgery-protection.js";
 import { Collector, UnknownFormat } from "../actiondispatch/respond-to.js";
 import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
 import { LookupContext } from "../actionview/lookup-context.js";

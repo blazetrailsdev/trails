@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import { parseNestedQuery } from "./utils.js";
 
 export class MultipartPartLimitError extends Error {
   constructor(message = "exceeded multipart part limit") {

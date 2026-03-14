@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/warnings_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, MysqlAdapter, MYSQL_TEST_URL } from "./test-helper.js";
 
 describeIfMysql("MysqlAdapter", () => {

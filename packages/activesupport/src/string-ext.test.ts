@@ -19,12 +19,6 @@ import {
   stripHeredoc,
   downcaseFirst,
   upcaseFirst,
-  at,
-  first,
-  last,
-  from,
-  to,
-  indent,
 } from "./index.js";
 
 describe("StringInflectionsTest", () => {

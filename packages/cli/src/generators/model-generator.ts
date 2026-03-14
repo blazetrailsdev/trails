@@ -5,7 +5,6 @@ import {
   dasherize,
   tableize,
   parseColumns,
-  ColumnType,
 } from "./base.js";
 import { MigrationGenerator } from "./migration-generator.js";
 

@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
 import { PostgresAdapter } from "./postgres-adapter.js";
 import {
   Base,
-  Relation,
-  Migration,
-  Schema,
   transaction,
   savepoint,
   registerModel,
@@ -75,6 +72,7 @@ describeIfPg("PostgresAdapter", () => {
   // -- Basic adapter operations --
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "users" CASCADE');
       await adapter.exec('CREATE TABLE "users" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
       await adapter.executeMutation(`INSERT INTO "users" ("name") VALUES ('Alice')`);
       const rows = await adapter.execute('SELECT * FROM "users"');

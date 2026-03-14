@@ -5,43 +5,16 @@
  * polymorphic, dependent, counterCache, touch, CollectionProxy, reflection,
  * strict loading, inverse_of, and scoped associations.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   loadHabtm,
   Base,
-  Relation,
-  Range,
-  transaction,
   CollectionProxy,
   association,
-  defineEnum,
-  readEnumValue,
-  RecordNotFound,
-  RecordInvalid,
-  SoleRecordExceeded,
-  ReadOnlyRecord,
   StrictLoadingViolationError,
-  StaleObjectError,
-  columns,
-  columnNames,
   reflectOnAssociation,
   reflectOnAllAssociations,
-  hasSecureToken,
-  serialize,
   registerModel,
-  composedOf,
-  acceptsNestedAttributesFor,
-  assignNestedAttributes,
-  generatesTokenFor,
-  store,
-  storedAttributes,
-  Migration,
-  Schema,
-  MigrationContext,
-  TableDefinition,
-  delegatedType,
-  enableSti,
-  registerSubclass,
   DeleteRestrictionError,
   touchBelongsToParents,
 } from "./index.js";
@@ -55,17 +28,9 @@ import {
   loadHasManyThrough,
   processDependentAssociations,
   updateCounterCaches,
-  setBelongsTo,
-  setHasOne,
-  setHasMany,
 } from "./associations.js";
-import {
-  OrderedOptions,
-  InheritableOptions,
-  Notifications,
-  NotificationEvent,
-} from "@rails-ts/activesupport";
-import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
+
+import { markForDestruction, isMarkedForDestruction } from "./autosave.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();

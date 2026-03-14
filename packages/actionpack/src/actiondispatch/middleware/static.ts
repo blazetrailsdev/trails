@@ -5,7 +5,7 @@
  */
 
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString, type RackBody } from "@rails-ts/rack";
+import { bodyFromString } from "@rails-ts/rack";
 import * as fs from "fs";
 import * as path from "path";
 
