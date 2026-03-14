@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Lint, LintError } from "./lint.js";
-import { MockRequest } from "./mock-request.js";
 
 function validEnv(overrides: Record<string, any> = {}): Record<string, any> {
   return {

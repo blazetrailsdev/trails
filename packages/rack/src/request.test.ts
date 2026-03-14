@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { Request } from "./request.js";
 import { MockRequest } from "./mock-request.js";
 import { MultipartPartLimitError, MultipartTotalPartLimitError } from "./multipart.js";

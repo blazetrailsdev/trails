@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MockRequest, FatalWarning } from "./mock-request.js";
+import { MockRequest } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 
 describe("Rack::MockRequest", () => {

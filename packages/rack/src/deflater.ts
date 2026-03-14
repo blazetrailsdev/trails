@@ -1,5 +1,5 @@
 import * as zlib from "zlib";
-import { CONTENT_TYPE, CONTENT_LENGTH, TRANSFER_ENCODING } from "./constants.js";
+import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 
 export interface DeflaterOptions {
   include?: string[];

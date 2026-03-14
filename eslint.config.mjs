@@ -52,7 +52,6 @@ export default defineConfig(
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "no-undef": "off",
-      "unused-imports/no-unused-imports": "off",
       "unused-imports/no-unused-vars": "off",
     },
   },

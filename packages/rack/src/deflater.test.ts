@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Deflater } from "./deflater.js";
 import { MockRequest } from "./mock-request.js";
-import * as zlib from "zlib";
 
 function makeApp(
   body: any,

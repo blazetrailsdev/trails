@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SSL } from "./ssl.js";
 import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString, bodyToString } from "@rails-ts/rack";
+import { bodyFromString } from "@rails-ts/rack";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,

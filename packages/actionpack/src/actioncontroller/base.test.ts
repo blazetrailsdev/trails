@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, API, DoubleRenderError } from "./base.js";
 import { Request } from "../actiondispatch/request.js";
 import { Response } from "../actiondispatch/response.js";

@@ -1,11 +1,4 @@
-import {
-  HTTP_COOKIE,
-  SET_COOKIE,
-  CONTENT_LENGTH,
-  CONTENT_TYPE,
-  TRANSFER_ENCODING,
-  STATUS_WITH_NO_ENTITY_BODY,
-} from "./constants.js";
+import { HTTP_COOKIE, SET_COOKIE, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import * as RackMime from "./mime.js";
 
 export { STATUS_WITH_NO_ENTITY_BODY };

@@ -12,7 +12,6 @@
  */
 
 import type { RouteSet } from "./route-set.js";
-import type { Route } from "./route.js";
 
 export type PathHelper = (...args: any[]) => string;
 export type UrlHelper = (...args: any[]) => string;

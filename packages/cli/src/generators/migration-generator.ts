@@ -3,7 +3,6 @@ import {
   GeneratorOptions,
   migrationTimestamp,
   classify,
-  tableize,
   underscore,
   parseColumns,
   ColumnType,
