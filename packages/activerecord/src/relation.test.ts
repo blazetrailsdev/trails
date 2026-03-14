@@ -1456,7 +1456,7 @@ describe("RelationTest", () => {
     }
     await Post.create({ title: "a" });
     const results = await Post.where({ title: "a" }).toArray();
-    expect(results.length).toBeGreaterThanOrEqual(0);
+    expect(results.length).toBe(1);
   });
 
   it("ordering with extra spaces", () => {
@@ -1713,12 +1713,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
-    // findByBang with empty hash should still work or throw
-    try {
-      await Post.findByBang({});
-    } catch (e) {
-      expect(e).toBeDefined();
-    }
+    await expect(Post.findByBang({})).rejects.toThrow();
   });
   it("do not double quote string id", () => {
     const adp = freshAdapter();
@@ -2080,8 +2075,9 @@ describe("RelationTest", () => {
     const result = await Post.all().firstOrCreate({ title: "unique" });
     expect(result).not.toBeNull();
     // calling again should find the existing record
-    const result2 = await Post.all().firstOrCreate({ title: "unique2" });
+    const result2 = await Post.all().firstOrCreate({ title: "unique" });
     expect(result2).not.toBeNull();
+    expect(result2.id).toBe(result.id);
   });
 
   it("first or create bang with valid block", async () => {
@@ -2092,7 +2088,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
-    const result = await Post.all().firstOrCreate({ title: "bang-unique" });
+    const result = await Post.all().firstOrCreateBang({ title: "bang-unique" });
     expect(result).not.toBeNull();
   });
 
