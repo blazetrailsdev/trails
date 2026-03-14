@@ -369,253 +369,251 @@ describe("ValidationsTest", () => {
     });
   });
 
-  // ---- Validations test (ported) ----
-  describe("Validations (ported)", () => {
-    it("single field validation", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true });
-        }
+  it("single field validation", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
       }
-      const p = new Person({});
-      expect(p.isValid()).toBe(false);
-      expect(p.errors.get("name").length).toBeGreaterThan(0);
-    });
-
-    it("single attr validation and error msg", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true });
-        }
-      }
-      const p = new Person({});
-      p.isValid();
-      expect(p.errors.fullMessages.length).toBeGreaterThan(0);
-    });
-
-    it("double attr validation and error msg", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.attribute("email", "string");
-          this.validates("name", { presence: true });
-          this.validates("email", { presence: true });
-        }
-      }
-      const p = new Person({});
-      p.isValid();
-      expect(p.errors.fullMessages.length).toBe(2);
-    });
-
-    it("errors on base", () => {
-      class Person extends Model {
-        static {
-          this.validate((record: any) => {
-            record.errors.add("base", "invalid", { message: "Model is invalid" });
-          });
-        }
-      }
-      const p = new Person({});
-      p.isValid();
-      expect(p.errors.fullMessages).toContain("Model is invalid");
-    });
-
-    it("errors empty after errors on check", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      const p = new Person({});
-      p.errors.get("name"); // Should not add errors
-      expect(p.errors.empty).toBe(true);
-    });
-
-    it("validates each", () => {
-      class Person extends Model {
-        static {
-          this.attribute("price", "integer");
-          this.attribute("discount", "integer");
-          this.validatesEach(["price", "discount"], (record, attr, value) => {
-            if (typeof value === "number" && value < 0) {
-              record.errors.add(attr, "invalid", { message: "must be non-negative" });
-            }
-          });
-        }
-      }
-      const p = new Person({ price: -5, discount: 10 });
-      expect(p.isValid()).toBe(false);
-      expect(p.errors.fullMessages).toContain("Price must be non-negative");
-    });
-
-    it("validate block", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validate((record: any) => {
-            if (record.readAttribute("name") === "INVALID") {
-              record.errors.add("name", "invalid");
-            }
-          });
-        }
-      }
-      expect(new Person({ name: "INVALID" }).isValid()).toBe(false);
-      expect(new Person({ name: "valid" }).isValid()).toBe(true);
-    });
-
-    it("validate block with params", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validate(function (record: any) {
-            if (!record.readAttribute("name")) {
-              record.errors.add("name", "blank");
-            }
-          });
-        }
-      }
-      expect(new Person({}).isValid()).toBe(false);
-    });
-
-    it("invalid should be the opposite of valid", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true });
-        }
-      }
-      expect(new Person({}).isInvalid()).toBe(true);
-      expect(new Person({ name: "Alice" }).isInvalid()).toBe(false);
-    });
-
-    it("validation order", () => {
-      const order: string[] = [];
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.attribute("email", "string");
-          this.validate((_record: any) => {
-            order.push("name_check");
-          });
-          this.validate((_record: any) => {
-            order.push("email_check");
-          });
-        }
-      }
-      new Person({}).isValid();
-      expect(order).toEqual(["name_check", "email_check"]);
-    });
-
-    it("validation with if and on", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true, on: "create" as any, if: () => true });
-        }
-      }
-      expect(new Person({}).isValid()).toBe(true); // no context
-      expect(new Person({}).isValid("create")).toBe(false); // with context
-    });
-
-    it("strict validation in validates", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true, strict: true });
-        }
-      }
-      expect(() => new Person({}).isValid()).toThrow();
-    });
-
-    it("strict validation not fails", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true, strict: true });
-        }
-      }
-      expect(new Person({ name: "Alice" }).isValid()).toBe(true);
-    });
-
-    it("list of validators for model", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.attribute("email", "string");
-          this.validates("name", { presence: true });
-          this.validates("email", { presence: true, length: { minimum: 5 } });
-        }
-      }
-      expect(Person.validators().length).toBe(3);
-    });
-
-    it("list of validators on an attribute", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true, length: { minimum: 3 } });
-        }
-      }
-      expect(Person.validatorsOn("name").length).toBe(2);
-    });
-
-    it("list of validators will be empty when empty", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      expect(Person.validatorsOn("name").length).toBe(0);
-    });
-
-    it("validate with bang", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true });
-        }
-      }
-      expect(() => new Person({}).validateBang()).toThrow();
-      expect(new Person({ name: "Alice" }).validateBang()).toBe(true);
-    });
-
-    it("errors to json", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validates("name", { presence: true });
-        }
-      }
-      const p = new Person({});
-      p.isValid();
-      const json = p.errors.asJson();
-      expect(json.name.length).toBeGreaterThan(0);
-    });
-
-    it("does not modify options argument", () => {
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      const opts = { presence: true };
-      Person.validates("name", opts);
-      expect(opts).toEqual({ presence: true });
-    });
-
-    it("validates with false hash value", () => {
-      // When presence is false, no validation should be added
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      Person.validates("name", { presence: false });
-      expect(new Person({}).isValid()).toBe(true);
-    });
+    }
+    const p = new Person({});
+    expect(p.isValid()).toBe(false);
+    expect(p.errors.get("name").length).toBeGreaterThan(0);
   });
+
+  it("single attr validation and error msg", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    const p = new Person({});
+    p.isValid();
+    expect(p.errors.fullMessages.length).toBeGreaterThan(0);
+  });
+
+  it("double attr validation and error msg", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validates("name", { presence: true });
+        this.validates("email", { presence: true });
+      }
+    }
+    const p = new Person({});
+    p.isValid();
+    expect(p.errors.fullMessages.length).toBe(2);
+  });
+
+  it("errors on base", () => {
+    class Person extends Model {
+      static {
+        this.validate((record: any) => {
+          record.errors.add("base", "invalid", { message: "Model is invalid" });
+        });
+      }
+    }
+    const p = new Person({});
+    p.isValid();
+    expect(p.errors.fullMessages).toContain("Model is invalid");
+  });
+
+  it("errors empty after errors on check", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({});
+    p.errors.get("name"); // Should not add errors
+    expect(p.errors.empty).toBe(true);
+  });
+
+  it("validates each", () => {
+    class Person extends Model {
+      static {
+        this.attribute("price", "integer");
+        this.attribute("discount", "integer");
+        this.validatesEach(["price", "discount"], (record, attr, value) => {
+          if (typeof value === "number" && value < 0) {
+            record.errors.add(attr, "invalid", { message: "must be non-negative" });
+          }
+        });
+      }
+    }
+    const p = new Person({ price: -5, discount: 10 });
+    expect(p.isValid()).toBe(false);
+    expect(p.errors.fullMessages).toContain("Price must be non-negative");
+  });
+
+  it("validate block", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validate((record: any) => {
+          if (record.readAttribute("name") === "INVALID") {
+            record.errors.add("name", "invalid");
+          }
+        });
+      }
+    }
+    expect(new Person({ name: "INVALID" }).isValid()).toBe(false);
+    expect(new Person({ name: "valid" }).isValid()).toBe(true);
+  });
+
+  it("validate block with params", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validate(function (record: any) {
+          if (!record.readAttribute("name")) {
+            record.errors.add("name", "blank");
+          }
+        });
+      }
+    }
+    expect(new Person({}).isValid()).toBe(false);
+  });
+
+  it("invalid should be the opposite of valid", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    expect(new Person({}).isInvalid()).toBe(true);
+    expect(new Person({ name: "Alice" }).isInvalid()).toBe(false);
+  });
+
+  it("validation order", () => {
+    const order: string[] = [];
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validate((_record: any) => {
+          order.push("name_check");
+        });
+        this.validate((_record: any) => {
+          order.push("email_check");
+        });
+      }
+    }
+    new Person({}).isValid();
+    expect(order).toEqual(["name_check", "email_check"]);
+  });
+
+  it("validation with if and on", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true, on: "create" as any, if: () => true });
+      }
+    }
+    expect(new Person({}).isValid()).toBe(true); // no context
+    expect(new Person({}).isValid("create")).toBe(false); // with context
+  });
+
+  it("strict validation in validates", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true, strict: true });
+      }
+    }
+    expect(() => new Person({}).isValid()).toThrow();
+  });
+
+  it("strict validation not fails", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true, strict: true });
+      }
+    }
+    expect(new Person({ name: "Alice" }).isValid()).toBe(true);
+  });
+
+  it("list of validators for model", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validates("name", { presence: true });
+        this.validates("email", { presence: true, length: { minimum: 5 } });
+      }
+    }
+    expect(Person.validators().length).toBe(3);
+  });
+
+  it("list of validators on an attribute", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true, length: { minimum: 3 } });
+      }
+    }
+    expect(Person.validatorsOn("name").length).toBe(2);
+  });
+
+  it("list of validators will be empty when empty", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    expect(Person.validatorsOn("name").length).toBe(0);
+  });
+
+  it("validate with bang", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    expect(() => new Person({}).validateBang()).toThrow();
+    expect(new Person({ name: "Alice" }).validateBang()).toBe(true);
+  });
+
+  it("errors to json", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    const p = new Person({});
+    p.isValid();
+    const json = p.errors.asJson();
+    expect(json.name.length).toBeGreaterThan(0);
+  });
+
+  it("does not modify options argument", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const opts = { presence: true };
+    Person.validates("name", opts);
+    expect(opts).toEqual({ presence: true });
+  });
+
+  it("validates with false hash value", () => {
+    // When presence is false, no validation should be added
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    Person.validates("name", { presence: false });
+    expect(new Person({}).isValid()).toBe(true);
+  });
+
   it("multiple errors per attr iteration with full error composition", () => {
     class Person extends Model {
       static {
