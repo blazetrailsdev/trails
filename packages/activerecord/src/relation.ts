@@ -1,4 +1,4 @@
-import { Table, SelectManager, Visitors, Nodes } from "@rails-ts/arel";
+import { Table, SelectManager, Nodes } from "@rails-ts/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { RecordNotFound, SoleRecordExceeded } from "./errors.js";

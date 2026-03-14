@@ -2,15 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Base,
-  registerModel,
-  association,
-  DeleteRestrictionError,
-  enableSti,
-  registerSubclass,
-  SubclassNotFound,
-} from "../index.js";
+import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
@@ -19,13 +11,8 @@ import {
   loadHasOne,
   loadHasMany,
   loadHasManyThrough,
-  loadHabtm,
-  processDependentAssociations,
-  CollectionProxy,
-  setBelongsTo,
   setHasOne,
   setHasMany,
-  buildHasOne,
 } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {

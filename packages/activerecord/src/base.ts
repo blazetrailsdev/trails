@@ -7,7 +7,6 @@ import {
   RecordNotFound,
   RecordInvalid,
   RecordNotSaved,
-  RecordNotDestroyed,
   StaleObjectError,
   ReadOnlyRecord,
 } from "./errors.js";

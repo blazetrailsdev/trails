@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
   registerModel,
-  association,
   DeleteRestrictionError,
   enableSti,
   registerSubclass,
@@ -17,14 +16,8 @@ import {
   Associations,
   loadBelongsTo,
   loadHasOne,
-  loadHasMany,
-  loadHasManyThrough,
-  loadHabtm,
   processDependentAssociations,
-  CollectionProxy,
-  setBelongsTo,
   setHasOne,
-  setHasMany,
   buildHasOne,
 } from "../associations.js";
 

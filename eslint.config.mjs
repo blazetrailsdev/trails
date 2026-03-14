@@ -44,7 +44,6 @@ export default defineConfig(
   // Per-package overrides for rules that still have violations
   {
     files: [
-      "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
@@ -54,6 +53,25 @@ export default defineConfig(
       "@typescript-eslint/no-explicit-any": "off",
       "no-undef": "off",
       "unused-imports/no-unused-imports": "off",
+      "unused-imports/no-unused-vars": "off",
+    },
+  },
+  {
+    files: ["packages/activerecord/src/**/*.ts"],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        process: "readonly",
+        console: "readonly",
+        btoa: "readonly",
+        atob: "readonly",
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
       "unused-imports/no-unused-vars": "off",
     },
   },

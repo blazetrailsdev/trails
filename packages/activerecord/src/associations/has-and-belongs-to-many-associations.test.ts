@@ -2,31 +2,10 @@
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Base,
-  registerModel,
-  association,
-  DeleteRestrictionError,
-  enableSti,
-  registerSubclass,
-  SubclassNotFound,
-} from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import {
-  Associations,
-  loadBelongsTo,
-  loadHasOne,
-  loadHasMany,
-  loadHasManyThrough,
-  loadHabtm,
-  processDependentAssociations,
-  CollectionProxy,
-  setBelongsTo,
-  setHasOne,
-  setHasMany,
-  buildHasOne,
-} from "../associations.js";
+import { loadHasMany, loadHabtm } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();

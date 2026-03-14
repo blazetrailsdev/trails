@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import type { AssociationDefinition } from "./associations.js";
-import { underscore, camelize, singularize } from "@rails-ts/activesupport";
+import { underscore } from "@rails-ts/activesupport";
 
 const MARKED_FOR_DESTRUCTION = Symbol("markedForDestruction");
 

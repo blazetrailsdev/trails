@@ -1,16 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import mysql from "mysql2/promise";
 import { MysqlAdapter } from "./mysql-adapter.js";
-import {
-  Base,
-  Relation,
-  Migration,
-  transaction,
-  savepoint,
-  registerModel,
-  loadBelongsTo,
-  loadHasMany,
-} from "../index.js";
+import { Base, transaction, registerModel, loadBelongsTo, loadHasMany } from "../index.js";
 
 /**
  * These tests require a running MySQL instance. They will be skipped if

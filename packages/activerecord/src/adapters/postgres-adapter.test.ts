@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
 import { PostgresAdapter } from "./postgres-adapter.js";
 import {
   Base,
-  Relation,
-  Migration,
-  Schema,
   transaction,
   savepoint,
   registerModel,
