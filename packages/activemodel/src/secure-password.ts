@@ -4,6 +4,7 @@ import { Model } from "./model.js";
 
 const MIN_COST = 4;
 const DEFAULT_COST = 12;
+const textEncoder = new TextEncoder();
 
 export const SecurePassword = {
   minCost: false,
@@ -62,7 +63,8 @@ export function hasSecurePassword(
       : `authenticate${camelAttr.charAt(0).toUpperCase()}${camelAttr.slice(1)}`;
 
   Object.defineProperty(modelClass.prototype, authMethodName, {
-    value: function (this: Model, unencryptedPassword: string) {
+    value: function (this: Model, unencryptedPassword: unknown) {
+      if (typeof unencryptedPassword !== "string" || !unencryptedPassword) return false;
       const digest = this.readAttribute(digestAttr) as string | null;
       if (!digest) return false;
       return bcrypt.compareSync(unencryptedPassword, digest) ? this : false;
@@ -81,7 +83,7 @@ export function hasSecurePassword(
       }
 
       if (pwd !== null && pwd !== undefined) {
-        if (new Blob([pwd]).size > 72) {
+        if (textEncoder.encode(pwd).length > 72) {
           record.errors.add(attribute, "too_long", { count: 72 });
         }
 

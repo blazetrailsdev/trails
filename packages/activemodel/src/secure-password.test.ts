@@ -1,9 +1,16 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
 
-beforeAll(() => {
+let savedMinCost: boolean;
+
+beforeEach(() => {
+  savedMinCost = SecurePassword.minCost;
   SecurePassword.minCost = true;
+});
+
+afterEach(() => {
+  SecurePassword.minCost = savedMinCost;
 });
 
 function createUserClass(opts: { validations?: boolean } = {}) {
@@ -193,7 +200,8 @@ describe("ActiveModel", () => {
       const User = createUserClass();
       const u = new User({ name: "test" });
       (u as any).password = "secret";
-      expect((u as any).authenticate("")).toBe(false);
+      expect((u as any).authenticate(null)).toBe(false);
+      expect((u as any).authenticate(undefined)).toBe(false);
     });
 
     it("updating an existing user with validation and a blank password challenge", () => {
@@ -298,22 +306,25 @@ describe("ActiveModel", () => {
     });
 
     it("Password digest cost defaults to bcrypt default cost when min_cost is false", () => {
+      SecurePassword.minCost = false;
       const User = createUserClass();
       const u = new User({ name: "test" });
       (u as any).password = "secret";
       const digest = u.readAttribute("password_digest") as string;
-      expect(digest).toMatch(/^\$2[aby]?\$/);
+      expect(digest).toMatch(/\$12\$/);
     });
 
     it("Password digest cost honors bcrypt cost attribute when min_cost is false", () => {
+      SecurePassword.minCost = false;
       const User = createUserClass();
       const u = new User({ name: "test" });
       (u as any).password = "secret";
       const digest = u.readAttribute("password_digest") as string;
-      expect(digest.length).toBeGreaterThan(20);
+      expect(digest).toMatch(/\$12\$/);
     });
 
     it("Password digest cost can be set to bcrypt min cost to speed up tests", () => {
+      SecurePassword.minCost = true;
       const User = createUserClass();
       const u = new User({ name: "test" });
       (u as any).password = "secret";
