@@ -1,3 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = any;
+
 import { humanize } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 
@@ -23,7 +26,7 @@ export class NestedError {
 
   get fullMessage(): string {
     if (this.attribute === "base") return this.message;
-    const modelClass = (this.base as any)?.constructor;
+    const modelClass = (this.base as AnyRecord)?.constructor;
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(this.attribute)
       : humanize(this.attribute);
@@ -86,7 +89,7 @@ export class Errors {
   add(
     attribute: string,
     type: string = "invalid",
-    options?: { message?: string | ((record: any) => string) } & Record<string, unknown>,
+    options?: { message?: string | ((record: AnyRecord) => string) } & Record<string, unknown>,
   ): void {
     let message: string;
     if (typeof options?.message === "function") {
@@ -306,7 +309,7 @@ export class Errors {
    */
   fullMessage(attribute: string, message: string): string {
     if (attribute === "base") return message;
-    const base = this._base as any;
+    const base = this._base as AnyRecord;
     const modelClass = base?.constructor;
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(attribute)
@@ -339,7 +342,7 @@ export class Errors {
     if (options?.message && typeof options.message === "string") {
       return this.interpolateMessage(options.message, options);
     }
-    const base = this._base as any;
+    const base = this._base as AnyRecord;
     const modelClass = base?.constructor;
     const modelKey = modelClass?.name
       ? modelClass.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()

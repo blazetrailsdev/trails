@@ -1,16 +1,19 @@
 import type { Errors } from "../errors.js";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyRecord = any;
+
 /**
  * Base validator interface.
  */
 export interface Validator {
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void;
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void;
 }
 
 /**
  * Conditional options for validators.
  */
-export type ConditionFn = ((record: any) => boolean) | string;
+export type ConditionFn = ((record: AnyRecord) => boolean) | string;
 
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
@@ -18,15 +21,14 @@ export interface ConditionalOptions {
   on?: string;
 }
 
-function evaluateCondition(record: any, cond: ConditionFn): boolean {
+function evaluateCondition(record: AnyRecord, cond: ConditionFn): boolean {
   if (typeof cond === "function") return cond(record);
-  // String method name
-  const method = (record as any)[cond];
+  const method = record[cond];
   if (typeof method === "function") return method.call(record);
   return !!method;
 }
 
-export function shouldValidate(record: any, options: ConditionalOptions): boolean {
+export function shouldValidate(record: AnyRecord, options: ConditionalOptions): boolean {
   if (options.if !== undefined) {
     const conds = Array.isArray(options.if) ? options.if : [options.if];
     for (const cond of conds) {

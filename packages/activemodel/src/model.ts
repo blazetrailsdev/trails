@@ -7,7 +7,12 @@ import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
-import type { Validator, ConditionalOptions, ConditionFn } from "./validations/validator.js";
+import type {
+  Validator,
+  ConditionalOptions,
+  ConditionFn,
+  AnyRecord,
+} from "./validations/validator.js";
 import { shouldValidate } from "./validations/validator.js";
 import {
   PresenceValidator,
@@ -38,7 +43,7 @@ interface ValidationEntry {
 }
 
 interface CustomValidationEntry {
-  method: string | ((record: any) => void);
+  method: string | ((record: AnyRecord) => void);
   options: ConditionalOptions;
 }
 
@@ -139,9 +144,11 @@ export class Model {
     if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
       options = lastArg as Record<string, unknown>;
       fn = args[args.length - 2] as (value: unknown) => unknown;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       args = args.slice(0, -2) as any;
     } else {
       fn = lastArg as (value: unknown) => unknown;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       args = args.slice(0, -1) as any;
     }
     const attributes = args as unknown as string[];
@@ -237,7 +244,7 @@ export class Model {
   static withOptions(defaults: Record<string, unknown>, fn: (model: typeof Model) => void): void {
     // Create a proxy that merges defaults into validates() calls
     const proxy = new Proxy(this, {
-      get(target: any, prop: string | symbol) {
+      get(target: AnyRecord, prop: string | symbol) {
         if (prop === "validates") {
           return (attr: string, rules: Record<string, unknown>) => {
             target.validates(attr, { ...defaults, ...rules });
@@ -275,17 +282,17 @@ export class Model {
     };
 
     if (rules.presence) {
-      const opts = rules.presence === true ? {} : (rules.presence as any);
+      const opts = rules.presence === true ? {} : (rules.presence as AnyRecord);
       push(new PresenceValidator(opts));
     }
 
     if (rules.absence) {
-      const opts = rules.absence === true ? {} : (rules.absence as any);
+      const opts = rules.absence === true ? {} : (rules.absence as AnyRecord);
       push(new AbsenceValidator(opts));
     }
 
     if (rules.length) {
-      const opts = { ...(rules.length as any) };
+      const opts = { ...(rules.length as AnyRecord) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -294,7 +301,7 @@ export class Model {
     }
 
     if (rules.numericality) {
-      const opts = rules.numericality === true ? {} : { ...(rules.numericality as any) };
+      const opts = rules.numericality === true ? {} : { ...(rules.numericality as AnyRecord) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -303,7 +310,7 @@ export class Model {
     }
 
     if (rules.inclusion) {
-      const opts = { ...(rules.inclusion as any) };
+      const opts = { ...(rules.inclusion as AnyRecord) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -312,7 +319,7 @@ export class Model {
     }
 
     if (rules.exclusion) {
-      const opts = { ...(rules.exclusion as any) };
+      const opts = { ...(rules.exclusion as AnyRecord) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -321,7 +328,7 @@ export class Model {
     }
 
     if (rules.format) {
-      const opts = { ...(rules.format as any) };
+      const opts = { ...(rules.format as AnyRecord) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -330,22 +337,22 @@ export class Model {
     }
 
     if (rules.acceptance) {
-      const opts = rules.acceptance === true ? {} : (rules.acceptance as any);
+      const opts = rules.acceptance === true ? {} : (rules.acceptance as AnyRecord);
       push(new AcceptanceValidator(opts));
     }
 
     if (rules.confirmation) {
-      const opts = rules.confirmation === true ? {} : (rules.confirmation as any);
+      const opts = rules.confirmation === true ? {} : (rules.confirmation as AnyRecord);
       push(new ConfirmationValidator(opts));
     }
 
     if (rules.comparison) {
-      push(new ComparisonValidator(rules.comparison as any));
+      push(new ComparisonValidator(rules.comparison as AnyRecord));
     }
   }
 
   static validate(
-    methodOrFn: string | ((record: any) => void),
+    methodOrFn: string | ((record: AnyRecord) => void),
     options: ConditionalOptions = {},
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_customValidations")) {
@@ -361,10 +368,10 @@ export class Model {
    */
   static validatesEach(
     attributes: string[],
-    fn: (record: any, attribute: string, value: unknown) => void,
+    fn: (record: AnyRecord, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
-    this.validate((record: any) => {
+    this.validate((record: AnyRecord) => {
       for (const attr of attributes) {
         const value = record.readAttribute(attr);
         fn(record, attr, value);
@@ -379,13 +386,15 @@ export class Model {
    * Mirrors: ActiveModel::Validations.validates_with
    */
   static validatesWith(
-    validatorClass: { new (options?: any): { validate(record: any): void } },
+    validatorClass: {
+      new (options?: Record<string, unknown>): { validate(record: AnyRecord): void };
+    },
     options: ConditionalOptions & { [key: string]: unknown } = {},
   ): void {
     const { if: ifOpt, unless: unlessOpt, on: onOpt, ...rest } = options;
     const validator = new validatorClass(rest);
     this.validate(
-      (record: any) => {
+      (record: AnyRecord) => {
         validator.validate(record);
       },
       { if: ifOpt, unless: unlessOpt, on: onOpt },
@@ -710,7 +719,7 @@ export class Model {
     for (const [name] of this._attributeDefinitions) {
       for (const prefix of this._attributeMethodPrefixes) {
         const methodName = `${prefix}${name}`;
-        if (!(this.prototype as any)[methodName]) {
+        if (!(this.prototype as AnyRecord)[methodName]) {
           Object.defineProperty(this.prototype, methodName, {
             value: function (this: Model) {
               return this.readAttribute(name);
@@ -722,7 +731,7 @@ export class Model {
       }
       for (const suffix of this._attributeMethodSuffixes) {
         const methodName = `${name}${suffix}`;
-        if (!(this.prototype as any)[methodName]) {
+        if (!(this.prototype as AnyRecord)[methodName]) {
           Object.defineProperty(this.prototype, methodName, {
             value: function (this: Model) {
               return this.readAttribute(name);
@@ -734,7 +743,7 @@ export class Model {
       }
       for (const { prefix, suffix } of this._attributeMethodAffixes) {
         const methodName = `${prefix}${name}${suffix}`;
-        if (!(this.prototype as any)[methodName]) {
+        if (!(this.prototype as AnyRecord)[methodName]) {
           Object.defineProperty(this.prototype, methodName, {
             value: function (this: Model) {
               return this.readAttribute(name);
@@ -750,13 +759,13 @@ export class Model {
   static undefineAttributeMethods(): void {
     for (const [name] of this._attributeDefinitions) {
       for (const prefix of this._attributeMethodPrefixes) {
-        delete (this.prototype as any)[`${prefix}${name}`];
+        delete (this.prototype as AnyRecord)[`${prefix}${name}`];
       }
       for (const suffix of this._attributeMethodSuffixes) {
-        delete (this.prototype as any)[`${name}${suffix}`];
+        delete (this.prototype as AnyRecord)[`${name}${suffix}`];
       }
       for (const { prefix, suffix } of this._attributeMethodAffixes) {
-        delete (this.prototype as any)[`${prefix}${name}${suffix}`];
+        delete (this.prototype as AnyRecord)[`${prefix}${name}${suffix}`];
       }
     }
   }
@@ -966,8 +975,8 @@ export class Model {
       if (!shouldValidate(this, entry.options)) continue;
       if (typeof entry.method === "function") {
         entry.method(this);
-      } else if (typeof (this as any)[entry.method] === "function") {
-        (this as any)[entry.method]();
+      } else if (typeof (this as AnyRecord)[entry.method] === "function") {
+        (this as AnyRecord)[entry.method]();
       }
     }
 
@@ -1336,7 +1345,7 @@ export class Model {
    * Mirrors: ActiveModel::AttributeMethods#respond_to?
    */
   respondTo(method: string): boolean {
-    if (typeof (this as any)[method] === "function") return true;
+    if (typeof (this as AnyRecord)[method] === "function") return true;
     if (this._attributes.has(method)) return true;
     return false;
   }

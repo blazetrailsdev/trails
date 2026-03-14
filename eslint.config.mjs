@@ -27,7 +27,7 @@ export default defineConfig(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
-  // Vitest-specific rules for activemodel test files only (other packages have too many violations)
+  // Vitest + activemodel test file overrides
   {
     files: ["packages/activemodel/src/**/*.test.ts"],
     plugins: {
@@ -38,6 +38,7 @@ export default defineConfig(
       "vitest/no-disabled-tests": "off",
       "vitest/no-identical-title": "off",
       "vitest/expect-expect": "off",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   // Per-package overrides for rules that still have violations
@@ -66,7 +67,6 @@ export default defineConfig(
     },
     rules: {
       "unused-imports/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {
