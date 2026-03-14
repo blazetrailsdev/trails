@@ -102,6 +102,8 @@ class TestExtractor
     return unless node.is_a?(Array)
 
     case node[0]
+    when :method_add_block
+      process_method_add_block(node)
     when :command
       process_command(node)
     when :method_add_arg
@@ -117,6 +119,62 @@ class TestExtractor
     else
       node.each { |child| walk(child) if child.is_a?(Array) }
     end
+  end
+
+  # Handle :method_add_block — wraps a command/fcall with a do_block/brace_block.
+  # This is how `describe "foo" do ... end` is parsed: the :command is child [1]
+  # and the :do_block with the body is child [2].
+  def process_method_add_block(node)
+    inner = node[1]
+    block = node[2]
+
+    # Check if inner is a command (describe/it/test)
+    if inner.is_a?(Array) && inner[0] == :command
+      cmd_name = ident_name(inner[1])
+      case cmd_name
+      when "describe"
+        desc = extract_first_string(inner[2])
+        if desc
+          @describe_stack.push(desc)
+          walk(block) if block.is_a?(Array)
+          @describe_stack.pop
+          return
+        end
+      when "it"
+        # it with a block body — already handled, but walk the block for nested content
+        process_it(inner[2], inner)
+        return
+      when "test"
+        process_test_macro(inner[2], inner)
+        return
+      end
+    end
+
+    # Check if inner is a method_add_arg (parenthesized form)
+    if inner.is_a?(Array) && inner[0] == :method_add_arg
+      if inner[1].is_a?(Array) && inner[1][0] == :fcall
+        cmd_name = ident_name(inner[1][1])
+        case cmd_name
+        when "describe"
+          desc = extract_string_from_arg_paren(inner[2])
+          if desc
+            @describe_stack.push(desc)
+            walk(block) if block.is_a?(Array)
+            @describe_stack.pop
+            return
+          end
+        when "it"
+          process_it_paren(inner)
+          return
+        when "test"
+          process_test_macro_paren(inner)
+          return
+        end
+      end
+    end
+
+    # Fallback: walk children
+    node.each { |child| walk(child) if child.is_a?(Array) }
   end
 
   def process_class(node)
