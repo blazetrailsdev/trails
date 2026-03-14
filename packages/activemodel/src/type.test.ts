@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "../index.js";
+import { Types } from "./index.js";
 
 describe("ActiveModel", () => {
   describe("TypeTest", () => {

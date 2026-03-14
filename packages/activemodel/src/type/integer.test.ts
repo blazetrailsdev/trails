@@ -5,6 +5,17 @@ const type = new Types.IntegerType();
 
 describe("ActiveModel", () => {
   describe("IntegerTest", () => {
+    it("changed?", () => {
+      class MyModel extends Model {
+        static {
+          this.attribute("count", "integer");
+        }
+      }
+      const m = new MyModel({ count: "1" });
+      m.writeAttribute("count", "1");
+      expect(m.attributeChanged("count")).toBe(false);
+    });
+
     it("simple values", () => {
       expect(type.cast(1)).toBe(1);
       expect(type.cast(0)).toBe(0);
