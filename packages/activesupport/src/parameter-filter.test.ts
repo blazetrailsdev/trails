@@ -62,3 +62,56 @@ describe("ParameterFilterTest", () => {
     expect(result["username"]).toBe("alice");
   });
 });
+
+describe("ParameterFilterTest", () => {
+  it("process parameter filter", () => {
+    const filter = new ParameterFilter(["password"]);
+    const result = filter.filter({ user: "alice", password: "secret" });
+    expect(result.user).toBe("alice");
+    expect(result.password).toBe("[FILTERED]");
+  });
+
+  it("filter should return mask option when value is filtered", () => {
+    const filter = new ParameterFilter(["token"], { mask: "REDACTED" });
+    const result = filter.filter({ token: "abc123" });
+    expect(result.token).toBe("REDACTED");
+  });
+
+  it("filter_param", () => {
+    const filter = new ParameterFilter(["secret"]);
+    expect(filter.filterParam("secret", "my_secret")).toBe("[FILTERED]");
+    expect(filter.filterParam("name", "alice")).toBe("alice");
+  });
+
+  it("filter_param can work with empty filters", () => {
+    const filter = new ParameterFilter([]);
+    expect(filter.filterParam("password", "value")).toBe("value");
+  });
+
+  it("parameter filter should maintain hash with indifferent access", () => {
+    const filter = new ParameterFilter(["password"]);
+    const result = filter.filter({ password: "secret", username: "admin" });
+    expect(result.password).toBe("[FILTERED]");
+    expect(result.username).toBe("admin");
+  });
+
+  it("filter_param should return mask option when value is filtered", () => {
+    const filter = new ParameterFilter(["key"], { mask: "***" });
+    expect(filter.filterParam("key", "value")).toBe("***");
+  });
+
+  it("process parameter filter with hash having integer keys", () => {
+    const filter = new ParameterFilter(["password"]);
+    const result = filter.filter({ 1: "one", password: "secret" } as Record<string, unknown>);
+    expect(result.password).toBe("[FILTERED]");
+    expect(result["1"]).toBe("one");
+  });
+
+  it("precompile_filters", () => {
+    // Verify filter works with regex patterns
+    const filter = new ParameterFilter([/password/i]);
+    const result = filter.filter({ Password: "secret", name: "alice" });
+    expect(result.Password).toBe("[FILTERED]");
+    expect(result.name).toBe("alice");
+  });
+});

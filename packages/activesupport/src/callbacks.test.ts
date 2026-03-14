@@ -885,8 +885,8 @@ describe("OneTimeCompileTest", () => {
       t.log.push("a");
       t.count++;
     });
-    runCallbacks(target, "save", () => {});
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
+    runCallbacks(target, "save");
     // Callback runs each time (once per runCallbacks call)
     expect(target.count).toBe(2);
   });
@@ -919,7 +919,7 @@ describe("CallStackTest", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", (t: any) => t.log.push("before"));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["before"]);
   });
 });
@@ -968,7 +968,7 @@ describe("WriterCallbacksTest", () => {
     const cb = (t: any) => t.log.push("written");
     setCallback(target, "write", "before", cb);
     skipCallback(target, "write", "before", cb);
-    runCallbacks(target, "write", () => {});
+    runCallbacks(target, "write");
     expect(target.log).not.toContain("written");
   });
 });
@@ -980,12 +980,12 @@ describe("ConditionalCallbackTest", () => {
     setCallback(target, "save", "before", (t: any) => t.log.push("conditional"), {
       if: (t: any) => t.active,
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("conditional");
 
     target.log = [];
     target.active = false;
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).not.toContain("conditional");
   });
 });
@@ -1011,7 +1011,7 @@ describe("ResetCallbackTest", () => {
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", (t: any) => t.log.push("before"));
     resetCallbacks(target, "save");
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual([]);
   });
   it("save conditional person", () => {
@@ -1020,11 +1020,11 @@ describe("ResetCallbackTest", () => {
     setCallback(person, "save", "before", (t: any) => t.log.push("validated"), {
       if: (t: any) => t.valid,
     });
-    runCallbacks(person, "save", () => {});
+    runCallbacks(person, "save");
     expect(person.log).toContain("validated");
     resetCallbacks(person, "save");
     person.log = [];
-    runCallbacks(person, "save", () => {});
+    runCallbacks(person, "save");
     expect(person.log).not.toContain("validated");
   });
   it("reset impacts subclasses", () => {
@@ -1032,7 +1032,7 @@ describe("ResetCallbackTest", () => {
     defineCallbacks(base, "save");
     setCallback(base, "save", "before", (t: any) => t.log.push("base"));
     resetCallbacks(base, "save");
-    runCallbacks(base, "save", () => {});
+    runCallbacks(base, "save");
     expect(base.log).toEqual([]);
   });
 });
@@ -1044,7 +1044,7 @@ describe("ConditionalTests", () => {
     setCallback(target, "save", "before", (t: any) => t.log.push("scoped"), {
       if: (t: any) => t.flag,
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("scoped");
   });
   it("class", () => {
@@ -1052,7 +1052,7 @@ describe("ConditionalTests", () => {
     defineCallbacks(target, "save");
     const handler = { call: (t: any) => t.log.push("class-handler") };
     setCallback(target, "save", "before", (t: any) => handler.call(t));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("class-handler");
   });
   it("proc negative arity", () => {
@@ -1061,7 +1061,7 @@ describe("ConditionalTests", () => {
     setCallback(target, "save", "before", () => {
       target.log.push("no-arg");
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("no-arg");
   });
   it("proc arity0", () => {
@@ -1070,7 +1070,7 @@ describe("ConditionalTests", () => {
     setCallback(target, "save", "before", () => {
       target.log.push("arity0");
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("arity0");
   });
   it("proc arity1", () => {
@@ -1079,7 +1079,7 @@ describe("ConditionalTests", () => {
     setCallback(target, "save", "before", (t: any) => {
       t.log.push("arity1");
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("arity1");
   });
   it("proc arity2", () => {
@@ -1089,7 +1089,7 @@ describe("ConditionalTests", () => {
       t.log.push("arity2-before");
       next();
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("arity2-before");
   });
 });
@@ -1102,7 +1102,7 @@ describe("SkipCallbacksTest", () => {
     setCallback(target, "save", "before", cb);
     setCallback(target, "save", "before", (t: any) => t.log.push("kept"));
     skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).not.toContain("to-skip");
     expect(target.log).toContain("kept");
   });
@@ -1112,7 +1112,7 @@ describe("SkipCallbacksTest", () => {
     const greet = (t: any) => t.log.push("hello " + t.name);
     setCallback(person, "save", "before", greet);
     skipCallback(person, "save", "before", greet);
-    runCallbacks(person, "save", () => {});
+    runCallbacks(person, "save");
     expect(person.log).not.toContain("hello Alice");
   });
   it("skip person programmatically", () => {
@@ -1121,7 +1121,7 @@ describe("SkipCallbacksTest", () => {
     const cb = (t: any) => t.log.push("ran");
     setCallback(person, "save", "before", cb, { unless: (t: any) => t.skip });
     person.skip = true;
-    runCallbacks(person, "save", () => {});
+    runCallbacks(person, "save");
     expect(person.log).not.toContain("ran");
   });
 });
@@ -1136,7 +1136,7 @@ describe("ExcludingDuplicatesCallbackTest", () => {
     };
     setCallback(target, "save", "before", cb);
     setCallback(target, "save", "before", cb); // duplicate — runs once per registration
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     // Our implementation registers each callback separately
     expect(target.count).toBeGreaterThanOrEqual(1);
   });
@@ -1147,7 +1147,7 @@ describe("ExcludingDuplicatesCallbackTest", () => {
       t.count++;
     };
     setCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.count).toBe(1);
   });
 });
@@ -1187,7 +1187,7 @@ describe("UsingObjectTest", () => {
     defineCallbacks(target, "save");
     const callbackObj = { before: (t: any) => t.log.push("obj-before") };
     setCallback(target, "save", "before", (t: any) => callbackObj.before(t));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("obj-before");
   });
   it("before object", () => {
@@ -1195,7 +1195,7 @@ describe("UsingObjectTest", () => {
     defineCallbacks(target, "save");
     const obj = { before: (t: any) => t.log.push("before-obj") };
     setCallback(target, "save", "before", (t: any) => obj.before(t));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("before-obj");
   });
   it("around object", () => {
@@ -1221,7 +1221,7 @@ describe("UsingObjectTest", () => {
       },
     };
     setCallback(target, "save", "before", (t: any) => obj.before(t));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toContain("custom");
   });
   it("block result is returned", () => {
@@ -1258,7 +1258,7 @@ describe("CallbackTerminatorTest", () => {
     const target = { log: [] as string[], halted: false };
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", () => false);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.halted).toBe(false); // hook not invoked automatically
   });
   it("block never called if terminated", () => {
@@ -1278,7 +1278,7 @@ describe("CallbackDefaultTerminatorTest", () => {
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", () => false);
     setCallback(target, "save", "before", (t: any) => t.log.push("ran"));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).not.toContain("ran");
   });
   it("default termination", () => {
@@ -1297,7 +1297,7 @@ describe("CallbackDefaultTerminatorTest", () => {
       t.count++;
       return false;
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.count).toBe(1);
   });
   it("block never called if abort is thrown", () => {
@@ -1318,7 +1318,7 @@ describe("CallbackProcTest", () => {
     setCallback(target, "save", "before", (t: any) => {
       t.value = 42;
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.value).toBe(42);
   });
   it("proc arity 0", () => {
@@ -1327,7 +1327,7 @@ describe("CallbackProcTest", () => {
     setCallback(target, "save", "before", () => {
       target.ran = true;
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.ran).toBe(true);
   });
   it("proc arity 1", () => {
@@ -1336,7 +1336,7 @@ describe("CallbackProcTest", () => {
     setCallback(target, "save", "before", (t: any) => {
       t.ran = true;
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.ran).toBe(true);
   });
   it("proc arity 2", () => {
@@ -1347,7 +1347,7 @@ describe("CallbackProcTest", () => {
       next();
       t.log.push("post");
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["pre", "post"]);
   });
   it("proc negative called with empty list", () => {
@@ -1356,7 +1356,7 @@ describe("CallbackProcTest", () => {
     setCallback(target, "save", "before", () => {
       target.ran = true;
     });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.ran).toBe(true);
   });
 });
@@ -1367,7 +1367,7 @@ describe("CallbackTerminatorSkippingAfterCallbacksTest", () => {
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", () => false);
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     // After callbacks should still run even when before halts (Rails behavior)
     // Actually in Rails, termination in before DOES skip the body but after callbacks still run
     // Our implementation may differ — just test what we implement
@@ -1386,7 +1386,7 @@ describe("CallbackTypeTest", () => {
     }
     const cb = new CallbackClass();
     setCallback(target, "save", "before", (t: any) => cb.before(t));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["class before"]);
   });
 
@@ -1395,7 +1395,7 @@ describe("CallbackTypeTest", () => {
     defineCallbacks(target, "save");
     const cb = (t: any) => t.log.push("lambda");
     setCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["lambda"]);
   });
 
@@ -1408,7 +1408,7 @@ describe("CallbackTypeTest", () => {
     };
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", (t: any) => t.myCallback());
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["symbol"]);
   });
 
@@ -1418,7 +1418,7 @@ describe("CallbackTypeTest", () => {
     const cb = (t: any) => t.log.push("cb");
     setCallback(target, "save", "before", cb);
     skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual([]);
   });
 
@@ -1428,7 +1428,7 @@ describe("CallbackTypeTest", () => {
     const cb = (t: any) => t.log.push("cb");
     setCallback(target, "save", "before", cb);
     skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual([]);
   });
 
@@ -1438,7 +1438,7 @@ describe("CallbackTypeTest", () => {
     const cb = (t: any) => t.log.push("cb");
     setCallback(target, "save", "before", cb);
     skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual([]);
   });
 
@@ -1456,7 +1456,7 @@ describe("CallbackTypeTest", () => {
     const cb = (t: any) => t.log.push("cb");
     setCallback(target, "save", "before", cb);
     skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual([]);
   });
 });
@@ -1468,7 +1468,7 @@ describe("NotSupportedStringConditionalTest", () => {
     // String conditionals (like `if: "method_name"` in Ruby) are not supported in TS
     // Using a function conditional instead
     setCallback(target, "save", "before", (t: any) => t.log.push("cb"), { if: () => true });
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["cb"]);
   });
 });
@@ -1573,7 +1573,7 @@ describe("DynamicInheritedCallbacks", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", (t: any) => t.log.push("cb"));
-    runCallbacks(target, "save", () => {});
+    runCallbacks(target, "save");
     expect(target.log).toEqual(["cb"]);
   });
 });

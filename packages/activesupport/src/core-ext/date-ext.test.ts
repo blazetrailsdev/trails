@@ -1,0 +1,56 @@
+import { describe, it } from "vitest";
+
+describe("DateExtBehaviorTest", () => {
+  it.skip("date acts like date");
+  it.skip("blank?");
+  it.skip("freeze doesnt clobber memoized instance methods");
+  it.skip("can freeze twice");
+});
+
+describe("DateExtCalculationsTest", () => {
+  it.skip("yesterday in calendar reform");
+  it.skip("tomorrow in calendar reform");
+  it.skip("to fs");
+  it.skip("to fs with single digit day");
+  it.skip("readable inspect");
+  it.skip("to time");
+  it.skip("compare to time");
+  it.skip("to datetime");
+  it.skip("to date");
+  it.skip("change");
+  it.skip("sunday");
+  it.skip("last year in calendar reform");
+  it.skip("advance does first years and then days");
+  it.skip("advance does first months and then days");
+  it.skip("advance in calendar reform");
+  it.skip("last week");
+  it.skip("last quarter on 31st");
+  it.skip("yesterday constructor");
+  it.skip("yesterday constructor when zone is not set");
+  it.skip("yesterday constructor when zone is set");
+  it.skip("tomorrow constructor");
+  it.skip("tomorrow constructor when zone is not set");
+  it.skip("tomorrow constructor when zone is set");
+  it.skip("since");
+  it.skip("since when zone is set");
+  it.skip("ago");
+  it.skip("ago when zone is set");
+  it.skip("beginning of day");
+  it.skip("middle of day");
+  it.skip("beginning of day when zone is set");
+  it.skip("end of day");
+  it.skip("end of day when zone is set");
+  it.skip("all day");
+  it.skip("all day when zone is set");
+  it.skip("all week");
+  it.skip("all month");
+  it.skip("all quarter");
+  it.skip("all year");
+  it.skip("xmlschema");
+  it.skip("xmlschema when zone is set");
+  it.skip("past");
+  it.skip("future");
+  it.skip("current returns date today when zone not set");
+  it.skip("current returns time zone today when zone is set");
+  it.skip("date advance should not change passed options hash");
+});

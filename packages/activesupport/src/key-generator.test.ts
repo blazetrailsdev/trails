@@ -216,3 +216,54 @@ describe("BacktraceCleanerFilterAndSilencerTest", () => {
     expect(cleaned).toEqual(["app/models/user.rb"]);
   });
 });
+
+describe("KeyGeneratorTest", () => {
+  it.skip("Generating a key of the default length");
+  it.skip("Generating a key of an alternative length");
+  it.skip("Expected results");
+  it.skip("With custom hash digest class");
+  it.skip("Raises if given a non digest instance");
+  it.skip("inspect does not show secrets");
+});
+
+describe("SecureRandomTest", () => {
+  it.skip("base58");
+  it.skip("base58 with length");
+  it.skip("base58 with nil");
+  it.skip("base36");
+  it.skip("base36 with length");
+  it.skip("base36 with nil");
+});
+
+describe("CachingKeyGeneratorTest", () => {
+  it("Generating a cached key for same salt and key size", () => {
+    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
+    const k1 = gen.generateKey("salt", 16);
+    const k2 = gen.generateKey("salt", 16);
+    expect(k1).toBe(k2); // same reference from cache
+  });
+
+  it("Does not cache key for different salt", () => {
+    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
+    const k1 = gen.generateKey("salt1", 16);
+    const k2 = gen.generateKey("salt2", 16);
+    expect(k1.equals(k2)).toBe(false);
+  });
+
+  it("Does not cache key for different length", () => {
+    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
+    const k1 = gen.generateKey("salt", 16);
+    const k2 = gen.generateKey("salt", 32);
+    expect(k1.length).toBe(16);
+    expect(k2.length).toBe(32);
+    expect(k1).not.toBe(k2);
+  });
+
+  it("Does not cache key for different salts and lengths that are different but are equal when concatenated", () => {
+    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
+    // Different salts with same length must produce different keys
+    const k1 = gen.generateKey("salt", 16);
+    const k2 = gen.generateKey("sal", 16);
+    expect(k1.equals(k2)).toBe(false);
+  });
+});

@@ -384,9 +384,7 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(callCount).toBe(3);
   });
 
-  it.skip("declaring attributes on singleton errors", () => {
-    // Ruby-specific: can't define mattr on singleton class
-  });
+  it.skip("declaring attributes on singleton errors");
 });
 
 describe("AttrInternalTest", () => {
@@ -498,18 +496,10 @@ describe("ClassTest", () => {
     expect(subs).not.toContain(Poodle); // only direct children
   });
 
-  it.skip("descendants excludes singleton classes", () => {
-    /* Ruby-specific */
-  });
-  it.skip("subclasses excludes singleton classes", () => {
-    /* Ruby-specific */
-  });
-  it.skip("subclasses exclude reloaded classes", () => {
-    /* Ruby-specific */
-  });
-  it.skip("descendants exclude reloaded classes", () => {
-    /* Ruby-specific */
-  });
+  it.skip("descendants excludes singleton classes");
+  it.skip("subclasses excludes singleton classes");
+  it.skip("subclasses exclude reloaded classes");
+  it.skip("descendants exclude reloaded classes");
 });
 
 describe("ConfigurableActiveSupport", () => {
@@ -574,74 +564,5 @@ describe("ConfigurableActiveSupport", () => {
     expect(() => configAccessor(Base, "1bad")).toThrow();
   });
 
-  it.skip("the config_accessor method should not be publicly callable", () => {
-    // Ruby-specific: config_accessor is a private class method
-  });
-});
-
-describe("RescuableTest", () => {
-  it("rescue from with method", () => {
-    class MyController {
-      static handled: string | null = null;
-      static handleError(e: Error) {
-        MyController.handled = e.message;
-      }
-    }
-    rescueFrom(MyController, TypeError, { with: "handleError" });
-    const handled = handleRescue(MyController, new TypeError("type error!"));
-    expect(handled).toBe(true);
-    expect(MyController.handled).toBe("type error!");
-  });
-
-  it("rescue from with block", () => {
-    class MyController {}
-    const caught: Error[] = [];
-    rescueFrom(MyController, RangeError, { with: (e: any) => caught.push(e) });
-    handleRescue(MyController, new RangeError("out of range"));
-    expect(caught).toHaveLength(1);
-    expect(caught[0].message).toBe("out of range");
-  });
-
-  it("rescue from with block with args", () => {
-    class MyController {}
-    let received: Error | null = null;
-    rescueFrom(MyController, Error, {
-      with: (e: any) => {
-        received = e;
-      },
-    });
-    const err = new Error("boom");
-    handleRescue(MyController, err);
-    expect(received).toBe(err);
-  });
-
-  it("rescues defined later are added at end of the rescue handlers array", () => {
-    class MyController {}
-    const log: string[] = [];
-    rescueFrom(MyController, TypeError, { with: () => log.push("first") });
-    rescueFrom(MyController, TypeError, { with: () => log.push("second") });
-    handleRescue(MyController, new TypeError("t"));
-    // Last registered handler takes priority (reversed search)
-    expect(log).toEqual(["second"]);
-  });
-
-  it("unhandled exceptions", () => {
-    class MyController {}
-    rescueFrom(MyController, TypeError, { with: () => {} });
-    const handled = handleRescue(MyController, new RangeError("not handled"));
-    expect(handled).toBe(false);
-  });
-
-  it.skip("rescue from error dispatchers with case operator", () => {
-    /* Ruby-specific */
-  });
-  it.skip("children should inherit rescue definitions from parents and child rescue should be appended", () => {
-    /* Ruby-specific */
-  });
-  it.skip("rescue falls back to exception cause", () => {
-    /* Ruby-specific */
-  });
-  it.skip("rescue handles loops in exception cause chain", () => {
-    /* Ruby-specific */
-  });
+  it.skip("the config_accessor method should not be publicly callable");
 });

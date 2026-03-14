@@ -102,26 +102,18 @@ describe("InflectorTest", () => {
     expect(pluralize("")).toBe("");
   });
 
-  it.skip("pluralize with fallback", () => {
-    // Requires I18n locale fallback support
-  });
+  it.skip("pluralize with fallback");
 
-  it.skip("uncountability of ascii word", () => {
-    // Requires runtime inflections.uncountable() API
-  });
+  it.skip("uncountability of ascii word");
 
-  it.skip("uncountability of non-ascii word", () => {
-    // Requires runtime inflections.uncountable() API
-  });
+  it.skip("uncountability of non-ascii word");
 
   it("uncountable word is not greedy", () => {
     expect(singularize("sponsor")).toBe("sponsor");
     expect(pluralize("sponsor")).toBe("sponsors");
   });
 
-  it.skip("overwrite previous inflectors", () => {
-    // Requires runtime inflections.singular() API
-  });
+  it.skip("overwrite previous inflectors");
 
   it("camelize", () => {
     expect(camelize("product")).toBe("Product");
@@ -135,46 +127,30 @@ describe("InflectorTest", () => {
     expect(camelize("capital", true)).toBe("Capital");
   });
 
-  it.skip("camelize with upper upcases the first letter", () => {
-    // Requires :upper symbol support
-  });
+  it.skip("camelize with upper upcases the first letter");
 
   it("camelize with false downcases the first letter", () => {
     expect(camelize("Capital", false)).toBe("capital");
     expect(camelize("capital", false)).toBe("capital");
   });
 
-  it.skip("camelize with nil downcases the first letter", () => {
-    // Requires nil/null mapping to lowercase
-  });
+  it.skip("camelize with nil downcases the first letter");
 
-  it.skip("camelize with lower downcases the first letter", () => {
-    // Requires :lower symbol support
-  });
+  it.skip("camelize with lower downcases the first letter");
 
-  it.skip("camelize with any other arg upcases the first letter", () => {
-    // Requires fallback behavior for unknown args
-  });
+  it.skip("camelize with any other arg upcases the first letter");
 
   it("camelize with underscores", () => {
     expect(camelize("Camel_Case")).toBe("CamelCase");
   });
 
-  it.skip("acronyms", () => {
-    // Requires runtime inflections.acronym() API
-  });
+  it.skip("acronyms");
 
-  it.skip("acronym override", () => {
-    // Requires runtime inflections.acronym() API
-  });
+  it.skip("acronym override");
 
-  it.skip("acronyms camelize lower", () => {
-    // Requires runtime inflections.acronym() API
-  });
+  it.skip("acronyms camelize lower");
 
-  it.skip("underscore acronym sequence", () => {
-    // Requires runtime inflections.acronym() API
-  });
+  it.skip("underscore acronym sequence");
 
   it("underscore", () => {
     expect(underscore("HTMLTidy")).toBe("html_tidy");
@@ -237,9 +213,7 @@ describe("InflectorTest", () => {
     expect(parameterize("Test with + sign")).toBe("test-with-sign");
   });
 
-  it.skip("parameterize and normalize", () => {
-    // Requires Unicode transliteration
-  });
+  it.skip("parameterize and normalize");
 
   it("parameterize with custom separator", () => {
     expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
@@ -252,22 +226,16 @@ describe("InflectorTest", () => {
     expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
   });
 
-  it.skip("parameterize with multi character separator", () => {
-    // Requires multi-char separator support
-  });
+  it.skip("parameterize with multi character separator");
 
-  it.skip("parameterize with locale", () => {
-    // Requires I18n transliteration
-  });
+  it.skip("parameterize with locale");
 
   it("classify", () => {
     expect(classify("primary_spokesmen")).toBe("PrimarySpokesman");
     expect(classify("node_children")).toBe("NodeChild");
   });
 
-  it.skip("classify with symbol", () => {
-    // Requires symbol/string coercion
-  });
+  it.skip("classify with symbol");
 
   it("classify with leading schema name", () => {
     expect(classify("schema.foo_bar")).toBe("FooBar");
@@ -290,29 +258,17 @@ describe("InflectorTest", () => {
     expect(humanize("underground", { capitalize: false })).toBe("underground");
   });
 
-  it.skip("humanize with keep id suffix", () => {
-    // Requires keep_id_suffix option
-  });
+  it.skip("humanize with keep id suffix");
 
-  it.skip("humanize by rule", () => {
-    // Requires runtime inflections.human() API
-  });
+  it.skip("humanize by rule");
 
-  it.skip("humanize by string", () => {
-    // Requires runtime inflections.human() API
-  });
+  it.skip("humanize by string");
 
-  it.skip("humanize with acronyms", () => {
-    // Requires runtime inflections.acronym() API
-  });
+  it.skip("humanize with acronyms");
 
-  it.skip("constantize", () => {
-    // Requires runtime constant resolution
-  });
+  it.skip("constantize");
 
-  it.skip("safe constantize", () => {
-    // Requires runtime constant resolution
-  });
+  it.skip("safe constantize");
 
   it("ordinal", () => {
     expect(ordinal(0)).toBe("th");
@@ -370,37 +326,21 @@ describe("InflectorTest", () => {
     expect(camelize("area51_controller", false)).toBe("area51Controller");
   });
 
-  it.skip("symbol to lower camel", () => {
-    // Requires symbol support
-  });
+  it.skip("symbol to lower camel");
 
-  it.skip("clear acronyms resets to reusable state", () => {
-    // Requires runtime inflections.clear() API
-  });
+  it.skip("clear acronyms resets to reusable state");
 
-  it.skip("inflector locality", () => {
-    // Requires I18n locale-specific inflections
-  });
+  it.skip("inflector locality");
 
-  it.skip("clear all", () => {
-    // Requires runtime inflections.clear() API
-  });
+  it.skip("clear all");
 
-  it.skip("clear with default", () => {
-    // Requires runtime inflections.clear() API
-  });
+  it.skip("clear with default");
 
-  it.skip("clear all resets camelize and underscore regexes", () => {
-    // Requires runtime inflections.clear() API
-  });
+  it.skip("clear all resets camelize and underscore regexes");
 
-  it.skip("clear inflections with acronyms", () => {
-    // Requires runtime inflections.clear() API
-  });
+  it.skip("clear inflections with acronyms");
 
-  it.skip("output is not frozen even if input is frozen", () => {
-    // Not applicable to TypeScript (no frozen strings)
-  });
+  it.skip("output is not frozen even if input is frozen");
 
   // Dynamic tests from SingularToPlural
   describe("pluralize singular", () => {
@@ -432,11 +372,7 @@ describe("InflectorTest", () => {
     });
   });
 
-  it.skip("humanize with international characters", () => {
-    // Requires Unicode-aware capitalize
-  });
+  it.skip("humanize with international characters");
 
-  it.skip("overlapping acronyms", () => {
-    // Requires runtime inflections.acronym() API
-  });
+  it.skip("overlapping acronyms");
 });
