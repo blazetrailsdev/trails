@@ -86,17 +86,17 @@ describe("PostgresTest", () => {
 
   describe("Nodes::DoesNotMatch", () => {
     it("should know how to visit case sensitive", () => {
-      const node = users.get("name").matches("foo%", true);
+      const node = users.get("name").doesNotMatch("foo%", true);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("LIKE");
+      expect(sql).toContain("NOT LIKE");
     });
   });
 
   describe("Nodes::NotRegexp", () => {
     it("can handle case insensitive", () => {
-      const node = users.get("name").matches("foo%", false);
+      const node = users.get("name").doesNotMatchRegexp("foo%");
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("LIKE");
+      expect(sql).toContain("!~");
     });
   });
 
@@ -143,9 +143,9 @@ describe("PostgresTest", () => {
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
-      const node = users.get("id").eq(posts.get("user_id"));
+      const node = users.get("id").isDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toBe('"users"."id" = "posts"."user_id"');
+      expect(sql).toContain("IS DISTINCT FROM");
     });
   });
 

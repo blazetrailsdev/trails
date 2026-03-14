@@ -148,9 +148,9 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
-      const node = users.get("id").eq(posts.get("user_id"));
+      const node = users.get("id").isDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."id" = "posts"."user_id"');
+      expect(sql).toContain("IS DISTINCT FROM");
     });
   });
 
