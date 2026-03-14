@@ -3518,23 +3518,8 @@ describe("Finders (Rails-guided)", () => {
     expect(result).toEqual(["Alice", 25]);
   });
 
-  class FinderUser extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("email", "string");
-    }
-  }
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    FinderUser.adapter = adapter;
-    await FinderUser.create({ name: "Alice", email: "alice@test.com" });
-    await FinderUser.create({ name: "Bob", email: "bob@test.com" });
-    await FinderUser.create({ name: "Charlie", email: "charlie@test.com" });
-  });
-
   it("find with multiple IDs returns array", async () => {
-    const users = await FinderUser.find([1, 2]);
+    const users = await User.find([1, 2]);
     expect(users).toHaveLength(2);
     expect(users[0].readAttribute("name")).toBeDefined();
     expect(users[1].readAttribute("name")).toBeDefined();
