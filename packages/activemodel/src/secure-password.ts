@@ -47,7 +47,11 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  const authMethodName = attribute === "password" ? "authenticate" : `authenticate_${attribute}`;
+  const camelAttr = attribute.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+  const authMethodName =
+    attribute === "password"
+      ? "authenticate"
+      : `authenticate${camelAttr.charAt(0).toUpperCase()}${camelAttr.slice(1)}`;
   Object.defineProperty(modelClass.prototype, authMethodName, {
     value: function (this: Model, unencryptedPassword: string) {
       const digest = this.readAttribute(digestAttr) as string | null;
