@@ -5459,24 +5459,38 @@ describe("Rails-guided: set operations and joins", () => {
   });
 
   it("first or create with array", async () => {
-    const p = await Post.where({ title: "first-or" }).firstOrCreate({ title: "first-or" });
-    expect(p.isPersisted()).toBe(true);
-  });
-
-  it("first or create bang with valid block", async () => {
     const adp = freshAdapter();
-    class Post extends Base {
+    class FocPost extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
       }
     }
-    const result = await Post.all().firstOrCreateBang({ title: "bang-unique" });
+    const p = await FocPost.where({ title: "first-or" }).firstOrCreate({ title: "first-or" });
+    expect(p.isPersisted()).toBe(true);
+  });
+
+  it("first or create bang with valid block", async () => {
+    const adp = freshAdapter();
+    class FocbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const result = await FocbPost.all().firstOrCreateBang({ title: "bang-unique" });
     expect(result).not.toBeNull();
   });
 
   it("first or create bang with valid array", async () => {
-    const p = await Post.where({ title: "valid-array" }).firstOrCreateBang({
+    const adp = freshAdapter();
+    class FocbaPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const p = await FocbaPost.where({ title: "valid-array" }).firstOrCreateBang({
       title: "valid-array",
     });
     expect(p.isPersisted()).toBe(true);
