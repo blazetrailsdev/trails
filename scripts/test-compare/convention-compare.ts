@@ -6,6 +6,14 @@
  * No overrides, no fuzzy matching. Shows how much is "in the right place"
  * purely by following the project's file naming conventions.
  *
+ * Matching strategy (per test):
+ *   1. Path match: normalize the full "Describe > test name" path from Ruby
+ *      and check if an identical path exists in the convention TS file.
+ *   2. Description fallback: if no path match, check if the test description
+ *      alone exists in the convention TS file (handles describe name mismatches).
+ *   3. Misplaced check: if not in the correct file, search other TS files
+ *      using the same path-then-description strategy.
+ *
  * Convention per package:
  *   arel:             attributes/attribute_test.rb → attributes/attribute.test.ts
  *   activemodel:      attribute_methods_test.rb    → attribute-methods.test.ts
@@ -36,14 +44,12 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack") {
-    // spec_auth_basic.rb → auth_basic.test.ts (strip spec_ prefix, keep underscores)
     const dir = path.dirname(rubyFile);
     const base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
     const tsFile = base + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
-  // General: snake_case_test.rb → snake-case.test.ts, preserve directory structure
   const dir = path.dirname(rubyFile);
   const base = path.basename(rubyFile, ".rb").replace(/_test$/, "");
   const kebab = base.replace(/_/g, "-");
@@ -94,6 +100,11 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+/** Build a normalized path key from ancestors + description */
+function normPath(ancestors: string[], description: string): string {
+  return [...ancestors, description].map(normalize).join(" > ");
+}
+
 function main() {
   const args = process.argv.slice(2);
   const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
@@ -112,41 +123,73 @@ function main() {
   const ruby: TestManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: TestManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // Build TS lookup: package → Map<relative-path, Set<normalized-description>>
-  // Also track pending status per test
-  const tsLookup = new Map<string, Map<string, Set<string>>>();
-  const tsAllFiles = new Map<string, Set<string>>();
-  const tsDescToFile = new Map<string, Map<string, string[]>>();
-  const tsPendingTests = new Map<string, Set<string>>(); // pkg → Set<"file:norm-desc">
+  // Build TS lookups per package:
+  //   byFilePath:   relPath → Set<normalized-path>     (full ancestor > desc path)
+  //   byFileDesc:   relPath → Set<normalized-desc>     (description only, for fallback)
+  //   pathToFile:   normalized-path → tsFile[]          (reverse lookup by path)
+  //   descToFile:   normalized-desc → tsFile[]          (reverse lookup by desc)
+  //   pendingSet:   Set<"relPath:norm-path">            (skipped tests)
+  const tsLookup = new Map<
+    string,
+    {
+      byFilePath: Map<string, Set<string>>;
+      byFileDesc: Map<string, Set<string>>;
+      allFiles: Set<string>;
+      pathToFile: Map<string, string[]>;
+      descToFile: Map<string, string[]>;
+      pendingPaths: Set<string>;
+      pendingDescs: Set<string>;
+    }
+  >();
 
   for (const [pkg, pkgInfo] of Object.entries(ts.packages)) {
-    const byPath = new Map<string, Set<string>>();
+    const byFilePath = new Map<string, Set<string>>();
+    const byFileDesc = new Map<string, Set<string>>();
     const allFiles = new Set<string>();
+    const pathToFile = new Map<string, string[]>();
     const descToFile = new Map<string, string[]>();
-    const pendingSet = new Set<string>();
+    const pendingPaths = new Set<string>();
+    const pendingDescs = new Set<string>();
 
     for (const file of pkgInfo.files) {
       const relPath = extractRelativeTsPath(file.file, pkg);
       allFiles.add(relPath);
 
-      if (!byPath.has(relPath)) byPath.set(relPath, new Set());
-      const descs = byPath.get(relPath)!;
+      if (!byFilePath.has(relPath)) byFilePath.set(relPath, new Set());
+      if (!byFileDesc.has(relPath)) byFileDesc.set(relPath, new Set());
+      const paths = byFilePath.get(relPath)!;
+      const descs = byFileDesc.get(relPath)!;
+
       for (const tc of file.testCases) {
-        const norm = normalize(tc.description);
-        descs.add(norm);
-        if (!descToFile.has(norm)) descToFile.set(norm, []);
-        const files = descToFile.get(norm)!;
-        if (!files.includes(relPath)) files.push(relPath);
+        const np = normPath(tc.ancestors, tc.description);
+        const nd = normalize(tc.description);
+        paths.add(np);
+        descs.add(nd);
+
+        if (!pathToFile.has(np)) pathToFile.set(np, []);
+        const pf = pathToFile.get(np)!;
+        if (!pf.includes(relPath)) pf.push(relPath);
+
+        if (!descToFile.has(nd)) descToFile.set(nd, []);
+        const df = descToFile.get(nd)!;
+        if (!df.includes(relPath)) df.push(relPath);
+
         if (tc.pending) {
-          pendingSet.add(`${relPath}:${norm}`);
+          pendingPaths.add(`${relPath}:${np}`);
+          pendingDescs.add(`${relPath}:${nd}`);
         }
       }
     }
 
-    tsLookup.set(pkg, byPath);
-    tsAllFiles.set(pkg, allFiles);
-    tsDescToFile.set(pkg, descToFile);
-    tsPendingTests.set(pkg, pendingSet);
+    tsLookup.set(pkg, {
+      byFilePath,
+      byFileDesc,
+      allFiles,
+      pathToFile,
+      descToFile,
+      pendingPaths,
+      pendingDescs,
+    });
   }
 
   const results: ConventionPackageResult[] = [];
@@ -154,23 +197,33 @@ function main() {
   for (const [pkg, pkgInfo] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
 
-    const tsByPath = tsLookup.get(pkg) || new Map<string, Set<string>>();
-    const allTsFiles = tsAllFiles.get(pkg) || new Set<string>();
-    const descToFile = tsDescToFile.get(pkg) || new Map<string, string[]>();
-    const pendingSet = tsPendingTests.get(pkg) || new Set<string>();
+    const lookup = tsLookup.get(pkg) || {
+      byFilePath: new Map<string, Set<string>>(),
+      byFileDesc: new Map<string, Set<string>>(),
+      allFiles: new Set<string>(),
+      pathToFile: new Map<string, string[]>(),
+      descToFile: new Map<string, string[]>(),
+      pendingPaths: new Set<string>(),
+      pendingDescs: new Set<string>(),
+    };
     const fileResults: ConventionFileResult[] = [];
 
-    // Build Ruby-side lookup: which test names appear in multiple Ruby files?
-    // These are shared concepts (e.g., "connection error" in both mysql and pg adapters)
-    // and shouldn't be flagged as misplaced when found in another adapter's TS file.
+    // Ruby-side: which test paths appear in multiple Ruby files?
+    const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
     for (const file of pkgInfo.files) {
-      const seen = new Set<string>();
+      const seenPaths = new Set<string>();
+      const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
-        const norm = normalize(tc.description);
-        if (!seen.has(norm)) {
-          seen.add(norm);
-          rubyDescToFileCount.set(norm, (rubyDescToFileCount.get(norm) || 0) + 1);
+        const np = normPath(tc.ancestors, tc.description);
+        const nd = normalize(tc.description);
+        if (!seenPaths.has(np)) {
+          seenPaths.add(np);
+          rubyPathToFileCount.set(np, (rubyPathToFileCount.get(np) || 0) + 1);
+        }
+        if (!seenDescs.has(nd)) {
+          seenDescs.add(nd);
+          rubyDescToFileCount.set(nd, (rubyDescToFileCount.get(nd) || 0) + 1);
         }
       }
     }
@@ -184,8 +237,9 @@ function main() {
 
     for (const file of pkgInfo.files) {
       const conventionTs = rubyToConventionTs(file.file, pkg);
-      const tsDescs = tsByPath.get(conventionTs);
-      const exists = allTsFiles.has(conventionTs);
+      const tsPaths = lookup.byFilePath.get(conventionTs);
+      const tsDescs = lookup.byFileDesc.get(conventionTs);
+      const exists = lookup.allFiles.has(conventionTs);
 
       if (exists) tsMapped++;
       else tsUnmapped++;
@@ -198,47 +252,64 @@ function main() {
 
       for (const tc of file.testCases) {
         totalRuby++;
-        const norm = normalize(tc.description);
-        if (tsDescs && tsDescs.has(norm)) {
+        const np = normPath(tc.ancestors, tc.description);
+        const nd = normalize(tc.description);
+
+        // Step 1: Try path match in convention file
+        if (tsPaths && tsPaths.has(np)) {
           matched++;
           totalMatched++;
-          if (pendingSet.has(`${conventionTs}:${norm}`)) {
+          if (lookup.pendingPaths.has(`${conventionTs}:${np}`)) {
+            matchedSkipped++;
+            totalMatchedSkipped++;
+          }
+          continue;
+        }
+
+        // Step 2: Try description-only match in convention file
+        if (tsDescs && tsDescs.has(nd)) {
+          matched++;
+          totalMatched++;
+          if (lookup.pendingDescs.has(`${conventionTs}:${nd}`)) {
+            matchedSkipped++;
+            totalMatchedSkipped++;
+          }
+          continue;
+        }
+
+        // Step 3: Look for the test in other TS files
+        // Try path match first, then description fallback
+        const pathLocations = (lookup.pathToFile.get(np) || []).filter((l) => l !== conventionTs);
+        const descLocations = (lookup.descToFile.get(nd) || []).filter((l) => l !== conventionTs);
+
+        // Use path locations if available (more precise), otherwise desc
+        const otherLocations = pathLocations.length > 0 ? pathLocations : descLocations;
+        const isShared =
+          (rubyPathToFileCount.get(np) || 0) > 1 ||
+          (pathLocations.length === 0 && (rubyDescToFileCount.get(nd) || 0) > 1);
+
+        if (otherLocations.length >= 1 && !isShared) {
+          misplaced++;
+          totalMisplaced++;
+          misplacedTests.push({
+            description: tc.description,
+            currentTsFile: otherLocations[0],
+            conventionTsFile: conventionTs,
+          });
+        } else if (otherLocations.length >= 1) {
+          // Shared test — count as matched
+          matched++;
+          totalMatched++;
+          const pendingKey =
+            pathLocations.length > 0
+              ? otherLocations.every((l) => lookup.pendingPaths.has(`${l}:${np}`))
+              : otherLocations.every((l) => lookup.pendingDescs.has(`${l}:${nd}`));
+          if (pendingKey) {
             matchedSkipped++;
             totalMatchedSkipped++;
           }
         } else {
-          // Check if it exists in a different TS file
-          const locations = descToFile.get(norm);
-          if (locations && locations.length > 0) {
-            const otherLocations = locations.filter((l) => l !== conventionTs);
-            // A test name that appears in multiple Ruby files (e.g., "connection error"
-            // in both mysql and pg adapter tests) is a shared concept — finding it in
-            // any adapter TS file is fine, not a misplacement.
-            const isSharedAcrossRubyFiles = (rubyDescToFileCount.get(norm) || 0) > 1;
-
-            if (otherLocations.length >= 1 && !isSharedAcrossRubyFiles) {
-              // Exists in other file(s) and is unique to this Ruby file — genuinely misplaced
-              misplaced++;
-              totalMisplaced++;
-              misplacedTests.push({
-                description: tc.description,
-                currentTsFile: otherLocations[0],
-                conventionTsFile: conventionTs,
-              });
-            } else if (otherLocations.length >= 1) {
-              // Shared test name across Ruby files — count as matched
-              matched++;
-              totalMatched++;
-              if (otherLocations.every((l) => pendingSet.has(`${l}:${norm}`))) {
-                matchedSkipped++;
-                totalMatchedSkipped++;
-              }
-            } else {
-              missingTests.push(tc.description);
-            }
-          } else {
-            missingTests.push(tc.description);
-          }
+          missingTests.push(tc.description);
         }
       }
 
@@ -257,7 +328,6 @@ function main() {
     }
 
     fileResults.sort((a, b) => {
-      // Sort: files with misplaced tests first, then by matched count
       if (a.misplaced !== b.misplaced) return b.misplaced - a.misplaced;
       if (a.tsFileExists !== b.tsFileExists) return a.tsFileExists ? -1 : 1;
       return b.matched - a.matched;
@@ -322,7 +392,6 @@ function main() {
       console.log(`  MISPLACED TESTS (need to move):`);
       console.log(`  ${"-".repeat(86)}`);
 
-      // Group by move: from → to
       const moves = new Map<string, { descriptions: string[]; from: string; to: string }>();
       for (const f of filesWithMisplaced) {
         for (const mt of f.misplacedTests!) {
@@ -375,11 +444,8 @@ function main() {
 
 /**
  * Extract the relative path of a TS test file within its package src dir.
- * e.g. "packages/arel/src/attributes/attribute.test.ts" → "attributes/attribute.test.ts"
- * e.g. "packages/actionpack/src/actiondispatch/dispatch/ssl.test.ts" → "dispatch/ssl.test.ts"
  */
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
-  // Package dir mapping
   const pkgDirs: Record<string, string> = {
     arel: "packages/arel/src/",
     activemodel: "packages/activemodel/src/",
@@ -397,7 +463,6 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     return fullPath.slice(prefix.length);
   }
 
-  // Fallback: just use basename
   return path.basename(fullPath);
 }
 

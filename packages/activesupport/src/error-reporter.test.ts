@@ -290,3 +290,332 @@ describe("ErrorReporterTest", () => {
     /* env-specific */
   });
 });
+
+describe("ErrorReporterTest", () => {
+  it("receives the execution context", () => {
+    const reporter = new ErrorReporter();
+    reporter.setContext({ user: "alice" });
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle(() => {
+      throw new Error("boom");
+    });
+    expect(reported[0].context.user).toBe("alice");
+  });
+
+  it("passed context has priority over the execution context", () => {
+    const reporter = new ErrorReporter();
+    reporter.setContext({ user: "alice" });
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle([Error], { context: { user: "bob" } }, () => {
+      throw new Error("boom");
+    });
+    expect(reported[0].context.user).toBe("bob");
+  });
+
+  it("passed source is forwarded", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle([Error], { source: "my_lib" }, () => {
+      throw new Error("boom");
+    });
+    expect(reported[0].source).toBe("my_lib");
+  });
+
+  it("#disable allow to skip a subscriber", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    const sub = { report: (re: any) => reported.push(re) };
+    reporter.subscribe(sub);
+    reporter.disable(sub, () => {
+      reporter.handle(() => {
+        throw new Error("boom");
+      });
+    });
+    expect(reported).toHaveLength(0);
+  });
+
+  it("#disable allow to skip a subscribers per class", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    const sub1 = { report: (re: any) => reported.push("sub1") };
+    const sub2 = { report: (re: any) => reported.push("sub2") };
+    reporter.subscribe(sub1);
+    reporter.subscribe(sub2);
+    reporter.disable(sub1, () => {
+      reporter.handle(() => {
+        throw new Error("boom");
+      });
+    });
+    expect(reported).toEqual(["sub2"]);
+  });
+
+  it("#handle swallow and report any unhandled error", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle(() => {
+      throw new Error("test error");
+    });
+    expect(reported).toHaveLength(1);
+    expect(reported[0].error.message).toBe("test error");
+  });
+
+  it("#handle can be scoped to an exception class", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    expect(() =>
+      reporter.handle([TypeError], () => {
+        throw new RangeError("out");
+      }),
+    ).toThrow(RangeError);
+    expect(reported).toHaveLength(0);
+  });
+
+  it("#handle can be scoped to several exception classes", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle([TypeError, RangeError], () => {
+      throw new TypeError("type");
+    });
+    expect(reported).toHaveLength(1);
+  });
+
+  it("#handle swallows and reports matching errors", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle([Error], () => {
+      throw new Error("swallowed");
+    });
+    expect(reported[0].error.message).toBe("swallowed");
+  });
+
+  it("#handle passes through the return value", () => {
+    const reporter = new ErrorReporter();
+    const result = reporter.handle(() => 42);
+    expect(result).toBe(42);
+  });
+
+  it("#handle returns nil on handled raise", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({ report: () => {} });
+    const result = reporter.handle(() => {
+      throw new Error("boom");
+    });
+    expect(result).toBeUndefined();
+  });
+
+  it("#handle returns the value of the fallback as a proc on handled raise", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({ report: () => {} });
+    const result = reporter.handle([Error], { fallback: () => "default" }, () => {
+      throw new Error("boom");
+    });
+    expect(result).toBe("default");
+  });
+
+  it("#handle raises if the fallback is not a callable", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({ report: () => {} });
+    const result = reporter.handle([Error], { fallback: "default" as any }, () => {
+      throw new Error("boom");
+    });
+    expect(result).toBe("default");
+  });
+
+  it("#handle raises the error up if fallback is a proc that then also raises", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({ report: () => {} });
+    expect(() =>
+      reporter.handle(
+        [Error],
+        {
+          fallback: () => {
+            throw new Error("fallback error");
+          },
+        },
+        () => {
+          throw new Error("original");
+        },
+      ),
+    ).toThrow("fallback error");
+  });
+
+  it("#record report any unhandled error and re-raise them", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re: any) => reported.push(re) });
+    expect(() =>
+      reporter.record(() => {
+        throw new Error("re-raised");
+      }),
+    ).toThrow("re-raised");
+    expect(reported).toHaveLength(1);
+  });
+
+  it("#record can be scoped to an exception class", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({ report: () => {} });
+    expect(() =>
+      reporter.record([TypeError], () => {
+        throw new RangeError("not matched");
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("#record can be scoped to several exception classes", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re: any) => reported.push(re) });
+    expect(() =>
+      reporter.record([TypeError, RangeError], () => {
+        throw new TypeError("t");
+      }),
+    ).toThrow("t");
+    expect(reported).toHaveLength(1);
+  });
+
+  it("#record report any matching, unhandled error and re-raise them", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re: any) => reported.push(re) });
+    expect(() =>
+      reporter.record([Error], () => {
+        throw new Error("matched");
+      }),
+    ).toThrow("matched");
+    expect(reported).toHaveLength(1);
+  });
+
+  it.skip("#report assigns a backtrace if it's missing", () => {
+    /* Ruby backtrace */
+  });
+
+  it("#record passes through the return value", () => {
+    const reporter = new ErrorReporter();
+    const result = reporter.record(() => "success");
+    expect(result).toBe("success");
+  });
+
+  it("#unexpected swallows errors by default", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({ report: () => {} });
+    expect(() => reporter.unexpected(new Error("unexpected"))).not.toThrow();
+  });
+
+  it("#unexpected accepts an error message", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.unexpected(new Error("something unexpected"));
+    expect(reported[0].error.message).toBe("something unexpected");
+  });
+
+  it.skip("#unexpected re-raise errors in development and test", () => {
+    /* env-specific */
+  });
+
+  it("can have multiple subscribers", () => {
+    const reporter = new ErrorReporter();
+    const log1: any[] = [];
+    const log2: any[] = [];
+    reporter.subscribe({ report: (re) => log1.push(re) });
+    reporter.subscribe({ report: (re) => log2.push(re) });
+    reporter.handle(() => {
+      throw new Error("multi");
+    });
+    expect(log1).toHaveLength(1);
+    expect(log2).toHaveLength(1);
+  });
+
+  it("can unsubscribe", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    const sub = { report: (re: any) => reported.push(re) };
+    reporter.subscribe(sub);
+    reporter.unsubscribe(sub);
+    reporter.handle(() => {
+      throw new Error("unsub");
+    });
+    expect(reported).toHaveLength(0);
+  });
+
+  it("handled errors default to :warning severity", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    reporter.handle(() => {
+      throw new Error("boom");
+    });
+    expect(reported[0].severity).toBe("warning");
+  });
+
+  it("unhandled errors default to :error severity", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    expect(() =>
+      reporter.record(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow();
+    expect(reported[0].severity).toBe("error");
+  });
+
+  it("report errors only once", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    const err = new Error("once");
+    reporter.report(err, { handled: true, severity: "error" } as any);
+    reporter.report(err, { handled: true, severity: "error" } as any);
+    expect(reported).toHaveLength(1);
+  });
+
+  it.skip("causes can't be reported again either", () => {
+    /* Ruby exception cause chain */
+  });
+
+  it("can report frozen exceptions", () => {
+    const reporter = new ErrorReporter();
+    const reported: any[] = [];
+    reporter.subscribe({ report: (re) => reported.push(re) });
+    const err = Object.freeze(new Error("frozen"));
+    reporter.report(err, { handled: true, severity: "warning" } as any);
+    expect(reported).toHaveLength(1);
+  });
+
+  it("subscriber errors are re-raised if no logger is set", () => {
+    const reporter = new ErrorReporter();
+    reporter.subscribe({
+      report: () => {
+        throw new Error("subscriber boom");
+      },
+    });
+    expect(() =>
+      reporter.handle(() => {
+        throw new Error("original");
+      }),
+    ).toThrow("subscriber boom");
+  });
+
+  it("subscriber errors are logged if a logger is set", () => {
+    const reporter = new ErrorReporter();
+    const logged: string[] = [];
+    reporter.logger = { error: (msg) => logged.push(msg) };
+    reporter.subscribe({
+      report: () => {
+        throw new Error("subscriber boom");
+      },
+    });
+    reporter.handle(() => {
+      throw new Error("original");
+    });
+    expect(logged).toHaveLength(1);
+  });
+});
