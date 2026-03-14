@@ -116,7 +116,8 @@ describe("ActiveModel", () => {
         }
       }
       const p = new Person({});
-      expect(p._attributes.has("name")).toBe(true);
+      expect(p.hasAttribute("name")).toBe(true);
+      expect(p.readAttribute("name")).toBe(null);
     });
 
     it("uninitialized attributes are not included in the attributes hash", () => {
@@ -126,9 +127,8 @@ describe("ActiveModel", () => {
         }
       }
       const p = new Person({});
-      const attrs = p.attributes;
-      expect("name" in attrs).toBe(true);
-      expect(attrs.name).toBe(null);
+      expect(p.attributePresent("name")).toBe(false);
+      expect(p.readAttribute("name")).toBe(null);
     });
 
     it("uninitialized attributes are not included in keys", () => {
@@ -138,7 +138,8 @@ describe("ActiveModel", () => {
         }
       }
       const p = new Person({});
-      expect(p._attributes.has("name")).toBe(true);
+      expect(p.attributeNames()).toContain("name");
+      expect(p.attributePresent("name")).toBe(false);
     });
 
     it("uninitialized attributes return false for key?", () => {
