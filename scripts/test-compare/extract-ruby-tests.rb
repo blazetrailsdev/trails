@@ -141,11 +141,11 @@ class TestExtractor
           return
         end
       when "it"
-        # it with a block body — already handled, but walk the block for nested content
-        process_it(inner[2], inner)
+        # Pass outer node so assertion extraction can walk the block body
+        process_it(inner[2], node)
         return
       when "test"
-        process_test_macro(inner[2], inner)
+        process_test_macro(inner[2], node)
         return
       end
     end
@@ -164,10 +164,11 @@ class TestExtractor
             return
           end
         when "it"
-          process_it_paren(inner)
+          # Pass inner for desc extraction, outer node includes block for assertions
+          process_it_paren(inner, node)
           return
         when "test"
-          process_test_macro_paren(inner)
+          process_test_macro_paren(inner, node)
           return
         end
       end
@@ -264,12 +265,12 @@ class TestExtractor
     }
   end
 
-  def process_it_paren(node)
+  def process_it_paren(node, outer_node = nil)
     desc = extract_string_from_arg_paren(node[2])
     return unless desc
 
     line = extract_line(node)
-    assertions = extract_assertions_from_node(node)
+    assertions = extract_assertions_from_node(outer_node || node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -304,12 +305,12 @@ class TestExtractor
     }
   end
 
-  def process_test_macro_paren(node)
+  def process_test_macro_paren(node, outer_node = nil)
     desc = extract_string_from_arg_paren(node[2])
     return unless desc
 
     line = extract_line(node)
-    assertions = extract_assertions_from_node(node)
+    assertions = extract_assertions_from_node(outer_node || node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
