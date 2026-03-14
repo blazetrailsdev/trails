@@ -29,14 +29,15 @@ describe("ActiveModel", () => {
     it("automatically include ActiveModel::Validations when validations are enabled", () => {
       const User = createUserClass();
       const u = new User({ name: "test" });
-      expect(typeof u.isValid).toBe("function");
+      expect(u.isValid()).toBe(false);
+      expect(u.errors.get("password")).toContain("can't be blank");
     });
 
     it("don't include ActiveModel::Validations when validations are disabled", () => {
       const User = createUserClass({ validations: false });
       const u = new User({ name: "test" });
-      (u as any).password = "secret";
-      expect(u.readAttribute("password_digest")).not.toBe(null);
+      expect(u.isValid()).toBe(true);
+      expect(u.errors.count).toBe(0);
     });
 
     it("create a new user with validations and valid password/confirmation", () => {
@@ -290,13 +291,15 @@ describe("ActiveModel", () => {
       const u = new User({ name: "test" });
       (u as any).password = "secret";
       const digest = u.readAttribute("password_digest") as string;
-      expect(digest).toMatch(/^\$2[aby]?\$/);
+      const salt = digest.slice(0, 29);
+      expect(salt).toMatch(/^\$2[aby]?\$\d{2}\$/);
     });
 
     it("password_salt should return nil when password is nil", () => {
       const User = createUserClass();
       const u = new User({ name: "test" });
       expect((u as any).password).toBe(null);
+      expect(u.readAttribute("password_digest")).toBe(null);
     });
 
     it("password_salt should return nil when password digest is nil", () => {
@@ -321,6 +324,7 @@ describe("ActiveModel", () => {
       (u as any).password = "secret";
       const digest = u.readAttribute("password_digest") as string;
       expect(digest).toMatch(/\$12\$/);
+      expect((u as any).authenticate("secret")).toBe(u);
     });
 
     it("Password digest cost can be set to bcrypt min cost to speed up tests", () => {
