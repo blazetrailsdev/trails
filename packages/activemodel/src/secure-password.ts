@@ -1,3 +1,4 @@
+import { humanize } from "@rails-ts/activesupport";
 import { Model } from "./model.js";
 
 export function hasSecurePassword(
@@ -26,9 +27,12 @@ export function hasSecurePassword(
         return;
       }
       const str = String(value);
-      if (str === "" || str.trim() === "") return;
+      if (str === "" || str.trim() === "") {
+        passwordCache.delete(this);
+        return;
+      }
       passwordCache.set(this, str);
-      this.writeAttribute(digestAttr, simpleHash(str));
+      this.writeAttribute(digestAttr, hashPassword(str));
     },
     configurable: true,
   });
@@ -43,12 +47,14 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  Object.defineProperty(modelClass.prototype, "authenticate", {
+  const authMethodName = attribute === "password" ? "authenticate" : `authenticate_${attribute}`;
+  Object.defineProperty(modelClass.prototype, authMethodName, {
     value: function (this: Model, unencryptedPassword: string) {
       const digest = this.readAttribute(digestAttr) as string | null;
       if (!digest) return false;
-      return digest === simpleHash(unencryptedPassword) ? this : false;
+      return digest === hashPassword(unencryptedPassword) ? this : false;
     },
+    writable: true,
     configurable: true,
   });
 
@@ -57,7 +63,7 @@ export function hasSecurePassword(
       const pwd = passwordCache.get(record);
       const digest = record.readAttribute(digestAttr);
 
-      if (!digest && pwd === undefined) {
+      if (!digest && (pwd === undefined || pwd === null)) {
         record.errors.add(attribute, "blank");
       }
 
@@ -66,21 +72,34 @@ export function hasSecurePassword(
           record.errors.add(attribute, "too_long", { count: 72 });
         }
 
+        const humanAttr = modelClass.humanAttributeName
+          ? modelClass.humanAttributeName(attribute)
+          : humanize(attribute);
         const confirmation = record._attributes.get(confirmationAttr);
         if (confirmation !== undefined && confirmation !== null && pwd !== confirmation) {
-          record.errors.add(attribute, "confirmation", { attribute: "Password" });
+          record.errors.add(attribute, "confirmation", { attribute: humanAttr });
         }
       }
     });
   }
 }
 
-function simpleHash(str: string): string {
-  let hash = 0;
+/**
+ * Simple password hashing using Web Crypto-style approach.
+ * NOT cryptographically secure — uses a basic string hash for test/dev purposes.
+ * In production, replace with bcrypt/scrypt/argon2.
+ */
+function hashPassword(str: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
   for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
   }
-  return `$simple$${hash.toString(16)}`;
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `$hash$${(h2 >>> 0).toString(16).padStart(8, "0")}${(h1 >>> 0).toString(16).padStart(8, "0")}`;
 }

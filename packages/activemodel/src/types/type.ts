@@ -185,14 +185,15 @@ export class ValueType extends Type<unknown> {
   }
 }
 
+const textEncoder = new TextEncoder();
+
 export class BinaryType extends Type<Uint8Array> {
   readonly name = "binary";
 
   cast(value: unknown): Uint8Array | null {
     if (value === null || value === undefined) return null;
     if (value instanceof Uint8Array) return value;
-    const str = String(value);
-    return new TextEncoder().encode(str);
+    return textEncoder.encode(String(value));
   }
 
   serialize(value: unknown): Uint8Array | null {
