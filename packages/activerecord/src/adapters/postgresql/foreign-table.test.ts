@@ -31,15 +31,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("update record", async () => {});
     it.skip("delete record", async () => {});
   });
-  it.skip("table exists", () => {
-    /* TODO: needs imports from original file */
-  });
-
   it.skip("attribute names", () => {
-    /* TODO: needs imports from original file */
-  });
-
-  it.skip("attributes", () => {
     /* TODO: needs imports from original file */
   });
 });

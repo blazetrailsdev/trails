@@ -60,7 +60,6 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("quote date", async () => {});
     it.skip("quote time", async () => {});
     it.skip("quote timestamp", async () => {});
-    it.skip("quote duration", async () => {});
     it.skip("quote range", async () => {});
     it.skip("quote array", async () => {});
     it.skip("quote integer", async () => {});

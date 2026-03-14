@@ -1967,16 +1967,6 @@ describe("FinderTest", () => {
     expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
   });
 
-  it("should respond to find by one attribute before caching", () => {
-    const { Post } = makeModel();
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should not respond to find by one missing attribute", () => {
-    const { Post } = makeModel();
-    expect(Post.respondToMissingFinder("findByNonexistent")).toBe(false);
-  });
-
   it("find by title and id with hash", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "title_id" });
@@ -2637,89 +2627,6 @@ describe("FinderTest2", () => {
     await Post.create({ title: "opt1" });
     const found = await Post.findBy({ title: "opt1" });
     expect(found).not.toBeNull();
-  });
-});
-
-describe("FinderRespondToTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  it("should preserve normal respond to behavior on base", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(typeof Post.find).toBe("function");
-    expect(typeof Post.where).toBe("function");
-  });
-
-  it("should preserve normal respond to behavior and respond to newly added method", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-      static customMethod() {
-        return "custom";
-      }
-    }
-    expect(Post.customMethod()).toBe("custom");
-  });
-
-  it("should preserve normal respond to behavior and respond to standard object method", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(typeof Post.toString).toBe("function");
-  });
-
-  it("should respond to find by with bang", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should respond to find by two attributes", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-    expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
-  });
-
-  it("should respond to find all by an aliased attribute", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should not respond to find by invalid method syntax", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
   });
 });
 

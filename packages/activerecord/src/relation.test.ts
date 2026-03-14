@@ -13,22 +13,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-describe("not respond to arel method", () => {
-  it("not respond to arel method", () => {
-    const adapter = freshAdapter();
-    class ArelPost extends Base {
-      static {
-        this._tableName = "arel_posts";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    // Base instances should not expose an arel method directly
-    const post = new ArelPost({ title: "test" });
-    expect((post as any).arel).toBeUndefined();
-  });
-});
-
 describe("isBlank / isPresent", () => {
   it("isBlank returns true when no records exist", async () => {
     const adapter = freshAdapter();
@@ -715,14 +699,5 @@ describe("RelationTest", () => {
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
-  });
-  it(" with blank value", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
   });
 });

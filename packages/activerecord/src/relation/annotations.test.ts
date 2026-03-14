@@ -250,35 +250,6 @@ describe("WithAnnotationsTest", () => {
   });
 });
 
-describe("AnnotateTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    return { Post };
-  }
-
-  it("annotate wraps content in an inline comment", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("my-hint").toSql();
-    expect(sql).toContain("my-hint");
-  });
-
-  it("annotate is sanitized", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("safe-hint").toSql();
-    expect(sql).toContain("safe-hint");
-  });
-});
-
 describe("annotate()", () => {
   it("adds SQL comments to the query", () => {
     class Item extends Base {

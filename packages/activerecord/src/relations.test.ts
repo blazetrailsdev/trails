@@ -6689,4 +6689,13 @@ describe("Rails-guided: set operations and joins", () => {
     const p = await Post.create({ title: "txn2" });
     expect((p as any).isPersisted()).toBe(true);
   });
+  it(" with blank value", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
+  });
 });
