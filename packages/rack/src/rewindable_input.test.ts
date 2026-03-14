@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { RewindableInput, RewindableInputMiddleware } from "./rewindable-input.js";
 import { RACK_INPUT } from "./constants.js";
 
@@ -115,28 +115,26 @@ it("be possible to call #close multiple times", () => {
   expect(input.closed).toBe(true);
 });
 
-describe("Rack::RewindableInput::Middleware", () => {
-  it("wraps rack.input in RewindableInput", async () => {
-    const app = async (env: any) => {
-      expect(env[RACK_INPUT]).toBeInstanceOf(RewindableInput);
-      return [200, {}, ["OK"]] as [number, Record<string, any>, any];
-    };
-    const mw = new RewindableInputMiddleware(app);
-    await mw.call({
-      [RACK_INPUT]: {
-        read() {
-          return "test";
-        },
+it("wraps rack.input in RewindableInput", async () => {
+  const app = async (env: any) => {
+    expect(env[RACK_INPUT]).toBeInstanceOf(RewindableInput);
+    return [200, {}, ["OK"]] as [number, Record<string, any>, any];
+  };
+  const mw = new RewindableInputMiddleware(app);
+  await mw.call({
+    [RACK_INPUT]: {
+      read() {
+        return "test";
       },
-    });
+    },
   });
+});
 
-  it("preserves a nil rack.input", async () => {
-    const app = async (env: any) => {
-      expect(env[RACK_INPUT]).toBeUndefined();
-      return [200, {}, ["OK"]] as [number, Record<string, any>, any];
-    };
-    const mw = new RewindableInputMiddleware(app);
-    await mw.call({});
-  });
+it("preserves a nil rack.input", async () => {
+  const app = async (env: any) => {
+    expect(env[RACK_INPUT]).toBeUndefined();
+    return [200, {}, ["OK"]] as [number, Record<string, any>, any];
+  };
+  const mw = new RewindableInputMiddleware(app);
+  await mw.call({});
 });
