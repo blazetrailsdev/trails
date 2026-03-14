@@ -14,7 +14,6 @@ describeIfPg("PostgresAdapter", () => {
   });
 
   describe("PostgresqlReferentialIntegrityTest", () => {
-    it.skip("disable referential integrity", async () => {});
     it.skip("enable referential integrity", async () => {});
     it.skip("disable and enable referential integrity", async () => {});
     it.skip("foreign key violation without disable", async () => {});

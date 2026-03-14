@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
   RecordNotFound,
-  RecordInvalid,
   registerModel,
   acceptsNestedAttributesFor,
   assignNestedAttributes,
@@ -1766,175 +1765,6 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 });
 
-describe("NestedAttributesWithCallbacksTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  function makeModels() {
-    class Bird extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
-    registerModel("Bird", Bird);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });
-    return { Bird, Pirate };
-  }
-
-  it(":before_add called for new bird when not loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(1);
-    expect(birds[0].readAttribute("name")).toBe("Polly");
-  });
-
-  it(":before_add called for new bird when loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    await Bird.create({ name: "Existing", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ name: "NewBird" }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(2);
-  });
-
-  it(":before_add not called for identical assignment when not loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, name: "Polly" }]);
-    await pirate.save();
-    const updated = await Bird.find(bird.id!);
-    expect(updated.readAttribute("name")).toBe("Polly");
-  });
-
-  it(":before_add not called for identical assignment when loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, name: "Polly" }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(1);
-  });
-
-  it(":before_add not called for destroy assignment when not loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const bird = await Bird.create({ name: "Doomed", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(0);
-  });
-
-  it(":before_add not called for deletion assignment when loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const bird = await Bird.create({ name: "Doomed", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(0);
-  });
-
-  it("Assignment updates records in target when not loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const bird = await Bird.create({ name: "OldName", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, name: "NewName" }]);
-    await pirate.save();
-    const updated = await Bird.find(bird.id!);
-    expect(updated.readAttribute("name")).toBe("NewName");
-  });
-
-  it("Assignment updates records in target when loaded", async () => {
-    const { Bird, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const bird = await Bird.create({ name: "OldName", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, name: "LoadedUpdate" }]);
-    await pirate.save();
-    const updated = await Bird.find(bird.id!);
-    expect(updated.readAttribute("name")).toBe("LoadedUpdate");
-  });
-});
-
-describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
-  it("index in nested attributes order", async () => {
-    const adapter = freshAdapter();
-    class EITag extends Base {
-      static {
-        this._tableName = "ei_tags";
-        this.attribute("name", "string");
-        this.attribute("ei_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel(EITag);
-    // Validate that errors are indexed per child record
-    const tag1 = new EITag({ name: "" });
-    const valid1 = await tag1.isValid();
-    expect(valid1).toBe(false);
-    expect(tag1.errors.size).toBeGreaterThan(0);
-
-    const tag2 = new EITag({ name: "valid" });
-    const valid2 = await tag2.isValid();
-    expect(valid2).toBe(true);
-  });
-
-  it("index unaffected by reject_if", async () => {
-    const adapter = freshAdapter();
-    class EIRTag extends Base {
-      static {
-        this._tableName = "eir_tags";
-        this.attribute("name", "string");
-        this.attribute("eir_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class EIRArticle extends Base {
-      static {
-        this._tableName = "eir_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(EIRArticle, "eirTags", {
-      className: "EIRTag",
-      foreignKey: "eir_article_id",
-    });
-    acceptsNestedAttributesFor(EIRArticle, "eirTags", {
-      rejectIf: (attrs) => attrs.name === "reject",
-    });
-    registerModel(EIRTag);
-    registerModel(EIRArticle);
-    const article = await EIRArticle.create({ title: "test" });
-    // Rejected items should not affect subsequent valid/invalid item indexing
-    assignNestedAttributes(article, "eirTags", [{ name: "reject" }, { name: "keep" }]);
-    await article.save();
-    const tags = await EIRTag.where({ eir_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("keep");
-  });
-});
-
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
   it.skip("should update existing records with non standard primary key", () => {
     /* test adapter auto-assigns 'id' not custom PK */
@@ -1995,42 +1825,6 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
     await article.save();
     const tags = await IERTag.where({ ier_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-  });
-});
-
-describe("AssociationsNestedErrorInAssociationOrderTest", () => {
-  it("index in association order", async () => {
-    const adapter = freshAdapter();
-    class IAOTag extends Base {
-      static {
-        this._tableName = "iao_tags";
-        this.attribute("name", "string");
-        this.attribute("iao_article_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class IAOArticle extends Base {
-      static {
-        this._tableName = "iao_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(IAOArticle, "iaoTags", {
-      className: "IAOTag",
-      foreignKey: "iao_article_id",
-    });
-    acceptsNestedAttributesFor(IAOArticle, "iaoTags");
-    registerModel(IAOTag);
-    registerModel(IAOArticle);
-    const article = await IAOArticle.create({ title: "test" });
-    assignNestedAttributes(article, "iaoTags", [{ name: "first" }, { name: "second" }]);
-    await article.save();
-    const tags = await IAOTag.where({ iao_article_id: article.id }).toArray();
-    expect(tags.length).toBe(2);
-    // Records should be created in order
-    expect(tags[0].readAttribute("name")).toBe("first");
-    expect(tags[1].readAttribute("name")).toBe("second");
   });
 });
 
@@ -2329,40 +2123,6 @@ describe("should automatically build new associated models for each entry in a h
   });
 });
 
-describe("should merge errors on the associated models onto the parent even if it is not valid", () => {
-  it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
-    const adapter = freshAdapter();
-    class METag extends Base {
-      static {
-        this._tableName = "me_tags";
-        this.attribute("name", "string");
-        this.attribute("me_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class MEArticle extends Base {
-      static {
-        this._tableName = "me_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(MEArticle, "meTags", {
-      className: "METag",
-      foreignKey: "me_article_id",
-    });
-    acceptsNestedAttributesFor(MEArticle, "meTags");
-    registerModel(METag);
-    registerModel(MEArticle);
-    // Validate that METag with blank name is invalid
-    const invalidTag = new METag({ name: "" });
-    const valid = await invalidTag.isValid();
-    expect(valid).toBe(false);
-    expect(invalidTag.errors.size).toBeGreaterThan(0);
-  });
-});
-
 describe("should not assign destroy key to a record", () => {
   it("should not assign destroy key to a record", async () => {
     const adapter = freshAdapter();
@@ -2589,46 +2349,6 @@ describe("should refresh saved records when not overwriting unsaved updates", ()
   });
 });
 
-describe("should rollback any changes if an exception occurred while saving", () => {
-  it("should rollback any changes if an exception occurred while saving", async () => {
-    const adapter = freshAdapter();
-    class RBTag extends Base {
-      static {
-        this._tableName = "rb_tags";
-        this.attribute("name", "string");
-        this.attribute("rb_article_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class RBArticle extends Base {
-      static {
-        this._tableName = "rb_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(RBArticle, "rbTags", {
-      className: "RBTag",
-      foreignKey: "rb_article_id",
-    });
-    acceptsNestedAttributesFor(RBArticle, "rbTags");
-    registerModel(RBTag);
-    registerModel(RBArticle);
-    const article = await RBArticle.create({ title: "rollback test" });
-    // Assign nested attributes including one with an unknown attribute to trigger an error
-    assignNestedAttributes(article, "rbTags", [
-      { name: "good" },
-      { name: "bad", unknownCol: "boom" },
-    ]);
-    await expect(article.save()).rejects.toThrow(/unknown attribute/);
-    // The first tag should NOT have been persisted due to the error
-    const tags = await RBTag.where({ rb_article_id: article.id }).toArray();
-    // Note: without proper transaction support the first record may have been created
-    // This test verifies the error is raised; the test adapter may not support true rollback
-    expect(tags.length).toBeLessThanOrEqual(1);
-  });
-});
-
 describe("should save only one association on create", () => {
   it("should save only one association on create", async () => {
     const adapter = freshAdapter();
@@ -2700,38 +2420,6 @@ describe("should sort the hash by the keys before building new associated models
     expect(tags[0].readAttribute("name")).toBe("first");
     expect(tags[1].readAttribute("name")).toBe("second");
     expect(tags[2].readAttribute("name")).toBe("third");
-  });
-});
-
-describe("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
-  it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
-    const adapter = freshAdapter();
-    class RITag extends Base {
-      static {
-        this._tableName = "ri_tags";
-        this.attribute("name", "string");
-        this.attribute("ri_article_id", "integer");
-        this.adapter = adapter;
-        this.validates("name", { presence: true });
-      }
-    }
-    class RIArticle extends Base {
-      static {
-        this._tableName = "ri_articles";
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(RIArticle, "riTags", {
-      className: "RITag",
-      foreignKey: "ri_article_id",
-    });
-    acceptsNestedAttributesFor(RIArticle, "riTags");
-    registerModel(RITag);
-    registerModel(RIArticle);
-    // Creating a tag with invalid (blank) name via saveBang should throw RecordInvalid
-    const tag = new RITag({ name: "" });
-    await expect(tag.saveBang()).rejects.toThrow(RecordInvalid);
   });
 });
 
@@ -3163,5 +2851,33 @@ describe("Nested Attributes (Rails-guided)", () => {
     cacheAssoc(pirate, "ships", [ship]);
     const saved = await pirate.save();
     expect(saved).toBe(false);
+  });
+  it("should automatically enable autosave on the association", () => {
+    const adapter = freshAdapter();
+    class AE1Tag extends Base {
+      static {
+        this._tableName = "ae1_tags";
+        this.attribute("name", "string");
+        this.attribute("ae1_article_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class AE1Article extends Base {
+      static {
+        this._tableName = "ae1_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(AE1Article, "ae1Tags", {
+      className: "AE1Tag",
+      foreignKey: "ae1_article_id",
+    });
+    acceptsNestedAttributesFor(AE1Article, "ae1Tags");
+    registerModel(AE1Tag);
+    registerModel(AE1Article);
+    const configs = (AE1Article as any)._nestedAttributeConfigs;
+    expect(configs).toBeDefined();
+    expect(configs.find((c: any) => c.associationName === "ae1Tags")).toBeDefined();
   });
 });

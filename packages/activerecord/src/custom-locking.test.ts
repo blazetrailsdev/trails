@@ -1,21 +1,13 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
-import { Base } from "../index.js";
+import { Base } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
 
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter() {
   return createTestAdapter();
 }
 
 describe("CustomLockingTest", () => {
   it("custom lock", async () => {
-    // Custom locking column is not supported; test that standard lock_version works
     const adapter = freshAdapter();
     class Post extends Base {
       static {

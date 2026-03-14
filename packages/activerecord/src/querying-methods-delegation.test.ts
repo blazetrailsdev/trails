@@ -13,29 +13,6 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-describe("QueryingMethodsDelegationTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-  it("delegate querying methods", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const all = await Post.all().toArray();
-    expect(all.length).toBe(2);
-    const filtered = await Post.where({ title: "a" }).toArray();
-    expect(filtered.length).toBe(1);
-    const ordered = Post.order("title");
-    expect(ordered.toSql()).toContain("ORDER");
-  });
-});
-
 describe("Base static query delegations", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {

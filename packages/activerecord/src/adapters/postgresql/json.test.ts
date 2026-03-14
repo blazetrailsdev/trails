@@ -20,4 +20,5 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("deserialize with array", async () => {});
     it.skip("noname columns of different types", async () => {});
   });
+  it.skip("default", async () => {});
 });

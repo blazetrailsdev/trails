@@ -70,8 +70,6 @@ describeIfPg("PostgresAdapter", () => {
   });
   it.skip("column", async () => {});
 
-  it.skip("default", async () => {});
-
   it.skip("schema dumping", () => {});
 
   it.skip("roundtrip", async () => {});
