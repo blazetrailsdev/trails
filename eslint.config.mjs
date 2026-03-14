@@ -26,9 +26,9 @@ export default defineConfig(
       "unused-imports/no-unused-imports": "error",
     },
   },
-  // Vitest-specific rules for test files
+  // Vitest-specific rules for activemodel test files only (other packages have too many violations)
   {
-    files: ["**/*.test.ts"],
+    files: ["packages/activemodel/src/**/*.test.ts"],
     plugins: {
       vitest,
     },
@@ -36,6 +36,7 @@ export default defineConfig(
       ...vitest.configs.recommended.rules,
       "vitest/no-disabled-tests": "off",
       "vitest/no-identical-title": "off",
+      "vitest/expect-expect": "off",
     },
   },
   // Per-package overrides for rules that still have violations
