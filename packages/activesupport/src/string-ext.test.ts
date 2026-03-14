@@ -32,9 +32,7 @@ describe("StringInflectionsTest", () => {
     expect(stripHeredoc("")).toBe("");
   });
 
-  it.skip("strip heredoc on a frozen string", () => {
-    // Not applicable to TypeScript (no frozen strings)
-  });
+  it.skip("strip heredoc on a frozen string", () => {});
 
   it("strip heredoc on a string with no lines", () => {
     expect(stripHeredoc("x")).toBe("x");
@@ -64,9 +62,7 @@ describe("StringInflectionsTest", () => {
     expect(pluralize("plurals")).toBe("plurals");
   });
 
-  it.skip("pluralize with count = 1 still returns new string", () => {
-    // Requires pluralize(word, count) API
-  });
+  it.skip("pluralize with count = 1 still returns new string", () => {});
 
   it("singularize", () => {
     expect(singularize("searches")).toBe("search");
@@ -81,9 +77,7 @@ describe("StringInflectionsTest", () => {
     expect(titleize("action web service")).toBe("Action Web Service");
   });
 
-  it.skip("titleize with keep id suffix", () => {
-    // Requires keep_id_suffix option
-  });
+  it.skip("titleize with keep id suffix", () => {});
 
   it("downcase first", () => {
     expect(downcaseFirst("Try again")).toBe("try again");
@@ -120,13 +114,9 @@ describe("StringInflectionsTest", () => {
     expect(camelize("Capital", false)).toBe("capital");
   });
 
-  it.skip("camelize upper", () => {
-    // Requires :upper symbol support
-  });
+  it.skip("camelize upper", () => {});
 
-  it.skip("camelize invalid option", () => {
-    // Requires ArgumentError for invalid camelize option
-  });
+  it.skip("camelize invalid option", () => {});
 
   it("dasherize", () => {
     expect(dasherize("street")).toBe("street");
@@ -186,13 +176,9 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("Donald E. Knuth", { preserveCase: true })).toBe("Donald-E-Knuth");
   });
 
-  it.skip("string parameterized no separator", () => {
-    // Requires separator: "" support
-  });
+  it.skip("string parameterized no separator", () => {});
 
-  it.skip("string parameterized no separator preserve case", () => {
-    // Requires separator: "" + preserveCase support
-  });
+  it.skip("string parameterized no separator preserve case", () => {});
 
   it("string parameterized underscore", () => {
     expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
@@ -205,13 +191,9 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
   });
 
-  it.skip("string parameterized underscore preserve case", () => {
-    // Requires separator: "_" + preserveCase support
-  });
+  it.skip("string parameterized underscore preserve case", () => {});
 
-  it.skip("parameterize with locale", () => {
-    // Requires I18n transliteration
-  });
+  it.skip("parameterize with locale", () => {});
 
   it("humanize", () => {
     expect(humanize("employee_salary")).toBe("Employee salary");
@@ -226,62 +208,38 @@ describe("StringInflectionsTest", () => {
     expect(humanize("underground", { capitalize: false })).toBe("underground");
   });
 
-  it.skip("humanize with keep id suffix", () => {
-    // Requires keep_id_suffix option
-  });
+  it.skip("humanize with keep id suffix", () => {});
 
-  it.skip("humanize with html escape", () => {
-    // Requires html_safe/ERB integration
-  });
+  it.skip("humanize with html escape", () => {});
 
-  it.skip("ord", () => {
-    // Not implemented — Ruby-specific string method
-  });
+  it.skip("ord", () => {});
 
-  it.skip("starts ends with alias", () => {
-    // Not applicable — JS has startsWith/endsWith natively
-  });
+  it.skip("starts ends with alias", () => {});
 
   it("string squish", () => {
     expect(squish("  foo   bar  \n  baz  ")).toBe("foo bar baz");
   });
 
-  it.skip("string inquiry", () => {
-    // Requires StringInquirer
-  });
+  it.skip("string inquiry", () => {});
 
   it("truncate", () => {
     expect(truncate("Hello World!", 12)).toBe("Hello World!");
     expect(truncate("Hello World!!", 12)).toBe("Hello Wor...");
   });
 
-  it.skip("truncate with omission and separator", () => {
-    // Requires separator option for truncate
-  });
+  it.skip("truncate with omission and separator", () => {});
 
-  it.skip("truncate with omission and regexp separator", () => {
-    // Requires regexp separator support
-  });
+  it.skip("truncate with omission and regexp separator", () => {});
 
-  it.skip("truncate returns frozen string", () => {
-    // Not applicable to TypeScript
-  });
+  it.skip("truncate returns frozen string", () => {});
 
-  it.skip("truncate bytes", () => {
-    // Requires truncate_bytes implementation
-  });
+  it.skip("truncate bytes", () => {});
 
-  it.skip("truncate bytes preserves codepoints", () => {
-    // Requires truncate_bytes implementation
-  });
+  it.skip("truncate bytes preserves codepoints", () => {});
 
-  it.skip("truncates bytes preserves grapheme clusters", () => {
-    // Requires truncate_bytes implementation
-  });
+  it.skip("truncates bytes preserves grapheme clusters", () => {});
 
-  it.skip("truncates bytes preserves encoding", () => {
-    // Requires truncate_bytes implementation
-  });
+  it.skip("truncates bytes preserves encoding", () => {});
 
   it("truncate words", () => {
     expect(truncateWords("Hello Big World!", 3)).toBe("Hello Big World!");
@@ -293,45 +251,25 @@ describe("StringInflectionsTest", () => {
     expect(truncateWords("Hello Big World!", 2, { omission: "[...]" })).toBe("Hello Big[...]");
   });
 
-  it.skip("truncate words with separator", () => {
-    // Requires separator option for truncateWords
-  });
+  it.skip("truncate words with separator", () => {});
 
-  it.skip("truncate words with separator and omission", () => {
-    // Requires separator option for truncateWords
-  });
+  it.skip("truncate words with separator and omission", () => {});
 
-  it.skip("truncate words with complex string", () => {
-    // Requires handling of complex whitespace patterns
-  });
+  it.skip("truncate words with complex string", () => {});
 
-  it.skip("truncate multibyte", () => {
-    // Requires multibyte-aware truncation
-  });
+  it.skip("truncate multibyte", () => {});
 
-  it.skip("truncate should not be html safe", () => {
-    // Requires html_safe integration
-  });
+  it.skip("truncate should not be html safe", () => {});
 
-  it.skip("remove", () => {
-    // Requires remove() function
-  });
+  it.skip("remove", () => {});
 
-  it.skip("remove for multiple occurrences", () => {
-    // Requires remove() function
-  });
+  it.skip("remove for multiple occurrences", () => {});
 
-  it.skip("remove!", () => {
-    // Requires remove!() function
-  });
+  it.skip("remove!", () => {});
 
-  it.skip("constantize", () => {
-    // Requires runtime constant resolution
-  });
+  it.skip("constantize", () => {});
 
-  it.skip("safe constantize", () => {
-    // Requires runtime constant resolution
-  });
+  it.skip("safe constantize", () => {});
 });
 
 describe("StringAccessTest", () => {
@@ -340,13 +278,9 @@ describe("StringAccessTest", () => {
     expect(at("hello", 4)).toBe("o");
   });
 
-  it.skip("#at with Range, returns a substring containing characters at offsets", () => {
-    // Requires Range support for at()
-  });
+  it.skip("#at with Range, returns a substring containing characters at offsets", () => {});
 
-  it.skip("#at with Regex, returns the matching portion of the string", () => {
-    // Requires Regex support for at()
-  });
+  it.skip("#at with Regex, returns the matching portion of the string", () => {});
 
   it("#from with positive Integer, returns substring from the given position to the end", () => {
     expect(from("hello", 2)).toBe("llo");
@@ -383,13 +317,9 @@ describe("StringAccessTest", () => {
     expect(first("x", 4)).toBe("x");
   });
 
-  it.skip("#first with Integer >= string length still returns a new string", () => {
-    // Not applicable to TypeScript (no object identity)
-  });
+  it.skip("#first with Integer >= string length still returns a new string", () => {});
 
-  it.skip("#first with Integer returns a non-frozen string", () => {
-    // Not applicable to TypeScript (no frozen strings)
-  });
+  it.skip("#first with Integer returns a non-frozen string", () => {});
 
   it("#first with negative Integer raises ArgumentError", () => {
     expect(() => first("hello", -1)).toThrow();
@@ -407,27 +337,19 @@ describe("StringAccessTest", () => {
     expect(last("x", 4)).toBe("x");
   });
 
-  it.skip("#last with Integer >= string length still returns a new string", () => {
-    // Not applicable to TypeScript (no object identity)
-  });
+  it.skip("#last with Integer >= string length still returns a new string", () => {});
 
-  it.skip("#last with Integer returns a non-frozen string", () => {
-    // Not applicable to TypeScript (no frozen strings)
-  });
+  it.skip("#last with Integer returns a non-frozen string", () => {});
 
   it("#last with negative Integer raises ArgumentError", () => {
     expect(() => last("hello", -1)).toThrow();
   });
 
-  it.skip("access returns a real string", () => {
-    // Not applicable to TypeScript (no object identity concerns)
-  });
+  it.skip("access returns a real string", () => {});
 });
 
 describe("StringExcludeTest", () => {
-  it.skip("inverse of #include", () => {
-    // Requires exclude() function — JS has !str.includes() natively
-  });
+  it.skip("inverse of #include", () => {});
 });
 
 describe("StringIndentTest", () => {
@@ -440,9 +362,7 @@ describe("StringIndentTest", () => {
     expect(indent("foo\n  bar", 4)).toBe("    foo\n      bar");
   });
 
-  it.skip("by default, indents with tabs if the existing indentation uses them", () => {
-    // Requires auto-detect tab indentation
-  });
+  it.skip("by default, indents with tabs if the existing indentation uses them", () => {});
 
   it("by default, indents with spaces as a fallback if there is no indentation", () => {
     expect(indent("foo\nbar\nbaz", 3)).toBe("   foo\n   bar\n   baz");

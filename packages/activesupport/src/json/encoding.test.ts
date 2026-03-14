@@ -3,9 +3,7 @@ import { describe, it, expect } from "vitest";
 import { slice, except } from "../hash-utils.js";
 
 describe("TestJSONEncoding", () => {
-  it.skip("process status", () => {
-    /* Ruby process status object */
-  });
+  it.skip("process status", () => {});
 
   it("hash encoding", () => {
     const h = { a: 1, b: "hello" };
@@ -19,9 +17,7 @@ describe("TestJSONEncoding", () => {
     expect(parsed.key_one).toBe(1);
   });
 
-  it.skip("hash keys encoding option", () => {
-    /* Ruby-specific encoding options */
-  });
+  it.skip("hash keys encoding option", () => {});
 
   it("utf8 string encoded properly", () => {
     const s = "こんにちは";
@@ -30,9 +26,7 @@ describe("TestJSONEncoding", () => {
     expect(parsed).toBe(s);
   });
 
-  it.skip("non utf8 string transcodes", () => {
-    /* Ruby encoding transcoding */
-  });
+  it.skip("non utf8 string transcodes", () => {});
 
   it("wide utf8 chars", () => {
     const s = "🎉🚀";
@@ -82,18 +76,10 @@ describe("TestJSONEncoding", () => {
     expect(parsed.nested.y).toBeCloseTo(2.75);
   });
 
-  it.skip("hash like with options", () => {
-    /* Ruby-specific hash-like objects */
-  });
-  it.skip("object to json with options", () => {
-    /* Ruby-specific */
-  });
-  it.skip("struct to json with options", () => {
-    /* Ruby Struct */
-  });
-  it.skip("struct to json with options nested", () => {
-    /* Ruby Struct */
-  });
+  it.skip("hash like with options", () => {});
+  it.skip("object to json with options", () => {});
+  it.skip("struct to json with options", () => {});
+  it.skip("struct to json with options nested", () => {});
 
   it("hash should pass encoding options to children in as json", () => {
     const h = { nested: { a: 1 } };
@@ -157,12 +143,8 @@ describe("TestJSONEncoding", () => {
     expect(JSON.parse(JSON.stringify(arr))).toEqual(arr);
   });
 
-  it.skip("struct encoding", () => {
-    /* Ruby Struct */
-  });
-  it.skip("data encoding", () => {
-    /* Ruby Data class */
-  });
+  it.skip("struct encoding", () => {});
+  it.skip("data encoding", () => {});
 
   it("nil true and false represented as themselves", () => {
     expect(JSON.stringify(null)).toBe("null");
@@ -170,24 +152,12 @@ describe("TestJSONEncoding", () => {
     expect(JSON.stringify(false)).toBe("false");
   });
 
-  it.skip("json gem dump by passing active support encoder", () => {
-    /* Ruby json gem */
-  });
-  it.skip("json gem generate by passing active support encoder", () => {
-    /* Ruby json gem */
-  });
-  it.skip("json gem pretty generate by passing active support encoder", () => {
-    /* Ruby json gem */
-  });
-  it.skip("twz to json with use standard json time format config set to false", () => {
-    /* TimeWithZone */
-  });
-  it.skip("twz to json with use standard json time format config set to true", () => {
-    /* TimeWithZone */
-  });
-  it.skip("twz to json with custom time precision", () => {
-    /* TimeWithZone */
-  });
+  it.skip("json gem dump by passing active support encoder", () => {});
+  it.skip("json gem generate by passing active support encoder", () => {});
+  it.skip("json gem pretty generate by passing active support encoder", () => {});
+  it.skip("twz to json with use standard json time format config set to false", () => {});
+  it.skip("twz to json with use standard json time format config set to true", () => {});
+  it.skip("twz to json with custom time precision", () => {});
   it("time to json with custom time precision", () => {
     // toISOString always includes milliseconds; verify standard format
     const d = new Date("2023-01-15T10:30:00.123Z");
@@ -202,9 +172,7 @@ describe("TestJSONEncoding", () => {
     const noMs = isoStr.replace(/\.\d{3}Z$/, "Z");
     expect(noMs).toBe("2023-06-01T12:00:00Z");
   });
-  it.skip("twz to json when wrapping a date time", () => {
-    /* TimeWithZone */
-  });
+  it.skip("twz to json when wrapping a date time", () => {});
 
   it("exception to json", () => {
     const err = new Error("boom");
@@ -221,22 +189,12 @@ describe("TestJSONEncoding", () => {
     expect(JSON.stringify(NaN)).toBe("null");
   });
 
-  it.skip("to json works on io objects", () => {
-    /* Ruby IO */
-  });
+  it.skip("to json works on io objects", () => {});
 });
 
 describe("TestJSONDecoding", () => {
-  it.skip("JSON decodes ", () => {
-    /* fixture-dependent */
-  });
-  it.skip("JSON decodes time JSON with time parsing disabled", () => {
-    /* fixture-dependent */
-  });
-  it.skip("failed json decoding", () => {
-    /* fixture-dependent */
-  });
-  it.skip("cannot pass unsupported options", () => {
-    /* fixture-dependent */
-  });
+  it.skip("JSON decodes ", () => {});
+  it.skip("JSON decodes time JSON with time parsing disabled", () => {});
+  it.skip("failed json decoding", () => {});
+  it.skip("cannot pass unsupported options", () => {});
 });

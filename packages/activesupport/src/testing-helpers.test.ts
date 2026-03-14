@@ -105,51 +105,21 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCFullYear()).toBe(2036);
   });
 
-  it.skip("time helper travel to with time zone", () => {
-    /* TimeZone not implemented */
-  });
-  it.skip("time helper travel to with different system and application time zones", () => {
-    /* TimeZone */
-  });
-  it.skip("time helper travel to with string for time zone", () => {
-    /* TimeZone */
-  });
-  it.skip("time helper travel to with string and milliseconds", () => {
-    /* string parsing */
-  });
-  it.skip("time helper travel to with separate class", () => {
-    /* Ruby-specific */
-  });
-  it.skip("time helper travel to with usec", () => {
-    /* microseconds */
-  });
-  it.skip("time helper with usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with datetime and usec", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with datetime and usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with string and usec", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with string and usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper freeze time with usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel with subsequent block", () => {
-    /* complex nesting */
-  });
-  it.skip("travel to will reset the usec to avoid mysql rounding", () => {
-    /* DB-specific */
-  });
-  it.skip("time helper travel with time subclass", () => {
-    /* Ruby Time subclass */
-  });
+  it.skip("time helper travel to with time zone", () => {});
+  it.skip("time helper travel to with different system and application time zones", () => {});
+  it.skip("time helper travel to with string for time zone", () => {});
+  it.skip("time helper travel to with string and milliseconds", () => {});
+  it.skip("time helper travel to with separate class", () => {});
+  it.skip("time helper travel to with usec", () => {});
+  it.skip("time helper with usec true", () => {});
+  it.skip("time helper travel to with datetime and usec", () => {});
+  it.skip("time helper travel to with datetime and usec true", () => {});
+  it.skip("time helper travel to with string and usec", () => {});
+  it.skip("time helper travel to with string and usec true", () => {});
+  it.skip("time helper freeze time with usec true", () => {});
+  it.skip("time helper travel with subsequent block", () => {});
+  it.skip("travel to will reset the usec to avoid mysql rounding", () => {});
+  it.skip("time helper travel with time subclass", () => {});
 });
 
 describe("MethodCallAssertionsTest", () => {
@@ -345,19 +315,9 @@ describe("MethodCallAssertionsTest", () => {
     }).toThrow();
   });
 
-  it.skip("assert called on instance of nesting", () => {
-    /* complex nesting */
-  });
-  it.skip("assert not called on instance of nesting", () => {
-    /* complex nesting */
-  });
-  it.skip("stub any instance", () => {
-    /* Ruby-specific stub_any_instance */
-  });
-  it.skip("stub any instance with instance", () => {
-    /* Ruby-specific */
-  });
-  it.skip("assert changes when assertions are included", () => {
-    /* assert_changes */
-  });
+  it.skip("assert called on instance of nesting", () => {});
+  it.skip("assert not called on instance of nesting", () => {});
+  it.skip("stub any instance", () => {});
+  it.skip("stub any instance with instance", () => {});
+  it.skip("assert changes when assertions are included", () => {});
 });

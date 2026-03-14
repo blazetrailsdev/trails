@@ -201,18 +201,10 @@ describe("RangeTest", () => {
     expect(overlap(makeRange(t1, t2), makeRange(t3, t4))).toBe(false);
   });
 
-  it.skip("each on time with zone", () => {
-    /* TimeWithZone not implemented */
-  });
-  it.skip("step on time with zone", () => {
-    /* TimeWithZone not implemented */
-  });
-  it.skip("cover on time with zone", () => {
-    /* TimeWithZone not implemented */
-  });
-  it.skip("case equals on time with zone", () => {
-    /* TimeWithZone not implemented */
-  });
+  it.skip("each on time with zone", () => {});
+  it.skip("step on time with zone", () => {});
+  it.skip("cover on time with zone", () => {});
+  it.skip("case equals on time with zone", () => {});
 
   it("date time with each", () => {
     const r = makeRange(0, 4);

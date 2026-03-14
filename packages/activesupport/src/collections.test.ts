@@ -985,12 +985,8 @@ describe("InTest", () => {
     expect(outside >= start && outside <= end).toBe(false);
   });
 
-  it.skip("in module", () => {
-    /* Ruby-specific Module#=== */
-  });
-  it.skip("no method catching", () => {
-    /* Ruby-specific method_missing */
-  });
+  it.skip("in module", () => {});
+  it.skip("no method catching", () => {});
 
   it("presence in", () => {
     expect(presenceIn(2, [1, 2, 3])).toBe(2);
@@ -1096,9 +1092,7 @@ describe("DeepMergeableTest", () => {
     expect(result.x).toBe(2);
   });
 
-  it.skip("deep_merge? can be overridden to allow deep merging of non-subclass values", () => {
-    /* custom override not supported */
-  });
+  it.skip("deep_merge? can be overridden to allow deep merging of non-subclass values", () => {});
 });
 
 describe("ToQueryTest", () => {

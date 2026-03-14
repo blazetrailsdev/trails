@@ -132,72 +132,28 @@ describe("SafeBufferTest", () => {
     expect(result.htmlSafe).toBe(true);
   });
 
-  it.skip("titleize", () => {
-    /* string method, not directly SafeBuffer */
-  });
-  it.skip("Should be converted to_yaml", () => {
-    /* YAML, not applicable in JS */
-  });
-  it.skip("Should work in nested to_yaml conversion", () => {
-    /* YAML */
-  });
-  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => {
-    /* YAML */
-  });
-  it.skip("Should work with underscore", () => {
-    /* Ruby string method */
-  });
-  it.skip("Should not return safe buffer from ", () => {
-    /* Ruby gsub */
-  });
-  it.skip("Should not return safe buffer from !", () => {
-    /* Ruby gsub! */
-  });
-  it.skip("can assign value into zero-index", () => {
-    /* Ruby index assignment */
-  });
-  it.skip("can assign value into non zero-index", () => {
-    /* Ruby index assignment */
-  });
-  it.skip("can assign value into slice", () => {
-    /* Ruby slice assignment */
-  });
-  it.skip("can assign value into offset slice", () => {
-    /* Ruby slice assignment */
-  });
-  it.skip("Should preserve html_safe? status on multiplication", () => {
-    /* Ruby string * */
-  });
-  it.skip("Should not fail if the returned object is not a string", () => {
-    /* Ruby-specific */
-  });
-  it.skip("Should continue safe on chr", () => {
-    /* Ruby chr */
-  });
-  it.skip("Should continue unsafe on chr", () => {
-    /* Ruby chr */
-  });
-  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => {
-    /* Ruby slice! */
-  });
-  it.skip("Should return a String on slice! if original value was not safe", () => {
-    /* Ruby slice! */
-  });
-  it.skip("Should work with interpolation (array argument)", () => {
-    /* Ruby % operator */
-  });
-  it.skip("Should work with interpolation (hash argument)", () => {
-    /* Ruby % operator */
-  });
-  it.skip("Should not affect frozen objects when accessing characters", () => {
-    /* Ruby frozen */
-  });
-  it.skip("Should set back references", () => {
-    /* Ruby regex back refs */
-  });
-  it.skip("Should support Enumerator", () => {
-    /* Ruby enumerator */
-  });
+  it.skip("titleize", () => {});
+  it.skip("Should be converted to_yaml", () => {});
+  it.skip("Should work in nested to_yaml conversion", () => {});
+  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => {});
+  it.skip("Should work with underscore", () => {});
+  it.skip("Should not return safe buffer from ", () => {});
+  it.skip("Should not return safe buffer from !", () => {});
+  it.skip("can assign value into zero-index", () => {});
+  it.skip("can assign value into non zero-index", () => {});
+  it.skip("can assign value into slice", () => {});
+  it.skip("can assign value into offset slice", () => {});
+  it.skip("Should preserve html_safe? status on multiplication", () => {});
+  it.skip("Should not fail if the returned object is not a string", () => {});
+  it.skip("Should continue safe on chr", () => {});
+  it.skip("Should continue unsafe on chr", () => {});
+  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => {});
+  it.skip("Should return a String on slice! if original value was not safe", () => {});
+  it.skip("Should work with interpolation (array argument)", () => {});
+  it.skip("Should work with interpolation (hash argument)", () => {});
+  it.skip("Should not affect frozen objects when accessing characters", () => {});
+  it.skip("Should set back references", () => {});
+  it.skip("Should support Enumerator", () => {});
 });
 
 describe("OutputSafetyTest", () => {
@@ -435,24 +391,12 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toContain("&lt;b&gt;");
   });
 
-  it.skip("Bytesplicing safe into safe yields safe", () => {
-    /* Ruby bytesplice */
-  });
-  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => {
-    /* Ruby bytesplice */
-  });
-  it.skip("emits normal string YAML", () => {
-    /* YAML */
-  });
-  it.skip("call to_param returns a normal string", () => {
-    /* Ruby to_param */
-  });
-  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
-    /* Ruby encoding */
-  });
-  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
-    /* Ruby encoding */
-  });
+  it.skip("Bytesplicing safe into safe yields safe", () => {});
+  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => {});
+  it.skip("emits normal string YAML", () => {});
+  it.skip("call to_param returns a normal string", () => {});
+  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {});
+  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {});
 });
 
 describe("SafeBufferTest", () => {
@@ -501,36 +445,16 @@ describe("SafeBufferTest", () => {
     expect(isHtmlSafe(buf)).toBe(true);
   });
 
-  it.skip("Should be converted to_yaml", () => {
-    /* YAML not applicable */
-  });
-  it.skip("Should work in nested to_yaml conversion", () => {
-    /* YAML */
-  });
-  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => {
-    /* YAML */
-  });
-  it.skip("Should work with underscore", () => {
-    /* Ruby underscore method */
-  });
-  it.skip("Should not return safe buffer from ", () => {
-    /* Ruby gsub */
-  });
-  it.skip("Should not return safe buffer from !", () => {
-    /* Ruby gsub! */
-  });
-  it.skip("can assign value into zero-index", () => {
-    /* Ruby index assignment */
-  });
-  it.skip("can assign value into non zero-index", () => {
-    /* Ruby index assignment */
-  });
-  it.skip("can assign value into slice", () => {
-    /* Ruby slice assignment */
-  });
-  it.skip("can assign value into offset slice", () => {
-    /* Ruby slice assignment */
-  });
+  it.skip("Should be converted to_yaml", () => {});
+  it.skip("Should work in nested to_yaml conversion", () => {});
+  it.skip("Should work with primitive-like-strings in to_yaml conversion", () => {});
+  it.skip("Should work with underscore", () => {});
+  it.skip("Should not return safe buffer from ", () => {});
+  it.skip("Should not return safe buffer from !", () => {});
+  it.skip("can assign value into zero-index", () => {});
+  it.skip("can assign value into non zero-index", () => {});
+  it.skip("can assign value into slice", () => {});
+  it.skip("can assign value into offset slice", () => {});
 
   it("Should escape dirty buffers on add", () => {
     const safe = htmlSafe("safe part ");
@@ -538,9 +462,7 @@ describe("SafeBufferTest", () => {
     expect(result.toString()).toContain("&lt;unsafe&gt;");
   });
 
-  it.skip("Should preserve html_safe? status on multiplication", () => {
-    /* Ruby string * */
-  });
+  it.skip("Should preserve html_safe? status on multiplication", () => {});
 
   it("Should concat as a normal string when safe", () => {
     const buf = htmlSafe("hello ");
@@ -572,9 +494,7 @@ describe("SafeBufferTest", () => {
     expect(() => buf.safeConcat("<unsafe>")).toThrow();
   });
 
-  it.skip("Should not fail if the returned object is not a string", () => {
-    /* Ruby-specific */
-  });
+  it.skip("Should not fail if the returned object is not a string", () => {});
 
   it("Should be safe when sliced if original value was safe", () => {
     const buf = htmlSafe("hello world");
@@ -595,24 +515,12 @@ describe("SafeBufferTest", () => {
     expect(isHtmlSafe(sliced)).toBe(true);
   });
 
-  it.skip("Should continue safe on chr", () => {
-    /* Ruby chr */
-  });
-  it.skip("Should continue unsafe on chr", () => {
-    /* Ruby chr */
-  });
-  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => {
-    /* Ruby slice! */
-  });
-  it.skip("Should return a String on slice! if original value was not safe", () => {
-    /* Ruby slice! */
-  });
-  it.skip("Should work with interpolation (array argument)", () => {
-    /* Ruby % operator */
-  });
-  it.skip("Should work with interpolation (hash argument)", () => {
-    /* Ruby % operator */
-  });
+  it.skip("Should continue safe on chr", () => {});
+  it.skip("Should continue unsafe on chr", () => {});
+  it.skip("Should return a SafeBuffer on slice! if original value was safe", () => {});
+  it.skip("Should return a String on slice! if original value was not safe", () => {});
+  it.skip("Should work with interpolation (array argument)", () => {});
+  it.skip("Should work with interpolation (hash argument)", () => {});
 
   it("Should escape unsafe interpolated args", () => {
     const unsafe = "<script>alert(1)</script>";
@@ -630,15 +538,9 @@ describe("SafeBufferTest", () => {
     expect(isHtmlSafe(result)).toBe(true);
   });
 
-  it.skip("Should not affect frozen objects when accessing characters", () => {
-    /* Ruby frozen */
-  });
-  it.skip("Should set back references", () => {
-    /* Ruby regex back refs */
-  });
-  it.skip("Should support Enumerator", () => {
-    /* Ruby enumerator */
-  });
+  it.skip("Should not affect frozen objects when accessing characters", () => {});
+  it.skip("Should set back references", () => {});
+  it.skip("Should support Enumerator", () => {});
 });
 
 describe("OutputSafetyTest", () => {
@@ -669,9 +571,7 @@ describe("OutputSafetyTest", () => {
     expect(isHtmlSafe({})).toBe(false);
   });
 
-  it.skip("Adding an object not responding to `#to_str` to a safe string is deprecated", () => {
-    /* Ruby-specific */
-  });
+  it.skip("Adding an object not responding to `#to_str` to a safe string is deprecated", () => {});
 
   it("Adding an object to a safe string returns a safe string", () => {
     const safe = htmlSafe("hello ");
@@ -695,12 +595,8 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toContain("&lt;script&gt;");
   });
 
-  it.skip("Prepending safe onto unsafe yields unsafe", () => {
-    /* Ruby prepend method */
-  });
-  it.skip("Prepending unsafe onto safe yields escaped safe", () => {
-    /* Ruby prepend method */
-  });
+  it.skip("Prepending safe onto unsafe yields unsafe", () => {});
+  it.skip("Prepending unsafe onto safe yields escaped safe", () => {});
 
   it("Concatting safe onto unsafe yields unsafe", () => {
     // A plain string concat'd with safe is still plain
@@ -725,30 +621,14 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toBe("ab");
   });
 
-  it.skip("Concatting safe onto unsafe with << yields unsafe", () => {
-    /* Ruby << operator */
-  });
-  it.skip("Concatting unsafe onto safe with << yields escaped safe", () => {
-    /* Ruby << operator */
-  });
-  it.skip("Concatting safe onto safe with << yields safe", () => {
-    /* Ruby << operator */
-  });
-  it.skip("Concatting safe onto unsafe with % yields unsafe", () => {
-    /* Ruby % operator */
-  });
-  it.skip("% method explicitly cast the argument to string", () => {
-    /* Ruby % operator */
-  });
-  it.skip("Concatting unsafe onto safe with % yields escaped safe", () => {
-    /* Ruby % operator */
-  });
-  it.skip("Concatting safe onto safe with % yields safe", () => {
-    /* Ruby % operator */
-  });
-  it.skip("Concatting with % doesn't modify a string", () => {
-    /* Ruby % operator */
-  });
+  it.skip("Concatting safe onto unsafe with << yields unsafe", () => {});
+  it.skip("Concatting unsafe onto safe with << yields escaped safe", () => {});
+  it.skip("Concatting safe onto safe with << yields safe", () => {});
+  it.skip("Concatting safe onto unsafe with % yields unsafe", () => {});
+  it.skip("% method explicitly cast the argument to string", () => {});
+  it.skip("Concatting unsafe onto safe with % yields escaped safe", () => {});
+  it.skip("Concatting safe onto safe with % yields safe", () => {});
+  it.skip("Concatting with % doesn't modify a string", () => {});
 
   it("Concatting an integer to safe always yields safe", () => {
     const safe = htmlSafe("count: ");
@@ -757,45 +637,23 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toBe("count: 42");
   });
 
-  it.skip("Inserting safe into safe yields safe", () => {
-    /* Ruby insert method */
-  });
-  it.skip("Inserting unsafe into safe yields escaped safe", () => {
-    /* Ruby insert method */
-  });
-  it.skip("Replacing safe with safe yields safe", () => {
-    /* Ruby replace method */
-  });
-  it.skip("Replacing safe with unsafe yields escaped safe", () => {
-    /* Ruby replace method */
-  });
-  it.skip("Replacing index of safe with safe yields safe", () => {
-    /* Ruby []= method */
-  });
-  it.skip("Replacing index of safe with unsafe yields escaped safe", () => {
-    /* Ruby []= method */
-  });
-  it.skip("Bytesplicing safe into safe yields safe", () => {
-    /* Ruby bytesplice */
-  });
-  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => {
-    /* Ruby bytesplice */
-  });
-  it.skip("emits normal string YAML", () => {
-    /* YAML */
-  });
-  it.skip("call to_param returns a normal string", () => {
-    /* Ruby to_param */
-  });
+  it.skip("Inserting safe into safe yields safe", () => {});
+  it.skip("Inserting unsafe into safe yields escaped safe", () => {});
+  it.skip("Replacing safe with safe yields safe", () => {});
+  it.skip("Replacing safe with unsafe yields escaped safe", () => {});
+  it.skip("Replacing index of safe with safe yields safe", () => {});
+  it.skip("Replacing index of safe with unsafe yields escaped safe", () => {});
+  it.skip("Bytesplicing safe into safe yields safe", () => {});
+  it.skip("Bytesplicing unsafe into safe yields escaped safe", () => {});
+  it.skip("emits normal string YAML", () => {});
+  it.skip("call to_param returns a normal string", () => {});
 
   it("ERB::Util.html_escape should escape unsafe characters", () => {
     const result = htmlEscape('<script>alert("xss")</script>');
     expect(result.toString()).toBe("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
   });
 
-  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
-    /* Ruby encoding */
-  });
+  it.skip("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {});
 
   it("ERB::Util.html_escape should not escape safe strings", () => {
     const safe = htmlSafe("<b>bold</b>");
@@ -810,9 +668,7 @@ describe("OutputSafetyTest", () => {
     expect(raw.toString()).toBe("&lt;raw&gt;");
   });
 
-  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
-    /* Ruby encoding */
-  });
+  it.skip("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {});
 
   it("ERB::Util.xml_name_escape should escape unsafe characters for XML names", () => {
     const result = xmlNameEscape("hello world");

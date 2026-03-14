@@ -384,9 +384,7 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(callCount).toBe(3);
   });
 
-  it.skip("declaring attributes on singleton errors", () => {
-    // Ruby-specific: can't define mattr on singleton class
-  });
+  it.skip("declaring attributes on singleton errors", () => {});
 });
 
 describe("AttrInternalTest", () => {
@@ -498,18 +496,10 @@ describe("ClassTest", () => {
     expect(subs).not.toContain(Poodle); // only direct children
   });
 
-  it.skip("descendants excludes singleton classes", () => {
-    /* Ruby-specific */
-  });
-  it.skip("subclasses excludes singleton classes", () => {
-    /* Ruby-specific */
-  });
-  it.skip("subclasses exclude reloaded classes", () => {
-    /* Ruby-specific */
-  });
-  it.skip("descendants exclude reloaded classes", () => {
-    /* Ruby-specific */
-  });
+  it.skip("descendants excludes singleton classes", () => {});
+  it.skip("subclasses excludes singleton classes", () => {});
+  it.skip("subclasses exclude reloaded classes", () => {});
+  it.skip("descendants exclude reloaded classes", () => {});
 });
 
 describe("ConfigurableActiveSupport", () => {
@@ -574,9 +564,7 @@ describe("ConfigurableActiveSupport", () => {
     expect(() => configAccessor(Base, "1bad")).toThrow();
   });
 
-  it.skip("the config_accessor method should not be publicly callable", () => {
-    // Ruby-specific: config_accessor is a private class method
-  });
+  it.skip("the config_accessor method should not be publicly callable", () => {});
 });
 
 describe("RescuableTest", () => {
@@ -632,16 +620,8 @@ describe("RescuableTest", () => {
     expect(handled).toBe(false);
   });
 
-  it.skip("rescue from error dispatchers with case operator", () => {
-    /* Ruby-specific */
-  });
-  it.skip("children should inherit rescue definitions from parents and child rescue should be appended", () => {
-    /* Ruby-specific */
-  });
-  it.skip("rescue falls back to exception cause", () => {
-    /* Ruby-specific */
-  });
-  it.skip("rescue handles loops in exception cause chain", () => {
-    /* Ruby-specific */
-  });
+  it.skip("rescue from error dispatchers with case operator", () => {});
+  it.skip("children should inherit rescue definitions from parents and child rescue should be appended", () => {});
+  it.skip("rescue falls back to exception cause", () => {});
+  it.skip("rescue handles loops in exception cause chain", () => {});
 });

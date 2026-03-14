@@ -280,15 +280,9 @@ describe("ErrorReporterTest", () => {
     expect(logs.some((l) => l.includes("subscriber error"))).toBe(true);
   });
 
-  it.skip("#report assigns a backtrace if it's missing", () => {
-    /* Ruby backtrace */
-  });
-  it.skip("causes can't be reported again either", () => {
-    /* Ruby exception cause chain */
-  });
-  it.skip("#unexpected re-raise errors in development and test", () => {
-    /* env-specific */
-  });
+  it.skip("#report assigns a backtrace if it's missing", () => {});
+  it.skip("causes can't be reported again either", () => {});
+  it.skip("#unexpected re-raise errors in development and test", () => {});
 });
 
 describe("ErrorReporterTest", () => {
@@ -492,9 +486,7 @@ describe("ErrorReporterTest", () => {
     expect(reported).toHaveLength(1);
   });
 
-  it.skip("#report assigns a backtrace if it's missing", () => {
-    /* Ruby backtrace */
-  });
+  it.skip("#report assigns a backtrace if it's missing", () => {});
 
   it("#record passes through the return value", () => {
     const reporter = new ErrorReporter();
@@ -516,9 +508,7 @@ describe("ErrorReporterTest", () => {
     expect(reported[0].error.message).toBe("something unexpected");
   });
 
-  it.skip("#unexpected re-raise errors in development and test", () => {
-    /* env-specific */
-  });
+  it.skip("#unexpected re-raise errors in development and test", () => {});
 
   it("can have multiple subscribers", () => {
     const reporter = new ErrorReporter();
@@ -577,9 +567,7 @@ describe("ErrorReporterTest", () => {
     expect(reported).toHaveLength(1);
   });
 
-  it.skip("causes can't be reported again either", () => {
-    /* Ruby exception cause chain */
-  });
+  it.skip("causes can't be reported again either", () => {});
 
   it("can report frozen exceptions", () => {
     const reporter = new ErrorReporter();

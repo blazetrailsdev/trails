@@ -35,15 +35,9 @@ describe("TimeTravelTest", () => {
     expect(inside!.getUTCFullYear()).toBe(2032);
   });
 
-  it.skip("time helper travel to with time zone", () => {
-    /* TimeZone not implemented */
-  });
-  it.skip("time helper travel to with different system and application time zones", () => {
-    /* TimeZone */
-  });
-  it.skip("time helper travel to with string for time zone", () => {
-    /* TimeZone */
-  });
+  it.skip("time helper travel to with time zone", () => {});
+  it.skip("time helper travel to with different system and application time zones", () => {});
+  it.skip("time helper travel to with string for time zone", () => {});
 
   it("time helper travel to with string and milliseconds", () => {
     const target = new Date("2033-03-15T10:30:00Z");
@@ -52,9 +46,7 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCMonth()).toBe(2); // March = 2
   });
 
-  it.skip("time helper travel to with separate class", () => {
-    /* Ruby-specific Time subclass */
-  });
+  it.skip("time helper travel to with separate class", () => {});
 
   it("time helper travel back", () => {
     const before = new Date();
@@ -93,27 +85,13 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCFullYear()).toBe(2036);
   });
 
-  it.skip("time helper travel to with usec", () => {
-    /* microseconds */
-  });
-  it.skip("time helper with usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with datetime and usec", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with datetime and usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with string and usec", () => {
-    /* microseconds */
-  });
-  it.skip("time helper travel to with string and usec true", () => {
-    /* microseconds */
-  });
-  it.skip("time helper freeze time with usec true", () => {
-    /* microseconds */
-  });
+  it.skip("time helper travel to with usec", () => {});
+  it.skip("time helper with usec true", () => {});
+  it.skip("time helper travel to with datetime and usec", () => {});
+  it.skip("time helper travel to with datetime and usec true", () => {});
+  it.skip("time helper travel to with string and usec", () => {});
+  it.skip("time helper travel to with string and usec true", () => {});
+  it.skip("time helper freeze time with usec true", () => {});
 
   it("time helper travel with subsequent block", () => {
     const results: number[] = [];
@@ -126,12 +104,8 @@ describe("TimeTravelTest", () => {
     expect(results).toEqual([2041, 2042]);
   });
 
-  it.skip("travel to will reset the usec to avoid mysql rounding", () => {
-    /* DB-specific */
-  });
-  it.skip("time helper travel with time subclass", () => {
-    /* Ruby Time subclass */
-  });
+  it.skip("travel to will reset the usec to avoid mysql rounding", () => {});
+  it.skip("time helper travel with time subclass", () => {});
 
   it("time helper freeze time", () => {
     freezeTime();

@@ -1,154 +1,56 @@
 import { describe, it } from "vitest";
 
 describe("MultibyteProxyText", () => {
-  it.skip("custom multibyte encoder", () => {
-    /* fixture-dependent */
-  });
+  it.skip("custom multibyte encoder", () => {});
 });
 
 describe("MultibyteCharsUTF8BehaviorTest", () => {
-  it.skip("split should return an array of chars instances", () => {
-    /* fixture-dependent */
-  });
-  it.skip("tidy bytes bang should return self", () => {
-    /* fixture-dependent */
-  });
-  it.skip("tidy bytes bang should change wrapped string", () => {
-    /* fixture-dependent */
-  });
-  it.skip("unicode string should have utf8 encoding", () => {
-    /* fixture-dependent */
-  });
-  it.skip("identity", () => {
-    /* fixture-dependent */
-  });
-  it.skip("string methods are chainable", () => {
-    /* fixture-dependent */
-  });
-  it.skip("should be equal to the wrapped string", () => {
-    /* fixture-dependent */
-  });
-  it.skip("should not be equal to an other string", () => {
-    /* fixture-dependent */
-  });
-  it.skip("sortability", () => {
-    /* fixture-dependent */
-  });
-  it.skip("should return character offset for regexp matches", () => {
-    /* fixture-dependent */
-  });
-  it.skip("match should return boolean for regexp match", () => {
-    /* fixture-dependent */
-  });
-  it.skip("should use character offsets for insert offsets", () => {
-    /* fixture-dependent */
-  });
-  it.skip("insert should be destructive", () => {
-    /* fixture-dependent */
-  });
-  it.skip("should know if one includes the other", () => {
-    /* fixture-dependent */
-  });
-  it.skip("include raises when nil is passed", () => {
-    /* fixture-dependent */
-  });
-  it.skip("index should return character offset", () => {
-    /* fixture-dependent */
-  });
-  it.skip("rindex should return character offset", () => {
-    /* fixture-dependent */
-  });
-  it.skip("indexed insert should take character offsets", () => {
-    /* fixture-dependent */
-  });
-  it.skip("indexed insert should raise on index overflow", () => {
-    /* fixture-dependent */
-  });
-  it.skip("indexed insert should raise on range overflow", () => {
-    /* fixture-dependent */
-  });
-  it.skip("rjust should raise argument errors on bad arguments", () => {
-    /* fixture-dependent */
-  });
-  it.skip("rjust should count characters instead of bytes", () => {
-    /* fixture-dependent */
-  });
-  it.skip("ljust should raise argument errors on bad arguments", () => {
-    /* fixture-dependent */
-  });
-  it.skip("ljust should count characters instead of bytes", () => {
-    /* fixture-dependent */
-  });
-  it.skip("center should raise argument errors on bad arguments", () => {
-    /* fixture-dependent */
-  });
-  it.skip("center should count characters instead of bytes", () => {
-    /* fixture-dependent */
-  });
-  it.skip("lstrip strips whitespace from the left of the string", () => {
-    /* fixture-dependent */
-  });
-  it.skip("rstrip strips whitespace from the right of the string", () => {
-    /* fixture-dependent */
-  });
-  it.skip("strip strips whitespace", () => {
-    /* fixture-dependent */
-  });
-  it.skip("stripping whitespace leaves whitespace within the string intact", () => {
-    /* fixture-dependent */
-  });
-  it.skip("size returns characters instead of bytes", () => {
-    /* fixture-dependent */
-  });
-  it.skip("reverse reverses characters", () => {
-    /* fixture-dependent */
-  });
-  it.skip("reverse should work with normalized strings", () => {
-    /* fixture-dependent */
-  });
-  it.skip("slice should take character offsets", () => {
-    /* fixture-dependent */
-  });
-  it.skip("slice bang returns sliced out substring", () => {
-    /* fixture-dependent */
-  });
-  it.skip("slice bang returns nil on out of bound arguments", () => {
-    /* fixture-dependent */
-  });
-  it.skip("slice bang removes the slice from the receiver", () => {
-    /* fixture-dependent */
-  });
-  it.skip("slice bang returns nil and does not modify receiver if out of bounds", () => {
-    /* fixture-dependent */
-  });
-  it.skip("slice should throw exceptions on invalid arguments", () => {
-    /* fixture-dependent */
-  });
-  it.skip("ord should return unicode value for first character", () => {
-    /* fixture-dependent */
-  });
-  it.skip("upcase should upcase ascii characters", () => {
-    /* fixture-dependent */
-  });
-  it.skip("downcase should downcase ascii characters", () => {
-    /* fixture-dependent */
-  });
-  it.skip("swapcase should swap ascii characters", () => {
-    /* fixture-dependent */
-  });
-  it.skip("capitalize should work on ascii characters", () => {
-    /* fixture-dependent */
-  });
-  it.skip("titleize should work on ascii characters", () => {
-    /* fixture-dependent */
-  });
-  it.skip("respond to knows which methods the proxy responds to", () => {
-    /* fixture-dependent */
-  });
-  it.skip("method works for proxyed methods", () => {
-    /* fixture-dependent */
-  });
-  it.skip("acts like string", () => {
-    /* fixture-dependent */
-  });
+  it.skip("split should return an array of chars instances", () => {});
+  it.skip("tidy bytes bang should return self", () => {});
+  it.skip("tidy bytes bang should change wrapped string", () => {});
+  it.skip("unicode string should have utf8 encoding", () => {});
+  it.skip("identity", () => {});
+  it.skip("string methods are chainable", () => {});
+  it.skip("should be equal to the wrapped string", () => {});
+  it.skip("should not be equal to an other string", () => {});
+  it.skip("sortability", () => {});
+  it.skip("should return character offset for regexp matches", () => {});
+  it.skip("match should return boolean for regexp match", () => {});
+  it.skip("should use character offsets for insert offsets", () => {});
+  it.skip("insert should be destructive", () => {});
+  it.skip("should know if one includes the other", () => {});
+  it.skip("include raises when nil is passed", () => {});
+  it.skip("index should return character offset", () => {});
+  it.skip("rindex should return character offset", () => {});
+  it.skip("indexed insert should take character offsets", () => {});
+  it.skip("indexed insert should raise on index overflow", () => {});
+  it.skip("indexed insert should raise on range overflow", () => {});
+  it.skip("rjust should raise argument errors on bad arguments", () => {});
+  it.skip("rjust should count characters instead of bytes", () => {});
+  it.skip("ljust should raise argument errors on bad arguments", () => {});
+  it.skip("ljust should count characters instead of bytes", () => {});
+  it.skip("center should raise argument errors on bad arguments", () => {});
+  it.skip("center should count characters instead of bytes", () => {});
+  it.skip("lstrip strips whitespace from the left of the string", () => {});
+  it.skip("rstrip strips whitespace from the right of the string", () => {});
+  it.skip("strip strips whitespace", () => {});
+  it.skip("stripping whitespace leaves whitespace within the string intact", () => {});
+  it.skip("size returns characters instead of bytes", () => {});
+  it.skip("reverse reverses characters", () => {});
+  it.skip("reverse should work with normalized strings", () => {});
+  it.skip("slice should take character offsets", () => {});
+  it.skip("slice bang returns sliced out substring", () => {});
+  it.skip("slice bang returns nil on out of bound arguments", () => {});
+  it.skip("slice bang removes the slice from the receiver", () => {});
+  it.skip("slice bang returns nil and does not modify receiver if out of bounds", () => {});
+  it.skip("slice should throw exceptions on invalid arguments", () => {});
+  it.skip("ord should return unicode value for first character", () => {});
+  it.skip("upcase should upcase ascii characters", () => {});
+  it.skip("downcase should downcase ascii characters", () => {});
+  it.skip("swapcase should swap ascii characters", () => {});
+  it.skip("capitalize should work on ascii characters", () => {});
+  it.skip("titleize should work on ascii characters", () => {});
+  it.skip("respond to knows which methods the proxy responds to", () => {});
+  it.skip("method works for proxyed methods", () => {});
+  it.skip("acts like string", () => {});
 });

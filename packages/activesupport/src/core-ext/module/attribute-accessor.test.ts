@@ -111,7 +111,5 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(callCount).toBe(3);
   });
 
-  it.skip("declaring attributes on singleton errors", () => {
-    /* Ruby-specific: singleton class */
-  });
+  it.skip("declaring attributes on singleton errors", () => {});
 });

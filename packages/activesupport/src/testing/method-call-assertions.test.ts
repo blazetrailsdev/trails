@@ -139,9 +139,7 @@ describe("MethodCallAssertionsTest", () => {
     expect(() => assertCalledOnInstanceOf(MyClass, "action", { times: 1 }, () => {})).toThrow();
   });
 
-  it.skip("assert called on instance of nesting", () => {
-    /* complex nesting */
-  });
+  it.skip("assert called on instance of nesting", () => {});
 
   it("assert not called", () => {
     const obj = { fn: () => {} };
@@ -179,15 +177,9 @@ describe("MethodCallAssertionsTest", () => {
     ).toThrow();
   });
 
-  it.skip("assert not called on instance of nesting", () => {
-    /* complex nesting */
-  });
-  it.skip("stub any instance", () => {
-    /* Ruby-specific stub_any_instance */
-  });
-  it.skip("stub any instance with instance", () => {
-    /* Ruby-specific */
-  });
+  it.skip("assert not called on instance of nesting", () => {});
+  it.skip("stub any instance", () => {});
+  it.skip("stub any instance with instance", () => {});
   it("assert changes when assertions are included", () => {
     let counter = 0;
     const before = counter;

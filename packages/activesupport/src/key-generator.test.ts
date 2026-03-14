@@ -218,45 +218,21 @@ describe("BacktraceCleanerFilterAndSilencerTest", () => {
 });
 
 describe("KeyGeneratorTest", () => {
-  it.skip("Generating a key of the default length", () => {
-    /* fixture-dependent */
-  });
-  it.skip("Generating a key of an alternative length", () => {
-    /* fixture-dependent */
-  });
-  it.skip("Expected results", () => {
-    /* fixture-dependent */
-  });
-  it.skip("With custom hash digest class", () => {
-    /* fixture-dependent */
-  });
-  it.skip("Raises if given a non digest instance", () => {
-    /* fixture-dependent */
-  });
-  it.skip("inspect does not show secrets", () => {
-    /* fixture-dependent */
-  });
+  it.skip("Generating a key of the default length", () => {});
+  it.skip("Generating a key of an alternative length", () => {});
+  it.skip("Expected results", () => {});
+  it.skip("With custom hash digest class", () => {});
+  it.skip("Raises if given a non digest instance", () => {});
+  it.skip("inspect does not show secrets", () => {});
 });
 
 describe("SecureRandomTest", () => {
-  it.skip("base58", () => {
-    /* fixture-dependent */
-  });
-  it.skip("base58 with length", () => {
-    /* fixture-dependent */
-  });
-  it.skip("base58 with nil", () => {
-    /* fixture-dependent */
-  });
-  it.skip("base36", () => {
-    /* fixture-dependent */
-  });
-  it.skip("base36 with length", () => {
-    /* fixture-dependent */
-  });
-  it.skip("base36 with nil", () => {
-    /* fixture-dependent */
-  });
+  it.skip("base58", () => {});
+  it.skip("base58 with length", () => {});
+  it.skip("base58 with nil", () => {});
+  it.skip("base36", () => {});
+  it.skip("base36 with length", () => {});
+  it.skip("base36 with nil", () => {});
 });
 
 describe("CachingKeyGeneratorTest", () => {

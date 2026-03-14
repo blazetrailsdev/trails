@@ -300,30 +300,14 @@ describe("OrderedHashTest", () => {
     expect(value).toBe(1);
   });
 
-  it.skip("each after yaml serialization", () => {
-    /* YAML not applicable in JS */
-  });
-  it.skip("each when yielding to block with splat", () => {
-    /* Ruby-specific block pattern */
-  });
-  it.skip("each pair when yielding to block with splat", () => {
-    /* Ruby-specific */
-  });
-  it.skip("order after yaml serialization", () => {
-    /* YAML */
-  });
-  it.skip("order after yaml serialization with nested arrays", () => {
-    /* YAML */
-  });
-  it.skip("psych serialize", () => {
-    /* YAML/Psych */
-  });
-  it.skip("psych serialize tag", () => {
-    /* YAML */
-  });
-  it.skip("has yaml tag", () => {
-    /* YAML */
-  });
+  it.skip("each after yaml serialization", () => {});
+  it.skip("each when yielding to block with splat", () => {});
+  it.skip("each pair when yielding to block with splat", () => {});
+  it.skip("order after yaml serialization", () => {});
+  it.skip("order after yaml serialization with nested arrays", () => {});
+  it.skip("psych serialize", () => {});
+  it.skip("psych serialize tag", () => {});
+  it.skip("has yaml tag", () => {});
 });
 
 describe("OrderedHashTest", () => {
@@ -588,30 +572,14 @@ describe("OrderedHashTest", () => {
     expect((h.get("data") as any).nested).toBe(true);
   });
 
-  it.skip("each after yaml serialization", () => {
-    /* YAML not applicable in JS */
-  });
-  it.skip("each when yielding to block with splat", () => {
-    /* Ruby-specific block pattern */
-  });
-  it.skip("each pair when yielding to block with splat", () => {
-    /* Ruby-specific */
-  });
-  it.skip("order after yaml serialization", () => {
-    /* YAML */
-  });
-  it.skip("order after yaml serialization with nested arrays", () => {
-    /* YAML */
-  });
-  it.skip("psych serialize", () => {
-    /* YAML/Psych */
-  });
-  it.skip("psych serialize tag", () => {
-    /* YAML */
-  });
-  it.skip("has yaml tag", () => {
-    /* YAML */
-  });
+  it.skip("each after yaml serialization", () => {});
+  it.skip("each when yielding to block with splat", () => {});
+  it.skip("each pair when yielding to block with splat", () => {});
+  it.skip("order after yaml serialization", () => {});
+  it.skip("order after yaml serialization with nested arrays", () => {});
+  it.skip("psych serialize", () => {});
+  it.skip("psych serialize tag", () => {});
+  it.skip("has yaml tag", () => {});
 
   it("update sets keys", () => {
     const h = new OrderedHash<string, number>();

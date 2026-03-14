@@ -68,105 +68,41 @@ describe("StringAccessTest", () => {
 });
 
 describe("ToTagTest", () => {
-  it.skip("#to_tag accepts a callable object and passes options with the builder", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts a callable object and passes options and tag name", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts an object responding to #to_xml and passes the options, where :root is key", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts arbitrary objects responding to #to_str", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag should use the type value in the options hash", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts symbol types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts boolean types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts float types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts decimal types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts date types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts datetime types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts time types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts ActiveSupport::TimeWithZone types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts duration types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts array types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag accepts hash types", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag should not add type when skip types option is set", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag should dasherize the space when passed a string with spaces as a key", () => {
-    /* fixture-dependent */
-  });
-  it.skip("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => {
-    /* fixture-dependent */
-  });
+  it.skip("#to_tag accepts a callable object and passes options with the builder", () => {});
+  it.skip("#to_tag accepts a callable object and passes options and tag name", () => {});
+  it.skip("#to_tag accepts an object responding to #to_xml and passes the options, where :root is key", () => {});
+  it.skip("#to_tag accepts arbitrary objects responding to #to_str", () => {});
+  it.skip("#to_tag should use the type value in the options hash", () => {});
+  it.skip("#to_tag accepts symbol types", () => {});
+  it.skip("#to_tag accepts boolean types", () => {});
+  it.skip("#to_tag accepts float types", () => {});
+  it.skip("#to_tag accepts decimal types", () => {});
+  it.skip("#to_tag accepts date types", () => {});
+  it.skip("#to_tag accepts datetime types", () => {});
+  it.skip("#to_tag accepts time types", () => {});
+  it.skip("#to_tag accepts ActiveSupport::TimeWithZone types", () => {});
+  it.skip("#to_tag accepts duration types", () => {});
+  it.skip("#to_tag accepts array types", () => {});
+  it.skip("#to_tag accepts hash types", () => {});
+  it.skip("#to_tag should not add type when skip types option is set", () => {});
+  it.skip("#to_tag should dasherize the space when passed a string with spaces as a key", () => {});
+  it.skip("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => {});
 });
 
 describe("StringConversionsTest", () => {
-  it.skip("string to time", () => {
-    /* fixture-dependent */
-  });
-  it.skip("timestamp string to time", () => {
-    /* fixture-dependent */
-  });
-  it.skip("string to time utc offset", () => {
-    /* fixture-dependent */
-  });
-  it.skip("partial string to time", () => {
-    /* fixture-dependent */
-  });
-  it.skip("standard time string to time when current time is standard time", () => {
-    /* fixture-dependent */
-  });
-  it.skip("standard time string to time when current time is daylight savings", () => {
-    /* fixture-dependent */
-  });
-  it.skip("daylight savings string to time when current time is standard time", () => {
-    /* fixture-dependent */
-  });
-  it.skip("daylight savings string to time when current time is daylight savings", () => {
-    /* fixture-dependent */
-  });
-  it.skip("partial string to time when current time is standard time", () => {
-    /* fixture-dependent */
-  });
-  it.skip("partial string to time when current time is daylight savings", () => {
-    /* fixture-dependent */
-  });
-  it.skip("string to datetime", () => {
-    /* fixture-dependent */
-  });
-  it.skip("partial string to datetime", () => {
-    /* fixture-dependent */
-  });
-  it.skip("string to date", () => {
-    /* fixture-dependent */
-  });
+  it.skip("string to time", () => {});
+  it.skip("timestamp string to time", () => {});
+  it.skip("string to time utc offset", () => {});
+  it.skip("partial string to time", () => {});
+  it.skip("standard time string to time when current time is standard time", () => {});
+  it.skip("standard time string to time when current time is daylight savings", () => {});
+  it.skip("daylight savings string to time when current time is standard time", () => {});
+  it.skip("daylight savings string to time when current time is daylight savings", () => {});
+  it.skip("partial string to time when current time is standard time", () => {});
+  it.skip("partial string to time when current time is daylight savings", () => {});
+  it.skip("string to datetime", () => {});
+  it.skip("partial string to datetime", () => {});
+  it.skip("string to date", () => {});
 });
 
 describe("StringIndentTest", () => {
@@ -194,15 +130,9 @@ describe("StringIndentTest", () => {
 });
 
 describe("CoreExtStringMultibyteTest", () => {
-  it.skip("core ext adds mb chars", () => {
-    /* fixture-dependent */
-  });
-  it.skip("string should recognize utf8 strings", () => {
-    /* fixture-dependent */
-  });
-  it.skip("mb chars returns instance of proxy class", () => {
-    /* fixture-dependent */
-  });
+  it.skip("core ext adds mb chars", () => {});
+  it.skip("string should recognize utf8 strings", () => {});
+  it.skip("mb chars returns instance of proxy class", () => {});
 });
 
 describe("StringBehaviorTest", () => {

@@ -211,21 +211,11 @@ describe("ClassAttributeTest", () => {
     expect(result).toBe("value");
   });
 
-  it.skip("works well with singleton classes", () => {
-    /* Ruby singleton classes */
-  });
-  it.skip("when defined in a class's singleton", () => {
-    /* Ruby singleton classes */
-  });
-  it.skip("works well with module singleton classes", () => {
-    /* Ruby module singleton */
-  });
-  it.skip("works when overriding private methods from an ancestor", () => {
-    /* private method override semantics */
-  });
-  it.skip("allow to prepend accessors", () => {
-    /* Ruby module prepend */
-  });
+  it.skip("works well with singleton classes", () => {});
+  it.skip("when defined in a class's singleton", () => {});
+  it.skip("works well with module singleton classes", () => {});
+  it.skip("works when overriding private methods from an ancestor", () => {});
+  it.skip("allow to prepend accessors", () => {});
 
   it("can check if value is set on a sub class", () => {
     class Parent {}

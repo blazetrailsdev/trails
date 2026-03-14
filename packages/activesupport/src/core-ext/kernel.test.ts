@@ -86,7 +86,5 @@ describe("KernelSuppressTest", () => {
 });
 
 describe("KernelConcernTest", () => {
-  it.skip("may be defined at toplevel", () => {
-    /* fixture-dependent */
-  });
+  it.skip("may be defined at toplevel", () => {});
 });

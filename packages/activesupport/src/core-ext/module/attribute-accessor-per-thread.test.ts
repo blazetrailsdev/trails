@@ -3,12 +3,8 @@ import { describe, it, expect } from "vitest";
 import { mattrAccessor } from "../../module-ext.js";
 
 describe("ModuleAttributeAccessorPerThreadTest", () => {
-  it.skip("is shared between fibers", () => {
-    /* fiber/async context not applicable */
-  });
-  it.skip("is not shared between fibers if isolation level is fiber", () => {
-    /* fiber/async context not applicable */
-  });
+  it.skip("is shared between fibers", () => {});
+  it.skip("is not shared between fibers if isolation level is fiber", () => {});
 
   it("default value", () => {
     class M {}
@@ -24,9 +20,7 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     expect((Parent as unknown as Record<string, unknown>).shared).toBe(42);
   });
 
-  it.skip("default value is accessible from other threads", () => {
-    /* threads not applicable */
-  });
+  it.skip("default value is accessible from other threads", () => {});
 
   it("nonfrozen default value is duped and frozen", () => {
     const defaultArr = [1, 2, 3];
@@ -88,9 +82,7 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     expect(Object.getOwnPropertyDescriptor(proto, "z")).toBeUndefined();
   });
 
-  it.skip("values should not bleed between threads", () => {
-    /* threads not applicable */
-  });
+  it.skip("values should not bleed between threads", () => {});
 
   it("should raise name error if attribute name is invalid", () => {
     class M {}

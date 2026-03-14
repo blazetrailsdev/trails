@@ -16,12 +16,8 @@ describe("TransliterateTest", () => {
     expect(transliterate("Ö")).toBe("O");
   });
 
-  it.skip("transliterate should work with custom i18n rules and uncomposed utf8", () => {
-    /* i18n-dependent */
-  });
-  it.skip("transliterate respects the locale argument", () => {
-    /* i18n-dependent */
-  });
+  it.skip("transliterate should work with custom i18n rules and uncomposed utf8", () => {});
+  it.skip("transliterate respects the locale argument", () => {});
 
   it("transliterate should allow a custom replacement char", () => {
     expect(transliterate("hello 日本語 world", "*")).toBe("hello *** world");
@@ -49,21 +45,11 @@ describe("TransliterateTest", () => {
     expect(transliterate("hello")).toBe("hello");
   });
 
-  it.skip("transliterate handles strings with valid gb18030 encodings", () => {
-    /* encoding-specific */
-  });
-  it.skip("transliterate handles strings with incompatible encodings", () => {
-    /* encoding-specific */
-  });
-  it.skip("transliterate handles strings with invalid utf8 bytes", () => {
-    /* encoding-specific */
-  });
-  it.skip("transliterate handles strings with invalid us ascii bytes", () => {
-    /* encoding-specific */
-  });
-  it.skip("transliterate handles strings with invalid gb18030 bytes", () => {
-    /* encoding-specific */
-  });
+  it.skip("transliterate handles strings with valid gb18030 encodings", () => {});
+  it.skip("transliterate handles strings with incompatible encodings", () => {});
+  it.skip("transliterate handles strings with invalid utf8 bytes", () => {});
+  it.skip("transliterate handles strings with invalid us ascii bytes", () => {});
+  it.skip("transliterate handles strings with invalid gb18030 bytes", () => {});
 
   it("transliterate returns a copy of ascii strings", () => {
     const original = "hello";

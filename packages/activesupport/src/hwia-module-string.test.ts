@@ -1153,36 +1153,9 @@ describe("ModuleTest", () => {
     expect(c.color).toBe("red");
   });
 
-  it.skip("delegation to index get method", () => {
-    class Arr {
-      data = [10, 20, 30];
-      at(i: number) {
-        return this.data[i];
-      }
-    }
-    class Wrapper {
-      arr = new Arr();
-    }
-    delegate(Wrapper.prototype, "at", { to: "arr" });
-    const w = new Wrapper() as Wrapper & { at: (i: number) => number };
-    expect(w.at(0)).toBe(10);
-  });
+  it.skip("delegation to index get method", () => {});
 
-  it.skip("delegation to index set method", () => {
-    class Arr {
-      data: unknown[] = [];
-      setAt(i: number, v: unknown) {
-        this.data[i] = v;
-      }
-    }
-    class Wrapper {
-      arr = new Arr();
-    }
-    delegate(Wrapper.prototype, "setAt", { to: "arr" });
-    const w = new Wrapper() as Wrapper & { setAt: (i: number, v: unknown) => void };
-    w.setAt(0, "hello");
-    expect((w as unknown as { arr: Arr }).arr.data[0]).toBe("hello");
-  });
+  it.skip("delegation to index set method", () => {});
 
   it("delegation down hierarchy", () => {
     class GrandParent {
@@ -1328,23 +1301,9 @@ describe("ModuleTest", () => {
     expect(proj.name).toBeUndefined();
   });
 
-  it.skip("delegation with allow nil and false value", () => {
-    class Project {
-      active: false | { toString: () => string } = false;
-    }
-    delegate(Project.prototype, "toString", { to: "active", allowNil: true });
-    const proj = new Project() as Project & { toString: () => string | undefined };
-    expect(proj.toString()).toBeUndefined();
-  });
+  it.skip("delegation with allow nil and false value", () => {});
 
-  it.skip("delegation with allow nil and invalid value", () => {
-    class Container {
-      val: unknown = undefined;
-    }
-    delegate(Container.prototype, "toString", { to: "val", allowNil: true });
-    const c = new Container() as Container & { toString: () => string | undefined };
-    expect(c.toString()).toBeUndefined();
-  });
+  it.skip("delegation with allow nil and invalid value", () => {});
 
   it("delegation with allow nil and nil value and prefix", () => {
     class Project {
@@ -1374,14 +1333,7 @@ describe("ModuleTest", () => {
     expect(() => c.toString()).toThrow();
   });
 
-  it.skip("delegation to method that exists on nil when allowing nil", () => {
-    class Container {
-      val: null = null;
-    }
-    delegate(Container.prototype, "toString", { to: "val", allowNil: true });
-    const c = new Container() as Container & { toString: () => string | undefined };
-    expect(c.toString()).toBeUndefined();
-  });
+  it.skip("delegation to method that exists on nil when allowing nil", () => {});
 
   it("delegation does not raise error when removing singleton instance methods", () => {
     class Foo {}
@@ -1396,14 +1348,7 @@ describe("ModuleTest", () => {
     expect(() => delegate(Foo.prototype, "bar", { to: "baz", allowNil: true })).not.toThrow();
   });
 
-  it.skip("delegate line with nil", () => {
-    class Container {
-      val: null = null;
-    }
-    delegate(Container.prototype, "toString", { to: "val", allowNil: true });
-    const c = new Container() as Container & { toString: () => string | undefined };
-    expect(c.toString()).toBeUndefined();
-  });
+  it.skip("delegate line with nil", () => {});
 
   it("delegation exception backtrace", () => {
     class Someone {
@@ -1522,15 +1467,7 @@ describe("ModuleTest", () => {
     expect(typeof delegate).toBe("function");
   });
 
-  it.skip("delegate missing to does not delegate to fake methods", () => {
-    class Source {}
-    class Proxy {
-      source = new Source();
-    }
-    delegate(Proxy.prototype, "nonExistent", { to: "source" });
-    const p = new Proxy() as Proxy & { nonExistent: unknown };
-    expect(() => p.nonExistent).toThrow();
-  });
+  it.skip("delegate missing to does not delegate to fake methods", () => {});
 
   it("delegate missing to raises delegation error if target nil", () => {
     class Container {
@@ -1686,10 +1623,7 @@ describe("ModuleTest", () => {
     expect(names).toEqual(["bar", "baz"]);
   });
 
-  it.skip("module nesting is empty", () => {
-    // In TS, there's no Module.nesting concept; verify isAnonymous works
-    expect(isAnonymous(() => {})).toBe(false);
-  });
+  it.skip("module nesting is empty", () => {});
 
   it("delegation unreacheable module", () => {
     class Container {

@@ -1,118 +1,44 @@
 import { describe, it } from "vitest";
 
 describe("MemCacheStoreTest", () => {
-  it.skip("validate pool arguments", () => {
-    /* fixture-dependent */
-  });
-  it.skip("instantiating the store doesn't connect to Memcache", () => {
-    /* fixture-dependent */
-  });
-  it.skip("clear also clears local cache", () => {
-    /* fixture-dependent */
-  });
-  it.skip("short key normalization", () => {
-    /* fixture-dependent */
-  });
-  it.skip("long key normalization", () => {
-    /* fixture-dependent */
-  });
-  it.skip("namespaced key normalization", () => {
-    /* fixture-dependent */
-  });
-  it.skip("multibyte string key normalization", () => {
-    /* fixture-dependent */
-  });
-  it.skip("whole key digest on normalization", () => {
-    /* fixture-dependent */
-  });
-  it.skip("raw values", () => {
-    /* fixture-dependent */
-  });
-  it.skip("raw read entry compression", () => {
-    /* fixture-dependent */
-  });
-  it.skip("raw values with marshal", () => {
-    /* fixture-dependent */
-  });
-  it.skip("local cache raw values", () => {
-    /* fixture-dependent */
-  });
-  it.skip("increment unset key", () => {
-    /* fixture-dependent */
-  });
-  it.skip("write expires at", () => {
-    /* fixture-dependent */
-  });
-  it.skip("write with unless exist", () => {
-    /* fixture-dependent */
-  });
-  it.skip("increment expires in", () => {
-    /* fixture-dependent */
-  });
-  it.skip("decrement unset key", () => {
-    /* fixture-dependent */
-  });
-  it.skip("decrement expires in", () => {
-    /* fixture-dependent */
-  });
-  it.skip("dalli cache nils", () => {
-    /* fixture-dependent */
-  });
-  it.skip("local cache raw values with marshal", () => {
-    /* fixture-dependent */
-  });
-  it.skip("read should return a different object id each time it is called", () => {
-    /* fixture-dependent */
-  });
-  it.skip("no compress when below threshold", () => {
-    /* fixture-dependent */
-  });
-  it.skip("no multiple compress", () => {
-    /* fixture-dependent */
-  });
-  it.skip("unless exist expires when configured", () => {
-    /* fixture-dependent */
-  });
-  it.skip("forwards string addresses if present", () => {
-    /* fixture-dependent */
-  });
-  it.skip("falls back to localhost if no address provided and memcache servers undefined", () => {
-    /* fixture-dependent */
-  });
-  it.skip("falls back to localhost if address provided as nil", () => {
-    /* fixture-dependent */
-  });
-  it.skip("falls back to localhost if no address provided and memcache servers defined", () => {
-    /* fixture-dependent */
-  });
-  it.skip("can load raw values from dalli store", () => {
-    /* fixture-dependent */
-  });
-  it.skip("can load raw falsey values from dalli store", () => {
-    /* fixture-dependent */
-  });
-  it.skip("can load raw values from dalli store with local cache", () => {
-    /* fixture-dependent */
-  });
-  it.skip("can load raw falsey values from dalli store with local cache", () => {
-    /* fixture-dependent */
-  });
-  it.skip("can read multi entries raw values from dalli store", () => {
-    /* fixture-dependent */
-  });
-  it.skip("pool options work", () => {
-    /* fixture-dependent */
-  });
-  it.skip("connection pooling by default", () => {
-    /* fixture-dependent */
-  });
+  it.skip("validate pool arguments", () => {});
+  it.skip("instantiating the store doesn't connect to Memcache", () => {});
+  it.skip("clear also clears local cache", () => {});
+  it.skip("short key normalization", () => {});
+  it.skip("long key normalization", () => {});
+  it.skip("namespaced key normalization", () => {});
+  it.skip("multibyte string key normalization", () => {});
+  it.skip("whole key digest on normalization", () => {});
+  it.skip("raw values", () => {});
+  it.skip("raw read entry compression", () => {});
+  it.skip("raw values with marshal", () => {});
+  it.skip("local cache raw values", () => {});
+  it.skip("increment unset key", () => {});
+  it.skip("write expires at", () => {});
+  it.skip("write with unless exist", () => {});
+  it.skip("increment expires in", () => {});
+  it.skip("decrement unset key", () => {});
+  it.skip("decrement expires in", () => {});
+  it.skip("dalli cache nils", () => {});
+  it.skip("local cache raw values with marshal", () => {});
+  it.skip("read should return a different object id each time it is called", () => {});
+  it.skip("no compress when below threshold", () => {});
+  it.skip("no multiple compress", () => {});
+  it.skip("unless exist expires when configured", () => {});
+  it.skip("forwards string addresses if present", () => {});
+  it.skip("falls back to localhost if no address provided and memcache servers undefined", () => {});
+  it.skip("falls back to localhost if address provided as nil", () => {});
+  it.skip("falls back to localhost if no address provided and memcache servers defined", () => {});
+  it.skip("can load raw values from dalli store", () => {});
+  it.skip("can load raw falsey values from dalli store", () => {});
+  it.skip("can load raw values from dalli store with local cache", () => {});
+  it.skip("can load raw falsey values from dalli store with local cache", () => {});
+  it.skip("can read multi entries raw values from dalli store", () => {});
+  it.skip("pool options work", () => {});
+  it.skip("connection pooling by default", () => {});
 });
 
 describe("ConnectionPoolBehaviorTest", () => {
-  it.skip("pool options work", () => {
-    /* fixture-dependent */
-  });
-  it.skip("connection pooling by default", () => {
-    /* fixture-dependent */
-  });
+  it.skip("pool options work", () => {});
+  it.skip("connection pooling by default", () => {});
 });

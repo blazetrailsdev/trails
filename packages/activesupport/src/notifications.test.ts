@@ -113,15 +113,9 @@ describe("EventedTest", () => {
     expect(names).toContain("beta");
   });
 
-  it.skip("listen start multiple exception consistency", () => {
-    /* evented-specific */
-  });
-  it.skip("listen finish multiple exception consistency", () => {
-    /* evented-specific */
-  });
-  it.skip("evented listener priority", () => {
-    /* evented-specific */
-  });
+  it.skip("listen start multiple exception consistency", () => {});
+  it.skip("listen finish multiple exception consistency", () => {});
+  it.skip("evented listener priority", () => {});
 
   it("listen to regexp", () => {
     const names: string[] = [];
@@ -131,9 +125,7 @@ describe("EventedTest", () => {
     expect(names).toEqual(["sql.active_record"]);
   });
 
-  it.skip("listen to regexp with exclusions", () => {
-    /* exclusion pattern not implemented */
-  });
+  it.skip("listen to regexp with exclusions", () => {});
 });
 
 describe("SubscribeEventObjectsTest", () => {
