@@ -758,6 +758,9 @@ describe("afterCommit / afterRollback", () => {
     const t1 = await Topic.create({ title: "a" });
     await t1.destroy();
     expect(log).toContain("destroyed");
+    // Attempting to modify a destroyed (frozen) record should throw, not trigger afterUpdate
+    expect(() => t1.writeAttribute("title", "b")).toThrow();
+    expect(log).not.toContain("updated");
   });
 
   it("callback on action with condition", async () => {

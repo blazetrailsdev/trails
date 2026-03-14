@@ -1099,8 +1099,11 @@ describe("MigrationTest", () => {
     /* fixture-dependent */
   });
 
-  // Helper for bulk alter table tests
-  const bulkAdapter = freshAdapter();
+  // Helper for bulk alter table tests — fresh adapter per test via beforeEach
+  let bulkAdapter: DatabaseAdapter;
+  beforeEach(() => {
+    bulkAdapter = freshAdapter();
+  });
   function makeBulkMig(m: Migration): Migration {
     (m as any).adapter = bulkAdapter;
     return m;

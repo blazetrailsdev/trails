@@ -174,16 +174,12 @@ describeIfPg("PostgresAdapter", () => {
 
   it.skip("bad connection", () => {});
 
-  it("database exists returns false when the database does not exist", async () => {
-    const rows = await adapter.execute(`SELECT 1`);
-    // A non-existent file-based db would fail; we just confirm the adapter works
-    expect(rows).toBeDefined();
+  it.skip("database exists returns false when the database does not exist", () => {
+    /* needs adapter.databaseExists() API */
   });
 
-  it("exec insert with returning disabled", async () => {
-    // Our adapter always returns lastInsertRowid for INSERT
-    const id = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('test')`);
-    expect(typeof id).toBe("number");
+  it.skip("exec insert with returning disabled", () => {
+    /* needs table setup and RETURNING-disabled adapter mode */
   });
 
   it.skip("pk and sequence for", async () => {});

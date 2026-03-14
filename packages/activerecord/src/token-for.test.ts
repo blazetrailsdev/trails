@@ -325,7 +325,11 @@ describe("generatesTokenFor()", () => {
     const found = await (User as any).findByTokenFor("confirm", "invalid-token");
     expect(found).toBeNull();
   });
-  it.skip("finds record by token", () => {});
+  it.skip("finds record by token", () => {
+    /* needs fixture setup from secure-token test suite */
+  });
 
-  it.skip("does not find record when token is invalid", () => {});
+  it.skip("does not find record when token is invalid", () => {
+    /* needs fixture setup from secure-token test suite */
+  });
 });
