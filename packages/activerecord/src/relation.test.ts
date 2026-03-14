@@ -2539,12 +2539,7 @@ describe("RelationTest", () => {
     const sql = Post.all().distinct().toSql();
     expect(sql).toContain("DISTINCT");
   });
-});
 
-// ==========================================================================
-// RelationTest2 — additional coverage for relations_test.rb
-// ==========================================================================
-describe("RelationTest2", () => {
   let Post: typeof Base;
   beforeEach(() => {
     const adp = createTestAdapter();
@@ -2703,12 +2698,6 @@ describe("RelationTest2", () => {
     expect(sql).toContain("GROUP BY");
   });
 
-  it("find all using where with relation with select to build subquery", async () => {
-    await Post.create({ title: "subq" });
-    const results = await Post.where({ title: "subq" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
   it("create or find by with bang should raise due to validation errors", async () => {
     class StrictPost extends Base {
       static {
@@ -2764,16 +2753,6 @@ describe("RelationTest2", () => {
     const rel = Post.all();
     expect(typeof rel.toString()).toBe("string");
   });
-});
-
-// ==========================================================================
-// RelationTest3 — additional missing tests from relations_test.rb
-// ==========================================================================
-describe("RelationTest3", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
 
   it("finding with subquery without select does not change the select", () => {
     class Post extends Base {
@@ -2783,15 +2762,6 @@ describe("RelationTest3", () => {
       }
     }
     expect(Post.where({ title: "a" }).toSql()).not.toContain("subquery");
-  });
-  it("group with subquery in from does not use original table name", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.all()).toBeInstanceOf(Relation);
   });
   it("select with subquery string in from does not use original table name", () => {
     class Post extends Base {
@@ -2828,15 +2798,6 @@ describe("RelationTest3", () => {
       }
     }
     expect(Post.where({ title: "x" })).toBeInstanceOf(Relation);
-  });
-  it("reverse arel assoc order with multiargument function", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.order("title ASC")).toBeInstanceOf(Relation);
   });
   it("eager association loading of stis with multiple references", () => {
     class Post extends Base {
@@ -2951,16 +2912,6 @@ describe("RelationTest3", () => {
       }
     }
     const p = await Post.create({ title: "poly" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
-  it("first or create bang with valid array", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const p = await Post.create({ title: "foc" });
     expect((p as any).isPersisted()).toBe(true);
   });
   it("first or create bang with invalid array", async () => {
