@@ -1,7 +1,8 @@
 # ActiveModel: 100% Convention Compare Coverage
 
 ActiveModel has reached **100% convention:compare coverage** — 963/963 tests
-across 56/56 files with 0 misplaced tests.
+across 56/56 files with 0 misplaced tests. 5 of those tests are skipped via
+`it.skip()` (railtie — Rails-specific initialization hooks with no TS equivalent).
 
 ## What's implemented
 
@@ -60,7 +61,7 @@ Complete type casting and serialization:
 | Serialization                          | 3     | 67    |
 | Other (railtie, secure_password, etc.) | 3     | 49    |
 
-5 tests are `it.skip` (railtie — Rails-specific initialization hooks with no TS equivalent).
+5 tests are skipped via `it.skip()` (railtie — Rails-specific initialization hooks with no TS equivalent).
 
 ## Dependencies
 
