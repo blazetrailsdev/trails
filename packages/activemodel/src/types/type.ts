@@ -65,7 +65,7 @@ export class FloatType extends Type<number> {
 export class BooleanType extends Type<boolean> {
   readonly name = "boolean";
 
-  private static readonly TRUE_VALUES = new Set([
+  private static readonly TRUE_VALUES: ReadonlySet<unknown> = new Set([
     true,
     1,
     "1",
@@ -78,7 +78,7 @@ export class BooleanType extends Type<boolean> {
     "yes",
     "YES",
   ]);
-  private static readonly FALSE_VALUES = new Set([
+  private static readonly FALSE_VALUES: ReadonlySet<unknown> = new Set([
     false,
     0,
     "0",
@@ -94,8 +94,8 @@ export class BooleanType extends Type<boolean> {
 
   cast(value: unknown): boolean | null {
     if (value === null || value === undefined) return null;
-    if (BooleanType.TRUE_VALUES.has(value as never)) return true;
-    if (BooleanType.FALSE_VALUES.has(value as never)) return false;
+    if (BooleanType.TRUE_VALUES.has(value)) return true;
+    if (BooleanType.FALSE_VALUES.has(value)) return false;
     return null;
   }
 }
@@ -150,11 +150,22 @@ export class BigIntegerType extends Type<bigint> {
 
   cast(value: unknown): bigint | null {
     if (value === null || value === undefined) return null;
-    try {
-      return BigInt(typeof value === "string" ? value.trim() : (value as never));
-    } catch {
-      return null;
+    if (typeof value === "bigint") return value;
+    if (typeof value === "string") {
+      try {
+        return BigInt(value.trim());
+      } catch {
+        return null;
+      }
     }
+    if (typeof value === "number" || typeof value === "boolean") {
+      try {
+        return BigInt(value);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   serialize(value: unknown): string | null {

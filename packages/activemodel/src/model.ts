@@ -144,10 +144,12 @@ export class Model {
     if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
       options = lastArg as Record<string, unknown>;
       fn = args[args.length - 2] as (value: unknown) => unknown;
-      args = args.slice(0, -2) as AnyRecord;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      args = args.slice(0, -2) as any;
     } else {
       fn = lastArg as (value: unknown) => unknown;
-      args = args.slice(0, -1) as AnyRecord;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      args = args.slice(0, -1) as any;
     }
     const attributes = args as unknown as string[];
     const applyToNil = !!options.applyToNil;
