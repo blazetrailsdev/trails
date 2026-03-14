@@ -3,6 +3,8 @@
 import eslint from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+import unusedImports from "eslint-plugin-unused-imports";
+import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig(
   {
@@ -11,12 +13,29 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
+    plugins: {
+      "unused-imports": unusedImports,
+    },
     rules: {
       // Enable with underscore-prefix ignore pattern for intentionally unused params
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // Auto-fixable unused imports
+      "unused-imports/no-unused-imports": "error",
+    },
+  },
+  // Vitest-specific rules for test files
+  {
+    files: ["**/*.test.ts"],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      "vitest/no-disabled-tests": "off",
+      "vitest/no-identical-title": "off",
     },
   },
   // Per-package overrides for rules that still have violations
@@ -27,12 +46,25 @@ export default defineConfig(
       "packages/actionpack/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/cli/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
     ],
     rules: {
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "no-undef": "off",
+      "unused-imports/no-unused-imports": "off",
+    },
+  },
+  {
+    files: ["packages/activemodel/src/**/*.ts"],
+    languageOptions: {
+      globals: {
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {

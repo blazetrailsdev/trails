@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "./index.js";
-import { ModelName } from "./naming.js";
-import { CallbackChain } from "./callbacks.js";
+import { Model } from "./index.js";
 
 describe("ActiveModel", () => {
   describe("ModelTest", () => {
@@ -87,7 +85,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.afterInitialize((r: any) => {
+          this.afterInitialize((_r: any) => {
             log.push("initialized");
           });
         }

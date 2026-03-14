@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "./index.js";
+import { Model } from "./index.js";
 import { ModelName } from "./naming.js";
-import { CallbackChain } from "./callbacks.js";
 
 describe("ActiveModel", () => {
   describe("Naming", () => {

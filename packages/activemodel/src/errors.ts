@@ -212,7 +212,7 @@ export class Errors {
    *
    * Mirrors: ActiveModel::Errors#added?
    */
-  added(attribute: string, type: string = "invalid", options?: Record<string, unknown>): boolean {
+  added(attribute: string, type: string = "invalid", _options?: Record<string, unknown>): boolean {
     return this._errors.some((e) => e.attribute === attribute && e.type === type);
   }
 

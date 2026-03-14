@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "../index.js";
-import { ModelName } from "../naming.js";
-import { CallbackChain } from "../callbacks.js";
+import { Model } from "../index.js";
 
 describe("ActiveModel", () => {
   describe("Validations Callbacks (ported)", () => {
@@ -178,7 +176,7 @@ describe("ActiveModel", () => {
     });
 
     it("before validation does not mutate the if options array", () => {
-      const conditions = [(r: any) => true];
+      const conditions = [(_r: any) => true];
       class Person extends Model {
         static {
           this.attribute("name", "string");
@@ -189,7 +187,7 @@ describe("ActiveModel", () => {
     });
 
     it("after validation does not mutate the if options array", () => {
-      const conditions = [(r: any) => true];
+      const conditions = [(_r: any) => true];
       class Person extends Model {
         static {
           this.attribute("name", "string");
@@ -207,10 +205,10 @@ describe("ActiveModel", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.beforeValidation((r: any) => {
+          this.beforeValidation((_r: any) => {
             log.push("before_proc");
           });
-          this.afterValidation((r: any) => {
+          this.afterValidation((_r: any) => {
             log.push("after_proc");
           });
         }
@@ -229,7 +227,7 @@ describe("ActiveModel", () => {
         static {
           this.attribute("name", "string");
           this.beforeValidation(
-            (r: any) => {
+            (_r: any) => {
               log.push("before");
             },
             { if: (r: any) => r.readAttribute("name") === "trigger" },
