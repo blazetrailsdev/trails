@@ -14,6 +14,7 @@ import { Associations, setBelongsTo } from "./associations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave.js";
+import { createFixtures } from "./test-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -1291,17 +1292,52 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it.skip("autosave belongs to association callbacks get called once", () => {
     /* fixture-dependent */
   });
-  it.skip("should not add the same callbacks multiple times for has one", () => {
-    /* fixture-dependent */
+  it("should not add the same callbacks multiple times for has one", async () => {
+    const { Pirate, Ship } = createFixtures();
+    // Declaring the association again should not cause duplicate callbacks
+    Associations.hasOne.call(Pirate, "ship", {
+      className: "Ship",
+      foreignKey: "pirate_id",
+      autosave: true,
+    });
+    const log: string[] = [];
+    Pirate.beforeSave(() => {
+      log.push("save");
+    });
+    const p = await Pirate.create({ catchphrase: "Arrr" });
+    // beforeSave should only fire once, not be duplicated
+    expect(log.filter((l) => l === "save").length).toBe(1);
   });
-  it.skip("should not add the same callbacks multiple times for belongs to", () => {
-    /* fixture-dependent */
+  it("should not add the same callbacks multiple times for belongs to", async () => {
+    const { Ship } = createFixtures();
+    Associations.belongsTo.call(Ship, "pirate", {
+      className: "Pirate",
+      foreignKey: "pirate_id",
+      autosave: true,
+    });
+    const log: string[] = [];
+    Ship.beforeSave(() => {
+      log.push("save");
+    });
+    const s = await Ship.create({ name: "Pearl" });
+    expect(log.filter((l) => l === "save").length).toBe(1);
   });
-  it.skip("should not add the same callbacks multiple times for has many", () => {
-    /* fixture-dependent */
+  it("should not add the same callbacks multiple times for has many", async () => {
+    const { Pirate } = createFixtures();
+    Associations.hasMany.call(Pirate, "birds", {
+      className: "Bird",
+      foreignKey: "pirate_id",
+      autosave: true,
+    });
+    const log: string[] = [];
+    Pirate.beforeSave(() => {
+      log.push("save");
+    });
+    const p = await Pirate.create({ catchphrase: "Arrr" });
+    expect(log.filter((l) => l === "save").length).toBe(1);
   });
   it.skip("should not add the same callbacks multiple times for has and belongs to many", () => {
-    /* fixture-dependent */
+    /* habtm not implemented */
   });
   it.skip("cyclic autosaves do not add multiple validations", () => {
     /* fixture-dependent */
