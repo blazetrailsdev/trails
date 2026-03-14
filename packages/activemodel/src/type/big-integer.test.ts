@@ -21,5 +21,21 @@ describe("ActiveModel", () => {
       const large = "9999999999999999999999";
       expect(type.cast(large)).toBe(BigInt(large));
     });
+
+    it("serialize_cast_value is equivalent to serialize after cast", () => {
+      const type = Types.typeRegistry.lookup("big_integer");
+      const cast = type.cast("123");
+      expect(cast).toBe(123n);
+    });
+
+    it("small values", () => {
+      const type = Types.typeRegistry.lookup("big_integer");
+      expect(type.cast(42)).toBe(42n);
+    });
+
+    it("large values", () => {
+      const type = Types.typeRegistry.lookup("big_integer");
+      expect(type.cast("99999999999999999999")).toBe(BigInt("99999999999999999999"));
+    });
   });
 });

@@ -47,5 +47,28 @@ describe("ActiveModel", () => {
       const type = new Types.DecimalType();
       expect(type.cast("not-a-number")).toBe(null);
     });
+
+    it("changed?", () => {
+      class MyModel extends Model {
+        static {
+          this.attribute("price", "decimal");
+        }
+      }
+      const m = new MyModel({ price: "1.0" });
+      m.writeAttribute("price", "1.0");
+      expect(m.attributeChanged("price")).toBe(false);
+    });
+
+    it("type cast decimal from float with large precision", () => {
+      const type = new Types.DecimalType();
+      const result = type.cast(3.14159265358979);
+      expect(Number(result)).toBeCloseTo(3.14159265358979);
+    });
+
+    it("type cast decimal from rational with precision", () => {
+      const type = new Types.DecimalType();
+      const result = type.cast(0.3333333333);
+      expect(Number(result)).toBeCloseTo(0.3333333333);
+    });
   });
 });

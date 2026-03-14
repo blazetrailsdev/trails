@@ -942,5 +942,56 @@ describe("ActiveModel", () => {
       expect(p.isValid()).toBe(false);
       expect(p.errors.get("name")).toEqual(["name is required for record"]);
     });
+
+    it("list of validators on multiple attributes", () => {
+      class Topic extends Model {
+        static {
+          this.attribute("title", "string");
+          this.attribute("author_name", "string");
+          this.validates("title", { length: { minimum: 10 } });
+          this.validates("author_name", { presence: true });
+        }
+      }
+      const titleValidators = Topic.validatorsOn("title");
+      const authorValidators = Topic.validatorsOn("author_name");
+      expect(titleValidators.length).toBe(1);
+      expect(authorValidators.length).toBe(1);
+    });
+
+    it("validate", () => {
+      class Topic extends Model {
+        static {
+          this.attribute("title", "string");
+          this.attribute("content", "string");
+        }
+      }
+      Topic.validate((t: any) => {
+        if (!t.readAttribute("title")) t.errors.add("title", "blank");
+      });
+      const topic = new Topic({});
+      expect(topic.errors.empty).toBe(true);
+      topic.validate();
+      expect(topic.errors.get("title")).toContain("can't be blank");
+    });
+
+    it("strict validation particular validator", () => {
+      class Topic extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { presence: true, strict: true });
+        }
+      }
+      expect(() => new Topic({}).isValid()).toThrow();
+    });
+
+    it("strict validation custom exception", () => {
+      class Topic extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { presence: true, strict: true });
+        }
+      }
+      expect(() => new Topic({}).isValid()).toThrow(/title/i);
+    });
   });
 });

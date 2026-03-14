@@ -335,5 +335,16 @@ describe("ActiveModel", () => {
       // age should still be the same
       expect(p.readAttribute("age")).toBe(25);
     });
+
+    it("value_before_type_cast returns the given value", () => {
+      class Person extends Model {
+        static {
+          this.attribute("age", "integer");
+        }
+      }
+      const p = new Person({ age: "42" });
+      expect(p.readAttributeBeforeTypeCast("age")).toBe("42");
+      expect(p.readAttribute("age")).toBe(42);
+    });
   });
 });

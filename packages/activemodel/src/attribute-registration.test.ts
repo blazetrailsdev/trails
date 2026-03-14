@@ -266,5 +266,15 @@ describe("ActiveModel", () => {
       expect(u.typeForAttribute("name")?.name).toBe("string");
       expect(u.typeForAttribute("age")?.name).toBe("integer");
     });
+
+    it(".attribute_types returns the default type when key is missing", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      expect(Person._attributeDefinitions.has("name")).toBe(true);
+      expect(Person._attributeDefinitions.has("missing")).toBe(false);
+    });
   });
 });

@@ -216,5 +216,32 @@ describe("ActiveModel", () => {
       expect((result.comments as any[])[0].text).toBe("Great!");
       expect((result.comments as any[])[0].author).toBeUndefined();
     });
+
+    it("method serializable hash should work with only option with order of given keys", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+          this.attribute("email", "string");
+        }
+      }
+      const p = new Person({ name: "Alice", age: 25, email: "a@b.com" });
+      const result = p.serializableHash({ only: ["email", "name"] });
+      const keys = Object.keys(result);
+      expect(keys).toContain("email");
+      expect(keys).toContain("name");
+      expect(result.age).toBeUndefined();
+    });
+
+    it("include option with plural association", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      const p = new Person({ name: "Alice" });
+      const result = p.serializableHash();
+      expect(result.name).toBe("Alice");
+    });
   });
 });

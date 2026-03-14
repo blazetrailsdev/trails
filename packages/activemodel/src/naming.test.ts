@@ -390,5 +390,12 @@ describe("ActiveModel", () => {
       const p = new Person({ name: "Alice" });
       expect(p.readAttribute("name")).toBe("Alice");
     });
+
+    it("anonymous class with name argument", () => {
+      const mn = new ModelName("CustomName");
+      expect(mn.name).toBe("CustomName");
+      expect(mn.singular).toBe("custom_name");
+      expect(mn.plural).toBe("custom_names");
+    });
   });
 });

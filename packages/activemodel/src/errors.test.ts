@@ -771,5 +771,20 @@ describe("ActiveModel", () => {
       errors.add("name", "blank");
       expect(errors.fullMessages).toEqual(["Name can't be blank"]);
     });
+
+    it("full_messages doesn't require the base object to respond to :errors", () => {
+      class CustomModel {
+        errors: Errors;
+        constructor() {
+          this.errors = new Errors(this);
+          this.errors.add("name", "invalid", { message: "bar" });
+        }
+        static humanAttributeName() {
+          return "foo";
+        }
+      }
+      const m = new CustomModel();
+      expect(m.errors.fullMessages).toEqual(["foo bar"]);
+    });
   });
 });

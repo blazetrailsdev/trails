@@ -198,5 +198,24 @@ describe("ActiveModel", () => {
       p.isValid();
       expect(typeof conditions.if).toBe("function");
     });
+
+    it("the callback chain is not halted when a before callback returns false)", () => {
+      const log: string[] = [];
+      class MyModel extends Model {
+        static {
+          this.attribute("name", "string");
+          this.beforeValidation(() => {
+            log.push("before");
+          });
+          this.afterValidation(() => {
+            log.push("after");
+          });
+        }
+      }
+      const m = new MyModel({ name: "test" });
+      m.isValid();
+      expect(log).toContain("before");
+      expect(log).toContain("after");
+    });
   });
 });
