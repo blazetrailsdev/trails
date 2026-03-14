@@ -12,18 +12,9 @@
  *   2. Description fallback: check test name alone (handles describe mismatches).
  *   3. Misplaced check: search other TS files using the same path-then-desc strategy.
  *
- * Convention per package:
- *   arel:             attributes/attribute_test.rb → attributes/attribute.test.ts
- *   activemodel:      attribute_methods_test.rb    → attribute-methods.test.ts
- *   activerecord:     finder_test.rb               → finder.test.ts
- *   activesupport:    array_inquirer_test.rb       → array-inquirer.test.ts
- *                     core_ext/string_ext_test.rb  → core-ext/string-ext.test.ts
- *   rack:             spec_auth_basic.rb           → auth_basic.test.ts
- *   actiondispatch:   dispatch/ssl_test.rb         → dispatch/ssl.test.ts
- *   actioncontroller: controller/filters_test.rb   → controller/filters.test.ts
- *
- * General rule: strip _test.rb / spec_ prefix, convert snake_case → kebab-case
- * (except rack which keeps underscores), append .test.ts, preserve directories.
+ * When multiple tests share the same description (e.g., "should handle nil" under
+ * both IsDistinctFrom and IsNotDistinctFrom), matching is count-aware: the Nth
+ * Ruby test with a given description consumes the Nth TS test with that description.
  *
  * Usage:
  *   npx tsx scripts/test-compare/convention-compare.ts [--missing] [--json] [--package activesupport]
@@ -37,7 +28,7 @@ const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 // ---------------------------------------------------------------------------
-// Convention mapping
+// Helpers
 // ---------------------------------------------------------------------------
 
 function rubyToConventionTs(rubyFile: string, pkg: string): string {
@@ -58,8 +49,30 @@ function rubyToConventionTs(rubyFile: string, pkg: string): string {
   return path.join(tsDir, tsFile);
 }
 
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function normPath(ancestors: string[], description: string): string {
+  return [...ancestors, description].map(normalize).join(" > ");
+}
+
+/** Decrement a counter in a Map, removing the key when it hits 0. Returns true if consumed. */
+function consume(map: Map<string, number>, key: string): boolean {
+  const count = map.get(key);
+  if (!count) return false;
+  if (count <= 1) map.delete(key);
+  else map.set(key, count - 1);
+  return true;
+}
+
+/** Increment a counter in a Map. */
+function increment(map: Map<string, number>, key: string): void {
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
 // ---------------------------------------------------------------------------
-// Main
+// Types
 // ---------------------------------------------------------------------------
 
 interface MisplacedTest {
@@ -103,14 +116,18 @@ interface ConventionPackageResult {
   files: ConventionFileResult[];
 }
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
+// ---------------------------------------------------------------------------
+// TS test info stored per-file for wrong-describe resolution
+// ---------------------------------------------------------------------------
+interface TsTestInfo {
+  path: string; // normalized full path
+  desc: string; // normalized description
+  pending: boolean;
 }
 
-/** Build a normalized path key from ancestors + description */
-function normPath(ancestors: string[], description: string): string {
-  return [...ancestors, description].map(normalize).join(" > ");
-}
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 function main() {
   const args = process.argv.slice(2);
@@ -130,72 +147,66 @@ function main() {
   const ruby: TestManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: TestManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // Build TS lookups per package:
-  //   byFilePath:   relPath → Set<normalized-path>     (full ancestor > desc path)
-  //   byFileDesc:   relPath → Set<normalized-desc>     (description only, for fallback)
-  //   pathToFile:   normalized-path → tsFile[]          (reverse lookup by path)
-  //   descToFile:   normalized-desc → tsFile[]          (reverse lookup by desc)
-  //   pendingSet:   Set<"relPath:norm-path">            (skipped tests)
+  // Build TS lookups per package.
+  // For count-aware matching, we store counts (not sets) so that the Nth Ruby test
+  // with description "should handle nil" consumes the Nth TS test with that description.
   const tsLookup = new Map<
     string,
     {
-      byFilePath: Map<string, Set<string>>;
-      byFileDesc: Map<string, Set<string>>;
+      // Per-file counts: relPath → Map<normalized-key, count>
+      filePathCounts: Map<string, Map<string, number>>;
+      fileDescCounts: Map<string, Map<string, number>>;
+      // Per-file ordered test list for wrong-describe resolution
+      fileTests: Map<string, TsTestInfo[]>;
       allFiles: Set<string>;
-      pathToFile: Map<string, string[]>;
-      descToFile: Map<string, string[]>;
-      pendingPaths: Set<string>;
-      pendingDescs: Set<string>;
+      // Cross-file reverse lookup: key → Map<tsFile, count>
+      pathToFileCounts: Map<string, Map<string, number>>;
+      descToFileCounts: Map<string, Map<string, number>>;
     }
   >();
 
   for (const [pkg, pkgInfo] of Object.entries(ts.packages)) {
-    const byFilePath = new Map<string, Set<string>>();
-    const byFileDesc = new Map<string, Set<string>>();
+    const filePathCounts = new Map<string, Map<string, number>>();
+    const fileDescCounts = new Map<string, Map<string, number>>();
+    const fileTests = new Map<string, TsTestInfo[]>();
     const allFiles = new Set<string>();
-    const pathToFile = new Map<string, string[]>();
-    const descToFile = new Map<string, string[]>();
-    const pendingPaths = new Set<string>();
-    const pendingDescs = new Set<string>();
+    const pathToFileCounts = new Map<string, Map<string, number>>();
+    const descToFileCounts = new Map<string, Map<string, number>>();
 
     for (const file of pkgInfo.files) {
       const relPath = extractRelativeTsPath(file.file, pkg);
       allFiles.add(relPath);
 
-      if (!byFilePath.has(relPath)) byFilePath.set(relPath, new Set());
-      if (!byFileDesc.has(relPath)) byFileDesc.set(relPath, new Set());
-      const paths = byFilePath.get(relPath)!;
-      const descs = byFileDesc.get(relPath)!;
+      const pathCounts = new Map<string, number>();
+      const descCounts = new Map<string, number>();
+      const tests: TsTestInfo[] = [];
 
       for (const tc of file.testCases) {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
-        paths.add(np);
-        descs.add(nd);
+        increment(pathCounts, np);
+        increment(descCounts, nd);
+        tests.push({ path: np, desc: nd, pending: !!tc.pending });
 
-        if (!pathToFile.has(np)) pathToFile.set(np, []);
-        const pf = pathToFile.get(np)!;
-        if (!pf.includes(relPath)) pf.push(relPath);
-
-        if (!descToFile.has(nd)) descToFile.set(nd, []);
-        const df = descToFile.get(nd)!;
-        if (!df.includes(relPath)) df.push(relPath);
-
-        if (tc.pending) {
-          pendingPaths.add(`${relPath}:${np}`);
-          pendingDescs.add(`${relPath}:${nd}`);
-        }
+        // Cross-file reverse lookup
+        if (!pathToFileCounts.has(np)) pathToFileCounts.set(np, new Map());
+        increment(pathToFileCounts.get(np)!, relPath);
+        if (!descToFileCounts.has(nd)) descToFileCounts.set(nd, new Map());
+        increment(descToFileCounts.get(nd)!, relPath);
       }
+
+      filePathCounts.set(relPath, pathCounts);
+      fileDescCounts.set(relPath, descCounts);
+      fileTests.set(relPath, tests);
     }
 
     tsLookup.set(pkg, {
-      byFilePath,
-      byFileDesc,
+      filePathCounts,
+      fileDescCounts,
+      fileTests,
       allFiles,
-      pathToFile,
-      descToFile,
-      pendingPaths,
-      pendingDescs,
+      pathToFileCounts,
+      descToFileCounts,
     });
   }
 
@@ -204,15 +215,9 @@ function main() {
   for (const [pkg, pkgInfo] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
 
-    const lookup = tsLookup.get(pkg) || {
-      byFilePath: new Map<string, Set<string>>(),
-      byFileDesc: new Map<string, Set<string>>(),
-      allFiles: new Set<string>(),
-      pathToFile: new Map<string, string[]>(),
-      descToFile: new Map<string, string[]>(),
-      pendingPaths: new Set<string>(),
-      pendingDescs: new Set<string>(),
-    };
+    const lookup = tsLookup.get(pkg);
+    if (!lookup) continue;
+
     const fileResults: ConventionFileResult[] = [];
 
     // Ruby-side: which test paths/names appear in multiple Ruby files?
@@ -226,11 +231,11 @@ function main() {
         const nd = normalize(tc.description);
         if (!seenPaths.has(np)) {
           seenPaths.add(np);
-          rubyPathToFileCount.set(np, (rubyPathToFileCount.get(np) || 0) + 1);
+          increment(rubyPathToFileCount, np);
         }
         if (!seenDescs.has(nd)) {
           seenDescs.add(nd);
-          rubyDescToFileCount.set(nd, (rubyDescToFileCount.get(nd) || 0) + 1);
+          increment(rubyDescToFileCount, nd);
         }
       }
     }
@@ -243,14 +248,21 @@ function main() {
     let tsMapped = 0;
     let tsUnmapped = 0;
 
+    // Clone the per-file counts so we can consume them during matching
+    // without affecting other Ruby files that map to different TS files.
+    // (Each Ruby file gets its own snapshot of the convention TS file's counts.)
     for (const file of pkgInfo.files) {
       const conventionTs = rubyToConventionTs(file.file, pkg);
-      const tsPaths = lookup.byFilePath.get(conventionTs);
-      const tsDescs = lookup.byFileDesc.get(conventionTs);
       const exists = lookup.allFiles.has(conventionTs);
 
       if (exists) tsMapped++;
       else tsUnmapped++;
+
+      const tsTests = lookup.fileTests.get(conventionTs) || [];
+      // Track which TS tests (by index) have been consumed
+      const consumedTs = new Set<number>();
+      // Track which Ruby tests (by index) have been matched
+      const matchedRuby = new Set<number>();
 
       let matched = 0;
       let matchedSkipped = 0;
@@ -260,61 +272,74 @@ function main() {
       const misplacedTests: MisplacedTest[] = [];
       const wrongDescribeTests: WrongDescribeTest[] = [];
 
-      for (const tc of file.testCases) {
+      // Pass 1: Path matches (exact ancestor + description match)
+      for (let ri = 0; ri < file.testCases.length; ri++) {
+        const tc = file.testCases[ri];
+        const np = normPath(tc.ancestors, tc.description);
+        const tsIdx = tsTests.findIndex((t, i) => t.path === np && !consumedTs.has(i));
+        if (tsIdx >= 0) {
+          consumedTs.add(tsIdx);
+          matchedRuby.add(ri);
+          matched++;
+          totalMatched++;
+          totalRuby++;
+          if (tsTests[tsIdx].pending) {
+            matchedSkipped++;
+            totalMatchedSkipped++;
+          }
+        }
+      }
+
+      // Pass 2: Description-only matches on remaining Ruby tests
+      for (let ri = 0; ri < file.testCases.length; ri++) {
+        if (matchedRuby.has(ri)) continue;
+        const tc = file.testCases[ri];
         totalRuby++;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        // Step 1: Try path match in convention file (right file, right describe)
-        if (tsPaths && tsPaths.has(np)) {
-          matched++;
-          totalMatched++;
-          if (lookup.pendingPaths.has(`${conventionTs}:${np}`)) {
-            matchedSkipped++;
-            totalMatchedSkipped++;
-          }
-          continue;
-        }
-
-        // Step 2: Try description-only match in convention file (right file, wrong describe)
-        if (tsDescs && tsDescs.has(nd)) {
+        const descIdx = tsTests.findIndex((t, i) => t.desc === nd && !consumedTs.has(i));
+        if (descIdx >= 0) {
+          consumedTs.add(descIdx);
+          matchedRuby.add(ri);
           matched++;
           totalMatched++;
           wrongDescribe++;
           totalWrongDescribe++;
-          if (lookup.pendingDescs.has(`${conventionTs}:${nd}`)) {
+          if (tsTests[descIdx].pending) {
             matchedSkipped++;
             totalMatchedSkipped++;
-          }
-          // Find what describe block the TS test is actually in
-          const tsPathsInFile = lookup.byFilePath.get(conventionTs);
-          let actualTsPath = nd;
-          if (tsPathsInFile) {
-            for (const tp of tsPathsInFile) {
-              if (tp.endsWith(` > ${nd}`)) {
-                actualTsPath = tp;
-                break;
-              }
-            }
           }
           wrongDescribeTests.push({
             description: tc.description,
             rubyPath: np,
-            tsPath: actualTsPath,
+            tsPath: tsTests[descIdx].path,
           });
           continue;
         }
 
         // Step 3: Look for the test in other TS files
-        // Try path match first, then description fallback
-        const pathLocations = (lookup.pathToFile.get(np) || []).filter((l) => l !== conventionTs);
-        const descLocations = (lookup.descToFile.get(nd) || []).filter((l) => l !== conventionTs);
+        const pathFileCounts = lookup.pathToFileCounts.get(np);
+        const descFileCounts = lookup.descToFileCounts.get(nd);
 
-        // Use path locations if available (more precise), otherwise desc
-        const otherLocations = pathLocations.length > 0 ? pathLocations : descLocations;
+        // Collect other files that have this test (excluding convention file)
+        const pathOtherFiles: string[] = [];
+        if (pathFileCounts) {
+          for (const [f, c] of pathFileCounts) {
+            if (f !== conventionTs && c > 0) pathOtherFiles.push(f);
+          }
+        }
+        const descOtherFiles: string[] = [];
+        if (descFileCounts) {
+          for (const [f, c] of descFileCounts) {
+            if (f !== conventionTs && c > 0) descOtherFiles.push(f);
+          }
+        }
+
+        const otherLocations = pathOtherFiles.length > 0 ? pathOtherFiles : descOtherFiles;
         const isShared =
           (rubyPathToFileCount.get(np) || 0) > 1 ||
-          (pathLocations.length === 0 && (rubyDescToFileCount.get(nd) || 0) > 1);
+          (pathOtherFiles.length === 0 && (rubyDescToFileCount.get(nd) || 0) > 1);
 
         if (otherLocations.length >= 1 && !isShared) {
           misplaced++;
@@ -328,11 +353,17 @@ function main() {
           // Shared test — count as matched
           matched++;
           totalMatched++;
-          const pendingKey =
-            pathLocations.length > 0
-              ? otherLocations.every((l) => lookup.pendingPaths.has(`${l}:${np}`))
-              : otherLocations.every((l) => lookup.pendingDescs.has(`${l}:${nd}`));
-          if (pendingKey) {
+          // Check if all instances in other files are pending
+          let allPending = true;
+          for (const f of otherLocations) {
+            const fTests = lookup.fileTests.get(f) || [];
+            const t = fTests.find((t) => t.path === np || t.desc === nd);
+            if (t && !t.pending) {
+              allPending = false;
+              break;
+            }
+          }
+          if (allPending) {
             matchedSkipped++;
             totalMatchedSkipped++;
           }
