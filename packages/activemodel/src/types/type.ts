@@ -185,6 +185,34 @@ export class ValueType extends Type<unknown> {
   }
 }
 
+export class BinaryType extends Type<Uint8Array> {
+  readonly name = "binary";
+
+  cast(value: unknown): Uint8Array | null {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Uint8Array) return value;
+    const str = String(value);
+    return new TextEncoder().encode(str);
+  }
+
+  serialize(value: unknown): Uint8Array | null {
+    return this.cast(value);
+  }
+}
+
+export class TimeType extends Type<Date> {
+  readonly name = "time";
+
+  cast(value: unknown): Date | null {
+    if (value === null || value === undefined) return null;
+    if (value === "" || (typeof value === "string" && value.trim() === "")) return null;
+    if (value instanceof Date) return value;
+    const str = String(value);
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+}
+
 export class JsonType extends Type<unknown> {
   readonly name = "json";
 

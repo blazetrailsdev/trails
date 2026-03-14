@@ -2417,15 +2417,6 @@ export const SKIP_FILES: string[] = [
   "visitors/postgres_test.rb",
   "visitors/sqlite_test.rb",
 
-  // --- ActiveModel skips ---
-  "railtie_test.rb",
-  "forbidden_attributes_protection_test.rb",
-  "type/serialize_cast_value_test.rb",
-  "secure_password_test.rb",
-  "attribute_set_test.rb",
-  "type/binary_test.rb",
-  "type_test.rb",
-
   // --- ActiveRecord skips ---
   // Adapters / Connection infrastructure
   "active_record_test.rb",

@@ -12,5 +12,7 @@ export {
   BigIntegerType,
   ImmutableStringType,
   ValueType,
+  BinaryType,
+  TimeType,
 } from "./type.js";
 export { typeRegistry } from "./registry.js";

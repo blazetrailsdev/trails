@@ -12,6 +12,8 @@ import {
   BigIntegerType,
   ImmutableStringType,
   ValueType,
+  BinaryType,
+  TimeType,
 } from "./type.js";
 
 /**
@@ -35,6 +37,8 @@ class TypeRegistry {
     this.register("big_integer", () => new BigIntegerType());
     this.register("immutable_string", () => new ImmutableStringType());
     this.register("value", () => new ValueType());
+    this.register("binary", () => new BinaryType());
+    this.register("time", () => new TimeType());
   }
 
   register(name: string, factory: () => Type): void {
