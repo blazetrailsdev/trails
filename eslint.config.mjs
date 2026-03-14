@@ -66,6 +66,11 @@ export default defineConfig(
     },
     rules: {
       "unused-imports/no-unused-vars": "off",
+    },
+  },
+  {
+    files: ["packages/activemodel/src/**/*.test.ts"],
+    rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
   },

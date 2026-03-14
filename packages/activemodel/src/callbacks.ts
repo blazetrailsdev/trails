@@ -1,15 +1,18 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = any;
+
 /**
  * Callback types.
  */
-export type CallbackFn = (record: any) => void | boolean | Promise<void | boolean>;
-export type AroundCallbackFn = (record: any, proceed: () => void) => void;
+export type CallbackFn = (record: AnyRecord) => void | boolean | Promise<void | boolean>;
+export type AroundCallbackFn = (record: AnyRecord, proceed: () => void) => void;
 
 export type CallbackTiming = "before" | "after" | "around";
 export type CallbackEvent = string;
 
 export interface CallbackConditions {
-  if?: (record: any) => boolean;
-  unless?: (record: any) => boolean;
+  if?: (record: AnyRecord) => boolean;
+  unless?: (record: AnyRecord) => boolean;
   prepend?: boolean;
 }
 
@@ -45,7 +48,7 @@ export class CallbackChain {
   /**
    * Check if a callback's conditions are met.
    */
-  private _shouldRun(entry: CallbackEntry, record: any): boolean {
+  private _shouldRun(entry: CallbackEntry, record: AnyRecord): boolean {
     if (entry.conditions?.if && !entry.conditions.if(record)) return false;
     if (entry.conditions?.unless && entry.conditions.unless(record)) return false;
     return true;
@@ -64,7 +67,7 @@ export class CallbackChain {
    * Run callbacks for a given event around a block.
    * Returns false if a before callback returns false (halting the chain).
    */
-  run(event: CallbackEvent, record: any, block: () => void): boolean {
+  run(event: CallbackEvent, record: AnyRecord, block: () => void): boolean {
     if (!this.runBefore(event, record)) return false;
 
     // Around callbacks wrap the block
@@ -88,7 +91,7 @@ export class CallbackChain {
    * Run only before callbacks for an event.
    * Returns false if a callback halts the chain.
    */
-  runBefore(event: CallbackEvent, record: any): boolean {
+  runBefore(event: CallbackEvent, record: AnyRecord): boolean {
     const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
     for (const cb of befores) {
       if (!this._shouldRun(cb, record)) continue;
@@ -101,7 +104,7 @@ export class CallbackChain {
   /**
    * Run only after callbacks for an event.
    */
-  runAfter(event: CallbackEvent, record: any): void {
+  runAfter(event: CallbackEvent, record: AnyRecord): void {
     const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
     for (const cb of afters) {
       if (!this._shouldRun(cb, record)) continue;

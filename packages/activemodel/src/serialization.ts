@@ -1,3 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = any;
+
 /**
  * Serialization options.
  */
@@ -14,7 +17,7 @@ export interface SerializeOptions {
  * Mirrors: ActiveModel::Serialization#serializable_hash
  */
 export function serializableHash(
-  record: any,
+  record: AnyRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
   const attrs: Map<string, unknown> = record._attributes ?? new Map();
@@ -54,7 +57,7 @@ export function serializableHash(
         record._preloadedAssociations?.get(assocName) ?? record._cachedAssociations?.get(assocName);
       if (cached !== undefined) {
         if (Array.isArray(cached)) {
-          result[assocName] = cached.map((r: any) => serializableHash(r, assocOpts));
+          result[assocName] = cached.map((r: AnyRecord) => serializableHash(r, assocOpts));
         } else if (cached && typeof cached === "object" && cached._attributes) {
           result[assocName] = serializableHash(cached, assocOpts);
         } else {

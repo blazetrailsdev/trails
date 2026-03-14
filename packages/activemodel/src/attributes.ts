@@ -7,6 +7,7 @@ export interface AttributeDefinition {
   defaultValue: unknown;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Constructor<T = object> = new (...args: any[]) => T;
 
 /**
@@ -53,15 +54,16 @@ export function Attributes<TBase extends Constructor>(Base: TBase) {
     _attributes: Map<string, unknown> = new Map();
     #initialized = false;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(...args: any[]) {
       super(...args);
-      this.#initAttributes(args[0] ?? {});
+      this.#initAttributes((args[0] as Record<string, unknown>) ?? {});
     }
 
     #initAttributes(initial: Record<string, unknown>) {
       if (this.#initialized) return;
       this.#initialized = true;
-      const ctor = this.constructor as any;
+      const ctor = this.constructor as typeof AttributesMixin;
       const defs: Map<string, AttributeDefinition> = ctor._attributeDefinitions ?? new Map();
 
       for (const [name, def] of defs) {
@@ -80,7 +82,7 @@ export function Attributes<TBase extends Constructor>(Base: TBase) {
     }
 
     writeAttribute(name: string, value: unknown): void {
-      const ctor = this.constructor as any;
+      const ctor = this.constructor as typeof AttributesMixin;
       const def = ctor._attributeDefinitions?.get(name);
       this._attributes.set(name, def ? def.type.cast(value) : value);
     }

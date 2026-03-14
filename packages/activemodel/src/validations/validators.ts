@@ -1,6 +1,6 @@
 import type { Errors } from "../errors.js";
 import { humanize } from "@rails-ts/activesupport";
-import type { Validator, ConditionalOptions } from "./validator.js";
+import type { Validator, ConditionalOptions, AnyRecord } from "./validator.js";
 import { shouldValidate } from "./validator.js";
 
 function isBlank(value: unknown): boolean {
@@ -11,13 +11,13 @@ function isBlank(value: unknown): boolean {
 }
 
 export interface PresenceOptions extends ConditionalOptions {
-  message?: string | ((record: any) => string);
+  message?: string | ((record: AnyRecord) => string);
 }
 
 export class PresenceValidator implements Validator {
   constructor(private options: PresenceOptions = {}) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (isBlank(value)) {
       errors.add(attribute, "blank", { message: this.options.message });
@@ -32,7 +32,7 @@ export interface AbsenceOptions extends ConditionalOptions {
 export class AbsenceValidator implements Validator {
   constructor(private options: AbsenceOptions = {}) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (!isBlank(value)) {
       errors.add(attribute, "present", { message: this.options.message });
@@ -56,7 +56,7 @@ export interface LengthOptions extends ConditionalOptions {
 export class LengthValidator implements Validator {
   constructor(private options: LengthOptions = {}) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (value === null || value === undefined) {
       if (this.options.allowNil !== false) return;
@@ -95,7 +95,7 @@ export class LengthValidator implements Validator {
   }
 }
 
-type NumericValue = number | ((record: any) => number) | string;
+type NumericValue = number | ((record: AnyRecord) => number) | string;
 
 export interface NumericalityOptions extends ConditionalOptions {
   onlyInteger?: boolean;
@@ -116,18 +116,18 @@ export interface NumericalityOptions extends ConditionalOptions {
 export class NumericalityValidator implements Validator {
   constructor(private options: NumericalityOptions = {}) {}
 
-  private resolveNumeric(val: NumericValue | undefined, record: any): number | undefined {
+  private resolveNumeric(val: NumericValue | undefined, record: AnyRecord): number | undefined {
     if (val === undefined) return undefined;
     if (typeof val === "function") return val(record);
     if (typeof val === "string") {
-      const method = (record as any)[val];
+      const method = (record as AnyRecord)[val];
       if (typeof method === "function") return method.call(record);
       return Number(method);
     }
     return val;
   }
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (value === null || value === undefined) {
       if (this.options.allowNil) return;
@@ -199,7 +199,7 @@ export interface InclusionOptions extends ConditionalOptions {
 export class InclusionValidator implements Validator {
   constructor(private options: InclusionOptions) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     // Rails skips when value is nil by default (allow_nil: true)
     if (this.options.allowNil !== false && (value === null || value === undefined)) return;
@@ -222,7 +222,7 @@ export interface ExclusionOptions extends ConditionalOptions {
 export class ExclusionValidator implements Validator {
   constructor(private options: ExclusionOptions) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (this.options.allowNil !== false && (value === null || value === undefined)) return;
     if (this.options.allowBlank && isBlank(value)) return;
@@ -236,8 +236,8 @@ export class ExclusionValidator implements Validator {
 }
 
 export interface FormatOptions extends ConditionalOptions {
-  with?: RegExp | ((record: any) => RegExp);
-  without?: RegExp | ((record: any) => RegExp);
+  with?: RegExp | ((record: AnyRecord) => RegExp);
+  without?: RegExp | ((record: AnyRecord) => RegExp);
   allowNil?: boolean;
   allowBlank?: boolean;
   message?: string;
@@ -259,7 +259,7 @@ export class FormatValidator implements Validator {
     }
   }
 
-  private resolveRegexp(opt: RegExp | ((record: any) => RegExp), record: any): RegExp {
+  private resolveRegexp(opt: RegExp | ((record: AnyRecord) => RegExp), record: AnyRecord): RegExp {
     const re = typeof opt === "function" ? opt(record) : opt;
     if (re.multiline) {
       throw new Error(
@@ -269,7 +269,7 @@ export class FormatValidator implements Validator {
     return re;
   }
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (value === null || value === undefined) {
       if (this.options.allowNil) return;
@@ -300,7 +300,7 @@ export interface AcceptanceOptions extends ConditionalOptions {
 export class AcceptanceValidator implements Validator {
   constructor(private options: AcceptanceOptions = {}) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     // Rails skips acceptance validation when value is nil
     if (value === null || value === undefined) return;
@@ -319,7 +319,7 @@ export interface ConfirmationOptions extends ConditionalOptions {
 export class ConfirmationValidator implements Validator {
   constructor(private options: ConfirmationOptions = {}) {}
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     const confirmationAttr = `${attribute}Confirmation`;
     const confirmation = record._attributes?.get(confirmationAttr) ?? record[confirmationAttr];
@@ -332,7 +332,7 @@ export class ConfirmationValidator implements Validator {
       matches = value === confirmation;
     }
     if (!matches) {
-      const modelClass = (record as any).constructor;
+      const modelClass = (record as AnyRecord).constructor;
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
@@ -345,20 +345,20 @@ export class ConfirmationValidator implements Validator {
 }
 
 export interface ComparisonOptions extends ConditionalOptions {
-  greaterThan?: unknown | ((record: any) => unknown);
-  greaterThanOrEqualTo?: unknown | ((record: any) => unknown);
-  lessThan?: unknown | ((record: any) => unknown);
-  lessThanOrEqualTo?: unknown | ((record: any) => unknown);
-  equalTo?: unknown | ((record: any) => unknown);
-  otherThan?: unknown | ((record: any) => unknown);
+  greaterThan?: unknown | ((record: AnyRecord) => unknown);
+  greaterThanOrEqualTo?: unknown | ((record: AnyRecord) => unknown);
+  lessThan?: unknown | ((record: AnyRecord) => unknown);
+  lessThanOrEqualTo?: unknown | ((record: AnyRecord) => unknown);
+  equalTo?: unknown | ((record: AnyRecord) => unknown);
+  otherThan?: unknown | ((record: AnyRecord) => unknown);
   message?: string;
 }
 
 export class ComparisonValidator implements Validator {
   constructor(private options: ComparisonOptions = {}) {}
 
-  private resolve(opt: unknown | ((record: any) => unknown), record: any): unknown {
-    return typeof opt === "function" ? (opt as (record: any) => unknown)(record) : opt;
+  private resolve(opt: unknown | ((record: AnyRecord) => unknown), record: AnyRecord): unknown {
+    return typeof opt === "function" ? (opt as (record: AnyRecord) => unknown)(record) : opt;
   }
 
   private compare(a: unknown, b: unknown): number {
@@ -368,7 +368,7 @@ export class ComparisonValidator implements Validator {
     return Number(a) - Number(b);
   }
 
-  validate(record: any, attribute: string, value: unknown, errors: Errors): void {
+  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
     if (value === null || value === undefined) return;
 

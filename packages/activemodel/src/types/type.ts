@@ -94,8 +94,8 @@ export class BooleanType extends Type<boolean> {
 
   cast(value: unknown): boolean | null {
     if (value === null || value === undefined) return null;
-    if (BooleanType.TRUE_VALUES.has(value as any)) return true;
-    if (BooleanType.FALSE_VALUES.has(value as any)) return false;
+    if (BooleanType.TRUE_VALUES.has(value as never)) return true;
+    if (BooleanType.FALSE_VALUES.has(value as never)) return false;
     return null;
   }
 }
@@ -151,7 +151,7 @@ export class BigIntegerType extends Type<bigint> {
   cast(value: unknown): bigint | null {
     if (value === null || value === undefined) return null;
     try {
-      return BigInt(typeof value === "string" ? value.trim() : (value as any));
+      return BigInt(typeof value === "string" ? value.trim() : (value as never));
     } catch {
       return null;
     }
