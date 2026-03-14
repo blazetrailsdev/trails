@@ -2686,13 +2686,24 @@ describe("Calculations (Rails-guided)", () => {
     }
   }
 
+  class Account extends Base {
+    static {
+      this.attribute("firm_id", "integer");
+      this.attribute("credit_limit", "integer");
+    }
+  }
+
   beforeEach(async () => {
     adapter = freshAdapter();
     Order.adapter = adapter;
+    Account.adapter = adapter;
     await Order.create({ amount: 10, status: "paid", customer_id: 1 });
     await Order.create({ amount: 20, status: "pending", customer_id: 1 });
     await Order.create({ amount: 30, status: "paid", customer_id: 2 });
     await Order.create({ amount: 5, status: "refunded", customer_id: 2 });
+    await Account.create({ firm_id: 1, credit_limit: 50 });
+    await Account.create({ firm_id: 1, credit_limit: 60 });
+    await Account.create({ firm_id: 2, credit_limit: 100 });
   });
 
   it("should sum field", async () => {
@@ -2770,21 +2781,6 @@ describe("Calculations (Rails-guided)", () => {
     expect(await Order.all().calculate("sum", "amount")).toBe(65);
     expect(await Order.all().calculate("minimum", "amount")).toBe(5);
     expect(await Order.all().calculate("maximum", "amount")).toBe(30);
-  });
-
-  class Account extends Base {
-    static {
-      this.attribute("firm_id", "integer");
-      this.attribute("credit_limit", "integer");
-    }
-  }
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Account.adapter = adapter;
-    await Account.create({ firm_id: 1, credit_limit: 50 });
-    await Account.create({ firm_id: 1, credit_limit: 60 });
-    await Account.create({ firm_id: 2, credit_limit: 100 });
   });
 
   it("sum with conditions", async () => {
