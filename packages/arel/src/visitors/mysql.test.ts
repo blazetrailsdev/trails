@@ -13,11 +13,13 @@ describe("MysqlTest", () => {
     it("should know how to visit", () => {
       const node = users.get("name").matchesRegexp("bar");
       expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(node.left).toHaveProperty("name", "name");
     });
 
     it("can handle subqueries", () => {
       const node = users.get("name").matchesRegexp("foo.*");
       expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(node.left).toHaveProperty("name", "name");
     });
   });
 
@@ -25,11 +27,13 @@ describe("MysqlTest", () => {
     it("can handle subqueries", () => {
       const node = users.get("name").doesNotMatchRegexp("foo.*");
       expect(node).toBeInstanceOf(Nodes.NotRegexp);
+      expect(node.left).toHaveProperty("name", "name");
     });
 
     it("should know how to visit", () => {
       const node = users.get("name").doesNotMatchRegexp("bar");
       expect(node).toBeInstanceOf(Nodes.NotRegexp);
+      expect(node.left).toHaveProperty("name", "name");
     });
   });
 
@@ -114,12 +118,16 @@ describe("MysqlTest", () => {
       const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.MySQL().compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toContain('"users"."id"');
+      expect(sql).toContain('"posts"."user_id"');
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
       const sql = new Visitors.MySQL().compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toContain('"users"."name"');
+      expect(sql).toContain("NULL");
     });
   });
 
