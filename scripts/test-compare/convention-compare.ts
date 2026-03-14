@@ -57,18 +57,28 @@ function normPath(ancestors: string[], description: string): string {
   return [...ancestors, description].map(normalize).join(" > ");
 }
 
-/** Decrement a counter in a Map, removing the key when it hits 0. Returns true if consumed. */
-function consume(map: Map<string, number>, key: string): boolean {
-  const count = map.get(key);
-  if (!count) return false;
-  if (count <= 1) map.delete(key);
-  else map.set(key, count - 1);
-  return true;
-}
-
 /** Increment a counter in a Map. */
 function increment(map: Map<string, number>, key: string): void {
   map.set(key, (map.get(key) || 0) + 1);
+}
+
+/** Append to a Map<string, number[]> (key → list of indices). */
+function appendIndex(map: Map<string, number[]>, key: string, idx: number): void {
+  let arr = map.get(key);
+  if (!arr) {
+    arr = [];
+    map.set(key, arr);
+  }
+  arr.push(idx);
+}
+
+/** Consume the first unconsumed index from a queue, returning it or -1. */
+function consumeIndex(queue: number[] | undefined, consumed: Set<number>): number {
+  if (!queue) return -1;
+  for (const idx of queue) {
+    if (!consumed.has(idx)) return idx;
+  }
+  return -1;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,16 +158,14 @@ function main() {
   const ts: TestManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
   // Build TS lookups per package.
-  // For count-aware matching, we store counts (not sets) so that the Nth Ruby test
-  // with description "should handle nil" consumes the Nth TS test with that description.
+  // Per-file, we store an ordered list of test info plus pre-indexed queues
+  // (path → indices, desc → indices) for O(1) consume-based matching.
   const tsLookup = new Map<
     string,
     {
-      // Per-file counts: relPath → Map<normalized-key, count>
-      filePathCounts: Map<string, Map<string, number>>;
-      fileDescCounts: Map<string, Map<string, number>>;
-      // Per-file ordered test list for wrong-describe resolution
       fileTests: Map<string, TsTestInfo[]>;
+      filePathIndex: Map<string, Map<string, number[]>>; // file → path → [indices]
+      fileDescIndex: Map<string, Map<string, number[]>>; // file → desc → [indices]
       allFiles: Set<string>;
       // Cross-file reverse lookup: key → Map<tsFile, count>
       pathToFileCounts: Map<string, Map<string, number>>;
@@ -166,9 +174,9 @@ function main() {
   >();
 
   for (const [pkg, pkgInfo] of Object.entries(ts.packages)) {
-    const filePathCounts = new Map<string, Map<string, number>>();
-    const fileDescCounts = new Map<string, Map<string, number>>();
     const fileTests = new Map<string, TsTestInfo[]>();
+    const filePathIndex = new Map<string, Map<string, number[]>>();
+    const fileDescIndex = new Map<string, Map<string, number[]>>();
     const allFiles = new Set<string>();
     const pathToFileCounts = new Map<string, Map<string, number>>();
     const descToFileCounts = new Map<string, Map<string, number>>();
@@ -177,16 +185,17 @@ function main() {
       const relPath = extractRelativeTsPath(file.file, pkg);
       allFiles.add(relPath);
 
-      const pathCounts = new Map<string, number>();
-      const descCounts = new Map<string, number>();
       const tests: TsTestInfo[] = [];
+      const pathIdx = new Map<string, number[]>();
+      const descIdx = new Map<string, number[]>();
 
-      for (const tc of file.testCases) {
+      for (let i = 0; i < file.testCases.length; i++) {
+        const tc = file.testCases[i];
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
-        increment(pathCounts, np);
-        increment(descCounts, nd);
         tests.push({ path: np, desc: nd, pending: !!tc.pending });
+        appendIndex(pathIdx, np, i);
+        appendIndex(descIdx, nd, i);
 
         // Cross-file reverse lookup
         if (!pathToFileCounts.has(np)) pathToFileCounts.set(np, new Map());
@@ -195,15 +204,15 @@ function main() {
         increment(descToFileCounts.get(nd)!, relPath);
       }
 
-      filePathCounts.set(relPath, pathCounts);
-      fileDescCounts.set(relPath, descCounts);
       fileTests.set(relPath, tests);
+      filePathIndex.set(relPath, pathIdx);
+      fileDescIndex.set(relPath, descIdx);
     }
 
     tsLookup.set(pkg, {
-      filePathCounts,
-      fileDescCounts,
       fileTests,
+      filePathIndex,
+      fileDescIndex,
       allFiles,
       pathToFileCounts,
       descToFileCounts,
@@ -248,9 +257,6 @@ function main() {
     let tsMapped = 0;
     let tsUnmapped = 0;
 
-    // Clone the per-file counts so we can consume them during matching
-    // without affecting other Ruby files that map to different TS files.
-    // (Each Ruby file gets its own snapshot of the convention TS file's counts.)
     for (const file of pkgInfo.files) {
       const conventionTs = rubyToConventionTs(file.file, pkg);
       const exists = lookup.allFiles.has(conventionTs);
@@ -259,6 +265,8 @@ function main() {
       else tsUnmapped++;
 
       const tsTests = lookup.fileTests.get(conventionTs) || [];
+      const pathIndex = lookup.filePathIndex.get(conventionTs) || new Map();
+      const descIndex = lookup.fileDescIndex.get(conventionTs) || new Map();
       // Track which TS tests (by index) have been consumed
       const consumedTs = new Set<number>();
       // Track which Ruby tests (by index) have been matched
@@ -276,7 +284,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         const tc = file.testCases[ri];
         const np = normPath(tc.ancestors, tc.description);
-        const tsIdx = tsTests.findIndex((t, i) => t.path === np && !consumedTs.has(i));
+        const tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
         if (tsIdx >= 0) {
           consumedTs.add(tsIdx);
           matchedRuby.add(ri);
@@ -298,7 +306,7 @@ function main() {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        const descIdx = tsTests.findIndex((t, i) => t.desc === nd && !consumedTs.has(i));
+        const descIdx = consumeIndex(descIndex.get(nd), consumedTs);
         if (descIdx >= 0) {
           consumedTs.add(descIdx);
           matchedRuby.add(ri);
@@ -353,12 +361,16 @@ function main() {
           // Shared test — count as matched
           matched++;
           totalMatched++;
-          // Check if all instances in other files are pending
+          // Check if all matching instances in other files are pending.
+          // Use path-based check when path locations were used, desc-based otherwise.
           let allPending = true;
+          const usePathCheck = pathOtherFiles.length > 0;
           for (const f of otherLocations) {
             const fTests = lookup.fileTests.get(f) || [];
-            const t = fTests.find((t) => t.path === np || t.desc === nd);
-            if (t && !t.pending) {
+            const matchingTests = fTests.filter((t) =>
+              usePathCheck ? t.path === np : t.desc === nd,
+            );
+            if (matchingTests.some((t) => !t.pending)) {
               allPending = false;
               break;
             }
