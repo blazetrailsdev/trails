@@ -16,7 +16,10 @@ import type { DatabaseAdapter } from "./adapter.js";
 
 /**
  * Creates a fresh set of test model classes with their own adapter.
- * Each call returns isolated models so tests don't share state.
+ * Each call returns new class instances with a fresh adapter so tests
+ * don't share database state. Note: models are registered in the global
+ * model registry (registerModel), so later calls overwrite earlier ones.
+ * This is fine for test isolation since each set uses its own adapter.
  */
 export interface TestFixtures {
   adapter: DatabaseAdapter;
@@ -309,7 +312,27 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     foreignKey: "author_id",
   });
 
+  // Tagging associations
+  Associations.belongsTo.call(Tagging, "tag", {
+    className: "Tag",
+    foreignKey: "tag_id",
+  });
+  Associations.belongsTo.call(Tagging, "post", {
+    className: "Post",
+    foreignKey: "post_id",
+  });
+
+  // Tag associations
+  Associations.hasMany.call(Tag, "taggings", {
+    className: "Tagging",
+    foreignKey: "tag_id",
+  });
+
   // Pirate associations
+  Associations.belongsTo.call(Pirate, "parrot", {
+    className: "Parrot",
+    foreignKey: "parrot_id",
+  });
   Associations.hasMany.call(Pirate, "birds", {
     className: "Bird",
     foreignKey: "pirate_id",
@@ -321,6 +344,12 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
   Associations.hasMany.call(Pirate, "treasures", {
     className: "Treasure",
     foreignKey: "pirate_id",
+  });
+
+  // Parrot associations
+  Associations.hasMany.call(Parrot, "pirates", {
+    className: "Pirate",
+    foreignKey: "parrot_id",
   });
 
   // Ship associations
