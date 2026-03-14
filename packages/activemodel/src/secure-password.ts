@@ -84,9 +84,8 @@ export function hasSecurePassword(
   });
 
   modelClass.afterInitialize((record: Model) => {
-    const plaintext = record.readAttribute(attribute);
-    if (plaintext !== undefined && plaintext !== null) {
-      // Remove plaintext from attributes to prevent serialization leaks
+    if (record._attributes.has(attribute)) {
+      const plaintext = record._attributes.get(attribute);
       record._attributes.delete(attribute);
       setPassword(record, plaintext, attribute, digestAttr, passwordCache);
     }
