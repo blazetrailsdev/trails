@@ -6,10 +6,6 @@ const appId = async (env: Record<string, any>): Promise<[number, Record<string, 
   return [200, { "content-type": "text/plain" }, ["OK"]];
 };
 
-const appEnv = async (env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
-  return [200, { "content-type": "text/plain" }, [JSON.stringify(env)]];
-};
-
 it("return a MockResponse", async () => {
   const req = new MockRequest(appId);
   const res = await req.get("/");

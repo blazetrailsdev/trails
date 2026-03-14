@@ -84,7 +84,6 @@ it("writes error to RACK_ERRORS when given invalid multipart form data", async (
 });
 
 it("writes error to RACK_ERRORS when using incompatible multipart encoding", async () => {
-  const errors: string[] = [];
   const app = new MethodOverride(async (env) => {
     return [200, {}, [env["REQUEST_METHOD"]]];
   });
