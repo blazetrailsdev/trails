@@ -9,15 +9,31 @@ describe("MysqlTest", () => {
     expect(mgr.toSql()).toContain("LIMIT 10");
   });
 
+  describe("Nodes::Regexp", () => {
+    it("should know how to visit", () => {
+      const node = users.get("name").matchesRegexp("bar");
+      expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(node.left).toHaveProperty("name", "name");
+    });
+
+    it("can handle subqueries", () => {
+      const node = users.get("name").matchesRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(node.left).toHaveProperty("name", "name");
+    });
+  });
+
   describe("Nodes::NotRegexp", () => {
     it("can handle subqueries", () => {
       const node = users.get("name").doesNotMatchRegexp("foo.*");
       expect(node).toBeInstanceOf(Nodes.NotRegexp);
+      expect(node.left).toHaveProperty("name", "name");
     });
 
     it("should know how to visit", () => {
       const node = users.get("name").doesNotMatchRegexp("bar");
       expect(node).toBeInstanceOf(Nodes.NotRegexp);
+      expect(node.left).toHaveProperty("name", "name");
     });
   });
 
@@ -98,12 +114,20 @@ describe("MysqlTest", () => {
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
-    it("should construct a valid generic SQL statement", () => {
-      const mgr = users.project(users.get("id")).where(users.get("id").gt(1));
-      const sql = new Visitors.MySQL().compile(mgr.ast);
-      expect(sql).toContain("SELECT");
-      expect(sql).toContain("FROM");
-      expect(sql).toContain("WHERE");
+    it("should handle column names on both sides", () => {
+      const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
+      const sql = new Visitors.MySQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toContain('"users"."id"');
+      expect(sql).toContain('"posts"."user_id"');
+    });
+
+    it("should handle nil", () => {
+      const node = users.get("name").isNotDistinctFrom(null);
+      const sql = new Visitors.MySQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toContain('"users"."name"');
+      expect(sql).toContain("NULL");
     });
   });
 

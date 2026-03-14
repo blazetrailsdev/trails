@@ -9,6 +9,11 @@ describe("DeleteManagerTest", () => {
       mgr.from(users);
       expect(mgr.toSql()).toContain('DELETE FROM "users"');
     });
+
+    it("chains", () => {
+      const mgr = new DeleteManager();
+      expect(mgr.from(users)).toBe(mgr);
+    });
   });
 
   describe("where", () => {
