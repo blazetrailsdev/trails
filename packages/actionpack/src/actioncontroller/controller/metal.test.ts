@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Metal } from "./metal.js";
-import { Request } from "../actiondispatch/request.js";
-import { Response } from "../actiondispatch/response.js";
-import { Parameters } from "../actiondispatch/parameters.js";
+import { Metal } from "../metal.js";
+import { Request } from "../../actiondispatch/request.js";
+import { Response } from "../../actiondispatch/response.js";
+import { Parameters } from "../../actiondispatch/parameters.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -20,7 +20,7 @@ function makeResponse(): Response {
 // ==========================================================================
 // action_controller/metal_test.rb
 // ==========================================================================
-describe("ActionController::Metal", () => {
+describe("MetalControllerInstanceTests", () => {
   it("has default status 200", () => {
     class TestController extends Metal {
       async index() {}

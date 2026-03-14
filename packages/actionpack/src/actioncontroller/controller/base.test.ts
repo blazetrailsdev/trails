@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Base, API, DoubleRenderError } from "./base.js";
-import { Request } from "../actiondispatch/request.js";
-import { Response } from "../actiondispatch/response.js";
+import { Base, API, DoubleRenderError } from "../base.js";
+import { Request } from "../../actiondispatch/request.js";
+import { Response } from "../../actiondispatch/response.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -19,7 +19,7 @@ function makeResponse(): Response {
 // ==========================================================================
 // action_controller/base_test.rb — Rendering
 // ==========================================================================
-describe("ActionController::Base rendering", () => {
+describe("ControllerInstanceTests", () => {
   it("render json", async () => {
     class JsonController extends Base {
       async index() {

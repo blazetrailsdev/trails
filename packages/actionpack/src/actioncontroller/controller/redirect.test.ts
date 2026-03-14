@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Base, DoubleRenderError } from "./base.js";
-import { Request } from "../actiondispatch/request.js";
-import { Response } from "../actiondispatch/response.js";
+import { Base, DoubleRenderError } from "../base.js";
+import { Request } from "../../actiondispatch/request.js";
+import { Response } from "../../actiondispatch/response.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -18,7 +18,7 @@ function makeResponse(): Response {
 // ==========================================================================
 // action_controller/redirect_test.rb
 // ==========================================================================
-describe("ActionController redirecting", () => {
+describe("RedirectTest", () => {
   it("redirect_to with path", async () => {
     class C extends Base {
       async index() {

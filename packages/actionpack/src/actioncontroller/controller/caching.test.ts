@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Base } from "./base.js";
-import { Request } from "../actiondispatch/request.js";
-import { Response } from "../actiondispatch/response.js";
+import { Base } from "../base.js";
+import { Request } from "../../actiondispatch/request.js";
+import { Response } from "../../actiondispatch/response.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -18,7 +18,7 @@ function makeResponse(): Response {
 // ==========================================================================
 // action_controller/caching_test.rb — Conditional GET
 // ==========================================================================
-describe("ActionController conditional GET", () => {
+describe("FragmentCachingTest", () => {
   it("freshWhen sets ETag", async () => {
     class C extends Base {
       async show() {
