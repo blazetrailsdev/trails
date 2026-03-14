@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "../index.js";
-import { ModelName } from "../naming.js";
-import { CallbackChain } from "../callbacks.js";
+import { Model } from "../index.js";
 
 describe("ActiveModel", () => {
   describe("NumericalityValidationTest", () => {
@@ -42,7 +40,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("score", "integer");
-          this.validates("score", { numericality: { greaterThan: (r: any) => 0 } });
+          this.validates("score", { numericality: { greaterThan: (_r: any) => 0 } });
         }
       }
       expect(new Person({ score: 1 }).isValid()).toBe(true);
@@ -308,7 +306,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("age", "integer");
-          this.validates("age", { numericality: { greaterThan: (r: any) => 0 } });
+          this.validates("age", { numericality: { greaterThan: (_r: any) => 0 } });
         }
       }
       const p = new Person({ age: 1 });
@@ -379,7 +377,7 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("value", "integer");
-          this.validates("value", { numericality: { greaterThan: (r: any) => 10 } });
+          this.validates("value", { numericality: { greaterThan: (_r: any) => 10 } });
         }
       }
       expect(new Person({ value: 15 }).isValid()).toBe(true);

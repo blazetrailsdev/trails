@@ -217,7 +217,7 @@ describe("ActiveModel", () => {
       expect(p.errors.fullMessages).toContain("First name can't be blank");
     });
 
-    it("validates_confirmation_of on generated message ", () => {
+    it("validates_confirmation_of on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("title", "string");
@@ -230,7 +230,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("title")[0]).toMatch(/doesn't match/);
     });
 
-    it("validates_acceptance_of on generated message ", () => {
+    it("validates_acceptance_of on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("terms", "string");
@@ -242,7 +242,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("terms")).toContain("must be accepted");
     });
 
-    it("validates_presence_of on generated message ", () => {
+    it("validates_presence_of on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
@@ -254,7 +254,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name")).toContain("can't be blank");
     });
 
-    it("validates_length_of for :within on generated message when too short ", () => {
+    it("validates_length_of for :within on generated message when too short", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
@@ -266,7 +266,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name")[0]).toMatch(/is too short/);
     });
 
-    it("validates_length_of for :too_long generated message ", () => {
+    it("validates_length_of for :too_long generated message", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
@@ -278,7 +278,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name")[0]).toMatch(/is too long/);
     });
 
-    it("validates_length_of for :is on generated message ", () => {
+    it("validates_length_of for :is on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
@@ -290,7 +290,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name")[0]).toMatch(/is the wrong length/);
     });
 
-    it("validates_format_of on generated message ", () => {
+    it("validates_format_of on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("email", "string");
@@ -302,7 +302,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("email")).toContain("is invalid");
     });
 
-    it("validates_inclusion_of on generated message ", () => {
+    it("validates_inclusion_of on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("role", "string");
@@ -314,7 +314,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("role")).toContain("is not included in the list");
     });
 
-    it("validates_inclusion_of using :within on generated message ", () => {
+    it("validates_inclusion_of using :within on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("role", "string");
@@ -326,7 +326,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("role")).toContain("is not included in the list");
     });
 
-    it("validates_exclusion_of generated message ", () => {
+    it("validates_exclusion_of generated message", () => {
       class Person extends Model {
         static {
           this.attribute("username", "string");
@@ -338,7 +338,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("username")).toContain("is reserved");
     });
 
-    it("validates_exclusion_of using :within generated message ", () => {
+    it("validates_exclusion_of using :within generated message", () => {
       class Person extends Model {
         static {
           this.attribute("username", "string");
@@ -350,7 +350,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("username")).toContain("is reserved");
     });
 
-    it("validates_numericality_of generated message ", () => {
+    it("validates_numericality_of generated message", () => {
       class Person extends Model {
         static {
           this.attribute("age", "string");
@@ -362,7 +362,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("age")).toContain("is not a number");
     });
 
-    it("validates_numericality_of for :only_integer on generated message ", () => {
+    it("validates_numericality_of for :only_integer on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("age", "string");
@@ -374,7 +374,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("age")).toContain("must be an integer");
     });
 
-    it("validates_numericality_of for :odd on generated message ", () => {
+    it("validates_numericality_of for :odd on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("count", "string");
@@ -386,7 +386,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("count")).toContain("must be odd");
     });
 
-    it("validates_numericality_of for :less_than on generated message ", () => {
+    it("validates_numericality_of for :less_than on generated message", () => {
       class Person extends Model {
         static {
           this.attribute("age", "string");
@@ -398,7 +398,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("age")).toContain("must be less than 10");
     });
 
-    it(" finds custom model key translation when ", () => {
+    it("finds custom model key translation when", () => {
       I18n.storeTranslations("en", {
         activemodel: {
           errors: {
@@ -425,7 +425,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name")).toContain("is required");
     });
 
-    it(" finds custom model key translation with interpolation when ", () => {
+    it("finds custom model key translation with interpolation when", () => {
       I18n.storeTranslations("en", {
         activemodel: {
           errors: {
@@ -452,7 +452,7 @@ describe("ActiveModel", () => {
       expect(p.errors.get("name")).toContain("must be at least 5 chars");
     });
 
-    it(" finds global default key translation when ", () => {
+    it("finds global default key translation when", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");

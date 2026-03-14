@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "./index.js";
-import { ModelName } from "./naming.js";
-import { CallbackChain } from "./callbacks.js";
+import { Model, Types } from "./index.js";
 
 describe("ActiveModel", () => {
   // =========================================================================
@@ -2031,10 +2029,10 @@ describe("ActiveModel", () => {
       }
 
       const log: string[] = [];
-      (Payment as any).beforeProcess((record: any) => {
+      (Payment as any).beforeProcess((_record: any) => {
         log.push("before_process");
       });
-      (Payment as any).afterProcess((record: any) => {
+      (Payment as any).afterProcess((_record: any) => {
         log.push("after_process");
       });
 

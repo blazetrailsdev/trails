@@ -1,7 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { Model, Errors, Types, NestedError, I18n } from "../index.js";
-import { ModelName } from "../naming.js";
-import { CallbackChain } from "../callbacks.js";
+import { describe, it, expect } from "vitest";
+import { Model, I18n } from "../index.js";
 
 describe("ActiveModel", () => {
   describe("ConfirmationValidationTest", () => {

@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, NestedError } from "./index.js";
-import { ModelName } from "./naming.js";
-import { CallbackChain } from "./callbacks.js";
+import { Model } from "./index.js";
 
 describe("Validations", () => {
   // =========================================================================
@@ -499,10 +497,10 @@ describe("Validations", () => {
           static {
             this.attribute("name", "string");
             this.attribute("email", "string");
-            this.validate((record: any) => {
+            this.validate((_record: any) => {
               order.push("name_check");
             });
-            this.validate((record: any) => {
+            this.validate((_record: any) => {
               order.push("email_check");
             });
           }
@@ -758,7 +756,7 @@ describe("ActiveModel", () => {
           this.attribute("name", "string");
         }
       }
-      const conditions = [(r: any) => true];
+      const conditions = [(_r: any) => true];
       Person.validates("name", { presence: true, if: conditions[0] });
       expect(conditions.length).toBe(1);
     });
@@ -933,7 +931,7 @@ describe("ActiveModel", () => {
           this.attribute("name", "string");
           this.validates("name", {
             presence: {
-              message: (record: any) => `name is required for record`,
+              message: (_record: any) => `name is required for record`,
             },
           });
         }

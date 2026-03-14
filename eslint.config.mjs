@@ -3,6 +3,8 @@
 import eslint from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+import unusedImports from "eslint-plugin-unused-imports";
+import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig(
   {
@@ -11,12 +13,31 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
+    plugins: {
+      "unused-imports": unusedImports,
+    },
     rules: {
-      // Enable with underscore-prefix ignore pattern for intentionally unused params
-      "@typescript-eslint/no-unused-vars": [
+      // Use unused-imports plugin for imports (auto-fixable) and vars
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // Disable the built-in rule to avoid duplicate reports
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  // Vitest-specific rules for activemodel test files only (other packages have too many violations)
+  {
+    files: ["packages/activemodel/src/**/*.test.ts"],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      "vitest/no-disabled-tests": "off",
+      "vitest/no-identical-title": "off",
+      "vitest/expect-expect": "off",
     },
   },
   // Per-package overrides for rules that still have violations
@@ -27,12 +48,25 @@ export default defineConfig(
       "packages/actionpack/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/cli/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
     ],
     rules: {
-      "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "no-undef": "off",
+      "unused-imports/no-unused-imports": "off",
+      "unused-imports/no-unused-vars": "off",
+    },
+  },
+  {
+    files: ["packages/activemodel/src/**/*.ts"],
+    languageOptions: {
+      globals: {
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+      },
+    },
+    rules: {
+      "unused-imports/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {

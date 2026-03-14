@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Errors, Types, NestedError } from "./index.js";
-import { ModelName } from "./naming.js";
-import { CallbackChain } from "./callbacks.js";
+import { Model } from "./index.js";
 
 describe("ActiveModel", () => {
   describe("CallbacksTest", () => {
@@ -10,11 +8,11 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.beforeValidation((r: any) => {
+          this.beforeValidation((_r: any) => {
             log.push("before");
             return false;
           });
-          this.afterValidation((r: any) => {
+          this.afterValidation((_r: any) => {
             log.push("after");
           });
         }
@@ -172,11 +170,11 @@ describe("ActiveModel", () => {
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.afterValidation((r: any) => {
+          this.afterValidation((_r: any) => {
             log.push("after1");
             return false;
           });
-          this.afterValidation((r: any) => {
+          this.afterValidation((_r: any) => {
             log.push("after2");
           });
         }
@@ -187,11 +185,11 @@ describe("ActiveModel", () => {
     });
 
     it("the :if option array should not be mutated by an after callback", () => {
-      const conditions = { if: (r: any) => true };
+      const conditions = { if: (_r: any) => true };
       class Person extends Model {
         static {
           this.attribute("name", "string");
-          this.afterValidation((r: any) => {}, conditions);
+          this.afterValidation((_r: any) => {}, conditions);
         }
       }
       const p = new Person({ name: "Alice" });
