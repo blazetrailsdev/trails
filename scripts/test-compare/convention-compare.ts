@@ -70,6 +70,7 @@ interface ConventionFileResult {
   tsFileExists: boolean;
   rubyTestCount: number;
   matched: number;
+  matchedSkipped: number;
   misplaced: number;
   missing: number;
   missingTests?: string[];
@@ -83,6 +84,7 @@ interface ConventionPackageResult {
   tsUnmapped: number;
   totalRubyTests: number;
   totalMatched: number;
+  totalMatchedSkipped: number;
   totalMisplaced: number;
   percent: number;
   files: ConventionFileResult[];
@@ -111,15 +113,17 @@ function main() {
   const ts: TestManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
   // Build TS lookup: package → Map<relative-path, Set<normalized-description>>
-  // Also build reverse lookup: package → Map<normalized-description, tsFile[]>
+  // Also track pending status per test
   const tsLookup = new Map<string, Map<string, Set<string>>>();
   const tsAllFiles = new Map<string, Set<string>>();
   const tsDescToFile = new Map<string, Map<string, string[]>>();
+  const tsPendingTests = new Map<string, Set<string>>(); // pkg → Set<"file:norm-desc">
 
   for (const [pkg, pkgInfo] of Object.entries(ts.packages)) {
     const byPath = new Map<string, Set<string>>();
     const allFiles = new Set<string>();
     const descToFile = new Map<string, string[]>();
+    const pendingSet = new Set<string>();
 
     for (const file of pkgInfo.files) {
       const relPath = extractRelativeTsPath(file.file, pkg);
@@ -133,12 +137,16 @@ function main() {
         if (!descToFile.has(norm)) descToFile.set(norm, []);
         const files = descToFile.get(norm)!;
         if (!files.includes(relPath)) files.push(relPath);
+        if (tc.pending) {
+          pendingSet.add(`${relPath}:${norm}`);
+        }
       }
     }
 
     tsLookup.set(pkg, byPath);
     tsAllFiles.set(pkg, allFiles);
     tsDescToFile.set(pkg, descToFile);
+    tsPendingTests.set(pkg, pendingSet);
   }
 
   const results: ConventionPackageResult[] = [];
@@ -149,10 +157,27 @@ function main() {
     const tsByPath = tsLookup.get(pkg) || new Map<string, Set<string>>();
     const allTsFiles = tsAllFiles.get(pkg) || new Set<string>();
     const descToFile = tsDescToFile.get(pkg) || new Map<string, string[]>();
+    const pendingSet = tsPendingTests.get(pkg) || new Set<string>();
     const fileResults: ConventionFileResult[] = [];
+
+    // Build Ruby-side lookup: which test names appear in multiple Ruby files?
+    // These are shared concepts (e.g., "connection error" in both mysql and pg adapters)
+    // and shouldn't be flagged as misplaced when found in another adapter's TS file.
+    const rubyDescToFileCount = new Map<string, number>();
+    for (const file of pkgInfo.files) {
+      const seen = new Set<string>();
+      for (const tc of file.testCases) {
+        const norm = normalize(tc.description);
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          rubyDescToFileCount.set(norm, (rubyDescToFileCount.get(norm) || 0) + 1);
+        }
+      }
+    }
 
     let totalRuby = 0;
     let totalMatched = 0;
+    let totalMatchedSkipped = 0;
     let totalMisplaced = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
@@ -166,6 +191,7 @@ function main() {
       else tsUnmapped++;
 
       let matched = 0;
+      let matchedSkipped = 0;
       let misplaced = 0;
       const missingTests: string[] = [];
       const misplacedTests: MisplacedTest[] = [];
@@ -176,17 +202,40 @@ function main() {
         if (tsDescs && tsDescs.has(norm)) {
           matched++;
           totalMatched++;
+          if (pendingSet.has(`${conventionTs}:${norm}`)) {
+            matchedSkipped++;
+            totalMatchedSkipped++;
+          }
         } else {
           // Check if it exists in a different TS file
           const locations = descToFile.get(norm);
           if (locations && locations.length > 0) {
-            misplaced++;
-            totalMisplaced++;
-            misplacedTests.push({
-              description: tc.description,
-              currentTsFile: locations[0],
-              conventionTsFile: conventionTs,
-            });
+            const otherLocations = locations.filter((l) => l !== conventionTs);
+            // A test name that appears in multiple Ruby files (e.g., "connection error"
+            // in both mysql and pg adapter tests) is a shared concept — finding it in
+            // any adapter TS file is fine, not a misplacement.
+            const isSharedAcrossRubyFiles = (rubyDescToFileCount.get(norm) || 0) > 1;
+
+            if (otherLocations.length >= 1 && !isSharedAcrossRubyFiles) {
+              // Exists in other file(s) and is unique to this Ruby file — genuinely misplaced
+              misplaced++;
+              totalMisplaced++;
+              misplacedTests.push({
+                description: tc.description,
+                currentTsFile: otherLocations[0],
+                conventionTsFile: conventionTs,
+              });
+            } else if (otherLocations.length >= 1) {
+              // Shared test name across Ruby files — count as matched
+              matched++;
+              totalMatched++;
+              if (otherLocations.every((l) => pendingSet.has(`${l}:${norm}`))) {
+                matchedSkipped++;
+                totalMatchedSkipped++;
+              }
+            } else {
+              missingTests.push(tc.description);
+            }
           } else {
             missingTests.push(tc.description);
           }
@@ -199,6 +248,7 @@ function main() {
         tsFileExists: exists,
         rubyTestCount: file.testCases.length,
         matched,
+        matchedSkipped,
         misplaced,
         missing: file.testCases.length - matched - misplaced,
         ...(showMissing ? { missingTests } : {}),
@@ -222,6 +272,7 @@ function main() {
       tsUnmapped,
       totalRubyTests: totalRuby,
       totalMatched,
+      totalMatchedSkipped,
       totalMisplaced,
       percent,
       files: fileResults,
@@ -243,6 +294,7 @@ function main() {
   // Print report
   let grandRuby = 0;
   let grandMatched = 0;
+  let grandMatchedSkipped = 0;
   let grandMisplaced = 0;
   let grandFiles = 0;
   let grandMapped = 0;
@@ -250,13 +302,15 @@ function main() {
   for (const pkg of results) {
     grandRuby += pkg.totalRubyTests;
     grandMatched += pkg.totalMatched;
+    grandMatchedSkipped += pkg.totalMatchedSkipped;
     grandMisplaced += pkg.totalMisplaced;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
 
+    const skippedStr = pkg.totalMatchedSkipped > 0 ? ` (${pkg.totalMatchedSkipped} skipped)` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
-      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
+      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)${skippedStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
     );
     console.log(`${"=".repeat(90)}\n`);
 
@@ -289,17 +343,17 @@ function main() {
     }
 
     console.log(
-      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
+      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
     );
     console.log(
-      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
+      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
     );
 
     for (const f of pkg.files) {
       const pct = f.rubyTestCount > 0 ? Math.round((f.matched / f.rubyTestCount) * 100) : 0;
       const marker = !f.tsFileExists ? " ✗" : pct === 100 ? " ✓" : "";
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
+        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {
@@ -311,9 +365,10 @@ function main() {
   }
 
   const grandPct = grandRuby > 0 ? Math.round((grandMatched / grandRuby) * 1000) / 10 : 0;
+  const grandSkipStr = grandMatchedSkipped > 0 ? ` (${grandMatchedSkipped} skipped)` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
-    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
+    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)${grandSkipStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
 }

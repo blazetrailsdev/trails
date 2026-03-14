@@ -82,15 +82,8 @@ function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo 
 }
 
 function extractFileTests(filePath: string): TestFileInfo {
-  const program = ts.createProgram([filePath], {
-    target: ts.ScriptTarget.ESNext,
-    module: ts.ModuleKind.CommonJS,
-  });
-  const sourceFile = program.getSourceFile(filePath);
-
-  if (!sourceFile) {
-    throw new Error(`Could not load source file: ${filePath}`);
-  }
+  const content = fs.readFileSync(filePath, "utf-8");
+  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.ESNext, false);
 
   const relativePath = path.relative(ROOT_DIR, filePath);
   const fileInfo: TestFileInfo = {
@@ -125,7 +118,7 @@ function extractFileTests(filePath: string): TestFileInfo {
               file: relativePath,
               line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
               style: funcName as "it" | "test",
-              assertions: countAssertions(node),
+              assertions: [],
               pending: false,
             };
             fileInfo.testCases.push(testCase);
@@ -145,7 +138,7 @@ function extractFileTests(filePath: string): TestFileInfo {
               file: relativePath,
               line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
               style: base.text as "it" | "test",
-              assertions: countAssertions(node),
+              assertions: [],
               pending: modifier === "skip" || modifier === "todo",
             };
             fileInfo.testCases.push(testCase);
@@ -180,47 +173,6 @@ function pkgFromPath(relPath: string): string {
     return parts[1];
   }
   return "unknown";
-}
-
-function countAssertions(node: ts.Node): string[] {
-  const assertions: string[] = [];
-
-  function findExpect(n: ts.Node) {
-    if (ts.isCallExpression(n)) {
-      const exp = n.expression;
-      if (ts.isIdentifier(exp) && exp.text === "expect") {
-        // Find the matcher
-        const parent = n.parent;
-        if (parent && ts.isPropertyAccessExpression(parent)) {
-          // expect(x).toBe(y) -> parent is .toBe
-          assertions.push(parent.name.text);
-        }
-      }
-    }
-    ts.forEachChild(n, findExpect);
-  }
-
-  ts.forEachChild(node, findExpect);
-  return assertions;
-}
-
-function isExpectChain(node: ts.Node): boolean {
-  if (ts.isCallExpression(node)) {
-    const expression = node.expression;
-    if (ts.isIdentifier(expression) && expression.text === "expect") {
-      return true;
-    }
-    if (ts.isPropertyAccessExpression(expression)) {
-      return isExpectChain(expression.expression);
-    }
-  }
-  if (ts.isPropertyAccessExpression(node)) {
-    // .not, .resolves, .rejects
-    if (node.name.text === "not" || node.name.text === "resolves" || node.name.text === "rejects") {
-      return isExpectChain(node.expression);
-    }
-  }
-  return false;
 }
 
 main();
