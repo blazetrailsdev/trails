@@ -398,13 +398,6 @@ describe("BasicsTest", () => {
     u.writeAttribute("name", "test");
     expect(u.readAttribute("name")).toBe("test");
   });
-});
-
-// ==========================================================================
-// More BasicsTest
-// ==========================================================================
-describe("BasicsTest", () => {
-  const adapter = freshAdapter();
 
   it("equality of destroyed records", async () => {
     class User extends Base {
@@ -533,12 +526,6 @@ describe("BasicsTest", () => {
     }
     expect(User.primaryKey).toBe("uuid");
   });
-});
-
-// ==========================================================================
-// BasicsTest — targets base_test.rb
-// ==========================================================================
-describe("BasicsTest", () => {
   it("attributes", () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -708,233 +695,6 @@ describe("BasicsTest", () => {
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
   });
-});
-
-// ==========================================================================
-// BasicsTest2 — additional coverage for base_test.rb
-// ==========================================================================
-describe("BasicsTest2", () => {
-  let Post: typeof Base;
-  beforeEach(() => {
-    const adp = createTestAdapter();
-    class PostClass extends Base {
-      static {
-        this.tableName = "posts";
-        this.adapter = adp;
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    Post = PostClass;
-  });
-
-  it("attributes", async () => {
-    const p = new Post({ title: "hello" });
-    expect(p.readAttribute("title")).toBe("hello");
-  });
-
-  it("clone of new object with defaults", () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string", { default: "default" });
-        this.adapter = createTestAdapter();
-      }
-    }
-    const i = new Item();
-    const c = i.dup();
-    expect(c.readAttribute("name")).toBe("default");
-  });
-
-  it("clone of new object marks attributes as dirty", () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = createTestAdapter();
-      }
-    }
-    const i = new Item({ name: "test" });
-    const c = i.dup();
-    expect(c.isNewRecord()).toBe(true);
-  });
-
-  it("dup of saved object marks attributes as dirty", async () => {
-    const p = await Post.create({ title: "saved" });
-    const d = p.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("bignum", async () => {
-    class Counter extends Base {
-      static {
-        this.attribute("count", "big_integer");
-        this.adapter = createTestAdapter();
-      }
-    }
-    const c = await Counter.create({ count: 9007199254740991 });
-    expect(Number(c.readAttribute("count"))).toBe(9007199254740991);
-  });
-
-  it("clear cache when setting table name", () => {
-    class MyModel extends Base {
-      static {
-        this.adapter = createTestAdapter();
-      }
-    }
-    MyModel.tableName = "my_table";
-    expect(MyModel.tableName).toBe("my_table");
-  });
-
-  it("count with join", async () => {
-    const count = await Post.all().count();
-    expect(typeof count).toBe("number");
-  });
-
-  it("no limit offset", async () => {
-    const sql = Post.all().toSql();
-    expect(sql).not.toContain("LIMIT");
-  });
-
-  it("all with conditions", async () => {
-    await Post.create({ title: "match" });
-    await Post.create({ title: "other" });
-    const results = await Post.where({ title: "match" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("find ordered last", async () => {
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const last = await Post.all().last();
-    expect(last).not.toBeNull();
-  });
-
-  it("find keeps multiple order values", async () => {
-    const sql = Post.order("title").order("body").toSql();
-    expect(sql).toContain("ORDER BY");
-  });
-
-  it("has attribute with symbol", () => {
-    expect(Post.hasAttributeDefinition("title")).toBe(true);
-  });
-
-  it("touch should raise error on a new object", async () => {
-    const p = new Post({ title: "unsaved" });
-    // new records are not persisted; touch is a no-op or returns false
-    const result = await p.touch();
-    expect(result === false || result === true || result === undefined).toBe(true);
-  });
-
-  it("default values are deeply dupped", () => {
-    class M extends Base {
-      static {
-        this.attribute("name", "string", { default: "val" });
-        this.adapter = createTestAdapter();
-      }
-    }
-    const a = new M();
-    const b = new M();
-    expect(a.readAttribute("name")).toBe("val");
-    expect(b.readAttribute("name")).toBe("val");
-  });
-
-  it("records of different classes have different hashes", () => {
-    class A extends Base {
-      static {
-        this.adapter = createTestAdapter();
-      }
-    }
-    class B extends Base {
-      static {
-        this.adapter = createTestAdapter();
-      }
-    }
-    const a = new A();
-    const b = new B();
-    expect(a.isEqual(b as any)).toBe(false);
-  });
-
-  it("dup with aggregate of same name as attribute", async () => {
-    const p = await Post.create({ title: "orig" });
-    const d = p.dup();
-    expect(d.readAttribute("title")).toBe("orig");
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("clone of new object marks as dirty only changed attributes", () => {
-    const p = new Post({ title: "t" });
-    const d = p.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup of saved object marks as dirty only changed attributes", async () => {
-    const p = await Post.create({ title: "saved" });
-    const d = p.dup();
-    // dup creates a new (unpersisted) record — it's a new record with the same attrs
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("sql injection via find", async () => {
-    await expect(Post.find("1 OR 1=1" as any)).rejects.toThrow();
-  });
-
-  it("marshal new record round trip", () => {
-    const p = new Post({ title: "draft" });
-    expect(p.isNewRecord()).toBe(true);
-    const attrs = p.attributes;
-    expect(attrs["title"]).toBe("draft");
-  });
-
-  it("select symbol", async () => {
-    await Post.create({ title: "x" });
-    const sql = Post.select("title").toSql();
-    expect(sql).toContain("title");
-  });
-
-  it("abstract class table name", () => {
-    class ApplicationRecord extends Base {}
-    // Abstract base classes don't have a table name by default
-    expect(ApplicationRecord.name).toBe("ApplicationRecord");
-  });
-
-  it("unicode column name", () => {
-    class M extends Base {
-      static {
-        this.attribute("名前", "string");
-        this.adapter = createTestAdapter();
-      }
-    }
-    expect(M.hasAttributeDefinition("名前")).toBe(true);
-  });
-
-  it("readonly attributes", () => {
-    class M extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attrReadonly("name");
-        this.adapter = createTestAdapter();
-      }
-    }
-    expect((M as any).readonlyAttributes).toContain("name");
-  });
-
-  it("ignored columns not included in SELECT", () => {
-    class M extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
-        this.adapter = createTestAdapter();
-      }
-    }
-    const sql = M.all().toSql();
-    expect(sql).not.toContain("secret");
-  });
-});
-
-// ==========================================================================
-// BasicsTest3 — more coverage for base_test.rb
-// ==========================================================================
-describe("BasicsTest", () => {
   it("generated association methods module name", () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -1114,14 +874,6 @@ describe("BasicsTest", () => {
     await Post.create({ title: "hello" });
     const results = await Post.select("title").toArray();
     expect(results.length).toBe(1);
-  });
-});
-
-describe("BasicsTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
   });
 
   it("column names are escaped", () => {
@@ -2178,18 +1930,6 @@ describe("BasicsTest", () => {
     expect(u.readAttribute("active")).toBe(true);
   });
 
-  it("has attribute", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = new User();
-    expect(u.hasAttribute("name")).toBe(true);
-    expect(u.hasAttribute("nonexistent")).toBe(false);
-  });
-
   it("has attribute with symbol", () => {
     class User extends Base {
       static {
@@ -2199,296 +1939,6 @@ describe("BasicsTest", () => {
     }
     expect(User.hasAttributeDefinition("name")).toBe(true);
     expect(User.hasAttributeDefinition("nonexistent")).toBe(false);
-  });
-
-  it("attribute names", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.adapter = adapter;
-      }
-    }
-    const names = User.attributeNames();
-    expect(names).toContain("name");
-    expect(names).toContain("age");
-  });
-
-  it("attribute names on abstract class", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    expect(AbstractModel.attributeNames()).toEqual([]);
-  });
-
-  it("initialize with attributes", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = new User({ name: "test" });
-    expect(u.readAttribute("name")).toBe("test");
-    expect(u.isNewRecord()).toBe(true);
-  });
-
-  it("equality", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u1 = await User.create({ name: "a" });
-    const u2 = await User.find(u1.id);
-    expect(u1.isEqual(u2)).toBe(true);
-  });
-
-  it("equality of new records", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u1 = new User({ name: "a" });
-    const u2 = new User({ name: "a" });
-    expect(u1.isEqual(u2)).toBe(false);
-  });
-
-  it("dup", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "orig" });
-    const d = u.dup();
-    expect(d.isNewRecord()).toBe(true);
-    expect(d.id).toBeNull();
-    expect(d.readAttribute("name")).toBe("orig");
-  });
-
-  it("reload", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "orig" });
-    u.writeAttribute("name", "changed");
-    await u.reload();
-    expect(u.readAttribute("name")).toBe("orig");
-  });
-
-  it("last", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "a" });
-    await User.create({ name: "b" });
-    const last = await User.last();
-    expect((last as Base).readAttribute("name")).toBe("b");
-  });
-
-  it("all", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "a" });
-    await User.create({ name: "b" });
-    const all = await User.all().toArray();
-    expect(all.length).toBe(2);
-  });
-
-  it("distinct delegates to scoped", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "a" });
-    await User.create({ name: "a" });
-    const sql = User.distinct().toSql();
-    expect(sql).toContain("DISTINCT");
-  });
-
-  it("abstract class table name", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class ConcreteModel extends AbstractModel {}
-    expect(AbstractModel.abstractClass).toBe(true);
-    expect(ConcreteModel.tableName).toBe("concrete_models");
-  });
-
-  it("#present? and #blank? on ActiveRecord::Base classes", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(await User.all().isBlank()).toBe(true);
-    await User.create({ name: "a" });
-    expect(await User.all().isBlank()).toBe(false);
-  });
-
-  it("select symbol", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "x" });
-    const sql = User.select("name").toSql();
-    expect(sql).toContain("name");
-  });
-
-  it("limit should take value from latest limit", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = User.limit(5).limit(3).toSql();
-    expect(sql).toContain("3");
-  });
-
-  it("previously new record returns boolean", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = new User({ name: "a" });
-    expect(u.isPreviouslyNewRecord()).toBe(false);
-    await u.save();
-    expect(u.isPreviouslyNewRecord()).toBe(true);
-  });
-
-  it("previously changed", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "orig" });
-    u.writeAttribute("name", "changed");
-    await u.save();
-    expect(u.previousChanges).toBeDefined();
-  });
-
-  it("auto id", () => {
-    class User extends Base {}
-    expect(User.primaryKey).toBe("id");
-  });
-
-  it("null fields", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = User.where({ name: null }).toSql();
-    expect(sql).toContain("IS NULL");
-  });
-
-  it("readonly attributes", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-        this.attrReadonly("name");
-      }
-    }
-    const u = await User.create({ name: "orig" });
-    u.writeAttribute("name", "changed");
-    await u.save();
-    await u.reload();
-    expect(u.readAttribute("name")).toBe("orig");
-  });
-
-  it("readonly attributes on a new record", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-        this.attrReadonly("name");
-      }
-    }
-    const u = await User.create({ name: "allowed" });
-    expect(u.readAttribute("name")).toBe("allowed");
-  });
-
-  it("scoped can take a values hash", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const rel = User.where({ name: "test" });
-    const hash = rel.whereValuesHash();
-    expect(hash.name).toBe("test");
-  });
-
-  it("records without an id have unique hashes", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u1 = new User({ name: "a" });
-    const u2 = new User({ name: "a" });
-    expect(u1.isEqual(u2)).toBe(false);
-  });
-
-  it("ignored columns are stored as an array of string", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
-      }
-    }
-    expect(User.ignoredColumns).toEqual(["secret"]);
-  });
-
-  it("singular table name guesses for individual table", () => {
-    class Person extends Base {}
-    expect(Person.tableName).toBe("people");
-    class Category extends Base {}
-    expect(Category.tableName).toBe("categories");
-  });
-
-  it("quoted table name after set table name", () => {
-    class User extends Base {
-      static {
-        this.tableName = "custom_users";
-      }
-    }
-    expect(User.tableName).toBe("custom_users");
   });
 
   it("no limit offset", () => {
@@ -2501,6 +1951,293 @@ describe("BasicsTest", () => {
     const sql = User.all().toSql();
     expect(sql).not.toContain("LIMIT");
     expect(sql).not.toContain("OFFSET");
+  });
+
+  function makeTopic() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.attribute("written_on", "date");
+        this.adapter = adapter;
+      }
+    }
+    return Topic;
+  }
+
+  it("new record returns boolean", async () => {
+    const Topic = makeTopic();
+    const t = new (Topic as any)({ title: "New" });
+    expect(t.isNewRecord()).toBe(true);
+    await t.save();
+    expect(t.isNewRecord()).toBe(false);
+  });
+
+  it("load", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    await Topic.create({ title: "Two" });
+    const all = await Topic.all().toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("all with conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "A", approved: true });
+    await Topic.create({ title: "B", approved: false });
+    const approved = await Topic.where({ approved: true }).toArray();
+    expect(approved.length).toBe(1);
+  });
+
+  it("find ordered last", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "First" });
+    const second = await Topic.create({ title: "Second" });
+    const last = await Topic.order("id").last();
+    expect(last!.id).toBe(second.id);
+  });
+
+  it("count with join", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Join" });
+    const count = await Topic.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it("find keeps multiple order values", async () => {
+    const Topic = makeTopic();
+    const sql = Topic.order("title").order("author_name").toSql();
+    expect(sql).toMatch(/ORDER BY/i);
+  });
+
+  it.skip("marshal round trip", async () => {
+    // Ruby-only serialization feature
+  });
+
+  it.skip("benchmark with log level", async () => {
+    // Ruby-only benchmarking
+  });
+});
+
+// ==========================================================================
+// BasicsTest2 — additional coverage for base_test.rb
+// ==========================================================================
+describe("BasicsTest2", () => {
+  let Post: typeof Base;
+  beforeEach(() => {
+    const adp = createTestAdapter();
+    class PostClass extends Base {
+      static {
+        this.tableName = "posts";
+        this.adapter = adp;
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
+    }
+    Post = PostClass;
+  });
+
+  it("attributes", async () => {
+    const p = new Post({ title: "hello" });
+    expect(p.readAttribute("title")).toBe("hello");
+  });
+
+  it("clone of new object with defaults", () => {
+    class Item extends Base {
+      static {
+        this.attribute("name", "string", { default: "default" });
+        this.adapter = createTestAdapter();
+      }
+    }
+    const i = new Item();
+    const c = i.dup();
+    expect(c.readAttribute("name")).toBe("default");
+  });
+
+  it("clone of new object marks attributes as dirty", () => {
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = createTestAdapter();
+      }
+    }
+    const i = new Item({ name: "test" });
+    const c = i.dup();
+    expect(c.isNewRecord()).toBe(true);
+  });
+
+  it("dup of saved object marks attributes as dirty", async () => {
+    const p = await Post.create({ title: "saved" });
+    const d = p.dup();
+    expect(d.isNewRecord()).toBe(true);
+  });
+
+  it("bignum", async () => {
+    class Counter extends Base {
+      static {
+        this.attribute("count", "big_integer");
+        this.adapter = createTestAdapter();
+      }
+    }
+    const c = await Counter.create({ count: 9007199254740991 });
+    expect(Number(c.readAttribute("count"))).toBe(9007199254740991);
+  });
+
+  it("clear cache when setting table name", () => {
+    class MyModel extends Base {
+      static {
+        this.adapter = createTestAdapter();
+      }
+    }
+    MyModel.tableName = "my_table";
+    expect(MyModel.tableName).toBe("my_table");
+  });
+
+  it("count with join", async () => {
+    const count = await Post.all().count();
+    expect(typeof count).toBe("number");
+  });
+
+  it("no limit offset", async () => {
+    const sql = Post.all().toSql();
+    expect(sql).not.toContain("LIMIT");
+  });
+
+  it("all with conditions", async () => {
+    await Post.create({ title: "match" });
+    await Post.create({ title: "other" });
+    const results = await Post.where({ title: "match" }).toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("find ordered last", async () => {
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    const last = await Post.all().last();
+    expect(last).not.toBeNull();
+  });
+
+  it("find keeps multiple order values", async () => {
+    const sql = Post.order("title").order("body").toSql();
+    expect(sql).toContain("ORDER BY");
+  });
+
+  it("has attribute with symbol", () => {
+    expect(Post.hasAttributeDefinition("title")).toBe(true);
+  });
+
+  it("touch should raise error on a new object", async () => {
+    const p = new Post({ title: "unsaved" });
+    // new records are not persisted; touch is a no-op or returns false
+    const result = await p.touch();
+    expect(result === false || result === true || result === undefined).toBe(true);
+  });
+
+  it("default values are deeply dupped", () => {
+    class M extends Base {
+      static {
+        this.attribute("name", "string", { default: "val" });
+        this.adapter = createTestAdapter();
+      }
+    }
+    const a = new M();
+    const b = new M();
+    expect(a.readAttribute("name")).toBe("val");
+    expect(b.readAttribute("name")).toBe("val");
+  });
+
+  it("records of different classes have different hashes", () => {
+    class A extends Base {
+      static {
+        this.adapter = createTestAdapter();
+      }
+    }
+    class B extends Base {
+      static {
+        this.adapter = createTestAdapter();
+      }
+    }
+    const a = new A();
+    const b = new B();
+    expect(a.isEqual(b as any)).toBe(false);
+  });
+
+  it("dup with aggregate of same name as attribute", async () => {
+    const p = await Post.create({ title: "orig" });
+    const d = p.dup();
+    expect(d.readAttribute("title")).toBe("orig");
+    expect(d.isNewRecord()).toBe(true);
+  });
+
+  it("clone of new object marks as dirty only changed attributes", () => {
+    const p = new Post({ title: "t" });
+    const d = p.dup();
+    expect(d.isNewRecord()).toBe(true);
+  });
+
+  it("dup of saved object marks as dirty only changed attributes", async () => {
+    const p = await Post.create({ title: "saved" });
+    const d = p.dup();
+    // dup creates a new (unpersisted) record — it's a new record with the same attrs
+    expect(d.isNewRecord()).toBe(true);
+  });
+
+  it("sql injection via find", async () => {
+    await expect(Post.find("1 OR 1=1" as any)).rejects.toThrow();
+  });
+
+  it("marshal new record round trip", () => {
+    const p = new Post({ title: "draft" });
+    expect(p.isNewRecord()).toBe(true);
+    const attrs = p.attributes;
+    expect(attrs["title"]).toBe("draft");
+  });
+
+  it("select symbol", async () => {
+    await Post.create({ title: "x" });
+    const sql = Post.select("title").toSql();
+    expect(sql).toContain("title");
+  });
+
+  it("abstract class table name", () => {
+    class ApplicationRecord extends Base {}
+    // Abstract base classes don't have a table name by default
+    expect(ApplicationRecord.name).toBe("ApplicationRecord");
+  });
+
+  it("unicode column name", () => {
+    class M extends Base {
+      static {
+        this.attribute("名前", "string");
+        this.adapter = createTestAdapter();
+      }
+    }
+    expect(M.hasAttributeDefinition("名前")).toBe(true);
+  });
+
+  it("readonly attributes", () => {
+    class M extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attrReadonly("name");
+        this.adapter = createTestAdapter();
+      }
+    }
+    expect((M as any).readonlyAttributes).toContain("name");
+  });
+
+  it("ignored columns not included in SELECT", () => {
+    class M extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+        this.adapter = createTestAdapter();
+      }
+    }
+    const sql = M.all().toSql();
+    expect(sql).not.toContain("secret");
   });
 });
 
@@ -2877,291 +2614,6 @@ describe("Base", () => {
       expect(await u.save()).toBe(false);
       expect(u.errors.get("name")).toContain("can't be blank");
     });
-  });
-});
-
-describe("BasicsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  function makeTopic() {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.attribute("approved", "boolean");
-        this.attribute("written_on", "date");
-        this.adapter = adapter;
-      }
-    }
-    return Topic;
-  }
-
-  it("create after initialize without block", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "New Topic" });
-    expect(t.id).toBeDefined();
-    expect(t.readAttribute("title")).toBe("New Topic");
-  });
-
-  it("initialize with attributes", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "Initialized" });
-    expect(t.readAttribute("title")).toBe("Initialized");
-  });
-
-  it("new record returns boolean", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "New" });
-    expect(t.isNewRecord()).toBe(true);
-    await t.save();
-    expect(t.isNewRecord()).toBe(false);
-  });
-
-  it("previously new record returns boolean", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "New" });
-    expect(t.previouslyNewRecord()).toBe(false);
-    await t.save();
-    expect(t.previouslyNewRecord()).toBe(true);
-  });
-
-  it("load", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    await Topic.create({ title: "Two" });
-    const all = await Topic.all().toArray();
-    expect(all.length).toBe(2);
-  });
-
-  it("load with condition", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Yes", approved: true });
-    await Topic.create({ title: "No", approved: false });
-    const approved = await Topic.where({ approved: true }).toArray();
-    expect(approved.length).toBe(1);
-    expect(approved[0].readAttribute("title")).toBe("Yes");
-  });
-
-  it("attributes", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "Hello", author_name: "Bob" });
-    const attrs = t.attributes;
-    expect(attrs["title"]).toBe("Hello");
-    expect(attrs["author_name"]).toBe("Bob");
-  });
-
-  it("equality", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "A" });
-    const t2 = await Topic.find(t.id);
-    expect(t.isEqual(t2)).toBe(true);
-  });
-
-  it("equality of new records", async () => {
-    const Topic = makeTopic();
-    const t1 = new (Topic as any)({ title: "A" });
-    const t2 = new (Topic as any)({ title: "A" });
-    expect(t1.isEqual(t2)).toBe(false);
-  });
-
-  it("equality of destroyed records", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Destroy" });
-    const id = t.id;
-    await t.destroy();
-    // destroyed record still has same id, equality based on id
-    expect(t.id).toBe(id);
-  });
-
-  it("dup", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Original" });
-    const duped = t.dup();
-    expect(duped.isNewRecord()).toBe(true);
-    expect(duped.readAttribute("title")).toBe("Original");
-  });
-
-  it("reload", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Before" });
-    // Simulate external change by updating directly
-    await Topic.where({ id: t.id }).updateAll({ title: "After" });
-    await t.reload();
-    expect(t.readAttribute("title")).toBe("After");
-  });
-
-  it("last", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "First" });
-    const last = await Topic.create({ title: "Last" });
-    const found = (await Topic.last()) as any;
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe(last.id);
-  });
-
-  it("all", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A" });
-    await Topic.create({ title: "B" });
-    const all = await Topic.all().toArray();
-    expect(all.length).toBe(2);
-  });
-
-  it("all with conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A", approved: true });
-    await Topic.create({ title: "B", approved: false });
-    const approved = await Topic.where({ approved: true }).toArray();
-    expect(approved.length).toBe(1);
-  });
-
-  it("find ordered last", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "First" });
-    const second = await Topic.create({ title: "Second" });
-    const last = await Topic.order("id").last();
-    expect(last!.id).toBe(second.id);
-  });
-
-  it("attribute names", async () => {
-    const Topic = makeTopic();
-    const names = Topic.attributeNames();
-    expect(names).toContain("title");
-    expect(names).toContain("author_name");
-  });
-
-  it("has attribute", async () => {
-    const Topic = makeTopic();
-    expect(Topic.hasAttribute("title")).toBe(true);
-    expect(Topic.hasAttribute("nonexistent")).toBe(false);
-  });
-
-  it("has attribute with symbol", async () => {
-    const Topic = makeTopic();
-    expect(Topic.hasAttribute("title")).toBe(true);
-  });
-
-  it("null fields", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Null Test" });
-    // author_name was not set, should be null
-    expect(t.readAttribute("author_name")).toBeNull();
-  });
-
-  it("auto id", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Auto ID" });
-    expect(t.id).toBeDefined();
-    expect(typeof t.id).toBe("number");
-  });
-
-  it("distinct delegates to scoped", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Dup" });
-    await Topic.create({ title: "Dup" });
-    const count = await Topic.distinct().count("title");
-    expect(count).toBe(1);
-  });
-
-  it("previously changed", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Before" });
-    await Topic.where({ id: t.id }).updateAll({ title: "After" });
-    await t.reload();
-    // savedChanges tracks last save diff
-    const saved = t.savedChanges;
-    expect(typeof saved).toBe("object");
-  });
-
-  it("select symbol", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Select" });
-    const sql = Topic.select("title").toSql();
-    expect(sql).toMatch(/title/);
-  });
-
-  it("limit should take value from latest limit", async () => {
-    const Topic = makeTopic();
-    const sql = Topic.limit(5).limit(2).toSql();
-    expect(sql).toMatch(/LIMIT 2/i);
-  });
-
-  it("table name based on model name", async () => {
-    const Topic = makeTopic();
-    expect(Topic.tableName).toBeDefined();
-    expect(typeof Topic.tableName).toBe("string");
-  });
-
-  it("table exists", async () => {
-    const Topic = makeTopic();
-    // MemoryAdapter always has the table; checking tableExists returns a boolean
-    const exists = await Topic.tableExists();
-    expect(typeof exists).toBe("boolean");
-  });
-
-  it("count with join", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Join" });
-    const count = await Topic.count();
-    expect(count).toBeGreaterThanOrEqual(1);
-  });
-
-  it("no limit offset", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A" });
-    await Topic.create({ title: "B" });
-    const all = await Topic.offset(0).toArray();
-    expect(all.length).toBe(2);
-  });
-
-  it("find keeps multiple order values", async () => {
-    const Topic = makeTopic();
-    const sql = Topic.order("title").order("author_name").toSql();
-    expect(sql).toMatch(/ORDER BY/i);
-  });
-
-  it("find symbol ordered last", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Z" });
-    await Topic.create({ title: "A" });
-    const last = await Topic.order("title").last();
-    expect(last!.readAttribute("title")).toBe("Z");
-  });
-
-  it("abstract class table name", async () => {
-    const Topic = makeTopic();
-    expect(typeof Topic.tableName).toBe("string");
-  });
-
-  it("switching between table name", async () => {
-    class MyModel extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const original = MyModel.tableName;
-    MyModel.tableName = "other_table";
-    expect(MyModel.tableName).toBe("other_table");
-    MyModel.tableName = original;
-  });
-
-  it("toggle attribute", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ approved: false });
-    await t.toggle("approved");
-    expect(t.readAttribute("approved")).toBe(true);
-  });
-
-  it.skip("marshal round trip", async () => {
-    // Ruby-only serialization feature
-  });
-
-  it.skip("benchmark with log level", async () => {
-    // Ruby-only benchmarking
   });
 });
 

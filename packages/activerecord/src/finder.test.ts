@@ -803,13 +803,6 @@ describe("FinderTest", () => {
     const values = await Topic.all().pluck("title");
     expect(values.length).toBe(2);
   });
-});
-
-// ==========================================================================
-// More FinderTest — additional tests for finder_test.rb
-// ==========================================================================
-describe("FinderTest", () => {
-  const adapter = freshAdapter();
 
   it("exists with order and distinct", async () => {
     class Topic extends Base {
@@ -1086,12 +1079,6 @@ describe("FinderTest", () => {
     const found = await Topic.findBy({ title: "a" });
     expect(found).not.toBeNull();
   });
-});
-
-// ==========================================================================
-// FinderTest (continued) — more finder_test.rb coverage
-// ==========================================================================
-describe("FinderTest", () => {
   it("find with string", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
@@ -1333,214 +1320,6 @@ describe("FinderTest", () => {
     const sql = Topic.where({ id: subq }).toSql();
     expect(sql).toContain("IN");
   });
-});
-
-// ==========================================================================
-// FinderTest2 — additional coverage for finder_test.rb
-// ==========================================================================
-describe("FinderTest2", () => {
-  let Post: typeof Base;
-  beforeEach(() => {
-    const adp = createTestAdapter();
-    class PostClass extends Base {
-      static {
-        this.tableName = "posts";
-        this.adapter = adp;
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    Post = PostClass;
-  });
-
-  it("find by empty in condition", async () => {
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: [] }).toArray();
-    expect(results.length).toBe(0);
-  });
-
-  it("find by records", async () => {
-    const p = await Post.create({ title: "rec" });
-    const found = await Post.find(p.id);
-    expect(found.id).toBe(p.id);
-  });
-
-  it("find with nil inside set passed for one attribute", async () => {
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: ["a", null] }).toArray();
-    expect(Array.isArray(results)).toBe(true);
-  });
-
-  it("find_by with associations", async () => {
-    await Post.create({ title: "unique-title" });
-    const found = await Post.findBy({ title: "unique-title" });
-    expect(found).not.toBeNull();
-  });
-
-  it("last with irreversible order", async () => {
-    await Post.create({ title: "a" });
-    const last = await Post.all().last();
-    expect(last).not.toBeNull();
-  });
-
-  it("first have determined order by default", async () => {
-    await Post.create({ title: "a" });
-    const first = await Post.first();
-    expect(first).not.toBeNull();
-  });
-
-  it("find only some columns", async () => {
-    await Post.create({ title: "col-test" });
-    const sql = Post.select("title").toSql();
-    expect(sql).toContain("title");
-  });
-
-  it("find on hash conditions with end exclusive range", async () => {
-    await Post.create({ title: "alpha" });
-    const sql = Post.where({ title: "alpha" }).toSql();
-    expect(sql).toContain("alpha");
-  });
-
-  it("find without primary key", async () => {
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
-  });
-
-  it("finder with offset string", async () => {
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const sql = Post.all().offset(1).toSql();
-    expect(sql).toContain("OFFSET");
-  });
-
-  it("find on a scope does not perform statement caching", async () => {
-    await Post.create({ title: "scope-test" });
-    const scope = Post.where({ title: "scope-test" });
-    const r1 = await scope.toArray();
-    const r2 = await scope.toArray();
-    expect(r1.length).toBe(r2.length);
-  });
-
-  it("find_by on a scope does not perform statement caching", async () => {
-    await Post.create({ title: "findby-scope" });
-    const r1 = await Post.findBy({ title: "findby-scope" });
-    const r2 = await Post.findBy({ title: "findby-scope" });
-    expect(r1?.id).toBe(r2?.id);
-  });
-
-  it("exists with loaded relation having updated owner record", async () => {
-    await Post.create({ title: "exists-test" });
-    const exists = await Post.where({ title: "exists-test" }).exists();
-    expect(exists).toBe(true);
-  });
-
-  it("find by on relation with large number", async () => {
-    const result = await Post.findBy({ id: 999999999 });
-    expect(result).toBeNull();
-  });
-
-  it("find by bang on relation with large number", async () => {
-    await expect(Post.findByBang({ id: 999999999 })).rejects.toThrow();
-  });
-
-  it("implicit order set to primary key", async () => {
-    await Post.create({ title: "pk-order" });
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
-  });
-
-  it("find on hash conditions with array of integers and ranges", async () => {
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: ["a", "b"] }).toArray();
-    expect(Array.isArray(results)).toBe(true);
-  });
-
-  it("member on unloaded relation with match", async () => {
-    const p = await Post.create({ title: "member-test" });
-    const exists = await Post.where({ id: p.id } as any).exists();
-    expect(exists).toBe(true);
-  });
-
-  it("member on unloaded relation without match", async () => {
-    const exists = await Post.where({ id: 99999 } as any).exists();
-    expect(exists).toBe(false);
-  });
-
-  it("member on loaded relation with match", async () => {
-    const p = await Post.create({ title: "loaded-member" });
-    const rel = Post.all();
-    const records = await rel.toArray();
-    const found = records.find((r: any) => r.id === p.id);
-    expect(found).toBeTruthy();
-  });
-
-  it("member on loaded relation without match", async () => {
-    await Post.create({ title: "other" });
-    const rel = Post.all();
-    const records = await rel.toArray();
-    const found = records.find((r: any) => r.id === 99999);
-    expect(found).toBeUndefined();
-  });
-
-  it("include on loaded relation with match", async () => {
-    const p = await Post.create({ title: "included" });
-    const records = await Post.all().toArray();
-    const found = records.find((r: any) => r.id === p.id);
-    expect(found).toBeTruthy();
-  });
-
-  it("include on loaded relation without match", async () => {
-    await Post.create({ title: "other2" });
-    const records = await Post.all().toArray();
-    const found = records.find((r: any) => r.id === 99999);
-    expect(found).toBeUndefined();
-  });
-
-  it("joins dont clobber id", async () => {
-    const p = await Post.create({ title: "join-test" });
-    expect(p.id).toBeTruthy();
-  });
-
-  it("named bind variables with quotes", async () => {
-    await Post.create({ title: "it's quoted" });
-    const results = await Post.where({ title: "it's quoted" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("find by one attribute bang with blank defined", async () => {
-    await expect(Post.findByBang({ title: "nonexistent" })).rejects.toThrow();
-  });
-
-  it("find by nil and not nil attributes", async () => {
-    await Post.create({ title: "has-title" });
-    const results = await Post.where({ title: "has-title" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("select rows", async () => {
-    await Post.create({ title: "row1" });
-    const results = await Post.all().toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("find ignores previously inserted record", async () => {
-    const p = await Post.create({ title: "first" });
-    await Post.create({ title: "second" });
-    const found = await Post.find(p.id);
-    expect(found.id).toBe(p.id);
-  });
-
-  it("find by one attribute with several options", async () => {
-    await Post.create({ title: "opt1" });
-    const found = await Post.findBy({ title: "opt1" });
-    expect(found).not.toBeNull();
-  });
-});
-
-// ==========================================================================
-// FinderTest3 — more coverage for finder_test.rb
-// ==========================================================================
-describe("FinderTest", () => {
   it("exists with loaded relation having updated owner record", async () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -1660,96 +1439,7 @@ describe("FinderTest", () => {
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
   });
-});
 
-describe("FinderRespondToTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  it("should preserve normal respond to behavior on base", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(typeof Post.find).toBe("function");
-    expect(typeof Post.where).toBe("function");
-  });
-
-  it("should preserve normal respond to behavior and respond to newly added method", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-      static customMethod() {
-        return "custom";
-      }
-    }
-    expect(Post.customMethod()).toBe("custom");
-  });
-
-  it("should preserve normal respond to behavior and respond to standard object method", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(typeof Post.toString).toBe("function");
-  });
-
-  it("should respond to find by with bang", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should respond to find by two attributes", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-    expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
-  });
-
-  it("should respond to find all by an aliased attribute", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
-  });
-
-  it("should not respond to find by invalid method syntax", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
-  });
-});
-
-describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
   function makeModel() {
     class Post extends Base {
       static {
@@ -2736,6 +2426,418 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
     expect(found!.id).toBe(p.id);
   });
+
+  function makeTopic() {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    return Topic;
+  }
+
+  it("find", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Hello" });
+    const found = await Topic.find(t.id);
+    expect(found.id).toBe(t.id);
+  });
+
+  it("find with hash parameter", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "World" });
+    const found = await Topic.findBy({ title: "World" });
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("title")).toBe("World");
+  });
+
+  it("find by id with hash", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Test" });
+    const found = await Topic.findBy({ id: t.id });
+    expect(found).not.toBeNull();
+  });
+
+  it("last", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Last" });
+    const t = await Topic.last();
+    expect(t).not.toBeNull();
+  });
+
+  it("find by empty ids", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.find([])).rejects.toThrow();
+  });
+
+  it("find an empty array", async () => {
+    const Topic = makeTopic();
+    await expect(Topic.find([])).rejects.toThrow();
+  });
+
+  it("exists returns false with false arg", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "One" });
+    const exists = await Topic.exists(false);
+    expect(exists).toBe(false);
+  });
+
+  it("find on hash conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Approved", approved: true });
+    await Topic.create({ title: "Rejected", approved: false });
+    const found = await Topic.where({ approved: true }).toArray();
+    expect(found.length).toBe(1);
+    expect(found[0].readAttribute("title")).toBe("Approved");
+  });
+
+  it("find on array conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Match" });
+    const found = await Topic.where({ title: ["Match", "Other"] }).toArray();
+    expect(found.length).toBe(1);
+  });
+
+  it("find on multiple hash conditions", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Hello", author_name: "Alice", approved: true });
+    const found = await Topic.where({
+      title: "Hello",
+      author_name: "Alice",
+      approved: true,
+    }).first();
+    expect(found).not.toBeNull();
+  });
+
+  it("find only some columns", async () => {
+    const Topic = makeTopic();
+    await Topic.create({ title: "Columns" });
+    const sql = Topic.select("title").toSql();
+    expect(sql).toMatch(/title/);
+  });
+
+  it("find by records", async () => {
+    const Topic = makeTopic();
+    const t1 = await Topic.create({ title: "T1" });
+    const t2 = await Topic.create({ title: "T2" });
+    const found = await Topic.where({ id: [t1, t2].map((t) => t.id) }).toArray();
+    expect(found.length).toBe(2);
+  });
+
+  it("find by array of one id", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "One" });
+    const found = await Topic.find([t.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(1);
+  });
+
+  it("find by ids", async () => {
+    const Topic = makeTopic();
+    const t1 = await Topic.create({ title: "A" });
+    const t2 = await Topic.create({ title: "B" });
+    const found = await Topic.find([t1.id, t2.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(2);
+  });
+
+  it("find by ids missing one", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "A" });
+    await expect(Topic.find([t.id, 999999])).rejects.toThrow();
+  });
+
+  it.skip("find with eager loading collection and ordering by collection primary key", async () => {
+    // requires eager loading
+  });
+});
+
+// ==========================================================================
+// FinderTest2 — additional coverage for finder_test.rb
+// ==========================================================================
+describe("FinderTest2", () => {
+  let Post: typeof Base;
+  beforeEach(() => {
+    const adp = createTestAdapter();
+    class PostClass extends Base {
+      static {
+        this.tableName = "posts";
+        this.adapter = adp;
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
+    }
+    Post = PostClass;
+  });
+
+  it("find by empty in condition", async () => {
+    await Post.create({ title: "a" });
+    const results = await Post.where({ title: [] }).toArray();
+    expect(results.length).toBe(0);
+  });
+
+  it("find by records", async () => {
+    const p = await Post.create({ title: "rec" });
+    const found = await Post.find(p.id);
+    expect(found.id).toBe(p.id);
+  });
+
+  it("find with nil inside set passed for one attribute", async () => {
+    await Post.create({ title: "a" });
+    const results = await Post.where({ title: ["a", null] }).toArray();
+    expect(Array.isArray(results)).toBe(true);
+  });
+
+  it("find_by with associations", async () => {
+    await Post.create({ title: "unique-title" });
+    const found = await Post.findBy({ title: "unique-title" });
+    expect(found).not.toBeNull();
+  });
+
+  it("last with irreversible order", async () => {
+    await Post.create({ title: "a" });
+    const last = await Post.all().last();
+    expect(last).not.toBeNull();
+  });
+
+  it("first have determined order by default", async () => {
+    await Post.create({ title: "a" });
+    const first = await Post.first();
+    expect(first).not.toBeNull();
+  });
+
+  it("find only some columns", async () => {
+    await Post.create({ title: "col-test" });
+    const sql = Post.select("title").toSql();
+    expect(sql).toContain("title");
+  });
+
+  it("find on hash conditions with end exclusive range", async () => {
+    await Post.create({ title: "alpha" });
+    const sql = Post.where({ title: "alpha" }).toSql();
+    expect(sql).toContain("alpha");
+  });
+
+  it("find without primary key", async () => {
+    const sql = Post.all().toSql();
+    expect(sql).toContain("SELECT");
+  });
+
+  it("finder with offset string", async () => {
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    const sql = Post.all().offset(1).toSql();
+    expect(sql).toContain("OFFSET");
+  });
+
+  it("find on a scope does not perform statement caching", async () => {
+    await Post.create({ title: "scope-test" });
+    const scope = Post.where({ title: "scope-test" });
+    const r1 = await scope.toArray();
+    const r2 = await scope.toArray();
+    expect(r1.length).toBe(r2.length);
+  });
+
+  it("find_by on a scope does not perform statement caching", async () => {
+    await Post.create({ title: "findby-scope" });
+    const r1 = await Post.findBy({ title: "findby-scope" });
+    const r2 = await Post.findBy({ title: "findby-scope" });
+    expect(r1?.id).toBe(r2?.id);
+  });
+
+  it("exists with loaded relation having updated owner record", async () => {
+    await Post.create({ title: "exists-test" });
+    const exists = await Post.where({ title: "exists-test" }).exists();
+    expect(exists).toBe(true);
+  });
+
+  it("find by on relation with large number", async () => {
+    const result = await Post.findBy({ id: 999999999 });
+    expect(result).toBeNull();
+  });
+
+  it("find by bang on relation with large number", async () => {
+    await expect(Post.findByBang({ id: 999999999 })).rejects.toThrow();
+  });
+
+  it("implicit order set to primary key", async () => {
+    await Post.create({ title: "pk-order" });
+    const sql = Post.all().toSql();
+    expect(sql).toContain("SELECT");
+  });
+
+  it("find on hash conditions with array of integers and ranges", async () => {
+    await Post.create({ title: "a" });
+    const results = await Post.where({ title: ["a", "b"] }).toArray();
+    expect(Array.isArray(results)).toBe(true);
+  });
+
+  it("member on unloaded relation with match", async () => {
+    const p = await Post.create({ title: "member-test" });
+    const exists = await Post.where({ id: p.id } as any).exists();
+    expect(exists).toBe(true);
+  });
+
+  it("member on unloaded relation without match", async () => {
+    const exists = await Post.where({ id: 99999 } as any).exists();
+    expect(exists).toBe(false);
+  });
+
+  it("member on loaded relation with match", async () => {
+    const p = await Post.create({ title: "loaded-member" });
+    const rel = Post.all();
+    const records = await rel.toArray();
+    const found = records.find((r: any) => r.id === p.id);
+    expect(found).toBeTruthy();
+  });
+
+  it("member on loaded relation without match", async () => {
+    await Post.create({ title: "other" });
+    const rel = Post.all();
+    const records = await rel.toArray();
+    const found = records.find((r: any) => r.id === 99999);
+    expect(found).toBeUndefined();
+  });
+
+  it("include on loaded relation with match", async () => {
+    const p = await Post.create({ title: "included" });
+    const records = await Post.all().toArray();
+    const found = records.find((r: any) => r.id === p.id);
+    expect(found).toBeTruthy();
+  });
+
+  it("include on loaded relation without match", async () => {
+    await Post.create({ title: "other2" });
+    const records = await Post.all().toArray();
+    const found = records.find((r: any) => r.id === 99999);
+    expect(found).toBeUndefined();
+  });
+
+  it("joins dont clobber id", async () => {
+    const p = await Post.create({ title: "join-test" });
+    expect(p.id).toBeTruthy();
+  });
+
+  it("named bind variables with quotes", async () => {
+    await Post.create({ title: "it's quoted" });
+    const results = await Post.where({ title: "it's quoted" }).toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("find by one attribute bang with blank defined", async () => {
+    await expect(Post.findByBang({ title: "nonexistent" })).rejects.toThrow();
+  });
+
+  it("find by nil and not nil attributes", async () => {
+    await Post.create({ title: "has-title" });
+    const results = await Post.where({ title: "has-title" }).toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("select rows", async () => {
+    await Post.create({ title: "row1" });
+    const results = await Post.all().toArray();
+    expect(results.length).toBe(1);
+  });
+
+  it("find ignores previously inserted record", async () => {
+    const p = await Post.create({ title: "first" });
+    await Post.create({ title: "second" });
+    const found = await Post.find(p.id);
+    expect(found.id).toBe(p.id);
+  });
+
+  it("find by one attribute with several options", async () => {
+    await Post.create({ title: "opt1" });
+    const found = await Post.findBy({ title: "opt1" });
+    expect(found).not.toBeNull();
+  });
+});
+
+describe("FinderRespondToTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("should preserve normal respond to behavior on base", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(typeof Post.find).toBe("function");
+    expect(typeof Post.where).toBe("function");
+  });
+
+  it("should preserve normal respond to behavior and respond to newly added method", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+      static customMethod() {
+        return "custom";
+      }
+    }
+    expect(Post.customMethod()).toBe("custom");
+  });
+
+  it("should preserve normal respond to behavior and respond to standard object method", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(typeof Post.toString).toBe("function");
+  });
+
+  it("should respond to find by with bang", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+  });
+
+  it("should respond to find by two attributes", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+    expect(Post.respondToMissingFinder("findByAuthor")).toBe(true);
+  });
+
+  it("should respond to find all by an aliased attribute", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.respondToMissingFinder("findByTitle")).toBe(true);
+  });
+
+  it("should not respond to find by invalid method syntax", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.respondToMissingFinder("findByNonExistentAttribute")).toBe(false);
+  });
 });
 
 describe("find_or_create_by / find_or_initialize_by", () => {
@@ -3415,12 +3517,8 @@ describe("Finders (Rails-guided)", () => {
     const result = await User.all().order({ name: "asc" }).pick("name", "age");
     expect(result).toEqual(["Alice", 25]);
   });
-});
 
-describe("Finders (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
-  class User extends Base {
+  class FinderUser extends Base {
     static {
       this.attribute("name", "string");
       this.attribute("email", "string");
@@ -3429,14 +3527,14 @@ describe("Finders (Rails-guided)", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
-    User.adapter = adapter;
-    await User.create({ name: "Alice", email: "alice@test.com" });
-    await User.create({ name: "Bob", email: "bob@test.com" });
-    await User.create({ name: "Charlie", email: "charlie@test.com" });
+    FinderUser.adapter = adapter;
+    await FinderUser.create({ name: "Alice", email: "alice@test.com" });
+    await FinderUser.create({ name: "Bob", email: "bob@test.com" });
+    await FinderUser.create({ name: "Charlie", email: "charlie@test.com" });
   });
 
   it("find with multiple IDs returns array", async () => {
-    const users = await User.find([1, 2]);
+    const users = await FinderUser.find([1, 2]);
     expect(users).toHaveLength(2);
     expect(users[0].readAttribute("name")).toBeDefined();
     expect(users[1].readAttribute("name")).toBeDefined();
@@ -3878,318 +3976,6 @@ describe("Finders (extended)", () => {
       await User.deleteBy({ name: "Alice" });
       expect(await User.count()).toBe(2);
     });
-  });
-});
-
-describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  function makeTopic() {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.attribute("approved", "boolean");
-        this.adapter = adapter;
-      }
-    }
-    return Topic;
-  }
-
-  it("find", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Hello" });
-    const found = await Topic.find(t.id);
-    expect(found.id).toBe(t.id);
-  });
-
-  it("find with hash parameter", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "World" });
-    const found = await Topic.findBy({ title: "World" });
-    expect(found).not.toBeNull();
-    expect(found!.readAttribute("title")).toBe("World");
-  });
-
-  it("find by id with hash", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Test" });
-    const found = await Topic.findBy({ id: t.id });
-    expect(found).not.toBeNull();
-  });
-
-  it("take", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    const t = await Topic.take();
-    expect(t).not.toBeNull();
-  });
-
-  it("take failing", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.take();
-    expect(t).toBeNull();
-  });
-
-  it("take bang present", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Present" });
-    const t = await Topic.take_();
-    expect(t).not.toBeNull();
-  });
-
-  it("take bang missing", async () => {
-    const Topic = makeTopic();
-    await expect(Topic.take_()).rejects.toThrow();
-  });
-
-  it("first", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "First" });
-    const t = await Topic.first();
-    expect(t).not.toBeNull();
-  });
-
-  it("first failing", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.first();
-    expect(t).toBeNull();
-  });
-
-  it("first bang present", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Here" });
-    const t = await Topic.first_();
-    expect(t).not.toBeNull();
-  });
-
-  it("first bang missing", async () => {
-    const Topic = makeTopic();
-    await expect(Topic.first_()).rejects.toThrow();
-  });
-
-  it("first have primary key order by default", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A" });
-    await Topic.create({ title: "B" });
-    const sql = Topic.all().toSql();
-    // first() should add ORDER BY primary key
-    const first = await Topic.first();
-    expect(first).not.toBeNull();
-  });
-
-  it("last", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Last" });
-    const t = await Topic.last();
-    expect(t).not.toBeNull();
-  });
-
-  it("last bang present", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Here" });
-    const t = await Topic.last_();
-    expect(t).not.toBeNull();
-  });
-
-  it("last bang missing", async () => {
-    const Topic = makeTopic();
-    await expect(Topic.last_()).rejects.toThrow();
-  });
-
-  it("find by one attribute", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Rails" });
-    const found = await Topic.findBy({ title: "Rails" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find by one attribute bang", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Rails" });
-    const found = await Topic.findBy_({ title: "Rails" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find by two attributes", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Hello", author_name: "Alice" });
-    const found = await Topic.findBy({ title: "Hello", author_name: "Alice" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find by nil attribute", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "NoAuthor", author_name: null });
-    const found = await Topic.findBy({ author_name: null });
-    expect(found).not.toBeNull();
-  });
-
-  it("find by empty ids", async () => {
-    const Topic = makeTopic();
-    await expect(Topic.find([])).rejects.toThrow();
-  });
-
-  it("find an empty array", async () => {
-    const Topic = makeTopic();
-    await expect(Topic.find([])).rejects.toThrow();
-  });
-
-  it("exists", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Exists" });
-    const exists = await Topic.exists({ title: "Exists" });
-    expect(exists).toBe(true);
-  });
-
-  it("exists returns true with one record and no args", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    const exists = await Topic.exists();
-    expect(exists).toBe(true);
-  });
-
-  it("exists returns false with false arg", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    const exists = await Topic.exists(false);
-    expect(exists).toBe(false);
-  });
-
-  it("find on hash conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Approved", approved: true });
-    await Topic.create({ title: "Rejected", approved: false });
-    const found = await Topic.where({ approved: true }).toArray();
-    expect(found.length).toBe(1);
-    expect(found[0].readAttribute("title")).toBe("Approved");
-  });
-
-  it("find on array conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Match" });
-    const found = await Topic.where({ title: ["Match", "Other"] }).toArray();
-    expect(found.length).toBe(1);
-  });
-
-  it("find on multiple hash conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Hello", author_name: "Alice", approved: true });
-    const found = await Topic.where({
-      title: "Hello",
-      author_name: "Alice",
-      approved: true,
-    }).first();
-    expect(found).not.toBeNull();
-  });
-
-  it("find by one attribute with conditions", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Rails", approved: true });
-    await Topic.create({ title: "Rails", approved: false });
-    const found = await Topic.where({ approved: true }).findBy({ title: "Rails" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find doesnt have implicit ordering", async () => {
-    const Topic = makeTopic();
-    const a = await Topic.create({ title: "A" });
-    const b = await Topic.create({ title: "B" });
-    const sql = Topic.where({ id: [a.id, b.id] }).toSql();
-    expect(sql).not.toMatch(/ORDER BY/i);
-  });
-
-  it("unexisting record exception handling", async () => {
-    const Topic = makeTopic();
-    await expect(Topic.find(999999)).rejects.toThrow();
-  });
-
-  it("find only some columns", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Columns" });
-    const sql = Topic.select("title").toSql();
-    expect(sql).toMatch(/title/);
-  });
-
-  it("count by sql", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    await Topic.create({ title: "Two" });
-    const count = await Topic.count();
-    expect(count).toBe(2);
-  });
-
-  it("find by records", async () => {
-    const Topic = makeTopic();
-    const t1 = await Topic.create({ title: "T1" });
-    const t2 = await Topic.create({ title: "T2" });
-    const found = await Topic.where({ id: [t1, t2].map((t) => t.id) }).toArray();
-    expect(found.length).toBe(2);
-  });
-
-  it("find by array of one id", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "One" });
-    const found = await Topic.find([t.id]);
-    expect(Array.isArray(found)).toBe(true);
-    expect((found as any[]).length).toBe(1);
-  });
-
-  it("find by ids", async () => {
-    const Topic = makeTopic();
-    const t1 = await Topic.create({ title: "A" });
-    const t2 = await Topic.create({ title: "B" });
-    const found = await Topic.find([t1.id, t2.id]);
-    expect(Array.isArray(found)).toBe(true);
-    expect((found as any[]).length).toBe(2);
-  });
-
-  it("find by ids missing one", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "A" });
-    await expect(Topic.find([t.id, 999999])).rejects.toThrow();
-  });
-
-  it("take and first and last with integer should return an array", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A" });
-    await Topic.create({ title: "B" });
-    const result = await Topic.all().first(2);
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it("find with group and sanitized having method", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "Group", author_name: "Alice" });
-    const sql = Topic.group("author_name").toSql();
-    expect(sql).toMatch(/GROUP BY/i);
-  });
-
-  it("hash condition find with array", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "A" });
-    await Topic.create({ title: "B" });
-    await Topic.create({ title: "C" });
-    const found = await Topic.where({ title: ["A", "B"] }).toArray();
-    expect(found.length).toBe(2);
-  });
-
-  it("hash condition find with nil", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ author_name: null });
-    const found = await Topic.where({ author_name: null }).toArray();
-    expect(found.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it.skip("find by sql with sti on joined table", async () => {
-    // requires real DB adapter with JOIN support
-  });
-
-  it.skip("find with eager loading collection and ordering by collection primary key", async () => {
-    // requires eager loading
   });
 });
 
