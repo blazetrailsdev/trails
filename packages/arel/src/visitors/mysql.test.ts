@@ -11,16 +11,13 @@ describe("MysqlTest", () => {
 
   describe("Nodes::NotRegexp", () => {
     it("can handle subqueries", () => {
-      const subquery = users.project(users.get("id"));
-      const node = users.get("id").in(subquery);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("SELECT");
+      const node = users.get("name").doesNotMatchRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.NotRegexp);
     });
 
     it("should know how to visit", () => {
-      const visitor = new Visitors.ToSql();
-      const node = users.get("id").in([1, 2, 3]);
-      expect(visitor.compile(node)).toContain("IN");
+      const node = users.get("name").doesNotMatchRegexp("bar");
+      expect(node).toBeInstanceOf(Nodes.NotRegexp);
     });
   });
 

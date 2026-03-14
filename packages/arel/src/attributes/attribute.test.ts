@@ -31,7 +31,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#gt_all", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").gtAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
@@ -73,13 +73,13 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#gteq_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").gteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#gteq_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").gteqAny([1, 2]));
@@ -89,7 +89,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#gteq_all", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").gteqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
@@ -123,13 +123,13 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#lt_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").ltAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#lt_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").ltAny([1, 2]));
@@ -139,7 +139,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#lt_all", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").ltAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
@@ -174,13 +174,13 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#lteq_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").lteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#lteq_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").lteqAny([1, 2]));
@@ -190,7 +190,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#lteq_all", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").lteqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
@@ -222,13 +222,13 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#eq_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").eqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#eq_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").eqAny([1, 2]));
@@ -318,13 +318,13 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#matches_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("name").matchesAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#matches_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").matchesAny(["%foo%", "%bar%"]));
@@ -334,7 +334,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#matches_all", () => {
     it("should not eat input", () => {
       const input = [1, 2, 3];
       const copy = [...input];
@@ -376,13 +376,13 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#does_not_match_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("name").doesNotMatchAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#does_not_match_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").doesNotMatchAny(["%foo%", "%bar%"]));
@@ -392,7 +392,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#does_not_match_all", () => {
     it("should create a Grouping node", () => {
       expect(users.get("name").doesNotMatchAll(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
@@ -420,7 +420,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#in_any", () => {
     it("should create a Grouping node", () => {
       expect(
         users.get("id").inAny([
@@ -431,7 +431,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#in_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(
@@ -446,7 +446,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#in_all", () => {
     it("should create a Grouping node", () => {
       expect(
         users.get("id").inAll([
@@ -598,7 +598,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#not_in_any", () => {
     it("should create a Grouping node", () => {
       expect(
         users.get("id").notInAny([
@@ -624,7 +624,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#not_in_all", () => {
     it("should create a Grouping node", () => {
       expect(
         users.get("id").notInAll([
@@ -700,7 +700,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#not_in", () => {
+  describe("#not_between", () => {
     it("can be constructed with a Union", () => {
       const node = users.get("age").notBetween(1, 100);
       expect(node).toBeInstanceOf(Nodes.Not);
@@ -1336,7 +1336,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#not_in_any", () => {
+  describe("#not_between", () => {
     it("should generate ORs in sql", () => {
       const left = users.get("age").notBetween(18, 30);
       const right = users.get("age").notBetween(40, 50);
@@ -1347,7 +1347,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
+  describe("#not_between", () => {
     it("should create a Grouping node", () => {
       const left = users.get("age").notBetween(18, 65);
       const right = users.get("score").notBetween(1, 100);
