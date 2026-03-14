@@ -55,17 +55,17 @@ It compares our test files and test names against the Rails test suite:
 npm run convention:compare
 ```
 
-Current status (5881/16982 tests = 34.6%):
+Current status (9726/17172 tests = 56.6%):
 
-| Package          | Tests | Files  | Misplaced |
-| ---------------- | ----- | ------ | --------- |
-| arel             | 100%  | 59/59  | 0         |
-| activemodel      | 68.1% | 45/56  | 5         |
-| activerecord     | 39%   | 74/342 | 3119      |
-| activesupport    | 18.9% | 17/157 | 2189      |
-| rack             | 91.2% | 40/40  | 3         |
-| actiondispatch   | 0%    | 0/60   | 433       |
-| actioncontroller | 0%    | 0/91   | 236       |
+| Package          | Tests | Files   | Misplaced |
+| ---------------- | ----- | ------- | --------- |
+| arel             | 100%  | 59/59   | 0         |
+| activemodel      | 100%  | 56/56   | 0         |
+| activerecord     | 69.3% | 185/342 | 560       |
+| activesupport    | 18.9% | 17/157  | 2189      |
+| rack             | 91.2% | 40/40   | 3         |
+| actiondispatch   | 0%    | 0/75    | 474       |
+| actioncontroller | 0%    | 0/91    | 236       |
 
 "Misplaced" means tests that exist but are in the wrong file according to
 Rails conventions. These need to be moved, not rewritten.
