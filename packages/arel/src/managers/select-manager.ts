@@ -179,10 +179,20 @@ export class SelectManager {
   /**
    * INNER JOIN.
    */
-  join(table: Node | string, onCondition?: Node): this {
+  join(
+    table: Node | string,
+    klassOrCondition?: (new (left: Node, right: Node | null) => Join) | Node,
+  ): this {
     const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
-    const onNode = onCondition ? new On(onCondition) : null;
-    this.core.source.right.push(new InnerJoin(tableNode, onNode));
+    if (klassOrCondition && typeof klassOrCondition === "function" && klassOrCondition.prototype) {
+      const JoinClass = klassOrCondition as new (left: Node, right: Node | null) => Join;
+      this.core.source.right.push(new JoinClass(tableNode, null));
+    } else if (klassOrCondition instanceof Node) {
+      const onNode = new On(klassOrCondition);
+      this.core.source.right.push(new InnerJoin(tableNode, onNode));
+    } else {
+      this.core.source.right.push(new InnerJoin(tableNode, null));
+    }
     return this;
   }
 

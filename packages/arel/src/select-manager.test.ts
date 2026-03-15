@@ -61,7 +61,7 @@ describe("SelectManagerTest", () => {
       it("converts right to SqlLiteral if a string", () => {
         const mgr = new SelectManager();
         const as = mgr.as("foo");
-        expect(as).toBeInstanceOf(Nodes.TableAlias);
+        expect(as.name).toBe("foo");
       });
 
       it("can make a subselect", () => {
@@ -72,7 +72,9 @@ describe("SelectManagerTest", () => {
         const outer = new SelectManager();
         outer.project(new Nodes.SqlLiteral("name"));
         outer.from(as);
-        expect(outer.toSql()).toContain("name");
+        const sql = outer.toSql();
+        expect(sql).toContain("name");
+        expect(sql).toContain("foo");
       });
     });
 
@@ -384,9 +386,7 @@ describe("SelectManagerTest", () => {
 
   describe("join", () => {
     it("raises EmptyJoinError on empty", () => {
-      // Joining with empty string
-      const mgr = users.join("");
-      expect(mgr).toBeInstanceOf(SelectManager);
+      expect(() => users.join("")).toThrow("EmptyJoinError");
     });
   });
 
