@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Base } from "./index.js";
+import { Base, RecordNotFound } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 
 describe("FinderRespondToTest", () => {
@@ -17,9 +17,7 @@ describe("FinderRespondToTest", () => {
         this.adapter = adapter;
       }
     }
-    // Adding a new attribute makes the corresponding finder respond
     expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
-    // Adding another attribute dynamically
     Topic.attribute("status", "string");
     expect(Topic.respondToMissingFinder("findByStatus")).toBe(true);
   });
@@ -48,15 +46,13 @@ describe("FinderRespondToTest", () => {
         this.adapter = adapter;
       }
     }
-    // findBy! in Rails corresponds to findBy that throws on not found
-    expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
-    // Verify findBy actually works end-to-end
-    await Topic.create({ title: "test" });
-    const found = await Topic.findBy({ title: "test" });
+    await Topic.create({ title: "exists" });
+    const found = await Topic.findByBang({ title: "exists" });
     expect(found).not.toBeNull();
+    await expect(Topic.findByBang({ title: "missing" })).rejects.toThrow(RecordNotFound);
   });
 
-  it("should respond to find by two attributes", () => {
+  it("should respond to find by two attributes", async () => {
     const adapter = createTestAdapter();
     class Topic extends Base {
       static {
@@ -65,21 +61,13 @@ describe("FinderRespondToTest", () => {
         this.adapter = adapter;
       }
     }
-    // Each attribute should independently respond
-    expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
-    expect(Topic.respondToMissingFinder("findByAuthorName")).toBe(true);
+    await Topic.create({ title: "Hello", author_name: "Alice" });
+    const byBoth = await Topic.findBy({ title: "Hello", author_name: "Alice" });
+    expect(byBoth).not.toBeNull();
   });
 
-  it("should respond to find all by an aliased attribute", () => {
-    const adapter = createTestAdapter();
-    class Topic extends Base {
-      static {
-        this.attribute("heading", "string");
-        this.adapter = adapter;
-      }
-    }
-    // Tests that the attribute name itself is used for finder detection
-    expect(Topic.respondToMissingFinder("findByHeading")).toBe(true);
+  it.skip("should respond to find all by an aliased attribute", () => {
+    /* needs aliasAttribute implementation */
   });
 
   it("should not respond to find by one missing attribute", () => {

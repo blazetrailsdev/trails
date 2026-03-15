@@ -20,6 +20,7 @@ import {
   processDependentAssociations,
   updateCounterCaches,
 } from "../associations.js";
+import { DeleteRestrictionError } from "../errors.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -8121,7 +8122,9 @@ describe("HasManyAssociationsTest", () => {
 
     const container = await RContainer.create({ name: "Box" });
     await RWidget.create({ name: "Item", container_id: container.id });
-    // Should throw DeleteRestrictionError when trying to destroy with children
-    await expect(processDependentAssociations(container)).rejects.toThrow(/Cannot delete record/);
+    // Destroying the parent should throw DeleteRestrictionError
+    await expect(container.destroy()).rejects.toThrow(DeleteRestrictionError);
+    // Parent should still exist
+    expect(await RContainer.count()).toBe(1);
   });
 });
