@@ -31,16 +31,23 @@ export function truncate(
 ): string {
   const { omission = "...", separator } = options;
   if (str.length <= length) return str;
-  const truncateAt = length - omission.length;
+  const truncateAt = Math.max(0, length - omission.length);
   let stop = str.slice(0, truncateAt);
   if (separator) {
     const sepPattern =
       typeof separator === "string"
         ? new RegExp(separator.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"), "g")
-        : new RegExp(separator.source, "g");
+        : new RegExp(
+            separator.source,
+            separator.flags.includes("g") ? separator.flags : separator.flags + "g",
+          );
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = sepPattern.exec(stop)) !== null) {
+      if (match[0].length === 0) {
+        sepPattern.lastIndex++;
+        continue;
+      }
       lastIndex = match.index;
     }
     if (lastIndex > 0) stop = stop.slice(0, lastIndex);
@@ -103,7 +110,8 @@ export function remove(str: string, ...patterns: (string | RegExp)[]): string {
 }
 
 export function ord(str: string): number {
-  return str.charCodeAt(0);
+  if (str.length === 0) throw new Error("empty string");
+  return str.codePointAt(0)!;
 }
 
 /**

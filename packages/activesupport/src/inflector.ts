@@ -22,7 +22,8 @@ function applyInflections(word: string, rules: { rule: RegExp; replacement: stri
   return word;
 }
 
-export function pluralize(word: string): string {
+export function pluralize(word: string, count?: number): string {
+  if (count === 1) return word;
   return applyInflections(word, Inflections.instance("en").plurals);
 }
 

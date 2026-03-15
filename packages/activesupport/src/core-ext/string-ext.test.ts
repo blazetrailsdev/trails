@@ -191,9 +191,8 @@ describe("StringInflectionsTest", () => {
   });
 
   it("pluralize with count = 1 still returns new string", () => {
-    const word = "count";
-    const result = pluralize(word);
-    expect(result).toBe("counts");
+    expect(pluralize("count", 1)).toBe("count");
+    expect(pluralize("count")).toBe("counts");
   });
 
   it("singularize", () => {
