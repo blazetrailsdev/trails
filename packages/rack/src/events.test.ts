@@ -35,7 +35,7 @@ async function consumeBody(body: RackBody): Promise<string[]> {
 }
 
 describe("TestEvents", () => {
-  it("events fire in correct order", async () => {
+  it("events fire", async () => {
     const events: [any, string][] = [];
     const appMarker = { name: "app" };
     const app: RackApp = async (env) => {
@@ -58,7 +58,7 @@ describe("TestEvents", () => {
     ]);
   });
 
-  it("send and finish are not run until body is consumed", async () => {
+  it("send and finish are not run until body is sent", async () => {
     const events: [any, string][] = [];
     const app: RackApp = async (env) => {
       events.push([null, "call"]);
@@ -72,7 +72,7 @@ describe("TestEvents", () => {
     expect(events.map(([_, m]) => m)).toEqual(["on_start", "call", "on_commit"]);
   });
 
-  it("send is called on body iteration", async () => {
+  it("send is called on each", async () => {
     const events: [any, string][] = [];
     const app: RackApp = async (env) => {
       events.push([null, "call"]);
@@ -109,7 +109,7 @@ describe("TestEvents", () => {
     ]);
   });
 
-  it("finish is called in reverse order for multiple handlers", async () => {
+  it("finish is called in reverse order", async () => {
     const events: [any, string][] = [];
     const app: RackApp = async (env) => {
       events.push([null, "call"]);

@@ -1150,13 +1150,13 @@ describe("RackRequestTest", () => {
     expect(() => req.GET).toThrow();
   });
 
-  it("not strip escaped characters from parameters when accessed as string", () => {
+  it("not strip '' => '' => '' escaped character from parameters when accessed as string", () => {
     // Test that percent-encoded characters are decoded correctly
     const req = makeReq("/?foo=%22bar%22");
     expect(req.GET["foo"]).toBe('"bar"');
   });
 
-  it("handles ASCII NUL input", () => {
+  it("handles ASCII NUL input of  bytes", () => {
     const length = 256;
     const req = makeReq("/", {
       method: "POST",

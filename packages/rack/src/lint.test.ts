@@ -281,6 +281,17 @@ it("notices rack.response_finished errors", async () => {
   await expect(app.call(env)).rejects.toThrow(LintError);
 });
 
+it("pass valid rack.response_finished", async () => {
+  const app = new Lint(async () => [200, { "content-length": "3" }, ["foo"]]);
+  const callable = (_env: any) => {};
+  const env = validEnv({
+    "rack.response_finished": [callable, callable],
+    "content-length": "3",
+  });
+  const [status] = await app.call(env);
+  expect(status).toBe(200);
+});
+
 it("notices when the response protocol is not an array of strings", async () => {
   const app = new Lint(async () => [
     200,
@@ -297,6 +308,12 @@ it("notices when the response protocol is specified in the response but not in t
     ["OK"],
   ]);
   await expect(app.call(validEnv())).rejects.toThrow(LintError);
+});
+
+it("notices when the response protocol is specified in the response but not in the request", async () => {
+  const app = new Lint(async () => [101, { "rack.protocol": "websocket" } as any, ["foo"]]);
+  const env = validEnv({ "rack.protocol": ["smtp"] });
+  await expect(app.call(env)).rejects.toThrow(LintError);
 });
 
 it("pass valid rack.protocol", async () => {
