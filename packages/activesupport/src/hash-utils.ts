@@ -233,8 +233,8 @@ function isPlainObject(value: unknown): value is AnyObject {
  * - null/undefined → null
  * - boolean → the boolean itself
  * - Array → each element's toParam joined with "/"
- * - plain object → URL query string (delegated to toQuery)
  * - objects with a toParam method → call it
+ * - plain objects → URL query string (delegated to toQuery)
  * - everything else → String(value)
  */
 export function toParam(value: unknown): string | boolean | null {
@@ -248,7 +248,7 @@ export function toParam(value: unknown): string | boolean | null {
       })
       .join("/");
   }
-  if (typeof value === "object" && value !== null) {
+  if (typeof value === "object") {
     if (typeof (value as any).toParam === "function") {
       return (value as any).toParam();
     }
