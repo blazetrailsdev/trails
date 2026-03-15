@@ -8096,7 +8096,32 @@ describe("HasManyAssociationsTest", () => {
     expect(reloaded.readAttribute("my_comment_count")).toBe(1);
   });
 
-  it.skip("restrict with exception", () => {
-    /* TODO: needs helpers from original file */
+  it("restrict with exception", async () => {
+    const adp = createTestAdapter();
+    class RWidget extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("container_id", "integer");
+        this.adapter = adp;
+      }
+    }
+    class RContainer extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    Associations.hasMany.call(RContainer, "rWidgets", {
+      className: "RWidget",
+      foreignKey: "container_id",
+      dependent: "restrictWithException",
+    });
+    registerModel("RWidget", RWidget);
+    registerModel("RContainer", RContainer);
+
+    const container = await RContainer.create({ name: "Box" });
+    await RWidget.create({ name: "Item", container_id: container.id });
+    // Should throw when trying to destroy with dependent children
+    await expect(processDependentAssociations(container)).rejects.toThrow();
   });
 });
