@@ -307,23 +307,6 @@ describe("Callbacks", () => {
     });
   });
 
-  describe("after save runs in the reverse order", () => {
-    it("after save runs in the reverse order", () => {
-      // AfterSaveConditionalPersonCallbackTest#test_after_save_runs_in_the_reverse_order
-      const history: string[] = [];
-      const target = { history };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "after", (t: any) => {
-        t.history.push("string1");
-      });
-      setCallback(target, "save", "after", (t: any) => {
-        t.history.push("string2");
-      });
-      runCallbacks(target, "save");
-      expect(target.history).toEqual(["string2", "string1"]);
-    });
-  });
-
   describe("save conditional person", () => {
     it("save conditional person", () => {
       // ConditionalCallbackTest#test_save_conditional_person
@@ -1470,5 +1453,21 @@ describe("NotSupportedStringConditionalTest", () => {
     setCallback(target, "save", "before", (t: any) => t.log.push("cb"), { if: () => true });
     runCallbacks(target, "save");
     expect(target.log).toEqual(["cb"]);
+  });
+});
+
+describe("AfterSaveConditionalPersonCallbackTest", () => {
+  it("after save runs in the reverse order", () => {
+    const history: string[] = [];
+    const target = { history };
+    defineCallbacks(target, "save");
+    setCallback(target, "save", "after", (t: any) => {
+      t.history.push("string1");
+    });
+    setCallback(target, "save", "after", (t: any) => {
+      t.history.push("string2");
+    });
+    runCallbacks(target, "save");
+    expect(target.history).toEqual(["string2", "string1"]);
   });
 });

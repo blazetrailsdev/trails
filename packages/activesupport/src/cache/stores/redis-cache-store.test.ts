@@ -45,9 +45,8 @@ describe("ClearTest", () => {
   it.skip("clear all cache key with Redis::Distributed");
 });
 
-describe("MemCacheStoreTest", () => {
+describe("ConnectionPoolBehaviorTest", () => {
   it.skip("pool options work");
-
   it.skip("connection pooling by default");
 });
 

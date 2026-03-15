@@ -490,8 +490,5 @@ describe("TimeWithZoneTest", () => {
     expect(forward.min).toBe(30);
     expect(forward.zone).toBe("EDT");
   });
-});
-
-describe("TimeZoneTest", () => {
   it.skip("to r");
 });

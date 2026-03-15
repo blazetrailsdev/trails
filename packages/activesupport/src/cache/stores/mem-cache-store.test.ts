@@ -34,9 +34,6 @@ describe("MemCacheStoreTest", () => {
   it.skip("can load raw values from dalli store with local cache");
   it.skip("can load raw falsey values from dalli store with local cache");
   it.skip("can read multi entries raw values from dalli store");
-});
-
-describe("ConnectionPoolBehaviorTest", () => {
   it.skip("pool options work");
   it.skip("connection pooling by default");
 });

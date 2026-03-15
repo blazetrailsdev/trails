@@ -24,9 +24,11 @@ describe("ShareLockTest", () => {
 });
 
 describe("ShareLockTest", () => {
-  it.skip("happy path");
-  it.skip("detects stuck thread");
-  it.skip("detects free thread");
-  it.skip("detects already released");
-  it.skip("detects remains latched");
+  describe("CustomAssertionsTest", () => {
+    it.skip("happy path");
+    it.skip("detects stuck thread");
+    it.skip("detects free thread");
+    it.skip("detects already released");
+    it.skip("detects remains latched");
+  });
 });
