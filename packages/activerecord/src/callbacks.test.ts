@@ -158,22 +158,153 @@ describe("CallbacksTest", () => {
   });
 
   it.skip("before validation returns false", () => {});
-  it.skip("before destroy returns false", () => {});
-  it.skip("before save returns false", () => {});
-  it.skip("before create returns false", () => {});
-  it.skip("before update returns false", () => {});
+
+  it.skip("before destroy returns false", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeDestroy(() => false);
+      }
+    }
+    const p = await CbPost.create({ title: "test" });
+    const result = await p.destroy();
+    expect(result).toBe(false);
+  });
+
+  it("before save returns false", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeSave(() => false);
+      }
+    }
+    const p = new CbPost({ title: "test" });
+    const result = await p.save();
+    expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
+  });
+
+  it("before create returns false", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeCreate(() => false);
+      }
+    }
+    const p = new CbPost({ title: "test" });
+    const result = await p.save();
+    expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
+  });
+
+  it("before update returns false", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await CbPost.create({ title: "test" });
+    CbPost.beforeUpdate(() => false);
+    p.writeAttribute("title", "changed");
+    const result = await p.save();
+    expect(result).toBe(false);
+    // Verify the update was not persisted
+    const reloaded = await CbPost.find(p.id);
+    expect(reloaded.readAttribute("title")).toBe("test");
+  });
+
   it.skip("after find", () => {});
   it.skip("after initialize", () => {});
-
   it.skip("after_commit_on_create_in_transaction", () => {});
   it.skip("after_commit callback doesnt fire for readonly", () => {});
 
-  it.skip("new valid?", () => {});
-  it.skip("validate on create", () => {});
-  it.skip("validate on update", () => {});
-  it.skip("before create throwing abort", () => {});
-  it.skip("before update throwing abort", () => {});
-  it.skip("before destroy throwing abort", () => {});
+  it("new valid?", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true });
+      }
+    }
+    const p = new CbPost({});
+    expect(await p.isValid()).toBe(false);
+    const p2 = new CbPost({ title: "hello" });
+    expect(await p2.isValid()).toBe(true);
+  });
+
+  it("validate on create", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true });
+      }
+    }
+    const invalid = new CbPost({});
+    const result = await invalid.save();
+    expect(result).toBe(false);
+    const valid = await CbPost.create({ title: "test" });
+    expect(valid.isPersisted()).toBe(true);
+  });
+
+  it("validate on update", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true });
+      }
+    }
+    const p = await CbPost.create({ title: "test" });
+    p.writeAttribute("title", "");
+    const result = await p.save();
+    expect(result).toBe(false);
+  });
+
+  it("before create throwing abort", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeCreate(() => false);
+      }
+    }
+    const p = new CbPost({ title: "test" });
+    const result = await p.save();
+    expect(result).toBe(false);
+  });
+
+  it("before update throwing abort", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await CbPost.create({ title: "test" });
+    CbPost.beforeUpdate(() => false);
+    p.writeAttribute("title", "changed");
+    const result = await p.save();
+    expect(result).toBe(false);
+  });
+
+  it.skip("before destroy throwing abort", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeDestroy(() => false);
+      }
+    }
+    const p = await CbPost.create({ title: "test" });
+    const result = await p.destroy();
+    expect(result).toBe(false);
+  });
+
   it.skip("callback throwing abort", () => {});
 });
 
