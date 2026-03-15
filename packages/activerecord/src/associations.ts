@@ -598,6 +598,15 @@ function singleFk(fk: string | string[] | undefined, fallback: string): string {
   return fk ?? fallback;
 }
 
+/** Resolve the owner primary key column for HABTM, respecting options.primaryKey. */
+function habtmOwnerPk(options: AssociationOptions, ctor: typeof Base): string {
+  const pk = options.primaryKey ?? ctor.primaryKey;
+  if (Array.isArray(pk)) {
+    throw new Error("HABTM associations do not support composite primary keys");
+  }
+  return pk as string;
+}
+
 function defaultJoinTableName(model1: typeof Base, assocName: string): string {
   const table1 = underscore(model1.name);
   const table2 = underscore(assocName);
@@ -625,7 +634,8 @@ export async function loadHabtm(
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
   const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
   const targetFk = `${underscore(singularize(assocName))}_id`;
-  const pkValue = record.readAttribute(ctor.primaryKey as string);
+  const ownerPkCol = habtmOwnerPk(options, ctor);
+  const pkValue = record.readAttribute(ownerPkCol);
   if (pkValue === null || pkValue === undefined) return [];
 
   // Query the join table to get target IDs
@@ -653,7 +663,8 @@ export async function processDependentAssociations(record: Base): Promise<void> 
   for (const assoc of associations) {
     // HABTM: always clean up join table records on destroy
     if (assoc.type === "hasAndBelongsToMany") {
-      const pkValue = record.readAttribute(ctor.primaryKey as string);
+      const ownerPkCol = habtmOwnerPk(assoc.options, ctor);
+      const pkValue = record.readAttribute(ownerPkCol);
       if (pkValue == null) continue;
       const joinTable = assoc.options.joinTable ?? defaultJoinTableName(ctor, assoc.name);
       const ownerFk = singleFk(assoc.options.foreignKey, `${underscore(ctor.name)}_id`);
@@ -931,7 +942,8 @@ export class CollectionProxy {
 
   private async _pushHabtm(records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
-    const pkValue = this._record.readAttribute(ctor.primaryKey as string);
+    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
+    const pkValue = this._record.readAttribute(ownerPkCol);
     if (pkValue == null) {
       throw new Error("Cannot add to HABTM association on an unpersisted record");
     }
@@ -1001,7 +1013,8 @@ export class CollectionProxy {
 
   private async _deleteHabtm(records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
-    const pkValue = this._record.readAttribute(ctor.primaryKey as string);
+    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
+    const pkValue = this._record.readAttribute(ownerPkCol);
     if (pkValue == null) return;
     const joinTable =
       this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
