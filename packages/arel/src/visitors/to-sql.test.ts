@@ -108,12 +108,6 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toBe("FALSE");
     });
-
-    it("should handle false", () => {
-      const node = new Nodes.False();
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("FALSE");
-    });
   });
 
   describe("Nodes::InfixOperation", () => {
