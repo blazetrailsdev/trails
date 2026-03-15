@@ -3,6 +3,7 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./managers/select-manager.js";
 import { InnerJoin, StringJoin } from "./nodes/join.js";
+import type { Join } from "./nodes/join.js";
 import { On } from "./nodes/unary.js";
 import { TableAlias } from "./nodes/with.js";
 import { True, False } from "./nodes/true-false.js";
@@ -100,9 +101,16 @@ export class Table extends Node {
    *
    * Mirrors: Arel::Table#join
    */
-  join(relation: Node | string, _klass?: typeof InnerJoin): SelectManager {
+  join(
+    relation: Node | string | null,
+    klass?: new (left: Node, right: Node | null) => Join,
+  ): SelectManager {
     const manager = new SelectManager(this);
-    manager.join(relation);
+    if (relation === null) return manager;
+    if (typeof relation === "string" && relation.trim() === "") {
+      throw new Error("EmptyJoinError");
+    }
+    manager.join(relation, klass);
     return manager;
   }
 

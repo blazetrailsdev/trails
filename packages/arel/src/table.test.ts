@@ -30,27 +30,30 @@ describe("TableTest", () => {
   });
 
   describe("backwards compat", () => {
-    it("noops on nil", () => {
-      const mgr = new SelectManager(users);
-      mgr.where(users.get("id").eq(1));
-      expect(mgr.toSql()).toContain("WHERE");
-    });
+    describe("join", () => {
+      it("noops on nil", () => {
+        const mgr = users.join(null);
+        expect(mgr.toSql()).toContain("FROM");
+        expect(mgr.toSql()).not.toContain("JOIN");
+      });
 
-    it("raises EmptyJoinError on empty", () => {
-      // Joining with empty string
-      const mgr = users.join("");
-      expect(mgr).toBeInstanceOf(SelectManager);
-    });
+      it("raises EmptyJoinError on empty", () => {
+        expect(() => users.join("")).toThrow("EmptyJoinError");
+      });
 
-    it("takes a second argument for join type", () => {
-      const mgr = users.outerJoin(posts);
-      const sql = mgr.toSql();
-      expect(sql).toContain("LEFT OUTER JOIN");
-    });
+      it("takes a second argument for join type", () => {
+        const right = users.alias();
+        const predicate = users.get("id").eq(right.get("id"));
+        const mgr = users.join(right, Nodes.OuterJoin).on(predicate);
+        expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
+      });
 
-    it("creates an outer join", () => {
-      const mgr = users.outerJoin(posts);
-      expect(mgr).toBeInstanceOf(SelectManager);
+      it("creates an outer join", () => {
+        const right = users.alias();
+        const predicate = users.get("id").eq(right.get("id"));
+        const mgr = users.outerJoin(right).on(predicate);
+        expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
+      });
     });
   });
 
@@ -122,11 +125,13 @@ describe("TableTest", () => {
   });
 
   describe("[]", () => {
-    it("manufactures an attribute if the symbol names an attribute within the relation", () => {
-      const attr = users.get("id");
-      expect(attr).toBeInstanceOf(Nodes.Attribute);
-      expect(attr.name).toBe("id");
-      expect(attr.relation).toBe(users);
+    describe("when given a Symbol", () => {
+      it("manufactures an attribute if the symbol names an attribute within the relation", () => {
+        const attr = users.get("id");
+        expect(attr).toBeInstanceOf(Nodes.Attribute);
+        expect(attr.name).toBe("id");
+        expect(attr.relation).toBe(users);
+      });
     });
   });
 

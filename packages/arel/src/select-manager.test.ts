@@ -20,95 +20,128 @@ describe("SelectManagerTest", () => {
   });
 
   describe("backwards compatibility", () => {
-    it("accepts symbols as sql literals", () => {
-      const mgr = new SelectManager(users);
-      mgr.project("id");
-      const sql = mgr.toSql();
-      expect(sql).toContain("id");
+    describe("project", () => {
+      it("accepts symbols as sql literals", () => {
+        const mgr = new SelectManager();
+        mgr.project("id");
+        mgr.from(users);
+        expect(mgr.toSql()).toContain("SELECT id");
+      });
     });
 
-    it("accepts symbols", () => {
-      const mgr = new SelectManager(users);
-      mgr.project("name");
-      const sql = mgr.toSql();
-      expect(sql).toContain("name");
+    describe("order", () => {
+      it("accepts symbols", () => {
+        const mgr = new SelectManager();
+        mgr.project(star);
+        mgr.from(users);
+        mgr.order(new Nodes.SqlLiteral("foo"));
+        expect(mgr.toSql()).toContain("ORDER BY");
+        expect(mgr.toSql()).toContain("foo");
+      });
     });
 
-    it("takes a symbol", () => {
-      const mgr = new SelectManager(users);
-      mgr.group("name");
-      const sql = mgr.toSql();
-      expect(sql).toContain("GROUP BY");
-      expect(sql).toContain("name");
+    describe("group", () => {
+      it("takes a symbol", () => {
+        const mgr = new SelectManager();
+        mgr.from(users);
+        mgr.group("foo");
+        expect(mgr.toSql()).toContain("GROUP BY");
+        expect(mgr.toSql()).toContain("foo");
+      });
     });
 
-    it("makes an AS node by grouping the AST", () => {
-      const mgr = users.project(users.get("id"));
-      const aliased = mgr.as("sub");
-      expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect(aliased.name).toBe("sub");
+    describe("as", () => {
+      it("makes an AS node by grouping the AST", () => {
+        const mgr = new SelectManager();
+        const as = mgr.as("foo");
+        expect(as).toBeInstanceOf(Nodes.TableAlias);
+        expect(as.name).toBe("foo");
+      });
+
+      it("converts right to SqlLiteral if a string", () => {
+        const mgr = new SelectManager();
+        const as = mgr.as("foo");
+        expect(as).toBeInstanceOf(Nodes.TableAlias);
+        const sql = new Visitors.ToSql().compile(as);
+        expect(sql).toContain("foo");
+      });
+
+      it("can make a subselect", () => {
+        const mgr = new SelectManager();
+        mgr.project(star);
+        mgr.from(new Nodes.SqlLiteral("zomg"));
+        const as = mgr.as("foo");
+        const outer = new SelectManager();
+        outer.project(new Nodes.SqlLiteral("name"));
+        outer.from(as);
+        const sql = outer.toSql();
+        expect(sql).toContain("name");
+        expect(sql).toContain("foo");
+      });
     });
 
-    it("converts right to SqlLiteral if a string", () => {
-      const node = users.get("name").as("n");
-      expect(node.right).toBeInstanceOf(Nodes.SqlLiteral);
+    describe("from", () => {
+      it("ignores strings when table of same name exists", () => {
+        const mgr = new SelectManager();
+        mgr.from(users);
+        mgr.from("users");
+        mgr.project(users.get("id"));
+        const sql = mgr.toSql();
+        expect(sql).toContain('"users"."id"');
+        expect(sql).toContain("FROM");
+      });
+
+      it("should support any ast", () => {
+        const mgr1 = new SelectManager();
+        const mgr2 = new SelectManager();
+        mgr2.project(star);
+        mgr2.from(users);
+        const as = mgr2.as("omg");
+        mgr1.project(new Nodes.SqlLiteral("lol"));
+        mgr1.from(as);
+        expect(mgr1.toSql()).toContain("lol");
+      });
     });
 
-    it("can make a subselect", () => {
-      const mgr = users.project(users.get("id"));
-      const node = users.get("id").in(mgr);
-      const outer = users.project(star).where(node);
-      expect(outer.toSql()).toContain("SELECT");
-      expect(outer.toSql()).toContain("IN");
+    describe("having", () => {
+      it("converts strings to SQLLiterals", () => {
+        const mgr = users.from();
+        mgr.having(new Nodes.SqlLiteral("foo"));
+        expect(mgr.toSql()).toContain("HAVING");
+        expect(mgr.toSql()).toContain("foo");
+      });
+
+      it("can have multiple items specified separately", () => {
+        const mgr = users.from();
+        mgr.having(new Nodes.SqlLiteral("foo"));
+        mgr.having(new Nodes.SqlLiteral("bar"));
+        expect(mgr.toSql()).toContain("HAVING");
+        expect(mgr.toSql()).toContain("foo");
+      });
+
+      it("can receive any node", () => {
+        const mgr = users.from();
+        mgr.having(new Nodes.And([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]));
+        expect(mgr.toSql()).toContain("HAVING");
+        expect(mgr.toSql()).toContain("foo");
+      });
     });
 
-    it("ignores strings when table of same name exists", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      const sql = mgr.toSql();
-      expect(sql).toContain("*");
-    });
+    describe("on", () => {
+      it("converts to sqlliterals", () => {
+        const right = users.alias();
+        const mgr = users.from();
+        mgr.join(right).on(new Nodes.SqlLiteral("omg"));
+        expect(mgr.toSql()).toContain("omg");
+      });
 
-    it("should support any ast", () => {
-      const mgr = new SelectManager();
-      mgr.from(users);
-      expect(mgr.ast).toBeInstanceOf(Nodes.SelectStatement);
-    });
-
-    it("converts strings to SQLLiterals", () => {
-      const mgr = users.project(star);
-      mgr.where(new Nodes.SqlLiteral("1 = 1"));
-      expect(mgr.toSql()).toContain("1 = 1");
-    });
-
-    it("can have multiple items specified separately", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.project(users.get("name"));
-      const result = mgr.toSql();
-      expect(result).toContain('"users"."id"');
-      expect(result).toContain('"users"."name"');
-    });
-
-    it("can receive any node", () => {
-      const mgr = new SelectManager(users);
-      mgr.where(users.get("id").eq(1));
-      const sql = mgr.toSql();
-      expect(sql).toContain("WHERE");
-    });
-
-    it("converts to sqlliterals", () => {
-      const mgr = new SelectManager(users);
-      mgr.project("foo");
-      const sql = mgr.toSql();
-      expect(sql).toContain("foo");
-    });
-
-    it("converts to sqlliterals with multiple items", () => {
-      const mgr = new SelectManager(users);
-      mgr.project("foo", "bar");
-      const sql = mgr.toSql();
-      expect(sql).toContain("foo");
-      expect(sql).toContain("bar");
+      it("converts to sqlliterals with multiple items", () => {
+        const right = users.alias();
+        const mgr = users.from();
+        mgr.join(right).on(new Nodes.SqlLiteral("omg"), new Nodes.SqlLiteral("123"));
+        expect(mgr.toSql()).toContain("omg");
+        expect(mgr.toSql()).toContain("123");
+      });
     });
   });
 
@@ -138,12 +171,14 @@ describe("SelectManagerTest", () => {
     });
   });
 
-  describe("offset", () => {
+  describe("skip", () => {
     it("should add an offset", () => {
       const mgr = users.project(star).skip(5);
       expect(mgr.toSql()).toContain("OFFSET 5");
     });
+  });
 
+  describe("offset", () => {
     it("should add an offset", () => {
       const mgr = users.skip(5).project(star);
       expect(mgr.toSql()).toContain("OFFSET 5");
@@ -355,9 +390,7 @@ describe("SelectManagerTest", () => {
 
   describe("join", () => {
     it("raises EmptyJoinError on empty", () => {
-      // Joining with empty string
-      const mgr = users.join("");
-      expect(mgr).toBeInstanceOf(SelectManager);
+      expect(() => users.join("")).toThrow("EmptyJoinError");
     });
   });
 
