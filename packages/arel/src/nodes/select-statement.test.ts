@@ -24,15 +24,29 @@ describe("Arel", () => {
       const o2 = new Nodes.Over(users.get("id").count(), w);
       expect(o1.right).not.toBe(o2.right);
     });
+
+    describe("equality", () => {
+      it("is equal with equal ivars", () => {
+        const s1 = new Nodes.SelectStatement();
+        s1.offset = new Nodes.Offset(new Nodes.Quoted(1));
+        s1.limit = new Nodes.Limit(new Nodes.Quoted(2));
+        const s2 = new Nodes.SelectStatement();
+        s2.offset = new Nodes.Offset(new Nodes.Quoted(1));
+        s2.limit = new Nodes.Limit(new Nodes.Quoted(2));
+        expect(s1.hash()).toBe(s2.hash());
+      });
+
+      it("is not equal with different ivars", () => {
+        const s1 = new Nodes.SelectStatement();
+        s1.offset = new Nodes.Offset(new Nodes.Quoted(1));
+        const s2 = new Nodes.SelectStatement();
+        s2.offset = new Nodes.Offset(new Nodes.Quoted(2));
+        expect(s1.hash()).not.toBe(s2.hash());
+      });
+    });
+
+    describe("#clone", () => {
+      it.skip("clones cores");
+    });
   });
-});
-
-describe("equality", () => {
-  it.skip("is equal with equal ivars");
-
-  it.skip("is not equal with different ivars");
-});
-
-describe("#clone", () => {
-  it.skip("clones cores");
 });

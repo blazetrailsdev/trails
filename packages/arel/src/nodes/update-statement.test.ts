@@ -27,15 +27,31 @@ describe("Arel", () => {
       const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
       expect(c1.name).toBe(c2.name);
     });
+
+    describe("equality", () => {
+      it("is equal with equal ivars", () => {
+        const s1 = new Nodes.UpdateStatement();
+        s1.relation = users;
+        s1.wheres = [new Nodes.Quoted(2)];
+        s1.key = new Nodes.Quoted("zomg");
+        const s2 = new Nodes.UpdateStatement();
+        s2.relation = users;
+        s2.wheres = [new Nodes.Quoted(2)];
+        s2.key = new Nodes.Quoted("zomg");
+        expect(s1.hash()).toBe(s2.hash());
+      });
+
+      it("is not equal with different ivars", () => {
+        const s1 = new Nodes.UpdateStatement();
+        s1.key = new Nodes.Quoted("zomg");
+        const s2 = new Nodes.UpdateStatement();
+        s2.key = new Nodes.Quoted("wth");
+        expect(s1.hash()).not.toBe(s2.hash());
+      });
+    });
+
+    describe("#clone", () => {
+      it.skip("clones wheres and values");
+    });
   });
-});
-
-describe("equality", () => {
-  it.skip("is equal with equal ivars");
-
-  it.skip("is not equal with different ivars");
-});
-
-describe("#clone", () => {
-  it.skip("clones wheres and values");
 });

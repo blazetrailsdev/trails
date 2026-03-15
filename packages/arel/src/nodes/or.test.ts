@@ -28,13 +28,30 @@ describe("Arel", () => {
     });
 
     describe("equality", () => {
-      it.skip("is equal with equal ivars");
+      it("is equal with equal ivars", () => {
+        const a = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));
+        const b = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));
+        expect(a.hash()).toBe(b.hash());
+      });
 
-      it.skip("is not equal with different ivars");
+      it("is not equal with different ivars", () => {
+        const a = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));
+        const b = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("baz"));
+        expect(a.hash()).not.toBe(b.hash());
+      });
     });
 
     describe("#or", () => {
-      it.skip("makes an OR node");
+      it("makes an OR node", () => {
+        const attr = users.get("id");
+        const left = attr.eq(10);
+        const right = attr.eq(11);
+        const node = left.or(right);
+        const grouping = node as Nodes.Grouping;
+        const orNode = grouping.expr as Nodes.Or;
+        expect(orNode.left).toBe(left);
+        expect(orNode.right).toBe(right);
+      });
     });
   });
 });

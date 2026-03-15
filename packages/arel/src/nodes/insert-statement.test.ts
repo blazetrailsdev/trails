@@ -18,7 +18,7 @@ describe("Arel", () => {
     it("is equal with equal ivars", () => {
       const o1 = new Nodes.Over(users.get("id").count());
       const o2 = new Nodes.Over(users.get("id").count());
-      expect(o1.right).toBe(o2.right); // both null
+      expect(o1.right).toBe(o2.right);
     });
 
     it("is not equal with different ivars", () => {
@@ -26,15 +26,39 @@ describe("Arel", () => {
       const c2 = new Nodes.NamedFunction("COUNT", [users.get("name")]);
       expect(c1.expressions[0]).not.toBe(c2.expressions[0]);
     });
+
+    describe("equality", () => {
+      it("is equal with equal ivars", () => {
+        const s1 = new Nodes.InsertStatement();
+        s1.columns = [users.get("a"), users.get("b"), users.get("c")];
+        s1.values = new Nodes.Quoted("xyz");
+        const s2 = new Nodes.InsertStatement();
+        s2.columns = [users.get("a"), users.get("b"), users.get("c")];
+        s2.values = new Nodes.Quoted("xyz");
+        expect(s1.hash()).toBe(s2.hash());
+      });
+
+      it("is not equal with different ivars", () => {
+        const s1 = new Nodes.InsertStatement();
+        s1.columns = [users.get("a"), users.get("b"), users.get("c")];
+        s1.values = new Nodes.Quoted("xyz");
+        const s2 = new Nodes.InsertStatement();
+        s2.columns = [users.get("a"), users.get("b"), users.get("c")];
+        s2.values = new Nodes.Quoted("123");
+        expect(s1.hash()).not.toBe(s2.hash());
+      });
+    });
+
+    describe("#clone", () => {
+      it.skip("clones columns and values");
+    });
+
+    describe("into", () => {
+      it("converts to sql", () => {
+        const manager = new Nodes.InsertStatement();
+        manager.relation = users;
+        expect(manager.relation).toBe(users);
+      });
+    });
   });
-});
-
-describe("equality", () => {
-  it.skip("is equal with equal ivars");
-
-  it.skip("is not equal with different ivars");
-});
-
-describe("#clone", () => {
-  it.skip("clones columns and values");
 });

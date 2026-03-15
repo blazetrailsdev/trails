@@ -27,15 +27,27 @@ describe("Arel", () => {
       const c2 = new Nodes.Case(users.get("id")).when(new Nodes.Quoted("b"));
       expect((c1.operand as Nodes.Attribute).name).not.toBe((c2.operand as Nodes.Attribute).name);
     });
+
+    describe("equality", () => {
+      it("is equal with equal ivars", () => {
+        const s1 = new Nodes.DeleteStatement();
+        s1.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
+        const s2 = new Nodes.DeleteStatement();
+        s2.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
+        expect(s1.hash()).toBe(s2.hash());
+      });
+
+      it("is not equal with different ivars", () => {
+        const s1 = new Nodes.DeleteStatement();
+        s1.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
+        const s2 = new Nodes.DeleteStatement();
+        s2.wheres = [new Nodes.Quoted("1"), new Nodes.Quoted("2"), new Nodes.Quoted("3")];
+        expect(s1.hash()).not.toBe(s2.hash());
+      });
+    });
+
+    describe("#clone", () => {
+      it.skip("clones wheres");
+    });
   });
-});
-
-describe("equality", () => {
-  it.skip("is equal with equal ivars");
-
-  it.skip("is not equal with different ivars");
-});
-
-describe("#clone", () => {
-  it.skip("clones wheres");
 });
