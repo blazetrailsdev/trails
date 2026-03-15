@@ -33,7 +33,11 @@ describe("the to_sql visitor", () => {
   });
 
   describe("Nodes::NotIn", () => {
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN");
+    });
 
     it("should know how to visit", () => {
       const visitor = new Visitors.ToSql();
@@ -61,25 +65,39 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql().compile(node)).toBeDefined();
     });
 
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN");
+    });
 
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       expect(new Visitors.ToSql().compile(node)).toBeDefined();
     });
 
-    it.skip("is preparable when a subselect");
+    it("is preparable when a subselect", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      expect(new Visitors.ToSql().compile(node)).toContain("SELECT");
+    });
   });
 
   describe("Nodes::DoesNotMatch", () => {
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
+      expect(new Visitors.ToSql().compile(node)).toContain("ESCAPE");
+    });
 
     it("should know how to visit", () => {
       const node = users.get("name").doesNotMatch("%chunky%");
       expect(new Visitors.ToSql().compile(node)).toContain("NOT LIKE");
     });
 
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
+      expect(new Visitors.ToSql().compile(node)).toContain("ESCAPE");
+    });
 
     it.skip("can handle subqueries");
   });
@@ -353,7 +371,11 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain("1, 2, 3");
     });
 
-    it.skip("is preparable when a subselect");
+    it("is preparable when a subselect", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      expect(new Visitors.ToSql().compile(node)).toContain("SELECT");
+    });
   });
 
   describe("Nodes::Fragments", () => {
@@ -938,7 +960,10 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql().compile(node)).toContain("LIKE");
     });
 
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").matches("%chunky%", true, "\\");
+      expect(new Visitors.ToSql().compile(node)).toContain("ESCAPE");
+    });
 
     it.skip("can handle subqueries");
   });

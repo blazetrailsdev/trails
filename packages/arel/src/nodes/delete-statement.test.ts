@@ -47,7 +47,13 @@ describe("Arel", () => {
     });
 
     describe("#clone", () => {
-      it.skip("clones wheres");
+      it("clones wheres", () => {
+        const stmt = new Nodes.DeleteStatement();
+        stmt.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
+        const dolly = stmt.clone();
+        expect(dolly.wheres).toEqual(stmt.wheres);
+        expect(dolly.wheres).not.toBe(stmt.wheres);
+      });
     });
   });
 });

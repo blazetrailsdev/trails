@@ -30,4 +30,17 @@ export class UpdateStatement extends Node {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
+
+  clone(): UpdateStatement {
+    const copy = new UpdateStatement();
+    copy.relation = this.relation;
+    copy.values = [...this.values];
+    copy.wheres = [...this.wheres];
+    copy.orders = [...this.orders];
+    copy.groups = [...this.groups];
+    copy.havings = [...this.havings];
+    copy.limit = this.limit;
+    copy.key = this.key;
+    return copy;
+  }
 }

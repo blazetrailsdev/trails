@@ -20,4 +20,12 @@ export class InsertStatement extends Node {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
+
+  clone(): InsertStatement {
+    const copy = new InsertStatement();
+    copy.relation = this.relation;
+    copy.columns = [...this.columns];
+    copy.values = this.values;
+    return copy;
+  }
 }

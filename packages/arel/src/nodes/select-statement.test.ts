@@ -46,7 +46,12 @@ describe("Arel", () => {
     });
 
     describe("#clone", () => {
-      it.skip("clones cores");
+      it("clones cores", () => {
+        const stmt = new Nodes.SelectStatement();
+        const dolly = stmt.clone();
+        expect(dolly.cores.length).toBe(stmt.cores.length);
+        expect(dolly.cores).not.toBe(stmt.cores);
+      });
     });
   });
 });

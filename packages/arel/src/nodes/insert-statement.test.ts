@@ -50,7 +50,15 @@ describe("Arel", () => {
     });
 
     describe("#clone", () => {
-      it.skip("clones columns and values");
+      it("clones columns and values", () => {
+        const stmt = new Nodes.InsertStatement();
+        stmt.columns = [users.get("a"), users.get("b"), users.get("c")];
+        stmt.values = new Nodes.Quoted("xyz");
+        const dolly = stmt.clone();
+        expect(dolly.columns).toEqual(stmt.columns);
+        expect(dolly.columns).not.toBe(stmt.columns);
+        expect(dolly.values).toBe(stmt.values);
+      });
     });
 
     describe("into", () => {

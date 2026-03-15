@@ -26,4 +26,15 @@ export class DeleteStatement extends Node {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
+
+  clone(): DeleteStatement {
+    const copy = new DeleteStatement();
+    copy.relation = this.relation;
+    copy.wheres = [...this.wheres];
+    copy.orders = [...this.orders];
+    copy.groups = [...this.groups];
+    copy.havings = [...this.havings];
+    copy.limit = this.limit;
+    return copy;
+  }
 }

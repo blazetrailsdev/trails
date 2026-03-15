@@ -30,4 +30,16 @@ export class SelectStatement extends Node {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
+
+  clone(): SelectStatement {
+    const copy = new SelectStatement();
+    copy.cores = this.cores.map((c) => c.clone());
+    copy.orders = [...this.orders];
+    copy.limit = this.limit;
+    copy.offset = this.offset;
+    copy.lock = this.lock;
+    copy.with = this.with;
+    copy.comment = this.comment;
+    return copy;
+  }
 }
