@@ -310,6 +310,12 @@ it("notices when the response protocol is specified in the response but not in t
   await expect(app.call(validEnv())).rejects.toThrow(LintError);
 });
 
+it("notices when the response protocol is specified in the response but not in the request", async () => {
+  const app = new Lint(async () => [101, { "rack.protocol": "websocket" } as any, ["foo"]]);
+  const env = validEnv({ "rack.protocol": ["smtp"] });
+  await expect(app.call(env)).rejects.toThrow(LintError);
+});
+
 it("pass valid rack.protocol", async () => {
   const app = new Lint(async () => [
     200,

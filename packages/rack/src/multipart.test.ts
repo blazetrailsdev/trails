@@ -498,6 +498,14 @@ it("parses content-disposition with escaped parameter values in name", () => {
   expect(params["file\\-xfoo"].filename).toBe("bar");
 });
 
+it("parses content-disposition with escaped parameter values in name", () => {
+  const boundary = "---------------------------932620571087722842402766118";
+  const body = `--${boundary}\r\nContent-Disposition: form-data;filename="bar"; name="file\\\\-\\xfoo"\r\ncontent-type:application/pdf\r\n\r\n\r\n--${boundary}--\r\n`;
+  const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
+  expect(Object.keys(params)).toEqual(["file\\-xfoo"]);
+  expect(params["file\\-xfoo"].filename).toBe("bar");
+});
+
 it("parses up to 16 content-disposition params", () => {
   const boundary = "---------------------------932620571087722842402766118";
   const extraParams = Array.from({ length: 14 }, (_, i) => `a${i}=b`).join(";");
