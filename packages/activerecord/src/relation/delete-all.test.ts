@@ -430,11 +430,10 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
     expect(items.every((i: any) => i.readAttribute("status") === "new")).toBe(true);
   });
   it("destroy all", async () => {
-    const adp = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Item.create({ name: "a" });

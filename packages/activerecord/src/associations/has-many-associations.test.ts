@@ -8098,18 +8098,17 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("restrict with exception", async () => {
-    const adp = createTestAdapter();
     class RWidget extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("container_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     class RContainer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RContainer, "rWidgets", {
