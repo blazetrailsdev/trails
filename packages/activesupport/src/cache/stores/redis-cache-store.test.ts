@@ -58,5 +58,5 @@ describe("DeleteMatchedTest", () => {
 });
 
 describe("RawTest", () => {
-  it.skip('does not compress values read with \\"raw\\" enabled');
+  it.skip('does not compress values read with "raw" enabled');
 });

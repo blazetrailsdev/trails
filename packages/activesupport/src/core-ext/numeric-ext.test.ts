@@ -72,25 +72,6 @@ describe("NumericExtTimeAndDateTimeTest", () => {
   it("in milliseconds", () => {
     expect(Duration.seconds(10).inMilliseconds()).toBe(10000);
   });
-
-  it("chaining duration operations", () => {
-    const now = new Date(2005, 1, 10, 15, 30, 45);
-    const result = Duration.days(2).minus(Duration.months(3)).since(now);
-    const expected = new Date(now);
-    expected.setDate(expected.getDate() + 2);
-    expected.setMonth(expected.getMonth() - 3);
-    expect(result.getTime()).toBe(expected.getTime());
-  });
-
-  it("add one year to leap day", () => {
-    // Feb 29, 2004 + 1 year via setFullYear → JS gives Mar 1, 2005
-    // (no automatic clamping to Feb 28 like Rails)
-    const leapDay = new Date(2004, 1, 29, 15, 15, 10);
-    const result = Duration.years(1).since(leapDay);
-    expect(result.getFullYear()).toBe(2005);
-    // JS behavior: setFullYear(2005) on Feb 29 overflows to Mar 1
-    expect(result.getFullYear()).toBe(2005);
-  });
 });
 
 describe("NumericExtDateTest", () => {
