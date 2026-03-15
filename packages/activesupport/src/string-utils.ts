@@ -41,7 +41,7 @@ export function truncate(
             separator.source,
             separator.flags.includes("g") ? separator.flags : separator.flags + "g",
           );
-    let lastIndex = 0;
+    let lastIndex = -1;
     let match: RegExpExecArray | null;
     while ((match = sepPattern.exec(stop)) !== null) {
       if (match[0].length === 0) {
@@ -50,7 +50,7 @@ export function truncate(
       }
       lastIndex = match.index;
     }
-    if (lastIndex > 0) stop = stop.slice(0, lastIndex);
+    if (lastIndex >= 0) stop = stop.slice(0, lastIndex);
   }
   return stop + omission;
 }
@@ -62,8 +62,7 @@ export function truncateWords(
 ): string {
   const { omission = "...", separator } = options;
   if (separator) {
-    const sep = typeof separator === "string" ? separator : separator;
-    const parts = str.split(sep);
+    const parts = str.split(separator);
     if (parts.length <= count) return str;
     const joinStr = typeof separator === "string" ? separator : (str.match(separator)?.[0] ?? "");
     return parts.slice(0, count).join(joinStr) + omission;
