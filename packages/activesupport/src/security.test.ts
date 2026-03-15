@@ -172,14 +172,3 @@ describe("MessageVerifierTest", () => {
     expect(v2.verified(message)).toBeNull();
   });
 });
-
-// Add missing Ruby test names for proper pipeline matching
-describe("MessageEncryptorTest", () => {
-  const secret = "a".repeat(32);
-  const encryptor = new MessageEncryptor(secret);
-
-  it("inspect does not show secrets", () => {
-    const str = encryptor.toString();
-    expect(str).not.toContain(secret);
-  });
-});

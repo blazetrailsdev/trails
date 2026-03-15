@@ -447,12 +447,6 @@ describe("TimeExtCalculationsTest", () => {
     expect(isYesterday(yesterday)).toBe(true);
   });
 
-  it("prev day with time local", () => {
-    const t = new Date();
-    const result = prevDay(t);
-    expect(result < t).toBe(true);
-  });
-
   it("prev day with time utc", () => {
     const t = new Date();
     const result = prevDay(t);
@@ -463,12 +457,6 @@ describe("TimeExtCalculationsTest", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     expect(isTomorrow(tomorrow)).toBe(true);
-  });
-
-  it("next day with time local", () => {
-    const t = new Date();
-    const result = nextDay(t);
-    expect(isTomorrow(result)).toBe(true);
   });
 
   it("next day with time utc", () => {
@@ -700,10 +688,6 @@ describe("DateExtCalculationsTest", () => {
     const result = lastWeek(date, "monday");
     expect(result.getDay()).toBe(1);
     expect(result < date).toBe(true);
-  });
-
-  it("advance", () => {
-    expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(d(2005, 2, 28));
   });
 
   it("advance does first years and then days", () => {

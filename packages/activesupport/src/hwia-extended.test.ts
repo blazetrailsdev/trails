@@ -45,10 +45,6 @@ describe("CallbackFalseTerminatorTest", () => {
     expect(log).toContain("main");
   });
 });
-describe("AfterTeardownTest", () => {
-  it.skip("teardown raise but all after teardown method are called");
-});
-
 describe("CallbackTerminatorTest", () => {
   it.skip("termination invokes hook");
 });

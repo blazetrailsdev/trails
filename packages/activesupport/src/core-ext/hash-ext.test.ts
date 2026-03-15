@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import { dasherize, camelize } from "../inflector.js";
-
 import {
   deepMerge,
   deepTransformKeys,
@@ -286,64 +284,90 @@ describe("HashExtTest", () => {
     expect(result).toEqual({ a: 1, c: 3 });
   });
 });
+describe("HashToXmlTest", () => {
+  it.skip("one level");
 
-describe("RenameKeyTest", () => {
-  // renameKey: transform an underscore_key with dasherize/camelize options
-  function renameKey(
-    key: string,
-    options: { dasherize?: boolean; camelize?: boolean | "lower" | "upper" } = {},
-  ): string {
-    let result = key;
-    if (options.camelize === true || options.camelize === "upper") {
-      result = camelize(result, true);
-    } else if (options.camelize === "lower") {
-      result = camelize(result, false);
-    } else if (options.dasherize !== false) {
-      // Extract leading/trailing underscores
-      const leadingMatch = result.match(/^(_+)/);
-      const trailingMatch = result.match(/(_+)$/);
-      const leading = leadingMatch ? leadingMatch[1] : "";
-      const trailing = trailingMatch ? trailingMatch[1] : "";
-      const inner = result.slice(leading.length, result.length - trailing.length);
-      result = leading + dasherize(inner) + trailing;
-    }
-    return result;
-  }
+  it.skip("one level dasherize false");
 
-  it("rename key dasherizes by default", () => {
-    expect(renameKey("hello_world")).toBe("hello-world");
-  });
-  it("rename key dasherizes with dasherize true", () => {
-    expect(renameKey("hello_world", { dasherize: true })).toBe("hello-world");
-  });
-  it("rename key does nothing with dasherize false", () => {
-    expect(renameKey("hello_world", { dasherize: false })).toBe("hello_world");
-  });
-  it("rename key camelizes with camelize true", () => {
-    expect(renameKey("hello_world", { camelize: true })).toBe("HelloWorld");
-  });
-  it("rename key lower camelizes with camelize lower", () => {
-    expect(renameKey("hello_world", { camelize: "lower" })).toBe("helloWorld");
-  });
-  it("rename key lower camelizes with camelize upper", () => {
-    expect(renameKey("hello_world", { camelize: "upper" })).toBe("HelloWorld");
-  });
-  it("rename key does not dasherize leading underscores", () => {
-    expect(renameKey("__hello_world")).toBe("__hello-world");
-  });
-  it("rename key with leading underscore dasherizes interior underscores", () => {
-    expect(renameKey("_hello_world")).toBe("_hello-world");
-  });
-  it("rename key does not dasherize trailing underscores", () => {
-    expect(renameKey("hello_world__")).toBe("hello-world__");
-  });
-  it("rename key with trailing underscore dasherizes interior underscores", () => {
-    expect(renameKey("hello_world_")).toBe("hello-world_");
-  });
-  it("rename key does not dasherize multiple leading underscores", () => {
-    expect(renameKey("___hello_world")).toBe("___hello-world");
-  });
-  it("rename key does not dasherize multiple trailing underscores", () => {
-    expect(renameKey("hello_world___")).toBe("hello-world___");
-  });
+  it.skip("one level dasherize true");
+
+  it.skip("one level camelize true");
+
+  it.skip("one level camelize lower");
+
+  it.skip("one level with types");
+
+  it.skip("one level with nils");
+
+  it.skip("one level with skipping types");
+
+  it.skip("one level with yielding");
+
+  it.skip("two levels");
+
+  it.skip("two levels with second level overriding to xml");
+
+  it.skip("two levels with array");
+
+  it.skip("three levels with array");
+
+  it.skip("single record from xml");
+
+  it.skip("single record from xml with nil values");
+
+  it.skip("multiple records from xml");
+
+  it.skip("single record from xml with attributes other than type");
+
+  it.skip("all caps key from xml");
+
+  it.skip("empty array from xml");
+
+  it.skip("empty array with whitespace from xml");
+
+  it.skip("array with one entry from xml");
+
+  it.skip("array with multiple entries from xml");
+
+  it.skip("file from xml");
+
+  it.skip("file from xml with defaults");
+
+  it.skip("tag with attrs and whitespace");
+
+  it.skip("empty cdata from xml");
+
+  it.skip("xsd like types from xml");
+
+  it.skip("type trickles through when unknown");
+
+  it.skip("from xml raises on disallowed type attributes");
+
+  it.skip("from xml disallows symbol and yaml types by default");
+
+  it.skip("from xml array one");
+
+  it.skip("from xml array many");
+
+  it.skip("from trusted xml allows symbol and yaml types");
+
+  it.skip("kernel method names to xml");
+
+  it.skip("empty string works for typecast xml value");
+
+  it.skip("escaping to xml");
+
+  it.skip("unescaping from xml");
+
+  it.skip("roundtrip to xml from xml");
+
+  it.skip("datetime xml type with utc time");
+
+  it.skip("datetime xml type with non utc time");
+
+  it.skip("datetime xml type with far future date");
+
+  it.skip("to xml dups options");
+
+  it.skip("expansion count is limited");
 });

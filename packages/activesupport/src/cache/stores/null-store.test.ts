@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-import { NullStore } from "../../cache/stores.js";
+import { NullStore } from "../stores.js";
 
 describe("NullStoreTest", () => {
   it("cleanup", () => {
@@ -64,5 +63,12 @@ describe("NullStoreTest", () => {
     const store = new NullStore();
     expect(store.read("x")).toBeNull();
     expect(store.read("x")).toBeNull();
+  });
+
+  it("clear", () => {
+    const store = new NullStore();
+    store.write("name", "value");
+    store.clear();
+    expect(store.read("name")).toBeNull();
   });
 });
