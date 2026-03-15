@@ -300,8 +300,8 @@ function main() {
       }
 
       // Pass 2: Description-only matches on remaining Ruby tests.
-      // When multiple TS tests share the same description, prefer the one whose
-      // ancestor path overlaps most with the Ruby path. This prevents tests like
+      // When multiple TS tests share the same description, prefer the one with
+      // the longest common ancestor prefix. This prevents tests like
       // "is equal with equal ivars" under #between from consuming a match meant
       // for the same description under #in.
       for (let ri = 0; ri < file.testCases.length; ri++) {
