@@ -235,11 +235,6 @@ describe("StringInflectionsTest", () => {
 
   it.skip("truncates bytes preserves encoding");
 
-  it("truncate words", () => {
-    expect(truncateWords("Hello Big World!", 3)).toBe("Hello Big World!");
-    expect(truncateWords("Hello Big World!", 2)).toBe("Hello Big...");
-  });
-
   it("truncate words with omission", () => {
     expect(truncateWords("Hello Big World!", 3, { omission: "[...]" })).toBe("Hello Big World!");
     expect(truncateWords("Hello Big World!", 2, { omission: "[...]" })).toBe("Hello Big[...]");

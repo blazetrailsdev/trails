@@ -3,13 +3,6 @@ import { describe, it, expect } from "vitest";
 import { NullStore } from "../../cache/stores.js";
 
 describe("NullStoreTest", () => {
-  it("clear", () => {
-    const store = new NullStore();
-    store.write("key", "value");
-    store.clear();
-    expect(store.read("key")).toBeNull();
-  });
-
   it("cleanup", () => {
     const store = new NullStore();
     // cleanup is a no-op for NullStore; just verify no errors

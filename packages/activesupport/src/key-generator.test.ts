@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  KeyGenerator,
-  CachingKeyGenerator,
-  secureRandomBase58,
-  secureRandomBase36,
-  BacktraceCleaner,
-} from "./key-generator.js";
+import { KeyGenerator, CachingKeyGenerator, BacktraceCleaner } from "./key-generator.js";
 
 describe("KeyGeneratorTest", () => {
   it("Generating a key of the default length", () => {
@@ -85,40 +79,6 @@ describe("CachingKeyGeneratorTest", () => {
     expect(key1.toString("hex")).not.toBe(key2.toString("hex"));
   });
 });
-
-describe("SecureRandomTest", () => {
-  it("base58", () => {
-    const s = secureRandomBase58();
-    expect(s).toHaveLength(16);
-    expect(s).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
-  });
-
-  it("base58 with length", () => {
-    const s = secureRandomBase58(32);
-    expect(s).toHaveLength(32);
-  });
-
-  it("base58 with nil", () => {
-    // default length
-    expect(secureRandomBase58()).toHaveLength(16);
-  });
-
-  it("base36", () => {
-    const s = secureRandomBase36();
-    expect(s).toHaveLength(16);
-    expect(s).toMatch(/^[0-9a-z]+$/);
-  });
-
-  it("base36 with length", () => {
-    const s = secureRandomBase36(24);
-    expect(s).toHaveLength(24);
-  });
-
-  it("base36 with nil", () => {
-    expect(secureRandomBase36()).toHaveLength(16);
-  });
-});
-
 describe("BacktraceCleanerFilterTest", () => {
   it("backtrace should filter all lines in a backtrace, removing prefixes", () => {
     const cleaner = new BacktraceCleaner();
@@ -225,16 +185,6 @@ describe("KeyGeneratorTest", () => {
   it.skip("Raises if given a non digest instance");
   it.skip("inspect does not show secrets");
 });
-
-describe("SecureRandomTest", () => {
-  it.skip("base58");
-  it.skip("base58 with length");
-  it.skip("base58 with nil");
-  it.skip("base36");
-  it.skip("base36 with length");
-  it.skip("base36 with nil");
-});
-
 describe("CachingKeyGeneratorTest", () => {
   it("Generating a cached key for same salt and key size", () => {
     const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));

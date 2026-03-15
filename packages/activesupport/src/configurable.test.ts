@@ -39,4 +39,28 @@ describe("ConfigurableActiveSupport", () => {
     class Cfg {}
     expect(() => configAccessor(Cfg, "invalid-name")).toThrow();
   });
+
+  it("configuration accessors are not available on instance", () => {
+    class Base {}
+    configAccessor(Base, "debug", { instanceAccessor: false });
+    const instance = new Base() as any;
+    // No instance-level property defined
+    expect(Object.getOwnPropertyDescriptor(Base.prototype, "debug")).toBeUndefined();
+  });
+
+  it("configuration accessors can take a default value as a block", () => {
+    class Base {}
+    configAccessor(Base, "computed_val", { default: () => 42 });
+    expect((Base as any).computed_val).toBe(42);
+  });
+
+  it("configuration is crystalizeable", () => {
+    class Base {}
+    configAccessor(Base, "frozen_val", { default: "immutable" });
+    expect((Base as any).frozen_val).toBe("immutable");
+    (Base as any).frozen_val = "changed";
+    expect((Base as any).frozen_val).toBe("changed");
+  });
+
+  it.skip("the config_accessor method should not be publicly callable");
 });

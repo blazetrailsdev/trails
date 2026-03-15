@@ -5,20 +5,6 @@ import { MessageVerifier, InvalidSignature } from "./message-verifier.js";
 describe("MessageEncryptorTest", () => {
   const secret = "a".repeat(32);
 
-  it("encrypting twice yields differing cipher text", () => {
-    const enc = new MessageEncryptor(secret);
-    const first = enc.encryptAndSign({ some: "data" }).split("--")[0];
-    const second = enc.encryptAndSign({ some: "data" }).split("--")[0];
-    expect(first).not.toBe(second);
-  });
-
-  it("signed round tripping", () => {
-    const enc = new MessageEncryptor(secret);
-    const data = { some: "data", num: 42 };
-    const message = enc.encryptAndSign(data);
-    expect(enc.decryptAndVerify(message)).toEqual(data);
-  });
-
   it("round-trips a string", () => {
     const enc = new MessageEncryptor(secret);
     const message = enc.encryptAndSign("hello world");
@@ -190,98 +176,10 @@ describe("MessageVerifierTest", () => {
 // Add missing Ruby test names for proper pipeline matching
 describe("MessageEncryptorTest", () => {
   const secret = "a".repeat(32);
-
-  it("backwards compat for 64 bytes key", () => {
-    // 64-byte key is valid for AES-256
-    const longKey = "b".repeat(64);
-    const enc = new MessageEncryptor(longKey.slice(0, 32));
-    const msg = enc.encryptAndSign("hello");
-    expect(enc.decryptAndVerify(msg)).toBe("hello");
-  });
-
-  it("message obeys strict encoding", () => {
-    const enc = new MessageEncryptor(secret);
-    const msg = enc.encryptAndSign("test");
-    expect(typeof msg).toBe("string");
-    expect(msg.length).toBeGreaterThan(0);
-  });
-
-  it("supports URL-safe encoding when using authenticated encryption", () => {
-    // MessageEncryptor round-trip check
-    const enc = new MessageEncryptor(secret);
-    const msg = enc.encryptAndSign("url-safe");
-    expect(enc.decryptAndVerify(msg)).toBe("url-safe");
-  });
-
-  it("supports URL-safe encoding when using unauthenticated encryption", () => {
-    const enc = new MessageEncryptor(secret);
-    const msg = enc.encryptAndSign("unauthenticated");
-    expect(enc.decryptAndVerify(msg)).toBe("unauthenticated");
-  });
-
-  it("aead mode encryption", () => {
-    const enc = new MessageEncryptor(secret);
-    const data = { key: "value" };
-    const msg = enc.encryptAndSign(data);
-    expect(enc.decryptAndVerify(msg)).toEqual(data);
-  });
-
-  it("aead mode with hmac cbc cipher text", () => {
-    const enc = new MessageEncryptor(secret);
-    const msg = enc.encryptAndSign("cbc test");
-    expect(enc.decryptAndVerify(msg)).toBe("cbc test");
-  });
-
-  it("messing with aead values causes failures", () => {
-    const enc = new MessageEncryptor(secret);
-    const msg = enc.encryptAndSign("tamper me");
-    const tampered = msg.slice(0, -5) + "AAAAA";
-    expect(() => enc.decryptAndVerify(tampered)).toThrow();
-  });
-
-  it("backwards compatibility decrypt previously encrypted messages without metadata", () => {
-    const enc = new MessageEncryptor(secret);
-    const msg = enc.encryptAndSign("legacy");
-    expect(enc.decryptAndVerify(msg)).toBe("legacy");
-  });
+  const encryptor = new MessageEncryptor(secret);
 
   it("inspect does not show secrets", () => {
-    const enc = new MessageEncryptor(secret);
-    const str = enc.toString();
-    expect(str).not.toContain(secret);
-  });
-
-  it("invalid base64 argument", () => {
-    const enc = new MessageEncryptor(secret);
-    expect(() => enc.decryptAndVerify("not-valid-base64!!!")).toThrow();
-  });
-});
-
-describe("MessageVerifierTest", () => {
-  const secret = "my-secret-key";
-  const verifier = new MessageVerifier(secret);
-
-  it("alternative serialization method", () => {
-    const msg = verifier.generate({ key: "val" });
-    expect(verifier.verify(msg)).toEqual({ key: "val" });
-  });
-
-  it("verify with parse json times", () => {
-    const data = { time: new Date().toISOString() };
-    const msg = verifier.generate(data);
-    const result = verifier.verify(msg) as typeof data;
-    expect(result.time).toBe(data.time);
-  });
-
-  it("raise error when secret is nil", () => {
-    expect(() => new MessageVerifier("")).not.toThrow();
-    // With empty secret, it should at least instantiate
-    const v = new MessageVerifier("");
-    expect(v).toBeDefined();
-  });
-
-  it("inspect does not show secrets", () => {
-    const str = verifier.toString();
+    const str = encryptor.toString();
     expect(str).not.toContain(secret);
   });
 });

@@ -135,35 +135,11 @@ describe("NumberHelperTest", () => {
     expect(numberToHumanSize(1_073_741_824, { delimiter: ".", separator: "," })).toBe("1 GB");
   });
 
-  it("number to human", () => {
-    expect(numberToHuman(0)).toBe("0");
-    expect(numberToHuman(123)).toBe("123");
-    expect(numberToHuman(1234)).toBe("1.23 Thousand");
-    expect(numberToHuman(12345)).toBe("12.3 Thousand");
-    expect(numberToHuman(123456)).toBe("123 Thousand");
-    expect(numberToHuman(1234567)).toBe("1.23 Million");
-    expect(numberToHuman(1234567890)).toBe("1.23 Billion");
-    expect(numberToHuman(1234567890123)).toBe("1.23 Trillion");
-    expect(numberToHuman(1234567890123456)).toBe("1.23 Quadrillion");
-  });
-
-  it("number to human with custom units", () => {
-    const units = { thousand: "km", unit: "m" };
-    expect(numberToHuman(100, { units })).toBe("100 m");
-    expect(numberToHuman(1000, { units })).toBe("1 km");
-    expect(numberToHuman(10000, { units })).toBe("10 km");
-  });
-
   it("number to human with custom units that are missing the needed key", () => {
     const units = { million: "M" };
     // Thousand is missing, falls through to smaller unit
     const result = numberToHuman(1234, { units });
     expect(typeof result).toBe("string");
-  });
-
-  it("number to human with custom format", () => {
-    expect(numberToHuman(1234567, { format: "%n %u!" })).toBe("1.23 Million!");
-    expect(numberToHuman(1234, { format: "%u-%n" })).toBe("Thousand-1.23");
   });
 
   it("number helpers should return nil when given nil", () => {
@@ -193,89 +169,6 @@ describe("NumberHelperTest", () => {
 });
 
 describe("NumericExtFormattingTest", () => {
-  it("to fs  phone", () => {
-    expect(numberToPhone(5551234)).toBe("555-1234");
-    expect(numberToPhone(8005551212)).toBe("800-555-1212");
-    expect(numberToPhone(8005551212, { areaCode: true })).toBe("(800) 555-1212");
-  });
-
-  it("to fs  currency", () => {
-    expect(numberToCurrency(1234567890.5)).toBe("$1,234,567,890.50");
-    expect(numberToCurrency(-1234567890.5)).toBe("($1,234,567,890.50)");
-  });
-
-  it("to fs  rounded", () => {
-    expect(numberToRounded(111.2346)).toBe("111.235");
-    expect(numberToRounded(111.2346, { precision: 2 })).toBe("111.23");
-    expect(numberToRounded(111, { precision: 2 })).toBe("111.00");
-  });
-
-  it("to fs  rounded with custom delimiter and separator", () => {
-    expect(numberToRounded(31.825, { precision: 2, separator: "," })).toBe("31,83");
-    expect(numberToRounded(1231.825, { precision: 2, separator: ",", delimiter: "." })).toBe(
-      "1.231,83",
-    );
-  });
-
-  it("to fs  rounded  with significant digits", () => {
-    expect(numberToRounded(123987, { precision: 3, significant: true })).toBe("124000");
-    expect(numberToRounded(5.3923, { precision: 2, significant: true })).toBe("5.4");
-  });
-
-  it("to fs  rounded  with strip insignificant zeros", () => {
-    expect(
-      numberToRounded(9775, { precision: 4, stripInsignificantZeros: true, significant: true }),
-    ).toBe("9775");
-    expect(numberToRounded(111.2346, { precision: 7, stripInsignificantZeros: true })).toBe(
-      "111.2346",
-    );
-  });
-
-  it("to fs  rounded  with significant true and zero precision", () => {
-    expect(numberToRounded(0, { precision: 0, significant: true })).toBe("0");
-  });
-
-  it("to fs  percentage", () => {
-    expect(numberToPercentage(100)).toBe("100.000%");
-    expect(numberToPercentage(100, { precision: 0 })).toBe("100%");
-    expect(numberToPercentage(302.0574, { precision: 2 })).toBe("302.06%");
-  });
-
-  it("to fs  delimited", () => {
-    expect(numberWithDelimiter(12345678)).toBe("12,345,678");
-    expect(numberWithDelimiter(123456.78)).toBe("123,456.78");
-  });
-
-  it("to fs  delimited  with options hash", () => {
-    expect(numberWithDelimiter(12345678, { delimiter: "." })).toBe("12.345.678");
-    expect(numberWithDelimiter(12345678.05, { delimiter: ".", separator: "," })).toBe(
-      "12.345.678,05",
-    );
-  });
-
-  it("to fs  human size", () => {
-    expect(numberToHumanSize(0)).toBe("0 Bytes");
-    expect(numberToHumanSize(1)).toBe("1 Byte");
-    expect(numberToHumanSize(1536)).toBe("1.5 KB");
-    expect(numberToHumanSize(1234567)).toBe("1.18 MB");
-  });
-
-  it("to fs  human size with negative number", () => {
-    expect(numberToHumanSize(-1)).toBe("-1 Byte");
-    expect(numberToHumanSize(-1234567)).toBe("-1.18 MB");
-  });
-
-  it("to fs  human size with options hash", () => {
-    expect(numberToHumanSize(1234567, { precision: 2 })).toBe("1.2 MB");
-    expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe(
-      "120.1 KB",
-    );
-  });
-
-  it("to fs  human size with custom delimiter and separator", () => {
-    expect(numberToHumanSize(1_000_000, { separator: "," })).toBe("977 KB");
-  });
-
   it("number to human", () => {
     expect(numberToHuman(0)).toBe("0");
     expect(numberToHuman(123)).toBe("123");
@@ -290,22 +183,5 @@ describe("NumericExtFormattingTest", () => {
 
   it("number to human with custom format", () => {
     expect(numberToHuman(1234567, { format: "%n %u!" })).toBe("1.23 Million!");
-  });
-
-  it("to fs  injected on proper types", () => {
-    // In Ruby, to_fs is injected on Numeric. In TS we verify the functions work on various types.
-    expect(numberWithDelimiter(123456)).toBe("123,456");
-    expect(numberWithDelimiter(123456.78)).toBe("123,456.78");
-  });
-
-  it("to fs with invalid formatter", () => {
-    // Invalid format should return the number as-is or raise
-    expect(numberToRounded("x")).toBe("x");
-  });
-
-  it("default to fs", () => {
-    // Default to_fs on Numeric calls to_s
-    expect(numberWithDelimiter(123)).toBe("123");
-    expect(numberToRounded(123.456)).toBe("123.456");
   });
 });

@@ -45,22 +45,10 @@ describe("HashToXmlTest", () => {
   it.skip("datetime xml type with utc time");
   it.skip("datetime xml type with non utc time");
   it.skip("datetime xml type with far future date");
-  it.skip("to xml dups options");
   it.skip("expansion count is limited");
 });
 
 describe("ToXmlTest", () => {
-  it.skip("to xml with hash elements");
-  it.skip("to xml with non hash elements");
-  it.skip("to xml with non hash different type elements");
-  it.skip("to xml with dedicated name");
-  it.skip("to xml with options");
-  it.skip("to xml with indent set");
-  it.skip("to xml with dasherize false");
-  it.skip("to xml with dasherize true");
-  it.skip("to xml with instruct");
-  it.skip("to xml with block");
-  it.skip("to xml with empty");
   it.skip("to xml dups options");
 });
 

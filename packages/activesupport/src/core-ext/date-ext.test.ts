@@ -1,4 +1,10 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { endOfMonth, endOfYear, advance } from "../time-ext.js";
+
+// Helper: make a local date
+function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
+  return new Date(year, month - 1, day, hour, min, sec, ms);
+}
 
 describe("DateExtBehaviorTest", () => {
   it.skip("date acts like date");
@@ -35,10 +41,8 @@ describe("DateExtCalculationsTest", () => {
   it.skip("since when zone is set");
   it.skip("ago");
   it.skip("ago when zone is set");
-  it.skip("beginning of day");
   it.skip("middle of day");
   it.skip("beginning of day when zone is set");
-  it.skip("end of day");
   it.skip("end of day when zone is set");
   it.skip("all day");
   it.skip("all day when zone is set");
@@ -53,4 +57,22 @@ describe("DateExtCalculationsTest", () => {
   it.skip("current returns date today when zone not set");
   it.skip("current returns time zone today when zone is set");
   it.skip("date advance should not change passed options hash");
+
+  it("end of year", () => {
+    const result = endOfYear(d(2005, 6, 15));
+    expect(result.getMonth()).toBe(11); // December
+    expect(result.getDate()).toBe(31);
+  });
+
+  it("end of month", () => {
+    const result = endOfMonth(d(2005, 2, 5));
+    expect(result.getDate()).toBe(28);
+    expect(result.getMonth()).toBe(1);
+  });
+
+  it("last year in leap years", () => {
+    const date = d(2012, 6, 15);
+    const result = advance(date, { years: -1 });
+    expect(result.getFullYear()).toBe(2011);
+  });
 });
