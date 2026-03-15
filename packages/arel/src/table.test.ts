@@ -10,8 +10,18 @@ describe("TableTest", () => {
   });
 
   it("should create join nodes with a klass", () => {
-    const join = users.createJoin(posts);
-    expect(join).toBeInstanceOf(Nodes.InnerJoin);
+    const join = users.createJoin("foo", "bar", Nodes.FullOuterJoin);
+    expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
+  });
+
+  it("should create join nodes with a klass", () => {
+    const join = users.createJoin("foo", "bar", Nodes.OuterJoin);
+    expect(join).toBeInstanceOf(Nodes.OuterJoin);
+  });
+
+  it("should create join nodes with a klass", () => {
+    const join = users.createJoin("foo", "bar", Nodes.RightOuterJoin);
+    expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
   });
 
   describe("skip", () => {

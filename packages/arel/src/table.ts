@@ -64,8 +64,20 @@ export class Table extends Node {
    *
    * Mirrors: Arel::Table#create_join
    */
-  createJoin(to: Node, constraint?: Node): InnerJoin {
-    return new InnerJoin(to, constraint ? new On(constraint) : null);
+  createJoin(
+    to: Node | string,
+    constraint?: Node | string | null,
+    klass?: new (left: Node, right: Node | null) => Join,
+  ): Join {
+    const left = typeof to === "string" ? new SqlLiteral(to) : to;
+    const right =
+      constraint == null
+        ? null
+        : typeof constraint === "string"
+          ? new On(new SqlLiteral(constraint))
+          : new On(constraint);
+    const JoinClass = klass ?? InnerJoin;
+    return new JoinClass(left, right);
   }
 
   /**

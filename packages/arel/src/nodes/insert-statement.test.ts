@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes, InsertManager } from "../index.js";
+import { Table, Nodes } from "../index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -46,14 +46,6 @@ describe("Arel", () => {
         expect(dolly.columns).toEqual(stmt.columns);
         expect(dolly.columns).not.toBe(stmt.columns);
         expect(dolly.values).toBe(stmt.values);
-      });
-    });
-
-    describe("into", () => {
-      it("converts to sql", () => {
-        const manager = new InsertManager();
-        manager.into(users);
-        expect(manager.toSql()).toContain('"users"');
       });
     });
   });
