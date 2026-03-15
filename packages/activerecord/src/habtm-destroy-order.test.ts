@@ -57,7 +57,8 @@ describe("HabtmDestroyOrderTest", () => {
     expect(student.isDestroyed()).toBe(true);
     // Verify join table rows are actually removed (not just target missing)
     const joinRows = await adapter.execute(
-      `SELECT * FROM "lessons_students" WHERE "student_id" = ${student.id}`,
+      `SELECT * FROM "lessons_students" WHERE "student_id" = ?`,
+      [student.id],
     );
     expect(joinRows).toHaveLength(0);
   });
