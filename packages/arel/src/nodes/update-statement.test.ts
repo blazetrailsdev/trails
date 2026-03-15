@@ -22,12 +22,6 @@ describe("Arel", () => {
       expect(s1.relation).not.toBe(s2.relation);
     });
 
-    it("is equal with equal ivars", () => {
-      const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      expect(c1.name).toBe(c2.name);
-    });
-
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const s1 = new Nodes.UpdateStatement();

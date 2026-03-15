@@ -12,20 +12,6 @@ describe("Arel", () => {
       expect(not.expr).toBe(eq);
     });
 
-    it("is equal with equal ivars", () => {
-      const s1 = new Nodes.SelectStatement();
-      const s2 = new Nodes.SelectStatement();
-      expect(s1.cores.length).toBe(s2.cores.length);
-      expect(s1.limit).toBe(s2.limit);
-    });
-
-    it("is not equal with different ivars", () => {
-      const s1 = new Nodes.DeleteStatement();
-      const s2 = new Nodes.DeleteStatement();
-      s2.relation = users;
-      expect(s1.relation).not.toBe(s2.relation);
-    });
-
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const a = new Nodes.Not(new Nodes.Quoted("foo"));

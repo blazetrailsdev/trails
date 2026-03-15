@@ -9,18 +9,6 @@ describe("NodesTest", () => {
       expect(caseNode.operand).toBeInstanceOf(Nodes.Attribute);
     });
 
-    it("is equal with equal ivars", () => {
-      const a = new Nodes.Window();
-      const b = new Nodes.Window();
-      expect(a.constructor).toBe(b.constructor);
-    });
-
-    it("is not equal with different ivars", () => {
-      const a = new Nodes.Or(users.get("id").eq(1), users.get("id").eq(2));
-      const b = new Nodes.Or(users.get("id").eq(3), users.get("id").eq(4));
-      expect(a).not.toBe(b);
-    });
-
     it("allows aliasing", () => {
       const node = new Nodes.And([users.get("id").eq(1), users.get("name").eq("dean")]);
       const aliased = node.as("condition");

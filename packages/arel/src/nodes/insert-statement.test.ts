@@ -15,18 +15,6 @@ describe("Arel", () => {
       expect(stmt.columns.length).toBe(2);
     });
 
-    it("is equal with equal ivars", () => {
-      const o1 = new Nodes.Over(users.get("id").count());
-      const o2 = new Nodes.Over(users.get("id").count());
-      expect(o1.right).toBe(o2.right);
-    });
-
-    it("is not equal with different ivars", () => {
-      const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      const c2 = new Nodes.NamedFunction("COUNT", [users.get("name")]);
-      expect(c1.expressions[0]).not.toBe(c2.expressions[0]);
-    });
-
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const s1 = new Nodes.InsertStatement();

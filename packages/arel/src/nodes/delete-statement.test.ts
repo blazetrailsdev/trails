@@ -15,19 +15,6 @@ describe("Arel", () => {
       expect(stmt.wheres.length).toBe(2);
     });
 
-    it("is equal with equal ivars", () => {
-      const s1 = new Nodes.InsertStatement();
-      const s2 = new Nodes.InsertStatement();
-      expect(s1.relation).toBe(s2.relation);
-      expect(s1.columns.length).toBe(s2.columns.length);
-    });
-
-    it("is not equal with different ivars", () => {
-      const c1 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
-      const c2 = new Nodes.Case(users.get("id")).when(new Nodes.Quoted("b"));
-      expect((c1.operand as Nodes.Attribute).name).not.toBe((c2.operand as Nodes.Attribute).name);
-    });
-
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const s1 = new Nodes.DeleteStatement();
