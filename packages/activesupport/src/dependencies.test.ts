@@ -18,4 +18,8 @@ describe("RequireDependencyTest", () => {
   it.skip("require_dependency fallback to Kernel#require (idempotent)");
 
   it.skip("require_dependency raises LoadError if the given argument is not found");
+
+  it.skip(
+    "require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path",
+  );
 });

@@ -2,20 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FileStore, NullStore } from "../stores.js";
-describe("NullStoreTest", () => {
-  let store: NullStore;
-  beforeEach(() => {
-    store = new NullStore();
-  });
-
-  it("clear", () => {
-    store.write("name", "value");
-    store.clear();
-    expect(store.read("name")).toBeNull();
-  });
-});
-
+import { FileStore } from "../stores.js";
 describe("FileStoreTest", () => {
   let cacheDir: string;
   let store: FileStore;
@@ -104,5 +91,15 @@ describe("FileStoreTest", () => {
     store.write("1", "aaaaaaaaaa");
     expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toBe(false);
     expect(store.write("new_k", "val", { unlessExist: true })).toBe(true);
+  });
+
+  it("clear", () => {
+    writeFileSync(join(cacheDir, ".gitkeep"), "");
+    writeFileSync(join(cacheDir, ".keep"), "");
+    store.write("foo", "bar");
+    store.clear();
+    expect(existsSync(join(cacheDir, ".gitkeep"))).toBe(true);
+    expect(existsSync(join(cacheDir, ".keep"))).toBe(true);
+    expect(store.read("foo")).toBeNull();
   });
 });

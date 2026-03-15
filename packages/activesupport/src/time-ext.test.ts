@@ -447,12 +447,6 @@ describe("TimeExtCalculationsTest", () => {
     expect(isYesterday(yesterday)).toBe(true);
   });
 
-  it("prev day with time local", () => {
-    const t = new Date();
-    const result = prevDay(t);
-    expect(result < t).toBe(true);
-  });
-
   it("prev day with time utc", () => {
     const t = new Date();
     const result = prevDay(t);
@@ -463,12 +457,6 @@ describe("TimeExtCalculationsTest", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     expect(isTomorrow(tomorrow)).toBe(true);
-  });
-
-  it("next day with time local", () => {
-    const t = new Date();
-    const result = nextDay(t);
-    expect(isTomorrow(result)).toBe(true);
   });
 
   it("next day with time utc", () => {
@@ -700,10 +688,6 @@ describe("DateExtCalculationsTest", () => {
     const result = lastWeek(date, "monday");
     expect(result.getDay()).toBe(1);
     expect(result < date).toBe(true);
-  });
-
-  it("advance", () => {
-    expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(d(2005, 2, 28));
   });
 
   it("advance does first years and then days", () => {
@@ -1061,24 +1045,11 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(result.getMilliseconds()).toBe(500);
   });
 
-  it("beginning of day", () => {
-    const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = beginningOfDay(dt);
-    expect(result.getHours()).toBe(0);
-  });
-
   it("middle of day", () => {
     const dt = d(2005, 2, 4, 10, 10, 10);
     const result = middleOfDay(dt);
     expect(result.getHours()).toBe(12);
     expect(result.getMinutes()).toBe(0);
-  });
-
-  it("end of day", () => {
-    const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = endOfDay(dt);
-    expect(result.getHours()).toBe(23);
-    expect(result.getMinutes()).toBe(59);
   });
 
   it("beginning of minute", () => {
@@ -1099,25 +1070,10 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(result.getDate()).toBe(28);
   });
 
-  it("ago", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(ago(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
-  });
-
-  it("since", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(since(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
-  });
-
   it("change", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
     const result = changeDate(dt, { year: 2006 });
     expect(result.getFullYear()).toBe(2006);
-  });
-
-  it("advance", () => {
-    const dt = d(2005, 2, 22, 15, 15, 10);
-    expect(advance(dt, { years: 1 })).toEqual(d(2006, 2, 22, 15, 15, 10));
   });
 
   it("advance partial days", () => {

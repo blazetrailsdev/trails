@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { defineCallbacks, setCallback, resetCallbacks, runCallbacks } from "./callbacks.js";
 
-describe("RequireDependencyTest", () => {
-  it.skip(
-    "require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path",
-  );
-});
 describe("JsonGemEncodingTest", () => {
   it("encodes primitives correctly", () => {
     expect(JSON.stringify(null)).toBe("null");
@@ -45,10 +40,6 @@ describe("CallbackFalseTerminatorTest", () => {
     expect(log).toContain("main");
   });
 });
-describe("AfterTeardownTest", () => {
-  it.skip("teardown raise but all after teardown method are called");
-});
-
 describe("CallbackTerminatorTest", () => {
   it.skip("termination invokes hook");
 });
@@ -103,11 +94,5 @@ describe("RunSpecificCallbackTest", () => {
 
     runCallbacks(proto, "validate", () => log.push("main"));
     expect(log).toEqual(["before", "main", "after"]);
-  });
-});
-
-describe("RawTest", () => {
-  it.skip('does not compress values read with \\"raw\\" enabled', () => {
-    /* fixture-dependent */
   });
 });

@@ -56,3 +56,7 @@ describe("DeleteMatchedTest", () => {
 
   it.skip("fails with regexp matchers");
 });
+
+describe("RawTest", () => {
+  it.skip('does not compress values read with "raw" enabled');
+});

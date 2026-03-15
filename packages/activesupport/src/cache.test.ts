@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileStore, MemoryStore, NullStore } from "./cache/stores.js";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -312,16 +312,6 @@ describe("FileStoreTest", () => {
 
   it("exist returns false when key absent", () => {
     expect(store.exist("missing")).toBe(false);
-  });
-
-  it("clear", () => {
-    writeFileSync(join(cacheDir, ".gitkeep"), "");
-    writeFileSync(join(cacheDir, ".keep"), "");
-    store.write("foo", "bar");
-    store.clear();
-    expect(existsSync(join(cacheDir, ".gitkeep"))).toBe(true);
-    expect(existsSync(join(cacheDir, ".keep"))).toBe(true);
-    expect(store.read("foo")).toBeNull();
   });
 
   it("increment increases value", () => {

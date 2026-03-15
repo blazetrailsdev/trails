@@ -1,4 +1,9 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { nextDay, prevDay, advance, ago, since } from "../time-ext.js";
+
+function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
+  return new Date(year, month - 1, day, hour, min, sec, ms);
+}
 
 describe("TimeExtCalculationsTest", () => {
   it.skip("seconds since midnight at daylight savings time start");
@@ -89,4 +94,42 @@ describe("TimeExtCalculationsTest", () => {
   it.skip("case equality");
   it.skip("all day with timezone");
   it.skip("rfc3339 parse");
+
+  it("ago", () => {
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 9, 10, 10));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 20, 10, 10, 10));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+      d(2005, 2, 20, 9, 9, 45),
+    );
+  });
+
+  it("since", () => {
+    expect(since(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 11, 10, 10));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 24, 10, 10, 10));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+      d(2005, 2, 24, 11, 10, 35),
+    );
+  });
+
+  it("advance", () => {
+    const t = d(2005, 1, 22, 15, 15, 10);
+    expect(advance(t, { years: 1 })).toEqual(d(2006, 1, 22, 15, 15, 10));
+    expect(advance(t, { months: 1 })).toEqual(d(2005, 2, 22, 15, 15, 10));
+    expect(advance(t, { days: 1 })).toEqual(d(2005, 1, 23, 15, 15, 10));
+  });
+
+  it("prev day with time local", () => {
+    const t = new Date();
+    const result = prevDay(t);
+    expect(result < t).toBe(true);
+  });
+
+  it("next day with time local", () => {
+    const t = d(2005, 6, 15, 12, 0, 0);
+    const result = nextDay(t);
+    expect(result.getDate()).toBe(16);
+    expect(result.getMonth()).toBe(5);
+  });
 });

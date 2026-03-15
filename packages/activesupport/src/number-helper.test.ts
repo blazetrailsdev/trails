@@ -167,21 +167,3 @@ describe("NumberHelperTest", () => {
     expect(numberToHumanSize("x")).toBe("x");
   });
 });
-
-describe("NumericExtFormattingTest", () => {
-  it("number to human", () => {
-    expect(numberToHuman(0)).toBe("0");
-    expect(numberToHuman(123)).toBe("123");
-    expect(numberToHuman(1234)).toBe("1.23 Thousand");
-    expect(numberToHuman(1234567)).toBe("1.23 Million");
-  });
-
-  it("number to human with custom units", () => {
-    const units = { thousand: "km", unit: "m" };
-    expect(numberToHuman(1000, { units })).toBe("1 km");
-  });
-
-  it("number to human with custom format", () => {
-    expect(numberToHuman(1234567, { format: "%n %u!" })).toBe("1.23 Million!");
-  });
-});

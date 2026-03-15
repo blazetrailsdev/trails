@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { endOfMonth, endOfYear, advance } from "../time-ext.js";
+import { beginningOfDay, endOfDay, endOfMonth, endOfYear, advance } from "../time-ext.js";
 
 // Helper: make a local date
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -74,5 +74,24 @@ describe("DateExtCalculationsTest", () => {
     const date = d(2012, 6, 15);
     const result = advance(date, { years: -1 });
     expect(result.getFullYear()).toBe(2011);
+  });
+
+  it("advance", () => {
+    expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(d(2005, 2, 28));
+  });
+
+  it("beginning of day", () => {
+    const date = d(2005, 2, 21, 10, 30, 45);
+    const result = beginningOfDay(date);
+    expect(result.getHours()).toBe(0);
+    expect(result.getMinutes()).toBe(0);
+    expect(result.getSeconds()).toBe(0);
+  });
+
+  it("end of day", () => {
+    const date = d(2005, 2, 21, 10, 30, 45);
+    const result = endOfDay(date);
+    expect(result.getHours()).toBe(23);
+    expect(result.getMinutes()).toBe(59);
   });
 });
