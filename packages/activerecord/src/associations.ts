@@ -638,8 +638,15 @@ export async function loadHabtm(
   const pkValue = record.readAttribute(ownerPkCol);
   if (pkValue === null || pkValue === undefined) return [];
 
+  // Reject composite target PKs
+  const targetPkCol = targetModel.primaryKey;
+  if (Array.isArray(targetPkCol)) {
+    throw new Error("HABTM associations do not support composite primary keys on the target model");
+  }
+
   // Query the join table to get target IDs
-  const pkQuoted = typeof pkValue === "number" ? String(pkValue) : `'${pkValue}'`;
+  const pkQuoted =
+    typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
   const joinRows = await ctor.adapter.execute(
     `SELECT "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted}`,
   );
@@ -649,7 +656,7 @@ export async function loadHabtm(
 
   return (targetModel as any)
     .all()
-    .where({ [targetModel.primaryKey as string]: targetIds })
+    .where({ [targetPkCol as string]: targetIds })
     .toArray();
 }
 
@@ -952,15 +959,20 @@ export class CollectionProxy {
     const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
     const targetFk = `${underscore(singularize(this._assocName))}_id`;
 
+    const pkQuoted =
+      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
       if (record.isNewRecord()) await record.save();
-      const targetPk = record.readAttribute(
-        (record.constructor as typeof Base).primaryKey as string,
-      );
+      const targetPkCol = (record.constructor as typeof Base).primaryKey;
+      if (Array.isArray(targetPkCol)) {
+        throw new Error(
+          "HABTM associations do not support composite primary keys on the target model",
+        );
+      }
+      const targetPk = record.readAttribute(targetPkCol as string);
       if (targetPk == null) continue;
-      const pkQuoted =
-        typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
       const targetQuoted =
         typeof targetPk === "number"
           ? String(targetPk)
@@ -1025,9 +1037,13 @@ export class CollectionProxy {
 
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
-      const targetPk = record.readAttribute(
-        (record.constructor as typeof Base).primaryKey as string,
-      );
+      const targetPkCol = (record.constructor as typeof Base).primaryKey;
+      if (Array.isArray(targetPkCol)) {
+        throw new Error(
+          "HABTM associations do not support composite primary keys on the target model",
+        );
+      }
+      const targetPk = record.readAttribute(targetPkCol as string);
       if (targetPk == null) continue;
       const targetQuoted =
         typeof targetPk === "number"
