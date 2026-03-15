@@ -417,6 +417,10 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     className: "Parrot",
     joinTable: "parrots_pirates",
   });
+  Associations.hasAndBelongsToMany.call(Parrot, "pirates", {
+    className: "Pirate",
+    joinTable: "parrots_pirates",
+  });
 
   // Nested attributes
   acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });

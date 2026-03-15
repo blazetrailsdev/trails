@@ -615,7 +615,7 @@ export async function loadHabtm(
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveModel(className);
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
-  const ownerFk = `${underscore(ctor.name)}_id`;
+  const ownerFk = (options.foreignKey as string | undefined) ?? `${underscore(ctor.name)}_id`;
   const targetFk = `${underscore(singularize(assocName))}_id`;
   const pkValue = record.readAttribute(ctor.primaryKey as string);
   if (pkValue === null || pkValue === undefined) return [];
@@ -645,10 +645,12 @@ export async function processDependentAssociations(record: Base): Promise<void> 
   for (const assoc of associations) {
     // HABTM: always clean up join table records on destroy
     if (assoc.type === "hasAndBelongsToMany") {
+      const pkValue = record.readAttribute(ctor.primaryKey as string);
+      if (pkValue == null) continue;
       const joinTable = assoc.options.joinTable ?? defaultJoinTableName(ctor, assoc.name);
       const ownerFk = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-      const pkValue = record.readAttribute(ctor.primaryKey as string);
-      const pkQuoted = typeof pkValue === "number" ? String(pkValue) : `'${pkValue}'`;
+      const pkQuoted =
+        typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
       await ctor.adapter.executeMutation(
         `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted}`,
       );
@@ -919,11 +921,14 @@ export class CollectionProxy {
 
   private async _pushHabtm(records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
+    const pkValue = this._record.readAttribute(ctor.primaryKey as string);
+    if (pkValue == null) {
+      throw new Error("Cannot add to HABTM association on an unpersisted record");
+    }
     const joinTable =
       this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
     const ownerFk = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const targetFk = `${underscore(singularize(this._assocName))}_id`;
-    const pkValue = this._record.readAttribute(ctor.primaryKey as string);
 
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
@@ -931,8 +936,13 @@ export class CollectionProxy {
       const targetPk = record.readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
-      const pkQuoted = typeof pkValue === "number" ? String(pkValue) : `'${pkValue}'`;
-      const targetQuoted = typeof targetPk === "number" ? String(targetPk) : `'${targetPk}'`;
+      if (targetPk == null) continue;
+      const pkQuoted =
+        typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+      const targetQuoted =
+        typeof targetPk === "number"
+          ? String(targetPk)
+          : `'${String(targetPk).replace(/'/g, "''")}'`;
       await ctor.adapter.executeMutation(
         `INSERT INTO "${joinTable}" ("${ownerFk}", "${targetFk}") VALUES (${pkQuoted}, ${targetQuoted})`,
       );
@@ -981,19 +991,25 @@ export class CollectionProxy {
 
   private async _deleteHabtm(records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
+    const pkValue = this._record.readAttribute(ctor.primaryKey as string);
+    if (pkValue == null) return;
     const joinTable =
       this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
     const ownerFk = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const targetFk = `${underscore(singularize(this._assocName))}_id`;
-    const pkValue = this._record.readAttribute(ctor.primaryKey as string);
-    const pkQuoted = typeof pkValue === "number" ? String(pkValue) : `'${pkValue}'`;
+    const pkQuoted =
+      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
 
     for (const record of records) {
       fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
       const targetPk = record.readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
-      const targetQuoted = typeof targetPk === "number" ? String(targetPk) : `'${targetPk}'`;
+      if (targetPk == null) continue;
+      const targetQuoted =
+        typeof targetPk === "number"
+          ? String(targetPk)
+          : `'${String(targetPk).replace(/'/g, "''")}'`;
       await ctor.adapter.executeMutation(
         `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted} AND "${targetFk}" = ${targetQuoted}`,
       );
