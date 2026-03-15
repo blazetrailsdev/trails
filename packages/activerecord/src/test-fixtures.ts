@@ -19,7 +19,11 @@ import type { DatabaseAdapter } from "./adapter.js";
  * Each call returns new model classes with a fresh adapter so tests
  * don't share database state. Note: models are registered in the global
  * model registry (registerModel), so later calls overwrite earlier ones.
- * This is fine for test isolation since each set uses its own adapter.
+ * Since associations resolve className via the registry at runtime, the
+ * most recently created fixture set's classes will be used for lookups.
+ * This works correctly when tests run sequentially (each beforeEach
+ * creates a fresh set), but concurrent tests sharing a worker should
+ * each call createFixtures() to ensure they get the latest classes.
  */
 export interface TestFixtures {
   adapter: DatabaseAdapter;
@@ -392,7 +396,7 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     foreignKey: "parent_id",
   });
 
-  // Company associations (STI)
+  // Company associations (self-referential firm)
   Associations.belongsTo.call(Company, "firm", {
     className: "Company",
     foreignKey: "firm_id",
