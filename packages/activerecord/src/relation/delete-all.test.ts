@@ -441,7 +441,7 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
     await Item.create({ name: "b" });
     await Item.create({ name: "c" });
     const destroyed = await Item.all().destroyAll();
-    expect(destroyed.length).toBe(3);
+    expect(destroyed).toHaveLength(3);
     expect(await Item.count()).toBe(0);
   });
 

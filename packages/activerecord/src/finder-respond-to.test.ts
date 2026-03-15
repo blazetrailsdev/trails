@@ -17,8 +17,11 @@ describe("FinderRespondToTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(typeof Topic.create).toBe("function");
-    expect(typeof Topic.where).toBe("function");
+    // Adding a new attribute makes the corresponding finder respond
+    expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
+    // Adding another attribute dynamically
+    Topic.attribute("status", "string");
+    expect(Topic.respondToMissingFinder("findByStatus")).toBe(true);
   });
 
   it("should preserve normal respond to behavior and respond to standard object method", () => {
@@ -37,7 +40,7 @@ describe("FinderRespondToTest", () => {
     expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
   });
 
-  it("should respond to find by with bang", () => {
+  it("should respond to find by with bang", async () => {
     const adapter = createTestAdapter();
     class Topic extends Base {
       static {
@@ -45,7 +48,12 @@ describe("FinderRespondToTest", () => {
         this.adapter = adapter;
       }
     }
+    // findBy! in Rails corresponds to findBy that throws on not found
     expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
+    // Verify findBy actually works end-to-end
+    await Topic.create({ title: "test" });
+    const found = await Topic.findBy({ title: "test" });
+    expect(found).not.toBeNull();
   });
 
   it("should respond to find by two attributes", () => {
@@ -57,6 +65,7 @@ describe("FinderRespondToTest", () => {
         this.adapter = adapter;
       }
     }
+    // Each attribute should independently respond
     expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
     expect(Topic.respondToMissingFinder("findByAuthorName")).toBe(true);
   });
@@ -65,11 +74,12 @@ describe("FinderRespondToTest", () => {
     const adapter = createTestAdapter();
     class Topic extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("heading", "string");
         this.adapter = adapter;
       }
     }
-    expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
+    // Tests that the attribute name itself is used for finder detection
+    expect(Topic.respondToMissingFinder("findByHeading")).toBe(true);
   });
 
   it("should not respond to find by one missing attribute", () => {
