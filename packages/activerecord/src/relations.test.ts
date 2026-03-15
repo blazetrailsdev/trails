@@ -6548,11 +6548,12 @@ describe("Rails-guided: set operations and joins", () => {
         this.adapter = adapter;
       }
     }
-    await Topic.create({ title: "first" });
-    await Topic.create({ title: "second" });
-    const found = await Topic.findBy({ title: "first" });
+    await Topic.create({ title: "match" });
+    await Topic.create({ title: "match" });
+    await Topic.create({ title: "other" });
+    const found = await Topic.findBy({ title: "match" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("title")).toBe("first");
+    expect(found!.readAttribute("title")).toBe("match");
   });
 
   it("find_by returns nil if the record is missing", async () => {
@@ -6666,7 +6667,7 @@ describe("Rails-guided: set operations and joins", () => {
         this.adapter = adapter;
       }
     }
-    const t = new Topic({ title: "built" });
+    const t = Topic.all().build({ title: "built" });
     expect(t.isNewRecord()).toBe(true);
     expect(t.readAttribute("title")).toBe("built");
   });
