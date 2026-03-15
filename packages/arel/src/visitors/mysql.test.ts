@@ -131,6 +131,8 @@ describe("MysqlTest", () => {
     });
 
     it.skip("should construct a valid generic SQL statement");
+
+    it.skip("should construct a valid generic SQL statement");
   });
 
   describe("Nodes::IsDistinctFrom", () => {

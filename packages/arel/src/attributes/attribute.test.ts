@@ -17,6 +17,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should handle nil");
+
+    it.skip("should handle nil");
   });
 
   describe("#eq_all", () => {
@@ -31,6 +33,8 @@ describe("AttributeTest", () => {
         'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
       );
     });
+
+    it.skip("should not eat input");
 
     it.skip("should not eat input");
   });
@@ -69,6 +73,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should accept various data types.");
+
+    it.skip("should accept various data types.");
   });
 
   describe("#lteq", () => {
@@ -83,6 +89,8 @@ describe("AttributeTest", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").gteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
+
+    it.skip("should generate ORs in sql");
 
     it.skip("should generate ORs in sql");
   });
@@ -123,6 +131,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should accept various data types.");
+
+    it.skip("should accept various data types.");
   });
 
   describe("#lteq", () => {
@@ -137,6 +147,8 @@ describe("AttributeTest", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").ltAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
+
+    it.skip("should generate ORs in sql");
 
     it.skip("should generate ORs in sql");
   });
@@ -178,6 +190,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should accept various data types.");
+
+    it.skip("should accept various data types.");
   });
 
   describe("#lteq", () => {
@@ -192,6 +206,8 @@ describe("AttributeTest", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").lteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
+
+    it.skip("should generate ORs in sql");
 
     it.skip("should generate ORs in sql");
   });
@@ -246,6 +262,9 @@ describe("AttributeTest", () => {
     it.skip("should generate ORs in sql");
 
     it.skip("should not eat input");
+
+    it.skip("should generate ORs in sql");
+    it.skip("should not eat input");
   });
 
   describe("#eq_any", () => {
@@ -280,6 +299,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should generate the proper SQL");
+
+    it.skip("should generate the proper SQL");
   });
 
   describe("#maximum", () => {
@@ -288,6 +309,8 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.NamedFunction);
       expect(node.name).toBe("MAX");
     });
+
+    it.skip("should generate proper SQL");
 
     it.skip("should generate proper SQL");
   });
@@ -300,6 +323,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should generate proper SQL");
+
+    it.skip("should generate proper SQL");
   });
 
   describe("#sum", () => {
@@ -308,6 +333,8 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.NamedFunction);
       expect(node.name).toBe("SUM");
     });
+
+    it.skip("should generate the proper SQL");
 
     it.skip("should generate the proper SQL");
   });
@@ -346,12 +373,16 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should handle nil");
+
+    it.skip("should handle nil");
   });
 
   describe("#matches_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("name").matchesAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
+
+    it.skip("should generate ORs in sql");
 
     it.skip("should generate ORs in sql");
   });
@@ -414,6 +445,8 @@ describe("AttributeTest", () => {
     });
 
     it.skip("should generate ORs in sql");
+
+    it.skip("should generate ORs in sql");
   });
 
   describe("#does_not_match_any", () => {
@@ -463,6 +496,8 @@ describe("AttributeTest", () => {
         ]),
       ).toBeInstanceOf(Nodes.Grouping);
     });
+
+    it.skip("should generate ORs in sql");
 
     it.skip("should generate ORs in sql");
   });
@@ -577,6 +612,13 @@ describe("AttributeTest", () => {
     it.skip("can be constructed with a quoted infinite range");
 
     it.skip("can be constructed with a range ending at Infinity");
+
+    it.skip("can be constructed with a quoted range starting from -Infinity");
+    it.skip("can be constructed with an exclusive range starting from -Infinity");
+    it.skip("can be constructed with a quoted exclusive range starting from -Infinity");
+    it.skip("can be constructed with an infinite range");
+    it.skip("can be constructed with a quoted infinite range");
+    it.skip("can be constructed with a range ending at Infinity");
   });
 
   describe("#between", () => {
@@ -612,6 +654,21 @@ describe("AttributeTest", () => {
 
     it.skip("can be constructed with a beginless range ending in -Infinity");
 
+    it.skip("can be constructed with an exclusive range");
+
+    it.skip("can be constructed with a standard range");
+    it.skip("can be constructed with a range starting from -Infinity");
+    it.skip("can be constructed with a quoted range starting from -Infinity");
+    it.skip("can be constructed with an exclusive range starting from -Infinity");
+    it.skip("can be constructed with a quoted exclusive range starting from -Infinity");
+    it.skip("can be constructed with an infinite range");
+    it.skip("can be constructed with a quoted infinite range");
+    it.skip("can be constructed with a range ending at Infinity");
+    it.skip("can be constructed with a range implicitly starting at Infinity");
+    it.skip("can be constructed with a range implicitly ending at Infinity");
+    it.skip("can be constructed with a quoted range ending at Infinity");
+    it.skip("can be constructed with an endless range starting from Infinity");
+    it.skip("can be constructed with a beginless range ending in -Infinity");
     it.skip("can be constructed with an exclusive range");
   });
 
@@ -670,6 +727,10 @@ describe("AttributeTest", () => {
     it.skip("can be constructed with a list");
 
     it.skip("can be constructed with a random object");
+
+    it.skip("can be constructed with a subquery");
+    it.skip("can be constructed with a list");
+    it.skip("can be constructed with a random object");
   });
 
   describe("#in", () => {
@@ -684,6 +745,10 @@ describe("AttributeTest", () => {
     it.skip("can be constructed with a list");
 
     it.skip("can be constructed with a random object");
+
+    it.skip("can be constructed with a subquery");
+    it.skip("can be constructed with a list");
+    it.skip("can be constructed with a random object");
   });
 
   describe("#not_in_any", () => {
@@ -695,6 +760,8 @@ describe("AttributeTest", () => {
         ]),
       ).toBeInstanceOf(Nodes.Grouping);
     });
+
+    it.skip("should generate ORs in sql");
 
     it.skip("should generate ORs in sql");
   });
@@ -926,6 +993,10 @@ describe("AttributeTest", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("tags").contains("foo");
       expect(visitor.compile(node)).toBe('"users"."tags" @> \'foo\'');
+    });
+
+    describe("#to_sql", () => {
+      it.skip("should produce sql");
     });
   });
 
@@ -1528,17 +1599,26 @@ describe("AttributeTest", () => {
     it.skip("should create a Grouping node");
 
     it.skip("should generate ORs in sql");
+
+    it.skip("should create a Grouping node");
+    it.skip("should generate ORs in sql");
   });
 
   describe("#not_eq_all", () => {
     it.skip("should create a Grouping node");
 
     it.skip("should generate ANDs in sql");
+
+    it.skip("should create a Grouping node");
+    it.skip("should generate ANDs in sql");
   });
 
   describe("#not_eq_any", () => {
     it.skip("should create a Grouping node");
 
+    it.skip("should generate ORs in sql");
+
+    it.skip("should create a Grouping node");
     it.skip("should generate ORs in sql");
   });
 });

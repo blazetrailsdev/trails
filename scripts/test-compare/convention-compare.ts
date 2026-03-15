@@ -299,7 +299,11 @@ function main() {
         }
       }
 
-      // Pass 2: Description-only matches on remaining Ruby tests
+      // Pass 2: Description-only matches on remaining Ruby tests.
+      // When multiple TS tests share the same description, prefer the one whose
+      // ancestor path overlaps most with the Ruby path. This prevents tests like
+      // "is equal with equal ivars" under #between from consuming a match meant
+      // for the same description under #in.
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
@@ -307,7 +311,28 @@ function main() {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        const descIdx = consumeIndex(descIndex.get(nd), consumedTs);
+        const candidates = descIndex.get(nd);
+        let descIdx = -1;
+        if (candidates) {
+          let bestScore = -1;
+          const rubyParts = np.split(" > ");
+          for (const idx of candidates) {
+            if (consumedTs.has(idx)) continue;
+            const tsParts = tsTests[idx].path.split(" > ");
+            // Score: prefix overlap, then prefer longer (more specific) paths
+            let overlap = 0;
+            for (let k = 0; k < Math.min(tsParts.length - 1, rubyParts.length - 1); k++) {
+              if (tsParts[k] === rubyParts[k]) overlap++;
+              else break;
+            }
+            // Score = overlap * 1000 + path length (prefer more specific matches)
+            const score = overlap * 1000 + tsParts.length;
+            if (score > bestScore) {
+              bestScore = score;
+              descIdx = idx;
+            }
+          }
+        }
         if (descIdx >= 0) {
           consumedTs.add(descIdx);
           matchedRuby.add(ri);

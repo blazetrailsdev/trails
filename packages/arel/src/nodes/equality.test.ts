@@ -42,14 +42,27 @@ describe("Arel", () => {
 
     describe("and", () => {
       it.skip("makes and AND node");
+
+      it.skip("makes and AND node");
     });
 
     describe("or", () => {
+      it.skip("makes an OR node");
+
       it.skip("makes an OR node");
     });
 
     describe("to_sql", () => {
       it.skip("takes an engine");
+    });
+
+    it.skip("is equal with equal ivars");
+    it.skip("is not equal with different ivars");
+
+    describe("backwards compat", () => {
+      describe("to_sql", () => {
+        it.skip("takes an engine");
+      });
     });
   });
 });

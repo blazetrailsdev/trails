@@ -50,6 +50,24 @@ describe("NodesTest", () => {
       expect(c2.conditions.length).toBe(1);
       expect(c2.defaultValue).not.toBeNull();
     });
+
+    describe("#as", () => {
+      it.skip("allows aliasing");
+    });
+
+    describe("equality", () => {
+      it.skip("is equal with equal ivars");
+      it.skip("is not equal with different ivars");
+    });
+
+    describe("#clone", () => {
+      it.skip("clones case, conditions and default");
+    });
+
+    describe("#initialize", () => {
+      it.skip("sets case expression from first argument");
+      it.skip("sets default case from second argument");
+    });
   });
 
   describe("#as", () => {
