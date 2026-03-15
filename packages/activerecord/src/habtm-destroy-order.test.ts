@@ -55,12 +55,11 @@ describe("HabtmDestroyOrderTest", () => {
     // Destroying the student should clean up join records without FK error
     await student.destroy();
     expect(student.isDestroyed()).toBe(true);
-    // Join records should be cleaned up
-    const after = await loadHabtm(lesson, "students", {
-      className: "Student",
-      joinTable: "lessons_students",
-    });
-    expect(after).toHaveLength(0);
+    // Verify join table rows are actually removed (not just target missing)
+    const joinRows = await adapter.execute(
+      `SELECT * FROM "lessons_students" WHERE "student_id" = ${student.id}`,
+    );
+    expect(joinRows).toHaveLength(0);
   });
 
   it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => {
