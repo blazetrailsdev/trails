@@ -8,15 +8,15 @@ The goal of this project is to be **100% API compatible with Rails**, matching b
 
 | Package                      | Rails Equivalent                                                              | Convention Compare | Description                                                |
 | ---------------------------- | ----------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------- |
-| `@rails-ts/arel`             | [Arel](https://api.rubyonrails.org/classes/Arel.html)                         | **99.2%**          | SQL AST builder and query generation                       |
+| `@rails-ts/arel`             | [Arel](https://api.rubyonrails.org/classes/Arel.html)                         | **99.4%**          | SQL AST builder and query generation                       |
 | `@rails-ts/activemodel`      | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)           | **100%**           | Attributes, validations, callbacks, dirty tracking, i18n   |
-| `@rails-ts/rack`             | [Rack](https://rack.github.io/)                                               | **91.3%**          | Modular web server interface, request/response, middleware |
+| `@rails-ts/rack`             | [Rack](https://rack.github.io/)                                               | **99%**            | Modular web server interface, request/response, middleware |
 | `@rails-ts/activerecord`     | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)         | **75.7%**          | ORM — persistence, querying, associations, migrations      |
-| `@rails-ts/activesupport`    | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **91.8%**          | Core utilities, inflection, caching, notifications         |
+| `@rails-ts/activesupport`    | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **94.6%**          | Core utilities, inflection, caching, notifications         |
 | `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **25.1%**          | Routing, middleware stack, cookies, sessions, security     |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**           | Controller layer, rendering, filters, parameters           |
 
-**68.5%** complete — 11,757 tests matched against 17,172 Rails tests.
+**69.3%** complete — 11,900 tests matched against 17,172 Rails tests.
 
 Progress is measured by `npm run convention:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.
 
