@@ -20,8 +20,20 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it.skip("explain with eager loading", async () => {});
-    it.skip("explain with options as symbols", async () => {});
-    it.skip("explain with options as strings", async () => {});
+
+    it("explain with options as symbols", async () => {
+      await adapter.exec(`CREATE TABLE "ex_explain" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.executeMutation(`INSERT INTO "ex_explain" ("name") VALUES ('test')`);
+      const result = await adapter.explain(`SELECT * FROM "ex_explain"`);
+      expect(result).toContain("Seq Scan");
+      await adapter.exec(`DROP TABLE "ex_explain"`);
+    });
+
+    it("explain with options as strings", async () => {
+      const result = await adapter.explain("SELECT 1 AS val");
+      expect(result).toContain("Result");
+    });
+
     it.skip("explain options with eager loading", async () => {});
   });
 });

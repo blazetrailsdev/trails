@@ -57,18 +57,51 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("quote table name with schema", async () => {});
     it.skip("quote unicode string", async () => {});
     it.skip("quote binary", async () => {});
-    it.skip("quote date", async () => {});
-    it.skip("quote time", async () => {});
-    it.skip("quote timestamp", async () => {});
+    it("quote date", async () => {
+      const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
+      const val = rows[0].val;
+      expect(val).toBeDefined();
+    });
+
+    it("quote time", async () => {
+      const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
+      expect(rows[0].val).toBeDefined();
+    });
+
+    it("quote timestamp", async () => {
+      const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
+      expect(rows[0].val).toBeDefined();
+    });
+
     it.skip("quote range", async () => {});
-    it.skip("quote array", async () => {});
-    it.skip("quote integer", async () => {});
+
+    it("quote array", async () => {
+      const rows = await adapter.execute("SELECT ARRAY[1,2,3]::integer[] AS val");
+      expect(rows[0].val).toEqual([1, 2, 3]);
+    });
+
+    it("quote integer", async () => {
+      const rows = await adapter.execute("SELECT 42::integer AS val");
+      expect(rows[0].val).toBe(42);
+    });
+
     it.skip("quote big decimal", async () => {});
     it.skip("quote rational", async () => {});
     it.skip("quote bit string", async () => {});
-    it.skip("quote table name with spaces", async () => {});
+
+    it("quote table name with spaces", async () => {
+      await adapter.exec(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
+      await adapter.executeMutation(`INSERT INTO "table with spaces" DEFAULT VALUES`);
+      const rows = await adapter.execute(`SELECT * FROM "table with spaces"`);
+      expect(rows).toHaveLength(1);
+      await adapter.exec(`DROP TABLE "table with spaces"`);
+    });
+
     it.skip("raise when int is wider than 64bit", async () => {});
-    it.skip("do not raise when int is not wider than 64bit", async () => {});
+    it("do not raise when int is not wider than 64bit", async () => {
+      const rows = await adapter.execute("SELECT 2147483647::integer AS val");
+      expect(rows[0].val).toBe(2147483647);
+    });
     it.skip("do not raise when raise int wider than 64bit is false", async () => {});
   });
 });
