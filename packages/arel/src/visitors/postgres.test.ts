@@ -11,16 +11,18 @@ describe("PostgresTest", () => {
     });
 
     it("can handle case insensitive", () => {
-      const node = users.get("name").matchesRegexp("foo.*", false);
+      const node = users.get("name").doesNotMatchRegexp("foo.*", false);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("~*");
+      expect(sql).toContain("!~*");
     });
 
     it("can handle subqueries", () => {
-      const mgr = users.project(users.get("id")).where(users.get("name").matchesRegexp("foo.*"));
+      const mgr = users
+        .project(users.get("id"))
+        .where(users.get("name").doesNotMatchRegexp("foo.*"));
       const node = users.get("id").in(mgr);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("~");
+      expect(sql).toContain("!~");
     });
   });
 
@@ -37,9 +39,9 @@ describe("PostgresTest", () => {
     });
 
     it("should handle column names on both sides", () => {
-      const node = users.get("name").isNotDistinctFrom(users.get("login"));
+      const node = users.get("name").isDistinctFrom(users.get("login"));
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toContain("IS DISTINCT FROM");
     });
   });
 

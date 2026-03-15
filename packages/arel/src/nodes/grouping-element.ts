@@ -1,7 +1,9 @@
 import { Node, NodeVisitor } from "./node.js";
 
 /**
- * Base class for advanced grouping elements.
+ * Grouping element — wraps expressions in parentheses for GROUP BY dimensions.
+ *
+ * Mirrors: Arel::Nodes::GroupingElement
  */
 export class GroupingElement extends Node {
   readonly expressions: Node[];
