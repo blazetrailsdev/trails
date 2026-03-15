@@ -84,13 +84,14 @@ describe("NodesTest", () => {
 
     describe("#clone", () => {
       it("clones case, conditions and default", () => {
-        const base = new Nodes.Case(new Nodes.Quoted("foo"));
-        const withCond = base.when("active", "A");
-        const withDefault = withCond.else("Z");
+        const node = new Nodes.Case(new Nodes.Quoted("foo"));
+        const built = node.when("active", "A").else("Z");
+        const dolly = built.clone();
 
-        expect(withDefault.conditions.length).toBe(1);
-        expect(withDefault.defaultValue).not.toBeNull();
-        expect(withDefault.operand).not.toBeNull();
+        expect(dolly.conditions).toEqual(built.conditions);
+        expect(dolly.conditions).not.toBe(built.conditions);
+        expect(dolly.defaultValue).toBe(built.defaultValue);
+        expect(dolly.operand).toBe(built.operand);
       });
     });
 
