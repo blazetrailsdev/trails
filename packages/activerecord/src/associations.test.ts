@@ -31,6 +31,7 @@ import {
 } from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave.js";
+import { createFixtures } from "./test-fixtures.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -1923,7 +1924,7 @@ describe("AssociationsTest", () => {
     expect(countAfter).toBe(countBefore);
   });
   it.skip("subselect", () => {
-    /* fixture-dependent */
+    /* needs author_favorites association */
   });
   it("loading the association target should keep child records marked for destruction", async () => {
     const adapter = freshAdapter();
@@ -1959,8 +1960,16 @@ describe("AssociationsTest", () => {
     // The original object is still marked
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
-  it.skip("loading the association target should load most recent attributes for child records marked for destruction", () => {
-    /* fixture-dependent */
+  it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
+    const f = createFixtures();
+    const ship = await f.Ship.create({ name: "The good ship Dollypop" });
+    const proxy = association(ship, "parts");
+    const part = await proxy.create({ name: "Mast" });
+    markForDestruction(part);
+    const reloaded = await f.ShipPart.find(part.id as number);
+    await reloaded.updateColumn("name", "Deck");
+    const parts = await proxy.toArray();
+    expect(parts[0].readAttribute("name")).toBe("Deck");
   });
   it("loading cpk association when persisted and in memory differ", async () => {
     const adapter = freshAdapter();
@@ -2130,13 +2139,13 @@ describe("AssociationsTest", () => {
     expect(reloaded.length).toBe(1);
   });
   it.skip("using limitable reflections helper", () => {
-    /* fixture-dependent */
+    /* needs limitable_reflections helper */
   });
   it.skip("association with references", () => {
-    /* fixture-dependent */
+    /* needs references/includes support */
   });
   it.skip("belongs to a model with composite foreign key finds associated record", () => {
-    /* fixture-dependent */
+    /* needs composite key support */
   });
   it("belongs to a cpk model by id attribute", async () => {
     const adapter = freshAdapter();
@@ -2216,55 +2225,55 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([1, 5]);
   });
   it.skip("querying by whole associated records using query constraints", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("querying by single associated record works using query constraints", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("querying by relation with composite key", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("has many association with composite foreign key loads records", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("has many association from a model with query constraints different from the association", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("query constraints over three without defining explicit foreign key query constraints raises", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("model with composite query constraints has many association sql", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("belongs to association does not use parent query constraints if not configured to", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("polymorphic belongs to uses parent query constraints", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("preloads model with query constraints by explicitly configured fk and pk", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("append composite foreign key has many association", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("nullify composite foreign key has many association", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("assign persisted composite foreign key belongs to association", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("nullify composite foreign key belongs to association", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("assign composite foreign key belongs to association", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("query constraints that dont include the primary key raise with a single column", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it.skip("query constraints that dont include the primary key raise with multiple columns", () => {
-    /* fixture-dependent */
+    /* needs composite key / query constraints support */
   });
   it("assign belongs to cpk model by id attribute", async () => {
     const adapter = freshAdapter();
