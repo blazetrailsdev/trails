@@ -6732,9 +6732,10 @@ describe("Rails-guided: set operations and joins", () => {
       }
     }
     await Topic.create({ title: "a" });
-    // Each toArray() call should return a new array instance
-    const first = await Topic.all().toArray();
-    const second = await Topic.all().toArray();
+    // Calling toArray() twice on the same relation should return different array instances
+    const rel = Topic.all();
+    const first = await rel.toArray();
+    const second = await rel.toArray();
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
     expect(first).not.toBe(second);

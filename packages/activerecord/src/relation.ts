@@ -1351,7 +1351,7 @@ export class Relation<T extends Base> {
    */
   async toArray(): Promise<T[]> {
     if (this._isNone) return [];
-    if (this._loaded) return this._records;
+    if (this._loaded) return [...this._records];
 
     const sql = this._toSql();
     const rows = await this._modelClass.adapter.execute(sql);
