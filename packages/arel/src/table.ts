@@ -61,24 +61,14 @@ export class Table extends Node {
 
   /**
    * Factory: create a Join node (defaults to InnerJoin).
-   * String arguments are inserted as raw SQL literals (not quoted).
+   * Arguments are passed directly to the join constructor, matching
+   * Ruby's Arel::FactoryMethods#create_join.
    *
    * Mirrors: Arel::Table#create_join
    */
-  createJoin(
-    to: Node | string,
-    constraint?: Node | string | null,
-    klass?: new (left: Node, right: Node | null) => Join,
-  ): Join {
-    const left = typeof to === "string" ? new SqlLiteral(to) : to;
-    const right =
-      constraint == null
-        ? null
-        : typeof constraint === "string"
-          ? new On(new SqlLiteral(constraint))
-          : new On(constraint);
+  createJoin(to: Node | string, constraint?: Node | string | null, klass?: typeof InnerJoin): Join {
     const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
-    return new JoinClass(left, right);
+    return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
   /**
