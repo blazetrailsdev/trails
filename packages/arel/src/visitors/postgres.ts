@@ -45,7 +45,7 @@ export class PostgreSQL extends ToSql {
   }
 
   protected override visitNotRegexp(node: Nodes.NotRegexp): SQLString {
-    return this.visitBinaryOp(node, "!~");
+    return this.visitBinaryOp(node, node.caseSensitive ? "!~" : "!~*");
   }
 }
 

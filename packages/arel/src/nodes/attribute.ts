@@ -139,8 +139,8 @@ export class Attribute extends Node {
     return new RegexpNode(this, buildQuoted(pattern), caseSensitive);
   }
 
-  doesNotMatchRegexp(pattern: string, _caseSensitive = true): NotRegexp {
-    return new NotRegexp(this, buildQuoted(pattern));
+  doesNotMatchRegexp(pattern: string, caseSensitive = true): NotRegexp {
+    return new NotRegexp(this, buildQuoted(pattern), caseSensitive);
   }
 
   in(values: unknown[] | { ast: Node }): In {
