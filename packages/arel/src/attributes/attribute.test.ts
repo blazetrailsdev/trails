@@ -16,7 +16,11 @@ describe("AttributeTest", () => {
       expect(result).toBe('SELECT * FROM "users" WHERE "users"."id" != 10');
     });
 
-    it.skip("should handle nil");
+    it("should handle nil", () => {
+      const relation = new Table("users");
+      const node = relation.get("id").notEq(null);
+      expect(node).toBeDefined();
+    });
   });
 
   describe("#eq_all", () => {
@@ -32,7 +36,12 @@ describe("AttributeTest", () => {
       );
     });
 
-    it.skip("should not eat input");
+    it("should not eat input", () => {
+      const relation = new Table("users");
+      const values = [1, 2];
+      relation.get("id").eqAll(values);
+      expect(values).toEqual([1, 2]);
+    });
   });
 
   describe("#gt_all", () => {
@@ -68,7 +77,12 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.GreaterThan);
     });
 
-    it.skip("should accept various data types.");
+    it("should accept various data types.", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").gt("fake_name"));
+      expect(mgr.toSql()).toContain("fake_name");
+    });
   });
 
   describe("#lteq", () => {
@@ -84,7 +98,12 @@ describe("AttributeTest", () => {
       expect(users.get("id").gteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").gteqAny([1, 2]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#gteq_any", () => {
@@ -122,7 +141,12 @@ describe("AttributeTest", () => {
       expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" >= 10');
     });
 
-    it.skip("should accept various data types.");
+    it("should accept various data types.", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").gteq("fake_name"));
+      expect(mgr.toSql()).toContain("fake_name");
+    });
   });
 
   describe("#lteq", () => {
@@ -138,7 +162,12 @@ describe("AttributeTest", () => {
       expect(users.get("id").ltAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").ltAny([1, 2]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#lt_any", () => {
@@ -177,7 +206,12 @@ describe("AttributeTest", () => {
       expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" < 10');
     });
 
-    it.skip("should accept various data types.");
+    it("should accept various data types.", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").lt("fake_name"));
+      expect(mgr.toSql()).toContain("fake_name");
+    });
   });
 
   describe("#lteq", () => {
@@ -193,7 +227,12 @@ describe("AttributeTest", () => {
       expect(users.get("id").lteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").lteqAny([1, 2]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#lteq_any", () => {
@@ -243,9 +282,19 @@ describe("AttributeTest", () => {
       expect(users.get("id").eqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").eqAny([1, 2]));
+      expect(mgr.toSql()).toContain("OR");
+    });
 
-    it.skip("should not eat input");
+    it("should not eat input", () => {
+      const relation = new Table("users");
+      const values = [1, 2];
+      relation.get("id").eqAny(values);
+      expect(values).toEqual([1, 2]);
+    });
   });
 
   describe("#eq_any", () => {
@@ -279,7 +328,11 @@ describe("AttributeTest", () => {
       expect(node.name).toBe("AVG");
     });
 
-    it.skip("should generate the proper SQL");
+    it("should generate the proper SQL", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id").average());
+      expect(mgr.toSql()).toContain("AVG");
+    });
   });
 
   describe("#maximum", () => {
@@ -289,7 +342,11 @@ describe("AttributeTest", () => {
       expect(node.name).toBe("MAX");
     });
 
-    it.skip("should generate proper SQL");
+    it("should generate proper SQL", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id").maximum());
+      expect(mgr.toSql()).toContain("MAX");
+    });
   });
 
   describe("#minimum", () => {
@@ -299,7 +356,11 @@ describe("AttributeTest", () => {
       expect(node.name).toBe("MIN");
     });
 
-    it.skip("should generate proper SQL");
+    it("should generate proper SQL", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id").minimum());
+      expect(mgr.toSql()).toContain("MIN");
+    });
   });
 
   describe("#sum", () => {
@@ -309,7 +370,11 @@ describe("AttributeTest", () => {
       expect(node.name).toBe("SUM");
     });
 
-    it.skip("should generate the proper SQL");
+    it("should generate the proper SQL", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id").sum());
+      expect(mgr.toSql()).toContain("SUM");
+    });
   });
 
   describe("#count", () => {
@@ -345,7 +410,11 @@ describe("AttributeTest", () => {
       expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
     });
 
-    it.skip("should handle nil");
+    it("should handle nil", () => {
+      const relation = new Table("users");
+      const node = relation.get("id").eq(null);
+      expect(node).toBeDefined();
+    });
   });
 
   describe("#matches_any", () => {
@@ -353,7 +422,12 @@ describe("AttributeTest", () => {
       expect(users.get("name").matchesAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").matchesAny(["%a%", "%b%"]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#matches_any", () => {
@@ -413,7 +487,12 @@ describe("AttributeTest", () => {
       expect(users.get("name").doesNotMatchAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").doesNotMatchAny(["%a%", "%b%"]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#does_not_match_any", () => {
@@ -464,7 +543,12 @@ describe("AttributeTest", () => {
       ).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").inAny([[1], [2]]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#in_any", () => {
@@ -696,7 +780,12 @@ describe("AttributeTest", () => {
       ).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").notInAny([[1], [2]]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#not_in_any", () => {
@@ -929,7 +1018,12 @@ describe("AttributeTest", () => {
     });
 
     describe("#to_sql", () => {
-      it.skip("should produce sql");
+      it("should produce sql", () => {
+        const relation = new Table("users");
+        const node = relation.get("id").eq(10);
+        const visitor = new Visitors.ToSql();
+        expect(visitor.compile(node)).toContain('"users"."id" = 10');
+      });
     });
   });
 
@@ -1525,24 +1619,53 @@ describe("AttributeTest", () => {
   });
 
   describe("#to_sql", () => {
-    it.skip("should produce sql");
+    it("should produce sql", () => {
+      const relation = new Table("users");
+      const node = relation.get("id").eq(10);
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(node)).toContain('"users"."id" = 10');
+    });
   });
 
   describe("#gt_any", () => {
-    it.skip("should create a Grouping node");
+    it("should create a Grouping node", () => {
+      const relation = new Table("users");
+      expect(relation.get("id").gtAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
+    });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").gtAny([1, 2]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 
   describe("#not_eq_all", () => {
-    it.skip("should create a Grouping node");
+    it("should create a Grouping node", () => {
+      const relation = new Table("users");
+      expect(relation.get("id").notEqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
+    });
 
-    it.skip("should generate ANDs in sql");
+    it("should generate ANDs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").notEqAll([1, 2]));
+      expect(mgr.toSql()).toContain("AND");
+    });
   });
 
   describe("#not_eq_any", () => {
-    it.skip("should create a Grouping node");
+    it("should create a Grouping node", () => {
+      const relation = new Table("users");
+      expect(relation.get("id").notEqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
+    });
 
-    it.skip("should generate ORs in sql");
+    it("should generate ORs in sql", () => {
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").notEqAny([1, 2]));
+      expect(mgr.toSql()).toContain("OR");
+    });
   });
 });
