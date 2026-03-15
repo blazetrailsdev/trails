@@ -30,14 +30,9 @@ describe("Arel", () => {
       it.skip("is equal with equal ivars");
 
       it.skip("is not equal with different ivars");
-
-      it.skip("is equal with equal ivars");
-      it.skip("is not equal with different ivars");
     });
 
     describe("#not", () => {
-      it.skip("makes a NOT node");
-
       it.skip("makes a NOT node");
     });
   });

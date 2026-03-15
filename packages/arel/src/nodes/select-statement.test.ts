@@ -31,13 +31,8 @@ describe("equality", () => {
   it.skip("is equal with equal ivars");
 
   it.skip("is not equal with different ivars");
-
-  it.skip("is equal with equal ivars");
-  it.skip("is not equal with different ivars");
 });
 
 describe("#clone", () => {
-  it.skip("clones cores");
-
   it.skip("clones cores");
 });

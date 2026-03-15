@@ -70,7 +70,5 @@ describe("Arel::Nodes::OverTest", () => {
 
   describe("with literal", () => {
     it.skip("should reference the window definition by name");
-
-    it.skip("should reference the window definition by name");
   });
 });

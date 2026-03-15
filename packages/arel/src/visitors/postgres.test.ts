@@ -16,10 +16,6 @@ describe("PostgresTest", () => {
     it.skip("can handle case insensitive");
 
     it.skip("can handle subqueries");
-
-    it.skip("should know how to visit");
-    it.skip("can handle case insensitive");
-    it.skip("can handle subqueries");
   });
 
   it("should escape LIMIT", () => {
@@ -33,8 +29,6 @@ describe("PostgresTest", () => {
       const node = users.get("name").isDistinctFrom(null);
       expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
-
-    it.skip("should handle column names on both sides");
 
     it.skip("should handle column names on both sides");
   });
@@ -61,11 +55,6 @@ describe("PostgresTest", () => {
 
     it.skip("can handle ESCAPE");
 
-    it.skip("can handle subqueries");
-
-    it.skip("should know how to visit");
-    it.skip("should know how to visit case sensitive");
-    it.skip("can handle ESCAPE");
     it.skip("can handle subqueries");
   });
 
@@ -162,10 +151,6 @@ describe("PostgresTest", () => {
     it.skip("should know how to visit with CubeDimension Argument");
 
     it.skip("should know how to generate parenthesis when supplied with many Dimensions");
-
-    it.skip("should know how to visit with array arguments");
-    it.skip("should know how to visit with CubeDimension Argument");
-    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
@@ -177,9 +162,6 @@ describe("PostgresTest", () => {
 
     it.skip("should construct a valid generic SQL statement");
 
-    it.skip("should handle column names on both sides");
-
-    it.skip("should construct a valid generic SQL statement");
     it.skip("should handle column names on both sides");
   });
 
@@ -213,10 +195,6 @@ describe("PostgresTest", () => {
     it.skip("should know how to visit with CubeDimension Argument");
 
     it.skip("should know how to generate parenthesis when supplied with many Dimensions");
-
-    it.skip("should know how to visit with array arguments");
-    it.skip("should know how to visit with CubeDimension Argument");
-    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
   });
 
   describe("Nodes::Cube", () => {
@@ -225,10 +203,6 @@ describe("PostgresTest", () => {
     it.skip("should know how to visit with CubeDimension Argument");
 
     it.skip("should know how to generate parenthesis when supplied with many Dimensions");
-
-    it.skip("should know how to visit with array arguments");
-    it.skip("should know how to visit with CubeDimension Argument");
-    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
   });
 
   describe("Nodes::Regexp", () => {
@@ -236,10 +210,6 @@ describe("PostgresTest", () => {
 
     it.skip("can handle case insensitive");
 
-    it.skip("can handle subqueries");
-
-    it.skip("should know how to visit");
-    it.skip("can handle case insensitive");
     it.skip("can handle subqueries");
   });
 
@@ -250,11 +220,6 @@ describe("PostgresTest", () => {
 
     it.skip("can handle ESCAPE");
 
-    it.skip("can handle subqueries");
-
-    it.skip("should know how to visit");
-    it.skip("should know how to visit case sensitive");
-    it.skip("can handle ESCAPE");
     it.skip("can handle subqueries");
   });
 });

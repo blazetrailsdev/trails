@@ -24,9 +24,6 @@ describe("the to_sql visitor", () => {
     it.skip("should handle column names on both sides");
 
     it.skip("should handle nil");
-
-    it.skip("should handle column names on both sides");
-    it.skip("should handle nil");
   });
 
   describe("Nodes::NotIn", () => {
@@ -55,14 +52,6 @@ describe("the to_sql visitor", () => {
     it.skip("is not preparable when an array");
 
     it.skip("is preparable when a subselect");
-
-    it.skip("should know how to visit");
-    it.skip("can handle two dot ranges");
-    it.skip("can handle three dot ranges");
-    it.skip("can handle ranges bounded by infinity");
-    it.skip("can handle subqueries");
-    it.skip("is not preparable when an array");
-    it.skip("is preparable when a subselect");
   });
 
   describe("Nodes::DoesNotMatch", () => {
@@ -77,10 +66,6 @@ describe("the to_sql visitor", () => {
 
     it.skip("can handle ESCAPE");
 
-    it.skip("can handle subqueries");
-
-    it.skip("should know how to visit");
-    it.skip("can handle ESCAPE");
     it.skip("can handle subqueries");
   });
 
@@ -99,8 +84,6 @@ describe("the to_sql visitor", () => {
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(new Nodes.False())).toBe("FALSE");
     });
-
-    it.skip("should handle false");
 
     it.skip("should handle false");
   });
@@ -141,8 +124,6 @@ describe("the to_sql visitor", () => {
       const node = users.get("tags").overlaps("bar");
       expect(visitor.compile(node)).toContain("&&");
     });
-
-    it.skip("should handle arbitrary operators");
 
     it.skip("should handle arbitrary operators");
   });
@@ -188,10 +169,6 @@ describe("the to_sql visitor", () => {
 
     it.skip("should handle column names on both sides");
 
-    it.skip("should handle nil");
-
-    it.skip("should construct a valid generic SQL statement");
-    it.skip("should handle column names on both sides");
     it.skip("should handle nil");
   });
 
@@ -273,8 +250,6 @@ describe("the to_sql visitor", () => {
     });
 
     it.skip("encloses SELECT statements with parentheses");
-
-    it.skip("encloses SELECT statements with parentheses");
   });
 
   describe("Nodes::Cte", () => {
@@ -308,8 +283,6 @@ describe("the to_sql visitor", () => {
     });
 
     it.skip("handles table aliases");
-
-    it.skip("handles table aliases");
   });
 
   describe("Nodes::WithRecursive", () => {
@@ -318,8 +291,6 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(aliased);
       expect(sql).toBe('"users" "u"');
     });
-
-    it.skip("handles table aliases");
 
     it.skip("handles table aliases");
   });
@@ -459,9 +430,6 @@ describe("the to_sql visitor", () => {
     it.skip("should handle false");
 
     it.skip("should handle nil");
-
-    it.skip("should handle false");
-    it.skip("should handle nil");
   });
 
   describe("Nodes::InfixOperation", () => {
@@ -478,8 +446,6 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("~");
     });
-
-    it.skip("should handle arbitrary operators");
 
     it.skip("should handle arbitrary operators");
   });
@@ -550,8 +516,6 @@ describe("the to_sql visitor", () => {
       const node = users.get("id").asc().nullsFirst().reverse();
       expect(new Visitors.ToSql().compile(node)).toContain("NULLS LAST");
     });
-
-    it.skip("should know how to visit");
 
     it.skip("should know how to visit");
   });
@@ -647,14 +611,6 @@ describe("the to_sql visitor", () => {
 
     it.skip("is not preparable when an array");
 
-    it.skip("is preparable when a subselect");
-
-    it.skip("should know how to visit");
-    it.skip("can handle two dot ranges");
-    it.skip("can handle three dot ranges");
-    it.skip("can handle ranges bounded by infinity");
-    it.skip("can handle subqueries");
-    it.skip("is not preparable when an array");
     it.skip("is preparable when a subselect");
   });
 
@@ -805,8 +761,6 @@ describe("the to_sql visitor", () => {
     });
 
     it.skip("encloses SELECT statements with parentheses");
-
-    it.skip("encloses SELECT statements with parentheses");
   });
 
   describe("Nodes::BoundSqlLiteral", () => {
@@ -906,18 +860,11 @@ describe("the to_sql visitor", () => {
     it.skip("can handle ESCAPE");
 
     it.skip("can handle subqueries");
-
-    it.skip("should know how to visit");
-    it.skip("can handle ESCAPE");
-    it.skip("can handle subqueries");
   });
 
   describe("Nodes::NotEqual", () => {
     it.skip("should handle false");
 
-    it.skip("should handle nil");
-
-    it.skip("should handle false");
     it.skip("should handle nil");
   });
 });

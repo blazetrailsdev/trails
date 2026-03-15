@@ -256,10 +256,4 @@ describe("MathTest", () => {
   it.skip("minimum should be compatible with ");
 
   it.skip("attribute node should be compatible with ");
-
-  it.skip("average should be compatible with ");
-  it.skip("count should be compatible with ");
-  it.skip("maximum should be compatible with ");
-  it.skip("minimum should be compatible with ");
-  it.skip("attribute node should be compatible with ");
 });
