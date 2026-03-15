@@ -89,7 +89,10 @@ describe("NodesTest", () => {
         expect(node.operand).toBeInstanceOf(Nodes.Quoted);
       });
 
-      it.skip("sets default case from second argument");
+      it("sets default case from second argument", () => {
+        const node = new Nodes.Case(undefined, new Nodes.Quoted("bar"));
+        expect(node.defaultValue).toBeInstanceOf(Nodes.Quoted);
+      });
     });
   });
 });

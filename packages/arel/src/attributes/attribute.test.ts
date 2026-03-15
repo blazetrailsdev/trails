@@ -650,17 +650,35 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.Not);
     });
 
-    it.skip("can be constructed with a quoted range starting from -Infinity");
+    it("can be constructed with a quoted range starting from -Infinity", () => {
+      const node = users.get("id").notBetween([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.Not);
+    });
 
-    it.skip("can be constructed with an exclusive range starting from -Infinity");
+    it("can be constructed with an exclusive range starting from -Infinity", () => {
+      const node = users.get("id").notBetween([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.Not);
+    });
 
-    it.skip("can be constructed with a quoted exclusive range starting from -Infinity");
+    it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
+      const node = users.get("id").notBetween([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.Not);
+    });
 
-    it.skip("can be constructed with an infinite range");
+    it("can be constructed with an infinite range", () => {
+      const node = users.get("id").notBetween([-Infinity, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.Not);
+    });
 
-    it.skip("can be constructed with a quoted infinite range");
+    it("can be constructed with a quoted infinite range", () => {
+      const node = users.get("id").notBetween([-Infinity, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.Not);
+    });
 
-    it.skip("can be constructed with a range ending at Infinity");
+    it("can be constructed with a range ending at Infinity", () => {
+      const node = users.get("id").notBetween([1, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.Not);
+    });
   });
 
   describe("#between", () => {
@@ -670,33 +688,75 @@ describe("AttributeTest", () => {
       expect(sql).toContain("<");
     });
 
-    it.skip("can be constructed with a standard range");
+    it("can be constructed with a standard range", () => {
+      const node = users.get("id").between([1, 3]);
+      expect(node).toBeInstanceOf(Nodes.Between);
+    });
 
-    it.skip("can be constructed with a range starting from -Infinity");
+    it("can be constructed with a range starting from -Infinity", () => {
+      const node = users.get("id").between([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
 
-    it.skip("can be constructed with a quoted range starting from -Infinity");
+    it("can be constructed with a quoted range starting from -Infinity", () => {
+      const node = users.get("id").between([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
 
-    it.skip("can be constructed with an exclusive range starting from -Infinity");
+    it("can be constructed with an exclusive range starting from -Infinity", () => {
+      const node = users.get("id").between([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
 
-    it.skip("can be constructed with a quoted exclusive range starting from -Infinity");
+    it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
+      const node = users.get("id").between([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
 
-    it.skip("can be constructed with an infinite range");
+    it("can be constructed with an infinite range", () => {
+      const node = users.get("id").between([-Infinity, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.True);
+    });
 
-    it.skip("can be constructed with a quoted infinite range");
+    it("can be constructed with a quoted infinite range", () => {
+      const node = users.get("id").between([-Infinity, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.True);
+    });
 
-    it.skip("can be constructed with a range ending at Infinity");
+    it("can be constructed with a range ending at Infinity", () => {
+      const node = users.get("id").between([1, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
 
-    it.skip("can be constructed with a range implicitly starting at Infinity");
+    it("can be constructed with a range implicitly starting at Infinity", () => {
+      const node = users.get("id").between([1, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
 
-    it.skip("can be constructed with a range implicitly ending at Infinity");
+    it("can be constructed with a range implicitly ending at Infinity", () => {
+      const node = users.get("id").between([-Infinity, 3]);
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
 
-    it.skip("can be constructed with a quoted range ending at Infinity");
+    it("can be constructed with a quoted range ending at Infinity", () => {
+      const node = users.get("id").between([1, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
 
-    it.skip("can be constructed with an endless range starting from Infinity");
+    it("can be constructed with an endless range starting from Infinity", () => {
+      const node = users.get("id").between([1, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
 
-    it.skip("can be constructed with a beginless range ending in -Infinity");
+    it("can be constructed with a beginless range ending in -Infinity", () => {
+      const node = users.get("id").between([-Infinity, -Infinity]);
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
 
-    it.skip("can be constructed with an exclusive range");
+    it("can be constructed with an exclusive range", () => {
+      const node = users.get("id").between([1, 2]);
+      expect(node).toBeInstanceOf(Nodes.Between);
+    });
   });
 
   describe("#not_between", () => {
@@ -749,11 +809,21 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.Not);
     });
 
-    it.skip("can be constructed with a subquery");
+    it("can be constructed with a subquery", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      expect(node).toBeInstanceOf(Nodes.NotIn);
+    });
 
-    it.skip("can be constructed with a list");
+    it("can be constructed with a list", () => {
+      const node = users.get("id").notIn([1, 2, 3]);
+      expect(node).toBeInstanceOf(Nodes.NotIn);
+    });
 
-    it.skip("can be constructed with a random object");
+    it("can be constructed with a random object", () => {
+      const node = users.get("id").notIn([42]);
+      expect(node).toBeInstanceOf(Nodes.NotIn);
+    });
   });
 
   describe("#in", () => {
@@ -763,11 +833,21 @@ describe("AttributeTest", () => {
       expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" IN (1, 2, 3)');
     });
 
-    it.skip("can be constructed with a subquery");
+    it("can be constructed with a subquery", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").in(mgr);
+      expect(node).toBeInstanceOf(Nodes.In);
+    });
 
-    it.skip("can be constructed with a list");
+    it("can be constructed with a list", () => {
+      const node = users.get("id").in([1, 2, 3]);
+      expect(node).toBeInstanceOf(Nodes.In);
+    });
 
-    it.skip("can be constructed with a random object");
+    it("can be constructed with a random object", () => {
+      const node = users.get("id").in([42]);
+      expect(node).toBeInstanceOf(Nodes.In);
+    });
   });
 
   describe("#not_in_any", () => {

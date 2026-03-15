@@ -18,11 +18,11 @@ export class Case extends Node {
   readonly conditions: Array<{ when: Node; then: Node }>;
   readonly defaultValue: Node | null;
 
-  constructor(operand?: Node) {
+  constructor(operand?: Node, defaultValue?: Node) {
     super();
     this.operand = operand ?? null;
     this.conditions = [];
-    this.defaultValue = null;
+    this.defaultValue = defaultValue ?? null;
   }
 
   when(condition: Node | unknown, result?: Node | unknown): Case {

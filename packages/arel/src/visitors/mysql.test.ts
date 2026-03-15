@@ -130,7 +130,11 @@ describe("MysqlTest", () => {
       expect(sql).toContain("NULL");
     });
 
-    it.skip("should construct a valid generic SQL statement");
+    it("should construct a valid generic SQL statement", () => {
+      const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
+      const sql = new Visitors.MySQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+    });
   });
 
   describe("Nodes::IsDistinctFrom", () => {

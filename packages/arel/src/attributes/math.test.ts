@@ -247,13 +247,37 @@ describe("MathTest", () => {
     expect(visitor.compile(table.get("id").bitwiseShiftRight(2))).toBe('("users"."id" >> 2)');
   });
 
-  it.skip("average should be compatible with ");
+  it("average should be compatible with ", () => {
+    const table = new Table("users");
+    const sql = new Visitors.ToSql().compile(table.get("id").average().divide(2));
+    expect(sql).toContain("AVG");
+    expect(sql).toContain("/");
+  });
 
-  it.skip("count should be compatible with ");
+  it("count should be compatible with ", () => {
+    const table = new Table("users");
+    const sql = new Visitors.ToSql().compile(table.get("id").count().divide(2));
+    expect(sql).toContain("COUNT");
+    expect(sql).toContain("/");
+  });
 
-  it.skip("maximum should be compatible with ");
+  it("maximum should be compatible with ", () => {
+    const table = new Table("users");
+    const sql = new Visitors.ToSql().compile(table.get("id").maximum().divide(2));
+    expect(sql).toContain("MAX");
+    expect(sql).toContain("/");
+  });
 
-  it.skip("minimum should be compatible with ");
+  it("minimum should be compatible with ", () => {
+    const table = new Table("users");
+    const sql = new Visitors.ToSql().compile(table.get("id").minimum().divide(2));
+    expect(sql).toContain("MIN");
+    expect(sql).toContain("/");
+  });
 
-  it.skip("attribute node should be compatible with ");
+  it("attribute node should be compatible with ", () => {
+    const table = new Table("users");
+    const sql = new Visitors.ToSql().compile(table.get("id").divide(2));
+    expect(sql).toContain("/");
+  });
 });
