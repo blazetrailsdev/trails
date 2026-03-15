@@ -220,7 +220,7 @@ it("can set same site cookies with symbol value", () => {
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=strict");
 });
 
-it("omits same site attribute given a nil/false value", () => {
+it("omits same site attribute given a  value", () => {
   for (const val of [null, false]) {
     const response = new Response();
     response.setCookie("foo", { value: "bar", same_site: val });

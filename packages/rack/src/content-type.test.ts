@@ -26,7 +26,7 @@ it("not change content-type if it is already set", async () => {
 });
 
 for (const code of [100, 204, 304]) {
-  it(`not set content-type on ${code} responses`, async () => {
+  it(`not set content-type on  responses`, async () => {
     const app = async () => [code, {}, []] as any;
     const ct = new ContentType(app, "text/html");
     const [, headers] = await ct.call(request());

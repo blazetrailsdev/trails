@@ -281,6 +281,17 @@ it("notices rack.response_finished errors", async () => {
   await expect(app.call(env)).rejects.toThrow(LintError);
 });
 
+it("pass valid rack.response_finished", async () => {
+  const app = new Lint(async () => [200, { "content-length": "3" }, ["foo"]]);
+  const callable = (_env: any) => {};
+  const env = validEnv({
+    "rack.response_finished": [callable, callable],
+    "content-length": "3",
+  });
+  const [status] = await app.call(env);
+  expect(status).toBe(200);
+});
+
 it("notices when the response protocol is not an array of strings", async () => {
   const app = new Lint(async () => [
     200,

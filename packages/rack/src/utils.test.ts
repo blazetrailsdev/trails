@@ -295,7 +295,7 @@ it("select best quality match", () => {
   expect(Utils.bestQMatch("application/json", ["text/html", "text/plain"])).toBeNull();
 });
 
-it("escape html entities [&><'\"/]", () => {
+it("escape html entities [&><'\\\"/]", () => {
   expect(Utils.escapeHtml("foo")).toBe("foo");
   expect(Utils.escapeHtml("f&o")).toBe("f&amp;o");
   expect(Utils.escapeHtml("f<o")).toBe("f&lt;o");
