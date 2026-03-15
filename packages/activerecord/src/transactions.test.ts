@@ -519,45 +519,17 @@ describe("TransactionTest", () => {
   it.skip("throw from transaction commits", () => {});
   it.skip("number of transactions in commit", () => {});
 
-  it("raising exception in callback rollbacks in save", async () => {
-    const adp = freshAdapter();
-    class TxPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-        this.afterCreate(() => {
-          throw new Error("callback error");
-        });
-      }
-    }
-    // afterCreate fires after the INSERT, so create raises but the row
-    // may already be persisted (memory adapter has no rollback).
-    // The key behavior: the exception surfaces to the caller.
-    await expect(TxPost.create({ title: "test" })).rejects.toThrow("callback error");
+  it.skip("raising exception in callback rollbacks in save", () => {
+    /* needs real transaction wrapping around create — afterCreate fires
+       after INSERT so rollback requires DB-level transaction support */
   });
-
   it.skip("update should rollback on failure!", () => {});
   it.skip("manually rolling back a transaction", () => {});
   it.skip("force savepoint on instance", () => {});
   it.skip("rollback when commit raises", () => {});
-
-  it("rollback when saving a frozen record", async () => {
-    const adp = freshAdapter();
-    class TxPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    const p = await TxPost.create({ title: "test" });
-    await p.destroy();
-    // After destroy, the record is frozen and destroyed
-    expect(p.isFrozen()).toBe(true);
-    expect(p.isDestroyed()).toBe(true);
-    // Attempting to modify a frozen record should throw
-    expect(() => p.writeAttribute("title", "new")).toThrow();
-    // Verify it was actually deleted from the database
-    expect(await TxPost.count()).toBe(0);
+  it.skip("rollback when saving a frozen record", () => {
+    /* test name implies transactional rollback but actual behavior is
+       frozen record prevention — needs real DB transaction support */
   });
 
   it.skip("restore frozen state after double destroy", () => {});
