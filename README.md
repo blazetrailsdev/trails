@@ -26,23 +26,32 @@ Rails patterns translate directly:
 
 ```ruby
 # Ruby / Rails
-users = Arel::Table.new(:users)
-query = users.project(users[:name])
-              .where(users[:age].gt(21))
-              .order(users[:name].asc)
-query.to_sql
-# => SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC
+class Post < ActiveRecord::Base
+  attribute :title, :string
+  attribute :published, :boolean, default: false
+  validates :title, presence: true
+  has_many :comments
+end
+
+post = Post.create!(title: "Hello World")
+post.update!(published: true)
+Post.where(published: true).order(:title)
 ```
 
 ```typescript
 // TypeScript / rails-ts
-const users = new Arel.Table("users");
-const query = users
-  .project(users.get("name"))
-  .where(users.get("age").gt(21))
-  .order(users.get("name").asc());
-query.toSql();
-// => SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC
+class Post extends Base {
+  static {
+    this.attribute("title", "string");
+    this.attribute("published", "boolean", { default: false });
+    this.validates("title", { presence: true });
+    this.hasMany("comments");
+  }
+}
+
+const post = await Post.create({ title: "Hello World" });
+await post.updateBang({ published: true });
+Post.where({ published: true }).order("title");
 ```
 
 ## Ruby to TypeScript Conventions
