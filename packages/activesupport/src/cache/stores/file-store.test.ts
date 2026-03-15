@@ -3,9 +3,6 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore, NullStore } from "../stores.js";
-// =============================================================================
-// MemoryStoreTest
-// =============================================================================
 describe("NullStoreTest", () => {
   let store: NullStore;
   beforeEach(() => {

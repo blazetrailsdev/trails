@@ -186,47 +186,6 @@ describe("TaggedLoggingTest", () => {
     expect(output.string).toContain("[BCX] [Jason] Funky time");
     expect(output.string).toContain("[BCX] Junky time!");
   });
-
-  it("tagged once", () => {
-    const t = logger.tagged("BCX");
-    t.info("Funky time");
-    expect(output.string).toBe("[BCX] Funky time\n");
-  });
-
-  it("tagged twice", () => {
-    const outer = logger.tagged("BCX");
-    const inner = outer.tagged("Jason");
-    inner.info("Funky time");
-    expect(output.string).toBe("[BCX] [Jason] Funky time\n");
-  });
-
-  it("tagged thrice at once", () => {
-    const t = logger.tagged("BCX", "Jason", "New");
-    t.info("Funky time");
-    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
-  });
-
-  it("tagged are flattened", () => {
-    const t = logger.tagged("BCX", ["Jason", "New"] as any);
-    t.info("Funky time");
-    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
-  });
-
-  it("tagged once with blank and nil", () => {
-    const t = logger.tagged(null as any, "", "New");
-    t.info("Funky time");
-    expect(output.string).toBe("[New] Funky time\n");
-  });
-
-  it("mixed levels of tagging", () => {
-    const outer = logger.tagged("BCX");
-    const inner = outer.tagged("Jason");
-    inner.info("Funky time");
-    // After inner tag, outer should still have BCX
-    outer.info("Junky time!");
-    expect(output.string).toContain("[BCX] [Jason] Funky time");
-    expect(output.string).toContain("[BCX] Junky time!");
-  });
 });
 
 describe("TaggedLoggingWithoutBlockTest", () => {
