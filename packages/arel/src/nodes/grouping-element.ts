@@ -3,12 +3,16 @@ import { Node, NodeVisitor } from "./node.js";
 /**
  * Base class for advanced grouping elements.
  */
-abstract class GroupingElement extends Node {
+export class GroupingElement extends Node {
   readonly expressions: Node[];
 
-  constructor(expressions: Node[]) {
+  constructor(expressions: Node | Node[]) {
     super();
-    this.expressions = expressions;
+    this.expressions = Array.isArray(expressions) ? expressions : [expressions];
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
   }
 }
 

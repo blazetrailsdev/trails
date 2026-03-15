@@ -11,11 +11,24 @@ describe("PostgresTest", () => {
       expect(visitor.compile(node)).toContain("IN");
     });
 
-    it.skip("should know how to visit");
+    it("should know how to visit", () => {
+      const node = users.get("name").matchesRegexp("foo.*");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("~");
+    });
 
-    it.skip("can handle case insensitive");
+    it("can handle case insensitive", () => {
+      const node = users.get("name").matchesRegexp("foo.*", false);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("~*");
+    });
 
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id")).where(users.get("name").matchesRegexp("foo.*"));
+      const node = users.get("id").in(mgr);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("~");
+    });
   });
 
   it("should escape LIMIT", () => {
@@ -30,7 +43,11 @@ describe("PostgresTest", () => {
       expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
 
-    it.skip("should handle column names on both sides");
+    it("should handle column names on both sides", () => {
+      const node = users.get("name").isNotDistinctFrom(users.get("login"));
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+    });
   });
 
   describe("Nodes::NotRegexp", () => {
@@ -43,19 +60,38 @@ describe("PostgresTest", () => {
 
   describe("Nodes::DoesNotMatch", () => {
     it("can handle ESCAPE", () => {
-      const node = users.get("name").doesNotMatch("foo%", true, "\\");
+      const node = users.get("name").doesNotMatch("foo%", "\\", true);
       const visitor = new Visitors.ToSql();
       const result = visitor.compile(node);
       expect(result).toContain("NOT LIKE");
     });
 
-    it.skip("should know how to visit");
+    it("should know how to visit", () => {
+      const node = users.get("name").doesNotMatch("foo%");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("NOT ILIKE");
+    });
 
-    it.skip("should know how to visit case sensitive");
+    it("should know how to visit case sensitive", () => {
+      const node = users.get("name").doesNotMatch("foo%", null, true);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("NOT LIKE");
+      expect(sql).not.toContain("ILIKE");
+    });
 
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").doesNotMatch("foo!%", "!");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("NOT ILIKE");
+      expect(sql).toContain("ESCAPE");
+    });
 
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id")).where(users.get("name").doesNotMatch("foo%"));
+      const node = users.get("id").in(mgr);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("NOT ILIKE");
+    });
   });
 
   describe("locking", () => {
@@ -102,7 +138,7 @@ describe("PostgresTest", () => {
 
   describe("Nodes::DoesNotMatch", () => {
     it("should know how to visit case sensitive", () => {
-      const node = users.get("name").doesNotMatch("foo%", true);
+      const node = users.get("name").doesNotMatch("foo%", null, true);
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("NOT LIKE");
     });
@@ -146,11 +182,27 @@ describe("PostgresTest", () => {
       expect(sql).toContain('CUBE("users"."id", "users"."name")');
     });
 
-    it.skip("should know how to visit with array arguments");
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.Rollup([users.get("name"), users.get("bool")]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ROLLUP");
+    });
 
-    it.skip("should know how to visit with CubeDimension Argument");
+    it("should know how to visit with CubeDimension Argument", () => {
+      const dim = new Nodes.GroupingElement([users.get("name")]);
+      const node = new Nodes.Rollup([dim]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ROLLUP");
+    });
 
-    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const d1 = new Nodes.GroupingElement([users.get("name")]);
+      const d2 = new Nodes.GroupingElement([users.get("bool")]);
+      const node = new Nodes.Rollup([d1, d2]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ROLLUP");
+      expect(sql).toContain("(");
+    });
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
@@ -160,9 +212,17 @@ describe("PostgresTest", () => {
       expect(sql).toContain("IS NOT DISTINCT FROM");
     });
 
-    it.skip("should construct a valid generic SQL statement");
+    it("should construct a valid generic SQL statement", () => {
+      const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+    });
 
-    it.skip("should handle column names on both sides");
+    it("should handle column names on both sides", () => {
+      const node = users.get("name").isNotDistinctFrom(users.get("login"));
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("IS NOT DISTINCT FROM");
+    });
   });
 
   describe("Nodes::IsDistinctFrom", () => {
@@ -190,36 +250,102 @@ describe("PostgresTest", () => {
   });
 
   describe("Nodes::GroupingSet", () => {
-    it.skip("should know how to visit with array arguments");
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.GroupingSet([users.get("name"), users.get("bool")]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("GROUPING SETS");
+    });
 
-    it.skip("should know how to visit with CubeDimension Argument");
+    it("should know how to visit with CubeDimension Argument", () => {
+      const dim = new Nodes.GroupingElement([users.get("name"), users.get("bool")]);
+      const node = new Nodes.GroupingSet([dim]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("GROUPING SETS");
+    });
 
-    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const d1 = new Nodes.GroupingElement([users.get("name")]);
+      const d2 = new Nodes.GroupingElement([users.get("bool")]);
+      const node = new Nodes.GroupingSet([d1, d2]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("GROUPING SETS");
+      expect(sql).toContain("(");
+    });
   });
 
   describe("Nodes::Cube", () => {
-    it.skip("should know how to visit with array arguments");
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.Cube([users.get("name"), users.get("bool")]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("CUBE");
+    });
 
-    it.skip("should know how to visit with CubeDimension Argument");
+    it("should know how to visit with CubeDimension Argument", () => {
+      const dim = new Nodes.GroupingElement([users.get("name"), users.get("bool")]);
+      const node = new Nodes.Cube([dim]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("CUBE");
+    });
 
-    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const d1 = new Nodes.GroupingElement([users.get("name")]);
+      const d2 = new Nodes.GroupingElement([users.get("bool"), users.get("created_at")]);
+      const node = new Nodes.Cube([d1, d2]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("CUBE");
+      expect(sql).toContain("(");
+    });
   });
 
   describe("Nodes::Regexp", () => {
-    it.skip("should know how to visit");
+    it("should know how to visit", () => {
+      const node = users.get("name").matchesRegexp("foo.*");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("~");
+      expect(sql).toContain("foo.*");
+    });
 
-    it.skip("can handle case insensitive");
+    it("can handle case insensitive", () => {
+      const node = users.get("name").matchesRegexp("foo.*", false);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("~*");
+    });
 
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id")).where(users.get("name").matchesRegexp("foo.*"));
+      const node = users.get("id").in(mgr);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("SELECT");
+      expect(sql).toContain("~");
+    });
   });
 
   describe("Nodes::Matches", () => {
-    it.skip("should know how to visit");
+    it("should know how to visit", () => {
+      const node = users.get("name").matches("foo%");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ILIKE");
+    });
 
-    it.skip("should know how to visit case sensitive");
+    it("should know how to visit case sensitive", () => {
+      const node = users.get("name").matches("foo%", null, true);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("LIKE");
+      expect(sql).not.toContain("ILIKE");
+    });
 
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").matches("foo!%", "!");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ILIKE");
+      expect(sql).toContain("ESCAPE");
+    });
 
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id")).where(users.get("name").matches("foo%"));
+      const node = users.get("id").in(mgr);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ILIKE");
+    });
   });
 });

@@ -20,8 +20,28 @@ export class PostgreSQL extends ToSql {
     return this.collector;
   }
 
+  protected override visitMatches(node: Nodes.Matches): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(node.caseSensitive ? " LIKE " : " ILIKE ");
+    this.visitNodeOrValue(node.right);
+    if (node.escape) {
+      this.collector.append(` ESCAPE '${node.escape}'`);
+    }
+    return this.collector;
+  }
+
+  protected override visitDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(node.caseSensitive ? " NOT LIKE " : " NOT ILIKE ");
+    this.visitNodeOrValue(node.right);
+    if (node.escape) {
+      this.collector.append(` ESCAPE '${node.escape}'`);
+    }
+    return this.collector;
+  }
+
   protected override visitRegexp(node: Nodes.Regexp): SQLString {
-    return this.visitBinaryOp(node, "~");
+    return this.visitBinaryOp(node, node.caseSensitive ? "~" : "~*");
   }
 
   protected override visitNotRegexp(node: Nodes.NotRegexp): SQLString {

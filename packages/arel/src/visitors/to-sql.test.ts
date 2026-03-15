@@ -78,7 +78,7 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::DoesNotMatch", () => {
     it("can handle ESCAPE", () => {
-      const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
+      const node = users.get("name").doesNotMatch("%chunky%", "\\", true);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("ESCAPE");
       expect(sql).toContain("ESCAPE '\\'");
@@ -924,7 +924,7 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle ESCAPE", () => {
-      const node = users.get("name").matches("%chunky%", true, "\\");
+      const node = users.get("name").matches("%chunky%", "\\", true);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("ESCAPE");
       expect(sql).toContain("ESCAPE '\\'");
