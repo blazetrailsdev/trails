@@ -7002,8 +7002,27 @@ describe("PreloaderTest", () => {
       expect((p as any)._preloadedAssociations.has("pkbaAuthor")).toBe(true);
     }
   });
-  it.skip("habtm association redefinition callbacks should differ and not inherited", () => {
-    /* HABTM not fully implemented */
+  it("habtm association redefinition callbacks should differ and not inherited", () => {
+    const oaAdapter = freshAdapter();
+    class OAParent extends Base {
+      static {
+        this._tableName = "oa_parents";
+        this.attribute("name", "string");
+        this.adapter = oaAdapter;
+      }
+    }
+    class OAChild extends OAParent {}
+    Associations.hasAndBelongsToMany.call(OAParent, "tags", {
+      className: "Tag",
+      joinTable: "oa_parents_tags",
+    });
+    Associations.hasAndBelongsToMany.call(OAChild, "tags", {
+      className: "Tag",
+      joinTable: "oa_children_tags",
+    });
+    const parentAssocs = (OAParent as unknown as Record<string, unknown>)._associations;
+    const childAssocs = (OAChild as unknown as Record<string, unknown>)._associations;
+    expect(parentAssocs).not.toBe(childAssocs);
   });
 
   it("has many association redefinition callbacks should differ and not inherited", () => {
@@ -7054,8 +7073,36 @@ describe("PreloaderTest", () => {
     expect(parentAssocs).not.toBe(subAssocs);
   });
 
-  it.skip("habtm association redefinition reflections should differ and not inherited", () => {
-    /* HABTM not fully implemented */
+  it("habtm association redefinition reflections should differ and not inherited", () => {
+    const oaAdapter = freshAdapter();
+    class OAParent extends Base {
+      static {
+        this._tableName = "oa_parents";
+        this.attribute("name", "string");
+        this.adapter = oaAdapter;
+      }
+    }
+    class OAChild extends OAParent {}
+    Associations.hasAndBelongsToMany.call(OAParent, "tags", {
+      className: "Tag",
+      joinTable: "oa_parents_tags",
+    });
+    Associations.hasAndBelongsToMany.call(OAChild, "tags", {
+      className: "Tag",
+      joinTable: "oa_children_tags",
+    });
+    const parentAssoc = (OAParent as unknown as Record<string, unknown>)._associations as {
+      name: string;
+      options: Record<string, unknown>;
+    }[];
+    const childAssoc = (OAChild as unknown as Record<string, unknown>)._associations as {
+      name: string;
+      options: Record<string, unknown>;
+    }[];
+    const parentHabtm = parentAssoc.filter((a) => a.name === "tags").pop();
+    const childHabtm = childAssoc.filter((a) => a.name === "tags").pop();
+    expect(parentHabtm?.options.joinTable).toBe("oa_parents_tags");
+    expect(childHabtm?.options.joinTable).toBe("oa_children_tags");
   });
 
   it("has many association redefinition reflections should differ and not inherited", () => {

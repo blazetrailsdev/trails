@@ -27,6 +27,9 @@ export interface AssociationOptions {
   afterAdd?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
   beforeRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
   afterRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  extend?:
+    | Record<string, (...args: unknown[]) => unknown>
+    | Record<string, (...args: unknown[]) => unknown>[];
 }
 
 export interface AssociationDefinition {
@@ -587,6 +590,23 @@ export async function loadHasOneThrough(
  * Compute the default join table name for HABTM.
  * Uses the two table names in alphabetical order, joined by underscore.
  */
+/** Coerce a foreignKey option to a single string. HABTM doesn't support composite keys. */
+function singleFk(fk: string | string[] | undefined, fallback: string): string {
+  if (Array.isArray(fk)) {
+    throw new Error("HABTM associations do not support composite foreign keys");
+  }
+  return fk ?? fallback;
+}
+
+/** Resolve the owner primary key column for HABTM, respecting options.primaryKey. */
+function habtmOwnerPk(options: AssociationOptions, ctor: typeof Base): string {
+  const pk = options.primaryKey ?? ctor.primaryKey;
+  if (Array.isArray(pk)) {
+    throw new Error("HABTM associations do not support composite primary keys");
+  }
+  return pk as string;
+}
+
 function defaultJoinTableName(model1: typeof Base, assocName: string): string {
   const table1 = underscore(model1.name);
   const table2 = underscore(assocName);
@@ -612,13 +632,21 @@ export async function loadHabtm(
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveModel(className);
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
-  const ownerFk = `${underscore(ctor.name)}_id`;
+  const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
   const targetFk = `${underscore(singularize(assocName))}_id`;
-  const pkValue = record.readAttribute(ctor.primaryKey as string);
+  const ownerPkCol = habtmOwnerPk(options, ctor);
+  const pkValue = record.readAttribute(ownerPkCol);
   if (pkValue === null || pkValue === undefined) return [];
 
+  // Reject composite target PKs
+  const targetPkCol = targetModel.primaryKey;
+  if (Array.isArray(targetPkCol)) {
+    throw new Error("HABTM associations do not support composite primary keys on the target model");
+  }
+
   // Query the join table to get target IDs
-  const pkQuoted = typeof pkValue === "number" ? String(pkValue) : `'${pkValue}'`;
+  const pkQuoted =
+    typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
   const joinRows = await ctor.adapter.execute(
     `SELECT "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted}`,
   );
@@ -628,7 +656,7 @@ export async function loadHabtm(
 
   return (targetModel as any)
     .all()
-    .where({ [targetModel.primaryKey as string]: targetIds })
+    .where({ [targetPkCol as string]: targetIds })
     .toArray();
 }
 
@@ -640,6 +668,21 @@ export async function processDependentAssociations(record: Base): Promise<void> 
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
 
   for (const assoc of associations) {
+    // HABTM: always clean up join table records on destroy
+    if (assoc.type === "hasAndBelongsToMany") {
+      const ownerPkCol = habtmOwnerPk(assoc.options, ctor);
+      const pkValue = record.readAttribute(ownerPkCol);
+      if (pkValue == null) continue;
+      const joinTable = assoc.options.joinTable ?? defaultJoinTableName(ctor, assoc.name);
+      const ownerFk = singleFk(assoc.options.foreignKey, `${underscore(ctor.name)}_id`);
+      const pkQuoted =
+        typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+      await ctor.adapter.executeMutation(
+        `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted}`,
+      );
+      continue;
+    }
+
     if (!assoc.options.dependent) continue;
     if (assoc.type !== "hasMany" && assoc.type !== "hasOne") continue;
 
@@ -732,12 +775,32 @@ export class CollectionProxy {
     this._record = record;
     this._assocName = assocName;
     this._assocDef = assocDef;
+
+    // Apply extend option — mix methods into this proxy instance
+    const ext = assocDef.options.extend;
+    if (ext) {
+      const extensions = Array.isArray(ext) ? ext : [ext];
+      for (const mod of extensions) {
+        for (const [key, fn] of Object.entries(mod)) {
+          if (typeof fn === "function") {
+            (this as Record<string, unknown>)[key] = fn.bind(this);
+          }
+        }
+      }
+    }
+  }
+
+  private get _isHabtm(): boolean {
+    return this._assocDef.type === "hasAndBelongsToMany";
   }
 
   /**
    * Load and return all associated records.
    */
   async toArray(): Promise<Base[]> {
+    if (this._isHabtm) {
+      return loadHabtm(this._record, this._assocName, this._assocDef.options);
+    }
     return loadHasMany(this._record, this._assocName, this._assocDef.options);
   }
 
@@ -816,6 +879,11 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
    */
   async push(...records: Base[]): Promise<void> {
+    // HABTM: insert into join table
+    if (this._isHabtm) {
+      await this._pushHabtm(records);
+      return;
+    }
     // Through association: create join records instead of setting FK on target
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
@@ -879,6 +947,43 @@ export class CollectionProxy {
     }
   }
 
+  private async _pushHabtm(records: Base[]): Promise<void> {
+    const ctor = this._record.constructor as typeof Base;
+    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
+    const pkValue = this._record.readAttribute(ownerPkCol);
+    if (pkValue == null) {
+      throw new Error("Cannot add to HABTM association on an unpersisted record");
+    }
+    const joinTable =
+      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
+    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
+    const targetFk = `${underscore(singularize(this._assocName))}_id`;
+
+    const pkQuoted =
+      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+
+    for (const record of records) {
+      fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      if (record.isNewRecord()) await record.save();
+      const targetPkCol = (record.constructor as typeof Base).primaryKey;
+      if (Array.isArray(targetPkCol)) {
+        throw new Error(
+          "HABTM associations do not support composite primary keys on the target model",
+        );
+      }
+      const targetPk = record.readAttribute(targetPkCol as string);
+      if (targetPk == null) continue;
+      const targetQuoted =
+        typeof targetPk === "number"
+          ? String(targetPk)
+          : `'${String(targetPk).replace(/'/g, "''")}'`;
+      await ctor.adapter.executeMutation(
+        `INSERT INTO "${joinTable}" ("${ownerFk}", "${targetFk}") VALUES (${pkQuoted}, ${targetQuoted})`,
+      );
+      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    }
+  }
+
   /**
    * Alias for push.
    */
@@ -892,6 +997,11 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
    */
   async delete(...records: Base[]): Promise<void> {
+    // HABTM: remove join table records
+    if (this._isHabtm) {
+      await this._deleteHabtm(records);
+      return;
+    }
     // Through association: delete the join records
     if (this._assocDef.options.through) {
       await this._deleteThrough(records);
@@ -909,6 +1019,39 @@ export class CollectionProxy {
       record.writeAttribute(foreignKey as string, null);
       if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
+      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+    }
+  }
+
+  private async _deleteHabtm(records: Base[]): Promise<void> {
+    const ctor = this._record.constructor as typeof Base;
+    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
+    const pkValue = this._record.readAttribute(ownerPkCol);
+    if (pkValue == null) return;
+    const joinTable =
+      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
+    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
+    const targetFk = `${underscore(singularize(this._assocName))}_id`;
+    const pkQuoted =
+      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+
+    for (const record of records) {
+      fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
+      const targetPkCol = (record.constructor as typeof Base).primaryKey;
+      if (Array.isArray(targetPkCol)) {
+        throw new Error(
+          "HABTM associations do not support composite primary keys on the target model",
+        );
+      }
+      const targetPk = record.readAttribute(targetPkCol as string);
+      if (targetPk == null) continue;
+      const targetQuoted =
+        typeof targetPk === "number"
+          ? String(targetPk)
+          : `'${String(targetPk).replace(/'/g, "''")}'`;
+      await ctor.adapter.executeMutation(
+        `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted} AND "${targetFk}" = ${targetQuoted}`,
+      );
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
   }

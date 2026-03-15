@@ -350,12 +350,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     foreignKey: "pirate_id",
   });
 
-  // Parrot associations
-  Associations.hasMany.call(Parrot, "pirates", {
-    className: "Pirate",
-    foreignKey: "parrot_id",
-  });
-
   // Ship associations
   Associations.belongsTo.call(Ship, "pirate", {
     className: "Pirate",
@@ -400,6 +394,26 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
   Associations.belongsTo.call(Company, "firm", {
     className: "Company",
     foreignKey: "firm_id",
+  });
+
+  // Developer <-> Project (HABTM)
+  Associations.hasAndBelongsToMany.call(Developer, "projects", {
+    className: "Project",
+    joinTable: "developers_projects",
+  });
+  Associations.hasAndBelongsToMany.call(Project, "developers", {
+    className: "Developer",
+    joinTable: "developers_projects",
+  });
+
+  // Pirate <-> Parrot (HABTM)
+  Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
+    className: "Parrot",
+    joinTable: "parrots_pirates",
+  });
+  Associations.hasAndBelongsToMany.call(Parrot, "pirates", {
+    className: "Pirate",
+    joinTable: "parrots_pirates",
   });
 
   // Nested attributes
