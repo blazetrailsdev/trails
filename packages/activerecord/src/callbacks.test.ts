@@ -183,6 +183,7 @@ describe("CallbacksTest", () => {
     const p = new CbPost({ title: "test" });
     const result = await p.save();
     expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
   });
 
   it("before create returns false", async () => {
@@ -211,6 +212,9 @@ describe("CallbacksTest", () => {
     p.writeAttribute("title", "changed");
     const result = await p.save();
     expect(result).toBe(false);
+    // Verify the update was not persisted
+    const reloaded = await CbPost.find(p.id);
+    expect(reloaded.readAttribute("title")).toBe("test");
   });
 
   it.skip("after find", () => {});

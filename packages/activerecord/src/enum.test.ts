@@ -494,6 +494,8 @@ describe("EnumTest", () => {
     b.writeAttribute("status", 2);
     const changes = b.changes;
     expect(changes.status).toBeDefined();
+    expect(changes.status[0]).toBe(0); // from: proposed (0)
+    expect(changes.status[1]).toBe(2); // to: published (2)
   });
 
   it.skip("building new objects with enum scopes", () => {});
