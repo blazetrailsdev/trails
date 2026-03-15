@@ -115,12 +115,24 @@ export class Attribute extends Node {
     return new LessThanOrEqual(this, buildQuoted(other));
   }
 
-  matches(pattern: string, _caseSensitive = true, escape: string | null = null): Matches {
-    return new Matches(this, buildQuoted(pattern), escape);
+  matches(
+    pattern: string | { ast: Node },
+    _caseSensitive = true,
+    escape: string | null = null,
+  ): Matches {
+    const right =
+      typeof pattern === "string" ? buildQuoted(pattern) : (pattern as { ast: Node }).ast;
+    return new Matches(this, right, escape);
   }
 
-  doesNotMatch(pattern: string, _caseSensitive = true, escape: string | null = null): DoesNotMatch {
-    return new DoesNotMatch(this, buildQuoted(pattern), escape);
+  doesNotMatch(
+    pattern: string | { ast: Node },
+    _caseSensitive = true,
+    escape: string | null = null,
+  ): DoesNotMatch {
+    const right =
+      typeof pattern === "string" ? buildQuoted(pattern) : (pattern as { ast: Node }).ast;
+    return new DoesNotMatch(this, right, escape);
   }
 
   in(values: unknown[] | { ast: Node }): In {

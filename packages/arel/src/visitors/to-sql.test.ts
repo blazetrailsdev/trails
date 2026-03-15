@@ -87,8 +87,11 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle subqueries", () => {
-      const sql = new Visitors.ToSql().compile(users.get("name").doesNotMatch("%x%"));
+      const mgr = users.project(users.get("name"));
+      const node = users.get("name").doesNotMatch(mgr);
+      const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("NOT LIKE");
+      expect(sql).toContain("SELECT");
     });
   });
 
@@ -926,8 +929,11 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle subqueries", () => {
-      const sql = new Visitors.ToSql().compile(users.get("name").matches("%x%"));
+      const mgr = users.project(users.get("name"));
+      const node = users.get("name").matches(mgr);
+      const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("LIKE");
+      expect(sql).toContain("SELECT");
     });
   });
 
