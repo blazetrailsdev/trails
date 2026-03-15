@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **65.4%** real (3,776 matched / 5,771 total Ruby tests), 1,866 stubs remaining.
+Current state: **75.7%** (6,347 matched / 8,385 total Ruby tests). 197/342 files matched, 0 misplaced, 1,266 wrong describes.
 
 ## How coverage is measured
 

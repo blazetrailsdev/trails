@@ -1,6 +1,6 @@
 # ActiveSupport: Road to 100% Test Coverage
 
-Current state: **27.8%** real (787 matched / 2,826 total Ruby tests), 2,036 stubs remaining.
+Current state: **51.7%** (1,481 matched / 2,862 total Ruby tests). 67/157 files matched, 1,240 misplaced, 6 wrong describes.
 
 ## How coverage is measured
 

@@ -36,6 +36,7 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules over large files.
 - Do NOT use subagents unless explicitly requested. Do the work directly.
+- Do use worktrees for any changes. Leave the default worktree for the user.
 - Do NOT add code comments that just describe what the line does. Only add
   comments when they provide additional value — a potential bug hidden, or
   explanation about the larger context.
@@ -55,17 +56,17 @@ It compares our test files and test names against the Rails test suite:
 npm run convention:compare
 ```
 
-Current status (9726/17172 tests = 56.6%):
+Current status (10576/17172 tests = 61.6%):
 
 | Package          | Tests | Files   | Misplaced |
 | ---------------- | ----- | ------- | --------- |
-| arel             | 100%  | 59/59   | 0         |
+| arel             | 94.1% | 59/59   | 0         |
 | activemodel      | 100%  | 56/56   | 0         |
-| activerecord     | 69.3% | 185/342 | 560       |
-| activesupport    | 18.9% | 17/157  | 2189      |
-| rack             | 91.2% | 40/40   | 3         |
-| actiondispatch   | 0%    | 0/75    | 474       |
-| actioncontroller | 0%    | 0/91    | 236       |
+| activerecord     | 75.7% | 197/342 | 0         |
+| activesupport    | 51.7% | 67/157  | 1240      |
+| rack             | 91.3% | 40/40   | 0         |
+| actiondispatch   | 25.1% | 16/75   | 67        |
+| actioncontroller | 0.4%  | 8/91    | 229       |
 
 "Misplaced" means tests that exist but are in the wrong file according to
 Rails conventions. These need to be moved, not rewritten.

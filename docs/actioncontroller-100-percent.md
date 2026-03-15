@@ -1,6 +1,6 @@
 # ActionController: Road to 100% Test Coverage
 
-Current state: **~44%** (~843 matched / 1,912 total controller+abstract tests). 1,577 actionpack tests total. Key additions: ActionView pipeline (71 + 18 integration), Parameters 201, Rendering 53, Response 49, TestCase 51, IntegrationTest 39.
+Current state: **0.4%** (7 matched / 1,860 total Rails tests). 8/91 files matched, 229 misplaced, 0 wrong describes.
 
 In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 

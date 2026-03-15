@@ -45,7 +45,7 @@ Complete type casting and serialization:
 ### Translation / Naming
 
 - `humanAttributeName` with i18n lookup and humanize fallback
-- `ModelName` with singular, plural, collection, element, i18nKey
+- `ModelName` with singular, plural, human, collection, element, i18nKey
 - `i18nScope` for translation key scoping
 
 ## Test breakdown by file
