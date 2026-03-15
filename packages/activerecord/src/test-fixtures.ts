@@ -16,7 +16,7 @@ import type { DatabaseAdapter } from "./adapter.js";
 
 /**
  * Creates a fresh set of test model classes with their own adapter.
- * Each call returns new class instances with a fresh adapter so tests
+ * Each call returns new model classes with a fresh adapter so tests
  * don't share database state. Note: models are registered in the global
  * model registry (registerModel), so later calls overwrite earlier ones.
  * This is fine for test isolation since each set uses its own adapter.
