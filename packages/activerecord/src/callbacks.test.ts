@@ -233,35 +233,32 @@ describe("CallbacksTest", () => {
   });
 
   it("validate on create", async () => {
-    const log: string[] = [];
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.beforeCreate(() => {
-          log.push("before_create");
-        });
+        this.validates("title", { presence: true });
       }
     }
-    await CbPost.create({ title: "test" });
-    expect(log).toContain("before_create");
+    const invalid = new CbPost({});
+    const result = await invalid.save();
+    expect(result).toBe(false);
+    const valid = await CbPost.create({ title: "test" });
+    expect(valid.isPersisted()).toBe(true);
   });
 
   it("validate on update", async () => {
-    const log: string[] = [];
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.beforeUpdate(() => {
-          log.push("before_update");
-        });
+        this.validates("title", { presence: true });
       }
     }
     const p = await CbPost.create({ title: "test" });
-    p.writeAttribute("title", "updated");
-    await p.save();
-    expect(log).toContain("before_update");
+    p.writeAttribute("title", "");
+    const result = await p.save();
+    expect(result).toBe(false);
   });
 
   it("before create throwing abort", async () => {

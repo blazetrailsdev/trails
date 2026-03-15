@@ -403,16 +403,16 @@ describe("EnumTest", () => {
   it.skip("enum with custom suffix", () => {});
   it.skip("enum with custom prefix", () => {});
 
-  it.skip("enum value with blank string", () => {
+  it("enum value with blank string", () => {
     const Book = makeBook();
     const b = new Book({ status: castEnumValue(Book, "status", "") });
-    expect(readEnumValue(b, "status")).toBeUndefined();
+    expect(readEnumValue(b, "status")).toBeNull();
   });
 
-  it.skip("enum value with blank is still valid", () => {
+  it("enum value with blank is still valid", () => {
     const Book = makeBook();
     const b = new Book({});
-    expect(readEnumValue(b, "status")).toBeUndefined();
+    expect(readEnumValue(b, "status")).toBeNull();
   });
 
   it("enum doesnt modify the options hash", () => {
@@ -456,8 +456,13 @@ describe("EnumTest", () => {
       status: castEnumValue(Book, "status", "published"),
       language: castEnumValue(Book, "language", "english"),
     });
+    // Query state: readEnumValue returns the string label
     expect(readEnumValue(b, "status")).toBe("published");
     expect(readEnumValue(b, "language")).toBe("english");
+    // Verify we can find via the stored integer value
+    const found = await Book.where({ status: 2 }).toArray();
+    expect(found.length).toBe(1);
+    expect(readEnumValue(found[0], "status")).toBe("published");
   });
 
   it.skip("find via negative scope", () => {});
