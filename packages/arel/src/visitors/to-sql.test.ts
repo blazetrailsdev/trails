@@ -366,8 +366,9 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::NotIn", () => {
     it("is not preparable when an array", () => {
-      const node = users.get("id").in([1, 2, 3]);
+      const node = users.get("id").notIn([1, 2, 3]);
       const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("NOT IN");
       expect(sql).toContain("1, 2, 3");
     });
 
