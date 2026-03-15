@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { Table, Nodes, InsertManager } from "../index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -55,9 +55,9 @@ describe("Arel", () => {
 
     describe("into", () => {
       it("converts to sql", () => {
-        const manager = new Nodes.InsertStatement();
-        manager.relation = users;
-        expect(manager.relation).toBe(users);
+        const manager = new InsertManager();
+        manager.into(users);
+        expect(manager.toSql()).toContain('"users"');
       });
     });
   });
