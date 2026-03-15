@@ -19,7 +19,7 @@ describe("AttributeTest", () => {
     it("should handle nil", () => {
       const relation = new Table("users");
       const node = relation.get("id").notEq(null);
-      expect(node).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT NULL");
     });
   });
 
@@ -413,7 +413,7 @@ describe("AttributeTest", () => {
     it("should handle nil", () => {
       const relation = new Table("users");
       const node = relation.get("id").eq(null);
-      expect(node).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NULL");
     });
   });
 

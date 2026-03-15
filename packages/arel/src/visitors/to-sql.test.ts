@@ -23,12 +23,12 @@ describe("the to_sql visitor", () => {
 
     it("should handle column names on both sides", () => {
       const node = users.get("name").isDistinctFrom(users.get("login"));
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS DISTINCT FROM");
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isDistinctFrom(null);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS DISTINCT FROM");
     });
   });
 
@@ -43,7 +43,7 @@ describe("the to_sql visitor", () => {
 
     it("should know how to visit", () => {
       const node = users.get("id").notIn([1, 2, 3]);
-      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN");
+      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN (1, 2, 3)");
     });
 
     it("can handle two dot ranges", () => {
@@ -182,17 +182,17 @@ describe("the to_sql visitor", () => {
 
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT DISTINCT FROM");
     });
 
     it("should handle column names on both sides", () => {
       const node = users.get("name").isNotDistinctFrom(users.get("login"));
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT DISTINCT FROM");
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT DISTINCT FROM");
     });
   });
 
@@ -315,7 +315,9 @@ describe("the to_sql visitor", () => {
       const mgr = users.project(star);
       const asNode = new Nodes.As(mgr.ast, new Nodes.SqlLiteral("foo"));
       const node = new Nodes.With([asNode]);
-      expect(new Visitors.ToSql().compile(node)).toContain("WITH");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("WITH");
+      expect(sql).toContain("foo");
     });
   });
 
@@ -330,7 +332,9 @@ describe("the to_sql visitor", () => {
       const mgr = users.project(star);
       const asNode = new Nodes.As(mgr.ast, new Nodes.SqlLiteral("foo"));
       const node = new Nodes.WithRecursive([asNode]);
-      expect(new Visitors.ToSql().compile(node)).toContain("WITH");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("WITH RECURSIVE");
+      expect(sql).toContain("foo");
     });
   });
 
@@ -645,7 +649,7 @@ describe("the to_sql visitor", () => {
 
     it("should know how to visit", () => {
       const node = users.get("id").in([1, 2, 3]);
-      expect(new Visitors.ToSql().compile(node)).toContain("IN");
+      expect(new Visitors.ToSql().compile(node)).toContain("IN (1, 2, 3)");
     });
 
     it("can handle two dot ranges", () => {
@@ -831,7 +835,9 @@ describe("the to_sql visitor", () => {
       const m1 = users.project(star);
       const m2 = users.project(star);
       const node = new Nodes.Union(m1.ast, m2.ast);
-      expect(new Visitors.ToSql().compile(node)).toContain("UNION");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("UNION");
+      expect(sql).toContain("(");
     });
   });
 
