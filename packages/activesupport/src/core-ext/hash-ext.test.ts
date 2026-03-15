@@ -370,4 +370,8 @@ describe("HashToXmlTest", () => {
   it.skip("to xml dups options");
 
   it.skip("expansion count is limited");
+
+  it.skip(
+    "multiple records from xml with attributes other than type ignores them without exploding",
+  );
 });

@@ -88,12 +88,6 @@ describe("StringAccessTest", () => {
   });
 });
 
-describe("ToTagTest", () => {
-  it.skip(
-    "#to_tag accepts an object responding to #to_xml and passes the options, where :root is key",
-  );
-});
-
 describe("StringConversionsTest", () => {
   it.skip("string to time");
   it.skip("timestamp string to time");

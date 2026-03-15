@@ -96,4 +96,6 @@ describe("ToXmlTest", () => {
   it.skip("to xml with block");
 
   it.skip("to xml with empty");
+
+  it.skip("to xml dups options");
 });

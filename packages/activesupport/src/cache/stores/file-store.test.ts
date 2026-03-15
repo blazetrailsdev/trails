@@ -92,4 +92,14 @@ describe("FileStoreTest", () => {
     expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toBe(false);
     expect(store.write("new_k", "val", { unlessExist: true })).toBe(true);
   });
+
+  it("clear", () => {
+    writeFileSync(join(cacheDir, ".gitkeep"), "");
+    writeFileSync(join(cacheDir, ".keep"), "");
+    store.write("foo", "bar");
+    store.clear();
+    expect(existsSync(join(cacheDir, ".gitkeep"))).toBe(true);
+    expect(existsSync(join(cacheDir, ".keep"))).toBe(true);
+    expect(store.read("foo")).toBeNull();
+  });
 });

@@ -1,11 +1,16 @@
 import { describe, it, expect } from "vitest";
 import {
+  advance,
+  ago,
+  beginningOfDay,
   beginningOfHour,
+  endOfDay,
   endOfHour,
   nextDay,
   prevDay,
   secondsSinceMidnight,
   secondsUntilEndOfDay,
+  since,
 } from "../time-ext.js";
 
 // Helper: make a local date
@@ -108,5 +113,33 @@ describe("DateTimeExtCalculationsTest", () => {
     const result = nextDay(t);
     expect(result.getDate()).toBe(16);
     expect(result.getMonth()).toBe(5);
+  });
+
+  it("beginning of day", () => {
+    const dt = d(2005, 2, 4, 10, 10, 10);
+    const result = beginningOfDay(dt);
+    expect(result.getHours()).toBe(0);
+  });
+
+  it("end of day", () => {
+    const dt = d(2005, 2, 4, 10, 10, 10);
+    const result = endOfDay(dt);
+    expect(result.getHours()).toBe(23);
+    expect(result.getMinutes()).toBe(59);
+  });
+
+  it("ago", () => {
+    const dt = d(2005, 2, 22, 10, 10, 10);
+    expect(ago(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
+  });
+
+  it("since", () => {
+    const dt = d(2005, 2, 22, 10, 10, 10);
+    expect(since(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
+  });
+
+  it("advance", () => {
+    const dt = d(2005, 2, 22, 15, 15, 10);
+    expect(advance(dt, { years: 1 })).toEqual(d(2006, 2, 22, 15, 15, 10));
   });
 });

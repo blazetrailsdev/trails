@@ -1,16 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { dasherize, camelize } from "./inflector.js";
 
-describe("HashToXmlTest", () => {
-  it.skip(
-    "multiple records from xml with attributes other than type ignores them without exploding",
-  );
-});
-
-describe("ToXmlTest", () => {
-  it.skip("to xml dups options");
-});
-
 describe("ParsingTest", () => {
   it.skip("symbol");
   it.skip("date");
@@ -134,4 +124,8 @@ describe("ToTagTest", () => {
   it.skip("#to_tag should dasherize the space when passed a string with spaces as a key");
 
   it.skip("#to_tag should dasherize the space when passed a symbol with spaces as a key");
+
+  it.skip(
+    "#to_tag accepts an object responding to #to_xml and passes the options, where :root is key",
+  );
 });
