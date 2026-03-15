@@ -85,17 +85,186 @@ describe("AssociationsExtensionsTest", () => {
     expect(count).toBe(1);
   });
 
-  it.skip("extension on habtm", () => {
-    /* needs extend option on HABTM associations */
+  it("extension on habtm", async () => {
+    class HProject extends Base {
+      static {
+        this._tableName = "h_projects";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    class HDeveloper extends Base {
+      static {
+        this._tableName = "h_developers";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    registerModel("HProject", HProject);
+    registerModel("HDeveloper", HDeveloper);
+
+    const findMostRecent = {
+      findMostRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[all.length - 1] ?? null;
+      },
+    };
+    Associations.hasAndBelongsToMany.call(HDeveloper, "hProjects", {
+      className: "HProject",
+      joinTable: "h_developers_h_projects",
+      extend: findMostRecent,
+    });
+
+    const dev = await HDeveloper.create({ name: "Alice" });
+    const p1 = await HProject.create({ name: "First" });
+    const p2 = await HProject.create({ name: "Second" });
+    const proxy = association(dev, "hProjects");
+    await proxy.push(p1, p2);
+    const most = await (
+      proxy as CollectionProxy & { findMostRecent: () => Promise<Base | null> }
+    ).findMostRecent();
+    expect(most).not.toBeNull();
+    expect(most!.readAttribute("name")).toBe("Second");
   });
-  it.skip("named extension on habtm", () => {
-    /* needs extend option on HABTM associations */
+
+  it("named extension on habtm", async () => {
+    class NProject extends Base {
+      static {
+        this._tableName = "n_projects";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    class NDeveloper extends Base {
+      static {
+        this._tableName = "n_developers";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    registerModel("NProject", NProject);
+    registerModel("NDeveloper", NDeveloper);
+
+    const FindMostRecent = {
+      findMostRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[all.length - 1] ?? null;
+      },
+    };
+    Associations.hasAndBelongsToMany.call(NDeveloper, "nProjects", {
+      className: "NProject",
+      joinTable: "n_developers_n_projects",
+      extend: FindMostRecent,
+    });
+
+    const dev = await NDeveloper.create({ name: "Bob" });
+    const p1 = await NProject.create({ name: "Old" });
+    const p2 = await NProject.create({ name: "New" });
+    const proxy = association(dev, "nProjects");
+    await proxy.push(p1, p2);
+    const most = await (
+      proxy as CollectionProxy & { findMostRecent: () => Promise<Base | null> }
+    ).findMostRecent();
+    expect(most).not.toBeNull();
+    expect(most!.readAttribute("name")).toBe("New");
   });
-  it.skip("named two extensions on habtm", () => {
-    /* needs extend option on HABTM associations */
+
+  it("named two extensions on habtm", async () => {
+    class T2Project extends Base {
+      static {
+        this._tableName = "t2_projects";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    class T2Developer extends Base {
+      static {
+        this._tableName = "t2_developers";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    registerModel("T2Project", T2Project);
+    registerModel("T2Developer", T2Developer);
+
+    const FindMostRecent = {
+      findMostRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[all.length - 1] ?? null;
+      },
+    };
+    const FindLeastRecent = {
+      findLeastRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[0] ?? null;
+      },
+    };
+    Associations.hasAndBelongsToMany.call(T2Developer, "t2Projects", {
+      className: "T2Project",
+      joinTable: "t2_developers_t2_projects",
+      extend: [FindMostRecent, FindLeastRecent],
+    });
+
+    const dev = await T2Developer.create({ name: "Carol" });
+    const p1 = await T2Project.create({ name: "Alpha" });
+    const p2 = await T2Project.create({ name: "Beta" });
+    const proxy = association(dev, "t2Projects") as CollectionProxy & {
+      findMostRecent: () => Promise<Base | null>;
+      findLeastRecent: () => Promise<Base | null>;
+    };
+    await proxy.push(p1, p2);
+    const most = await proxy.findMostRecent();
+    const least = await proxy.findLeastRecent();
+    expect(most!.readAttribute("name")).toBe("Beta");
+    expect(least!.readAttribute("name")).toBe("Alpha");
   });
-  it.skip("named extension and block on habtm", () => {
-    /* needs extend option on HABTM associations */
+
+  it("named extension and block on habtm", async () => {
+    class NBProject extends Base {
+      static {
+        this._tableName = "nb_projects";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    class NBDeveloper extends Base {
+      static {
+        this._tableName = "nb_developers";
+        this.attribute("name", "string");
+        this.adapter = extAdapter;
+      }
+    }
+    registerModel("NBProject", NBProject);
+    registerModel("NBDeveloper", NBDeveloper);
+
+    const FindMostRecent = {
+      findMostRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[all.length - 1] ?? null;
+      },
+    };
+    const FindLeastRecent = {
+      findLeastRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[0] ?? null;
+      },
+    };
+    Associations.hasAndBelongsToMany.call(NBDeveloper, "nbProjects", {
+      className: "NBProject",
+      joinTable: "nb_developers_nb_projects",
+      extend: [FindMostRecent, FindLeastRecent],
+    });
+
+    const dev = await NBDeveloper.create({ name: "Dave" });
+    const p1 = await NBProject.create({ name: "First" });
+    const p2 = await NBProject.create({ name: "Last" });
+    const proxy = association(dev, "nbProjects") as CollectionProxy & {
+      findMostRecent: () => Promise<Base | null>;
+      findLeastRecent: () => Promise<Base | null>;
+    };
+    await proxy.push(p1, p2);
+    expect((await proxy.findMostRecent())!.readAttribute("name")).toBe("Last");
+    expect((await proxy.findLeastRecent())!.readAttribute("name")).toBe("First");
   });
   it.skip("extension with dirty target", () => {
     /* dirty tracking on proxy not implemented */

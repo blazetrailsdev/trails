@@ -27,6 +27,9 @@ export interface AssociationOptions {
   afterAdd?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
   beforeRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
   afterRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  extend?:
+    | Record<string, (...args: unknown[]) => unknown>
+    | Record<string, (...args: unknown[]) => unknown>[];
 }
 
 export interface AssociationDefinition {
@@ -744,6 +747,17 @@ export class CollectionProxy {
     this._record = record;
     this._assocName = assocName;
     this._assocDef = assocDef;
+
+    // Apply extend option — mix methods into this proxy instance
+    const ext = assocDef.options.extend;
+    if (ext) {
+      const extensions = Array.isArray(ext) ? ext : [ext];
+      for (const mod of extensions) {
+        for (const [key, fn] of Object.entries(mod)) {
+          (this as Record<string, unknown>)[key] = fn.bind(this);
+        }
+      }
+    }
   }
 
   private get _isHabtm(): boolean {
