@@ -1,94 +1,70 @@
 # ActiveSupport: Road to 100% Test Coverage
 
-Current state: **51.7%** (1,481 matched / 2,862 total Ruby tests). 67/157 files matched, 1,240 misplaced, 6 wrong describes.
+Current state: **91.8%** (2,626 matched / 2,862 total Ruby tests). 150/157 files matched, 0 misplaced, 17 wrong describes.
 
 ## How coverage is measured
 
-The compare script (`npm run test:compare`) extracts test names from both Rails Ruby source and our TypeScript tests, then matches them by normalized description. A "stub" is an `it.skip()` that matched a Ruby test name. The goal is 0 stubs.
+The compare script (`npm run convention:compare`) extracts test names from both Rails Ruby source and our TypeScript tests, then matches them by normalized description. "Skipped" means `it.skip()` stubs that match a Ruby test name. The goal is to convert all skips to real passing tests.
 
-## Current status by test file
+## What's left
 
-### Complete (100% pass rate) — 318 tests across 12 files
+### Missing files (7 files, 81 tests)
 
-| File            | Tests |     | File             | Tests |
-| --------------- | ----- | --- | ---------------- | ----- |
-| duration        | 79    |     | notifications    | 37    |
-| callbacks       | 54    |     | logger           | 31    |
-| ordered-options | 28    |     | try              | 23    |
-| number-helper   | 21    |     | lazy-load-hooks  | 15    |
-| key-generator   | 10    |     | parameter-filter | 8     |
-| array-inquirer  | 7     |     | string-inquirer  | 5     |
+These files exist in Rails but have no TypeScript counterpart yet:
 
-### Partial progress
+| Ruby file                         | Tests | Notes                          |
+| --------------------------------- | ----- | ------------------------------ |
+| i18n_test.rb                      | 21    | i18n integration               |
+| core_ext/class/attribute_test.rb  | 19    | Class attribute extensions     |
+| log_subscriber_test.rb            | 15    | Log subscriber                 |
+| message_verifier_test.rb          | 10    | Message verifier (mostly done) |
+| core_ext/object/deep_dup_test.rb  | 10    | Deep dup                       |
+| security_utils_test.rb            | 4     | Security utilities             |
+| core_ext/object/json_gem_encoding | 2     | JSON gem encoding              |
 
-| File           | Passing / Total | Stubs              |
-| -------------- | --------------- | ------------------ |
-| time_ext       | 66 / 119        | 53                 |
-| hash_ext       | 49 / 93         | 44                 |
-| deprecation    | 46 / 80         | 34                 |
-| range_ext      | 43 / 47         | 4                  |
-| ordered-hash   | 34 / 42         | 8                  |
-| error-reporter | 29 / 32         | 3                  |
-| safe-buffer    | 19 / 41         | 22                 |
-| string_ext     | 126 / 148       | 22 stubs remaining |
-| inflector      | 55 / 56         | 1 missing          |
-| concern        | 2 / 17          | 15                 |
+### Wrong describe (17 tests)
 
-### Needs work (0% — stubs only)
+Tests that are in the correct file but under the wrong `describe` block name. These need their describe renamed to match the Ruby test class.
 
-| File                         | Stubs | Notes                                                     |
-| ---------------------------- | ----- | --------------------------------------------------------- |
-| time_with_zone               | 179   | Implementation exists (203 TS tests), needs name matching |
-| time_zone                    | 108   | Implementation exists, needs name matching                |
-| hash_with_indifferent_access | 93    | HWIA edge cases                                           |
-| multibyte_chars              | 76    | Unicode/multibyte handling                                |
-| date_time_ext                | 68    | DateTime extensions                                       |
-| test_case                    | 62    | Test framework utilities                                  |
-| date_ext                     | 56    | Date extensions                                           |
-| module                       | 53    | Module extensions                                         |
-| xml_mini                     | 47    | XML serialization                                         |
-| json/encoding                | 46    | JSON encoding edge cases                                  |
-| broadcast_logger             | 37    | Multi-destination logging                                 |
-| cache/mem_cache_store        | 35    | Memcached cache store                                     |
-| numeric_ext                  | 33    | Numeric extensions                                        |
-| enumerable                   | 29    | Enumerable extensions                                     |
-| tagged_logging               | 29    | Tagged logging                                            |
-| cache/redis_cache_store      | 28    | Redis cache store                                         |
-| time_travel                  | 27    | Time travel helpers                                       |
-| array/conversions            | 25    | Array conversion helpers                                  |
-| share_lock                   | 25    | Thread-safe locking                                       |
+### Skipped tests (~1,008)
 
-Plus 60+ smaller files with < 25 stubs each.
+Tests that are `it.skip()` stubs matching Ruby test names. The biggest concentrations:
+
+| Area              | Skipped | Notes                              |
+| ----------------- | ------- | ---------------------------------- |
+| time_ext          | ~88     | DST handling, time zone edge cases |
+| time_with_zone    | ~52     | TimeWithZone calculations          |
+| date_ext          | ~47     | Date calculation edge cases        |
+| date_time_ext     | ~57     | DateTime extensions                |
+| hash_ext          | ~44     | Hash deep merge, to_xml edge cases |
+| share_lock        | ~25     | Thread concurrency (hard in JS)    |
+| xml_mini          | ~31     | XML parsing edge cases             |
+| mem_cache_store   | ~35     | Memcached store (needs adapter)    |
+| redis_cache_store | ~27     | Redis store (needs adapter)        |
+| inflector         | ~30     | Transliteration, locale-specific   |
+| safe_buffer       | ~22     | HTML-safe string edge cases        |
+| json/encoding     | ~17     | JSON encoding edge cases           |
 
 ## Recommended next targets
 
-### Highest ROI (most stubs, foundational)
+### Highest ROI
 
-1. **time_with_zone** (179 stubs) — Implementation exists, needs test name matching
-2. **time_zone** (108 stubs) — Implementation exists, needs test name matching
-3. **hash_with_indifferent_access** (93 stubs) — Core data structure, used everywhere
-4. **json/encoding** (46 stubs) — JSON serialization
+1. **core_ext/class/attribute** (19 tests) — Missing file, class_attribute is foundational
+2. **i18n** (21 tests) — Missing file, i18n integration
+3. **core_ext/object/deep_dup** (10 tests) — Missing file, small and self-contained
+4. **message_verifier** (10 tests) — Mostly implemented, just needs the test file recreated
 
-### Medium effort, good payoff
+### Converting skips to real tests
 
-6. **time_ext** (53 stubs remaining) — Already 55% done
-7. **hash_ext** (44 stubs remaining) — Already 53% done
-8. **deprecation** (34 stubs remaining) — Already 57% done
-9. **safe_buffer** (22 stubs) — HTML-safe string handling
-10. **cache stores** (mem_cache 35, redis 28, file 14, memory 13, null 12) — Cache backends
-
-### Lower ROI / complex
-
-- **multibyte_chars** (76 stubs) — Unicode normalization, Ruby-specific encoding
-- **date/time extensions** (68 + 56 + 21 stubs) — TimeZone now available, needs porting
-- **xml_mini** (47 stubs) — XML parsing/serialization
-- **test_case** (62 stubs) — Test framework utilities
-- **share_lock** (25 stubs) — Thread concurrency primitives
+5. **time_ext** (88 skipped) — Already 20 passing, DST/timezone edge cases
+6. **hash_ext** (44 skipped) — Already 49 passing, deep merge and to_xml
+7. **safe_buffer** (22 skipped) — Already 19 passing, HTML safety
+8. **json/encoding** (17 skipped) — Already 29 passing, JSON edge cases
 
 ## Tracking progress
 
-```
-npm run test:compare
+```bash
+npm run convention:compare --package activesupport
 ```
 
-Target: `activesupport: 100% real (2826 matched, 0 stub / 2826 total)`
+Target: 2,862/2,862 tests matched, 0 skipped, 0 misplaced.
