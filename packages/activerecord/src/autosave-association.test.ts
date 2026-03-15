@@ -1292,16 +1292,16 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     /* fixture-dependent */
   });
   it.skip("should not add the same callbacks multiple times for has one", () => {
-    /* fixture-dependent */
+    /* needs reflectOnAllAssociations to inspect association count */
   });
   it.skip("should not add the same callbacks multiple times for belongs to", () => {
-    /* fixture-dependent */
+    /* needs reflectOnAllAssociations to inspect association count */
   });
   it.skip("should not add the same callbacks multiple times for has many", () => {
-    /* fixture-dependent */
+    /* needs reflectOnAllAssociations to inspect association count */
   });
   it.skip("should not add the same callbacks multiple times for has and belongs to many", () => {
-    /* fixture-dependent */
+    /* habtm not implemented */
   });
   it.skip("cyclic autosaves do not add multiple validations", () => {
     /* fixture-dependent */
