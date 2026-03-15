@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, association, registerModel } from "./index.js";
-import { Associations } from "./associations.js";
+import { Associations, loadHabtm } from "./associations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
@@ -46,8 +46,21 @@ describe("HabtmDestroyOrderTest", () => {
     const lesson = await Lesson.create({ name: "SICP" });
     const student = await Student.create({ name: "Ben Bitdiddle" });
     await association(lesson, "students").push(student);
+    // Verify join record exists before destroy
+    const before = await loadHabtm(lesson, "students", {
+      className: "Student",
+      joinTable: "lessons_students",
+    });
+    expect(before).toHaveLength(1);
+    // Destroying the student should clean up join records without FK error
     await student.destroy();
     expect(student.isDestroyed()).toBe(true);
+    // Join records should be cleaned up
+    const after = await loadHabtm(lesson, "students", {
+      className: "Student",
+      joinTable: "lessons_students",
+    });
+    expect(after).toHaveLength(0);
   });
 
   it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => {

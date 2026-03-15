@@ -1969,6 +1969,7 @@ describe("AssociationsTest", () => {
     const reloaded = await f.ShipPart.find(part.id as number);
     await reloaded.updateColumn("name", "Deck");
     const parts = await proxy.toArray();
+    expect(parts).toHaveLength(1);
     expect(parts[0].readAttribute("name")).toBe("Deck");
   });
   it("loading cpk association when persisted and in memory differ", async () => {
