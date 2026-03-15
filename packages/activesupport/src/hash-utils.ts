@@ -228,11 +228,39 @@ function isPlainObject(value: unknown): value is AnyObject {
 }
 
 /**
- * Convert a plain object to a URL query string (Rails' to_param / to_query).
- * Keys are sorted ascending. Values are URL-encoded with spaces as +.
+ * Convert a value to its URL parameter representation (Rails' to_param).
+ *
+ * - null/undefined → null
+ * - boolean → the boolean itself
+ * - Array → each element's toParam joined with "/"
+ * - plain object → URL query string (delegated to toQuery)
+ * - objects with a toParam method → call it
+ * - everything else → String(value)
  */
-export function toParam(obj: Record<string, unknown>): string {
-  return toQuery(obj);
+export function toParam(value: unknown): string | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => {
+        const p = toParam(v);
+        return p === null ? "" : String(p);
+      })
+      .join("/");
+  }
+  if (typeof value === "object" && value !== null) {
+    if (typeof (value as any).toParam === "function") {
+      return (value as any).toParam();
+    }
+    if (isPlainObject(value)) {
+      // If toString is overridden, use it (mirrors Ruby Object#to_param → to_s)
+      if (value.toString !== Object.prototype.toString) {
+        return String(value);
+      }
+      return toQuery(value as Record<string, unknown>);
+    }
+  }
+  return String(value);
 }
 
 function encodeQueryValue(val: unknown): string {
