@@ -60,12 +60,15 @@ export class Table extends Node {
   }
 
   /**
-   * Factory: create an InnerJoin node.
+   * Factory: create a Join node (defaults to InnerJoin).
+   * Arguments are passed directly to the join constructor, matching
+   * Ruby's Arel::FactoryMethods#create_join.
    *
    * Mirrors: Arel::Table#create_join
    */
-  createJoin(to: Node, constraint?: Node): InnerJoin {
-    return new InnerJoin(to, constraint ? new On(constraint) : null);
+  createJoin(to: Node | string, constraint?: Node | string | null, klass?: typeof InnerJoin): Join {
+    const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
+    return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
   /**
