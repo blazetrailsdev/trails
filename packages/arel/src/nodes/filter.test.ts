@@ -30,19 +30,28 @@ describe("FilterTest", () => {
     });
 
     describe("over", () => {
-      it.skip("should reference the window definition by name");
+      it("should reference the window definition by name", () => {
+        const count = users.get("id").count();
+        const filter = new Nodes.Filter(count, users.get("income").gteq(40000));
+        const window = new Nodes.Window();
+        window.partition(users.get("year"));
+        const over = new Nodes.Over(filter, window);
+        const sql = new Visitors.ToSql().compile(over);
+        expect(sql).toContain("FILTER");
+        expect(sql).toContain("OVER");
+        expect(sql).toContain("PARTITION BY");
+      });
     });
 
     describe("as", () => {
-      it.skip("should alias the expression");
+      it("should alias the expression", () => {
+        const count = users.get("id").count();
+        const filter = new Nodes.Filter(count, users.get("income").gteq(40000));
+        const aliased = filter.as("rich_users_count");
+        const sql = new Visitors.ToSql().compile(aliased);
+        expect(sql).toContain("FILTER");
+        expect(sql).toContain("AS rich_users_count");
+      });
     });
-  });
-
-  describe("over", () => {
-    it.skip("should reference the window definition by name");
-  });
-
-  describe("as", () => {
-    it.skip("should alias the expression");
   });
 });

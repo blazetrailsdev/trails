@@ -69,6 +69,10 @@ describe("Arel::Nodes::OverTest", () => {
   });
 
   describe("with literal", () => {
-    it.skip("should reference the window definition by name");
+    it("should reference the window definition by name", () => {
+      const over = new Nodes.Over(users.get("id").count(), new Nodes.SqlLiteral("foo"));
+      const sql = new Visitors.ToSql().compile(over);
+      expect(sql).toContain("OVER foo");
+    });
   });
 });
