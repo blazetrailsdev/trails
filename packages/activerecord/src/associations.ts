@@ -590,6 +590,14 @@ export async function loadHasOneThrough(
  * Compute the default join table name for HABTM.
  * Uses the two table names in alphabetical order, joined by underscore.
  */
+/** Coerce a foreignKey option to a single string. HABTM doesn't support composite keys. */
+function singleFk(fk: string | string[] | undefined, fallback: string): string {
+  if (Array.isArray(fk)) {
+    throw new Error("HABTM associations do not support composite foreign keys");
+  }
+  return fk ?? fallback;
+}
+
 function defaultJoinTableName(model1: typeof Base, assocName: string): string {
   const table1 = underscore(model1.name);
   const table2 = underscore(assocName);
@@ -615,7 +623,7 @@ export async function loadHabtm(
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveModel(className);
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
-  const ownerFk = (options.foreignKey as string | undefined) ?? `${underscore(ctor.name)}_id`;
+  const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
   const targetFk = `${underscore(singularize(assocName))}_id`;
   const pkValue = record.readAttribute(ctor.primaryKey as string);
   if (pkValue === null || pkValue === undefined) return [];
@@ -648,7 +656,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
       const pkValue = record.readAttribute(ctor.primaryKey as string);
       if (pkValue == null) continue;
       const joinTable = assoc.options.joinTable ?? defaultJoinTableName(ctor, assoc.name);
-      const ownerFk = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+      const ownerFk = singleFk(assoc.options.foreignKey, `${underscore(ctor.name)}_id`);
       const pkQuoted =
         typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
       await ctor.adapter.executeMutation(
@@ -756,7 +764,9 @@ export class CollectionProxy {
       const extensions = Array.isArray(ext) ? ext : [ext];
       for (const mod of extensions) {
         for (const [key, fn] of Object.entries(mod)) {
-          (this as Record<string, unknown>)[key] = fn.bind(this);
+          if (typeof fn === "function") {
+            (this as Record<string, unknown>)[key] = fn.bind(this);
+          }
         }
       }
     }
@@ -927,7 +937,7 @@ export class CollectionProxy {
     }
     const joinTable =
       this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
-    const ownerFk = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
     const targetFk = `${underscore(singularize(this._assocName))}_id`;
 
     for (const record of records) {
@@ -995,7 +1005,7 @@ export class CollectionProxy {
     if (pkValue == null) return;
     const joinTable =
       this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
-    const ownerFk = this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
     const targetFk = `${underscore(singularize(this._assocName))}_id`;
     const pkQuoted =
       typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;

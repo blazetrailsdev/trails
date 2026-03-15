@@ -350,12 +350,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     foreignKey: "pirate_id",
   });
 
-  // Parrot associations
-  Associations.hasMany.call(Parrot, "pirates", {
-    className: "Pirate",
-    foreignKey: "parrot_id",
-  });
-
   // Ship associations
   Associations.belongsTo.call(Ship, "pirate", {
     className: "Pirate",
