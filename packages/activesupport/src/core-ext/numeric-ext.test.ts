@@ -60,13 +60,11 @@ describe("NumericExtTimeAndDateTimeTest", () => {
   });
 
   it("add one year to leap day", () => {
-    // Feb 29, 2004 + 1 year via setFullYear → JS gives Mar 1, 2005
-    // (no automatic clamping to Feb 28 like Rails)
     const leapDay = new Date(2004, 1, 29, 15, 15, 10);
     const result = Duration.years(1).since(leapDay);
     expect(result.getFullYear()).toBe(2005);
     // JS behavior: setFullYear(2005) on Feb 29 overflows to Mar 1
-    expect(result.getFullYear()).toBe(2005);
+    expect(result.getMonth()).toBe(2); // Mar (0-indexed), overflowed from Feb 29
   });
 
   it("in milliseconds", () => {
