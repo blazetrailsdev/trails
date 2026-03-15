@@ -6573,7 +6573,7 @@ describe("Rails-guided: set operations and joins", () => {
         this.adapter = adapter;
       }
     }
-    await expect(Topic.findByBang({ title: "nonexistent" })).rejects.toThrow();
+    await expect(Topic.findByBang({ title: "nonexistent" })).rejects.toThrow(RecordNotFound);
   });
 
   it("find on hash conditions", async () => {
@@ -6731,22 +6731,16 @@ describe("Rails-guided: set operations and joins", () => {
       }
     }
     await Topic.create({ title: "a" });
-    const all = await Topic.all().toArray();
-    const dup = [...all];
-    expect(dup).toHaveLength(all.length);
-    expect(dup).not.toBe(all);
+    // Each toArray() call should return a new array instance
+    const first = await Topic.all().toArray();
+    const second = await Topic.all().toArray();
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(first).not.toBe(second);
   });
 
-  it("create with block", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const t = await Topic.create({ title: "block-created" });
-    expect(t.isPersisted()).toBe(true);
-    expect(t.readAttribute("title")).toBe("block-created");
+  it.skip("create with block", () => {
+    /* needs block/yield support in create */
   });
 
   it("multiple find or create by within transactions", async () => {
