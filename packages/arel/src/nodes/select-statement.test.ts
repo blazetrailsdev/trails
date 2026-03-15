@@ -37,6 +37,7 @@ describe("Arel", () => {
         const dolly = stmt.clone();
         expect(dolly.cores.length).toBe(stmt.cores.length);
         expect(dolly.cores).not.toBe(stmt.cores);
+        expect(dolly.cores[0]).not.toBe(stmt.cores[0]);
         expect(dolly.offset).toBe(stmt.offset);
         expect(dolly.limit).toBe(stmt.limit);
       });

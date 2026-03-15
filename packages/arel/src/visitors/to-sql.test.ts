@@ -180,8 +180,6 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  describe("Nodes::IsDistinctFrom", () => {});
-
   // Convention-compare parity stubs (Ruby tests that should live in visitors/to-sql.test.ts).
   describe("Nodes::Case", () => {
     it("allows chaining multiple conditions", () => {
@@ -487,8 +485,6 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain("||");
     });
   });
-
-  describe("Nodes::UnaryOperation", () => {});
 
   it("should handle nil with named functions", () => {
     const fn = new Nodes.NamedFunction("COALESCE", [users.get("name"), new Nodes.Quoted(null)]);
