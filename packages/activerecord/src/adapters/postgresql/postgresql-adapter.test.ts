@@ -110,7 +110,7 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_uniq" ("name") VALUES ('Alice')`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_uniq" ("name") VALUES ('Alice')`),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/duplicate key|unique/i);
     });
 
     it("translate exception not null violation", async () => {
@@ -119,7 +119,7 @@ describeIfPg("PostgresAdapter", () => {
       );
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_notnull" ("name") VALUES (NULL)`),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/not-null|null value/i);
     });
 
     it("translate exception foreign key violation", async () => {
@@ -129,7 +129,7 @@ describeIfPg("PostgresAdapter", () => {
       );
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_child" ("parent_id") VALUES (999)`),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/foreign key|violates/i);
     });
 
     it.skip("translate exception value too long", async () => {});
@@ -140,14 +140,14 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_num" ("id" SERIAL PRIMARY KEY, "val" SMALLINT)`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_num" ("val") VALUES (99999)`),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/out of range/i);
     });
 
     it("translate exception invalid text representation", async () => {
       await adapter.exec(`CREATE TABLE "ex_cast" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_cast" ("val") VALUES ('not_a_number')`),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/invalid input|integer/i);
     });
 
     it.skip("translate exception query cancelled", async () => {});

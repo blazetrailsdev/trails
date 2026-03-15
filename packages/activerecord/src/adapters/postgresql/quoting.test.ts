@@ -10,6 +10,12 @@ describeIfPg("PostgresAdapter", () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
+    try {
+      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test" CASCADE`);
+      await adapter.exec(`DROP TABLE IF EXISTS "table with spaces" CASCADE`);
+    } catch {
+      // ignore
+    }
     await adapter.close();
   });
 
@@ -60,17 +66,22 @@ describeIfPg("PostgresAdapter", () => {
     it("quote date", async () => {
       const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
       const val = rows[0].val;
-      expect(val).toBeDefined();
+      expect(val).toBeInstanceOf(Date);
+      expect((val as Date).getFullYear()).toBe(2023);
     });
 
     it("quote time", async () => {
       const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
-      expect(rows[0].val).toBeDefined();
+      const val = rows[0].val;
+      expect(typeof val === "string" || val instanceof Date).toBe(true);
+      expect(String(val)).toContain("14:30");
     });
 
     it("quote timestamp", async () => {
       const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
-      expect(rows[0].val).toBeDefined();
+      const val = rows[0].val;
+      expect(val).toBeInstanceOf(Date);
+      expect((val as Date).getFullYear()).toBe(2023);
     });
 
     it.skip("quote range", async () => {});
@@ -94,7 +105,6 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "table with spaces" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT * FROM "table with spaces"`);
       expect(rows).toHaveLength(1);
-      await adapter.exec(`DROP TABLE "table with spaces"`);
     });
 
     it.skip("raise when int is wider than 64bit", async () => {});
