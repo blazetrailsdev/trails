@@ -61,6 +61,7 @@ export class Table extends Node {
 
   /**
    * Factory: create a Join node (defaults to InnerJoin).
+   * String arguments are inserted as raw SQL literals (not quoted).
    *
    * Mirrors: Arel::Table#create_join
    */
@@ -76,7 +77,7 @@ export class Table extends Node {
         : typeof constraint === "string"
           ? new On(new SqlLiteral(constraint))
           : new On(constraint);
-    const JoinClass = klass ?? InnerJoin;
+    const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
     return new JoinClass(left, right);
   }
 
