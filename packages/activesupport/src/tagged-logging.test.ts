@@ -1,5 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, BroadcastLogger, taggedLogging } from "./logger.js";
+
+function makeBuffer() {
+  const lines: string[] = [];
+  return {
+    write(s: string) {
+      lines.push(s);
+    },
+    get string(): string {
+      return lines.join("");
+    },
+    lines,
+  };
+}
 
 describe("TaggedLoggingWithoutBlockTest", () => {
   it.skip("shares tags across threads");
@@ -8,6 +21,14 @@ describe("TaggedLoggingWithoutBlockTest", () => {
 });
 
 describe("TaggedLoggingTest", () => {
+  let output: ReturnType<typeof makeBuffer>;
+  let logger: ReturnType<typeof taggedLogging>;
+  beforeEach(() => {
+    output = makeBuffer();
+    const base = new Logger(output);
+    logger = taggedLogging(base);
+  });
+
   function makeOutput() {
     const lines: string[] = [];
     return { write: (s: string) => lines.push(s), lines };
@@ -76,6 +97,94 @@ describe("TaggedLoggingTest", () => {
     tagged.pushTags("X");
     tagged.info("test");
     expect(output.lines.some((l) => l.includes("[X]") && l.includes("test"))).toBe(true);
+  });
+
+  it("tagged once", () => {
+    const t = logger.tagged("BCX");
+    t.info("Funky time");
+    expect(output.string).toBe("[BCX] Funky time\n");
+  });
+
+  it("tagged twice", () => {
+    const outer = logger.tagged("BCX");
+    const inner = outer.tagged("Jason");
+    inner.info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] Funky time\n");
+  });
+
+  it("tagged thrice at once", () => {
+    const t = logger.tagged("BCX", "Jason", "New");
+    t.info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
+  });
+
+  it("tagged with an array", () => {
+    const t = logger.tagged(["BCX", "Jason", "New"] as any);
+    t.info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
+  });
+
+  it("tagged are flattened", () => {
+    const t = logger.tagged("BCX", ["Jason", "New"] as any);
+    t.info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
+  });
+
+  it("push and pop tags directly", () => {
+    const pushed = logger.pushTags("A", ["B", "  ", ["C"]] as any);
+    expect(pushed).toEqual(["A", "B", "C"]);
+    logger.info("a");
+    const popped1 = logger.popTags();
+    expect(popped1).toEqual(["C"]);
+    logger.info("b");
+    const popped2 = logger.popTags(1);
+    expect(popped2).toEqual(["B"]);
+    logger.info("c");
+    const cleared = logger.clearTags();
+    expect(cleared).toEqual([]);
+    logger.info("d");
+    expect(output.string).toBe("[A] [B] [C] a\n[A] [B] b\n[A] c\nd\n");
+  });
+
+  it("does not strip message content", () => {
+    logger.info("  Hello");
+    expect(output.string).toBe("  Hello\n");
+  });
+
+  it("tagged once with blank and nil", () => {
+    const t = logger.tagged(null as any, "", "New");
+    t.info("Funky time");
+    expect(output.string).toBe("[New] Funky time\n");
+  });
+
+  it("keeps each tag in their own thread", () => {
+    // JS is single-threaded; verify tags are isolated per logger
+    const out2 = makeBuffer();
+    const base2 = new Logger(out2);
+    const logger2 = taggedLogging(base2);
+    logger.tagged("Thread1").info("t1 msg");
+    logger2.tagged("Thread2").info("t2 msg");
+    expect(output.string).toContain("[Thread1]");
+    expect(out2.string).toContain("[Thread2]");
+    expect(output.string).not.toContain("[Thread2]");
+  });
+
+  it("keeps each tag in their own thread even when pushed directly", () => {
+    const t = logger.tagged("Direct");
+    t.pushTags("Extra");
+    t.info("pushed");
+    expect(output.string).toContain("[Direct] [Extra]");
+    t.clearTags();
+  });
+
+  it("mixed levels of tagging", () => {
+    const outer = logger.tagged("BCX");
+    const inner = outer.tagged("Jason");
+    inner.info("Funky time");
+    // After inner tag, outer should still have BCX
+    outer.info("Junky time!");
+    expect(output.string).toContain("[BCX] [Jason] Funky time");
+    expect(output.string).toContain("[BCX] Junky time!");
   });
 });
 

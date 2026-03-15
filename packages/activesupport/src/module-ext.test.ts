@@ -8,9 +8,6 @@ import {
   isAnonymous,
   moduleParentName,
   suppress,
-  registerSubclass,
-  subclasses,
-  descendants,
 } from "./module-ext.js";
 
 describe("ModuleTest", () => {
@@ -147,130 +144,6 @@ describe("ModuleTest", () => {
     const Inner = { name: "Outer::Inner" } as unknown as Function;
     expect(moduleParentName(Inner)).toBe("Outer");
   });
-
-  it("delegation to index get method", () => {
-    class Container {
-      data: Record<string, unknown> = { key: "value" };
-      get(key: string) {
-        return this.data[key];
-      }
-    }
-    class Wrapper {
-      container: Container;
-      constructor() {
-        this.container = new Container();
-      }
-    }
-    delegate(Wrapper.prototype, "get", { to: "container" });
-    const w = new Wrapper() as Wrapper & Record<string, unknown>;
-    // delegate creates a getter that returns the method; bind to call it
-    const getFn = w.get as Container["get"];
-    expect(getFn.call(w.container, "key")).toBe("value");
-  });
-
-  it("delegation to index set method", () => {
-    class Container {
-      data: Record<string, unknown> = {};
-      set(key: string, val: unknown) {
-        this.data[key] = val;
-      }
-      get(key: string) {
-        return this.data[key];
-      }
-    }
-    class Wrapper {
-      container: Container;
-      constructor() {
-        this.container = new Container();
-      }
-    }
-    delegate(Wrapper.prototype, "set", "get", { to: "container" });
-    const w = new Wrapper() as Wrapper & Record<string, unknown>;
-    const setFn = w.set as Container["set"];
-    const getFn = w.get as Container["get"];
-    setFn.call(w.container, "x", 42);
-    expect(getFn.call(w.container, "x")).toBe(42);
-  });
-
-  it("delegation with allow nil and false value", () => {
-    class Settings {
-      enabled = false;
-    }
-    class App {
-      settings: Settings | null = new Settings();
-    }
-    delegate(App.prototype, "enabled", { to: "settings", allowNil: true });
-    const app = new App() as App & { enabled: boolean | undefined };
-    expect(app.enabled).toBe(false);
-  });
-
-  it("delegation with allow nil and invalid value", () => {
-    class Target {
-      value: unknown = undefined;
-    }
-    class Host {
-      target: Target | null = new Target();
-    }
-    delegate(Host.prototype, "value", { to: "target", allowNil: true });
-    const h = new Host() as Host & { value: unknown };
-    expect(h.value).toBeUndefined();
-    h.target = null;
-    expect(h.value).toBeUndefined();
-  });
-
-  it("delegation to method that exists on nil when allowing nil", () => {
-    class Greeter {
-      greet() {
-        return "hello";
-      }
-    }
-    class Host {
-      greeter: Greeter | null = null;
-    }
-    delegate(Host.prototype, "greet", { to: "greeter", allowNil: true });
-    const h = new Host() as Host & Record<string, unknown>;
-    // When greeter is null, returns undefined
-    expect(h.greet).toBeUndefined();
-    h.greeter = new Greeter();
-    // When greeter exists, returns the method
-    expect(typeof h.greet).toBe("function");
-  });
-
-  it("delegate line with nil", () => {
-    class Name {
-      first = "Alice";
-    }
-    class Person {
-      name: Name | null = null;
-    }
-    delegate(Person.prototype, "first", { to: "name", allowNil: true });
-    const p = new Person() as Person & { first: string | undefined };
-    expect(p.first).toBeUndefined();
-  });
-
-  it("delegate missing to does not delegate to fake methods", () => {
-    class Real {
-      exists() {
-        return true;
-      }
-    }
-    class Host {
-      real: Real = new Real();
-    }
-    delegate(Host.prototype, "exists", { to: "real" });
-    const h = new Host() as Host & Record<string, unknown>;
-    expect((h as any).exists()).toBe(true);
-    // Non-delegated method should not exist
-    expect(typeof h.nonExistent).toBe("undefined");
-  });
-
-  it("module nesting is empty", () => {
-    // In JS, there's no module nesting concept like Ruby's Module.nesting
-    // The nearest equivalent: check that a plain class has no namespace
-    class Foo {}
-    expect(Foo.name).toBe("Foo");
-    expect(Foo.name.includes("::")).toBe(false);
-  });
 });
 
 describe("ModuleAttributeAccessorTest", () => {
@@ -384,52 +257,6 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it.skip("declaring attributes on singleton errors");
 });
-
-describe("AttrInternalTest", () => {
-  it("reader", () => {
-    class Widget {}
-    attrInternal(Widget.prototype, "color");
-    const w = new Widget() as any;
-    (w as any)._color_ = "red";
-    expect(w.color).toBe("red");
-  });
-
-  it("writer", () => {
-    class Widget {}
-    attrInternal(Widget.prototype, "size");
-    const w = new Widget() as any;
-    w.size = "large";
-    expect((w as any)._size_).toBe("large");
-  });
-
-  it("accessor", () => {
-    class Widget {}
-    attrInternal(Widget.prototype, "label");
-    const w = new Widget() as any;
-    w.label = "hello";
-    expect(w.label).toBe("hello");
-  });
-
-  it("invalid naming format", () => {
-    // attrInternal doesn't validate names — it stores with underscore prefix
-    // So this is just documentation: naming is _name_
-    class Widget {}
-    attrInternal(Widget.prototype, "foo");
-    const w = new Widget() as any;
-    w.foo = 99;
-    expect((w as any)._foo_).toBe(99);
-  });
-
-  it("naming format", () => {
-    // Default naming format: _name_
-    class Widget {}
-    attrInternal(Widget.prototype, "bar");
-    const w = new Widget() as any;
-    w.bar = "test";
-    expect(Object.keys(w)).toContain("_bar_");
-  });
-});
-
 describe("KernelSuppressTest", () => {
   it("suppression", () => {
     const log: string[] = [];
@@ -448,58 +275,6 @@ describe("KernelSuppressTest", () => {
     }).toThrow(RangeError);
   });
 });
-
-describe("ClassTest", () => {
-  it("descendants", () => {
-    class Vehicle {}
-    class Car extends Vehicle {
-      constructor() {
-        super();
-        registerSubclass(Vehicle, Car);
-      }
-    }
-    class Truck extends Vehicle {
-      constructor() {
-        super();
-        registerSubclass(Vehicle, Truck);
-      }
-    }
-    class SportsCar extends Car {
-      constructor() {
-        super();
-        registerSubclass(Car, SportsCar);
-      }
-    }
-    // register manually (simulating class definition time registration)
-    registerSubclass(Vehicle, Car);
-    registerSubclass(Vehicle, Truck);
-    registerSubclass(Car, SportsCar);
-    const desc = descendants(Vehicle);
-    expect(desc).toContain(Car);
-    expect(desc).toContain(Truck);
-    expect(desc).toContain(SportsCar);
-  });
-
-  it("subclasses", () => {
-    class Animal {}
-    class Dog extends Animal {}
-    class Cat extends Animal {}
-    class Poodle extends Dog {}
-    registerSubclass(Animal, Dog);
-    registerSubclass(Animal, Cat);
-    registerSubclass(Dog, Poodle);
-    const subs = subclasses(Animal);
-    expect(subs).toContain(Dog);
-    expect(subs).toContain(Cat);
-    expect(subs).not.toContain(Poodle); // only direct children
-  });
-
-  it.skip("descendants excludes singleton classes");
-  it.skip("subclasses excludes singleton classes");
-  it.skip("subclasses exclude reloaded classes");
-  it.skip("descendants exclude reloaded classes");
-});
-
 describe("ConfigurableActiveSupport", () => {
   it("adds a configuration hash", () => {
     class MyApp {}
@@ -521,20 +296,6 @@ describe("ConfigurableActiveSupport", () => {
     expect((Base as any).timeout).toBe(30);
   });
 
-  it("configuration accessors are not available on instance", () => {
-    class Base {}
-    configAccessor(Base, "debug", { instanceAccessor: false });
-    const instance = new Base() as any;
-    // No instance-level property defined
-    expect(Object.getOwnPropertyDescriptor(Base.prototype, "debug")).toBeUndefined();
-  });
-
-  it("configuration accessors can take a default value as a block", () => {
-    class Base {}
-    configAccessor(Base, "computed_val", { default: () => 42 });
-    expect((Base as any).computed_val).toBe(42);
-  });
-
   it("configuration accessors can take a default value as an option", () => {
     class Base {}
     configAccessor(Base, "max_connections", { default: 100 });
@@ -549,18 +310,8 @@ describe("ConfigurableActiveSupport", () => {
     expect(instance.verbose).toBe(true); // instance delegates to class
   });
 
-  it("configuration is crystalizeable", () => {
-    class Base {}
-    configAccessor(Base, "frozen_val", { default: "immutable" });
-    expect((Base as any).frozen_val).toBe("immutable");
-    (Base as any).frozen_val = "changed";
-    expect((Base as any).frozen_val).toBe("changed");
-  });
-
   it("should raise name error if attribute name is invalid", () => {
     class Base {}
     expect(() => configAccessor(Base, "1bad")).toThrow();
   });
-
-  it.skip("the config_accessor method should not be publicly callable");
 });

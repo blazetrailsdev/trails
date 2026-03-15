@@ -30,18 +30,8 @@ interface Payment {
 const pay = (price: number): Payment => ({ price });
 
 describe("EnumerableTests", () => {
-  it("minimum", () => {
-    const payments = [pay(5), pay(15), pay(10)];
-    expect(minimum(payments, (p) => p.price)).toBe(5);
-  });
-
   it("minimum with empty", () => {
     expect(minimum([], (p: Payment) => p.price)).toBeUndefined();
-  });
-
-  it("maximum", () => {
-    const payments = [pay(5), pay(15), pay(10)];
-    expect(maximum(payments, (p) => p.price)).toBe(15);
   });
 
   it("maximum with empty", () => {

@@ -64,3 +64,40 @@ describe("ToSentenceTest", () => {
     expect(typeof result).toBe("string");
   });
 });
+
+describe("ToFsTest", () => {
+  it("to fs db", () => {
+    // Array to db format (similar to join with comma)
+    const arr = ["a", "b", "c"];
+    expect(arr.join(", ")).toBe("a, b, c");
+    expect([1, 2, 3].join(", ")).toBe("1, 2, 3");
+  });
+});
+
+describe("ToXmlTest", () => {
+  it.skip("to xml with hash elements");
+
+  it.skip("to xml with non hash elements");
+
+  it.skip("to xml with non hash different type elements");
+
+  it.skip("to xml with dedicated name");
+
+  it.skip("to xml with options");
+
+  it.skip("to xml with indent set");
+
+  it.skip("to xml with dasherize false");
+
+  it.skip("to xml with dasherize true");
+
+  it.skip("to xml with instruct");
+
+  it.skip("to xml with block");
+
+  it.skip("to xml with empty");
+});
+
+describe("HashToXmlTest", () => {
+  it.skip("to xml dups options");
+});

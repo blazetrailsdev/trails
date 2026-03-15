@@ -1,4 +1,22 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import {
+  beginningOfDay,
+  endOfDay,
+  beginningOfHour,
+  endOfHour,
+  nextDay,
+  prevDay,
+  advance,
+  secondsSinceMidnight,
+  secondsUntilEndOfDay,
+  ago,
+  since,
+} from "../time-ext.js";
+
+// Helper: make a local date
+function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
+  return new Date(year, month - 1, day, hour, min, sec, ms);
+}
 
 describe("DateTimeExtCalculationsTest", () => {
   it.skip("to fs");
@@ -58,4 +76,86 @@ describe("DateTimeExtCalculationsTest", () => {
   it.skip("usec");
   it.skip("nsec");
   it.skip("subsec");
+
+  it("seconds since midnight", () => {
+    const dt = d(2005, 2, 4, 1, 30, 0);
+    expect(secondsSinceMidnight(dt)).toBe(5400);
+  });
+
+  it("seconds until end of day", () => {
+    const dt = d(2005, 2, 4, 23, 59, 59);
+    expect(secondsUntilEndOfDay(dt)).toBe(0);
+  });
+
+  it("beginning of hour", () => {
+    const dt = d(2005, 2, 4, 19, 30, 10);
+    const result = beginningOfHour(dt);
+    expect(result.getHours()).toBe(19);
+    expect(result.getMinutes()).toBe(0);
+  });
+
+  it("end of hour", () => {
+    const dt = d(2005, 2, 4, 19, 30, 10);
+    const result = endOfHour(dt);
+    expect(result.getHours()).toBe(19);
+    expect(result.getMinutes()).toBe(59);
+  });
+
+  it("prev day with offset", () => {
+    const t = d(2005, 6, 15, 12, 0, 0);
+    const result = prevDay(t);
+    expect(result.getDate()).toBe(14);
+    expect(result.getMonth()).toBe(5); // June (0-indexed)
+  });
+
+  it("next day with offset", () => {
+    const t = d(2005, 6, 15, 12, 0, 0);
+    const result = nextDay(t);
+    expect(result.getDate()).toBe(16);
+    expect(result.getMonth()).toBe(5);
+  });
+});
+
+describe("DateExtCalculationsTest", () => {
+  it("beginning of day", () => {
+    const date = d(2005, 2, 21, 10, 30, 45);
+    const result = beginningOfDay(date);
+    expect(result.getHours()).toBe(0);
+    expect(result.getMinutes()).toBe(0);
+    expect(result.getSeconds()).toBe(0);
+  });
+
+  it("end of day", () => {
+    const date = d(2005, 2, 21, 10, 30, 45);
+    const result = endOfDay(date);
+    expect(result.getHours()).toBe(23);
+    expect(result.getMinutes()).toBe(59);
+  });
+});
+
+describe("TimeExtCalculationsTest", () => {
+  it("ago", () => {
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 9, 10, 10));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 20, 10, 10, 10));
+    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+      d(2005, 2, 20, 9, 9, 45),
+    );
+  });
+
+  it("since", () => {
+    expect(since(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 11, 10, 10));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 24, 10, 10, 10));
+    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+      d(2005, 2, 24, 11, 10, 35),
+    );
+  });
+
+  it("advance", () => {
+    const t = d(2005, 1, 22, 15, 15, 10);
+    expect(advance(t, { years: 1 })).toEqual(d(2006, 1, 22, 15, 15, 10));
+    expect(advance(t, { months: 1 })).toEqual(d(2005, 2, 22, 15, 15, 10));
+    expect(advance(t, { days: 1 })).toEqual(d(2005, 1, 23, 15, 15, 10));
+  });
 });

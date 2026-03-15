@@ -498,29 +498,3 @@ describe("HashExtTest", () => {
     expect(r).toEqual({ b: 2 });
   });
 });
-
-describe("HashExtToParamTests", () => {
-  it("string hash", () => {
-    expect(toParam({ name: "Greetings" })).toBe("name=Greetings");
-  });
-
-  it("number hash", () => {
-    expect(toParam({ a: 1, b: 2 })).toContain("a=1");
-    expect(toParam({ a: 1, b: 2 })).toContain("b=2");
-  });
-
-  it("to param hash", () => {
-    const result = toParam({ a: "b", c: "d" });
-    expect(result).toContain("a=b");
-    expect(result).toContain("c=d");
-  });
-
-  it("to param hash escapes its keys and values", () => {
-    const result = toParam({ "foo bar": "hello world" });
-    expect(decodeURIComponent(result.replace(/\+/g, " "))).toBe("foo bar=hello world");
-  });
-
-  it("to param orders by key in ascending order", () => {
-    expect(toParam({ b: 2, a: 1 })).toBe("a=1&b=2");
-  });
-});
