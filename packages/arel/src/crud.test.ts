@@ -1,16 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { Table, InsertManager, UpdateManager, DeleteManager } from "./index.js";
 
-describe("Arel", () => {
+describe("crud", () => {
   const users = new Table("users");
 
-  describe("crud", () => {
+  describe("insert", () => {
     it("should call insert on the connection", () => {
       const mgr = new InsertManager(users);
       mgr.insert([[users.get("name"), "dean"]]);
       expect(mgr.toSql()).toContain('INSERT INTO "users"');
     });
+  });
 
+  describe("update", () => {
     it("should call update on the connection", () => {
       const mgr = new UpdateManager();
       mgr
@@ -19,7 +21,9 @@ describe("Arel", () => {
         .where(users.get("id").eq(1));
       expect(mgr.toSql()).toContain('UPDATE "users"');
     });
+  });
 
+  describe("delete", () => {
     it("should call delete on the connection", () => {
       const mgr = new DeleteManager();
       mgr.from(users).where(users.get("id").eq(1));
