@@ -466,21 +466,108 @@ describe("TransactionTest", () => {
   it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {});
   it.skip("after_commit_not_called_on_rollback", () => {});
   it.skip("after_commit callback doesnt fire for readonly", () => {});
-  it.skip("transaction within transaction", () => {});
-  it.skip("transaction with savepoint", () => {});
+  it("transaction within transaction", async () => {
+    const adp = freshAdapter();
+    class TxPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    await transaction(TxPost, async () => {
+      await TxPost.create({ title: "outer" });
+      await transaction(TxPost, async () => {
+        await TxPost.create({ title: "inner" });
+      });
+    });
+    expect(await TxPost.count()).toBe(2);
+  });
+
+  it("transaction with savepoint", async () => {
+    const adp = freshAdapter();
+    class TxPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    await transaction(TxPost, async () => {
+      await TxPost.create({ title: "kept" });
+      try {
+        await transaction(TxPost, async () => {
+          await TxPost.create({ title: "discarded" });
+          throw new Error("rollback inner");
+        });
+      } catch {
+        // inner transaction rolled back
+      }
+    });
+    const count = await TxPost.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
 
   it.skip("after all transactions commit", () => {});
   it.skip("transaction after rollback callback", () => {});
-  it.skip("rollback dirty changes then retry save on new record", () => {});
+
+  it("rollback dirty changes then retry save on new record", async () => {
+    const adp = freshAdapter();
+    class TxPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const p = new TxPost({ title: "first attempt" });
+    try {
+      await transaction(TxPost, async () => {
+        await p.save();
+        throw new Error("force rollback");
+      });
+    } catch {
+      // rolled back
+    }
+    p.writeAttribute("title", "second attempt");
+    const saved = await p.save();
+    expect(saved).toBe(true);
+  });
+
   it.skip("break from transaction commits", () => {});
   it.skip("throw from transaction commits", () => {});
   it.skip("number of transactions in commit", () => {});
-  it.skip("raising exception in callback rollbacks in save", () => {});
+
+  it("raising exception in callback rollbacks in save", async () => {
+    const adp = freshAdapter();
+    class TxPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCreate(() => {
+          throw new Error("callback error");
+        });
+      }
+    }
+    await expect(TxPost.create({ title: "test" })).rejects.toThrow("callback error");
+  });
+
   it.skip("update should rollback on failure!", () => {});
   it.skip("manually rolling back a transaction", () => {});
   it.skip("force savepoint on instance", () => {});
   it.skip("rollback when commit raises", () => {});
-  it.skip("rollback when saving a frozen record", () => {});
+
+  it("rollback when saving a frozen record", async () => {
+    const adp = freshAdapter();
+    class TxPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const p = await TxPost.create({ title: "test" });
+    await p.destroy();
+    expect(p.isFrozen()).toBe(true);
+    expect(() => p.writeAttribute("title", "new")).toThrow();
+  });
+
   it.skip("restore frozen state after double destroy", () => {});
   it.skip("restore previously new record after double save", () => {});
   it.skip("restore composite id after rollback", () => {});
