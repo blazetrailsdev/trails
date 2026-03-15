@@ -3401,7 +3401,7 @@ describe("Relation#size and Relation#length", () => {
 
 describe("Relation#toArel", () => {
   it.skip("returns a SelectManager", () => {
-    /* TODO: needs helpers from original file */
+    /* needs toArel() to return Arel SelectManager */
   });
 
   it("respects limit and offset", () => {
@@ -4534,7 +4534,7 @@ describe("Rails-guided: set operations and joins", () => {
   });
 
   it.skip("finding with reversed arel assoc order", () => {
-    /* TODO: needs helpers from original file */
+    /* needs association-based ordering with Arel */
   });
 
   it("reverse order with function", () => {
@@ -6541,24 +6541,58 @@ describe("Rails-guided: set operations and joins", () => {
     expect(last).not.toBeNull();
   });
 
-  it.skip("find_by with hash conditions returns the first matching record", () => {
-    /* TODO: needs helpers from original file */
+  it("find_by with hash conditions returns the first matching record", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const first = await Topic.create({ title: "match" });
+    await Topic.create({ title: "match" });
+    await Topic.create({ title: "other" });
+    const found = await Topic.findBy({ title: "match" });
+    expect(found).not.toBeNull();
+    expect(found!.readAttribute("title")).toBe("match");
+    expect(found!.id).toBe(first.id);
   });
 
-  it.skip("find_by returns nil if the record is missing", () => {
-    /* TODO: needs helpers from original file */
+  it("find_by returns nil if the record is missing", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const found = await Topic.findBy({ title: "nonexistent" });
+    expect(found).toBeNull();
   });
 
-  it.skip("find_by! raises RecordNotFound if the record is missing", () => {
-    /* TODO: needs helpers from original file */
+  it("find_by! raises RecordNotFound if the record is missing", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await expect(Topic.findByBang({ title: "nonexistent" })).rejects.toThrow(RecordNotFound);
   });
 
-  it.skip("find on hash conditions", () => {
-    /* TODO: needs helpers from original file */
+  it("find on hash conditions", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "target" });
+    const found = await Topic.where({ title: "target" }).toArray();
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe(t.id);
   });
 
   it.skip("joins with string array", () => {
-    /* TODO: needs helpers from original file */
+    /* needs string-based joins support */
   });
 
   it("find_by with multi-arg conditions returns the first matching record", async () => {
@@ -6614,20 +6648,53 @@ describe("Rails-guided: set operations and joins", () => {
     /* fixture-dependent */
   });
 
-  it.skip("find ids", () => {
-    /* TODO: needs helpers from original file */
+  it("find ids", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const found = await Topic.find([t1.id as number, t2.id as number]);
+    expect(found).toHaveLength(2);
   });
 
-  it.skip("build", () => {
-    /* TODO: needs helpers from original file */
+  it("build", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = Topic.all().build({ title: "built" });
+    expect(t.isNewRecord()).toBe(true);
+    expect(t.readAttribute("title")).toBe("built");
   });
 
-  it.skip("create", () => {
-    /* TODO: needs helpers from original file */
+  it("create", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "created" });
+    expect(t.isPersisted()).toBe(true);
+    expect(t.readAttribute("title")).toBe("created");
   });
 
-  it.skip("count", () => {
-    /* TODO: needs helpers from original file */
+  it("count", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: "a" });
+    await Topic.create({ title: "b" });
+    expect(await Topic.count()).toBe(2);
   });
 
   it("count with block", async () => {
@@ -6658,12 +6725,25 @@ describe("Rails-guided: set operations and joins", () => {
     expect(sql).toContain("DISTINCT");
   });
 
-  it.skip("to a should dup target", () => {
-    /* TODO: needs helpers from original file */
+  it("to a should dup target", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: "a" });
+    // Calling toArray() twice on the same relation should return different array instances
+    const rel = Topic.all();
+    const first = await rel.toArray();
+    const second = await rel.toArray();
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(first).not.toBe(second);
   });
 
   it.skip("create with block", () => {
-    /* TODO: needs helpers from original file */
+    /* needs block/yield support in create */
   });
 
   it("multiple find or create by within transactions", async () => {
