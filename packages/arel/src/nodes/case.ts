@@ -69,6 +69,13 @@ export class Case extends Node {
     return new As(this, new SqlLiteral(aliasName));
   }
 
+  clone(): Case {
+    const c = new Case(this.operand ?? undefined) as MutableCase;
+    c.conditions = [...this.conditions];
+    c.defaultValue = this.defaultValue;
+    return c;
+  }
+
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }

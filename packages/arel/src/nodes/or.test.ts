@@ -14,19 +14,6 @@ describe("Arel", () => {
       expect(or.right).toBe(b);
     });
 
-    it("is equal with equal ivars", () => {
-      const s1 = new Nodes.NamedFunction("SUM", [users.get("id")]);
-      const s2 = new Nodes.NamedFunction("SUM", [users.get("id")]);
-      expect(s1.name).toBe(s2.name);
-    });
-
-    it("is not equal with different ivars", () => {
-      const s1 = new Nodes.InsertStatement();
-      const s2 = new Nodes.InsertStatement();
-      s2.relation = users;
-      expect(s1.relation).not.toBe(s2.relation);
-    });
-
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const a = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));

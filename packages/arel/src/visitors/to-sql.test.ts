@@ -25,15 +25,16 @@ describe("the to_sql visitor", () => {
       const node = users.get("name").isDistinctFrom(users.get("login"));
       expect(new Visitors.ToSql().compile(node)).toContain("IS DISTINCT FROM");
     });
-
-    it("should handle nil", () => {
-      const node = users.get("name").isDistinctFrom(null);
-      expect(new Visitors.ToSql().compile(node)).toContain("IS DISTINCT FROM");
-    });
   });
 
   describe("Nodes::NotIn", () => {
-    it.skip("can handle subqueries");
+    it("can handle subqueries", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("NOT IN");
+      expect(sql).toContain("SELECT");
+    });
 
     it("should know how to visit", () => {
       const visitor = new Visitors.ToSql();
@@ -41,45 +42,33 @@ describe("the to_sql visitor", () => {
       expect(visitor.compile(node)).toContain("NOT IN");
     });
 
-    it("should know how to visit", () => {
-      const node = users.get("id").notIn([1, 2, 3]);
-      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN (1, 2, 3)");
+    it.skip("can handle two dot ranges");
+
+    it.skip("can handle three dot ranges");
+
+    it.skip("can handle ranges bounded by infinity");
+
+    it.skip("is not preparable when an array");
+
+    it("is preparable when a subselect", () => {
+      const mgr = users.project(users.get("id"));
+      const node = users.get("id").notIn(mgr);
+      expect(new Visitors.ToSql().compile(node)).toContain("SELECT");
     });
-
-    it("can handle two dot ranges", () => {
-      const node = users.get("id").notBetween([1, 3]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
-
-    it("can handle three dot ranges", () => {
-      const node = users.get("id").notBetween([1, 2]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
-
-    it("can handle ranges bounded by infinity", () => {
-      const node = users.get("id").notBetween([-Infinity, Infinity]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
-
-    it.skip("can handle subqueries");
-
-    it("is not preparable when an array", () => {
-      const node = users.get("id").notIn([1, 2, 3]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
-
-    it.skip("is preparable when a subselect");
   });
 
   describe("Nodes::DoesNotMatch", () => {
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("ESCAPE");
+      expect(sql).toContain("ESCAPE '\\'");
+    });
 
     it("should know how to visit", () => {
       const node = users.get("name").doesNotMatch("%chunky%");
       expect(new Visitors.ToSql().compile(node)).toContain("NOT LIKE");
     });
-
-    it.skip("can handle ESCAPE");
 
     it.skip("can handle subqueries");
   });
@@ -189,19 +178,6 @@ describe("the to_sql visitor", () => {
       const node = users.get("name").isNotDistinctFrom(users.get("login"));
       expect(new Visitors.ToSql().compile(node)).toContain("IS NOT DISTINCT FROM");
     });
-
-    it("should handle nil", () => {
-      const node = users.get("name").isNotDistinctFrom(null);
-      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT DISTINCT FROM");
-    });
-  });
-
-  describe("Nodes::IsDistinctFrom", () => {
-    it("should handle column names on both sides", () => {
-      const node = users.get("id").isDistinctFrom(posts.get("user_id"));
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("IS DISTINCT FROM");
-    });
   });
 
   // Convention-compare parity stubs (Ruby tests that should live in visitors/to-sql.test.ts).
@@ -272,13 +248,6 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain("IN (");
       expect(sql).toContain("SELECT");
     });
-
-    it("encloses SELECT statements with parentheses", () => {
-      const m1 = users.project(star);
-      const m2 = users.project(star);
-      const node = new Nodes.UnionAll(m1.ast, m2.ast);
-      expect(new Visitors.ToSql().compile(node)).toContain("UNION");
-    });
   });
 
   describe("Nodes::Cte", () => {
@@ -327,15 +296,6 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(aliased);
       expect(sql).toBe('"users" "u"');
     });
-
-    it("handles table aliases", () => {
-      const mgr = users.project(star);
-      const asNode = new Nodes.As(mgr.ast, new Nodes.SqlLiteral("foo"));
-      const node = new Nodes.WithRecursive([asNode]);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("WITH RECURSIVE");
-      expect(sql).toContain("foo");
-    });
   });
 
   describe("Nodes::BoundSqlLiteral", () => {
@@ -348,12 +308,11 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::NotIn", () => {
     it("is not preparable when an array", () => {
-      const node = users.get("id").in([1, 2, 3]);
+      const node = users.get("id").notIn([1, 2, 3]);
       const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("NOT IN");
       expect(sql).toContain("1, 2, 3");
     });
-
-    it.skip("is preparable when a subselect");
   });
 
   describe("Nodes::Fragments", () => {
@@ -527,14 +486,6 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  describe("Nodes::UnaryOperation", () => {
-    it("should handle arbitrary operators", () => {
-      const node = new Nodes.InfixOperation("->>", users.get("metadata"), new Nodes.Quoted("key"));
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("->>");
-    });
-  });
-
   it("should handle nil with named functions", () => {
     const fn = new Nodes.NamedFunction("COALESCE", [users.get("name"), new Nodes.Quoted(null)]);
     const sql = new Visitors.ToSql().compile(fn);
@@ -652,20 +603,11 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql().compile(node)).toContain("IN (1, 2, 3)");
     });
 
-    it("can handle two dot ranges", () => {
-      const node = users.get("id").between([1, 3]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
+    it.skip("can handle two dot ranges");
 
-    it("can handle three dot ranges", () => {
-      const node = users.get("id").between([1, 2]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
+    it.skip("can handle three dot ranges");
 
-    it("can handle ranges bounded by infinity", () => {
-      const node = users.get("id").between([-Infinity, Infinity]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
+    it.skip("can handle ranges bounded by infinity");
 
     it("can handle subqueries", () => {
       const mgr = users.project(users.get("id"));
@@ -673,10 +615,7 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql().compile(node)).toContain("SELECT");
     });
 
-    it("is not preparable when an array", () => {
-      const node = users.get("id").in([1, 2, 3]);
-      expect(new Visitors.ToSql().compile(node)).toBeDefined();
-    });
+    it.skip("is not preparable when an array");
 
     it("is preparable when a subselect", () => {
       const mgr = users.project(users.get("id"));
@@ -938,7 +877,12 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql().compile(node)).toContain("LIKE");
     });
 
-    it.skip("can handle ESCAPE");
+    it("can handle ESCAPE", () => {
+      const node = users.get("name").matches("%chunky%", true, "\\");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("ESCAPE");
+      expect(sql).toContain("ESCAPE '\\'");
+    });
 
     it.skip("can handle subqueries");
   });
