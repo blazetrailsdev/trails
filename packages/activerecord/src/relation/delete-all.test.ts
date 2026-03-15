@@ -429,8 +429,19 @@ describe("Relation Delete All / Update All (Rails-guided)", () => {
     const items = await Item.all().toArray();
     expect(items.every((i: any) => i.readAttribute("status") === "new")).toBe(true);
   });
-  it.skip("destroy all", () => {
-    /* TODO: needs helpers from original file */
+  it("destroy all", async () => {
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Item.create({ name: "a" });
+    await Item.create({ name: "b" });
+    await Item.create({ name: "c" });
+    const destroyed = await Item.all().destroyAll();
+    expect(destroyed).toHaveLength(3);
+    expect(await Item.count()).toBe(0);
   });
 
   it("delete all", async () => {

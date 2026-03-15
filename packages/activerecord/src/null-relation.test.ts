@@ -178,7 +178,17 @@ describe("Null Relation (Rails-guided)", () => {
     await Item.create({ name: "A" });
     expect(await Item.all().none().deleteAll()).toBe(0);
   });
-  it.skip("none", () => {
-    /* TODO: needs helpers from original file */
+  it("none", async () => {
+    class Dev extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Dev.create({ name: "Alice" });
+    const results = await Dev.none().toArray();
+    expect(results).toEqual([]);
+    const allResults = await Dev.all().none().toArray();
+    expect(allResults).toEqual([]);
   });
 });
