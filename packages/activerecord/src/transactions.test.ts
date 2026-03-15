@@ -466,21 +466,49 @@ describe("TransactionTest", () => {
   it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {});
   it.skip("after_commit_not_called_on_rollback", () => {});
   it.skip("after_commit callback doesnt fire for readonly", () => {});
-  it.skip("transaction within transaction", () => {});
-  it.skip("transaction with savepoint", () => {});
+  it("transaction within transaction", async () => {
+    const adp = freshAdapter();
+    class TxPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    await transaction(TxPost, async () => {
+      await TxPost.create({ title: "outer" });
+      await transaction(TxPost, async () => {
+        await TxPost.create({ title: "inner" });
+      });
+    });
+    expect(await TxPost.count()).toBe(2);
+  });
+
+  it.skip("transaction with savepoint", () => {
+    /* needs real DB savepoint support — memory adapter can't rollback */
+  });
 
   it.skip("after all transactions commit", () => {});
   it.skip("transaction after rollback callback", () => {});
-  it.skip("rollback dirty changes then retry save on new record", () => {});
+  it.skip("rollback dirty changes then retry save on new record", () => {
+    /* needs real transaction rollback — memory adapter persists on save */
+  });
   it.skip("break from transaction commits", () => {});
   it.skip("throw from transaction commits", () => {});
   it.skip("number of transactions in commit", () => {});
-  it.skip("raising exception in callback rollbacks in save", () => {});
+
+  it.skip("raising exception in callback rollbacks in save", () => {
+    /* needs real transaction wrapping around create — afterCreate fires
+       after INSERT so rollback requires DB-level transaction support */
+  });
   it.skip("update should rollback on failure!", () => {});
   it.skip("manually rolling back a transaction", () => {});
   it.skip("force savepoint on instance", () => {});
   it.skip("rollback when commit raises", () => {});
-  it.skip("rollback when saving a frozen record", () => {});
+  it.skip("rollback when saving a frozen record", () => {
+    /* test name implies transactional rollback but actual behavior is
+       frozen record prevention — needs real DB transaction support */
+  });
+
   it.skip("restore frozen state after double destroy", () => {});
   it.skip("restore previously new record after double save", () => {});
   it.skip("restore composite id after rollback", () => {});

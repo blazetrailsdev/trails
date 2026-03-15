@@ -571,11 +571,98 @@ describe("EachTest", () => {
   it.skip("find in batches should error on config specified to error", () => {});
   it.skip("find in batches should not error by default", () => {});
   it.skip("find in batches should use any column as primary key when start is not specified", () => {});
-  it.skip("in batches update all returns zero when no batches", () => {});
-  it.skip("in batches touch all returns rows affected", () => {});
-  it.skip("in batches touch all returns zero when no batches", () => {});
-  it.skip("in batches delete all returns zero when no batches", () => {});
-  it.skip("in batches destroy all returns zero when no batches", () => {});
+
+  it("in batches update all returns zero when no batches", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    let total = 0;
+    let batches = 0;
+    for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
+      total += await batchRel.updateAll({ title: "updated" });
+    }
+    expect(batches).toBe(0);
+    expect(total).toBe(0);
+  });
+
+  it.skip("in batches touch all returns rows affected", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    await Post.create({ title: "c" });
+    let total = 0;
+    for await (const batchRel of Post.all().inBatches({ batchSize: 2 })) {
+      total += await batchRel.touchAll();
+    }
+    expect(total).toBe(3);
+  });
+
+  it("in batches touch all returns zero when no batches", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    let total = 0;
+    let batches = 0;
+    for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
+      total += await batchRel.touchAll();
+    }
+    expect(batches).toBe(0);
+    expect(total).toBe(0);
+  });
+
+  it("in batches delete all returns zero when no batches", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    let total = 0;
+    let batches = 0;
+    for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
+      total += await batchRel.deleteAll();
+    }
+    expect(batches).toBe(0);
+    expect(total).toBe(0);
+  });
+
+  it("in batches destroy all returns zero when no batches", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    let total = 0;
+    let batches = 0;
+    for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
+      const destroyed = await batchRel.destroyAll();
+      total += destroyed.length;
+    }
+    expect(batches).toBe(0);
+    expect(total).toBe(0);
+  });
+
   it.skip("in batches should use any column as primary key when start is not specified", () => {});
   it.skip("in_batches should return no records if the limit is 0 and load is ", () => {});
   it.skip(".find_each respects table alias", () => {});
