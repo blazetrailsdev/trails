@@ -1,5 +1,3 @@
-import { describe, it } from "vitest";
+import { it } from "vitest";
 
-describe("without assertions", () => {
-  it.skip("without assertions");
-});
+it.skip("without assertions");
