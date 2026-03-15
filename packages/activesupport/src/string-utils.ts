@@ -83,9 +83,10 @@ export function truncateBytes(
   const strBytes = encoder.encode(str);
   if (strBytes.length <= byteLimit) return str;
 
+  if (byteLimit <= 0) return "";
   const omissionBytes = omission ? encoder.encode(omission).length : 0;
+  if (omissionBytes > byteLimit) return "";
   const available = byteLimit - omissionBytes;
-  if (available <= 0) return omission || "";
 
   const truncated = new Uint8Array(strBytes.buffer, 0, available);
   let decoded = new TextDecoder().decode(truncated);
