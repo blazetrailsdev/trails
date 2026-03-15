@@ -21,9 +21,7 @@ describe("ShareLockTest", () => {
   it.skip("manual recursive yield cannot expand outer compatible");
   it.skip("manual recursive yield restores previous compatible");
   it.skip("in shared section incompatible non upgrading threads cannot preempt upgrading threads");
-});
 
-describe("ShareLockTest", () => {
   describe("CustomAssertionsTest", () => {
     it.skip("happy path");
     it.skip("detects stuck thread");

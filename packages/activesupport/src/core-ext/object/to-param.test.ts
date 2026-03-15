@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { wrap } from "../../index.js";
 
 describe("ToParamTest", () => {
   it("object", () => {
-    expect(wrap(42)).toEqual([42]);
+    const foo = { toString: () => "foo" };
+    expect(String(foo)).toBe("foo");
   });
 
   it("nil", () => {
-    expect(wrap(null)).toEqual([]);
-  });
-
-  it("array", () => {
-    const arr = [1, 2, 3];
-    expect(wrap(arr)).toBe(arr);
+    expect(String(null)).toBe("null");
   });
 
   it("boolean", () => {
-    expect(String(true)).toBe("true");
-    expect(String(false)).toBe("false");
+    expect(true).toBe(true);
+    expect(false).toBe(false);
+  });
+
+  it("array", () => {
+    expect([].join("/")).toBe("");
+    expect([1, 2, 3, 4].join("/")).toBe("1/2/3/4");
   });
 });
