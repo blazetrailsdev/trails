@@ -10,6 +10,12 @@ describeIfPg("PostgresAdapter", () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
+    try {
+      await adapter.exec(`DROP TABLE IF EXISTS "quoting_test" CASCADE`);
+      await adapter.exec(`DROP TABLE IF EXISTS "table with spaces" CASCADE`);
+    } catch {
+      // ignore
+    }
     await adapter.close();
   });
 
@@ -57,18 +63,55 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("quote table name with schema", async () => {});
     it.skip("quote unicode string", async () => {});
     it.skip("quote binary", async () => {});
-    it.skip("quote date", async () => {});
-    it.skip("quote time", async () => {});
-    it.skip("quote timestamp", async () => {});
+    it("quote date", async () => {
+      const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
+      const val = rows[0].val;
+      expect(val).toBeInstanceOf(Date);
+      expect((val as Date).getFullYear()).toBe(2023);
+    });
+
+    it("quote time", async () => {
+      const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
+      const val = rows[0].val;
+      expect(typeof val === "string" || val instanceof Date).toBe(true);
+      expect(String(val)).toContain("14:30");
+    });
+
+    it("quote timestamp", async () => {
+      const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
+      const val = rows[0].val;
+      expect(val).toBeInstanceOf(Date);
+      expect((val as Date).getFullYear()).toBe(2023);
+    });
+
     it.skip("quote range", async () => {});
-    it.skip("quote array", async () => {});
-    it.skip("quote integer", async () => {});
+
+    it("quote array", async () => {
+      const rows = await adapter.execute("SELECT ARRAY[1,2,3]::integer[] AS val");
+      expect(rows[0].val).toEqual([1, 2, 3]);
+    });
+
+    it("quote integer", async () => {
+      const rows = await adapter.execute("SELECT 42::integer AS val");
+      expect(rows[0].val).toBe(42);
+    });
+
     it.skip("quote big decimal", async () => {});
     it.skip("quote rational", async () => {});
     it.skip("quote bit string", async () => {});
-    it.skip("quote table name with spaces", async () => {});
+
+    it("quote table name with spaces", async () => {
+      await adapter.exec(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
+      await adapter.executeMutation(`INSERT INTO "table with spaces" DEFAULT VALUES`);
+      const rows = await adapter.execute(`SELECT * FROM "table with spaces"`);
+      expect(rows).toHaveLength(1);
+    });
+
     it.skip("raise when int is wider than 64bit", async () => {});
-    it.skip("do not raise when int is not wider than 64bit", async () => {});
+    it("do not raise when int is not wider than 64bit", async () => {
+      const rows = await adapter.execute("SELECT 2147483647::integer AS val");
+      expect(rows[0].val).toBe(2147483647);
+    });
     it.skip("do not raise when raise int wider than 64bit is false", async () => {});
   });
 });

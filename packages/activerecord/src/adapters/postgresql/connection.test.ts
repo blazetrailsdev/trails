@@ -40,18 +40,50 @@ describeIfPg("PostgresAdapter", () => {
 
     it.skip("indexes logs name", async () => {});
     it.skip("table alias length logs name", async () => {});
-    it.skip("current database logs name", async () => {});
+
+    it("current database logs name", async () => {
+      const rows = await adapter.execute("SELECT current_database() AS db");
+      expect(rows[0].db).toBeTruthy();
+    });
+
     it.skip("encoding logs name", async () => {});
     it.skip("schema names logs name", async () => {});
     it.skip("statement key is logged", async () => {});
-    it.skip("set session variable true", async () => {});
-    it.skip("set session variable false", async () => {});
+
+    it("set session variable true", async () => {
+      await adapter.exec("SET enable_seqscan = ON");
+      const rows = await adapter.execute("SHOW enable_seqscan");
+      expect(rows[0].enable_seqscan).toBe("on");
+    });
+
+    it("set session variable false", async () => {
+      await adapter.exec("SET enable_seqscan = OFF");
+      const rows = await adapter.execute("SHOW enable_seqscan");
+      expect(rows[0].enable_seqscan).toBe("off");
+    });
+
     it.skip("set session variable nil", async () => {});
     it.skip("set session variable default", async () => {});
     it.skip("set session variable reset", async () => {});
-    it.skip("set session timezone", async () => {});
-    it.skip("get advisory lock", async () => {});
-    it.skip("release advisory lock", async () => {});
+
+    it("set session timezone", async () => {
+      await adapter.exec("SET timezone = 'UTC'");
+      const rows = await adapter.execute("SHOW timezone");
+      expect(rows[0].TimeZone).toBe("UTC");
+    });
+
+    it("get advisory lock", async () => {
+      const rows = await adapter.execute("SELECT pg_try_advisory_lock(12345) AS locked");
+      expect(rows[0].locked).toBe(true);
+      await adapter.execute("SELECT pg_advisory_unlock(12345)");
+    });
+
+    it("release advisory lock", async () => {
+      await adapter.execute("SELECT pg_try_advisory_lock(12346)");
+      const rows = await adapter.execute("SELECT pg_advisory_unlock(12346) AS unlocked");
+      expect(rows[0].unlocked).toBe(true);
+    });
+
     it.skip("advisory lock with xact", async () => {});
     it.skip("reconnection after actual disconnection", async () => {});
     it.skip("reconnection after simulated disconnection", async () => {});

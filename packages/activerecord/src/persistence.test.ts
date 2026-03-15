@@ -401,19 +401,19 @@ describe("PersistenceTest", () => {
 
   it("create many", async () => {
     const adp = freshAdapter();
-    class Post extends Base {
+    class CmItem extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adp;
       }
     }
-    const posts = await Promise.all([
-      Post.create({ title: "a" }),
-      Post.create({ title: "b" }),
-      Post.create({ title: "c" }),
+    const items = await Promise.all([
+      CmItem.create({ title: "a" }),
+      CmItem.create({ title: "b" }),
+      CmItem.create({ title: "c" }),
     ]);
-    expect(posts.length).toBe(3);
-    expect(posts.every((p: any) => p.id)).toBe(true);
+    expect(items.length).toBe(3);
+    expect(items.every((p: Base) => p.id)).toBe(true);
   });
 
   it("delete many", async () => {
