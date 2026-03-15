@@ -36,7 +36,9 @@ describe("the to_sql visitor", () => {
     it("can handle subqueries", () => {
       const mgr = users.project(users.get("id"));
       const node = users.get("id").notIn(mgr);
-      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("NOT IN");
+      expect(sql).toContain("SELECT");
     });
 
     it("should know how to visit", () => {
@@ -68,7 +70,9 @@ describe("the to_sql visitor", () => {
     it("can handle subqueries", () => {
       const mgr = users.project(users.get("id"));
       const node = users.get("id").notIn(mgr);
-      expect(new Visitors.ToSql().compile(node)).toContain("NOT IN");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("NOT IN");
+      expect(sql).toContain("SELECT");
     });
 
     it("is not preparable when an array", () => {
@@ -86,7 +90,9 @@ describe("the to_sql visitor", () => {
   describe("Nodes::DoesNotMatch", () => {
     it("can handle ESCAPE", () => {
       const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
-      expect(new Visitors.ToSql().compile(node)).toContain("ESCAPE");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("ESCAPE");
+      expect(sql).toContain("'\\");
     });
 
     it("should know how to visit", () => {
@@ -96,7 +102,9 @@ describe("the to_sql visitor", () => {
 
     it("can handle ESCAPE", () => {
       const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
-      expect(new Visitors.ToSql().compile(node)).toContain("ESCAPE");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("ESCAPE");
+      expect(sql).toContain("'\\");
     });
 
     it.skip("can handle subqueries");
@@ -963,7 +971,9 @@ describe("the to_sql visitor", () => {
 
     it("can handle ESCAPE", () => {
       const node = users.get("name").matches("%chunky%", true, "\\");
-      expect(new Visitors.ToSql().compile(node)).toContain("ESCAPE");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("ESCAPE");
+      expect(sql).toContain("'\\");
     });
 
     it.skip("can handle subqueries");
