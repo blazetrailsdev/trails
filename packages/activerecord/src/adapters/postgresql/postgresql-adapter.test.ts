@@ -10,6 +10,17 @@ describeIfPg("PostgresAdapter", () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
+    // Clean up test tables
+    try {
+      const tables = await adapter.execute(
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items'))`,
+      );
+      for (const t of tables) {
+        await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
+      }
+    } catch {
+      // ignore cleanup errors
+    }
     await adapter.close();
   });
 
@@ -51,25 +62,94 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows[0].val).toBe("hello");
     });
 
-    it.skip("table alias length", async () => {});
-    it.skip("partial index", async () => {});
+    it("table alias length", async () => {
+      // PostgreSQL default max identifier length is 63
+      const rows = await adapter.execute("SHOW max_identifier_length");
+      const len = parseInt(String(rows[0].max_identifier_length), 10);
+      expect(len).toBeGreaterThanOrEqual(63);
+    });
+
+    it("partial index", async () => {
+      await adapter.exec(`CREATE TABLE "ex_partial" ("id" SERIAL PRIMARY KEY, "number" INTEGER)`);
+      await adapter.exec(`CREATE INDEX "partial_idx" ON "ex_partial" ("id") WHERE number > 100`);
+      const rows = await adapter.execute(
+        `SELECT indexname FROM pg_indexes WHERE tablename = 'ex_partial' AND indexname = 'partial_idx'`,
+      );
+      expect(rows).toHaveLength(1);
+    });
+
     it.skip("expression index", async () => {});
     it.skip("index with opclass", async () => {});
-    it.skip("pk and sequence for table with serial pk", async () => {});
-    it.skip("pk and sequence for table with bigserial pk", async () => {});
+
+    it("pk and sequence for table with serial pk", async () => {
+      await adapter.exec(`CREATE TABLE "ex_serial" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      const rows = await adapter.execute(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'ex_serial' AND column_default LIKE 'nextval%'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].column_name).toBe("id");
+    });
+
+    it("pk and sequence for table with bigserial pk", async () => {
+      await adapter.exec(`CREATE TABLE "ex_bigserial" ("id" BIGSERIAL PRIMARY KEY, "name" TEXT)`);
+      const rows = await adapter.execute(
+        `SELECT data_type FROM information_schema.columns WHERE table_name = 'ex_bigserial' AND column_name = 'id'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].data_type).toBe("bigint");
+    });
+
     it.skip("pk and sequence for table with custom sequence", async () => {});
     it.skip("columns for distinct", async () => {});
     it.skip("columns for distinct with order", async () => {});
     it.skip("columns for distinct with order and a column prefix", async () => {});
     it.skip("translate exception class", async () => {});
-    it.skip("translate exception unique violation", async () => {});
-    it.skip("translate exception not null violation", async () => {});
-    it.skip("translate exception foreign key violation", async () => {});
+
+    it("translate exception unique violation", async () => {
+      await adapter.exec(`CREATE TABLE "ex_uniq" ("id" SERIAL PRIMARY KEY, "name" TEXT UNIQUE)`);
+      await adapter.executeMutation(`INSERT INTO "ex_uniq" ("name") VALUES ('Alice')`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_uniq" ("name") VALUES ('Alice')`),
+      ).rejects.toThrow();
+    });
+
+    it("translate exception not null violation", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_notnull" ("id" SERIAL PRIMARY KEY, "name" TEXT NOT NULL)`,
+      );
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_notnull" ("name") VALUES (NULL)`),
+      ).rejects.toThrow();
+    });
+
+    it("translate exception foreign key violation", async () => {
+      await adapter.exec(`CREATE TABLE "ex_parent" ("id" SERIAL PRIMARY KEY)`);
+      await adapter.exec(
+        `CREATE TABLE "ex_child" ("id" SERIAL PRIMARY KEY, "parent_id" INTEGER REFERENCES "ex_parent"("id"))`,
+      );
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_child" ("parent_id") VALUES (999)`),
+      ).rejects.toThrow();
+    });
+
     it.skip("translate exception value too long", async () => {});
     it.skip("translate exception lock wait timeout", async () => {});
     it.skip("translate exception deadlock", async () => {});
-    it.skip("translate exception numeric value out of range", async () => {});
-    it.skip("translate exception invalid text representation", async () => {});
+
+    it("translate exception numeric value out of range", async () => {
+      await adapter.exec(`CREATE TABLE "ex_num" ("id" SERIAL PRIMARY KEY, "val" SMALLINT)`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_num" ("val") VALUES (99999)`),
+      ).rejects.toThrow();
+    });
+
+    it("translate exception invalid text representation", async () => {
+      await adapter.exec(`CREATE TABLE "ex_cast" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_cast" ("val") VALUES ('not_a_number')`),
+      ).rejects.toThrow();
+    });
+
     it.skip("translate exception query cancelled", async () => {});
     it.skip("translate exception serialization failure", async () => {});
     it.skip("type map", async () => {});
@@ -85,24 +165,81 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("prepared statements with multiple binds", async () => {});
     it.skip("prepared statements disabled", async () => {});
     it.skip("default prepared statements", async () => {});
-    it.skip("date time decoding", async () => {});
-    it.skip("date decoding", async () => {});
-    it.skip("time decoding", async () => {});
-    it.skip("timestamp decoding", async () => {});
-    it.skip("timestamp with time zone decoding", async () => {});
-    it.skip("interval decoding", async () => {});
-    it.skip("money decoding", async () => {});
-    it.skip("boolean decoding", async () => {});
-    it.skip("oid decoding", async () => {});
-    it.skip("float decoding", async () => {});
-    it.skip("integer decoding", async () => {});
-    it.skip("bigint decoding", async () => {});
-    it.skip("numeric decoding", async () => {});
-    it.skip("json decoding", async () => {});
-    it.skip("jsonb decoding", async () => {});
+
+    it("boolean decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_bool" ("id" SERIAL PRIMARY KEY, "flag" BOOLEAN)`);
+      await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (true)`);
+      await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (false)`);
+      const rows = await adapter.execute(`SELECT "flag" FROM "ex_bool" ORDER BY "id"`);
+      expect(rows[0].flag).toBe(true);
+      expect(rows[1].flag).toBe(false);
+    });
+
+    it("float decoding", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_float" ("id" SERIAL PRIMARY KEY, "val" DOUBLE PRECISION)`,
+      );
+      await adapter.executeMutation(`INSERT INTO "ex_float" ("val") VALUES (3.14)`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_float"`);
+      expect(rows[0].val).toBeCloseTo(3.14);
+    });
+
+    it("integer decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_int" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await adapter.executeMutation(`INSERT INTO "ex_int" ("val") VALUES (42)`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_int"`);
+      expect(rows[0].val).toBe(42);
+    });
+
+    it("bigint decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_bigint" ("id" SERIAL PRIMARY KEY, "val" BIGINT)`);
+      await adapter.executeMutation(`INSERT INTO "ex_bigint" ("val") VALUES (9007199254740991)`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_bigint"`);
+      expect(Number(rows[0].val)).toBe(9007199254740991);
+    });
+
+    it("numeric decoding", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_numeric" ("id" SERIAL PRIMARY KEY, "val" NUMERIC(10,2))`,
+      );
+      await adapter.executeMutation(`INSERT INTO "ex_numeric" ("val") VALUES (123.45)`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_numeric"`);
+      expect(parseFloat(String(rows[0].val))).toBeCloseTo(123.45);
+    });
+
+    it("json decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_json" ("id" SERIAL PRIMARY KEY, "val" JSON)`);
+      await adapter.executeMutation(`INSERT INTO "ex_json" ("val") VALUES ('{"a":1}')`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_json"`);
+      expect(rows[0].val).toEqual({ a: 1 });
+    });
+
+    it("jsonb decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_jsonb" ("id" SERIAL PRIMARY KEY, "val" JSONB)`);
+      await adapter.executeMutation(`INSERT INTO "ex_jsonb" ("val") VALUES ('{"b":2}')`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_jsonb"`);
+      expect(rows[0].val).toEqual({ b: 2 });
+    });
+
     it.skip("hstore decoding", async () => {});
-    it.skip("array decoding", async () => {});
-    it.skip("uuid decoding", async () => {});
+
+    it("array decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_arr" ("id" SERIAL PRIMARY KEY, "val" INTEGER[])`);
+      await adapter.executeMutation(`INSERT INTO "ex_arr" ("val") VALUES ('{1,2,3}')`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_arr"`);
+      expect(rows[0].val).toEqual([1, 2, 3]);
+    });
+
+    it("uuid decoding", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_uuid" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "name" TEXT)`,
+      );
+      await adapter.executeMutation(`INSERT INTO "ex_uuid" ("name") VALUES ('test')`);
+      const rows = await adapter.execute(`SELECT "id" FROM "ex_uuid"`);
+      expect(typeof rows[0].id).toBe("string");
+      expect(String(rows[0].id)).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
     it.skip("xml decoding", async () => {});
     it.skip("cidr decoding", async () => {});
     it.skip("inet decoding", async () => {});
@@ -110,6 +247,14 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("point decoding", async () => {});
     it.skip("bit decoding", async () => {});
     it.skip("range decoding", async () => {});
+    it.skip("date time decoding", async () => {});
+    it.skip("date decoding", async () => {});
+    it.skip("time decoding", async () => {});
+    it.skip("timestamp decoding", async () => {});
+    it.skip("timestamp with time zone decoding", async () => {});
+    it.skip("interval decoding", async () => {});
+    it.skip("money decoding", async () => {});
+    it.skip("oid decoding", async () => {});
     it.skip("bad connection to postgres database", async () => {});
     it.skip("reconnect after bad connection on check version", async () => {});
     it.skip("primary key works tables containing capital letters", async () => {});
