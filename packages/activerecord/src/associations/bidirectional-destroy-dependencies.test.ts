@@ -59,7 +59,7 @@ describe("BidirectionalDestroyDependenciesTest", () => {
   it("bidirectional dependence when destroying item with has one association fails first time", async () => {
     const { Content, ContentPosition } = makeModels();
     const content = await Content.create({ title: "article" });
-    const pos = await ContentPosition.create({ content_id: content.id, position: 1 });
+    await ContentPosition.create({ content_id: content.id, position: 1 });
 
     // First destroy attempt on content
     await content.destroy();
