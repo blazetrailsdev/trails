@@ -6548,12 +6548,13 @@ describe("Rails-guided: set operations and joins", () => {
         this.adapter = adapter;
       }
     }
-    await Topic.create({ title: "match" });
+    const first = await Topic.create({ title: "match" });
     await Topic.create({ title: "match" });
     await Topic.create({ title: "other" });
     const found = await Topic.findBy({ title: "match" });
     expect(found).not.toBeNull();
     expect(found!.readAttribute("title")).toBe("match");
+    expect(found!.id).toBe(first.id);
   });
 
   it("find_by returns nil if the record is missing", async () => {

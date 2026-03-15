@@ -1380,7 +1380,7 @@ export class Relation<T extends Base> {
       await this._preloadAssociationsForRecords(this._records, allAssocs);
     }
 
-    return this._records;
+    return [...this._records];
   }
 
   /**
