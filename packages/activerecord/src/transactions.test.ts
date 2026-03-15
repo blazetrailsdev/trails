@@ -503,7 +503,11 @@ describe("TransactionTest", () => {
       }
     });
     const count = await TxPost.count();
+    // Only the outer insert should persist; inner was rolled back via savepoint
+    expect(count).toBeLessThanOrEqual(2);
     expect(count).toBeGreaterThanOrEqual(1);
+    const titles = (await TxPost.all().toArray()).map((r: Base) => r.readAttribute("title"));
+    expect(titles).toContain("kept");
   });
 
   it.skip("after all transactions commit", () => {});
@@ -526,9 +530,11 @@ describe("TransactionTest", () => {
     } catch {
       // rolled back
     }
+    // Retry: the record can be saved again with a new title
     p.writeAttribute("title", "second attempt");
     const saved = await p.save();
     expect(saved).toBe(true);
+    expect(p.readAttribute("title")).toBe("second attempt");
   });
 
   it.skip("break from transaction commits", () => {});
@@ -564,8 +570,14 @@ describe("TransactionTest", () => {
     }
     const p = await TxPost.create({ title: "test" });
     await p.destroy();
+    // After destroy, the record is frozen
     expect(p.isFrozen()).toBe(true);
+    expect(p.isDestroyed()).toBe(true);
+    // Attempting to modify a frozen record should throw
     expect(() => p.writeAttribute("title", "new")).toThrow();
+    // Verify it was actually deleted from the database
+    const count = await TxPost.count();
+    expect(count).toBe(0);
   });
 
   it.skip("restore frozen state after double destroy", () => {});

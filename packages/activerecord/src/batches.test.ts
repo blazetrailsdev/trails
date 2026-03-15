@@ -581,9 +581,12 @@ describe("EachTest", () => {
       }
     }
     let total = 0;
+    let batches = 0;
     for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
       total += await batchRel.updateAll({ title: "updated" });
     }
+    expect(batches).toBe(0);
     expect(total).toBe(0);
   });
 
@@ -614,9 +617,12 @@ describe("EachTest", () => {
       }
     }
     let total = 0;
+    let batches = 0;
     for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
       total += await batchRel.touchAll();
     }
+    expect(batches).toBe(0);
     expect(total).toBe(0);
   });
 
@@ -629,9 +635,12 @@ describe("EachTest", () => {
       }
     }
     let total = 0;
+    let batches = 0;
     for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
       total += await batchRel.deleteAll();
     }
+    expect(batches).toBe(0);
     expect(total).toBe(0);
   });
 
@@ -644,10 +653,13 @@ describe("EachTest", () => {
       }
     }
     let total = 0;
+    let batches = 0;
     for await (const batchRel of Post.where({ title: "nonexistent" }).inBatches({ batchSize: 2 })) {
+      batches++;
       const destroyed = await batchRel.destroyAll();
       total += destroyed.length;
     }
+    expect(batches).toBe(0);
     expect(total).toBe(0);
   });
 
