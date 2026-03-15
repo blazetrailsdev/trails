@@ -117,22 +117,30 @@ export class Attribute extends Node {
 
   matches(
     pattern: string | { ast: Node },
-    _caseSensitive = true,
     escape: string | null = null,
+    caseSensitive = false,
   ): Matches {
     const right =
       typeof pattern === "string" ? buildQuoted(pattern) : (pattern as { ast: Node }).ast;
-    return new Matches(this, right, escape);
+    return new Matches(this, right, escape, caseSensitive);
   }
 
   doesNotMatch(
     pattern: string | { ast: Node },
-    _caseSensitive = true,
     escape: string | null = null,
+    caseSensitive = false,
   ): DoesNotMatch {
     const right =
       typeof pattern === "string" ? buildQuoted(pattern) : (pattern as { ast: Node }).ast;
-    return new DoesNotMatch(this, right, escape);
+    return new DoesNotMatch(this, right, escape, caseSensitive);
+  }
+
+  matchesRegexp(pattern: string, caseSensitive = true): RegexpNode {
+    return new RegexpNode(this, buildQuoted(pattern), caseSensitive);
+  }
+
+  doesNotMatchRegexp(pattern: string, caseSensitive = true): NotRegexp {
+    return new NotRegexp(this, buildQuoted(pattern), caseSensitive);
   }
 
   in(values: unknown[] | { ast: Node }): In {
@@ -432,16 +440,6 @@ export class Attribute extends Node {
     return new NamedFunction("CAST", [
       new SqlLiteral(`${this.relation.name}.${this.name} AS ${asType}`),
     ]);
-  }
-
-  // -- Regexp --
-
-  matchesRegexp(pattern: string): RegexpNode {
-    return new RegexpNode(this, buildQuoted(pattern));
-  }
-
-  doesNotMatchRegexp(pattern: string): NotRegexp {
-    return new NotRegexp(this, buildQuoted(pattern));
   }
 
   // -- Extract --

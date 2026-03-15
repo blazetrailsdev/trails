@@ -147,6 +147,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.Cube) return this.visitCube(node);
     if (node instanceof Nodes.Rollup) return this.visitRollup(node);
     if (node instanceof Nodes.GroupingSet) return this.visitGroupingSet(node);
+    if (node instanceof Nodes.GroupingElement) return this.visitGroupingElement(node);
     if (node instanceof Nodes.Lateral) return this.visitLateral(node);
     if (node instanceof Nodes.Comment) return this.visitComment(node);
 
@@ -903,6 +904,17 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  private visitGroupingElement(node: Nodes.GroupingElement): SQLString {
+    this.collector.append("(");
+    const exprs = node.expressions;
+    for (let i = 0; i < exprs.length; i++) {
+      if (i > 0) this.collector.append(", ");
+      this.visit(exprs[i]);
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
   private visitGroupingSet(node: Nodes.GroupingSet): SQLString {
     this.collector.append("GROUPING SETS(");
     const exprs = node.expressions;
@@ -930,7 +942,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- Matches with ESCAPE --
 
-  private visitMatches(node: Nodes.Matches): SQLString {
+  protected visitMatches(node: Nodes.Matches): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" LIKE ");
     this.visitNodeOrValue(node.right);
@@ -940,7 +952,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
+  protected visitDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" NOT LIKE ");
     this.visitNodeOrValue(node.right);
@@ -1052,7 +1064,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- Helpers --
 
-  private visitNodeOrValue(v: Nodes.NodeOrValue): SQLString {
+  protected visitNodeOrValue(v: Nodes.NodeOrValue): SQLString {
     // Duck-type check for SelectManager (not a Node, but has ast/toSql)
     if (v !== null && v !== undefined && typeof v === "object" && "ast" in v && "toSql" in v) {
       this.collector.append("(");

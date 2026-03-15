@@ -97,7 +97,7 @@ export { Concat } from "./concat.js";
 export { True, False } from "./true-false.js";
 export { Regexp, NotRegexp } from "./regexp.js";
 export { IsDistinctFrom, IsNotDistinctFrom } from "./distinct-from.js";
-export { Cube, Rollup, GroupingSet } from "./grouping-element.js";
+export { GroupingElement, Cube, Rollup, GroupingSet } from "./grouping-element.js";
 export { Lateral } from "./lateral.js";
 export { Comment } from "./comment.js";
 export { Cte } from "./cte.js";

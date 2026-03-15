@@ -70,16 +70,30 @@ export class LessThanOrEqual extends Binary {}
 /** Pattern predicates */
 export class Matches extends Binary {
   escape: string | null;
-  constructor(left: NodeOrValue, right: NodeOrValue, escape: string | null = null) {
+  caseSensitive: boolean;
+  constructor(
+    left: NodeOrValue,
+    right: NodeOrValue,
+    escape: string | null = null,
+    caseSensitive = false,
+  ) {
     super(left, right);
     this.escape = escape;
+    this.caseSensitive = caseSensitive;
   }
 }
 export class DoesNotMatch extends Binary {
   escape: string | null;
-  constructor(left: NodeOrValue, right: NodeOrValue, escape: string | null = null) {
+  caseSensitive: boolean;
+  constructor(
+    left: NodeOrValue,
+    right: NodeOrValue,
+    escape: string | null = null,
+    caseSensitive = false,
+  ) {
     super(left, right);
     this.escape = escape;
+    this.caseSensitive = caseSensitive;
   }
 }
 

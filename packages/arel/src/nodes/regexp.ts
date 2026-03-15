@@ -7,8 +7,10 @@ import { NodeVisitor } from "./node.js";
  * Mirrors: Arel::Nodes::Regexp
  */
 export class Regexp extends Binary {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
+  caseSensitive: boolean;
+  constructor(left: NodeOrValue, right: NodeOrValue, caseSensitive = true) {
     super(left, right);
+    this.caseSensitive = caseSensitive;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
@@ -22,8 +24,10 @@ export class Regexp extends Binary {
  * Mirrors: Arel::Nodes::NotRegexp
  */
 export class NotRegexp extends Binary {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
+  caseSensitive: boolean;
+  constructor(left: NodeOrValue, right: NodeOrValue, caseSensitive = true) {
     super(left, right);
+    this.caseSensitive = caseSensitive;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
