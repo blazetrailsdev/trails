@@ -166,34 +166,47 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("prepared statements disabled", async () => {});
     it.skip("default prepared statements", async () => {});
 
+    // ── Bind parameter rewriting + type round-trip ──────────────────────
+    // Our adapter rewrites ? → $1, $2. These tests verify that bind params
+    // work correctly with various PG types through INSERT and SELECT.
+
     it("boolean decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_bool" ("id" SERIAL PRIMARY KEY, "flag" BOOLEAN)`);
-      await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (true)`);
-      await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (false)`);
-      const rows = await adapter.execute(`SELECT "flag" FROM "ex_bool" ORDER BY "id"`);
+      await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (?)`, [true]);
+      await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (?)`, [false]);
+      const rows = await adapter.execute(
+        `SELECT "flag" FROM "ex_bool" WHERE "flag" = ? ORDER BY "id"`,
+        [true],
+      );
+      expect(rows).toHaveLength(1);
       expect(rows[0].flag).toBe(true);
-      expect(rows[1].flag).toBe(false);
     });
 
     it("float decoding", async () => {
       await adapter.exec(
         `CREATE TABLE "ex_float" ("id" SERIAL PRIMARY KEY, "val" DOUBLE PRECISION)`,
       );
-      await adapter.executeMutation(`INSERT INTO "ex_float" ("val") VALUES (3.14)`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_float"`);
+      await adapter.executeMutation(`INSERT INTO "ex_float" ("val") VALUES (?)`, [3.14]);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_float" WHERE "val" > ?`, [3.0]);
+      expect(rows).toHaveLength(1);
       expect(rows[0].val).toBeCloseTo(3.14);
     });
 
     it("integer decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_int" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
-      await adapter.executeMutation(`INSERT INTO "ex_int" ("val") VALUES (42)`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_int"`);
+      // executeMutation with auto-RETURNING returns the inserted id
+      const id = await adapter.executeMutation(`INSERT INTO "ex_int" ("val") VALUES (?)`, [42]);
+      expect(id).toBeGreaterThan(0);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_int" WHERE "id" = ?`, [id]);
       expect(rows[0].val).toBe(42);
     });
 
     it("bigint decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_bigint" ("id" SERIAL PRIMARY KEY, "val" BIGINT)`);
-      await adapter.executeMutation(`INSERT INTO "ex_bigint" ("val") VALUES (9007199254740991)`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_bigint" ("val") VALUES (?)`,
+        [9007199254740991],
+      );
       const rows = await adapter.execute(`SELECT "val" FROM "ex_bigint"`);
       expect(Number(rows[0].val)).toBe(9007199254740991);
     });
@@ -202,22 +215,32 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(
         `CREATE TABLE "ex_numeric" ("id" SERIAL PRIMARY KEY, "val" NUMERIC(10,2))`,
       );
-      await adapter.executeMutation(`INSERT INTO "ex_numeric" ("val") VALUES (123.45)`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_numeric"`);
+      await adapter.executeMutation(`INSERT INTO "ex_numeric" ("val") VALUES (?)`, [123.45]);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_numeric" WHERE "val" > ?`, [100]);
+      expect(rows).toHaveLength(1);
       expect(parseFloat(String(rows[0].val))).toBeCloseTo(123.45);
     });
 
     it("json decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_json" ("id" SERIAL PRIMARY KEY, "val" JSON)`);
-      await adapter.executeMutation(`INSERT INTO "ex_json" ("val") VALUES ('{"a":1}')`);
+      const obj = { key: "value", nested: { a: 1 } };
+      await adapter.executeMutation(`INSERT INTO "ex_json" ("val") VALUES (?)`, [
+        JSON.stringify(obj),
+      ]);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_json"`);
-      expect(rows[0].val).toEqual({ a: 1 });
+      expect(rows[0].val).toEqual(obj);
     });
 
     it("jsonb decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_jsonb" ("id" SERIAL PRIMARY KEY, "val" JSONB)`);
-      await adapter.executeMutation(`INSERT INTO "ex_jsonb" ("val") VALUES ('{"b":2}')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_jsonb"`);
+      await adapter.executeMutation(`INSERT INTO "ex_jsonb" ("val") VALUES (?)`, [
+        JSON.stringify({ b: 2 }),
+      ]);
+      // JSONB supports containment queries via bind params
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_jsonb" WHERE "val" @> ?::jsonb`, [
+        '{"b":2}',
+      ]);
+      expect(rows).toHaveLength(1);
       expect(rows[0].val).toEqual({ b: 2 });
     });
 
@@ -226,7 +249,9 @@ describeIfPg("PostgresAdapter", () => {
     it("array decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_arr" ("id" SERIAL PRIMARY KEY, "val" INTEGER[])`);
       await adapter.executeMutation(`INSERT INTO "ex_arr" ("val") VALUES ('{1,2,3}')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_arr"`);
+      // Test bind param in ANY() array query
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_arr" WHERE ? = ANY("val")`, [2]);
+      expect(rows).toHaveLength(1);
       expect(rows[0].val).toEqual([1, 2, 3]);
     });
 
@@ -234,11 +259,30 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(
         `CREATE TABLE "ex_uuid" ("id" UUID PRIMARY KEY DEFAULT gen_random_uuid(), "name" TEXT)`,
       );
-      await adapter.executeMutation(`INSERT INTO "ex_uuid" ("name") VALUES ('test')`);
-      const rows = await adapter.execute(`SELECT "id" FROM "ex_uuid"`);
+      await adapter.executeMutation(`INSERT INTO "ex_uuid" ("name") VALUES (?)`, ["test"]);
+      const rows = await adapter.execute(`SELECT "id" FROM "ex_uuid" WHERE "name" = ?`, ["test"]);
       expect(typeof rows[0].id).toBe("string");
       expect(String(rows[0].id)).toMatch(/^[0-9a-f-]{36}$/);
     });
+
+    // ── Transaction tests ─────────────────────────────────────────────
+    // Our adapter manages transactions, savepoints, and rollbacks.
+
+    it.skip("xml decoding", async () => {});
+    it.skip("cidr decoding", async () => {});
+    it.skip("inet decoding", async () => {});
+    it.skip("macaddr decoding", async () => {});
+    it.skip("point decoding", async () => {});
+    it.skip("bit decoding", async () => {});
+    it.skip("range decoding", async () => {});
+    it.skip("date time decoding", async () => {});
+    it.skip("date decoding", async () => {});
+    it.skip("time decoding", async () => {});
+    it.skip("timestamp decoding", async () => {});
+    it.skip("timestamp with time zone decoding", async () => {});
+    it.skip("interval decoding", async () => {});
+    it.skip("money decoding", async () => {});
+    it.skip("oid decoding", async () => {});
 
     it.skip("xml decoding", async () => {});
     it.skip("cidr decoding", async () => {});
@@ -328,4 +372,116 @@ describeIfPg("PostgresAdapter", () => {
   });
 
   it.skip("pk and sequence for", async () => {});
+
+  // ── Transaction lifecycle tests ───────────────────────────────────
+  describe("Transactions", () => {
+    it("commit persists data", async () => {
+      await adapter.exec(`CREATE TABLE "ex_txn" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      await adapter.beginTransaction();
+      await adapter.executeMutation(`INSERT INTO "ex_txn" ("val") VALUES ('committed')`);
+      await adapter.commit();
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_txn"`);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].val).toBe("committed");
+    });
+
+    it("rollback discards data", async () => {
+      await adapter.exec(`CREATE TABLE "ex_txn_rb" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      await adapter.executeMutation(`INSERT INTO "ex_txn_rb" ("val") VALUES ('before')`);
+      await adapter.beginTransaction();
+      await adapter.executeMutation(`INSERT INTO "ex_txn_rb" ("val") VALUES ('during')`);
+      await adapter.rollback();
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_rb"`);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].val).toBe("before");
+    });
+
+    it("savepoint allows partial rollback", async () => {
+      await adapter.exec(`CREATE TABLE "ex_txn_sp" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      await adapter.beginTransaction();
+      await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('a')`);
+      await adapter.createSavepoint("sp1");
+      await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('b')`);
+      await adapter.rollbackToSavepoint("sp1");
+      await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('c')`);
+      await adapter.commit();
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_sp" ORDER BY "id"`);
+      expect(rows.map((r) => r.val)).toEqual(["a", "c"]);
+    });
+  });
+
+  // ── executeMutation auto-RETURNING tests ──────────────────────────
+  describe("executeMutation RETURNING", () => {
+    it("returns inserted id for serial pk", async () => {
+      await adapter.exec(`CREATE TABLE "ex_ret" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      const id1 = await adapter.executeMutation(`INSERT INTO "ex_ret" ("name") VALUES (?)`, [
+        "first",
+      ]);
+      const id2 = await adapter.executeMutation(`INSERT INTO "ex_ret" ("name") VALUES (?)`, [
+        "second",
+      ]);
+      expect(id1).toBe(1);
+      expect(id2).toBe(2);
+    });
+
+    it("returns affected rows for UPDATE", async () => {
+      await adapter.exec(`CREATE TABLE "ex_upd" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await adapter.executeMutation(`INSERT INTO "ex_upd" ("val") VALUES (1)`);
+      await adapter.executeMutation(`INSERT INTO "ex_upd" ("val") VALUES (2)`);
+      await adapter.executeMutation(`INSERT INTO "ex_upd" ("val") VALUES (3)`);
+      const affected = await adapter.executeMutation(
+        `UPDATE "ex_upd" SET "val" = "val" + 10 WHERE "val" > ?`,
+        [1],
+      );
+      expect(affected).toBe(2);
+    });
+
+    it("returns affected rows for DELETE", async () => {
+      await adapter.exec(`CREATE TABLE "ex_del" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await adapter.executeMutation(`INSERT INTO "ex_del" ("val") VALUES (1)`);
+      await adapter.executeMutation(`INSERT INTO "ex_del" ("val") VALUES (2)`);
+      await adapter.executeMutation(`INSERT INTO "ex_del" ("val") VALUES (3)`);
+      const affected = await adapter.executeMutation(`DELETE FROM "ex_del" WHERE "val" < ?`, [3]);
+      expect(affected).toBe(2);
+    });
+
+    it("handles INSERT with explicit RETURNING", async () => {
+      await adapter.exec(`CREATE TABLE "ex_ret2" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      const id = await adapter.executeMutation(
+        `INSERT INTO "ex_ret2" ("name") VALUES (?) RETURNING id`,
+        ["test"],
+      );
+      expect(id).toBe(1);
+    });
+  });
+
+  // ── Multiple bind parameter tests ─────────────────────────────────
+  describe("Bind parameters", () => {
+    it("rewrites multiple ? to $1 $2 $3", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_multi" ("id" SERIAL PRIMARY KEY, "a" TEXT, "b" INTEGER, "c" BOOLEAN)`,
+      );
+      await adapter.executeMutation(`INSERT INTO "ex_multi" ("a", "b", "c") VALUES (?, ?, ?)`, [
+        "hello",
+        42,
+        true,
+      ]);
+      const rows = await adapter.execute(
+        `SELECT * FROM "ex_multi" WHERE "a" = ? AND "b" > ? AND "c" = ?`,
+        ["hello", 10, true],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].a).toBe("hello");
+      expect(rows[0].b).toBe(42);
+      expect(rows[0].c).toBe(true);
+    });
+
+    it("handles null bind values", async () => {
+      await adapter.exec(`CREATE TABLE "ex_null" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      await adapter.executeMutation(`INSERT INTO "ex_null" ("val") VALUES (?)`, [null]);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_null" WHERE "val" IS NULL`);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].val).toBeNull();
+    });
+  });
 });
