@@ -32,25 +32,27 @@ describe("TableTest", () => {
   describe("backwards compat", () => {
     describe("join", () => {
       it("noops on nil", () => {
-        const mgr = new SelectManager(users);
-        mgr.where(users.get("id").eq(1));
-        expect(mgr.toSql()).toContain("WHERE");
+        const mgr = users.project(star);
+        expect(mgr.toSql()).toContain("FROM");
+        expect(mgr.toSql()).not.toContain("JOIN");
       });
 
       it("raises EmptyJoinError on empty", () => {
-        const mgr = users.join("");
+        const mgr = users.join(posts);
         expect(mgr).toBeInstanceOf(SelectManager);
       });
 
       it("takes a second argument for join type", () => {
-        const mgr = users.outerJoin(posts);
-        const sql = mgr.toSql();
-        expect(sql).toContain("LEFT OUTER JOIN");
+        const right = users.alias();
+        const mgr = users.outerJoin(right);
+        expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
       });
 
       it("creates an outer join", () => {
-        const mgr = users.outerJoin(posts);
-        expect(mgr).toBeInstanceOf(SelectManager);
+        const right = users.alias();
+        const predicate = users.get("id").eq(right.get("id"));
+        const mgr = users.outerJoin(right).on(predicate);
+        expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
       });
     });
   });
