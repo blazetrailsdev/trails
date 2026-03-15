@@ -246,4 +246,14 @@ describe("MathTest", () => {
   it("attribute node should be compatible with >>", () => {
     expect(visitor.compile(table.get("id").bitwiseShiftRight(2))).toBe('("users"."id" >> 2)');
   });
+
+  it.skip("average should be compatible with ");
+
+  it.skip("count should be compatible with ");
+
+  it.skip("maximum should be compatible with ");
+
+  it.skip("minimum should be compatible with ");
+
+  it.skip("attribute node should be compatible with ");
 });

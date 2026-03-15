@@ -35,5 +35,27 @@ describe("Arel", () => {
       const b = new Nodes.Grouping(new Nodes.Quoted("bar"));
       expect(a).not.toBe(b);
     });
+
+    it.skip("is equal with equal ivars");
+
+    it.skip("is not equal with different ivars");
+
+    describe("and", () => {
+      it.skip("makes and AND node");
+    });
+
+    describe("or", () => {
+      it.skip("makes an OR node");
+    });
+
+    describe("to_sql", () => {
+      it.skip("takes an engine");
+    });
+
+    describe("backwards compat", () => {
+      describe("to_sql", () => {
+        it.skip("takes an engine");
+      });
+    });
   });
 });

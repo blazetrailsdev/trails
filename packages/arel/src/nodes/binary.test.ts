@@ -15,5 +15,16 @@ describe("NodesTest", () => {
       const b = new Nodes.NotEqual(users.get("id"), new Nodes.Quoted(1));
       expect(a.hash()).not.toBe(b.hash());
     });
+
+    describe("#hash", () => {
+      it.skip("generates a hash based on its value");
+      it.skip("generates a hash specific to its class");
+    });
+  });
+
+  describe("#hash", () => {
+    it.skip("generates a hash based on its value");
+
+    it.skip("generates a hash specific to its class");
   });
 });

@@ -29,3 +29,13 @@ describe("Arel", () => {
     });
   });
 });
+
+describe("equality", () => {
+  it.skip("is equal with equal ivars");
+
+  it.skip("is not equal with different ivars");
+});
+
+describe("#clone", () => {
+  it.skip("clones wheres");
+});

@@ -41,3 +41,24 @@ describe("Arel", () => {
     });
   });
 });
+
+describe("Window", () => {
+  describe("equality", () => {
+    it.skip("is equal with equal ivars");
+    it.skip("is not equal with different ivars");
+  });
+});
+
+describe("NamedWindow", () => {
+  describe("equality", () => {
+    it.skip("is equal with equal ivars");
+    it.skip("is not equal with different ivars");
+  });
+});
+
+describe("CurrentRow", () => {
+  describe("equality", () => {
+    it.skip("is equal to other current row nodes");
+    it.skip("is not equal with other nodes");
+  });
+});

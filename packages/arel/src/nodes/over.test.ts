@@ -67,4 +67,8 @@ describe("Arel::Nodes::OverTest", () => {
       expect(a).not.toBe(b);
     });
   });
+
+  describe("with literal", () => {
+    it.skip("should reference the window definition by name");
+  });
 });
