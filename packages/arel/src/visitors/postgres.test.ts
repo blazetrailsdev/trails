@@ -145,6 +145,28 @@ describe("PostgresTest", () => {
       const sql = new Visitors.PostgreSQL().compile(mgr.ast);
       expect(sql).toContain('CUBE("users"."id", "users"."name")');
     });
+
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.Rollup([users.get("name"), users.get("bool")]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ROLLUP");
+    });
+
+    it("should know how to visit with CubeDimension Argument", () => {
+      const dim = new Nodes.GroupingElement([users.get("name")]);
+      const node = new Nodes.Rollup([dim]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ROLLUP");
+    });
+
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const d1 = new Nodes.GroupingElement([users.get("name")]);
+      const d2 = new Nodes.GroupingElement([users.get("bool")]);
+      const node = new Nodes.Rollup([d1, d2]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ROLLUP");
+      expect(sql).toContain("(");
+    });
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
