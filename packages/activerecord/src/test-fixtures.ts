@@ -402,6 +402,22 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     foreignKey: "firm_id",
   });
 
+  // Developer <-> Project (HABTM)
+  Associations.hasAndBelongsToMany.call(Developer, "projects", {
+    className: "Project",
+    joinTable: "developers_projects",
+  });
+  Associations.hasAndBelongsToMany.call(Project, "developers", {
+    className: "Developer",
+    joinTable: "developers_projects",
+  });
+
+  // Pirate <-> Parrot (HABTM)
+  Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
+    className: "Parrot",
+    joinTable: "parrots_pirates",
+  });
+
   // Nested attributes
   acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });
   acceptsNestedAttributesFor(Pirate, "ship", { allowDestroy: true });
