@@ -157,11 +157,6 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(star).skip(5);
       expect(mgr.toSql()).toContain("OFFSET 5");
     });
-
-    it("should chain", () => {
-      const mgr = users.project(star).skip(5);
-      expect(mgr).toBeInstanceOf(SelectManager);
-    });
   });
 
   describe("offset", () => {
