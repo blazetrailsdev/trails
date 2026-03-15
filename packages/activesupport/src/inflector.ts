@@ -30,7 +30,15 @@ export function singularize(word: string): string {
   return applyInflections(word, Inflections.instance("en").singulars);
 }
 
-export function camelize(term: string, uppercaseFirstLetter: boolean = true): string {
+export function camelize(
+  term: string,
+  uppercaseFirstLetter: boolean | "upper" | "lower" = true,
+): string {
+  if (uppercaseFirstLetter === "upper") uppercaseFirstLetter = true;
+  else if (uppercaseFirstLetter === "lower") uppercaseFirstLetter = false;
+  else if (typeof uppercaseFirstLetter === "string") {
+    throw new Error("Invalid option, use either :upper or :lower.");
+  }
   const inflections = Inflections.instance("en");
   let result = term;
 
@@ -84,9 +92,9 @@ export function underscore(camelCasedWord: string): string {
 
 export function humanize(
   lowerCaseAndUnderscoredWord: string,
-  options: { capitalize?: boolean } = {},
+  options: { capitalize?: boolean; keepIdSuffix?: boolean } = {},
 ): string {
-  const { capitalize: cap = true } = options;
+  const { capitalize: cap = true, keepIdSuffix = false } = options;
   const inflections = Inflections.instance("en");
   let result = lowerCaseAndUnderscoredWord;
 
@@ -104,8 +112,9 @@ export function humanize(
     }
   }
 
-  // Remove _id suffix
-  result = result.replace(/_id$/, "");
+  if (!keepIdSuffix) {
+    result = result.replace(/_id$/, "");
+  }
   // Replace underscores with spaces
   result = result.replace(/_/g, " ");
 
@@ -122,8 +131,11 @@ export function humanize(
   return result;
 }
 
-export function titleize(word: string): string {
-  return humanize(underscore(word)).replace(/\b(?<![''`])[a-z]/g, (match) => match.toUpperCase());
+export function titleize(word: string, options: { keepIdSuffix?: boolean } = {}): string {
+  return humanize(underscore(word), { keepIdSuffix: options.keepIdSuffix }).replace(
+    /\b(?<![''`])[a-z]/g,
+    (match) => match.toUpperCase(),
+  );
 }
 
 export function tableize(className: string): string {
@@ -171,18 +183,10 @@ export function parameterize(
   let result = str.replace(/[^\x00-\x7F]/g, "");
 
   if (separator === "") {
-    // Split on non-alphanumeric runs, capitalise each word, join
     const words = result.split(/[^a-z0-9]+/gi).filter((w) => w.length > 0);
     if (words.length === 0) return "";
-    result = words
-      .map((w, i) => {
-        if (!preserveCase) {
-          // lowercase first word entirely, capitalise first char of rest
-          return i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase();
-        }
-        return w;
-      })
-      .join("");
+    result = words.join("");
+    if (!preserveCase) result = result.toLowerCase();
     return result;
   }
 

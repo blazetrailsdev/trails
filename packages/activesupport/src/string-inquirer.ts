@@ -19,7 +19,9 @@ export class StringInquirer {
         if (typeof prop === "symbol" || prop in target) {
           return (target as any)[prop];
         }
-        const name = prop.endsWith("?") ? prop.slice(0, -1) : prop;
+        let name = prop;
+        if (name.endsWith("?")) name = name.slice(0, -1);
+        if (/^is[A-Z]/.test(name)) name = name[2].toLowerCase() + name.slice(3);
         return () => target._value === name;
       },
     });
