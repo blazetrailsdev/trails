@@ -86,16 +86,16 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it.skip("extension on habtm", () => {
-    /* HABTM extensions not implemented */
+    /* needs extend option on HABTM associations */
   });
   it.skip("named extension on habtm", () => {
-    /* HABTM extensions not implemented */
+    /* needs extend option on HABTM associations */
   });
   it.skip("named two extensions on habtm", () => {
-    /* HABTM extensions not implemented */
+    /* needs extend option on HABTM associations */
   });
   it.skip("named extension and block on habtm", () => {
-    /* HABTM extensions not implemented */
+    /* needs extend option on HABTM associations */
   });
   it.skip("extension with dirty target", () => {
     /* dirty tracking on proxy not implemented */

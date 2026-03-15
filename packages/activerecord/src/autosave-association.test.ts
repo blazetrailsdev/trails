@@ -9,7 +9,7 @@ import {
   acceptsNestedAttributesFor,
   assignNestedAttributes,
 } from "./index.js";
-import { Associations, setBelongsTo } from "./associations.js";
+import { Associations, setBelongsTo, association } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -289,32 +289,60 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(b2.isNewRecord()).toBe(false);
   });
 
+  function makePirateParrot() {
+    class Parrot extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    Pirate.adapter = adapter;
+    Parrot.adapter = adapter;
+    registerModel("Parrot", Parrot);
+    registerModel("Pirate", Pirate);
+    Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
+      className: "Parrot",
+      joinTable: "parrots_pirates",
+    });
+    return { Pirate, Parrot };
+  }
+
   it.skip("should destroy habtm as part of the save transaction if they were marked for destruction", () => {
-    /* habtm not implemented */
+    /* needs autosave to process marked-for-destruction HABTM children during save */
   });
   it.skip("should skip validation on habtm if marked for destruction", () => {
-    /* habtm not implemented */
+    /* needs autosave to skip validation on marked-for-destruction children */
   });
   it.skip("should skip validation on habtm if destroyed", () => {
-    /* habtm not implemented */
+    /* needs autosave to skip validation on destroyed children */
   });
-  it.skip("should be valid on habtm if persisted and unchanged", () => {
-    /* habtm not implemented */
+  it("should be valid on habtm if persisted and unchanged", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const proxy = association(pirate, "parrots");
+    const p1 = await Parrot.create({ name: "Polly" });
+    await proxy.push(p1);
+    expect(await pirate.isValid()).toBe(true);
   });
   it.skip("should be invalid on habtm when any record in the association chain is invalid and was changed", () => {
-    /* habtm not implemented */
+    /* needs autosave validation of HABTM children */
   });
   it.skip("should be invalid on habtm when any record in the association chain is invalid and was changed with autosave", () => {
-    /* habtm not implemented */
+    /* needs autosave validation of HABTM children */
   });
   it.skip("should be valid on habtm when any record in the association chain is invalid but was not changed", () => {
-    /* habtm not implemented */
+    /* needs autosave validation of HABTM children */
   });
   it.skip("a child marked for destruction should not be destroyed twice while saving habtm", () => {
-    /* habtm not implemented */
+    /* needs autosave to process marked-for-destruction HABTM children during save */
   });
   it.skip("should rollback destructions if an exception occurred while saving habtm", () => {
-    /* habtm not implemented */
+    /* needs transaction rollback support */
   });
 });
 
@@ -1301,7 +1329,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     /* needs reflectOnAllAssociations to inspect association count */
   });
   it.skip("should not add the same callbacks multiple times for has and belongs to many", () => {
-    /* habtm not implemented */
+    /* needs reflectOnAllAssociations to inspect association count */
   });
   it.skip("cyclic autosaves do not add multiple validations", () => {
     /* fixture-dependent */
