@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -25,36 +25,51 @@ describe("Arel", () => {
     });
 
     it("is equal with equal ivars", () => {
-      const a = new Nodes.Or(users.get("id").eq(1), users.get("id").eq(2));
-      const b = new Nodes.Or(users.get("id").eq(1), users.get("id").eq(2));
-      expect(a.constructor).toBe(b.constructor);
+      const a = new Nodes.Equality("foo", "bar");
+      const b = new Nodes.Equality("foo", "bar");
+      expect(a.hash()).toBe(b.hash());
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.Grouping(new Nodes.Quoted("foo"));
-      const b = new Nodes.Grouping(new Nodes.Quoted("bar"));
-      expect(a).not.toBe(b);
+      const a = new Nodes.Equality("foo", "bar");
+      const b = new Nodes.Equality("foo", "baz");
+      expect(a.hash()).not.toBe(b.hash());
     });
 
-    it.skip("is equal with equal ivars");
-
-    it.skip("is not equal with different ivars");
-
     describe("and", () => {
-      it.skip("makes and AND node");
+      it("makes and AND node", () => {
+        const attr = users.get("id");
+        const left = attr.eq(10);
+        const right = attr.eq(11);
+        const node = left.and(right);
+        expect(node).toBeInstanceOf(Nodes.And);
+        expect(node.children).toContain(left);
+        expect(node.children).toContain(right);
+      });
     });
 
     describe("or", () => {
-      it.skip("makes an OR node");
-    });
-
-    describe("to_sql", () => {
-      it.skip("takes an engine");
+      it("makes an OR node", () => {
+        const attr = users.get("id");
+        const left = attr.eq(10);
+        const right = attr.eq(11);
+        const node = left.or(right);
+        const grouping = node as Nodes.Grouping;
+        const orNode = grouping.expr as Nodes.Or;
+        expect(orNode.left).toBe(left);
+        expect(orNode.right).toBe(right);
+      });
     });
 
     describe("backwards compat", () => {
       describe("to_sql", () => {
-        it.skip("takes an engine");
+        it("takes an engine", () => {
+          const attr = users.get("id");
+          const test = attr.eq(10);
+          const sql = new Visitors.ToSql().compile(test);
+          expect(sql).toContain('"users"."id"');
+          expect(sql).toContain("10");
+        });
       });
     });
   });

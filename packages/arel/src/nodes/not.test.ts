@@ -27,13 +27,27 @@ describe("Arel", () => {
     });
 
     describe("equality", () => {
-      it.skip("is equal with equal ivars");
+      it("is equal with equal ivars", () => {
+        const a = new Nodes.Not(new Nodes.Quoted("foo"));
+        const b = new Nodes.Not(new Nodes.Quoted("foo"));
+        expect(a.hash()).toBe(b.hash());
+      });
 
-      it.skip("is not equal with different ivars");
+      it("is not equal with different ivars", () => {
+        const a = new Nodes.Not(new Nodes.Quoted("foo"));
+        const b = new Nodes.Not(new Nodes.Quoted("baz"));
+        expect(a.hash()).not.toBe(b.hash());
+      });
     });
 
     describe("#not", () => {
-      it.skip("makes a NOT node");
+      it("makes a NOT node", () => {
+        const attr = users.get("id");
+        const expr = attr.eq(10);
+        const node = expr.not();
+        expect(node).toBeInstanceOf(Nodes.Not);
+        expect(node.expr).toBe(expr);
+      });
     });
   });
 });
