@@ -51,6 +51,8 @@ describe("SqliteTest", () => {
       expect(sql).toContain('"users"."name"');
       expect(sql).toContain("NULL");
     });
+
+    it.skip("should construct a valid generic SQL statement");
   });
 
   describe("Nodes::IsDistinctFrom", () => {

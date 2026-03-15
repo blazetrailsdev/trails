@@ -26,5 +26,15 @@ describe("Arel", () => {
       s2.relation = users;
       expect(s1.relation).not.toBe(s2.relation);
     });
+
+    describe("equality", () => {
+      it.skip("is equal with equal ivars");
+
+      it.skip("is not equal with different ivars");
+    });
+
+    describe("#or", () => {
+      it.skip("makes an OR node");
+    });
   });
 });

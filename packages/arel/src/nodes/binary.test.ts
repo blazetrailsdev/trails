@@ -16,4 +16,10 @@ describe("NodesTest", () => {
       expect(a.hash()).not.toBe(b.hash());
     });
   });
+
+  describe("#hash", () => {
+    it.skip("generates a hash based on its value");
+
+    it.skip("generates a hash specific to its class");
+  });
 });

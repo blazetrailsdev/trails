@@ -29,4 +29,12 @@ describe("FilterTest", () => {
       expect(result).toContain("ORDER BY");
     });
   });
+
+  describe("over", () => {
+    it.skip("should reference the window definition by name");
+  });
+
+  describe("as", () => {
+    it.skip("should alias the expression");
+  });
 });

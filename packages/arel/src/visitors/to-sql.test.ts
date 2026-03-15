@@ -20,6 +20,10 @@ describe("the to_sql visitor", () => {
       const node = users.get("name").isDistinctFrom(null);
       expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
+
+    it.skip("should handle column names on both sides");
+
+    it.skip("should handle nil");
   });
 
   describe("Nodes::NotIn", () => {
@@ -34,6 +38,20 @@ describe("the to_sql visitor", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       expect(visitor.compile(node)).toContain("NOT IN");
     });
+
+    it.skip("should know how to visit");
+
+    it.skip("can handle two dot ranges");
+
+    it.skip("can handle three dot ranges");
+
+    it.skip("can handle ranges bounded by infinity");
+
+    it.skip("can handle subqueries");
+
+    it.skip("is not preparable when an array");
+
+    it.skip("is preparable when a subselect");
   });
 
   describe("Nodes::DoesNotMatch", () => {
@@ -43,6 +61,12 @@ describe("the to_sql visitor", () => {
       const result = visitor.compile(node);
       expect(result).toContain("NOT LIKE");
     });
+
+    it.skip("should know how to visit");
+
+    it.skip("can handle ESCAPE");
+
+    it.skip("can handle subqueries");
   });
 
   it("should escape LIMIT", () => {
@@ -60,6 +84,8 @@ describe("the to_sql visitor", () => {
       const visitor = new Visitors.ToSql();
       expect(visitor.compile(new Nodes.False())).toBe("FALSE");
     });
+
+    it.skip("should handle false");
   });
 
   describe("Nodes::InfixOperation", () => {
@@ -98,6 +124,8 @@ describe("the to_sql visitor", () => {
       const node = users.get("tags").overlaps("bar");
       expect(visitor.compile(node)).toContain("&&");
     });
+
+    it.skip("should handle arbitrary operators");
   });
 
   describe("Table", () => {
@@ -136,6 +164,12 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
     });
+
+    it.skip("should construct a valid generic SQL statement");
+
+    it.skip("should handle column names on both sides");
+
+    it.skip("should handle nil");
   });
 
   describe("Nodes::IsDistinctFrom", () => {
@@ -214,6 +248,8 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain("IN (");
       expect(sql).toContain("SELECT");
     });
+
+    it.skip("encloses SELECT statements with parentheses");
   });
 
   describe("Nodes::Cte", () => {
@@ -245,6 +281,8 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(cte);
       expect(sql).toContain('"t" AS (');
     });
+
+    it.skip("handles table aliases");
   });
 
   describe("Nodes::WithRecursive", () => {
@@ -253,6 +291,8 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(aliased);
       expect(sql).toBe('"users" "u"');
     });
+
+    it.skip("handles table aliases");
   });
 
   describe("Nodes::BoundSqlLiteral", () => {
@@ -386,6 +426,10 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("O''Reilly");
     });
+
+    it.skip("should handle false");
+
+    it.skip("should handle nil");
   });
 
   describe("Nodes::InfixOperation", () => {
@@ -402,6 +446,8 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("~");
     });
+
+    it.skip("should handle arbitrary operators");
   });
 
   describe("Nodes::InfixOperation", () => {
@@ -470,6 +516,8 @@ describe("the to_sql visitor", () => {
       const node = users.get("id").asc().nullsFirst().reverse();
       expect(new Visitors.ToSql().compile(node)).toContain("NULLS LAST");
     });
+
+    it.skip("should know how to visit");
   });
 
   describe("Constants", () => {
@@ -550,6 +598,20 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toBe("1=0");
     });
+
+    it.skip("should know how to visit");
+
+    it.skip("can handle two dot ranges");
+
+    it.skip("can handle three dot ranges");
+
+    it.skip("can handle ranges bounded by infinity");
+
+    it.skip("can handle subqueries");
+
+    it.skip("is not preparable when an array");
+
+    it.skip("is preparable when a subselect");
   });
 
   describe("Nodes::NotIn", () => {
@@ -697,6 +759,8 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("UNION");
     });
+
+    it.skip("encloses SELECT statements with parentheses");
   });
 
   describe("Nodes::BoundSqlLiteral", () => {
@@ -788,5 +852,19 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("THEN");
     });
+  });
+
+  describe("Nodes::Matches", () => {
+    it.skip("should know how to visit");
+
+    it.skip("can handle ESCAPE");
+
+    it.skip("can handle subqueries");
+  });
+
+  describe("Nodes::NotEqual", () => {
+    it.skip("should handle false");
+
+    it.skip("should handle nil");
   });
 });

@@ -10,6 +10,12 @@ describe("PostgresTest", () => {
       const node = users.get("id").in([1, 2, 3]);
       expect(visitor.compile(node)).toContain("IN");
     });
+
+    it.skip("should know how to visit");
+
+    it.skip("can handle case insensitive");
+
+    it.skip("can handle subqueries");
   });
 
   it("should escape LIMIT", () => {
@@ -23,6 +29,8 @@ describe("PostgresTest", () => {
       const node = users.get("name").isDistinctFrom(null);
       expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
     });
+
+    it.skip("should handle column names on both sides");
   });
 
   describe("Nodes::NotRegexp", () => {
@@ -40,6 +48,14 @@ describe("PostgresTest", () => {
       const result = visitor.compile(node);
       expect(result).toContain("NOT LIKE");
     });
+
+    it.skip("should know how to visit");
+
+    it.skip("should know how to visit case sensitive");
+
+    it.skip("can handle ESCAPE");
+
+    it.skip("can handle subqueries");
   });
 
   describe("locking", () => {
@@ -129,6 +145,12 @@ describe("PostgresTest", () => {
       const sql = new Visitors.PostgreSQL().compile(mgr.ast);
       expect(sql).toContain('CUBE("users"."id", "users"."name")');
     });
+
+    it.skip("should know how to visit with array arguments");
+
+    it.skip("should know how to visit with CubeDimension Argument");
+
+    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
@@ -137,6 +159,10 @@ describe("PostgresTest", () => {
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
     });
+
+    it.skip("should construct a valid generic SQL statement");
+
+    it.skip("should handle column names on both sides");
   });
 
   describe("Nodes::IsDistinctFrom", () => {
@@ -161,5 +187,39 @@ describe("PostgresTest", () => {
       const node = products.get("tags").overlaps("{foo,bar,baz}");
       expect(visitor.compile(node)).toBe(`"products"."tags" && '{foo,bar,baz}'`);
     });
+  });
+
+  describe("Nodes::GroupingSet", () => {
+    it.skip("should know how to visit with array arguments");
+
+    it.skip("should know how to visit with CubeDimension Argument");
+
+    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
+  });
+
+  describe("Nodes::Cube", () => {
+    it.skip("should know how to visit with array arguments");
+
+    it.skip("should know how to visit with CubeDimension Argument");
+
+    it.skip("should know how to generate parenthesis when supplied with many Dimensions");
+  });
+
+  describe("Nodes::Regexp", () => {
+    it.skip("should know how to visit");
+
+    it.skip("can handle case insensitive");
+
+    it.skip("can handle subqueries");
+  });
+
+  describe("Nodes::Matches", () => {
+    it.skip("should know how to visit");
+
+    it.skip("should know how to visit case sensitive");
+
+    it.skip("can handle ESCAPE");
+
+    it.skip("can handle subqueries");
   });
 });
