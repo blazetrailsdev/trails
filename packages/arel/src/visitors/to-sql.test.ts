@@ -80,7 +80,7 @@ describe("the to_sql visitor", () => {
       const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("ESCAPE");
-      expect(sql).toContain("'\\");
+      expect(sql).toContain("ESCAPE '\\'");
     });
 
     it("should know how to visit", () => {
@@ -92,7 +92,7 @@ describe("the to_sql visitor", () => {
       const node = users.get("name").doesNotMatch("%chunky%", true, "\\");
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("ESCAPE");
-      expect(sql).toContain("'\\");
+      expect(sql).toContain("ESCAPE '\\'");
     });
 
     it.skip("can handle subqueries");
@@ -949,7 +949,7 @@ describe("the to_sql visitor", () => {
       const node = users.get("name").matches("%chunky%", true, "\\");
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("ESCAPE");
-      expect(sql).toContain("'\\");
+      expect(sql).toContain("ESCAPE '\\'");
     });
 
     it.skip("can handle subqueries");

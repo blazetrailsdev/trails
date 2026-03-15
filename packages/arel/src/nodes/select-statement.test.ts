@@ -32,9 +32,13 @@ describe("Arel", () => {
     describe("#clone", () => {
       it("clones cores", () => {
         const stmt = new Nodes.SelectStatement();
+        stmt.offset = new Nodes.Offset(new Nodes.Quoted(5));
+        stmt.limit = new Nodes.Limit(new Nodes.Quoted(10));
         const dolly = stmt.clone();
         expect(dolly.cores.length).toBe(stmt.cores.length);
         expect(dolly.cores).not.toBe(stmt.cores);
+        expect(dolly.offset).toBe(stmt.offset);
+        expect(dolly.limit).toBe(stmt.limit);
       });
     });
   });
