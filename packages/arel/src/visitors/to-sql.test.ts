@@ -46,18 +46,21 @@ describe("the to_sql visitor", () => {
       const node = users.get("id").notBetween([1, 3]);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("NOT");
+      expect(sql).toContain("BETWEEN");
     });
 
     it("can handle three dot ranges", () => {
       const node = users.get("id").notBetween([1, 2]);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("NOT");
+      expect(sql).toContain("BETWEEN");
     });
 
     it("can handle ranges bounded by infinity", () => {
       const node = users.get("id").notBetween([-Infinity, Infinity]);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("NOT");
+      expect(sql).toContain("TRUE");
     });
 
     it("is not preparable when an array", () => {
@@ -90,8 +93,7 @@ describe("the to_sql visitor", () => {
       const mgr = users.project(users.get("name"));
       const node = users.get("name").doesNotMatch(mgr);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("NOT LIKE");
-      expect(sql).toContain("SELECT");
+      expect(sql).toContain("NOT LIKE SELECT");
     });
   });
 
@@ -932,8 +934,7 @@ describe("the to_sql visitor", () => {
       const mgr = users.project(users.get("name"));
       const node = users.get("name").matches(mgr);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("LIKE");
-      expect(sql).toContain("SELECT");
+      expect(sql).toContain("LIKE SELECT");
     });
   });
 
