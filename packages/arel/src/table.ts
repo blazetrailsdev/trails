@@ -60,7 +60,7 @@ export class Table extends Node {
   }
 
   /**
-   * Factory: create an InnerJoin node.
+   * Factory: create a Join node (defaults to InnerJoin).
    *
    * Mirrors: Arel::Table#create_join
    */
