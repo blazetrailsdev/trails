@@ -1,7 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("MethodWrappersTest", () => {
-  // Helper: wraps a method on an object to emit a deprecation warning before calling it
   function deprecateMethod(obj: Record<string, unknown>, name: string, message?: string) {
     const original = obj[name] as Function;
     obj[name] = function (...args: unknown[]) {
@@ -10,10 +9,12 @@ describe("MethodWrappersTest", () => {
     };
   }
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("deprecate methods without alternate method", () => {
-    const warnings: string[] = [];
-    const orig = console.warn;
-    console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const obj: Record<string, unknown> = {
       old_method() {
         return "result";
@@ -21,14 +22,12 @@ describe("MethodWrappersTest", () => {
     };
     deprecateMethod(obj, "old_method");
     (obj.old_method as () => string)();
-    console.warn = orig;
-    expect(warnings.some((w) => w.includes("old_method"))).toBe(true);
+    expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls[0][0]).toContain("old_method");
   });
 
   it("deprecate methods warning default", () => {
-    const warnings: string[] = [];
-    const orig = console.warn;
-    console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const obj: Record<string, unknown> = {
       foo() {
         return 1;
@@ -36,8 +35,7 @@ describe("MethodWrappersTest", () => {
     };
     deprecateMethod(obj, "foo");
     (obj.foo as () => number)();
-    console.warn = orig;
-    expect(warnings.length).toBeGreaterThan(0);
+    expect(spy).toHaveBeenCalled();
   });
 
   it("deprecate methods warning with optional deprecator", () => {
@@ -82,13 +80,10 @@ describe("MethodWrappersTest", () => {
     }
     const proto = MyClass.prototype as unknown as Record<string, unknown>;
     deprecateMethod(proto, "private_method");
-    const warnings: string[] = [];
-    const orig = console.warn;
-    console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const inst = new MyClass();
     inst.private_method();
-    console.warn = orig;
-    expect(warnings.length).toBeGreaterThan(0);
+    expect(spy).toHaveBeenCalled();
   });
 
   it("deprecate class method", () => {
@@ -99,12 +94,9 @@ describe("MethodWrappersTest", () => {
     }
     const cls = MyClass as unknown as Record<string, unknown>;
     deprecateMethod(cls, "class_method");
-    const warnings: string[] = [];
-    const orig = console.warn;
-    console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     (MyClass as unknown as { class_method(): string }).class_method();
-    console.warn = orig;
-    expect(warnings.length).toBeGreaterThan(0);
+    expect(spy).toHaveBeenCalled();
   });
 
   it("deprecate method when class extends module", () => {
@@ -119,11 +111,8 @@ describe("MethodWrappersTest", () => {
       console.warn("shared is deprecated");
       return Base.prototype.shared.call(this);
     };
-    const warnings: string[] = [];
-    const orig = console.warn;
-    console.warn = (...a: unknown[]) => warnings.push(a.join(" "));
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     new Child().shared();
-    console.warn = orig;
-    expect(warnings[0]).toContain("deprecated");
+    expect(spy).toHaveBeenCalledWith("shared is deprecated");
   });
 });

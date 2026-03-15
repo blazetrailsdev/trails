@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Event, Notifications } from "../notifications.js";
 
 describe("InstrumenterTest", () => {
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
+
   it("instrument", () => {
     let fired = false;
     Notifications.subscribe("foo.bar", () => {

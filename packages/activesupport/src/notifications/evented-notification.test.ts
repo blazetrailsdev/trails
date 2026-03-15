@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Event, Notifications } from "../notifications.js";
 
 describe("EventedTest", () => {
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
+
   it("evented listener", () => {
     const events: Event[] = [];
     const sub = Notifications.subscribe("evented.test", (e) => events.push(e));

@@ -11,8 +11,6 @@ import {
   secondsUntilEndOfDay,
   ago,
   since,
-  isTomorrow,
-  isYesterday,
 } from "../time-ext.js";
 
 // Helper: make a local date
@@ -104,15 +102,17 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("prev day with offset", () => {
-    const t = new Date();
+    const t = d(2005, 6, 15, 12, 0, 0);
     const result = prevDay(t);
-    expect(isYesterday(result)).toBe(true);
+    expect(result.getDate()).toBe(14);
+    expect(result.getMonth()).toBe(5); // June (0-indexed)
   });
 
   it("next day with offset", () => {
-    const t = new Date();
+    const t = d(2005, 6, 15, 12, 0, 0);
     const result = nextDay(t);
-    expect(isTomorrow(result)).toBe(true);
+    expect(result.getDate()).toBe(16);
+    expect(result.getMonth()).toBe(5);
   });
 });
 
