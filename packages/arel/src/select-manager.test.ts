@@ -61,7 +61,9 @@ describe("SelectManagerTest", () => {
       it("converts right to SqlLiteral if a string", () => {
         const mgr = new SelectManager();
         const as = mgr.as("foo");
-        expect(as.name).toBe("foo");
+        expect(as).toBeInstanceOf(Nodes.TableAlias);
+        const sql = new Visitors.ToSql().compile(as);
+        expect(sql).toContain("foo");
       });
 
       it("can make a subselect", () => {
@@ -84,7 +86,9 @@ describe("SelectManagerTest", () => {
         mgr.from(users);
         mgr.from("users");
         mgr.project(users.get("id"));
-        expect(mgr.toSql()).toContain('"users"."id"');
+        const sql = mgr.toSql();
+        expect(sql).toContain('"users"."id"');
+        expect(sql).toContain("FROM");
       });
 
       it("should support any ast", () => {
