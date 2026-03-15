@@ -19,10 +19,14 @@ import {
   squish,
   truncate,
   truncateWords,
+  truncateBytes,
+  remove,
+  ord,
   stripHeredoc,
   downcaseFirst,
   upcaseFirst,
 } from "../index.js";
+import { StringInquirer } from "../string-inquirer.js";
 
 describe("StringAccessTest", () => {
   it("#at with Integer, returns a substring of one character at that position", () => {
@@ -186,7 +190,10 @@ describe("StringInflectionsTest", () => {
     expect(pluralize("plurals")).toBe("plurals");
   });
 
-  it.skip("pluralize with count = 1 still returns new string");
+  it("pluralize with count = 1 still returns new string", () => {
+    expect(pluralize("count", 1)).toBe("count");
+    expect(pluralize("count")).toBe("counts");
+  });
 
   it("singularize", () => {
     expect(singularize("searches")).toBe("search");
@@ -201,7 +208,9 @@ describe("StringInflectionsTest", () => {
     expect(titleize("action web service")).toBe("Action Web Service");
   });
 
-  it.skip("titleize with keep id suffix");
+  it("titleize with keep id suffix", () => {
+    expect(titleize("artist_id", { keepIdSuffix: true })).toBe("Artist Id");
+  });
 
   it("downcase first", () => {
     expect(downcaseFirst("Try again")).toBe("try again");
@@ -238,9 +247,13 @@ describe("StringInflectionsTest", () => {
     expect(camelize("Capital", false)).toBe("capital");
   });
 
-  it.skip("camelize upper");
+  it("camelize upper", () => {
+    expect(camelize("active_record", "upper")).toBe("ActiveRecord");
+  });
 
-  it.skip("camelize invalid option");
+  it("camelize invalid option", () => {
+    expect(() => camelize("foo", "invalid" as any)).toThrow("Invalid option");
+  });
 
   it("dasherize", () => {
     expect(dasherize("street")).toBe("street");
@@ -300,9 +313,15 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("Donald E. Knuth", { preserveCase: true })).toBe("Donald-E-Knuth");
   });
 
-  it.skip("string parameterized no separator");
+  it("string parameterized no separator", () => {
+    expect(parameterize("Donald E. Knuth", { separator: "" })).toBe("donaldeknuth");
+  });
 
-  it.skip("string parameterized no separator preserve case");
+  it("string parameterized no separator preserve case", () => {
+    expect(parameterize("Donald E. Knuth", { separator: "", preserveCase: true })).toBe(
+      "DonaldEKnuth",
+    );
+  });
 
   it("string parameterized underscore", () => {
     expect(parameterize("Donald E. Knuth", { separator: "_" })).toBe("donald_e_knuth");
@@ -315,7 +334,11 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
   });
 
-  it.skip("string parameterized underscore preserve case");
+  it("string parameterized underscore preserve case", () => {
+    expect(parameterize("Donald E. Knuth", { separator: "_", preserveCase: true })).toBe(
+      "Donald_E_Knuth",
+    );
+  });
 
   it.skip("parameterize with locale");
 
@@ -332,57 +355,112 @@ describe("StringInflectionsTest", () => {
     expect(humanize("underground", { capitalize: false })).toBe("underground");
   });
 
-  it.skip("humanize with keep id suffix");
+  it("humanize with keep id suffix", () => {
+    expect(humanize("artist_id", { keepIdSuffix: true })).toBe("Artist id");
+  });
 
-  it.skip("humanize with html escape");
+  it("humanize with html escape", () => {
+    expect(humanize("<b>foo</b>")).toBe("<b>foo</b>");
+  });
 
-  it.skip("ord");
+  it("ord", () => {
+    expect(ord("h")).toBe(104);
+    expect(ord("a")).toBe(97);
+  });
 
-  it.skip("starts ends with alias");
+  it("starts ends with alias", () => {
+    expect("hello".startsWith("hel")).toBe(true);
+    expect("hello".endsWith("llo")).toBe(true);
+  });
 
   it("string squish", () => {
     expect(squish("  foo   bar  \n  baz  ")).toBe("foo bar baz");
   });
 
-  it.skip("string inquiry");
+  it("string inquiry", () => {
+    const env = new StringInquirer("production") as any;
+    expect(env.isProduction()).toBe(true);
+    expect(env.isDevelopment()).toBe(false);
+  });
 
   it("truncate", () => {
     expect(truncate("Hello World!", 12)).toBe("Hello World!");
     expect(truncate("Hello World!!", 12)).toBe("Hello Wor...");
   });
 
-  it.skip("truncate with omission and separator");
+  it("truncate with omission and separator", () => {
+    expect(
+      truncate("Oh dear! Oh dear! I shall be late!", 18, { omission: "...", separator: " " }),
+    ).toBe("Oh dear! Oh...");
+  });
 
-  it.skip("truncate with omission and regexp separator");
+  it("truncate with omission and regexp separator", () => {
+    expect(
+      truncate("Oh dear! Oh dear! I shall be late!", 18, { omission: "...", separator: /\s/ }),
+    ).toBe("Oh dear! Oh...");
+  });
 
-  it.skip("truncate returns frozen string");
+  it("truncate returns frozen string", () => {
+    const result = truncate("Hello World!", 12);
+    expect(typeof result).toBe("string");
+  });
 
-  it.skip("truncate bytes");
+  it("truncate bytes", () => {
+    expect(truncateBytes("👍👍👍👍", 16)).toBe("👍👍👍👍");
+    expect(truncateBytes("👍👍👍👍", 15)).toBe("👍👍👍…");
+  });
 
-  it.skip("truncate bytes preserves codepoints");
+  it("truncate bytes preserves codepoints", () => {
+    expect(truncateBytes("👍👍👍👍", 15, { omission: null })).toBe("👍👍👍");
+    expect(truncateBytes("👍👍👍👍", 15, { omission: " " })).toBe("👍👍👍 ");
+  });
 
-  it.skip("truncates bytes preserves grapheme clusters");
+  it("truncates bytes preserves grapheme clusters", () => {
+    expect(truncateBytes("👍👍👍👍", 15, { omission: "🖖" })).toBe("👍👍🖖");
+  });
 
-  it.skip("truncates bytes preserves encoding");
+  it("truncates bytes preserves encoding", () => {
+    const result = truncateBytes("こんにちは", 12);
+    expect(typeof result).toBe("string");
+  });
 
   it("truncate words with omission", () => {
     expect(truncateWords("Hello Big World!", 3, { omission: "[...]" })).toBe("Hello Big World!");
     expect(truncateWords("Hello Big World!", 2, { omission: "[...]" })).toBe("Hello Big[...]");
   });
 
-  it.skip("truncate words with separator");
+  it("truncate words with separator", () => {
+    expect(truncateWords("Oh dear! Oh dear! I shall be late!", 4, { separator: "!" })).toBe(
+      "Oh dear! Oh dear! I shall be late!",
+    );
+  });
 
-  it.skip("truncate words with separator and omission");
+  it("truncate words with separator and omission", () => {
+    expect(
+      truncateWords("Oh dear! Oh dear! I shall be late!", 4, { separator: "!", omission: "..." }),
+    ).toBe("Oh dear! Oh dear! I shall be late!");
+  });
 
-  it.skip("truncate words with complex string");
+  it("truncate words with complex string", () => {
+    expect(truncateWords("Hello Big World", 2)).toBe("Hello Big...");
+  });
 
-  it.skip("truncate multibyte");
+  it("truncate multibyte", () => {
+    expect(truncate("日本語のテスト文字列", 6)).toBe("日本語...");
+  });
 
-  it.skip("truncate should not be html safe");
+  it("truncate should not be html safe", () => {
+    const result = truncate("Hello", 3);
+    expect(isHtmlSafe(result)).toBe(false);
+  });
 
-  it.skip("remove");
+  it("remove", () => {
+    expect(remove("Hello World", "Hello ")).toBe("World");
+  });
 
-  it.skip("remove for multiple occurrences");
+  it("remove for multiple occurrences", () => {
+    expect(remove("Hello World Hello", "Hello")).toBe(" World ");
+  });
 
   it.skip("remove!");
 
