@@ -29,13 +29,12 @@ export class TempfileReaper {
     const [status, headers, body] = response;
 
     // Wrap body to clean up tempfiles on close
-    const self = this;
     const wrappedBody = {
       [Symbol.iterator]: body[Symbol.iterator]?.bind(body),
       each: body.each?.bind(body),
-      close() {
+      close: () => {
         if (body && typeof body.close === "function") body.close();
-        self.closeTempfiles(env);
+        this.closeTempfiles(env);
       },
       forEach: body.forEach?.bind(body),
       map: body.map?.bind(body),

@@ -6,19 +6,19 @@ import type { RackApp, RackBody } from "./index.js";
 function makeHandler(events: [any, string][]): EventHandler & { self: object } {
   const handler = {
     self: {} as object,
-    onStart(req: Request, res: EventResponse) {
+    onStart(_req: Request, _res: EventResponse) {
       events.push([handler, "on_start"]);
     },
-    onCommit(req: Request, res: EventResponse) {
+    onCommit(_req: Request, _res: EventResponse) {
       events.push([handler, "on_commit"]);
     },
-    onSend(req: Request, res: EventResponse) {
+    onSend(_req: Request, _res: EventResponse) {
       events.push([handler, "on_send"]);
     },
-    onFinish(req: Request, res: EventResponse) {
+    onFinish(_req: Request, _res: EventResponse) {
       events.push([handler, "on_finish"]);
     },
-    onError(req: Request, res: EventResponse, e: Error) {
+    onError(_req: Request, _res: EventResponse, _e: Error) {
       events.push([handler, "on_error"]);
     },
   };
@@ -38,18 +38,18 @@ describe("TestEvents", () => {
   it("events fire", async () => {
     const events: [any, string][] = [];
     const appMarker = { name: "app" };
-    const app: RackApp = async (env) => {
+    const app: RackApp = async (_env) => {
       events.push([appMarker, "call"]);
       return [200, {}, (async function* () {})()];
     };
     const se = makeHandler(events);
     const e = new Events(app, [se]);
 
-    const [status, headers, body] = await e.call({});
+    const [_status, _headers, body] = await e.call({});
     await consumeBody(body);
     (body as any).close();
 
-    expect(events.map(([o, m]) => m)).toEqual([
+    expect(events.map(([_o, m]) => m)).toEqual([
       "on_start",
       "call",
       "on_commit",
@@ -60,7 +60,7 @@ describe("TestEvents", () => {
 
   it("send and finish are not run until body is sent", async () => {
     const events: [any, string][] = [];
-    const app: RackApp = async (env) => {
+    const app: RackApp = async (_env) => {
       events.push([null, "call"]);
       return [200, {}, (async function* () {})()];
     };
@@ -74,7 +74,7 @@ describe("TestEvents", () => {
 
   it("send is called on each", async () => {
     const events: [any, string][] = [];
-    const app: RackApp = async (env) => {
+    const app: RackApp = async (_env) => {
       events.push([null, "call"]);
       return [200, {}, (async function* () {})()];
     };
@@ -89,7 +89,7 @@ describe("TestEvents", () => {
 
   it("finish is called on close", async () => {
     const events: [any, string][] = [];
-    const app: RackApp = async (env) => {
+    const app: RackApp = async (_env) => {
       events.push([null, "call"]);
       return [200, {}, (async function* () {})()];
     };
@@ -111,7 +111,7 @@ describe("TestEvents", () => {
 
   it("finish is called in reverse order", async () => {
     const events: [any, string][] = [];
-    const app: RackApp = async (env) => {
+    const app: RackApp = async (_env) => {
       events.push([null, "call"]);
       return [200, {}, (async function* () {})()];
     };

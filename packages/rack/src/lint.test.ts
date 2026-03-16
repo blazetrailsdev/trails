@@ -26,9 +26,9 @@ function validEnv(overrides: Record<string, any> = {}): Record<string, any> {
 }
 
 it("pass valid request", async () => {
-  const app = new Lint(async (env) => [200, { "content-type": "text/plain" }, ["OK"]]);
+  const app = new Lint(async (_env) => [200, { "content-type": "text/plain" }, ["OK"]]);
   const env = validEnv();
-  const [status, headers, body] = await app.call(env);
+  const [status, _headers, _body] = await app.call(env);
   expect(status).toBe(200);
 });
 
@@ -149,7 +149,7 @@ it("handles body.to_path returning nil", async () => {
     },
   };
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
-  const [status, , b] = await app.call(validEnv());
+  const [status] = await app.call(validEnv());
   expect(status).toBe(200);
 });
 

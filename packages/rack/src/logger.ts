@@ -26,8 +26,6 @@ export class Logger {
   }
 }
 
-const LEVELS = ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"] as const;
-
 class RackLogger {
   private output: LoggerStream | undefined;
 

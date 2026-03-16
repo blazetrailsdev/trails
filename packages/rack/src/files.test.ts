@@ -228,7 +228,7 @@ it("detect SystemCallErrors", async () => {
 it("return bodies that respond to #to_path", async () => {
   const app = makeApp();
   const env = MockRequest.envFor("/test.txt");
-  const [status, headers, body] = app.serving(env, "/test.txt");
+  const [status, _headers, body] = app.serving(env, "/test.txt");
   expect(status).toBe(200);
   expect(typeof body.toPath).toBe("function");
   expect(body.toPath()).toBe(path.join(tmpDir, "test.txt"));
