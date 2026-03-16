@@ -95,7 +95,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("Active Record basics", () => {});
   });
 
-  describe("SchemaJointTablesTest", () => {
+  describe("SchemaJoinTablesTest", () => {
     it.skip("create join table", () => {});
   });
 
