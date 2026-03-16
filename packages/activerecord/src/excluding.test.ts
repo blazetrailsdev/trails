@@ -133,15 +133,6 @@ describe("ExcludingTest", () => {
   });
 
   it("result set does not include collection of excluded records", async () => {
-    function makeModel() {
-      class Post extends Base {
-        static {
-          this.attribute("title", "string");
-          this.adapter = adapter;
-        }
-      }
-      return { Post };
-    }
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "first" });
     const p2 = await Post.create({ title: "second" });
