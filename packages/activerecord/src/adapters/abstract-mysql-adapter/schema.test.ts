@@ -20,6 +20,9 @@ describeIfMysql("MysqlAdapter", () => {
     it.skip("data source exists", () => {});
     it.skip("dump indexes", () => {});
     it.skip("drop temporary table", () => {});
+  });
+
+  describe("MySQLAnsiQuotesTest", () => {
     it.skip("primary key method with ansi quotes", () => {});
     it.skip("foreign keys method with ansi quotes", () => {});
   });
