@@ -169,6 +169,7 @@ describe("CallbacksTest", () => {
     const p = new CbPost({ title: "test" });
     const result = await p.save();
     expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
   });
 
   it.skip("before destroy returns false", async () => {
@@ -241,6 +242,7 @@ describe("CallbacksTest", () => {
       }
     }
     await CbPost.create({ title: "test" });
+    log.length = 0;
     await CbPost.first();
     expect(log).toContain("found");
   });
@@ -355,13 +357,13 @@ describe("CallbacksTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        this.beforeSave(() => {
-          throw new Error("abort");
-        });
+        this.beforeSave(() => false);
       }
     }
     const p = new CbPost({ title: "test" });
-    await expect(p.save()).rejects.toThrow("abort");
+    const result = await p.save();
+    expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
   });
 });
 
