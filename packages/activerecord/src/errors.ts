@@ -190,10 +190,7 @@ export class InverseOfAssociationNotFoundError extends Error {
   readonly corrections: string[];
 
   constructor(reflection: string, inverseOf: string, corrections: string[] = []) {
-    const suggestion = corrections.length > 0 ? ` Did you mean? ${corrections[0]}` : "";
-    super(
-      `Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).${suggestion}`,
-    );
+    super(`Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).`);
     this.name = "InverseOfAssociationNotFoundError";
     this.reflection = reflection;
     this.inverseOf = inverseOf;

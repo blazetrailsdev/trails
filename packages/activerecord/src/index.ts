@@ -50,6 +50,7 @@ export {
   DeleteRestrictionError,
   UnknownAttributeError,
   SubclassNotFound,
+  InverseOfAssociationNotFoundError,
 } from "./errors.js";
 export {
   AssociationReflection,
