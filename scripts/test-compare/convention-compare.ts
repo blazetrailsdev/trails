@@ -299,6 +299,42 @@ function main() {
         }
       }
 
+      // Pass 1.5: Suffix path matches — TS path ends with the Ruby path.
+      // Handles cases where TS wraps tests in an extra outer describe
+      // (e.g., TS: "arel > equality > or > makes an or node"
+      //  Ruby: "equality > or > makes an or node").
+      for (let ri = 0; ri < file.testCases.length; ri++) {
+        if (matchedRuby.has(ri)) continue;
+        const tc = file.testCases[ri];
+        const np = normPath(tc.ancestors, tc.description);
+        const nd = normalize(tc.description);
+
+        const candidates = descIndex.get(nd);
+        if (!candidates) continue;
+
+        for (const idx of candidates) {
+          if (consumedTs.has(idx)) continue;
+          const tsPath = tsTests[idx].path;
+          // Check if TS path ends with the full Ruby path
+          if (tsPath.endsWith(np) && tsPath.length > np.length) {
+            const prefix = tsPath.slice(0, tsPath.length - np.length);
+            // Ensure the prefix ends with " > " (clean ancestor boundary)
+            if (prefix.endsWith(" > ")) {
+              consumedTs.add(idx);
+              matchedRuby.add(ri);
+              matched++;
+              totalMatched++;
+              totalRuby++;
+              if (tsTests[idx].pending) {
+                matchedSkipped++;
+                totalMatchedSkipped++;
+              }
+              break;
+            }
+          }
+        }
+      }
+
       // Pass 2: Description-only matches on remaining Ruby tests.
       // When multiple TS tests share the same description, prefer the one with
       // the longest common ancestor prefix. This prevents tests like
@@ -318,15 +354,17 @@ function main() {
           const rubyParts = np.split(" > ");
           for (const idx of candidates) {
             if (consumedTs.has(idx)) continue;
-            const tsParts = tsTests[idx].path.split(" > ");
-            // Score: prefix overlap, then prefer longer (more specific) paths
+            const tsPath = tsTests[idx].path;
+            const tsParts = tsPath.split(" > ");
+            // Score: suffix match (TS path ends with Ruby path) gets highest priority,
+            // then prefix overlap, then path length
             let overlap = 0;
             for (let k = 0; k < Math.min(tsParts.length - 1, rubyParts.length - 1); k++) {
               if (tsParts[k] === rubyParts[k]) overlap++;
               else break;
             }
-            // Score = overlap * 1000 + path length (prefer more specific matches)
-            const score = overlap * 1000 + tsParts.length;
+            const isSuffix = tsPath.endsWith(np) ? 1 : 0;
+            const score = isSuffix * 100000 + overlap * 1000 + tsParts.length;
             if (score > bestScore) {
               bestScore = score;
               descIdx = idx;
