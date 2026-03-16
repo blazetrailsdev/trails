@@ -443,7 +443,7 @@ describe("TransactionCallbacksTest", () => {
   it.skip("callbacks run in order defined in model if not using run after transaction callbacks in order defined", () => {});
 });
 
-describe("afterCommit / afterRollback", () => {
+describe("TransactionCallbacksTest", () => {
   it("fires afterCommit callback outside transaction", async () => {
     const adapter = freshAdapter();
     const log: string[] = [];

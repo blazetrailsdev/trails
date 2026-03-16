@@ -1891,7 +1891,7 @@ describe("BasicsTest", () => {
 // ==========================================================================
 // BasicsTest2 — additional coverage for base_test.rb
 // ==========================================================================
-describe("BasicsTest2", () => {
+describe("BasicsTest", () => {
   let Post: typeof Base;
   beforeEach(() => {
     const adp = createTestAdapter();
@@ -2109,7 +2109,7 @@ describe("BasicsTest2", () => {
   });
 });
 
-describe("Base", () => {
+describe("BasicsTest", () => {
   // -- Table name inference --
   describe("table name inference", () => {
     it("table name guesses", () => {

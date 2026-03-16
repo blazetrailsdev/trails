@@ -13,7 +13,7 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-describe("ReadOnlyTest", () => {
+describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -136,7 +136,7 @@ describe("ReadOnlyTest", () => {
   });
 });
 
-describe("ReadOnlyTest", () => {
+describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -156,7 +156,7 @@ describe("ReadOnlyTest", () => {
   it.skip("cant update column readonly record", () => {});
 });
 
-describe("readonly", () => {
+describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -193,7 +193,7 @@ describe("readonly", () => {
   });
 });
 
-describe("readonly()", () => {
+describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -214,7 +214,7 @@ describe("readonly()", () => {
   });
 });
 
-describe("attrReadonly", () => {
+describe("ReadonlyTest", () => {
   it("allows setting readonly attributes on create", async () => {
     const adapter = freshAdapter();
     class Product extends Base {
@@ -266,7 +266,7 @@ describe("attrReadonly", () => {
   });
 });
 
-describe("Readonly (Rails-guided)", () => {
+describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -287,7 +287,7 @@ describe("Readonly (Rails-guided)", () => {
   });
 });
 
-describe("Readonly (Rails-guided)", () => {
+describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

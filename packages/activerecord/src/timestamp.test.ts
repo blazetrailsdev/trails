@@ -300,7 +300,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampsWithoutTransactionTest", () => {
+describe("TimestampTest", () => {
   it("do not write timestamps on save if they are not attributes", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
@@ -319,7 +319,7 @@ describe("TimestampsWithoutTransactionTest", () => {
   });
 });
 
-describe("Timestamps", () => {
+describe("TimestampTest", () => {
   it("auto-sets created_at and updated_at on insert", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
@@ -399,7 +399,7 @@ describe("Timestamps", () => {
   });
 });
 
-describe("touch", () => {
+describe("TimestampTest", () => {
   it("touching a record updates its timestamp", async () => {
     const adapter = freshAdapter();
 
@@ -478,7 +478,7 @@ describe("touch", () => {
   });
 });
 
-describe("touch edge cases", () => {
+describe("TimestampTest", () => {
   it("touch persists to database", async () => {
     const adapter = freshAdapter();
 
@@ -533,7 +533,7 @@ describe("touch edge cases", () => {
   });
 });
 
-describe("touchAll()", () => {
+describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -555,7 +555,7 @@ describe("touchAll()", () => {
   });
 });
 
-describe("recordTimestamps", () => {
+describe("TimestampTest", () => {
   it("defaults to true", () => {
     class User extends Base {
       static {
@@ -578,7 +578,7 @@ describe("recordTimestamps", () => {
   });
 });
 
-describe("noTouching()", () => {
+describe("TimestampTest", () => {
   it("suppresses touching during the block", async () => {
     class User extends Base {
       static {
@@ -594,7 +594,7 @@ describe("noTouching()", () => {
   });
 });
 
-describe("Timestamps (Rails-guided)", () => {
+describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -732,7 +732,7 @@ describe("Timestamps (Rails-guided)", () => {
   });
 });
 
-describe("Touch All (Rails-guided)", () => {
+describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -752,7 +752,7 @@ describe("Touch All (Rails-guided)", () => {
   });
 });
 
-describe("Timestamps (Rails-guided)", () => {
+describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
 
   class Article extends Base {
@@ -808,7 +808,7 @@ describe("Timestamps (Rails-guided)", () => {
   });
 });
 
-describe("Touch on belongs_to (Rails-guided)", () => {
+describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

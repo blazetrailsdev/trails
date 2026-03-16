@@ -515,7 +515,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 // PersistenceTest2 — additional coverage for persistence_test.rb
 // ==========================================================================
-describe("PersistenceTest2", () => {
+describe("PersistenceTest", () => {
   let Post: typeof Base;
   beforeEach(() => {
     const adp = createTestAdapter();
@@ -768,7 +768,7 @@ describe("PersistenceTest2", () => {
 // ==========================================================================
 // PersistenceTest3 — additional missing tests from persistence_test.rb
 // ==========================================================================
-describe("PersistenceTest3", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1961,7 +1961,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("updateColumn / updateColumns", () => {
+describe("PersistenceTest", () => {
   it("update column", async () => {
     const adapter = freshAdapter();
     const log: string[] = [];
@@ -2056,7 +2056,7 @@ describe("updateColumn / updateColumns", () => {
   });
 });
 
-describe("Persistence edge cases", () => {
+describe("PersistenceTest", () => {
   it("update does not run sql if record has not changed", async () => {
     const adapter = freshAdapter();
 
@@ -2156,7 +2156,7 @@ describe("Persistence edge cases", () => {
   });
 });
 
-describe("destroyBy and deleteBy", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2196,7 +2196,7 @@ describe("destroyBy and deleteBy", () => {
   });
 });
 
-describe("static updateAll", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2219,7 +2219,7 @@ describe("static updateAll", () => {
   });
 });
 
-describe("static update()", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2239,7 +2239,7 @@ describe("static update()", () => {
   });
 });
 
-describe("static destroyAll()", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2261,7 +2261,7 @@ describe("static destroyAll()", () => {
   });
 });
 
-describe("save with validate: false", () => {
+describe("PersistenceTest", () => {
   it("skips validation when validate: false", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2281,7 +2281,7 @@ describe("save with validate: false", () => {
   });
 });
 
-describe("save with touch: false", () => {
+describe("PersistenceTest", () => {
   it("skips timestamp updates on save", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
@@ -2323,7 +2323,7 @@ describe("save with touch: false", () => {
   });
 });
 
-describe("updateAttribute", () => {
+describe("PersistenceTest", () => {
   it("updates a single attribute and saves, skipping validations", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2343,7 +2343,7 @@ describe("updateAttribute", () => {
   });
 });
 
-describe("static destroy(id)", () => {
+describe("PersistenceTest", () => {
   it("destroys a single record by id", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2376,7 +2376,7 @@ describe("static destroy(id)", () => {
   });
 });
 
-describe("static updateBang", () => {
+describe("PersistenceTest", () => {
   it("updates and raises on validation failure", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2395,7 +2395,7 @@ describe("static updateBang", () => {
   });
 });
 
-describe("Persistence (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2798,7 +2798,7 @@ describe("Persistence (Rails-guided)", () => {
   });
 });
 
-describe("Persistence (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   class Post extends Base {
@@ -2991,7 +2991,7 @@ describe("Persistence (Rails-guided)", () => {
   });
 });
 
-describe("update_column / update_columns (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   class Topic extends Base {
@@ -3099,7 +3099,7 @@ describe("update_column / update_columns (Rails-guided)", () => {
   });
 });
 
-describe("touch (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   class Topic extends Base {
@@ -3155,7 +3155,7 @@ describe("touch (Rails-guided)", () => {
   });
 });
 
-describe("Persistence edge cases (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   class User extends Base {
@@ -3260,7 +3260,7 @@ describe("Persistence edge cases (Rails-guided)", () => {
   });
 });
 
-describe("Bulk operations (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -3361,7 +3361,7 @@ describe("Bulk operations (Rails-guided)", () => {
   });
 });
 
-describe("update_column / touch edge cases (Rails-guided)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -3464,7 +3464,7 @@ describe("update_column / touch edge cases (Rails-guided)", () => {
   });
 });
 
-describe("previouslyNewRecord", () => {
+describe("PersistenceTest", () => {
   it("returns false before first save", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3509,7 +3509,7 @@ describe("previouslyNewRecord", () => {
   });
 });
 
-describe("Rails-guided: increment/decrement/toggle", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3593,7 +3593,7 @@ describe("Rails-guided: increment/decrement/toggle", () => {
   });
 });
 
-describe("Base: increment/decrement/toggle", () => {
+describe("PersistenceTest", () => {
   it("increment attribute", () => {
     class Counter extends Base {
       static {
@@ -3713,7 +3713,7 @@ describe("Base: increment/decrement/toggle", () => {
   });
 });
 
-describe("Base (extended) - persistence", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3795,7 +3795,7 @@ describe("Base (extended) - persistence", () => {
     expect(result.isDestroyed()).toBe(true);
   });
 });
-describe("Persistence (extended)", () => {
+describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
   class Article extends Base {

@@ -557,7 +557,7 @@ describe("StoreTest", () => {
   it.skip("updating the store will mark it as changed", () => {});
 });
 
-describe("Store", () => {
+describe("StoreTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -624,7 +624,7 @@ describe("Store", () => {
   });
 });
 
-describe("store", () => {
+describe("StoreTest", () => {
   it("defines accessor methods for stored attributes", () => {
     class User extends Base {
       static {
@@ -671,7 +671,7 @@ describe("store", () => {
   });
 });
 
-describe("Store (Rails-guided)", () => {
+describe("StoreTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

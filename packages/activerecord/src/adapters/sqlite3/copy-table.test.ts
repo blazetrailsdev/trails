@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: copy_table_test.rb --
-describe("SQLite3CopyTableTest", () => {
+describe("CopyTableTest", () => {
   it("copy table", async () => {
     adapter.exec(`CREATE TABLE "source" ("id" INTEGER PRIMARY KEY, "name" TEXT, "age" INTEGER)`);
     await adapter.executeMutation(`INSERT INTO "source" ("name", "age") VALUES ('Alice', 30)`);

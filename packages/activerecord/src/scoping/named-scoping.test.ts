@@ -585,7 +585,7 @@ describe("NamedScopingTest", () => {
 // ==========================================================================
 // NamedScopingTest2 — more targets for named_scoping_test.rb
 // ==========================================================================
-describe("NamedScopingTest2", () => {
+describe("NamedScopingTest", () => {
   it("method missing priority when delegating", async () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -983,7 +983,7 @@ describe("NamedScopingTest2", () => {
 // ==========================================================================
 // NamedScopingTest3 — additional missing tests from scoping/named_scoping_test.rb
 // ==========================================================================
-describe("NamedScopingTest3", () => {
+describe("NamedScopingTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1041,7 +1041,7 @@ describe("NamedScopingTest3", () => {
   });
 });
 
-describe("Scopes", () => {
+describe("NamedScopingTest", () => {
   let adapter: DatabaseAdapter;
 
   class Product extends Base {
@@ -1072,7 +1072,7 @@ describe("Scopes", () => {
   });
 });
 
-describe("Scope proxy", () => {
+describe("NamedScopingTest", () => {
   it("scope is accessible on Relation via proxy", async () => {
     const adapter = freshAdapter();
 
@@ -1177,7 +1177,7 @@ describe("Scope proxy", () => {
   });
 });
 
-describe("scope with extension block", () => {
+describe("NamedScopingTest", () => {
   it("adds extension methods to the scoped relation", () => {
     const adapter = freshAdapter();
     class Article extends Base {
@@ -1199,7 +1199,7 @@ describe("scope with extension block", () => {
   });
 });
 
-describe("Scopes (Rails-guided)", () => {
+describe("NamedScopingTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1317,7 +1317,7 @@ describe("Scopes (Rails-guided)", () => {
   });
 });
 
-describe("Scopes (Rails-guided)", () => {
+describe("NamedScopingTest", () => {
   let adapter: DatabaseAdapter;
 
   class Post extends Base {
@@ -1412,7 +1412,7 @@ describe("Scopes (Rails-guided)", () => {
   });
 });
 
-describe("Scopes edge cases (Rails-guided)", () => {
+describe("NamedScopingTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

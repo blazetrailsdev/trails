@@ -166,7 +166,7 @@ describe("DeleteAllTest", () => {
   });
 });
 
-describe("Bulk operations edge cases", () => {
+describe("DeleteAllTest", () => {
   it("updateAll does not run callbacks", async () => {
     const adapter = freshAdapter();
     const log: string[] = [];
@@ -290,7 +290,7 @@ describe("Bulk operations edge cases", () => {
   });
 });
 
-describe("Relation Delete All / Update All (Rails-guided)", () => {
+describe("DeleteAllTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();

@@ -1765,7 +1765,7 @@ describe("CalculationsTest", () => {
 // ==========================================================================
 // CalculationsTestExtra — additional targets for calculations_test.rb
 // ==========================================================================
-describe("CalculationsTestExtra", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2470,7 +2470,7 @@ describe("CalculationsTestExtra", () => {
   });
 });
 
-describe("grouped calculations", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2513,7 +2513,7 @@ describe("grouped calculations", () => {
   });
 });
 
-describe("calculate()", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2539,7 +2539,7 @@ describe("calculate()", () => {
   });
 });
 
-describe("incrementCounter / decrementCounter", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2578,7 +2578,7 @@ describe("incrementCounter / decrementCounter", () => {
   });
 });
 
-describe("updateCounters", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2603,7 +2603,7 @@ describe("updateCounters", () => {
   });
 });
 
-describe("Calculations (Rails-guided)", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
 
   class Order extends Base {
@@ -2754,7 +2754,7 @@ describe("Calculations (Rails-guided)", () => {
   });
 });
 
-describe("Calculations edge cases (Rails-guided)", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
 
   class Product extends Base {
@@ -2838,7 +2838,7 @@ describe("Calculations edge cases (Rails-guided)", () => {
   });
 });
 
-describe("Grouped Calculations (Rails-guided)", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -6667,7 +6667,7 @@ describe("Grouped Calculations (Rails-guided)", () => {
   });
 });
 
-describe("Rails-guided: pick", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -6696,7 +6696,7 @@ describe("Rails-guided: pick", () => {
     expect(await User.all().pick("name")).toBe(null);
   });
 });
-describe("Calculations (extended)", () => {
+describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
 
   class Product extends Base {

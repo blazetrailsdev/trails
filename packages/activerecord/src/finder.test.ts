@@ -2431,7 +2431,7 @@ describe("FinderTest", () => {
 // ==========================================================================
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
-describe("FinderTest2", () => {
+describe("FinderTest", () => {
   let Post: typeof Base;
   beforeEach(() => {
     const adp = createTestAdapter();
@@ -2630,7 +2630,7 @@ describe("FinderTest2", () => {
   });
 });
 
-describe("find_or_create_by / find_or_initialize_by", () => {
+describe("FinderTest", () => {
   it("findOrCreateBy returns existing record if found", async () => {
     const adapter = freshAdapter();
 
@@ -2703,7 +2703,7 @@ describe("find_or_create_by / find_or_initialize_by", () => {
   });
 });
 
-describe("sole() and take()", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2786,7 +2786,7 @@ describe("sole() and take()", () => {
   });
 });
 
-describe("findSoleBy()", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2819,7 +2819,7 @@ describe("findSoleBy()", () => {
   });
 });
 
-describe("exists?(conditions)", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2852,7 +2852,7 @@ describe("exists?(conditions)", () => {
   });
 });
 
-describe("positional finders", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2965,7 +2965,7 @@ describe("positional finders", () => {
   });
 });
 
-describe("createOrFindBy", () => {
+describe("FinderTest", () => {
   it("creates a new record when none exists", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2996,7 +2996,7 @@ describe("createOrFindBy", () => {
   });
 });
 
-describe("findBySql", () => {
+describe("FinderTest", () => {
   it("returns model instances from raw SQL", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3017,7 +3017,7 @@ describe("findBySql", () => {
   });
 });
 
-describe("find with variadic args", () => {
+describe("FinderTest", () => {
   it("finds multiple records with variadic ids", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3035,7 +3035,7 @@ describe("find with variadic args", () => {
   });
 });
 
-describe("firstOrCreate / firstOrInitialize", () => {
+describe("FinderTest", () => {
   it("firstOrCreate returns existing record when found", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3114,7 +3114,7 @@ describe("firstOrCreate / firstOrInitialize", () => {
   });
 });
 
-describe("Finders (Rails-guided)", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
 
   class User extends Base {
@@ -3337,7 +3337,7 @@ describe("Finders (Rails-guided)", () => {
   });
 });
 
-describe("find_or_create_by (Rails-guided)", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
 
   class Bird extends Base {
@@ -3388,7 +3388,7 @@ describe("find_or_create_by (Rails-guided)", () => {
   });
 });
 
-describe("Finders edge cases (Rails-guided)", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
 
   class User extends Base {
@@ -3456,7 +3456,7 @@ describe("Finders edge cases (Rails-guided)", () => {
   });
 });
 
-describe("Base.findByAttribute", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3490,7 +3490,7 @@ describe("Base.findByAttribute", () => {
   });
 });
 
-describe("Base.respondToMissingFinder", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3522,7 +3522,7 @@ describe("Base.respondToMissingFinder", () => {
   });
 });
 
-describe("Rails-guided: first/last with count", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3559,7 +3559,7 @@ describe("Rails-guided: first/last with count", () => {
   });
 });
 
-describe("Base (extended) - finders", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3603,7 +3603,7 @@ describe("Base (extended) - finders", () => {
     await expect(User.find([1, 999])).rejects.toThrow("not found");
   });
 });
-describe("Finders (extended)", () => {
+describe("FinderTest", () => {
   let adapter: DatabaseAdapter;
 
   class User extends Base {

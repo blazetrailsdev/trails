@@ -279,7 +279,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("TooManyOrTest", () => {
+describe("OrTest", () => {
   it("too many or", () => {
     const adapter = freshAdapter();
     class Post extends Base {
@@ -298,7 +298,7 @@ describe("TooManyOrTest", () => {
   });
 });
 
-describe("Relation#or", () => {
+describe("OrTest", () => {
   it("combines two where clauses with OR", async () => {
     const adapter = freshAdapter();
 
@@ -341,7 +341,7 @@ describe("Relation#or", () => {
   });
 });
 
-describe("Relation#or edge cases", () => {
+describe("OrTest", () => {
   it("triple or chains", async () => {
     const adapter = freshAdapter();
 
@@ -388,7 +388,7 @@ describe("Relation#or edge cases", () => {
   });
 });
 
-describe("or with scope", () => {
+describe("OrTest", () => {
   it("combines two scoped relations with OR", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -414,7 +414,7 @@ describe("or with scope", () => {
   });
 });
 
-describe("Relation Or (Rails-guided)", () => {
+describe("OrTest", () => {
   let adapter: DatabaseAdapter;
 
   class User extends Base {
@@ -465,7 +465,7 @@ describe("Relation Or (Rails-guided)", () => {
   });
 });
 
-describe("Relation#or (Rails-guided)", () => {
+describe("OrTest", () => {
   let adapter: DatabaseAdapter;
 
   class Post extends Base {
@@ -543,7 +543,7 @@ describe("Relation#or (Rails-guided)", () => {
   });
 });
 
-describe("OR queries (Rails-guided)", () => {
+describe("OrTest", () => {
   let adapter: DatabaseAdapter;
 
   class User extends Base {

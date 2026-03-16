@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
 
-describe("AdapterTest", () => {
+describe("AdapterForeignKeyTest", () => {
   it.skip("disable referential integrity", async () => {});
 });

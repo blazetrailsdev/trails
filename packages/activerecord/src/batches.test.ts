@@ -673,7 +673,7 @@ describe("EachTest", () => {
 // ==========================================================================
 // EachTest2 — more targets for batches_test.rb
 // ==========================================================================
-describe("EachTest2", () => {
+describe("EachTest", () => {
   it("each should return a sized enumerator", async () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -940,7 +940,7 @@ describe("EachTest2", () => {
 // ==========================================================================
 // EachTest3 — additional missing tests from batches_test.rb
 // ==========================================================================
-describe("EachTest3", () => {
+describe("EachTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1363,7 +1363,7 @@ describe("EachTest3", () => {
   });
 });
 
-describe("findEach / findInBatches", () => {
+describe("EachTest", () => {
   it("find in batches should return batches", async () => {
     const adapter = freshAdapter();
 
@@ -1435,7 +1435,7 @@ describe("findEach / findInBatches", () => {
   });
 });
 
-describe("findInBatches edge cases", () => {
+describe("EachTest", () => {
   it("findInBatches with batchSize 1", async () => {
     const adapter = freshAdapter();
 
@@ -1483,7 +1483,7 @@ describe("findInBatches edge cases", () => {
   });
 });
 
-describe("findEach / findInBatches", () => {
+describe("EachTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1524,7 +1524,7 @@ describe("findEach / findInBatches", () => {
   });
 });
 
-describe("inBatches", () => {
+describe("EachTest", () => {
   it("yields Relation objects for each batch", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1547,7 +1547,7 @@ describe("inBatches", () => {
   });
 });
 
-describe("findEach with start/finish", () => {
+describe("EachTest", () => {
   it("finds records within a range", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1569,7 +1569,7 @@ describe("findEach with start/finish", () => {
   });
 });
 
-describe("findEach with order", () => {
+describe("EachTest", () => {
   it("supports order: desc option", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1593,7 +1593,7 @@ describe("findEach with order", () => {
   });
 });
 
-describe("Batches (Rails-guided)", () => {
+describe("EachTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1668,7 +1668,7 @@ describe("Batches (Rails-guided)", () => {
   });
 });
 
-describe("find_each / find_in_batches (Rails-guided)", () => {
+describe("EachTest", () => {
   let adapter: DatabaseAdapter;
 
   class Record extends Base {
@@ -1749,7 +1749,7 @@ describe("find_each / find_in_batches (Rails-guided)", () => {
   });
 });
 
-describe("Batches (Rails-guided)", () => {
+describe("EachTest", () => {
   let adapter: DatabaseAdapter;
 
   class Record extends Base {
