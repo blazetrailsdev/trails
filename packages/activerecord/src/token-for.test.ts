@@ -272,11 +272,35 @@ describe("TokenForTest", () => {
     const found = await (User as any).findByTokenFor("confirm", "invalid-token");
     expect(found).toBeNull();
   });
-  it.skip("finds record by token", () => {
-    /* needs fixture setup from secure-token test suite */
+  it("finds record by token", async () => {
+    const { generatesTokenFor } = await import("./generates-token-for.js");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    generatesTokenFor(User, "lookup");
+    const user = await User.create({ name: "Alice" });
+    const token = (user as any).generateTokenFor("lookup");
+    const found = await (User as any).findByTokenFor("lookup", token);
+    expect(found).not.toBeNull();
+    expect(found.readAttribute("name")).toBe("Alice");
   });
 
-  it.skip("does not find record when token is invalid", () => {
-    /* needs fixture setup from secure-token test suite */
+  it("does not find record when token is invalid", async () => {
+    const { generatesTokenFor } = await import("./generates-token-for.js");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    generatesTokenFor(User, "lookup");
+    await User.create({ name: "Alice" });
+    const found = await (User as any).findByTokenFor("lookup", "bad-token");
+    expect(found).toBeNull();
   });
 });
