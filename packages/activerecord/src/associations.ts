@@ -496,17 +496,80 @@ export async function loadHasMany(
 }
 
 /**
- * Count associated records for a hasMany association.
- * Delegates to loadHasMany to ensure identical query semantics
- * (scopes, queryConstraints, polymorphic, CPK, etc.).
+ * Build the relation for a hasMany association without executing it.
+ * Skips caching, strict loading, and inverse_of — used by countHasMany
+ * so resetCounters works under strict loading.
+ * Returns null if primary key values are missing.
+ */
+function buildHasManyRelation(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): any | null {
+  const ctor = record.constructor as typeof Base;
+  const className = options.className ?? camelize(singularize(assocName));
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  const targetModel = resolveModel(className);
+
+  if (options.as) {
+    const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
+    const pkValue = record.readAttribute(primaryKey as string);
+    if (pkValue === null || pkValue === undefined) return null;
+    const typeCol = `${underscore(options.as)}_type`;
+    let rel = (targetModel as any).all().where({
+      [foreignKey as string]: pkValue,
+      [typeCol]: ctor.name,
+    });
+    if (options.scope) rel = options.scope(rel);
+    return rel;
+  }
+
+  const foreignKey =
+    options.foreignKey ??
+    (options.queryConstraints
+      ? options.queryConstraints
+      : Array.isArray(primaryKey)
+        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+        : `${underscore(ctor.name)}_id`);
+
+  if (Array.isArray(foreignKey)) {
+    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    const conditions: Record<string, unknown> = {};
+    for (let i = 0; i < foreignKey.length; i++) {
+      const pkVal = record.readAttribute(pkCols[i]);
+      if (pkVal === null || pkVal === undefined) return null;
+      conditions[foreignKey[i]] = pkVal;
+    }
+    let rel = (targetModel as any).all().where(conditions);
+    if (options.scope) rel = options.scope(rel);
+    return rel;
+  }
+
+  const pkValue = record.readAttribute(primaryKey as string);
+  if (pkValue === null || pkValue === undefined) return null;
+  let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
+  if (options.scope) rel = options.scope(rel);
+  return rel;
+}
+
+/**
+ * Count associated records for a hasMany association using COUNT(*)
+ * without loading records into memory. Bypasses strict loading checks
+ * so resetCounters works on strict-loading models.
  */
 export async function countHasMany(
   record: Base,
   assocName: string,
   options: AssociationOptions,
 ): Promise<number> {
-  const records = await loadHasMany(record, assocName, options);
-  return records.length;
+  if (options.through) {
+    const records = await loadHasManyThrough(record, assocName, options);
+    return records.length;
+  }
+  const rel = buildHasManyRelation(record, assocName, options);
+  if (!rel) return 0;
+  const result = await rel.count();
+  return typeof result === "number" ? result : 0;
 }
 
 /**
