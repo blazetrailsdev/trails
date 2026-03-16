@@ -29,7 +29,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
     const p = new Post({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
@@ -41,7 +41,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 1 });
     const p0 = new Post({ status: 0 });
     const p1 = new Post({ status: 1 });
@@ -1056,7 +1056,7 @@ describe("EnumTest", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     await Post.create({ title: "A", status: 0 });
@@ -1078,7 +1078,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 0 });
@@ -1093,7 +1093,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 0 });
@@ -1109,7 +1109,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 5, archived: 10 });
 
     const post = new Post({ status: 5 });
@@ -1123,7 +1123,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 2 });
