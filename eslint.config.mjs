@@ -99,11 +99,12 @@ export default defineConfig(
     files: ["packages/rack/src/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unused-expressions": "off",
-      "@typescript-eslint/no-this-alias": "off",
-      "unused-imports/no-unused-vars": "off",
-      "no-undef": "off",
-      "no-useless-assignment": "off",
+    },
+  },
+  {
+    files: ["packages/rack/src/common-logger.ts"],
+    rules: {
+      "no-control-regex": "off",
     },
   },
 

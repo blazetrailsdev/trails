@@ -90,8 +90,8 @@ export class Directory {
       const displayName = entry.isDirectory() ? name + "/" : name;
       const uri = encodeURI(scriptName + path.join(reqPath, name).replace(/\\/g, "/"));
 
-      let size = "";
-      let mtime = "";
+      let size: string;
+      let mtime: string;
       try {
         const stat = fs.statSync(fullEntryPath);
         size = entry.isDirectory() ? "-" : String(stat.size);

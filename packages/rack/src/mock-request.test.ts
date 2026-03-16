@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import { MockRequest } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 
-const appId = async (env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
+const appId = async (_env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
   return [200, { "content-type": "text/plain" }, ["OK"]];
 };
 
@@ -155,7 +155,7 @@ it("accept params and build multipart encoded params for POST requests", () => {
 });
 
 it("behave valid according to the Rack spec", async () => {
-  const app = async (env: any): Promise<[number, Record<string, string>, any]> => {
+  const app = async (_env: any): Promise<[number, Record<string, string>, any]> => {
     return [200, { "content-type": "text/plain" }, ["OK"]];
   };
   const req = new MockRequest(app);

@@ -13,7 +13,7 @@ it("can provide options", async () => {
 
 it("supports run with block", async () => {
   const builder = new Builder();
-  builder.run(null, async (env) => [200, {}, ["block"]]);
+  builder.run(null, async (_env) => [200, {}, ["block"]]);
   const app = builder.toApp();
   const res = await new MockRequest(app).get("/");
   expect(res.bodyString).toBe("block");
@@ -32,10 +32,10 @@ it("raises if #run provided both app and block", () => {
 it("supports mapping", async () => {
   const builder = new Builder();
   builder.map("/foo", (b) => {
-    b.run(async (env) => [200, {}, ["foo"]]);
+    b.run(async (_env) => [200, {}, ["foo"]]);
   });
   builder.map("/bar", (b) => {
-    b.run(async (env) => [200, {}, ["bar"]]);
+    b.run(async (_env) => [200, {}, ["bar"]]);
   });
   const app = builder.toApp();
   const res1 = await new MockRequest(app).get("/foo");

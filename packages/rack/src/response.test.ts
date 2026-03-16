@@ -41,7 +41,7 @@ it("have sensible default values", () => {
   expect(header).toEqual({});
 
   response = new Response();
-  const [s2, h2, b2] = response.toArray();
+  const [s2, _h2, _b2] = response.toArray();
   expect(s2).toBe(200);
 });
 

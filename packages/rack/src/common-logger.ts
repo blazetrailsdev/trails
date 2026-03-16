@@ -14,7 +14,6 @@ function clockTime(): number {
 }
 
 function escapeNonPrintable(str: string): string {
-  // eslint-disable-next-line no-control-regex
   return str.replace(/[\x00-\x1f]/g, (ch) => {
     return "\\x" + ch.charCodeAt(0).toString(16).padStart(2, "0");
   });
@@ -32,7 +31,7 @@ export class CommonLogger {
   async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
     const began = clockTime();
     const response = await this.app(env);
-    const [status, headers, body] = response;
+    const [status, headers, _body] = response;
     const logger = this.logger || env["rack.errors"];
     const now = clockTime();
     this.log(env, status, headers, now - began, logger);

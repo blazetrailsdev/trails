@@ -15,7 +15,7 @@ export class Sendfile {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
     const response = await this.app(env);
-    const [status, headers, body] = response;
+    const [_status, headers, body] = response;
 
     // Get the file path from body.toPath()
     const path = body && typeof body.toPath === "function" ? body.toPath() : null;

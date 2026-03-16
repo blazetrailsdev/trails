@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { MockRequest, FatalWarning } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 
-const app = async (env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
+const app = async (_env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
   return [200, { "content-type": "text/plain" }, ["OK"]];
 };
 

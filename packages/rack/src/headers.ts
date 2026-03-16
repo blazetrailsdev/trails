@@ -409,7 +409,7 @@ export class Headers {
 
   // --- Other ---
 
-  flatten(depth = 1): string[] {
+  flatten(_depth = 1): string[] {
     const result: string[] = [];
     for (const [k, v] of this._data) {
       result.push(k, v);

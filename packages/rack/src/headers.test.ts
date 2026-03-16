@@ -82,17 +82,17 @@ describe("RackHeadersTest", () => {
   });
 
   it("delete if and reject", () => {
-    const rejected = fh.reject((k, v) => k === "ab" || k === "cd");
+    const rejected = fh.reject((k, _v) => k === "ab" || k === "cd");
     expect(rejected.length).toBe(1);
     expect(rejected.get("3")).toBe("4");
     expect(fh.length).toBe(3);
 
-    fh.deleteIf((k, v) => k === "ab" || k === "cd");
+    fh.deleteIf((k, _v) => k === "ab" || k === "cd");
     expect(fh.length).toBe(1);
     expect(fh.get("3")).toBe("4");
 
-    expect(fh.rejectInPlace((k, v) => k === "ab" || k === "cd")).toBeNull();
-    const result = fh.rejectInPlace((k, v) => k === "3");
+    expect(fh.rejectInPlace((k, _v) => k === "ab" || k === "cd")).toBeNull();
+    const result = fh.rejectInPlace((k, _v) => k === "3");
     expect(result).not.toBeNull();
     expect(fh.length).toBe(0);
   });

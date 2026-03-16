@@ -62,7 +62,7 @@ export class ShowExceptions {
     e: Error,
     name: string,
     message: string,
-    env: Record<string, any>,
+    _env: Record<string, any>,
   ): string {
     const stack = e.stack || "unknown location";
     return `${name}: ${message}\n\n${stack}`;

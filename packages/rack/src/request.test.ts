@@ -425,7 +425,7 @@ describe("RackRequestTest", () => {
     const req = new Request(env);
     // Note: our multipart parser merges duplicate keys, so the POST hash has only the last value
     // but form_pairs should still show both via POST entries
-    const post = req.POST;
+    const _post = req.POST;
     // With merged keys, formPairs reflects the final merged state
     expect(req.formPairs.length).toBeGreaterThan(0);
   });
@@ -704,7 +704,7 @@ describe("RackRequestTest", () => {
     const req = new Request(env);
     // Should either throw or return without infinite loop
     try {
-      req.POST;
+      void req.POST;
     } catch {
       // Expected - malformed data
     }
@@ -853,7 +853,7 @@ describe("RackRequestTest", () => {
       },
     };
     const req = new Request(env);
-    req.POST;
+    void req.POST;
     // Our implementation stores file info objects in POST, not env rack.tempfiles
     // Verify files were parsed
     expect(req.POST["f1"].filename).toBe("foo.jpg");
@@ -1130,7 +1130,7 @@ describe("RackRequestTest", () => {
   it("allow subclass request to be instantiated after parent request", () => {
     class SubRequest extends Request {}
     const env = makeEnv();
-    const parent = new Request(env);
+    const _parent = new Request(env);
     const sub = new SubRequest(env);
     expect(sub).toBeInstanceOf(SubRequest);
     expect(sub).toBeInstanceOf(Request);
@@ -1139,7 +1139,7 @@ describe("RackRequestTest", () => {
   it("allow parent request to be instantiated after subclass request", () => {
     class SubRequest extends Request {}
     const env = makeEnv();
-    const sub = new SubRequest(env);
+    const _sub = new SubRequest(env);
     const parent = new Request(env);
     expect(parent).toBeInstanceOf(Request);
   });

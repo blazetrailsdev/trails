@@ -122,7 +122,6 @@ function parseBoundary(contentType: string): string | null {
 function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Record<string, any> {
   const delimiter = Buffer.from("--" + boundary);
   const endDelimiter = Buffer.from("--" + boundary + "--");
-  const crlf = Buffer.from("\r\n");
   const headerSep = Buffer.from("\r\n\r\n");
 
   const params: Record<string, any> = {};
@@ -305,11 +304,11 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
       }
     } else {
       // Text field
-      let encoding = "utf-8";
+      let _encoding = "utf-8";
       if (contentTypeHeader) {
         const charsetMatch = contentTypeHeader.match(/charset=(?:"([^"]+)"|([^\s;]+))/i);
         if (charsetMatch) {
-          encoding = (charsetMatch[1] || charsetMatch[2]).toLowerCase();
+          _encoding = (charsetMatch[1] || charsetMatch[2]).toLowerCase();
         }
       }
 
