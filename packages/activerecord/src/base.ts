@@ -1557,7 +1557,7 @@ export class Base extends Model {
     const assocDefs = (this as any)._associations as
       | Array<{ type: string; name: string; options: any }>
       | undefined;
-    const { loadHasMany, resolveCounterColumn } = await import("./associations.js");
+    const { resolveCounterColumn } = await import("./associations.js");
     for (const counterName of counterNames) {
       // Support both association name ("replies") and counter column name ("replies_count")
       const isColumnName = counterName.endsWith("_count");
@@ -1569,8 +1569,9 @@ export class Base extends Model {
         );
       }
       const counterColumn = resolveCounterColumn(this, assoc, counterName);
-      const records = await loadHasMany(record, assocName, assoc.options);
-      await record.updateColumn(counterColumn, records.length);
+      const { countHasMany } = await import("./associations.js");
+      const count = await countHasMany(record, assocName, assoc.options);
+      await record.updateColumn(counterColumn, count);
     }
   }
 

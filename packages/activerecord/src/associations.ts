@@ -498,6 +498,61 @@ export async function loadHasMany(
 }
 
 /**
+ * Count associated records for a hasMany association using COUNT(*)
+ * instead of loading all records into memory.
+ */
+export async function countHasMany(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): Promise<number> {
+  if (options.through) {
+    const records = await loadHasManyThrough(record, assocName, options);
+    return records.length;
+  }
+
+  const ctor = record.constructor as typeof Base;
+  const className = options.className ?? camelize(singularize(assocName));
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  const targetModel = resolveModel(className);
+
+  if (options.as) {
+    const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
+    const pkValue = record.readAttribute(primaryKey as string);
+    if (pkValue === null || pkValue === undefined) return 0;
+    const typeCol = `${underscore(options.as)}_type`;
+    const result = await (targetModel as any)
+      .all()
+      .where({ [foreignKey as string]: pkValue, [typeCol]: ctor.name })
+      .count();
+    return typeof result === "number" ? result : 0;
+  }
+
+  const foreignKey =
+    options.foreignKey ??
+    (Array.isArray(primaryKey)
+      ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+      : `${underscore(ctor.name)}_id`);
+
+  if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
+    const where: Record<string, unknown> = {};
+    for (let i = 0; i < primaryKey.length; i++) {
+      where[foreignKey[i]] = record.readAttribute(primaryKey[i]);
+    }
+    const result = await (targetModel as any).all().where(where).count();
+    return typeof result === "number" ? result : 0;
+  }
+
+  const pkValue = record.readAttribute(primaryKey as string);
+  if (pkValue === null || pkValue === undefined) return 0;
+  const result = await (targetModel as any)
+    .all()
+    .where({ [foreignKey as string]: pkValue })
+    .count();
+  return typeof result === "number" ? result : 0;
+}
+
+/**
  * Load a has_many :through association.
  */
 export async function loadHasManyThrough(
