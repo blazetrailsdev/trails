@@ -540,7 +540,7 @@ describe("TransactionTest", () => {
       }
     }
     await Post.create({ title: "test" });
-    expect(log).toEqual(expect.arrayContaining(["a", "b", "c"]));
+    expect(log).toEqual(["a", "b", "c"]);
   });
 
   it("after_commit_returns_record_with_save", async () => {
