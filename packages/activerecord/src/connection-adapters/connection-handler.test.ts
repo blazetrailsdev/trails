@@ -1,0 +1,31 @@
+import { describe, it } from "vitest";
+
+describe("ConnectionHandlerTest", () => {
+  it.skip("default env fall back to default env when rails env or rack env is empty string", () => {});
+  it.skip("establish connection using 3 levels config", () => {});
+  it.skip("validates db configuration and raises on invalid adapter", () => {});
+  it.skip("not setting writing role while using another named role raises", () => {});
+  it.skip("fixtures dont raise if theres no writing pool config", () => {});
+  it.skip("setting writing role while using another named role does not raise", () => {});
+  it.skip("establish connection with primary works without deprecation", () => {});
+  it.skip("establish connection using 3 level config defaults to default env primary db", () => {});
+  it.skip("establish connection using 2 level config defaults to default env primary db", () => {});
+  it.skip("establish connection using two level configurations", () => {});
+  it.skip("establish connection using top level key in two level config", () => {});
+  it.skip("establish connection with string owner name", () => {});
+  it.skip("symbolized configurations assignment", () => {});
+  it.skip("retrieve connection", () => {});
+  it.skip("active connections?", () => {});
+  it.skip("retrieve connection pool", () => {});
+  it.skip("retrieve connection pool with invalid id", () => {});
+  it.skip("connection pools", () => {});
+  it.skip("a class using custom pool and switching back to primary", () => {});
+  it.skip("connection specification name should fallback to parent", () => {});
+  it.skip("remove connection should not remove parent", () => {});
+  it.skip("default handlers are writing and reading", () => {});
+  it.skip("connection pool per pid", () => {});
+  it.skip("forked child doesnt mangle parent connection", () => {});
+  it.skip("forked child recovers from disconnected parent", () => {});
+  it.skip("retrieve connection pool copies schema cache from ancestor pool", () => {});
+  it.skip("pool from any process for uses most recent spec", () => {});
+});
