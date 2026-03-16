@@ -7,5 +7,4 @@ describe("DatabaseConfigurations", () => {
     it.skip("replica parsing", () => {});
     it.skip("database tasks parsing", () => {});
   });
-
 });

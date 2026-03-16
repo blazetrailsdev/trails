@@ -16,5 +16,4 @@ describe("FixtureSet", () => {
     it.skip("removes fixture config row", () => {});
     it.skip("extracts model class from config row", () => {});
   });
-
 });

@@ -19,5 +19,4 @@ describe("PoolConfig", () => {
     it.skip("url sub key for sqlite3", () => {});
     it.skip("pool config with invalid type", () => {});
   });
-
 });

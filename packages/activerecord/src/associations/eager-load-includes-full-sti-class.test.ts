@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { it } from "vitest";
 
 it.skip("class names", () => {});
 it.skip("class names with includes", () => {});

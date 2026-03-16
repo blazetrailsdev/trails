@@ -37,5 +37,4 @@ describe("DatabaseConfigurations", () => {
     it.skip("inspect does not show secrets", () => {});
     it.skip("seeds defaults to primary", () => {});
   });
-
 });
