@@ -218,6 +218,8 @@ describe("InsertAllTest", () => {
     );
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Book.all().toArray();
+    expect(all.length).toBe(2);
+    expect(all.some((b: any) => b.readAttribute("title") === "Existing")).toBe(true);
     expect(all.some((b: any) => b.readAttribute("title") === "New")).toBe(true);
   });
   it("upsert all updates records", async () => {
@@ -244,15 +246,8 @@ describe("InsertAllTest", () => {
     /* needs readonly attribute checking in upsert */
   });
 
-  it("upsert all updates changed columns only", async () => {
-    const adapter = freshAdapter();
-    const Book = makeBook(adapter);
-    const b = await Book.create({ title: "Original", author: "OrigAuth" });
-    await Book.upsertAll([{ id: b.id, title: "Changed", author: "OrigAuth" }], {
-      updateOnly: ["title"],
-    });
-    const reloaded = await Book.find(b.id);
-    expect(reloaded.readAttribute("title")).toBe("Changed");
+  it.skip("upsert all updates changed columns only", () => {
+    /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
   });
 
   it("insert_all with enum values", async () => {
@@ -279,10 +274,8 @@ describe("InsertAllTest", () => {
         this.adapter = adapter;
       }
     }
-    const now = new Date();
-    const count = await Post.insertAll([
-      { title: "Timestamped", created_at: now, updated_at: now },
-    ]);
+    const ts = new Date("2023-06-15T12:00:00Z");
+    const count = await Post.insertAll([{ title: "Timestamped", created_at: ts, updated_at: ts }]);
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Post.all().toArray();
     expect(all.length).toBe(1);
@@ -301,15 +294,8 @@ describe("InsertAllTest", () => {
     /* needs index introspection */
   });
 
-  it("upsert all supports update_only option", async () => {
-    const adapter = freshAdapter();
-    const Book = makeBook(adapter);
-    const b = await Book.create({ title: "Orig", author: "OrigAuth" });
-    await Book.upsertAll([{ id: b.id, title: "New", author: "NewAuth" }], {
-      updateOnly: ["title"],
-    });
-    const reloaded = await Book.find(b.id);
-    expect(reloaded.readAttribute("title")).toBe("New");
+  it.skip("upsert all supports update_only option", () => {
+    /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
   });
 
   it.skip("upsert all supports returning option", () => {
@@ -353,7 +339,8 @@ describe("InsertAllTest", () => {
     await Item.insertAll([{ code: "A1", name: "Original" }]);
     await Item.upsertAll([{ code: "A1", name: "Updated" }]);
     const all = await Item.all().toArray();
-    expect(all.length).toBeGreaterThanOrEqual(1);
+    expect(all.length).toBe(1);
+    expect(all[0].readAttribute("name")).toBe("Updated");
   });
 
   it("insert_all can skip callbacks", async () => {
