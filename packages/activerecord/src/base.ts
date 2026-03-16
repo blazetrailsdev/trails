@@ -1558,17 +1558,20 @@ export class Base extends Model {
     const assocDefs = (this as any)._associations as
       | Array<{ type: string; name: string; options: any }>
       | undefined;
+    const { loadHasMany } = await import("./associations.js");
     for (const counterName of counterNames) {
       // Support both association name ("replies") and counter column name ("replies_count")
       const isColumnName = counterName.endsWith("_count");
       const assocName = isColumnName ? counterName.slice(0, -6) : counterName;
       const counterColumn = isColumnName ? counterName : `${counterName}_count`;
       const assoc = assocDefs?.find((a) => a.name === assocName);
-      if (assoc) {
-        const { loadHasMany } = await import("./associations.js");
-        const records = await loadHasMany(record, assocName, assoc.options);
-        await record.updateColumn(counterColumn, records.length);
+      if (!assoc) {
+        throw new Error(
+          `'${counterName}' is not a valid counter name or association on ${this.name}`,
+        );
       }
+      const records = await loadHasMany(record, assocName, assoc.options);
+      await record.updateColumn(counterColumn, records.length);
     }
   }
 
