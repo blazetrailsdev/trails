@@ -8,16 +8,14 @@ Current state: **50.5%** (4,231 implemented / 8,385 total Ruby tests). 340/342 f
 
 The percentage reflects **implemented** (non-skipped) tests only. Skipped stubs (`it.skip`) are tracked separately.
 
-Columns in the output: `OK` (matched + passing), `Skip` (matched but `it.skip`), `Desc` (wrong describe block), `Move` (misplaced — wrong file), `Miss` (no TS equivalent at all), `Tot` (total matched).
+Columns in the output: `OK` (implemented, non-skipped), `Skip` (matched but `it.skip`), `Desc` (wrong describe block), `Move` (misplaced — wrong file), `Miss` (no TS equivalent at all), `Tot` (total Ruby tests in file).
 
 ## The gap: 4,154 tests
 
 To reach 100%, we need to implement 4,154 more tests (8,385 - 4,231). These break down into:
 
-- **3,910 skipped tests** — `it.skip()` stubs that matched Ruby names but aren't implemented
-- **79 wrong describes** — tests in the right file but wrong describe block
-- **244 missing tests** — tests in files that exist but with no TS equivalent yet
-- **2 missing files** — 342 Ruby files, 340 have TS equivalents
+- **3,910 skipped tests** — `it.skip()` stubs that need real implementations
+- **244 unmatched tests** — Ruby tests with no TS equivalent (across existing and 2 missing files)
 
 ## Completed work
 
