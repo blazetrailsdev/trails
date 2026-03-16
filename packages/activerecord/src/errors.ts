@@ -180,3 +180,30 @@ export class DeleteRestrictionError extends Error {
     this.association = association;
   }
 }
+
+/**
+ * Mirrors: ActiveRecord::InverseOfAssociationNotFoundError
+ */
+export class InverseOfAssociationNotFoundError extends Error {
+  readonly reflection: string;
+  readonly inverseOf: string;
+  readonly corrections: string[];
+
+  constructor(reflection: string, inverseOf: string, corrections: string[] = []) {
+    const suggestion = corrections.length > 0 ? ` Did you mean? ${corrections[0]}` : "";
+    super(
+      `Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).${suggestion}`,
+    );
+    this.name = "InverseOfAssociationNotFoundError";
+    this.reflection = reflection;
+    this.inverseOf = inverseOf;
+    this.corrections = corrections;
+  }
+
+  get detailedMessage(): string {
+    if (this.corrections.length > 0) {
+      return `${this.message}\nDid you mean? ${this.corrections.join(", ")}`;
+    }
+    return this.message;
+  }
+}

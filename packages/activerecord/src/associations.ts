@@ -1,5 +1,9 @@
 import type { Base } from "./base.js";
-import { StrictLoadingViolationError, DeleteRestrictionError } from "./errors.js";
+import {
+  StrictLoadingViolationError,
+  DeleteRestrictionError,
+  InverseOfAssociationNotFoundError,
+} from "./errors.js";
 import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
 import { getInheritanceColumn, findStiClass } from "./sti.js";
 
@@ -66,6 +70,46 @@ function resolveModel(name: string): typeof Base {
     throw new Error(`Model "${name}" not found in registry. Did you call registerModel(${name})?`);
   }
   return model;
+}
+
+/**
+ * Validate that an inverse_of association exists on the target model.
+ * Throws InverseOfAssociationNotFoundError if not found.
+ */
+function validateInverseOf(targetModel: typeof Base, assocName: string, inverseOf: string): void {
+  const targetAssocs = (targetModel as any)._associations as
+    | Array<{ type: string; name: string; options: any }>
+    | undefined;
+  if (!targetAssocs || targetAssocs.length === 0) return;
+  if (targetAssocs.some((a) => a.name === inverseOf)) return;
+
+  // Find similar names for suggestions
+  const corrections: string[] = [];
+  if (targetAssocs) {
+    for (const a of targetAssocs) {
+      if (levenshtein(a.name, inverseOf) <= 3) {
+        corrections.push(a.name);
+      }
+    }
+  }
+  throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections);
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
 }
 
 /**
@@ -215,6 +259,10 @@ export async function loadBelongsTo(
 
   const targetModel = resolveModel(className);
 
+  if (options.inverseOf && !options.polymorphic) {
+    validateInverseOf(targetModel, assocName, options.inverseOf);
+  }
+
   // Resolve foreign key and primary key (may be arrays for CPK)
   const foreignKey =
     options.foreignKey ??
@@ -287,6 +335,10 @@ export async function loadHasOne(
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
   const targetModel = resolveModel(className);
+
+  if (options.inverseOf) {
+    validateInverseOf(targetModel, assocName, options.inverseOf);
+  }
 
   // Polymorphic "as" option: has_one :image, as: :imageable
   if (options.as) {
@@ -437,6 +489,10 @@ export async function loadHasMany(
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
   const targetModel = resolveModel(className);
+
+  if (options.inverseOf) {
+    validateInverseOf(targetModel, assocName, options.inverseOf);
+  }
 
   // Polymorphic "as" option: has_many :comments, as: :commentable
   if (options.as) {
