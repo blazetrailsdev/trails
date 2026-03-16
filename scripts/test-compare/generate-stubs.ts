@@ -15,6 +15,7 @@ import * as path from "path";
 import type { TestManifest, TestCaseInfo } from "./types.js";
 
 const SCRIPT_DIR = __dirname;
+const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 const PKG_DIRS: Record<string, string> = {
@@ -40,25 +41,6 @@ interface ConventionResult {
     package: string;
     files: ConventionFile[];
   }[];
-}
-
-function rubyToConventionTs(rubyFile: string, pkg: string): string {
-  if (pkg === "rack") {
-    const dir = path.dirname(rubyFile);
-    const base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
-    const kebab = base.replace(/_/g, "-");
-    const tsFile = kebab + ".test.ts";
-    return dir === "." ? tsFile : path.join(dir, tsFile);
-  }
-
-  const dir = path.dirname(rubyFile);
-  const base = path.basename(rubyFile, ".rb").replace(/_test$/, "");
-  const kebab = base.replace(/_/g, "-");
-  const tsFile = kebab + ".test.ts";
-
-  if (dir === ".") return tsFile;
-  const tsDir = dir.replace(/_/g, "-");
-  return path.join(tsDir, tsFile);
 }
 
 function escapeTsString(str: string): string {
@@ -139,7 +121,7 @@ function main() {
 
   if (!fs.existsSync(railsPath) || !fs.existsSync(conventionPath)) {
     console.error("Missing rails-tests.json or convention-comparison.json in output/");
-    console.error("Run: pnpm test:compare");
+    console.error("Run: pnpm test:stubs (or: pnpm convention:compare -- --missing --json)");
     process.exit(1);
   }
 
@@ -164,11 +146,6 @@ function main() {
     }
   }
 
-  // Re-run convention:compare with --missing to get the missing test names if they're not there
-  // Actually, missingTests is only populated when --missing flag was used. Let's check.
-  // We need to ensure convention-comparison.json was generated with --missing.
-  // If missingTests is empty, fall back to generating all tests for missing files.
-
   let totalGenerated = 0;
   let totalFiles = 0;
 
@@ -190,7 +167,7 @@ function main() {
 
       const rubyFile = convFile.rubyFile;
       const conventionTsFile = convFile.conventionTsFile;
-      const tsFullPath = path.join(pkgDir, conventionTsFile);
+      const tsFullPath = path.join(ROOT_DIR, pkgDir, conventionTsFile);
 
       // Find the Ruby file in the manifest
       const rubyFileInfo = pkgInfo.files.find((f) => f.file === rubyFile);
@@ -211,10 +188,16 @@ function main() {
             testsToStub.push(tc);
           }
         }
-      } else {
-        // No specific missing list — this is a file with no TS equivalent at all
-        // Generate stubs for all tests
+      } else if (!convFile.tsFileExists) {
+        // No TS file at all — generate stubs for all tests
         testsToStub = rubyFileInfo.testCases;
+      } else {
+        // TS file exists but missingTests wasn't populated — convention:compare
+        // was probably run without --missing. Skip to avoid over-generating.
+        console.warn(
+          `  [warn] ${rubyFile}: missingTests not populated, skipping (re-run with: pnpm test:stubs)`,
+        );
+        continue;
       }
 
       if (testsToStub.length === 0) continue;

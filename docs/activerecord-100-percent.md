@@ -22,7 +22,7 @@ The work naturally splits into independent areas. Each can be tackled in its own
 
 ---
 
-### Area 1: Wrong describes (382 tests)
+### Area 1: Wrong describes (79 tests)
 
 **Goal:** Fix describe block names so convention:compare matches them correctly.
 **Effort:** Low — purely structural, no new feature code needed.
@@ -88,7 +88,7 @@ Fix describe blocks across all `adapters/postgresql/` files. Most need sub-descr
 
 ---
 
-### Area 2: Unskip tests (2,151 skipped)
+### Area 2: Unskip tests (2,122 skipped)
 
 Grouped by the feature/capability that blocks them, so each PR implements one capability and unskips all tests that depend on it.
 
