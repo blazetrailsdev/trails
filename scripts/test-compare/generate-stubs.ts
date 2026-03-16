@@ -232,7 +232,9 @@ function main() {
           // so the user can merge manually.
           const stubPath = tsFullPath.replace(/\.test\.ts$/, ".stub.test.ts");
           fs.writeFileSync(stubPath, content);
-          console.log(`  ${stubPath} (${testsToStub.length} tests — merge into ${conventionTsFile})`);
+          console.log(
+            `  ${stubPath} (${testsToStub.length} tests — merge into ${conventionTsFile})`,
+          );
         } else {
           fs.writeFileSync(tsFullPath, content);
           console.log(`  ${tsFullPath} (${testsToStub.length} tests)`);
