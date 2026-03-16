@@ -398,10 +398,58 @@ describe("EnumTest", () => {
     /* needs string-based enum mapping support */
   });
 
-  it.skip("enum without scope", () => {});
-  it.skip("enum with scope", () => {});
-  it.skip("enum with custom suffix", () => {});
-  it.skip("enum with custom prefix", () => {});
+  it("enum without scope", async () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 });
+    await Post.create({ status: 0 });
+    await Post.create({ status: 1 });
+    const all = await Post.all().toArray();
+    expect(all.length).toBe(2);
+  });
+
+  it("enum with scope", async () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 });
+    await Post.create({ status: 0 });
+    await Post.create({ status: 1 });
+    const drafts = await (Post as any).draft().toArray();
+    expect(drafts.length).toBe(1);
+    expect(readEnumValue(drafts[0], "status")).toBe("draft");
+  });
+
+  it("enum with custom suffix", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 }, { suffix: "status" });
+    const p = new Post({ status: 0 });
+    expect((p as any).isDraftStatus()).toBe(true);
+  });
+
+  it("enum with custom prefix", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: "post" });
+    const p = new Post({ status: 0 });
+    expect((p as any).isPostDraft()).toBe(true);
+  });
 
   it("enum value with blank string", () => {
     const Book = makeBook();
@@ -498,16 +546,67 @@ describe("EnumTest", () => {
     expect(changes.status[1]).toBe(2); // to: published (2)
   });
 
-  it.skip("building new objects with enum scopes", () => {});
-  it.skip("creating new objects with enum scopes", () => {});
-  it.skip("reserved enum values", () => {});
-  it.skip("reserved enum values for relation", () => {});
-  it.skip("query state by predicate with custom prefix", () => {});
-  it.skip("query state by predicate with custom suffix", () => {});
-  it.skip("enum methods with custom suffix defined", () => {});
-  it.skip("update enum attributes with custom suffix", () => {});
-  it.skip("enum on custom attribute with default", () => {});
-  it.skip("scopes are named like methods", () => {});
+  it.skip("building new objects with enum scopes", () => {
+    /* needs scope.build() support */
+  });
+  it.skip("creating new objects with enum scopes", () => {
+    /* needs scope.create() support */
+  });
+  it.skip("reserved enum values", () => {
+    /* needs reserved name validation */
+  });
+  it.skip("reserved enum values for relation", () => {
+    /* needs reserved name validation */
+  });
+
+  it("query state by predicate with custom prefix", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: true });
+    const p = new Post({ status: 0 });
+    expect((p as any).isStatusDraft()).toBe(true);
+    expect((p as any).isStatusPublished()).toBe(false);
+  });
+
+  it("query state by predicate with custom suffix", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 }, { suffix: true });
+    const p = new Post({ status: 1 });
+    expect((p as any).isDraftStatus()).toBe(false);
+    expect((p as any).isPublishedStatus()).toBe(true);
+  });
+
+  it.skip("enum methods with custom suffix defined", () => {
+    /* needs bang setters like draft_status! */
+  });
+  it.skip("update enum attributes with custom suffix", () => {
+    /* needs bang setters */
+  });
+
+  it("enum on custom attribute with default", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer", { default: 0 });
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 });
+    const p = new Post({});
+    expect(readEnumValue(p, "status")).toBe("draft");
+  });
+
+  it.skip("scopes are named like methods", () => {
+    /* needs method introspection */
+  });
 });
 
 // ==========================================================================
@@ -979,7 +1078,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 0 });
@@ -994,7 +1093,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 0 });
@@ -1010,7 +1109,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 5, archived: 10 });
 
     const post = new Post({ status: 5 });
@@ -1024,7 +1123,7 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = freshAdapter();
+    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 2 });
