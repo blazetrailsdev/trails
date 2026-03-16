@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, MysqlAdapter, MYSQL_TEST_URL } from "./test-helper.js";
 
-describeIfMysql("MysqlAdapter", () => {
+describeIfMysql("AbstractMySQLAdapter", () => {
   let adapter: MysqlAdapter;
   beforeEach(async () => {
     adapter = new MysqlAdapter(MYSQL_TEST_URL);

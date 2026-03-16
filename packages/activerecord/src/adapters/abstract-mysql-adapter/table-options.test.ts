@@ -21,6 +21,9 @@ describeIfMysql("MysqlAdapter", () => {
     it.skip("charset and collation options", () => {});
     it.skip("charset and partitioned table options", () => {});
     it.skip("schema dump works with NO_TABLE_OPTIONS sql mode", () => {});
+  });
+
+  describe("DefaultEngineOptionTest", () => {
     it.skip("new migrations do not contain default ENGINE=InnoDB option", () => {});
     it.skip("legacy migrations contain default ENGINE=InnoDB option", () => {});
   });

@@ -17,7 +17,7 @@ describeIfMysql("MysqlAdapter", () => {
     await adapter.close();
   });
 
-  describe("CheckConstraintQuotingTest", () => {
+  describe("MySQL2CheckConstraintQuotingTest", () => {
     it.skip("check constraint no duplicate expression quoting", () => {});
   });
 });
