@@ -961,8 +961,9 @@ describe("BasicsTest", () => {
       }
     }
     const p = await Post.create({ title: "test" });
-    expect(p.readAttribute("lock_version")).toBe(0);
     expect(p.isPersisted()).toBe(true);
+    const reloaded = (await Post.find(p.id)) as any;
+    expect(reloaded.readAttribute("lock_version")).toBe(0);
   });
   it("create with custom timestamps", async () => {
     class User extends Base {
