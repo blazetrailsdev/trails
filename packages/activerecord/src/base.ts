@@ -2619,6 +2619,7 @@ export class Base extends Model {
     copy._newRecord = this._newRecord;
     copy._destroyed = this._destroyed;
     copy._readonly = this._readonly;
+    copy._frozen = this._frozen;
     if (!this._newRecord) {
       (copy as any)._dirty.snapshot(copy._attributes);
       copy.changesApplied();
