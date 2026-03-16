@@ -1,127 +1,250 @@
 #!/usr/bin/env npx tsx
 /**
  * Generates Vitest stub files (it.skip) for missing tests.
- * Reads test-comparison-report.json and produces one stub file per package.
+ *
+ * Reads rails-tests.json and convention-comparison.json to find tests that
+ * have no TypeScript equivalent yet, then generates per-file stub files
+ * with properly nested describe blocks matching the Ruby test hierarchy.
+ *
+ * Usage:
+ *   npx tsx scripts/test-compare/generate-stubs.ts [--package activerecord] [--dry-run] [--missing-files-only]
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import type { TestComparisonResult, TestComparison } from "./types.js";
+import type { TestManifest, TestCaseInfo } from "./types.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-function main() {
-  const reportPath = path.join(OUTPUT_DIR, "test-comparison-report.json");
+const PKG_DIRS: Record<string, string> = {
+  arel: "packages/arel/src/",
+  activemodel: "packages/activemodel/src/",
+  activerecord: "packages/activerecord/src/",
+  activesupport: "packages/activesupport/src/",
+  rack: "packages/rack/src/",
+  actiondispatch: "packages/actionpack/src/actiondispatch/",
+  actioncontroller: "packages/actionpack/src/actioncontroller/",
+};
 
-  if (!fs.existsSync(reportPath)) {
-    console.error("Missing test-comparison-report.json — run compare.ts first");
-    process.exit(1);
-  }
-
-  const report: TestComparisonResult = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
-
-  for (const [pkg, pkgComp] of Object.entries(report.packages)) {
-    const missingTests: { rubyFile: string; tests: TestComparison[] }[] = [];
-
-    for (const fileComp of pkgComp.files) {
-      const missing = fileComp.tests.filter((t) => t.status === "missing");
-      if (missing.length > 0) {
-        missingTests.push({
-          rubyFile: fileComp.rubyFile,
-          tests: missing,
-        });
-      }
-    }
-
-    if (missingTests.length === 0) {
-      console.log(`  ${pkg}: no missing tests — skipping stub generation`);
-      continue;
-    }
-
-    const stubContent = generateStubFile(pkg, missingTests);
-    const stubPath = path.join(OUTPUT_DIR, `missing-${pkg}-stubs.test.ts`);
-    fs.writeFileSync(stubPath, stubContent);
-
-    const totalMissing = missingTests.reduce((s, f) => s + f.tests.length, 0);
-    console.log(`  ${pkg}: ${totalMissing} missing tests → ${stubPath}`);
-  }
+interface ConventionFile {
+  rubyFile: string;
+  conventionTsFile: string;
+  tsFileExists: boolean;
+  missing: number;
+  missingTests?: string[];
 }
 
-function generateStubFile(
-  pkg: string,
-  missingTests: { rubyFile: string; tests: TestComparison[] }[],
-): string {
-  const lines: string[] = [];
-
-  lines.push(`import { describe, it } from "vitest";`);
-  lines.push("");
-  lines.push(`/**`);
-  lines.push(` * Auto-generated stubs for missing ${pkg} tests.`);
-  lines.push(` * These tests exist in Rails but have no TypeScript equivalent yet.`);
-  lines.push(` * Review and merge into real test files as appropriate.`);
-  lines.push(` */`);
-  lines.push("");
-
-  // Group by Ruby file
-  for (const { rubyFile, tests } of missingTests) {
-    // Use the Ruby file as a describe block
-    const describeName = rubyFileToDescribeName(rubyFile);
-
-    lines.push(`describe("${escapeTsString(describeName)}", () => {`);
-
-    // Group by ancestor path for nested describes
-    const byAncestor = new Map<string, TestComparison[]>();
-    for (const test of tests) {
-      // Use the path up to the test description as grouping key
-      const parts = test.rubyPath.split(" > ");
-      const groupKey = parts.length > 1 ? parts.slice(0, -1).join(" > ") : "";
-      if (!byAncestor.has(groupKey)) {
-        byAncestor.set(groupKey, []);
-      }
-      byAncestor.get(groupKey)!.push(test);
-    }
-
-    for (const [ancestor, ancestorTests] of byAncestor) {
-      if (ancestor) {
-        lines.push(`  // From: ${ancestor}`);
-      }
-
-      for (const test of ancestorTests) {
-        const desc = test.rubyPath.split(" > ").pop() || test.rubyPath;
-        lines.push(`  it.skip("${escapeTsString(desc)}", () => {`);
-        lines.push(`    // TODO: Port from Rails ${rubyFile}`);
-        lines.push(`    // Original: ${escapeTsString(test.rubyPath)}`);
-        lines.push(`  });`);
-        lines.push("");
-      }
-    }
-
-    lines.push(`});`);
-    lines.push("");
-  }
-
-  return lines.join("\n");
+interface ConventionResult {
+  results: {
+    package: string;
+    files: ConventionFile[];
+  }[];
 }
 
-function rubyFileToDescribeName(file: string): string {
-  // Convert "persistence_test.rb" to "Persistence"
-  // Convert "arel/table_test.rb" to "Arel Table"
-  return file
-    .replace(/_test\.rb$/, "")
-    .replace(/test_/, "")
-    .split("/")
-    .map((part) =>
-      part
-        .split("_")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" "),
-    )
-    .join(" ");
+function rubyToConventionTs(rubyFile: string, pkg: string): string {
+  if (pkg === "rack") {
+    const dir = path.dirname(rubyFile);
+    const base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
+    const kebab = base.replace(/_/g, "-");
+    const tsFile = kebab + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
+  const dir = path.dirname(rubyFile);
+  const base = path.basename(rubyFile, ".rb").replace(/_test$/, "");
+  const kebab = base.replace(/_/g, "-");
+  const tsFile = kebab + ".test.ts";
+
+  if (dir === ".") return tsFile;
+  const tsDir = dir.replace(/_/g, "-");
+  return path.join(tsDir, tsFile);
 }
 
 function escapeTsString(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+}
+
+interface DescribeNode {
+  name: string;
+  children: Map<string, DescribeNode>;
+  tests: string[];
+}
+
+function buildDescribeTree(testCases: TestCaseInfo[]): DescribeNode {
+  const root: DescribeNode = { name: "", children: new Map(), tests: [] };
+
+  for (const tc of testCases) {
+    let node = root;
+    for (const ancestor of tc.ancestors) {
+      if (!node.children.has(ancestor)) {
+        node.children.set(ancestor, { name: ancestor, children: new Map(), tests: [] });
+      }
+      node = node.children.get(ancestor)!;
+    }
+    node.tests.push(tc.description);
+  }
+
+  return root;
+}
+
+function renderDescribeTree(node: DescribeNode, indent: number): string[] {
+  const lines: string[] = [];
+  const pad = "  ".repeat(indent);
+
+  for (const [, child] of node.children) {
+    lines.push(`${pad}describe("${escapeTsString(child.name)}", () => {`);
+
+    // Render nested describes
+    for (const childLine of renderDescribeTree(child, indent + 1)) {
+      lines.push(childLine);
+    }
+
+    lines.push(`${pad}});`);
+    lines.push("");
+  }
+
+  for (const testDesc of node.tests) {
+    lines.push(`${pad}it.skip("${escapeTsString(testDesc)}", () => {});`);
+  }
+
+  return lines;
+}
+
+function generateStubContent(testCases: TestCaseInfo[]): string {
+  const tree = buildDescribeTree(testCases);
+  const lines: string[] = [];
+
+  lines.push(`import { describe, it } from "vitest";`);
+  lines.push("");
+  lines.push(...renderDescribeTree(tree, 0));
+
+  // Remove trailing blank lines
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop();
+  }
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
+  const dryRun = args.includes("--dry-run");
+  const missingFilesOnly = args.includes("--missing-files-only");
+
+  const railsPath = path.join(OUTPUT_DIR, "rails-tests.json");
+  const conventionPath = path.join(OUTPUT_DIR, "convention-comparison.json");
+
+  if (!fs.existsSync(railsPath) || !fs.existsSync(conventionPath)) {
+    console.error("Missing rails-tests.json or convention-comparison.json in output/");
+    console.error("Run: pnpm test:compare");
+    process.exit(1);
+  }
+
+  const rails: TestManifest = JSON.parse(fs.readFileSync(railsPath, "utf-8"));
+  const convention: ConventionResult = JSON.parse(fs.readFileSync(conventionPath, "utf-8"));
+
+  // Build a set of missing test descriptions per ruby file per package from convention comparison
+  const missingByFile = new Map<string, Map<string, Set<string>>>();
+  for (const pkgResult of convention.results) {
+    const pkg = pkgResult.package;
+    if (filterPkg && pkg !== filterPkg) continue;
+    const fileMap = new Map<string, Set<string>>();
+    for (const f of pkgResult.files) {
+      if (f.missing === 0) continue;
+      if (missingFilesOnly && f.tsFileExists) continue;
+      if (f.missingTests) {
+        fileMap.set(f.rubyFile, new Set(f.missingTests));
+      }
+    }
+    if (fileMap.size > 0) {
+      missingByFile.set(pkg, fileMap);
+    }
+  }
+
+  // Re-run convention:compare with --missing to get the missing test names if they're not there
+  // Actually, missingTests is only populated when --missing flag was used. Let's check.
+  // We need to ensure convention-comparison.json was generated with --missing.
+  // If missingTests is empty, fall back to generating all tests for missing files.
+
+  let totalGenerated = 0;
+  let totalFiles = 0;
+
+  for (const [pkg, pkgInfo] of Object.entries(rails.packages)) {
+    if (filterPkg && pkg !== filterPkg) continue;
+
+    const pkgDir = PKG_DIRS[pkg];
+    if (!pkgDir) continue;
+
+    const pkgMissing = missingByFile.get(pkg);
+
+    // Find convention comparison data for this package
+    const pkgConvention = convention.results.find((r) => r.package === pkg);
+    if (!pkgConvention) continue;
+
+    for (const convFile of pkgConvention.files) {
+      if (convFile.missing === 0) continue;
+      if (missingFilesOnly && convFile.tsFileExists) continue;
+
+      const rubyFile = convFile.rubyFile;
+      const conventionTsFile = convFile.conventionTsFile;
+      const tsFullPath = path.join(pkgDir, conventionTsFile);
+
+      // Find the Ruby file in the manifest
+      const rubyFileInfo = pkgInfo.files.find((f) => f.file === rubyFile);
+      if (!rubyFileInfo) continue;
+
+      // Filter to only missing tests
+      const missingDescs = pkgMissing?.get(rubyFile);
+      let testsToStub: TestCaseInfo[];
+
+      if (missingDescs && missingDescs.size > 0) {
+        // We have specific missing test names — filter by description
+        testsToStub = [];
+        const descCounts = new Map<string, number>();
+        for (const tc of rubyFileInfo.testCases) {
+          const count = descCounts.get(tc.description) || 0;
+          descCounts.set(tc.description, count + 1);
+          if (missingDescs.has(tc.description)) {
+            testsToStub.push(tc);
+          }
+        }
+      } else {
+        // No specific missing list — this is a file with no TS equivalent at all
+        // Generate stubs for all tests
+        testsToStub = rubyFileInfo.testCases;
+      }
+
+      if (testsToStub.length === 0) continue;
+
+      const content = generateStubContent(testsToStub);
+
+      if (dryRun) {
+        console.log(`  [dry-run] ${tsFullPath} (${testsToStub.length} tests)`);
+      } else {
+        const dir = path.dirname(tsFullPath);
+        fs.mkdirSync(dir, { recursive: true });
+
+        if (fs.existsSync(tsFullPath)) {
+          // File exists — append missing tests. For now, write to a .stub file
+          // so the user can merge manually.
+          const stubPath = tsFullPath.replace(/\.test\.ts$/, ".stub.test.ts");
+          fs.writeFileSync(stubPath, content);
+          console.log(`  ${stubPath} (${testsToStub.length} tests — merge into ${conventionTsFile})`);
+        } else {
+          fs.writeFileSync(tsFullPath, content);
+          console.log(`  ${tsFullPath} (${testsToStub.length} tests)`);
+        }
+      }
+
+      totalFiles++;
+      totalGenerated += testsToStub.length;
+    }
+  }
+
+  console.log(`\n  Total: ${totalGenerated} test stubs across ${totalFiles} files`);
 }
 
 main();
