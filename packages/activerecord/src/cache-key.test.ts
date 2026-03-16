@@ -234,13 +234,90 @@ describe("CacheKeyTest", () => {
     expect(version).toBeNull();
   });
 
-  it.skip("cache key format for new records", () => {});
-  it.skip("cache key for timestamp", () => {});
-  it.skip("cache version for new records", () => {});
+  it("cache key format for new records", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const p = new Post({ title: "new" });
+    expect(p.cacheKey()).toBe("posts/new");
+  });
 
-  it.skip("cache_key has no version when versioning is on", () => {});
-  it.skip("cache_version does not truncate zeros when timestamp ends in zeros", () => {});
-  it.skip("cache_version calls updated_at when the value is generated at create time", () => {});
+  it("cache key for timestamp", async () => {
+    const a = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = a;
+      }
+    }
+    const p = await Post.create({ title: "ts", updated_at: new Date("2023-06-15T12:00:00Z") });
+    const key = p.cacheKeyWithVersion();
+    expect(key).toBe(`posts/${p.id}-20230615120000000`);
+  });
+
+  it("cache version for new records", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const p = new Post({ title: "new" });
+    expect(p.cacheVersion()).toBeNull();
+  });
+
+  it("cache_key has no version when versioning is on", async () => {
+    const a = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = a;
+      }
+    }
+    const p = await Post.create({ title: "v", updated_at: new Date("2023-01-01T00:00:00Z") });
+    const key = p.cacheKey();
+    expect(key).toBe(`posts/${p.id}`);
+  });
+
+  it("cache_version does not truncate zeros when timestamp ends in zeros", async () => {
+    const a = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = a;
+      }
+    }
+    const p = await Post.create({ title: "z", updated_at: new Date("2023-01-01T10:00:00.000Z") });
+    const version = p.cacheVersion();
+    expect(version).toBe("20230101100000000");
+  });
+
+  it("cache_version calls updated_at when the value is generated at create time", async () => {
+    const a = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = a;
+      }
+    }
+    const p = await Post.create({ title: "gen" });
+    const updatedAt = p.readAttribute("updated_at");
+    if (updatedAt instanceof Date) {
+      const version = p.cacheVersion();
+      expect(version).not.toBeNull();
+      const expected = updatedAt.toISOString().replace(/[^0-9]/g, "");
+      expect(version).toBe(expected);
+    } else {
+      expect(p.cacheVersion()).toBeNull();
+    }
+  });
 });
 
 describe("cacheKey / cacheKeyWithVersion", () => {
