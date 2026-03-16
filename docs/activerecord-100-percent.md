@@ -1,187 +1,168 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **75.7%** (6,347 matched / 8,385 total Ruby tests). 197/342 files matched, 0 misplaced, 1,266 wrong describes.
+Current state: **75.7%** (6,347 matched / 8,385 total Ruby tests). 197/342 files matched, 0 misplaced, 382 wrong describes, 2,151 skipped.
 
 ## How coverage is measured
 
-The compare script (`npm run test:compare`) extracts test names from both Rails Ruby source and our TypeScript tests, then matches them by normalized description. File mapping is **convention-based**:
+`npm run convention:compare` extracts test names from both Rails Ruby source and our TypeScript tests, then matches them by normalized name and describe-block ancestry. File mapping is convention-based: `finder_test.rb` maps to `finder.test.ts` (snake_case to kebab-case).
 
-- `finder_test.rb` → `finder.test.ts` (snake_case → kebab-case)
-- Per-package overrides for non-standard names (e.g. `belongs_to_associations_test.rb` → `belongs-to.test.ts`)
+Columns in the output: `OK` (matched + passing), `Skip` (matched but `it.skip`), `Desc` (wrong describe block), `Move` (misplaced — wrong file), `Miss` (no TS equivalent at all), `Tot` (total matched).
 
-A "stub" is an `it.skip()` that matched a Ruby test name. The goal is 0 stubs.
+## The gap: 2,038 tests
 
-Other commands:
+To reach 100%, we need to close a gap of 2,038 tests (8,385 - 6,347). These break down into:
 
-- **`npm run api:compare`** — Compares exported class/method signatures against Rails' public API.
-- **`npm run test:generate-stubs`** — Generates `it.skip()` stubs for unmatched Rails tests.
+- **2,151 skipped tests** — `it.skip()` stubs that matched Ruby names but aren't implemented
+- **382 wrong describes** — tests in the right file but wrong describe block
+- **145 missing files** — 342 Ruby files, only 197 have TS equivalents (the missing files account for the rest of the gap)
 
-## Database adapters
+## Work areas (parallelizable)
 
-Tests run against three backends in CI: in-memory (default), PostgreSQL 17, and MariaDB 11. Set `PG_TEST_URL` or `MYSQL_TEST_URL` to run against a real database locally. The `SchemaAdapter` in `test-adapter.ts` auto-creates tables from model attribute definitions so tests don't need manual DDL.
+The work naturally splits into independent areas. Each can be tackled in its own worktree without conflicts.
 
-## Test file conventions
+---
 
-TS test files mirror the Rails test file structure:
+### Area 1: Wrong describes (382 tests)
 
-| Rails file                                   | TS file                                                      |
-| -------------------------------------------- | ------------------------------------------------------------ |
-| `finder_test.rb`                             | `finder.test.ts`                                             |
-| `associations/has_many_associations_test.rb` | `associations/has-many.test.ts`                              |
-| `validations/uniqueness_validation_test.rb`  | `validations/uniqueness.test.ts`                             |
-| `locking_test.rb`                            | `locking/optimistic.test.ts` + `locking/pessimistic.test.ts` |
-| `relation/where_test.rb`                     | `relation/where.test.ts`                                     |
+**Goal:** Fix describe block names so convention:compare matches them correctly.
+**Effort:** Low — purely structural, no new feature code needed.
+**Files with most wrong describes:**
 
-Tests use `describe("RubyTestClassName", ...)` blocks matching the Ruby test class name.
+| File                                           | Wrong | Notes                                                        |
+| ---------------------------------------------- | ----- | ------------------------------------------------------------ |
+| adapters/postgresql/schema.test.ts             | 71    | Multiple Ruby classes (SchemaTest, SchemaWithDotsTest, etc.) |
+| migration.test.ts                              | 34    | BulkAlterTableMigrationsTest, CopyMigrationsTest, etc.       |
+| adapters/postgresql/geometric.test.ts          | 24    | PostgreSQLPointTest, PostgreSQLGeometricTypesTest, etc.      |
+| transaction-callbacks.test.ts                  | 21    | 8+ distinct Ruby test classes                                |
+| nested-attributes.test.ts                      | 18    | TestNestedAttributesInGeneral, etc.                          |
+| associations.test.ts                           | 17    | OverridingAssociationsTest, GeneratedMethodsTest, etc.       |
+| adapters/postgresql/quoting.test.ts            | 16    | Nested under PostgreSQLAdapter                               |
+| autosave-association.test.ts                   | 15    | Tests are top-level in Ruby, nested in TS                    |
+| adapters/postgresql/uuid.test.ts               | 15    | Multiple UUID test classes                                   |
+| adapters/postgresql/postgresql-adapter.test.ts | 13    | Nested sub-classes                                           |
+| transactions.test.ts                           | 12    | Several remaining multi-class tests                          |
+| adapters/postgresql/timestamp.test.ts          | 12    | Multiple timestamp test classes                              |
 
-## Current status by test file
+Plus ~50 files with 1-10 wrong describes each.
 
-### Complete (100% pass rate) — 334 tests across 28 files
+**How to fix:** Check the Ruby describe path in convention:compare output, then rename or restructure the TS describe blocks to match. Some need sub-describes added; others need top-level renames.
 
-| File                      | Tests |     | File                     | Tests |
-| ------------------------- | ----- | --- | ------------------------ | ----- |
-| sqlite-adapter (combined) | 104   |     | explain                  | 14    |
-| primary-keys (+ CPK)      | 60    |     | numericality             | 14    |
-| custom-properties         | 38    |     | nested-attributes        | 10    |
-| json-serialization        | 23    |     | presence                 | 8     |
-| mutation                  | 21    |     | boolean                  | 5     |
-| suppressor                | 6     |     | length                   | 5     |
-| absence                   | 5     |     | structural-compatibility | 4     |
-| order                     | 4     |     | and                      | 3     |
-| bidirectional-destroy     | 3     |     | annotations              | 2     |
-| inheritance               | 2     |     | custom                   | 1     |
-| errors                    | 1     |     |                          |       |
+---
 
-### Near-complete (90%+ pass rate)
+### Area 2: Unskip core ORM tests (762 skipped across top files)
 
-| File                 | Passing / Total | Skipped |
-| -------------------- | --------------- | ------- |
-| has-many             | 306 / 311       | 5       |
-| calculations         | 211 / 233       | 22      |
-| belongs-to           | 153 / 153       | 0       |
-| attribute-methods    | 126 / 133       | 7       |
-| default-scoping      | 88 / 96         | 8       |
-| relation-scoping     | 62 / 64         | 2       |
-| uniqueness           | 54 / 55         | 1       |
-| timestamp            | 39 / 40         | 1       |
-| merging              | 32 / 33         | 1       |
-| inner-join           | 28 / 31         | 3       |
-| or                   | 26 / 27         | 1       |
-| core                 | 22 / 24         | 2       |
-| validations          | 20 / 21         | 1       |
-| normalized-attribute | 14 / 15         | 1       |
-| delete-all           | 12 / 13         | 1       |
+**Goal:** Implement missing features and unskip tests in existing high-coverage files.
+**Effort:** Medium — requires implementing actual ORM behavior.
+**Best targets (highest skip counts in existing files):**
 
-### Solid progress (70–89%)
+| File                                           | Passing | Skipped | Total | What's needed                    |
+| ---------------------------------------------- | ------- | ------- | ----- | -------------------------------- |
+| associations/has-many-through.test.ts          | 67      | 98      | 165   | Through association features     |
+| associations/eager.test.ts                     | 93      | 84      | 177   | Eager loading (includes/preload) |
+| autosave-association.test.ts                   | 100     | 76      | 176   | Autosave edge cases              |
+| base.test.ts                                   | 112     | 74      | 186   | Core Base class features         |
+| associations.test.ts                           | 58      | 72      | 130   | Association edge cases           |
+| adapters/postgresql/postgresql-adapter.test.ts | 7       | 60      | 67    | PostgreSQL adapter features      |
+| associations/nested-through.test.ts            | 10      | 54      | 64    | Nested through associations      |
+| migration.test.ts                              | 40      | 50      | 90    | Migration features               |
+| associations/has-and-belongs-to-many.test.ts   | 44      | 48      | 92    | HABTM features                   |
+| adapters/postgresql/hstore.test.ts             | 1       | 44      | 45    | HStore type support              |
+| insert-all.test.ts                             | 29      | 42      | 71    | Bulk insert features             |
+| reflection.test.ts                             | 24      | 43      | 67    | Reflection API                   |
+| adapters/postgresql/array.test.ts              | 1       | 41      | 42    | Array type support               |
+| associations/inverse.test.ts                   | 52      | 40      | 92    | Inverse association features     |
+| strict-loading.test.ts                         | 17      | 37      | 54    | Strict loading modes             |
+| relation/where.test.ts                         | 26      | 36      | 62    | Where clause features            |
+| counter-cache.test.ts                          | 20      | 35      | 55    | Counter cache                    |
+| associations/has-one.test.ts                   | 60      | 33      | 93    | Has-one association features     |
+| locking.test.ts                                | 17      | 33      | 50    | Optimistic/pessimistic locking   |
+| relation/where-chain.test.ts                   | 23      | 31      | 54    | where.not/missing/associated     |
+| associations/has-one-through.test.ts           | 18      | 29      | 47    | Has-one-through features         |
 
-| File            | Passing / Total | Skipped |
-| --------------- | --------------- | ------- |
-| relations       | 234 / 279       | 45      |
-| finder          | 221 / 260       | 39      |
-| persistence     | 123 / 153       | 30      |
-| batches         | 86 / 107        | 21      |
-| transactions    | 80 / 98         | 18      |
-| enum            | 75 / 97         | 22      |
-| inheritance     | 65 / 73         | 8       |
-| named-scoping   | 61 / 73         | 12      |
-| dirty           | 50 / 62         | 12      |
-| store           | 42 / 50         | 8       |
-| select          | 23 / 26         | 3       |
-| update-all      | 23 / 26         | 3       |
-| left-outer-join | 16 / 19         | 3       |
-| dup             | 17 / 19         | 2       |
-| token-for       | 16 / 18         | 2       |
-| schema          | 12 / 14         | 2       |
-| delegated-type  | 11 / 13         | 2       |
+**Sub-areas for parallel work:**
 
-Plus smaller files: excluding (8/11), finder (8/9), secure-token (8/9), serialization (8/9), nested-attributes (3/4).
+- **Associations** (inverse, eager, through, autosave, has-one, HABTM, counter-cache, strict-loading) — 535 skipped tests
+- **Core ORM** (base, persistence, relation/where, relation/where-chain, locking, reflection) — 227+ skipped tests
+- **PostgreSQL adapter** (postgresql-adapter, hstore, array, schema, uuid, geometric) — 300+ skipped tests
+- **Migration & bulk ops** (migration, insert-all) — 92 skipped tests
 
-### Needs work (below 70%)
+---
 
-| File                     | Passing / Total | Skipped |
-| ------------------------ | --------------- | ------- |
-| associations (misc)      | 25 / 130        | 105     |
-| base                     | 83 / 186        | 103     |
-| has-many-through         | 66 / 165        | 99      |
-| eager                    | 105 / 197       | 92      |
-| autosave-association     | 87 / 177        | 90      |
-| migration                | 19 / 90         | 71      |
-| has-one-habtm (combined) | 162 / 397       | 225     |
-| insert-all               | 19 / 73         | 54      |
-| relation                 | 1 / 51          | 50      |
-| nested-attributes        | 78 / 127        | 49      |
-| where                    | 15 / 62         | 47      |
-| where-chain              | 10 / 54         | 44      |
-| reflection               | 24 / 67         | 43      |
-| inverse                  | 52 / 93         | 41      |
-| counter-cache            | 14 / 55         | 41      |
-| strict-loading           | 14 / 54         | 40      |
-| transaction-callbacks    | 19 / 57         | 38      |
-| serialized-attribute     | 30 / 59         | 29      |
-| optimistic locking       | 19 / 50         | 31      |
+### Area 3: Missing files (145 files, ~2,038 tests)
 
-Plus smaller files: cascaded-eager-loading (8/27), signed-id (16/29), defaults (12/25), callbacks (17/46), aggregations (14/25), invertible (18/28), sanitize (13/22), readonly (5/14), modules (9/14), cache-key (7/12), touch-later (6/11), association validation (5/10), field-ordered-values (6/10), extensions (4/12), required (4/7), clone (2/4), habtm (0/4), comment (0/17), where-clause (0/21), with (0/16), null-relation (6/9), querying-methods-delegation (2/3), reload-cache (0/1).
+**Goal:** Create new test files for Ruby test files that have no TS equivalent.
+**Effort:** High — requires both stub creation and feature implementation.
+**Highest-value missing files:**
 
-### DB adapter tests
+| Ruby file                    | Missing tests | Notes                   |
+| ---------------------------- | ------------- | ----------------------- |
+| fixtures_test.rb             | 149           | Test fixtures system    |
+| tasks/database-tasks.test.ts | 78            | Rake task equivalents   |
+| query-cache.test.ts          | 62            | Query caching           |
+| connection-pool.test.ts      | 50            | Connection pooling      |
+| adapters/trilogy/\*          | 80            | Trilogy adapter (skip?) |
+| connection-adapters/\*       | 160+          | Connection management   |
+| encryption/\*                | 50+           | Encrypted attributes    |
+| database-configurations/\*   | 65+           | DB config resolution    |
+| collection-cache-key.test.ts | 30            | Cache key generation    |
+| relation/with.test.ts        | 16            | WITH (CTE) support      |
+| bind-parameter.test.ts       | 17            | Bind parameter handling |
 
-| File           | Matched | Skipped (null) | Stubs |
-| -------------- | ------- | -------------- | ----- |
-| sqlite-adapter | 104     | 23             | 0     |
-| mysql-adapter  | 1       | 0              | 183   |
+Many of these are infrastructure-heavy (connection pooling, task runners, multi-DB) and may not be relevant for the TypeScript port. Consider permanently skipping Ruby-only concepts.
 
-MySQL adapter stubs need real DB connections. PostgreSQL adapter tests are still excluded from comparison.
+**Likely candidates to permanently skip:**
 
-## Missing capabilities
+- `fixtures_test.rb` — Rails test fixtures system (we use different patterns)
+- `tasks/*` — Rake tasks
+- `adapters/trilogy/*` — Trilogy adapter (MySQL variant)
+- `connection_pool_test.rb` — Connection pooling (different model in TS)
+- `encryption/*` — Depends on Rails encryption infrastructure
 
-These are features that Rails implements but we haven't built yet. Tests that appear to "pass" for these areas are actually using workarounds (e.g. `readAttribute`) rather than the real Rails API.
+**Good candidates to implement:**
 
-### Dynamic attribute accessors (high priority)
+- `relation/with.test.ts` — CTE support (16 tests)
+- `bind-parameter.test.ts` — Bind params (17 tests)
+- `date-time.test.ts`, `date.test.ts` — Date handling (13 tests)
+- `type/*.test.ts` — Type system (40+ tests)
+- `instrumentation.test.ts` — Query instrumentation (18 tests)
 
-In Rails, `method_missing` and `define_attribute_methods` generate getter/setter/predicate methods on the fly for each column — so `user.name` works instead of `user.readAttribute("name")`. Our `attribute-methods.test.ts` tests (126/133 passing) use `readAttribute`/`writeAttribute` everywhere, masking the fact that dynamic accessors aren't implemented.
+---
 
-**What's needed:** When `attribute()` is called (or columns are loaded from the schema), define ES getters/setters on the class prototype via `Object.defineProperty`, or use a `Proxy` on instances. This would enable:
+### Area 4: PostgreSQL adapter tests (300+ tests)
 
-- `user.name` (getter) — delegates to `readAttribute("name")`
-- `user.name = "dean"` (setter) — delegates to `writeAttribute("name", "dean")`
-- `user.name?` equivalent (predicate) — `user.isName()` or similar convention
+**Goal:** Implement PostgreSQL-specific features and fix wrong describes.
+**Effort:** Medium-high — requires running against real PostgreSQL.
+**Prerequisite:** `PG_TEST_URL` environment variable.
 
-**Affected tests:** `attribute-methods.test.ts` lines ~753-896 (method_missing group), plus any test that should use `model.column` syntax.
+| File                       |  OK | Skip | Wrong | Miss | Notes                            |
+| -------------------------- | --: | ---: | ----: | ---: | -------------------------------- |
+| schema.test.ts             |   0 |   71 |    71 |    0 | All skipped, all wrong describe  |
+| postgresql-adapter.test.ts |   7 |   60 |    13 |    0 | Most skipped                     |
+| range.test.ts              |   0 |   46 |     0 |    0 | Range type support               |
+| hstore.test.ts             |   1 |   44 |     3 |    0 | HStore type                      |
+| array.test.ts              |   1 |   41 |     0 |    0 | Array type                       |
+| geometric.test.ts          |   5 |    0 |    24 |    0 | Geometric types, wrong describes |
+| uuid.test.ts               |   0 |    0 |    15 |    0 | UUID, wrong describes            |
+| timestamp.test.ts          |   0 |    0 |    12 |    0 | Timestamps, wrong describes      |
+| quoting.test.ts            |   0 |    0 |    16 |    0 | Quoting, wrong describes         |
+| serial.test.ts             |   0 |    0 |     6 |    0 | Serial columns, wrong describes  |
 
-## Recommended next targets
+This area is fully independent — it only touches `adapters/postgresql/` files.
 
-### Highest ROI
-
-1. **associations.test.ts** (105 stubs, 19%) — misc association edge cases
-2. **base.test.ts** (103 stubs, 45%) — broad coverage, good infrastructure
-3. **has-many-through.test.ts** (99 stubs, 40%) — through associations
-4. **eager.test.ts** (92 stubs, 53%) — eager loading
-5. **autosave-association.test.ts** (90 stubs, 49%) — autosave edge cases
-
-### Medium effort
-
-6. **migration.test.ts** (71 stubs, 21%) — migration edge cases
-7. **insert-all.test.ts** (54 stubs, 26%) — bulk operations
-8. **relation.test.ts** (50 stubs, 2%) — core relation methods
-9. **nested-attributes.test.ts** (49 stubs, 61%) — CPK, dirty tracking
-10. **where.test.ts** (47 stubs, 24%) — where clause conditions
-
-### Association-heavy (larger effort)
-
-- **has-one-habtm.test.ts** (225 stubs combined) — HABTM + has_one across multiple Ruby files
-- **where-chain.test.ts** (44 stubs) — where.not/missing/associated
-- **counter-cache.test.ts** (41 stubs) — counter cache
-- **strict-loading.test.ts** (40 stubs) — strict loading modes
-
-### Lower ROI / complex
-
-- Pessimistic locking — needs FOR UPDATE support
-- MySQL adapter — needs real DB connection (183 stubs)
-- Ruby-only concepts (marshal, YAML) — permanently skip
+---
 
 ## Tracking progress
 
-```
-npm run test:compare
+```bash
+npm run convention:compare -- --package activerecord
 ```
 
-Target: `activerecord: 100% real (5771 matched, 0 stub / 5771 total)`
+Target: `activerecord — 8385/8385 tests (100%)`
+
+## Quick wins checklist
+
+- [ ] Fix remaining 382 wrong describes (Area 1)
+- [ ] Unskip tests in files already at 90%+ (low-hanging fruit)
+- [ ] Add sub-describes in PostgreSQL adapter files (Area 4 wrong describes)
+- [ ] Implement CTE/WITH support (16 tests, Area 3)
+- [ ] Implement type system tests (40+ tests, Area 3)
