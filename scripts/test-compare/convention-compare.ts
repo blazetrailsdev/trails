@@ -470,7 +470,8 @@ function main() {
       return b.matched - a.matched;
     });
 
-    const percent = totalRuby > 0 ? Math.round((totalMatched / totalRuby) * 1000) / 10 : 0;
+    const implemented = totalMatched - totalMatchedSkipped;
+    const percent = totalRuby > 0 ? Math.round((implemented / totalRuby) * 1000) / 10 : 0;
 
     results.push({
       package: pkg,
@@ -517,13 +518,14 @@ function main() {
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
 
+    const pkgImplemented = pkg.totalMatched - pkg.totalMatchedSkipped;
     const details: string[] = [];
     if (pkg.totalMatchedSkipped > 0) details.push(`${pkg.totalMatchedSkipped} skipped`);
     if (pkg.totalWrongDescribe > 0) details.push(`${pkg.totalWrongDescribe} wrong describe`);
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
-      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
+      `  ${pkg.package}  —  ${pkgImplemented}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
     );
     console.log(`${"=".repeat(90)}\n`);
 
@@ -581,7 +583,8 @@ function main() {
     );
 
     for (const f of pkg.files) {
-      const pct = f.rubyTestCount > 0 ? Math.round((f.matched / f.rubyTestCount) * 100) : 0;
+      const fileImplemented = f.matched - f.matchedSkipped;
+      const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
       const marker = !f.tsFileExists ? " ✗" : pct === 100 && f.wrongDescribe === 0 ? " ✓" : "";
       console.log(
         `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
@@ -595,14 +598,15 @@ function main() {
     }
   }
 
-  const grandPct = grandRuby > 0 ? Math.round((grandMatched / grandRuby) * 1000) / 10 : 0;
+  const grandImplemented = grandMatched - grandMatchedSkipped;
+  const grandPct = grandRuby > 0 ? Math.round((grandImplemented / grandRuby) * 1000) / 10 : 0;
   const grandDetails: string[] = [];
   if (grandMatchedSkipped > 0) grandDetails.push(`${grandMatchedSkipped} skipped`);
   if (grandWrongDescribe > 0) grandDetails.push(`${grandWrongDescribe} wrong describe`);
   const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
-    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
+    `  Overall: ${grandImplemented}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
 }
