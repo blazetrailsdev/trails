@@ -250,8 +250,7 @@ describe("SanitizeTest", () => {
       }
     }
     const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
-    expect(sql).toContain("'hello'");
-    expect(sql).toContain("1");
+    expect(sql).toBe("title = 'hello' AND id = 1");
   });
 
   it.skip("sanitize sql array handles relations", () => {
