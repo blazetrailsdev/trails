@@ -1305,19 +1305,19 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 
 describe("TestAutosaveAssociationsInGeneral", () => {
   it.skip("autosave works even when other callbacks update the parent model", () => {
-    /* fixture-dependent */
+    /* needs autosave association with cached child records + parent callback mutation */
   });
   it.skip("autosave does not pass through non custom validation contexts", () => {
-    /* fixture-dependent */
+    /* needs custom validation contexts on autosave */
   });
   it.skip("autosave collection association callbacks get called once", () => {
-    /* fixture-dependent */
+    /* needs hasMany autosave with association callbacks */
   });
   it.skip("autosave has one association callbacks get called once", () => {
-    /* fixture-dependent */
+    /* needs hasOne autosave with association callbacks */
   });
   it.skip("autosave belongs to association callbacks get called once", () => {
-    /* fixture-dependent */
+    /* needs belongsTo autosave with association callbacks */
   });
   it.skip("should not add the same callbacks multiple times for has one", () => {
     /* needs reflectOnAllAssociations to inspect association count */
@@ -1332,7 +1332,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     /* needs reflectOnAllAssociations to inspect association count */
   });
   it.skip("cyclic autosaves do not add multiple validations", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1442,22 +1442,22 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   it.skip("should generate validation methods for has_many associations", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should generate validation methods for has_one associations with :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should not generate validation methods for has_one associations without :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should generate validation methods for belongs_to associations with :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should not generate validation methods for belongs_to associations without :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should generate validation methods for HABTM associations with :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1533,19 +1533,19 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   it.skip("autosave new record on belongs to can be disabled per relationship", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("autosave new record on has one can be disabled per relationship", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("autosave new record on has many can be disabled per relationship", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("autosave new record with after create callback", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("autosave new record with after create callback and habtm association", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1564,10 +1564,10 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     expect(valid).toBe(false);
   });
   it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
     const adapter = freshAdapter();
@@ -1658,10 +1658,10 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 
 describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   it.skip("should not has one through model", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should not reversed has one through model", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1695,25 +1695,25 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
   it.skip("after save callback with autosave", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
   it.skip("should not raise error", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
 describe("TestAutosaveAssociationWithTouch", () => {
   it.skip("autosave with touch should not raise system stack error", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
   it.skip("should update children when association redefined in subclass", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1769,7 +1769,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 
 describe("should update children when autosave is true and parent is new but child is not", () => {
   it.skip("should update children when autosave is true and parent is new but child is not", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it("should automatically save the associated models", async () => {
     const adapter = freshAdapter();
