@@ -19,7 +19,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgreSQLQuotingTest", () => {
+  describe("QuotingTest", () => {
     it("type cast true", async () => {
       const rows = await adapter.execute("SELECT TRUE AS val");
       expect(rows[0].val).toBe(true);
