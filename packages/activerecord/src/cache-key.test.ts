@@ -242,7 +242,7 @@ describe("CacheKeyTest", () => {
       }
     }
     const p = new Post({ title: "new" });
-    expect(p.cacheKey()).toMatch(/posts\/new/);
+    expect(p.cacheKey()).toBe("posts/new");
   });
 
   it("cache key for timestamp", async () => {
@@ -256,8 +256,7 @@ describe("CacheKeyTest", () => {
     }
     const p = await Post.create({ title: "ts", updated_at: new Date("2023-06-15T12:00:00Z") });
     const key = p.cacheKeyWithVersion();
-    expect(key).toContain("posts/");
-    expect(key).toContain("20230615");
+    expect(key).toBe(`posts/${p.id}-20230615120000000`);
   });
 
   it("cache version for new records", () => {
@@ -282,8 +281,7 @@ describe("CacheKeyTest", () => {
     }
     const p = await Post.create({ title: "v", updated_at: new Date("2023-01-01T00:00:00Z") });
     const key = p.cacheKey();
-    expect(key).not.toContain("-");
-    expect(key).toMatch(/posts\/\d+/);
+    expect(key).toBe(`posts/${p.id}`);
   });
 
   it("cache_version does not truncate zeros when timestamp ends in zeros", async () => {
@@ -297,9 +295,7 @@ describe("CacheKeyTest", () => {
     }
     const p = await Post.create({ title: "z", updated_at: new Date("2023-01-01T10:00:00.000Z") });
     const version = p.cacheVersion();
-    expect(version).not.toBeNull();
-    // Full ISO digits for 2023-01-01T10:00:00.000Z = 20230101100000000
-    expect(version!).toBe("20230101100000000");
+    expect(version).toBe("20230101100000000");
   });
 
   it("cache_version calls updated_at when the value is generated at create time", async () => {
@@ -311,16 +307,15 @@ describe("CacheKeyTest", () => {
         this.adapter = a;
       }
     }
-    const before = new Date();
     const p = await Post.create({ title: "gen" });
-    const version = p.cacheVersion();
-    // updated_at should be auto-populated, giving a non-null version
-    if (p.readAttribute("updated_at") !== null) {
+    const updatedAt = p.readAttribute("updated_at");
+    if (updatedAt instanceof Date) {
+      const version = p.cacheVersion();
       expect(version).not.toBeNull();
-      expect(version!.length).toBeGreaterThan(0);
+      const expected = updatedAt.toISOString().replace(/[^0-9]/g, "");
+      expect(version).toBe(expected);
     } else {
-      // If auto-population isn't implemented, version will be null
-      expect(version).toBeNull();
+      expect(p.cacheVersion()).toBeNull();
     }
   });
 });
