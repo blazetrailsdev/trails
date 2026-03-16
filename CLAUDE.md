@@ -37,9 +37,7 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - Prefer small, focused modules over large files.
 - Do NOT use subagents unless explicitly requested. Do the work directly.
 - Do use worktrees for any changes. Leave the default worktree for the user.
-- All PRs should request Copilot's review. After creating the PR, comment
-  `@copilot review` to trigger the review:
-  `gh api repos/deanmarano/rails-ts/issues/<number>/comments -f body="@copilot review"`
+- All PRs should request Copilot's review.
 - Do NOT add code comments that just describe what the line does. Only add
   comments when they provide additional value — a potential bug hidden, or
   explanation about the larger context.
