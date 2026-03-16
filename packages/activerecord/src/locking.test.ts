@@ -362,7 +362,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 });
 
-describe("optimistic locking", () => {
+describe("OptimisticLockingTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -408,7 +408,7 @@ describe("optimistic locking", () => {
   });
 });
 
-describe("Optimistic Locking (Rails-guided)", () => {
+describe("OptimisticLockingTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
