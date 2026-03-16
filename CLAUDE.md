@@ -37,9 +37,9 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - Prefer small, focused modules over large files.
 - Do NOT use subagents unless explicitly requested. Do the work directly.
 - Do use worktrees for any changes. Leave the default worktree for the user.
-- All PRs should request Copilot's review. Create the PR first, then add
-  Copilot as a reviewer: `gh pr create ...` followed by
-  `gh pr edit <number> --add-reviewer copilot`.
+- All PRs should request Copilot's review. Add Copilot after creating the PR
+  since `--reviewer` doesn't work at creation time:
+  `gh api repos/deanmarano/rails-ts/pulls/<number>/requested_reviewers -f 'reviewers[]=Copilot'`
 - Do NOT add code comments that just describe what the line does. Only add
   comments when they provide additional value — a potential bug hidden, or
   explanation about the larger context.
