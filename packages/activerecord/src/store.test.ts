@@ -552,9 +552,48 @@ describe("StoreTest", () => {
     /* needs type checking */
   });
 
-  it.skip("reading store attributes through accessors with prefix", () => {});
-  it.skip("writing store attributes through accessors with prefix", () => {});
-  it.skip("updating the store will mark it as changed", () => {});
+  it("reading store attributes through accessors with prefix", () => {
+    const a = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent", "string");
+        this.adapter = a;
+      }
+    }
+    store(User, "parent", { accessors: ["name", "birthday"], prefix: true });
+    const u = new User({
+      name: "John",
+      parent: JSON.stringify({ name: "Quinn", birthday: null }),
+    });
+    expect((u as any).parent_name).toBe("Quinn");
+    expect((u as any).parent_birthday).toBeNull();
+  });
+
+  it("writing store attributes through accessors with prefix", () => {
+    const a = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("partner", "string");
+        this.adapter = a;
+      }
+    }
+    store(User, "partner", { accessors: ["name", "birthday"], prefix: true });
+    const u = new User({ name: "John", partner: JSON.stringify({}) });
+    (u as any).partner_name = "River";
+    (u as any).partner_birthday = "1999-2-11";
+    expect((u as any).partner_name).toBe("River");
+    expect((u as any).partner_birthday).toBe("1999-2-11");
+  });
+
+  it("updating the store will mark it as changed", () => {
+    const { User } = makeModel();
+    const u = new User({ name: "John", settings: JSON.stringify({ theme: "black" }) });
+    (u as any)._dirty.snapshot(u._attributes);
+    (u as any).theme = "red";
+    expect(u.attributeChanged("settings")).toBe(true);
+  });
 });
 
 describe("StoreTest", () => {

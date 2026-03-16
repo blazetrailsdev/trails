@@ -116,11 +116,36 @@ describe("DirtyTest", () => {
     expect(typeof t.changed).toBe("boolean");
   });
 
-  it.skip("aliased attribute changes", () => {});
-  it.skip("saved_change_to_attribute? returns whether a change occurred in the last save", () => {});
-  it.skip("saved_change_to_attribute returns the change that occurred in the last save", () => {});
-  it.skip("attribute_before_last_save returns the original value before saving", () => {});
-  it.skip("changed? in after callbacks returns false", () => {});
+  it.skip("aliased attribute changes", () => {
+    /* needs aliasAttribute to propagate dirty tracking */
+  });
+
+  it.skip("saved_change_to_attribute? returns whether a change occurred in the last save", () => {
+    /* needs previousChanges to be populated after create */
+  });
+
+  it.skip("saved_change_to_attribute returns the change that occurred in the last save", () => {
+    /* needs previousChanges to be populated after create */
+  });
+
+  it.skip("attribute_before_last_save returns the original value before saving", () => {
+    /* needs previousChanges to be populated after create */
+  });
+
+  it("changed? in after callbacks returns false", async () => {
+    class Person extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+        this.afterSave(function (record: any) {
+          if (record.changed) throw new Error("changed? should be false");
+          if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
+        });
+      }
+    }
+    const person = await Person.create({ first_name: "Sean" });
+    expect(person.changed).toBe(false);
+  });
 });
 
 // ==========================================================================

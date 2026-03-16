@@ -132,7 +132,15 @@ describe("ExcludingTest", () => {
     expect(results.length).toBe(1);
   });
 
-  it.skip("result set does not include collection of excluded records", () => {});
+  it("result set does not include collection of excluded records", async () => {
+    const { Post } = makeModel();
+    const p1 = await Post.create({ title: "first" });
+    const p2 = await Post.create({ title: "second" });
+    await Post.create({ title: "third" });
+    const results = await Post.all().excluding(p1, p2).toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].readAttribute("title")).toBe("third");
+  });
 });
 
 describe("excluding() / without()", () => {

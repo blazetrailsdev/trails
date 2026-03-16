@@ -44,8 +44,24 @@ describe("CloneTest", () => {
 });
 
 describe("CloneTest", () => {
-  it.skip("clone preserves frozen state", () => {});
-  it.skip("clone of frozen record is not frozen", () => {});
+  it.skip("clone preserves frozen state", () => {
+    /* clone() doesn't copy frozen flag */
+  });
+
+  it("clone of frozen record is not frozen", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const original = await Topic.create({ title: "test" });
+    original.freeze();
+    expect(original.isFrozen()).toBe(true);
+    const cloned = original.clone();
+    expect(cloned.isFrozen()).toBe(false);
+  });
 });
 
 describe("Base#clone", () => {
