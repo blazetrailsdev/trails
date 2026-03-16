@@ -69,6 +69,42 @@ function resolveModel(name: string): typeof Base {
 }
 
 /**
+ * Resolve the counter cache column for a hasMany association by inspecting
+ * the child model's belongsTo reflection for a counterCache option.
+ * Falls back to `${assocName}_count` if no reflection is found.
+ */
+export function resolveCounterColumn(
+  parentModel: typeof Base,
+  assoc: { type: string; name: string; options: any },
+  counterName: string,
+): string {
+  // If counter name was passed as a column name directly, use it
+  if (counterName.endsWith("_count")) return counterName;
+
+  try {
+    const childClassName = assoc.options.className ?? camelize(singularize(assoc.name));
+    const childModel = resolveModel(childClassName);
+    const childAssocs = (childModel as any)._associations as
+      | Array<{ type: string; name: string; options: any }>
+      | undefined;
+    if (childAssocs) {
+      const belongsTo = childAssocs.find(
+        (a) =>
+          a.type === "belongsTo" &&
+          a.options.counterCache &&
+          (a.options.className === parentModel.name || camelize(a.name) === parentModel.name),
+      );
+      if (belongsTo && typeof belongsTo.options.counterCache === "string") {
+        return belongsTo.options.counterCache;
+      }
+    }
+  } catch {
+    // Child model not registered — fall through to default
+  }
+  return `${assoc.name}_count`;
+}
+
+/**
  * Associations mixin — adds belongsTo, hasOne, hasMany to a model class.
  *
  * Mirrors: ActiveRecord::Associations::ClassMethods
