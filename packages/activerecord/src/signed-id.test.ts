@@ -218,12 +218,60 @@ describe("SignedIdTest", () => {
     // Custom verifier support is not implemented yet
   });
 
-  it.skip("find signed record", () => {});
-  it.skip("find signed record on relation", () => {});
-  it.skip("find signed record with a bang", () => {});
-  it.skip("find signed record with a bang on relation", () => {});
-  it.skip("find signed record with purpose", () => {});
-  it.skip("find signed record with a bang within expiration duration", () => {});
+  it("find signed record", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const token = u.signedId();
+    const found = await User.findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(u.id);
+  });
+
+  it.skip("find signed record on relation", () => {
+    /* needs findSigned on Relation */
+  });
+
+  it("find signed record with a bang", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const token = u.signedId();
+    const found = await User.findSignedBang(token);
+    expect(found.id).toBe(u.id);
+  });
+
+  it.skip("find signed record with a bang on relation", () => {
+    /* needs findSignedBang on Relation */
+  });
+
+  it("find signed record with purpose", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const token = u.signedId({ purpose: "confirm" });
+    const found = await User.findSigned(token, { purpose: "confirm" });
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(u.id);
+    const wrongPurpose = await User.findSigned(token, { purpose: "wrong" });
+    expect(wrongPurpose).toBeNull();
+  });
+
+  it.skip("find signed record with a bang within expiration duration", () => {
+    /* needs time-based expiration testing */
+  });
 });
 
 describe("toGid / toSgid", () => {

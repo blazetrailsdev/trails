@@ -264,9 +264,27 @@ describe("OptimisticLockingTest", () => {
     expect(p.readAttribute("lock_version")).toBe(11);
   });
 
-  it.skip("non integer lock existing", () => {});
-  it.skip("lock repeating", () => {});
-  it.skip("lock new", () => {});
+  it.skip("non integer lock existing", () => {
+    /* needs non-integer lock column support (e.g. timestamp-based) */
+  });
+
+  it("lock repeating", async () => {
+    const { Person } = makePerson();
+    const p = await Person.create({ name: "Test" });
+    expect(p.readAttribute("lock_version")).toBe(0);
+    await p.update({ name: "V1" });
+    expect(p.readAttribute("lock_version")).toBe(1);
+    await p.update({ name: "V2" });
+    expect(p.readAttribute("lock_version")).toBe(2);
+    await p.update({ name: "V3" });
+    expect(p.readAttribute("lock_version")).toBe(3);
+  });
+
+  it("lock new", async () => {
+    const { Person } = makePerson();
+    const p = await Person.create({ name: "New" });
+    expect(p.readAttribute("lock_version")).toBe(0);
+  });
 });
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
