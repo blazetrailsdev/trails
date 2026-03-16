@@ -253,7 +253,40 @@ describe("UpdateAllTest", () => {
     expect(posts[0].readAttribute("views")).toBe(11);
   });
 
-  it.skip("touch all updates records timestamps", () => {});
-  it.skip("touch all with custom timestamp", () => {});
-  it.skip("update all doesnt ignore order", () => {});
+  it("touch all updates records timestamps", async () => {
+    const a = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = a;
+      }
+    }
+    const past = new Date("2020-01-01T00:00:00Z");
+    await Post.create({ title: "old", updated_at: past });
+    await Post.all().touchAll();
+    const p = (await Post.first()) as any;
+    const updatedAt = p.readAttribute("updated_at");
+    expect(new Date(updatedAt).getTime()).toBeGreaterThan(past.getTime());
+  });
+
+  it.skip("touch all with custom timestamp", () => {
+    /* needs custom timestamp column name support in touchAll */
+  });
+
+  it("update all doesnt ignore order", async () => {
+    const a = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("views", "integer");
+        this.adapter = a;
+      }
+    }
+    await Post.create({ title: "a", views: 0 });
+    await Post.create({ title: "b", views: 0 });
+    await Post.order("title").updateAll({ views: 99 });
+    const all = await Post.all().toArray();
+    expect(all.every((p: any) => p.readAttribute("views") === 99)).toBe(true);
+  });
 });
