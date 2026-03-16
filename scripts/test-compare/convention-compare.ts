@@ -467,7 +467,7 @@ function main() {
     fileResults.sort((a, b) => {
       if (a.misplaced !== b.misplaced) return b.misplaced - a.misplaced;
       if (a.tsFileExists !== b.tsFileExists) return a.tsFileExists ? -1 : 1;
-      return (b.matched - b.matchedSkipped) - (a.matched - a.matchedSkipped);
+      return b.matched - b.matchedSkipped - (a.matched - a.matchedSkipped);
     });
 
     const implemented = totalMatched - totalMatchedSkipped;
