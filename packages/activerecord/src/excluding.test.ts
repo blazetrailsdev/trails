@@ -146,8 +146,9 @@ describe("ExcludingTest", () => {
     const p1 = await Post.create({ title: "first" });
     const p2 = await Post.create({ title: "second" });
     await Post.create({ title: "third" });
-    const sql = Post.all().excluding(p1, p2).toSql();
-    expect(sql).toContain("NOT IN");
+    const results = await Post.all().excluding(p1, p2).toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].readAttribute("title")).toBe("third");
   });
 });
 

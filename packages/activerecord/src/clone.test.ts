@@ -56,10 +56,10 @@ describe("CloneTest", () => {
         this.adapter = adapter;
       }
     }
-    const cloned = await Topic.create({ title: "test" });
-    const copy = cloned.clone();
-    copy.freeze();
-    expect(copy.isFrozen()).toBe(true);
+    const original = await Topic.create({ title: "test" });
+    original.freeze();
+    expect(original.isFrozen()).toBe(true);
+    const cloned = original.clone();
     expect(cloned.isFrozen()).toBe(false);
   });
 });
