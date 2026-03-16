@@ -467,10 +467,11 @@ function main() {
     fileResults.sort((a, b) => {
       if (a.misplaced !== b.misplaced) return b.misplaced - a.misplaced;
       if (a.tsFileExists !== b.tsFileExists) return a.tsFileExists ? -1 : 1;
-      return b.matched - a.matched;
+      return b.matched - b.matchedSkipped - (a.matched - a.matchedSkipped);
     });
 
-    const percent = totalRuby > 0 ? Math.round((totalMatched / totalRuby) * 1000) / 10 : 0;
+    const implemented = totalMatched - totalMatchedSkipped;
+    const percent = totalRuby > 0 ? Math.round((implemented / totalRuby) * 1000) / 10 : 0;
 
     results.push({
       package: pkg,
@@ -517,13 +518,14 @@ function main() {
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
 
+    const pkgImplemented = pkg.totalMatched - pkg.totalMatchedSkipped;
     const details: string[] = [];
     if (pkg.totalMatchedSkipped > 0) details.push(`${pkg.totalMatchedSkipped} skipped`);
     if (pkg.totalWrongDescribe > 0) details.push(`${pkg.totalWrongDescribe} wrong describe`);
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
-      `  ${pkg.package}  —  ${pkg.totalMatched}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
+      `  ${pkg.package}  —  ${pkgImplemented}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
     );
     console.log(`${"=".repeat(90)}\n`);
 
@@ -581,10 +583,12 @@ function main() {
     );
 
     for (const f of pkg.files) {
-      const pct = f.rubyTestCount > 0 ? Math.round((f.matched / f.rubyTestCount) * 100) : 0;
-      const marker = !f.tsFileExists ? " ✗" : pct === 100 && f.wrongDescribe === 0 ? " ✓" : "";
+      const fileImplemented = f.matched - f.matchedSkipped;
+      const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
+      const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
+      const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(f.matched).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
+        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {
@@ -595,14 +599,15 @@ function main() {
     }
   }
 
-  const grandPct = grandRuby > 0 ? Math.round((grandMatched / grandRuby) * 1000) / 10 : 0;
+  const grandImplemented = grandMatched - grandMatchedSkipped;
+  const grandPct = grandRuby > 0 ? Math.round((grandImplemented / grandRuby) * 1000) / 10 : 0;
   const grandDetails: string[] = [];
   if (grandMatchedSkipped > 0) grandDetails.push(`${grandMatchedSkipped} skipped`);
   if (grandWrongDescribe > 0) grandDetails.push(`${grandWrongDescribe} wrong describe`);
   const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
-    `  Overall: ${grandMatched}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
+    `  Overall: ${grandImplemented}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
 }
