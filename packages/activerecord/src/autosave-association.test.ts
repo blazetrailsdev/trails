@@ -20,6 +20,11 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
+function cacheAssoc(record: Base, name: string, value: unknown) {
+  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+  (record as any)._cachedAssociations.set(name, value);
+}
+
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
@@ -1304,11 +1309,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("TestAutosaveAssociationsInGeneral", () => {
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
-  }
-
   it("autosave works even when other callbacks update the parent model", async () => {
     const adapter = freshAdapter();
     class Ship extends Base {
@@ -1344,6 +1344,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await pirate.save();
     expect(pirate.readAttribute("catchphrase")).toBe("Ahoy!");
     expect(ship.isNewRecord()).toBe(false);
+    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
   });
 
   it.skip("autosave does not pass through non custom validation contexts", () => {
@@ -1386,6 +1387,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await author.save();
     expect(book.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
+    expect(book.readAttribute("author_id")).toBe(author.id);
   });
 
   it("autosave has one association callbacks get called once", async () => {
@@ -1424,6 +1426,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await user.save();
     expect(profile.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
+    expect(profile.readAttribute("user_id")).toBe(user.id);
   });
 
   it("autosave belongs to association callbacks get called once", async () => {
@@ -1678,11 +1681,6 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
-  }
-
   it("autosave new record on belongs to can be disabled per relationship", async () => {
     const adapter = freshAdapter();
     class Author extends Base {
@@ -1714,6 +1712,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     post.writeAttribute("title", "trigger save");
     await post.save();
     expect(author.isNewRecord()).toBe(true);
+    expect(post.readAttribute("author_id")).toBeNull();
   });
 
   it("autosave new record on has one can be disabled per relationship", async () => {
@@ -1747,6 +1746,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     user.writeAttribute("name", "trigger save");
     await user.save();
     expect(profile.isNewRecord()).toBe(true);
+    expect(profile.readAttribute("user_id")).toBeNull();
   });
 
   it("autosave new record on has many can be disabled per relationship", async () => {
@@ -1780,6 +1780,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     author.writeAttribute("name", "trigger save");
     await author.save();
     expect(book.isNewRecord()).toBe(true);
+    expect(book.readAttribute("author_id")).toBeNull();
   });
 
   it("autosave new record with after create callback", async () => {
@@ -1817,6 +1818,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     await pirate.save();
     expect(log).toContain("pirate_created");
     expect(pirate.isNewRecord()).toBe(false);
+    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
     expect(ship.isNewRecord()).toBe(false);
   });
 
