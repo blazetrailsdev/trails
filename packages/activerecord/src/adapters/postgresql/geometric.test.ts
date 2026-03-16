@@ -13,11 +13,28 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlGeometricTest", () => {
+  describe("PostgreSQLPointTest", () => {
     it.skip("point column", async () => {});
     it.skip("point default", async () => {});
     it.skip("point type cast", async () => {});
     it.skip("point write", async () => {});
+    it.skip("column", async () => {});
+    it.skip("schema dumping", () => {});
+    it.skip("roundtrip", async () => {});
+    it.skip("mutation", () => {});
+    it.skip("array assignment", () => {});
+    it.skip("hash assignment", () => {});
+    it.skip("string assignment", () => {});
+    it.skip("empty string assignment", () => {});
+    it.skip("array of points round trip", () => {});
+    it.skip("legacy column", () => {});
+    it.skip("legacy default", () => {});
+    it.skip("legacy schema dumping", () => {});
+    it.skip("legacy roundtrip", () => {});
+    it.skip("legacy mutation", () => {});
+  });
+
+  describe("PostgreSQLGeometricTypesTest", () => {
     it.skip("line column", async () => {});
     it.skip("line default", async () => {});
     it.skip("line type cast", async () => {});
@@ -43,23 +60,9 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("geometric where", async () => {});
     it.skip("geometric invalid", async () => {});
     it.skip("geometric nil", async () => {});
-    it.skip("mutation", () => {});
-    it.skip("array assignment", () => {});
-    it.skip("hash assignment", () => {});
-    it.skip("string assignment", () => {});
-    it.skip("empty string assignment", () => {});
-    it.skip("array of points round trip", () => {});
-    it.skip("legacy column", () => {});
-    it.skip("legacy default", () => {});
-    it.skip("legacy schema dumping", () => {});
-    it.skip("legacy roundtrip", () => {});
-    it.skip("legacy mutation", () => {});
     it.skip("geometric types", () => {});
     it.skip("alternative format", () => {});
     it.skip("geometric function", () => {});
-    it.skip("geometric line type", () => {});
-    it.skip("alternative format line type", () => {});
-    it.skip("schema dumping for line type", () => {});
     it.skip("creating column with point type", () => {});
     it.skip("creating column with line type", () => {});
     it.skip("creating column with lseg type", () => {});
@@ -68,9 +71,10 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("creating column with polygon type", () => {});
     it.skip("creating column with circle type", () => {});
   });
-  it.skip("column", async () => {});
 
-  it.skip("schema dumping", () => {});
-
-  it.skip("roundtrip", async () => {});
+  describe("PostgreSQLGeometricLineTest", () => {
+    it.skip("geometric line type", () => {});
+    it.skip("alternative format line type", () => {});
+    it.skip("schema dumping for line type", () => {});
+  });
 });

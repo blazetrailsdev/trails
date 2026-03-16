@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlTimestampTest", () => {
+  describe("PostgreSQLTimestampTest", () => {
     it.skip("timestamp column", async () => {});
     it.skip("timestamp default", async () => {});
     it.skip("timestamp type cast", async () => {});
@@ -30,18 +30,29 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("datetime schema dump", async () => {});
     it.skip("timestamp with zone values with rails time zone support and no time zone set", () => {});
     it.skip("timestamp with zone values without rails time zone support", () => {});
+  });
+
+  describe("PostgreSQLTimestampWithAwareTypesTest", () => {
     it.skip("timestamp with zone values with rails time zone support and time zone set", () => {});
+  });
+
+  describe("PostgreSQLTimestampWithTimeZoneTest", () => {
     it.skip("timestamp with zone values with rails time zone support and timestamptz and no time zone set", () => {});
     it.skip("timestamp with zone values with rails time zone support and timestamptz and time zone set", () => {});
+  });
+
+  describe("PostgreSQLTimestampFixtureTest", () => {
     it.skip("group by date", () => {});
+    it.skip("load infinity and beyond", async () => {});
+    it.skip("save infinity and beyond", async () => {});
     it.skip("bc timestamp", () => {});
     it.skip("bc timestamp leap year", () => {});
     it.skip("bc timestamp year zero", () => {});
+  });
+
+  describe("PostgreSQLTimestampMigrationTest", () => {
     it.skip("adds column as timestamp", () => {});
     it.skip("adds column as timestamptz if datetime type changed", () => {});
     it.skip("adds column as custom type", () => {});
   });
-  it.skip("load infinity and beyond", async () => {});
-
-  it.skip("save infinity and beyond", async () => {});
 });
