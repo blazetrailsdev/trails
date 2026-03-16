@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, association, registerModel } from "../index.js";
+import { Base, association, registerModel, InverseOfAssociationNotFoundError } from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -176,11 +176,64 @@ describe("InverseBelongsToTests", () => {
     expect((f as any)._cachedAssociations.get("man")).toBe(m2);
     expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
   });
-  it.skip("trying to use inverses that dont exist should raise an error", () => {
-    /* needs inverse validation */
+  it("trying to use inverses that dont exist should raise an error", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(Human, "confusedFace", {
+      className: "Face",
+      inverseOf: "cnffusedHuman",
+    });
+    Associations.belongsTo.call(Face, "human", {});
+    registerModel(Human);
+    registerModel(Face);
+    const h = await Human.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", human_id: h.id });
+    await expect(
+      loadHasOne(h, "confusedFace", { className: "Face", inverseOf: "cnffusedHuman" }),
+    ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
-  it.skip("trying to use inverses that dont exist should have suggestions for fix", () => {
-    /* needs inverse validation */
+
+  it("trying to use inverses that dont exist should have suggestions for fix", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(Human, "confusedFace", {
+      className: "Face",
+      inverseOf: "cnffusedHuman",
+    });
+    Associations.belongsTo.call(Face, "confusedHuman", { className: "Human" });
+    registerModel(Human);
+    registerModel(Face);
+    const h = await Human.create({ name: "Gordon" });
+    await Face.create({ description: "pretty", human_id: h.id });
+    try {
+      await loadHasOne(h, "confusedFace", { className: "Face", inverseOf: "cnffusedHuman" });
+      expect.unreachable("should have thrown");
+    } catch (e: any) {
+      expect(e.message).toMatch(/Did you mean/);
+      expect(e.corrections).toContain("confusedHuman");
+    }
   });
 
   it("building has many parent association inverses one record", async () => {
@@ -445,8 +498,31 @@ describe("InverseHasManyTests", () => {
     expect(Array.isArray(result) ? result.length : -1).toBe(0);
   });
 
-  it.skip("trying to use inverses that dont exist should raise an error", () => {
-    /* needs inverse validation */
+  it("trying to use inverses that dont exist should raise an error", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Human, "secretInterests", {
+      className: "Interest",
+      inverseOf: "secretHuman",
+    });
+    Associations.belongsTo.call(Interest, "human", {});
+    registerModel(Human);
+    registerModel(Interest);
+    const h = await Human.create({ name: "Gordon" });
+    await expect(
+      loadHasMany(h, "secretInterests", { className: "Interest", inverseOf: "secretHuman" }),
+    ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
 
   it("child instance should point to parent without saving", async () => {
@@ -1152,10 +1228,61 @@ describe("InverseHasOneTests", () => {
     expect((f as any)._cachedAssociations.get("man")).toBe(m2);
     expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
   });
-  it.skip("trying to use inverses that dont exist should raise an error", () => {
-    /* needs inverse validation */
+  it("trying to use inverses that dont exist should raise an error", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Face, "confusedHuman", {
+      className: "Human",
+      inverseOf: "cnffusedFace",
+    });
+    Associations.hasOne.call(Human, "face", {});
+    registerModel(Human);
+    registerModel(Face);
+    const f = await Face.create({ description: "pretty", human_id: 1 });
+    await expect(
+      loadBelongsTo(f, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" }),
+    ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
-  it.skip("trying to use inverses that dont exist should have suggestions for fix", () => {
-    /* needs inverse validation */
+
+  it("trying to use inverses that dont exist should have suggestions for fix", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Face, "confusedHuman", {
+      className: "Human",
+      inverseOf: "cnffusedFace",
+    });
+    Associations.hasOne.call(Human, "confusedFace", { className: "Face" });
+    registerModel(Human);
+    registerModel(Face);
+    const f = await Face.create({ description: "pretty", human_id: 1 });
+    try {
+      await loadBelongsTo(f, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" });
+      expect.unreachable("should have thrown");
+    } catch (e: any) {
+      expect(e.message).toMatch(/Did you mean/);
+      expect(e.corrections).toContain("confusedFace");
+    }
   });
 });
