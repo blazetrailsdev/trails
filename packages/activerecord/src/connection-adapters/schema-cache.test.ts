@@ -1,0 +1,31 @@
+import { describe, it } from "vitest";
+
+describe("SchemaCacheTest", () => {
+  it.skip("cached?", () => {});
+  it.skip("yaml dump and load", () => {});
+  it.skip("cache path can be in directory", () => {});
+  it.skip("yaml dump and load with gzip", () => {});
+  it.skip("yaml loads 5 1 dump", () => {});
+  it.skip("yaml loads 5 1 dump without indexes still queries for indexes", () => {});
+  it.skip("primary key for existent table", () => {});
+  it.skip("primary key for non existent table", () => {});
+  it.skip("columns for existent table", () => {});
+  it.skip("columns for non existent table", () => {});
+  it.skip("columns hash for existent table", () => {});
+  it.skip("columns hash for non existent table", () => {});
+  it.skip("indexes for existent table", () => {});
+  it.skip("indexes for non existent table", () => {});
+  it.skip("clearing", () => {});
+  it.skip("marshal dump and load", () => {});
+  it.skip("marshal dump and load via disk", () => {});
+  it.skip("marshal dump and load with ignored tables", () => {});
+  it.skip("marshal dump and load with gzip", () => {});
+  it.skip("gzip dumps identical", () => {});
+  it.skip("data source exist", () => {});
+  it.skip("clear data source cache", () => {});
+  it.skip("#columns_hash? is populated by #columns_hash", () => {});
+  it.skip("#columns_hash? is not populated by #data_source_exists?", () => {});
+  it.skip("when lazily load schema cache is set cache is lazily populated when est connection", () => {});
+  it.skip("#init_with skips deduplication if told to", () => {});
+  it.skip("#encode_with sorts members", () => {});
+});

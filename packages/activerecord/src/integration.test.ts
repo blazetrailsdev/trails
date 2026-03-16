@@ -1,0 +1,37 @@
+import { describe, it } from "vitest";
+
+describe("IntegrationTest", () => {
+  it.skip("to param should return string", () => {});
+  it.skip("to param returns nil if not persisted", () => {});
+  it.skip("to param returns id if not persisted but id is set", () => {});
+  it.skip("to param class method", () => {});
+  it.skip("to param class method truncates words properly", () => {});
+  it.skip("to param class method truncates after parameterize", () => {});
+  it.skip("to param class method truncates after parameterize with hyphens", () => {});
+  it.skip("to param class method truncates", () => {});
+  it.skip("to param class method truncates edge case", () => {});
+  it.skip("to param class method truncates case shown in doc", () => {});
+  it.skip("to param class method squishes", () => {});
+  it.skip("to param class method multibyte character", () => {});
+  it.skip("to param class method uses default if blank", () => {});
+  it.skip("to param class method uses default if not persisted", () => {});
+  it.skip("to param with no arguments", () => {});
+  it.skip("to param for a composite primary key model", () => {});
+  it.skip("param delimiter changes delimiter used in to param", () => {});
+  it.skip("param delimiter is defined per class", () => {});
+  it.skip("cache key for existing record is not timezone dependent", () => {});
+  it.skip("cache key format for existing record with updated at", () => {});
+  it.skip("cache key format for existing record with updated at and custom cache timestamp format", () => {});
+  it.skip("cache key changes when child touched", () => {});
+  it.skip("cache key format for existing record with nil updated timestamps", () => {});
+  it.skip("cache key for updated on", () => {});
+  it.skip("cache key for newer updated at", () => {});
+  it.skip("cache key for newer updated on", () => {});
+  it.skip("cache key format is precise enough", () => {});
+  it.skip("cache key format is not too precise", () => {});
+  it.skip("cache version format is precise enough", () => {});
+  it.skip("cache version format is not too precise", () => {});
+  it.skip("cache key is stable with versioning on", () => {});
+  it.skip("cache version changes with versioning on", () => {});
+  it.skip("cache key retains version when custom timestamp is used", () => {});
+});

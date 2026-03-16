@@ -1,0 +1,51 @@
+import { describe, it } from "vitest";
+
+describe("ActionPackAssertionsControllerTest", () => {
+  it.skip("render file absolute path", () => {});
+  it.skip("render file relative path", () => {});
+  it.skip("get request", () => {});
+  it.skip("post request", () => {});
+  it.skip("get post request switch", () => {});
+  it.skip("string constraint", () => {});
+  it.skip("with routing works with api only controllers", () => {});
+  it.skip("assert redirect to named route failure", () => {});
+  it.skip("assert redirect to nested named route", () => {});
+  it.skip("assert redirected to top level named route from nested controller", () => {});
+  it.skip("assert redirected to top level named route with same controller name in both namespaces", () => {});
+  it.skip("assert redirect failure message with protocol relative url", () => {});
+  it.skip("template objects exist", () => {});
+  it.skip("template objects missing", () => {});
+  it.skip("empty flash", () => {});
+  it.skip("flash exist", () => {});
+  it.skip("flash does not exist", () => {});
+  it.skip("session exist", () => {});
+  it.skip("redirection location", () => {});
+  it.skip("no redirect url", () => {});
+  it.skip("server error response code", () => {});
+  it.skip("missing response code", () => {});
+  it.skip("client error response code", () => {});
+  it.skip("redirect url match", () => {});
+  it.skip("redirection", () => {});
+  it.skip("successful response code", () => {});
+  it.skip("response object", () => {});
+  it.skip("render based on parameters", () => {});
+  it.skip("assert redirection fails with incorrect controller", () => {});
+  it.skip("assert redirection with extra controller option", () => {});
+  it.skip("redirected to url leading slash", () => {});
+  it.skip("redirected to url no leading slash fails", () => {});
+  it.skip("redirect invalid external route", () => {});
+  it.skip("redirected to url full url", () => {});
+  it.skip("assert redirection with symbol", () => {});
+  it.skip("assert redirection with custom message", () => {});
+  it.skip("assert redirection with status", () => {});
+  it.skip("redirected to with nested controller", () => {});
+  it.skip("assert response uses exception message", () => {});
+  it.skip("assert response failure response with no exception", () => {});
+});
+
+describe("ActionPackHeaderTest", () => {
+  it.skip("rendering xml sets content type", () => {});
+  it.skip("rendering xml respects content type", () => {});
+  it.skip("rendering xml respects content type when set in the header", () => {});
+  it.skip("render text with custom content type", () => {});
+});

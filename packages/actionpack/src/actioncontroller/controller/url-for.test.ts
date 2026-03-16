@@ -1,0 +1,32 @@
+import { describe, it } from "vitest";
+
+describe("UrlForTest", () => {
+  it.skip("anchor should call to param", () => {});
+  it.skip("anchor should not escape safe pchar", () => {});
+  it.skip("subdomain may be changed", () => {});
+  it.skip("subdomain may be object", () => {});
+  it.skip("subdomain may be removed", () => {});
+  it.skip("subdomain may be removed with blank string", () => {});
+  it.skip("multiple subdomains may be removed", () => {});
+  it.skip("subdomain may be accepted with numeric host", () => {});
+  it.skip("domain may be changed", () => {});
+  it.skip("tld length may be changed", () => {});
+  it.skip("relative url root is respected with environment variable", () => {});
+  it.skip("relative url root is respected for named routes", () => {});
+  it.skip("path params with default url options", () => {});
+  it.skip("path params without default url options", () => {});
+  it.skip("params option", () => {});
+  it.skip("params option strong parameters", () => {});
+  it.skip("non hash params option", () => {});
+  it.skip("hash recursive parameters", () => {});
+  it.skip("hash recursive and array parameters", () => {});
+  it.skip("url action controller parameters", () => {});
+  it.skip("path generation for symbol parameter keys", () => {});
+  it.skip("named routes with nil keys", () => {});
+  it.skip("multiple includes maintain distinct options", () => {});
+  it.skip("with stringified keys", () => {});
+  it.skip("with hash with indifferent access", () => {});
+  it.skip("url generation with array and hash", () => {});
+  it.skip("url for with array is unmodified", () => {});
+  it.skip("default params first empty", () => {});
+});

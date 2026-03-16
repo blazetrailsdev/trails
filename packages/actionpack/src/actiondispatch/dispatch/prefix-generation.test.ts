@@ -1,0 +1,52 @@
+import { describe, it } from "vitest";
+
+describe("WithMountedEngine", () => {
+  it.skip("[ENGINE] generating engine's URL use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] generating application's URL never uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] generating engine's URL with polymorphic path", () => {});
+  it.skip("[ENGINE] url_helpers from engine have higher priority than application's url_helpers", () => {});
+  it.skip("[ENGINE] relative path root uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative path redirect uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative option root uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative option redirect uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative custom root uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative custom redirect uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute path root doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute path redirect doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute option root doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute option redirect doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute custom root doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute custom redirect doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[APP] generating engine's route includes prefix", () => {});
+  it.skip("[APP] generating engine's route includes default_url_options[:script_name]", () => {});
+  it.skip("[APP] generating engine's URL with polymorphic path", () => {});
+  it.skip("polymorphic_path_for_app", () => {});
+  it.skip("[APP] generating engine's URL with url_for(@post)", () => {});
+  it.skip("[APP] instance variable with same name as engine", () => {});
+  it.skip("[OBJECT] proxy route should override respond_to?() as expected", () => {});
+  it.skip("[OBJECT] generating engine's route includes prefix", () => {});
+  it.skip("[OBJECT] generating engine's route includes dynamic prefix", () => {});
+  it.skip("[OBJECT] generating engine's route includes default_url_options[:script_name]", () => {});
+  it.skip("[OBJECT] generating application's route", () => {});
+  it.skip("[OBJECT] generating application's route includes default_url_options[:script_name]", () => {});
+  it.skip("[OBJECT] generating application's route includes default_url_options[:trailing_slash]", () => {});
+  it.skip("[OBJECT] generating engine's route with url_for", () => {});
+  it.skip("[OBJECT] generating engine's route with named route helpers", () => {});
+  it.skip("[OBJECT] generating engine's route with polymorphic_url", () => {});
+});
+
+describe("EngineMountedAtRoot", () => {
+  it.skip("generating path inside engine", () => {});
+  it.skip("[ENGINE] relative path root uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative path redirect uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative option root uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative option redirect uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative custom root uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] relative custom redirect uses SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute path root doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute path redirect doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute option root doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute option redirect doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute custom root doesn't use SCRIPT_NAME from request", () => {});
+  it.skip("[ENGINE] absolute custom redirect doesn't use SCRIPT_NAME from request", () => {});
+});

@@ -1,0 +1,32 @@
+import { describe, it } from "vitest";
+
+describe("RoutesInspectorTest", () => {
+  it.skip("displaying routes for engines without routes", () => {});
+  it.skip("inspect shows custom assets", () => {});
+  it.skip("inspect routes shows resources route", () => {});
+  it.skip("inspect routes shows root route", () => {});
+  it.skip("inspect routes shows dynamic action route", () => {});
+  it.skip("inspect routes shows controller and action only route", () => {});
+  it.skip("inspect routes shows controller and action route with constraints", () => {});
+  it.skip("rails routes shows route with defaults", () => {});
+  it.skip("rails routes shows route with constraints", () => {});
+  it.skip("rails routes shows routes with dashes", () => {});
+  it.skip("rails routes shows route with rack app", () => {});
+  it.skip("rails routes shows named route with mounted rack app", () => {});
+  it.skip("rails routes shows overridden named route with mounted rack app with name", () => {});
+  it.skip("rails routes shows route with rack app nested with dynamic constraints", () => {});
+  it.skip("rails routes dont show app mounted in assets prefix", () => {});
+  it.skip("rails routes shows route defined in under assets prefix", () => {});
+  it.skip("redirect", () => {});
+  it.skip("routes can be filtered", () => {});
+  it.skip("routes when expanded", () => {});
+  it.skip("no routes matched filter when expanded", () => {});
+  it.skip("not routes when expanded", () => {});
+  it.skip("routes can be filtered with namespaced controllers", () => {});
+  it.skip("regression route with controller regexp", () => {});
+  it.skip("routes with undefined filter", () => {});
+  it.skip("no routes matched filter", () => {});
+  it.skip("no routes were defined", () => {});
+  it.skip("displaying routes for internal engines", () => {});
+  it.skip("route with proc handler", () => {});
+});

@@ -1,0 +1,32 @@
+import { describe, it } from "vitest";
+
+describe("HasManyThroughDisableJoinsAssociationsTest", () => {
+  it.skip("counting on disable joins through", () => {});
+  it.skip("counting on disable joins through using custom foreign key", () => {});
+  it.skip("pluck on disable joins through", () => {});
+  it.skip("pluck on disable joins through using custom foreign key", () => {});
+  it.skip("fetching on disable joins through", () => {});
+  it.skip("fetching on disable joins through using custom foreign key", () => {});
+  it.skip("to a on disable joins through", () => {});
+  it.skip("appending on disable joins through", () => {});
+  it.skip("appending on disable joins through using custom foreign key", () => {});
+  it.skip("empty on disable joins through", () => {});
+  it.skip("empty on disable joins through using custom foreign key", () => {});
+  it.skip("pluck on disable joins through a through", () => {});
+  it.skip("count on disable joins through a through", () => {});
+  it.skip("count on disable joins using relation with scope", () => {});
+  it.skip("to a on disable joins with multiple scopes", () => {});
+  it.skip("preloading has many through disable joins", () => {});
+  it.skip("polymophic disable joins through counting", () => {});
+  it.skip("polymophic disable joins through ordering", () => {});
+  it.skip("polymorphic disable joins through reordering", () => {});
+  it.skip("polymorphic disable joins through ordered scopes", () => {});
+  it.skip("polymorphic disable joins through ordered chained scopes", () => {});
+  it.skip("polymorphic disable joins through ordered scope limits", () => {});
+  it.skip("polymorphic disable joins through ordered scope first", () => {});
+  it.skip("order applied in double join", () => {});
+  it.skip("first and scope applied in double join", () => {});
+  it.skip("first and scope in double join applies order in memory", () => {});
+  it.skip("limit and scope applied in double join", () => {});
+  it.skip("limit and scope in double join applies limit in memory", () => {});
+});

@@ -1,0 +1,34 @@
+import { describe, it } from "vitest";
+
+describe("CollectionCacheKeyTest", () => {
+  it.skip("collection_cache_key on model", () => {});
+  it.skip("cache_key for relation", () => {});
+  it.skip("cache_key for relation with limit", () => {});
+  it.skip("cache_key for relation with custom select and limit", () => {});
+  it.skip("cache_key for loaded relation", () => {});
+  it.skip("cache_key for relation with table alias", () => {});
+  it.skip("cache_key for relation with includes", () => {});
+  it.skip("cache_key for loaded relation with includes", () => {});
+  it.skip("update_all will update cache_key", () => {});
+  it.skip("update_all with includes will update cache_key", () => {});
+  it.skip("delete_all will update cache_key", () => {});
+  it.skip("delete_all with includes will update cache_key", () => {});
+  it.skip("destroy_all will update cache_key", () => {});
+  it.skip("it triggers at most one query", () => {});
+  it.skip("it doesn't trigger any query if the relation is already loaded", () => {});
+  it.skip("it doesn't trigger any query if collection_cache_versioning is enabled", () => {});
+  it.skip("relation cache_key changes when the sql query changes", () => {});
+  it.skip("cache_key for empty relation", () => {});
+  it.skip("cache_key with custom timestamp column", () => {});
+  it.skip("cache_key with unknown timestamp column", () => {});
+  it.skip("collection proxy provides a cache_key", () => {});
+  it.skip("cache_key for loaded collection with zero size", () => {});
+  it.skip("cache_key for queries with offset which return 0 rows", () => {});
+  it.skip("cache_key with a relation having selected columns", () => {});
+  it.skip("cache_key with a relation having distinct and order", () => {});
+  it.skip("cache_key with a relation having custom select and order", () => {});
+  it.skip("cache_key should be stable when using collection_cache_versioning", () => {});
+  it.skip("cache_version for relation", () => {});
+  it.skip("reset will reset cache_version", () => {});
+  it.skip("cache_key_with_version contains key and version regardless of collection_cache_versioning setting", () => {});
+});
