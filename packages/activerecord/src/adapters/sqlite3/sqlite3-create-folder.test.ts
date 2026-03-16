@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: sqlite3_create_folder_test.rb --
-describe("SQLite3Adapter", () => {
+describe("SQLite3CreateFolder", () => {
   it("sqlite creates directory", async () => {
     const fs = await import("fs");
     const path = await import("path");

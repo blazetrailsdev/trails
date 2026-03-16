@@ -1021,7 +1021,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe("TransactionsWithTransactionalFixturesTest", () => {
   it("automatic savepoint in outer transaction", () => {
     expect(true).toBe(true);
   });
@@ -1033,7 +1033,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionUUIDTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe("TransactionUUIDTest", () => {
   it("the uuid is lazily computed", () => {
     expect(true).toBe(true);
   });
@@ -1048,7 +1048,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // ConcurrentTransactionTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe("ConcurrentTransactionTest", () => {
   it("transaction per thread", () => {
     expect(true).toBe(true);
   });
