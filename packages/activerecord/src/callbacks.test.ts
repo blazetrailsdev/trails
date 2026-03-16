@@ -157,7 +157,20 @@ describe("CallbacksTest", () => {
     /* fixture-dependent */
   });
 
-  it.skip("before validation returns false", () => {});
+  it("before validation returns false", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validates("title", { presence: true });
+        this.beforeValidation(() => false);
+      }
+    }
+    const p = new CbPost({ title: "test" });
+    const result = await p.save();
+    expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
+  });
 
   it.skip("before destroy returns false", async () => {
     class CbPost extends Base {
@@ -217,10 +230,44 @@ describe("CallbacksTest", () => {
     expect(reloaded.readAttribute("title")).toBe("test");
   });
 
-  it.skip("after find", () => {});
-  it.skip("after initialize", () => {});
-  it.skip("after_commit_on_create_in_transaction", () => {});
-  it.skip("after_commit callback doesnt fire for readonly", () => {});
+  it("after find", async () => {
+    const log: string[] = [];
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.afterFind(function () {
+          log.push("found");
+        });
+      }
+    }
+    await CbPost.create({ title: "test" });
+    log.length = 0;
+    await CbPost.first();
+    expect(log).toContain("found");
+  });
+
+  it("after initialize", () => {
+    const log: string[] = [];
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.afterInitialize(function () {
+          log.push("initialized");
+        });
+      }
+    }
+    new CbPost({ title: "test" });
+    expect(log).toContain("initialized");
+  });
+
+  it.skip("after_commit_on_create_in_transaction", () => {
+    /* needs transaction + afterCommit on create */
+  });
+  it.skip("after_commit callback doesnt fire for readonly", () => {
+    /* needs readonly check in commit callbacks */
+  });
 
   it("new valid?", async () => {
     class CbPost extends Base {
@@ -305,7 +352,19 @@ describe("CallbacksTest", () => {
     expect(result).toBe(false);
   });
 
-  it.skip("callback throwing abort", () => {});
+  it("callback throwing abort", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeSave(() => false);
+      }
+    }
+    const p = new CbPost({ title: "test" });
+    const result = await p.save();
+    expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
+  });
 });
 
 describe("CallbacksTest", () => {
