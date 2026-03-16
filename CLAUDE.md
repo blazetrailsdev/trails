@@ -59,8 +59,8 @@ npm run convention:compare
 
 Current status (8713/17172 implemented = 50.7%, 4981 skipped):
 
-| Package          | Implemented | Files   | Misplaced |
-| ---------------- | ----------- | ------- | --------- |
+| Package          | Implemented % | Files   | Misplaced |
+| ---------------- | ------------- | ------- | --------- |
 | arel             | 99.4%       | 59/59   | 0         |
 | activemodel      | 99.5%       | 56/56   | 0         |
 | activerecord     | 50.5%       | 340/342 | 0         |

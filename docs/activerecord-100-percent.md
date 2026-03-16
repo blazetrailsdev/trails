@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **50.5%** (4,231 implemented / 8,385 total Ruby tests). 340/342 files matched, 0 misplaced, 79 wrong describes, 3,910 skipped.
+Current state: **50.5%** (4,231 implemented / 8,385 total Ruby tests). 340/342 files mapped, 0 misplaced, 79 wrong describes, 3,910 skipped.
 
 ## How coverage is measured
 
