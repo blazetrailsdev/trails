@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlUUIDTest", () => {
+  describe("PostgreSQLUUIDTest", () => {
     it.skip("uuid column", async () => {});
     it.skip("uuid default", async () => {});
     it.skip("uuid type cast", async () => {});
@@ -56,6 +56,9 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("acceptable uuid regex", () => {});
     it.skip("uuid formats", () => {});
     it.skip("uniqueness validation ignores uuid", () => {});
+  });
+
+  describe("PostgreSQLUUIDGenerationTest", () => {
     it.skip("id is uuid", () => {});
     it.skip("id has a default", () => {});
     it.skip("auto create uuid", () => {});
@@ -64,12 +67,21 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("schema dumper for uuid primary key with custom default", () => {});
     it.skip("schema dumper for uuid primary key default", () => {});
     it.skip("schema dumper for uuid primary key default in legacy migration", () => {});
+  });
+
+  describe("PostgreSQLUUIDTestNilDefault", () => {
     it.skip("id allows default override via nil", () => {});
     it.skip("schema dumper for uuid primary key with default override via nil", () => {});
     it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {});
+  });
+
+  describe("PostgreSQLUUIDTestInverseOf", () => {
     it.skip("collection association with uuid", () => {});
     it.skip("find with uuid", () => {});
     it.skip("find by with uuid", () => {});
+  });
+
+  describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
     it.skip("uuid primary key and disable joins with delegate cache", () => {});
   });
 });

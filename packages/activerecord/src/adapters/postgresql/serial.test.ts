@@ -15,7 +15,6 @@ describeIfPg("PostgresAdapter", () => {
 
   describe("PostgresqlSerialTest", () => {
     it.skip("serial column", async () => {});
-    it.skip("bigserial column", async () => {});
     it.skip("smallserial column", async () => {});
     it.skip("serial default", async () => {});
     it.skip("serial sequence name", async () => {});
@@ -28,11 +27,21 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("serial custom sequence", async () => {});
     it.skip("not serial column", async () => {});
     it.skip("schema dump with not serial", async () => {});
+    it.skip("serial columns 2", async () => {});
+  });
+
+  describe("PostgreSQLBigSerialTest", () => {
+    it.skip("bigserial column", async () => {});
     it.skip("not bigserial column", async () => {});
     it.skip("schema dump with not bigserial", async () => {});
+  });
+
+  describe("CollidedSequenceNameTest", () => {
     it.skip("serial columns", async () => {});
-    it.skip("serial columns 2", async () => {});
     it.skip("schema dump with collided sequence name", async () => {});
+  });
+
+  describe("LongerSequenceNameDetectionTest", () => {
     it.skip("schema dump with long table name", async () => {});
   });
 });
