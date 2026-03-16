@@ -2017,10 +2017,6 @@ export class Base extends Model {
       if (!updateResult) saved = false;
     }
 
-    if (saved) {
-      ctor._callbackChain.runAfter("save", this);
-    }
-
     // Wait for the async operation
     if (this._pendingOperation) {
       await this._pendingOperation;
@@ -2033,6 +2029,8 @@ export class Base extends Model {
       this._previouslyNewRecord = wasNewRecord;
       this._newRecord = false;
       this.changesApplied();
+
+      ctor._callbackChain.runAfter("save", this);
 
       // Counter cache: increment on create
       if (wasNewRecord) {
