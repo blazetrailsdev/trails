@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgresAdapter", () => {
+describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgresAdapter;
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlBindParameterTest", () => {
+  describe("BindParameterTest", () => {
     beforeEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS "bind_test"`);
       await adapter.exec(`

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgresAdapter", () => {
+describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgresAdapter;
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
@@ -19,7 +19,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlQuotingTest", () => {
+  describe("PostgreSQLQuotingTest", () => {
     it("type cast true", async () => {
       const rows = await adapter.execute("SELECT TRUE AS val");
       expect(rows[0].val).toBe(true);

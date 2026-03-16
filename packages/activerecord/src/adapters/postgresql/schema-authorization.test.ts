@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlSchemaAuthorizationTest", () => {
+  describe("SchemaAuthorizationTest", () => {
     it.skip("schema authorization", async () => {});
     it.skip("schema authorization with quoted names", async () => {});
     it.skip("session authorization", async () => {});

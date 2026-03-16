@@ -4,7 +4,7 @@
 import { describe, it, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgresAdapter", () => {
+describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgresAdapter;
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);

@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlTransactionTest", () => {
+  describe("PostgreSQLTransactionTest", () => {
     it.skip("transaction isolation read committed", async () => {});
     it.skip("transaction isolation repeatable read", async () => {});
     it.skip("transaction isolation serializable", async () => {});

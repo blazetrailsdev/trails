@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlCreateUnloggedTablesTest", () => {
+  describe("UnloggedTablesTest", () => {
     it.skip("create unlogged table", async () => {});
     it.skip("create unlogged table with index", async () => {});
     it.skip("create unlogged table from select", async () => {});
