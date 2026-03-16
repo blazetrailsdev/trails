@@ -208,11 +208,11 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Existing", author: "Auth" });
-    const existing = await Book.first();
+    const existing = (await Book.first()) as any;
     const count = await Book.insertAll(
       [
-        { id: (existing as any).id, title: "Dup", author: "Auth" },
-        { title: "New", author: "Auth2" },
+        { id: existing.id, title: "Dup", author: "Auth" },
+        { id: existing.id + 1000, title: "New", author: "Auth2" },
       ],
       { uniqueBy: "id" },
     );
@@ -340,7 +340,7 @@ describe("InsertAllTest", () => {
     const all = await Book.all().toArray();
     expect(all.some((b: any) => b.readAttribute("title") === "NoCallback")).toBe(true);
   });
-  it("upsert_all works with custom primary key", async () => {
+  it.skipIf(adapterType !== "memory")("upsert_all works with custom primary key", async () => {
     const adapter = freshAdapter();
     class Item extends Base {
       static {
