@@ -69,6 +69,51 @@ function resolveModel(name: string): typeof Base {
 }
 
 /**
+ * Resolve the counter cache column for a hasMany association by inspecting
+ * the child model's belongsTo reflection for a counterCache option.
+ * Falls back to `${assocName}_count` if no reflection is found.
+ */
+export function resolveCounterColumn(
+  parentModel: typeof Base,
+  assoc: { type: string; name: string; options: any },
+  counterName: string,
+): string {
+  // If counter name was passed as a column name directly, use it
+  if (counterName.endsWith("_count")) return counterName;
+
+  const childClassName = assoc.options.className ?? camelize(singularize(assoc.name));
+  if (!modelRegistry.has(childClassName)) {
+    return `${assoc.name}_count`;
+  }
+  const childModel = resolveModel(childClassName);
+  const childAssocs = (childModel as any)._associations as
+    | Array<{ type: string; name: string; options: any }>
+    | undefined;
+  if (childAssocs) {
+    // Check against parent name and STI base class name
+    const parentNames = new Set([parentModel.name]);
+    let proto = Object.getPrototypeOf(parentModel);
+    while (proto && proto.name && proto !== Function.prototype) {
+      parentNames.add(proto.name);
+      proto = Object.getPrototypeOf(proto);
+    }
+    const belongsTo = childAssocs.find(
+      (a) =>
+        a.type === "belongsTo" &&
+        a.options.counterCache &&
+        (parentNames.has(a.options.className) || parentNames.has(camelize(a.name))),
+    );
+    if (belongsTo) {
+      if (typeof belongsTo.options.counterCache === "string") {
+        return belongsTo.options.counterCache;
+      }
+      return `${pluralize(underscore(childModel.name))}_count`;
+    }
+  }
+  return `${assoc.name}_count`;
+}
+
+/**
  * Associations mixin — adds belongsTo, hasOne, hasMany to a model class.
  *
  * Mirrors: ActiveRecord::Associations::ClassMethods
@@ -455,6 +500,96 @@ export async function loadHasMany(
   }
 
   return results;
+}
+
+/**
+ * Build the relation for a hasMany association without executing it.
+ * Skips caching, strict loading, and inverse_of — used by countHasMany
+ * so resetCounters works under strict loading.
+ * Returns null if primary key values are missing.
+ */
+function buildHasManyRelation(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): any | null {
+  const ctor = record.constructor as typeof Base;
+  const className = options.className ?? camelize(singularize(assocName));
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  const targetModel = resolveModel(className);
+
+  if (options.as) {
+    const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
+    const pkValue = record.readAttribute(primaryKey as string);
+    if (pkValue === null || pkValue === undefined) return null;
+    const typeCol = `${underscore(options.as)}_type`;
+    let rel = (targetModel as any).all().where({
+      [foreignKey as string]: pkValue,
+      [typeCol]: ctor.name,
+    });
+    if (options.scope) rel = options.scope(rel);
+    return rel;
+  }
+
+  const foreignKey =
+    options.foreignKey ??
+    (options.queryConstraints
+      ? options.queryConstraints
+      : Array.isArray(primaryKey)
+        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+        : `${underscore(ctor.name)}_id`);
+
+  if (Array.isArray(foreignKey)) {
+    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    const conditions: Record<string, unknown> = {};
+    for (let i = 0; i < foreignKey.length; i++) {
+      const pkVal = record.readAttribute(pkCols[i]);
+      if (pkVal === null || pkVal === undefined) return null;
+      conditions[foreignKey[i]] = pkVal;
+    }
+    let rel = (targetModel as any).all().where(conditions);
+    if (options.scope) rel = options.scope(rel);
+    return rel;
+  }
+
+  const pkValue = record.readAttribute(primaryKey as string);
+  if (pkValue === null || pkValue === undefined) return null;
+  let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
+  if (options.scope) rel = options.scope(rel);
+  return rel;
+}
+
+/**
+ * Count associated records for a hasMany association using COUNT(*)
+ * without loading records into memory. Bypasses strict loading checks
+ * so resetCounters works on strict-loading models.
+ */
+export async function countHasMany(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): Promise<number> {
+  if (options.through) {
+    // Temporarily disable strict loading so through-association loading works
+    const wasStrict = (record as any)._strictLoading;
+    (record as any)._strictLoading = false;
+    try {
+      const records = await loadHasManyThrough(record, assocName, options);
+      return records.length;
+    } finally {
+      (record as any)._strictLoading = wasStrict;
+    }
+  }
+  const rel = buildHasManyRelation(record, assocName, options);
+  if (!rel) return 0;
+  const result = await rel.count();
+  if (typeof result !== "number") {
+    throw new Error(
+      `countHasMany expected a numeric count but got ${typeof result} — ` +
+        `association "${assocName}" may have a grouped scope`,
+    );
+  }
+  return result;
 }
 
 /**
