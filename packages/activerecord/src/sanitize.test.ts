@@ -231,9 +231,32 @@ describe("SanitizeTest", () => {
     expect(sql).toContain("'10:00'");
   });
 
-  it.skip("sanitize sql array handles string interpolation", () => {});
-  it.skip("sanitize sql array handles bind variables", () => {});
-  it.skip("sanitize sql array handles relations", () => {});
+  it("sanitize sql array handles string interpolation", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const sql = Post.sanitizeSqlArray("title = ?", "hello");
+    expect(sql).toBe("title = 'hello'");
+  });
+
+  it("sanitize sql array handles bind variables", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
+    expect(sql).toContain("'hello'");
+    expect(sql).toContain("1");
+  });
+
+  it.skip("sanitize sql array handles relations", () => {
+    /* needs Relation#toSql integration with sanitize */
+  });
 });
 
 describe("sanitizeSql", () => {
