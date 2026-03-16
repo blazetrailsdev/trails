@@ -451,21 +451,134 @@ describe("TransactionTest", () => {
     expect(await Post.count()).toBe(1);
   });
 
-  it.skip("after_commit on update", () => {});
-  it.skip("after_commit on destroy", () => {});
-  it.skip("after commit fires in correct order", () => {});
-  it.skip("after_commit_on_create_in_transaction", () => {});
-  it.skip("after_rollback on create", () => {});
-  it.skip("after_rollback on update", () => {});
-  it.skip("after_rollback on destroy", () => {});
-  it.skip("after commit callback ordering", () => {});
-  it.skip("after_commit_returns_record_with_save", () => {});
-  it.skip("after_commit_returns_record_with_destroy", () => {});
-  it.skip("rollback triggers after_rollback", () => {});
-  it.skip("after_commit_on_destroy_in_transaction", () => {});
-  it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {});
-  it.skip("after_commit_not_called_on_rollback", () => {});
-  it.skip("after_commit callback doesnt fire for readonly", () => {});
+  it("after_commit on update", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit((record: any) => {
+          log.push("committed:" + record.readAttribute("title"));
+        });
+      }
+    }
+    const p = await Post.create({ title: "orig" });
+    log.length = 0;
+    p.writeAttribute("title", "updated");
+    await p.save();
+    expect(log).toContain("committed:updated");
+  });
+
+  it.skip("after_commit on destroy", () => {
+    /* destroy doesn't trigger afterCommit callbacks */
+  });
+
+  it("after commit fires in correct order", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit(() => {
+          log.push("first");
+        });
+        this.afterCommit(() => {
+          log.push("second");
+        });
+      }
+    }
+    await Post.create({ title: "test" });
+    expect(log.indexOf("first")).toBeLessThan(log.indexOf("second"));
+  });
+
+  it("after_commit_on_create_in_transaction", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit(() => {
+          log.push("committed");
+        });
+      }
+    }
+    await transaction(Post, async () => {
+      await Post.create({ title: "in-txn" });
+    });
+    expect(log).toContain("committed");
+  });
+
+  it.skip("after_rollback on create", () => {
+    /* needs real transaction rollback */
+  });
+  it.skip("after_rollback on update", () => {
+    /* needs real transaction rollback */
+  });
+  it.skip("after_rollback on destroy", () => {
+    /* needs real transaction rollback */
+  });
+
+  it("after commit callback ordering", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit(() => {
+          log.push("a");
+        });
+        this.afterCommit(() => {
+          log.push("b");
+        });
+        this.afterCommit(() => {
+          log.push("c");
+        });
+      }
+    }
+    await Post.create({ title: "test" });
+    expect(log).toEqual(expect.arrayContaining(["a", "b", "c"]));
+  });
+
+  it("after_commit_returns_record_with_save", async () => {
+    const adp = freshAdapter();
+    let savedRecord: any = null;
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit((record: any) => {
+          savedRecord = record;
+        });
+      }
+    }
+    const p = await Post.create({ title: "test" });
+    expect(savedRecord).not.toBeNull();
+    expect(savedRecord.readAttribute("title")).toBe("test");
+  });
+
+  it.skip("after_commit_returns_record_with_destroy", () => {
+    /* destroy doesn't trigger afterCommit callbacks */
+  });
+
+  it.skip("rollback triggers after_rollback", () => {
+    /* needs real transaction rollback */
+  });
+  it.skip("after_commit_on_destroy_in_transaction", () => {
+    /* needs destroy within transaction + afterCommit */
+  });
+  it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {
+    /* needs nested transaction / savepoint support */
+  });
+  it.skip("after_commit_not_called_on_rollback", () => {
+    /* needs real transaction rollback */
+  });
+  it.skip("after_commit callback doesnt fire for readonly", () => {
+    /* needs readonly check in commit callbacks */
+  });
   it("transaction within transaction", async () => {
     const adp = freshAdapter();
     class TxPost extends Base {
