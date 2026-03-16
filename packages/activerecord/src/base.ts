@@ -1003,7 +1003,7 @@ export class Base extends Model {
    */
   static async upsertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[] },
+    options?: { uniqueBy?: string | string[]; updateOnly?: string | string[] },
   ): Promise<number> {
     return this.all().upsertAll(records, options);
   }
