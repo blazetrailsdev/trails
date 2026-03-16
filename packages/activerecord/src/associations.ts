@@ -94,8 +94,12 @@ export function resolveCounterColumn(
           a.options.counterCache &&
           (a.options.className === parentModel.name || camelize(a.name) === parentModel.name),
       );
-      if (belongsTo && typeof belongsTo.options.counterCache === "string") {
-        return belongsTo.options.counterCache;
+      if (belongsTo) {
+        if (typeof belongsTo.options.counterCache === "string") {
+          return belongsTo.options.counterCache;
+        }
+        // Match updateCounterCaches default: pluralize(underscore(childModelName))_count
+        return `${pluralize(underscore(childModel.name))}_count`;
       }
     }
   } catch {

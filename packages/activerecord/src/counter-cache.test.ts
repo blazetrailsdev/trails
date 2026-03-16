@@ -480,32 +480,31 @@ describe("CounterCacheTest", () => {
     expect(reloaded.readAttribute("views_count")).toBe(5);
   });
   it("reset counter with custom column name", async () => {
-    class Topic extends Base {
+    class Car extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("name", "string");
+        this.attribute("num_engines", "integer", { default: 0 });
         this.adapter = adapter;
       }
     }
-    class Reply extends Base {
+    class Engine extends Base {
       static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
+        this.attribute("car_id", "integer");
         this.adapter = adapter;
       }
     }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await Topic.incrementCounter("replies_count", t.id);
-    const before = await Topic.find(t.id);
-    expect(before.readAttribute("replies_count")).toBe(2);
-    await Topic.resetCounters(t.id, "replies_count");
-    const after = await Topic.find(t.id);
-    expect(after.readAttribute("replies_count")).toBe(1);
+    Associations.belongsTo.call(Engine, "car", { counterCache: "num_engines" });
+    Associations.hasMany.call(Car, "engines", { foreignKey: "car_id" });
+    registerModel(Car);
+    registerModel(Engine);
+    const car = await Car.create({ name: "Honda" });
+    await Engine.create({ car_id: car.id });
+    await Car.incrementCounter("num_engines", car.id);
+    const before = await Car.find(car.id);
+    expect(before.readAttribute("num_engines")).toBe(2);
+    await Car.resetCounters(car.id, "engines");
+    const after = await Car.find(car.id);
+    expect(after.readAttribute("num_engines")).toBe(1);
   });
   it("counter cache columns are updated in memory after create", async () => {
     class Topic extends Base {
