@@ -231,7 +231,7 @@ describe("InverseBelongsToTests", () => {
       await loadHasOne(h, "confusedFace", { className: "Face", inverseOf: "cnffusedHuman" });
       expect.unreachable("should have thrown");
     } catch (e: any) {
-      expect(e.detailedMessage).toMatch(/Did you mean/);
+      expect(e.message).toMatch(/Did you mean/);
       expect(e.corrections).toContain("confusedHuman");
     }
   });
@@ -1281,7 +1281,7 @@ describe("InverseHasOneTests", () => {
       await loadBelongsTo(f, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" });
       expect.unreachable("should have thrown");
     } catch (e: any) {
-      expect(e.detailedMessage).toMatch(/Did you mean/);
+      expect(e.message).toMatch(/Did you mean/);
       expect(e.corrections).toContain("confusedFace");
     }
   });
