@@ -300,7 +300,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe("TimestampsWithoutTransactionTest", () => {
   it("do not write timestamps on save if they are not attributes", async () => {
     const adapter = freshAdapter();
     class Post extends Base {

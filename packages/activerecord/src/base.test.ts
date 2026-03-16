@@ -2111,30 +2111,28 @@ describe("BasicsTest", () => {
 
 describe("BasicsTest", () => {
   // -- Table name inference --
-  describe("table name inference", () => {
-    it("table name guesses", () => {
-      class User extends Base {}
-      expect(User.tableName).toBe("users");
-    });
+  it("table name guesses", () => {
+    class User extends Base {}
+    expect(User.tableName).toBe("users");
+  });
 
-    it("handles CamelCase class names", () => {
-      class BlogPost extends Base {}
-      expect(BlogPost.tableName).toBe("blog_posts");
-    });
+  it("handles CamelCase class names", () => {
+    class BlogPost extends Base {}
+    expect(BlogPost.tableName).toBe("blog_posts");
+  });
 
-    it("handles names ending in y", () => {
-      class Category extends Base {}
-      expect(Category.tableName).toBe("categories");
-    });
+  it("handles names ending in y", () => {
+    class Category extends Base {}
+    expect(Category.tableName).toBe("categories");
+  });
 
-    it("switching between table name", () => {
-      class User extends Base {
-        static {
-          this.tableName = "people";
-        }
+  it("switching between table name", () => {
+    class User extends Base {
+      static {
+        this.tableName = "people";
       }
-      expect(User.tableName).toBe("people");
-    });
+    }
+    expect(User.tableName).toBe("people");
   });
 
   // -- Primary key --
@@ -2305,25 +2303,23 @@ describe("BasicsTest", () => {
   });
 
   // -- Reload --
-  describe("reload", () => {
-    it("reload", async () => {
-      const adapter = freshAdapter();
-      class User extends Base {
-        static {
-          this.attribute("name", "string");
-          this.adapter = adapter;
-        }
+  it("reload", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
       }
-      const u = await User.create({ name: "Original" });
-      // Directly modify via another instance
-      const u2 = await User.find(u.id);
-      await u2.update({ name: "Modified" });
+    }
+    const u = await User.create({ name: "Original" });
+    // Directly modify via another instance
+    const u2 = await User.find(u.id);
+    await u2.update({ name: "Modified" });
 
-      // u still has old value
-      expect(u.readAttribute("name")).toBe("Original");
-      await u.reload();
-      expect(u.readAttribute("name")).toBe("Modified");
-    });
+    // u still has old value
+    expect(u.readAttribute("name")).toBe("Original");
+    await u.reload();
+    expect(u.readAttribute("name")).toBe("Modified");
   });
 
   // -- Callbacks --

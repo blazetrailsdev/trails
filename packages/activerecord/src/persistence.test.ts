@@ -1945,20 +1945,22 @@ describe("PersistenceTest", () => {
     expect(found.readAttribute("title")).toBe("new");
   });
 
-  it("primary key stays the same", async () => {
-    const adapter = freshAdapter();
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
+  describe("QueryConstraintsTest", () => {
+    it("primary key stays the same", async () => {
+      const adapter = freshAdapter();
+      class Topic extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adapter;
+        }
       }
-    }
-    const t = await Topic.create({ title: "test" });
-    const id = t.id;
-    t.writeAttribute("title", "updated");
-    await t.save();
-    expect(t.id).toBe(id);
-  });
+      const t = await Topic.create({ title: "test" });
+      const id = t.id;
+      t.writeAttribute("title", "updated");
+      await t.save();
+      expect(t.id).toBe(id);
+    });
+  }); // QueryConstraintsTest
 });
 
 describe("PersistenceTest", () => {
@@ -4345,31 +4347,33 @@ describe("PersistenceTest", () => {
     expect(u.isPersisted()).toBe(true);
   });
 
-  it("query constraints list is nil if primary key is nil", () => {
-    expect(true).toBe(true);
-  });
+  describe("QueryConstraintsTest", () => {
+    it("query constraints list is nil if primary key is nil", () => {
+      expect(true).toBe(true);
+    });
 
-  it("query constraints list is nil for non cpk model", () => {
-    expect(true).toBe(true);
-  });
+    it("query constraints list is nil for non cpk model", () => {
+      expect(true).toBe(true);
+    });
 
-  it("query constraints list equals to composite primary key", () => {
-    expect(true).toBe(true);
-  });
+    it("query constraints list equals to composite primary key", () => {
+      expect(true).toBe(true);
+    });
 
-  it("child keeps parents query constraints", () => {
-    expect(true).toBe(true);
-  });
+    it("child keeps parents query constraints", () => {
+      expect(true).toBe(true);
+    });
 
-  it("child keeps parents query contraints derived from composite pk", () => {
-    expect(true).toBe(true);
-  });
+    it("child keeps parents query contraints derived from composite pk", () => {
+      expect(true).toBe(true);
+    });
 
-  it("query constraints raises an error when no columns provided", () => {
-    expect(true).toBe(true);
-  });
+    it("query constraints raises an error when no columns provided", () => {
+      expect(true).toBe(true);
+    });
 
-  it("child class with query constraints overrides parents", () => {
-    expect(true).toBe(true);
-  });
+    it("child class with query constraints overrides parents", () => {
+      expect(true).toBe(true);
+    });
+  }); // QueryConstraintsTest
 });

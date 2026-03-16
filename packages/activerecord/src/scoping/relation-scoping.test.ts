@@ -215,7 +215,9 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("default scope filters on joins", () => {});
-  it.skip("should maintain default scope on associations", () => {});
+  describe("HasManyScopingTest", () => {
+    it.skip("should maintain default scope on associations", () => {});
+  });
 });
 
 describe("NestedRelationScopingTest", () => {
@@ -328,29 +330,31 @@ describe("Static shorthands (Rails-guided)", () => {
     /* TODO: needs helpers from original file */
   });
 
-  it.skip("forwarding of static methods", () => {
-    /* TODO: needs helpers from original file */
-  });
+  describe("HasManyScopingTest", () => {
+    it.skip("forwarding of static methods", () => {
+      /* TODO: needs helpers from original file */
+    });
 
-  it.skip("nested scope finder", () => {
-    /* TODO: needs helpers from original file */
-  });
+    it.skip("nested scope finder", () => {
+      /* TODO: needs helpers from original file */
+    });
 
-  it.skip("none scoping", () => {
-    /* TODO: needs helpers from original file */
-  });
+    it.skip("none scoping", () => {
+      /* TODO: needs helpers from original file */
+    });
 
-  it.skip("forwarding to scoped", () => {
-    /* TODO: needs helpers from original file */
-  });
+    it.skip("forwarding to scoped", () => {
+      /* TODO: needs helpers from original file */
+    });
 
-  it.skip("should default scope on associations is overridden by association conditions", () => {
-    /* TODO: needs helpers from original file */
-  });
+    it.skip("should default scope on associations is overridden by association conditions", () => {
+      /* TODO: needs helpers from original file */
+    });
 
-  it.skip("should maintain default scope on eager loaded associations", () => {
-    /* TODO: needs helpers from original file */
-  });
+    it.skip("should maintain default scope on eager loaded associations", () => {
+      /* TODO: needs helpers from original file */
+    });
+  }); // HasManyScopingTest
 
   it.skip("scoping applies to all queries on has many when set", () => {
     /* TODO: needs helpers from original file */

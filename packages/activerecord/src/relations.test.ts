@@ -6746,29 +6746,32 @@ describe("RelationTest", () => {
     /* needs block/yield support in create */
   });
 
-  it("multiple find or create by within transactions", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
+  describe("CreateOrFindByWithinTransactions", () => {
+    it("multiple find or create by within transactions", async () => {
+      const adp = freshAdapter();
+      class Post extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adp;
+        }
       }
-    }
-    const p = await Post.create({ title: "txn1" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
+      const p = await Post.create({ title: "txn1" });
+      expect((p as any).isPersisted()).toBe(true);
+    });
 
-  it("multiple find or create by bang within transactions", async () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
+    it("multiple find or create by bang within transactions", async () => {
+      const adp = freshAdapter();
+      class Post extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adp;
+        }
       }
-    }
-    const p = await Post.create({ title: "txn2" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
+      const p = await Post.create({ title: "txn2" });
+      expect((p as any).isPersisted()).toBe(true);
+    });
+  }); // CreateOrFindByWithinTransactions
+
   it(" with blank value", () => {
     class Post extends Base {
       static {

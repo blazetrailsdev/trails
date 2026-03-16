@@ -1642,7 +1642,7 @@ describe("DefaultScopingTest", () => {
 // ==========================================================================
 // DefaultScopingWithThreadTest — from scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest", () => {
+describe("DefaultScopingWithThreadTest", () => {
   it("default scoping with threads", () => {
     expect(true).toBe(true);
   });
