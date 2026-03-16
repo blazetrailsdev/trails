@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlForeignTableTest", () => {
+  describe("ForeignTableTest", () => {
     it.skip("create foreign table", async () => {});
     it.skip("drop foreign table", async () => {});
     it.skip("foreign table exists", async () => {});

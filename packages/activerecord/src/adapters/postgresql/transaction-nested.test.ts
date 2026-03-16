@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlTransactionNestedTest", () => {
+  describe("PostgreSQLTransactionNestedTest", () => {
     it.skip("nested transaction rollback", async () => {});
     it.skip("nested transaction commit", async () => {});
     it.skip("double nested transaction", async () => {});

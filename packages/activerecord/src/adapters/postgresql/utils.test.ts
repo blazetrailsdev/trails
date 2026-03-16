@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlUtilsTest", () => {
+  describe("PostgreSQLNameTest", () => {
     it.skip("reset pk sequence on empty table", async () => {});
     it.skip("reset pk sequence with custom pk", async () => {});
     it.skip("distinct zero", async () => {});

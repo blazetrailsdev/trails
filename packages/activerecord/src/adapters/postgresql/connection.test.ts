@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlConnectionTest", () => {
+  describe("PostgreSQLConnectionTest", () => {
     it("encoding", async () => {
       const rows = await adapter.execute(
         `SELECT pg_encoding_to_char(encoding) AS encoding FROM pg_database WHERE datname = current_database()`,

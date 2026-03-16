@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlVirtualColumnTest", () => {
+  describe("PostgreSQLVirtualColumnTest", () => {
     it.skip("virtual column", async () => {});
     it.skip("virtual column default", async () => {});
     it.skip("virtual column type cast", async () => {});

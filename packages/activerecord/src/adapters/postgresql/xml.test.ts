@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlXmlTest", () => {
+  describe("PostgreSQLXMLTest", () => {
     it.skip("xml column", async () => {});
     it.skip("xml default", async () => {});
     it.skip("xml type cast", async () => {});

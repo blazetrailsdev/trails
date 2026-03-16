@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlPreparedStatementsDisabledTest", () => {
+  describe("PreparedStatementsDisabledTest", () => {
     it.skip("prepared statements disabled", async () => {});
     it.skip("select query works even when prepared statements are disabled", async () => {});
   });

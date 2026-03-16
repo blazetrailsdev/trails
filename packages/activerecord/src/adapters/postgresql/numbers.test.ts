@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlNumbersTest", () => {
+  describe("PostgreSQLNumberTest", () => {
     it.skip("numeric column", async () => {});
     it.skip("numeric default", async () => {});
     it.skip("numeric type cast", async () => {});

@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlOptimizerHintsTest", () => {
+  describe("PostgreSQLOptimizerHintsTest", () => {
     it.skip("optimizer hints", async () => {});
     it.skip("optimizer hints with count", async () => {});
     it.skip("optimizer hints with delete all", async () => {});

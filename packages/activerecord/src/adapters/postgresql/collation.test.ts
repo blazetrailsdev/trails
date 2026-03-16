@@ -13,28 +13,24 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlCollationTest", () => {
+  describe("PostgreSQLCollationTest", () => {
     it.skip("columns collation", async () => {});
     it.skip("collation change", async () => {});
     it.skip("collation add", async () => {});
     it.skip("collation schema dump", async () => {});
     it.skip("collation default", async () => {});
+    it.skip("string column with collation", () => {
+      /* needs PostgreSQL-specific collation syntax */
+    });
+    it.skip("text column with collation", () => {
+      /* needs PostgreSQL-specific collation syntax */
+    });
+    it.skip("add column with collation", () => {
+      /* needs PostgreSQL-specific collation syntax */
+    });
+    it.skip("change column with collation", () => {
+      /* needs PostgreSQL-specific collation syntax */
+    });
+    it.skip("schema dump includes collation", () => {});
   });
-  it.skip("string column with collation", () => {
-    /* needs PostgreSQL-specific collation syntax */
-  });
-
-  it.skip("text column with collation", () => {
-    /* needs PostgreSQL-specific collation syntax */
-  });
-
-  it.skip("add column with collation", () => {
-    /* needs PostgreSQL-specific collation syntax */
-  });
-
-  it.skip("change column with collation", () => {
-    /* needs PostgreSQL-specific collation syntax */
-  });
-
-  it.skip("schema dump includes collation", () => {});
 });
