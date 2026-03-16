@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, association, registerModel } from "../index.js";
+import { Base, association, registerModel, InverseOfAssociationNotFoundError } from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -201,7 +201,7 @@ describe("InverseBelongsToTests", () => {
     await Face.create({ description: "pretty", human_id: h.id });
     await expect(
       loadHasOne(h, "confusedFace", { className: "Face", inverseOf: "cnffusedHuman" }),
-    ).rejects.toThrow(/inverse/i);
+    ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {
@@ -522,7 +522,7 @@ describe("InverseHasManyTests", () => {
     const h = await Human.create({ name: "Gordon" });
     await expect(
       loadHasMany(h, "secretInterests", { className: "Interest", inverseOf: "secretHuman" }),
-    ).rejects.toThrow(/inverse/i);
+    ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
 
   it("child instance should point to parent without saving", async () => {
@@ -1252,7 +1252,7 @@ describe("InverseHasOneTests", () => {
     const f = await Face.create({ description: "pretty", human_id: 1 });
     await expect(
       loadBelongsTo(f, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" }),
-    ).rejects.toThrow(/inverse/i);
+    ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {

@@ -77,19 +77,14 @@ function resolveModel(name: string): typeof Base {
  * Throws InverseOfAssociationNotFoundError if not found.
  */
 function validateInverseOf(targetModel: typeof Base, assocName: string, inverseOf: string): void {
-  const targetAssocs = (targetModel as any)._associations as
-    | Array<{ type: string; name: string; options: any }>
-    | undefined;
-  if (!targetAssocs || targetAssocs.length === 0) return;
+  const targetAssocs: AssociationDefinition[] = (targetModel as any)._associations ?? [];
+  if (targetAssocs.length === 0) return;
   if (targetAssocs.some((a) => a.name === inverseOf)) return;
 
-  // Find similar names for suggestions
   const corrections: string[] = [];
-  if (targetAssocs) {
-    for (const a of targetAssocs) {
-      if (levenshtein(a.name, inverseOf) <= 3) {
-        corrections.push(a.name);
-      }
+  for (const a of targetAssocs) {
+    if (levenshtein(a.name, inverseOf) <= 3) {
+      corrections.push(a.name);
     }
   }
   throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections);

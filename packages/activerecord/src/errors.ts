@@ -200,7 +200,7 @@ export class InverseOfAssociationNotFoundError extends Error {
     this.corrections = corrections;
   }
 
-  get detailedMessage(): string {
+  detailedMessage(): string {
     return this.message;
   }
 }
