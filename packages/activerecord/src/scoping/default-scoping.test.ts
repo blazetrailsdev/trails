@@ -14,7 +14,7 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 // ==========================================================================
-// ScopingTest — targets scoping/default_scoping_test.rb, scoping/named_scoping_test.rb
+// DefaultScopingTest — targets scoping/default_scoping_test.rb
 // ==========================================================================
 describe("DefaultScopingTest", () => {
   let adapter: DatabaseAdapter;
