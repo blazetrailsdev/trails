@@ -171,8 +171,33 @@ describe("CoreTest", () => {
     expect(t.id).toBeDefined();
   });
 
-  it.skip("inspect instance", () => {});
-  it.skip("inspect new instance", () => {});
+  it("inspect instance", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "first" });
+    const str = t.inspect();
+    expect(str).toContain("Topic");
+    expect(str).toContain("title");
+    expect(str).toContain("first");
+  });
+
+  it("inspect new instance", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ title: "new" });
+    const str = t.inspect();
+    expect(str).toContain("Topic");
+    expect(str).toContain("title");
+    expect(str).toContain("new");
+  });
 });
 
 describe("frozen / isFrozen", () => {

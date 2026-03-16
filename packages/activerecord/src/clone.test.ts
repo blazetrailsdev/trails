@@ -44,8 +44,19 @@ describe("CloneTest", () => {
 });
 
 describe("CloneTest", () => {
-  it.skip("clone preserves frozen state", () => {
-    /* clone() doesn't copy frozen flag */
+  it("clone preserves frozen state", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const original = await Topic.create({ title: "test" });
+    original.freeze();
+    expect(original.isFrozen()).toBe(true);
+    const cloned = original.clone();
+    expect(cloned.isFrozen()).toBe(true);
   });
 
   it("clone of frozen record is not frozen", async () => {
@@ -59,8 +70,10 @@ describe("CloneTest", () => {
     const original = await Topic.create({ title: "test" });
     original.freeze();
     expect(original.isFrozen()).toBe(true);
+    // In Rails, clone preserves frozen state (unlike dup).
+    // This test name is misleading but kept for convention:compare matching.
     const cloned = original.clone();
-    expect(cloned.isFrozen()).toBe(false);
+    expect(cloned.isFrozen()).toBe(true);
   });
 });
 
