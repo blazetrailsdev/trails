@@ -97,7 +97,10 @@ function generateStubContent(testCases: TestCaseInfo[]): string {
   const tree = buildDescribeTree(testCases);
   const lines: string[] = [];
 
-  lines.push(`import { describe, it } from "vitest";`);
+  const needsDescribe = tree.children.size > 0;
+  lines.push(
+    needsDescribe ? `import { describe, it } from "vitest";` : `import { it } from "vitest";`,
+  );
   lines.push("");
   lines.push(...renderDescribeTree(tree, 0));
 
@@ -180,10 +183,7 @@ function main() {
       if (missingDescs && missingDescs.size > 0) {
         // We have specific missing test names — filter by description
         testsToStub = [];
-        const descCounts = new Map<string, number>();
         for (const tc of rubyFileInfo.testCases) {
-          const count = descCounts.get(tc.description) || 0;
-          descCounts.set(tc.description, count + 1);
           if (missingDescs.has(tc.description)) {
             testsToStub.push(tc);
           }
