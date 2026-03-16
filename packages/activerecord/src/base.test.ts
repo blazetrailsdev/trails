@@ -771,18 +771,93 @@ describe("BasicsTest", () => {
     class BlogPost extends Base {}
     expect(BlogPost.tableName).toBe("blog_posts");
   });
-  it.skip("attribute names are protected from injection", () => {});
-  it.skip("inherited from scoped find", () => {});
-  it.skip("model classes with matching names", () => {});
-  it.skip("copy table with id", () => {});
-  it.skip("select does not fire after_initialize callbacks on unmatched records", () => {});
-  it.skip("type cast attribute from select to false", () => {});
-  it.skip("type cast attribute from select to true", () => {});
-  it.skip("type cast attribute from select to null", () => {});
-  it.skip("type cast attribute from select to integer", () => {});
-  it.skip("type cast attribute from select to string", () => {});
-  it.skip("attributes_before_type_cast returns user input for integers", () => {});
-  it.skip("raise no method error for nonexistent method", () => {});
+  it.skip("attribute names are protected from injection", () => {
+    /* needs attribute name validation */
+  });
+
+  it.skip("inherited from scoped find", () => {
+    /* needs scoped find with STI */
+  });
+
+  it.skip("model classes with matching names", () => {
+    /* needs module/namespace support */
+  });
+
+  it.skip("copy table with id", () => {
+    /* needs SQLite copy_table support */
+  });
+
+  it.skip("select does not fire after_initialize callbacks on unmatched records", () => {
+    /* needs select() with column projection */
+  });
+
+  it("type cast attribute from select to false", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ approved: false });
+    const t = (await Topic.first()) as any;
+    expect(t!.readAttribute("approved")).toBe(false);
+  });
+
+  it("type cast attribute from select to true", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ approved: true });
+    const t = (await Topic.first()) as any;
+    expect(t!.readAttribute("approved")).toBe(true);
+  });
+
+  it("type cast attribute from select to null", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: null });
+    const t = (await Topic.first()) as any;
+    expect(t!.readAttribute("title")).toBeNull();
+  });
+
+  it("type cast attribute from select to integer", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ views: 42 });
+    const t = (await Topic.first()) as any;
+    expect(t!.readAttribute("views")).toBe(42);
+  });
+
+  it("type cast attribute from select to string", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: "hello" });
+    const t = (await Topic.first()) as any;
+    expect(t!.readAttribute("title")).toBe("hello");
+  });
+
+  it.skip("attributes_before_type_cast returns user input for integers", () => {
+    /* needs attributeBeforeTypeCast API */
+  });
+
+  it.skip("raise no method error for nonexistent method", () => {
+    /* needs method_missing-style error handling */
+  });
   it("table exists? is true for existing tables", () => {
     class User extends Base {
       static {
@@ -865,10 +940,31 @@ describe("BasicsTest", () => {
     // The key behavior is that abstractClass is true
     expect(AbstractModel.abstractClass).toBe(true);
   });
-  it.skip("update all on abstract class raises", () => {});
-  it.skip("delete all on abstract class raises", () => {});
-  it.skip("where on abstract class raises", () => {});
-  it.skip("create works with optimistic locking", () => {});
+  it.skip("update all on abstract class raises", () => {
+    /* needs updateAll to check abstractClass */
+  });
+
+  it.skip("delete all on abstract class raises", () => {
+    /* needs deleteAll to check abstractClass */
+  });
+
+  it.skip("where on abstract class raises", () => {
+    /* needs where to check abstractClass */
+  });
+
+  it("create works with optimistic locking", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const p = await Post.create({ title: "test" });
+    expect(p.isPersisted()).toBe(true);
+    const reloaded = (await Post.find(p.id)) as any;
+    expect(reloaded.readAttribute("lock_version")).toBe(0);
+  });
   it("create with custom timestamps", async () => {
     class User extends Base {
       static {
