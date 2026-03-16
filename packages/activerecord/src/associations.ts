@@ -90,11 +90,18 @@ export function resolveCounterColumn(
     | Array<{ type: string; name: string; options: any }>
     | undefined;
   if (childAssocs) {
+    // Check against parent name and STI base class name
+    const parentNames = new Set([parentModel.name]);
+    let proto = Object.getPrototypeOf(parentModel);
+    while (proto && proto.name && proto !== Function.prototype) {
+      parentNames.add(proto.name);
+      proto = Object.getPrototypeOf(proto);
+    }
     const belongsTo = childAssocs.find(
       (a) =>
         a.type === "belongsTo" &&
         a.options.counterCache &&
-        (a.options.className === parentModel.name || camelize(a.name) === parentModel.name),
+        (parentNames.has(a.options.className) || parentNames.has(camelize(a.name))),
     );
     if (belongsTo) {
       if (typeof belongsTo.options.counterCache === "string") {

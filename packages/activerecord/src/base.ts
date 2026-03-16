@@ -1586,9 +1586,7 @@ export class Base extends Model {
             `'${counterName}' is not a valid counter name or hasMany association on ${this.name}`,
           );
         }
-        counterColumn = counterName.endsWith("_count")
-          ? counterName
-          : resolveCounterColumn(this, assoc, counterName);
+        counterColumn = resolveCounterColumn(this, assoc, assoc.name);
       }
 
       const count = await countHasMany(record, assoc.name, assoc.options);
