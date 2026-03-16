@@ -207,9 +207,20 @@ describe("SelectTest", () => {
     expect(sql).toContain("SELECT");
   });
 
-  it.skip("reselect with default scope select", () => {});
-  it.skip("enumerate columns in select statements", () => {});
-  it.skip("select with block without any arguments", () => {});
+  it.skip("reselect with default scope select", () => {
+    /* needs default_scope with select */
+  });
+
+  it("enumerate columns in select statements", () => {
+    const { Developer } = makeModel();
+    const sql = Developer.select("name", "salary").toSql();
+    expect(sql).toContain('"name"');
+    expect(sql).toContain('"salary"');
+  });
+
+  it.skip("select with block without any arguments", () => {
+    /* needs select with block form */
+  });
 });
 
 describe("select block form", () => {

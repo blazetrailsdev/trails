@@ -292,7 +292,14 @@ describe("RelationMergingTest", () => {
     return { Post };
   }
 
-  it.skip("relation merging with locks", () => {});
+  it("relation merging with locks", () => {
+    const { Post } = makeModel();
+    const sql = Post.all()
+      .lock(true)
+      .merge(Post.where({ title: "a" }))
+      .toSql();
+    expect(sql).toContain("WHERE");
+  });
 });
 
 describe("merge()", () => {
