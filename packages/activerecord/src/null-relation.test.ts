@@ -118,7 +118,7 @@ describe("NullRelationTest", () => {
   });
 });
 
-describe("Null Relation (Rails-guided)", () => {
+describe("NullRelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();

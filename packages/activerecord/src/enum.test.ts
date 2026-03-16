@@ -513,7 +513,7 @@ describe("EnumTest", () => {
 // ==========================================================================
 // EnumTest2 — more targets for enum_test.rb
 // ==========================================================================
-describe("EnumTest2", () => {
+describe("EnumTest", () => {
   function makeEnum(adp: DatabaseAdapter) {
     class P extends Base {
       static {
@@ -721,7 +721,7 @@ describe("EnumTest2", () => {
 // ==========================================================================
 // EnumTest3 — additional missing tests from enum_test.rb
 // ==========================================================================
-describe("EnumTest3", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -943,7 +943,7 @@ describe("EnumTest3", () => {
   });
 });
 
-describe("Enum", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -1032,7 +1032,7 @@ describe("Enum", () => {
   });
 });
 
-describe("enum enhancements", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1073,7 +1073,7 @@ describe("enum enhancements", () => {
   });
 });
 
-describe("enum prefix/suffix", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1111,7 +1111,7 @@ describe("enum prefix/suffix", () => {
   });
 });
 
-describe("enum", () => {
+describe("EnumTest", () => {
   it("defines enum attribute with predicate methods", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1194,7 +1194,7 @@ describe("enum", () => {
   });
 });
 
-describe("Enum (Rails-guided)", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1291,7 +1291,7 @@ describe("Enum (Rails-guided)", () => {
   });
 });
 
-describe("Enum (Rails-guided)", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -1404,7 +1404,7 @@ describe("Enum (Rails-guided)", () => {
     expect(readEnumValue(conv, "priority")).toBe("high");
   });
 });
-describe("Enum (extended)", () => {
+describe("EnumTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

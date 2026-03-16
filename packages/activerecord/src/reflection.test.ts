@@ -798,7 +798,7 @@ describe("ReflectionTest", () => {
   });
 });
 
-describe("reflection", () => {
+describe("ReflectionTest", () => {
   it("returns columns for a model", () => {
     class User extends Base {
       static _tableName = "users";
@@ -862,7 +862,7 @@ describe("reflection", () => {
   });
 });
 
-describe("Reflection (Rails-guided)", () => {
+describe("ReflectionTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

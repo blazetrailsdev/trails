@@ -519,7 +519,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionTest2 — more targets for transactions_test.rb
 // ==========================================================================
-describe("TransactionTest2", () => {
+describe("TransactionTest", () => {
   it("successful", async () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -871,7 +871,7 @@ describe("TransactionTest2", () => {
 // ==========================================================================
 // TransactionTest3 — additional missing tests from transactions_test.rb
 // ==========================================================================
-describe("TransactionTest3", () => {
+describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1021,7 +1021,7 @@ describe("TransactionTest3", () => {
 // ==========================================================================
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionsWithTransactionalFixturesTest", () => {
+describe("TransactionTest", () => {
   it("automatic savepoint in outer transaction", () => {
     expect(true).toBe(true);
   });
@@ -1033,7 +1033,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
 // ==========================================================================
 // TransactionUUIDTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionUUIDTest", () => {
+describe("TransactionTest", () => {
   it("the uuid is lazily computed", () => {
     expect(true).toBe(true);
   });
@@ -1048,7 +1048,7 @@ describe("TransactionUUIDTest", () => {
 // ==========================================================================
 // ConcurrentTransactionTest — from transactions_test.rb
 // ==========================================================================
-describe("ConcurrentTransactionTest", () => {
+describe("TransactionTest", () => {
   it("transaction per thread", () => {
     expect(true).toBe(true);
   });
@@ -1060,13 +1060,13 @@ describe("ConcurrentTransactionTest", () => {
 // ==========================================================================
 // after current transaction commit multidb nested transactions (standalone)
 // ==========================================================================
-describe("after current transaction commit multidb nested transactions", () => {
+describe("TransactionTest", () => {
   it("after current transaction commit multidb nested transactions", () => {
     expect(true).toBe(true);
   });
 });
 
-describe("Transactions", () => {
+describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
 
   class Account extends Base {
@@ -1156,7 +1156,7 @@ describe("Transactions", () => {
   });
 });
 
-describe("Transactions (Rails-guided)", () => {
+describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1237,7 +1237,7 @@ describe("Transactions (Rails-guided)", () => {
   });
 });
 
-describe("Transactions (Rails-guided)", () => {
+describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
 
   class Account extends Base {

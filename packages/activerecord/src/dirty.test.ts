@@ -126,7 +126,7 @@ describe("DirtyTest", () => {
 // ==========================================================================
 // DirtyTest2 — more targets for dirty_test.rb
 // ==========================================================================
-describe("DirtyTest2", () => {
+describe("DirtyTest", () => {
   it("attribute changes", async () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -377,7 +377,7 @@ describe("DirtyTest2", () => {
 // ==========================================================================
 // DirtyTest3 — additional missing tests from dirty_test.rb
 // ==========================================================================
-describe("DirtyTest3", () => {
+describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -520,7 +520,7 @@ describe("DirtyTest3", () => {
   });
 });
 
-describe("savedChanges", () => {
+describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -557,7 +557,7 @@ describe("savedChanges", () => {
   });
 });
 
-describe("dirty tracking: attributeInDatabase, attributeBeforeLastSave", () => {
+describe("DirtyTest", () => {
   it("attributeInDatabase returns the pre-change value", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -603,7 +603,7 @@ describe("dirty tracking: attributeInDatabase, attributeBeforeLastSave", () => {
   });
 });
 
-describe("isChangedForAutosave", () => {
+describe("DirtyTest", () => {
   it("returns true for new records", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -645,7 +645,7 @@ describe("isChangedForAutosave", () => {
   });
 });
 
-describe("attributeChanged with from/to options", () => {
+describe("DirtyTest", () => {
   it("attributeChanged with from and to after save", async () => {
     const adapter = freshAdapter();
 
@@ -684,7 +684,7 @@ describe("attributeChanged with from/to options", () => {
   });
 });
 
-describe("Dirty (Rails-guided)", () => {
+describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();

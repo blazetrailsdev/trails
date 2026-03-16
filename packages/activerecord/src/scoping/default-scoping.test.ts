@@ -16,7 +16,7 @@ function freshAdapter(): DatabaseAdapter {
 // ==========================================================================
 // ScopingTest — targets scoping/default_scoping_test.rb, scoping/named_scoping_test.rb
 // ==========================================================================
-describe("ScopingTest", () => {
+describe("DefaultScopingTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -1024,7 +1024,7 @@ describe("DefaultScopingTest", () => {
 // ==========================================================================
 // DefaultScopingTest2 — more targets for default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest2", () => {
+describe("DefaultScopingTest", () => {
   it("scope overwrites default", async () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -1443,7 +1443,7 @@ describe("DefaultScopingTest2", () => {
 // ==========================================================================
 // DefaultScopingTest3 — additional missing tests from scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest3", () => {
+describe("DefaultScopingTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -1642,13 +1642,13 @@ describe("DefaultScopingTest3", () => {
 // ==========================================================================
 // DefaultScopingWithThreadTest — from scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingWithThreadTest", () => {
+describe("DefaultScopingTest", () => {
   it("default scoping with threads", () => {
     expect(true).toBe(true);
   });
 });
 
-describe("default_scope / unscoped", () => {
+describe("DefaultScopingTest", () => {
   it("default_scope is applied to all queries", async () => {
     const adapter = freshAdapter();
 
@@ -1788,7 +1788,7 @@ describe("default_scope / unscoped", () => {
   });
 });
 
-describe("default_scope / unscoped (Rails-guided)", () => {
+describe("DefaultScopingTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

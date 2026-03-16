@@ -77,7 +77,7 @@ async function seedPosts() {
 // RELATION TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-describe("Relation", () => {
+describe("RelationTest", () => {
   beforeEach(seedPosts);
 
   // ── where ──
@@ -785,7 +785,7 @@ describe("Relation", () => {
 // FINDER TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-describe("Finders", () => {
+describe("RelationTest", () => {
   beforeEach(seedPosts);
 
   describe("find", () => {
@@ -1065,7 +1065,7 @@ describe("Finders", () => {
 // SCOPING TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-describe("Scoping", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
 
   class Article extends Base {
@@ -1190,7 +1190,7 @@ describe("Scoping", () => {
   });
 });
 
-describe("Relation", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
 
   class Item extends Base {
@@ -1842,7 +1842,7 @@ describe("Relation", () => {
   });
 });
 
-describe("Relation (extended)", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
 
   class Widget extends Base {
@@ -2030,7 +2030,7 @@ describe("Relation (extended)", () => {
   });
 });
 
-describe("Relation#having", () => {
+describe("RelationTest", () => {
   it("generates SQL with HAVING clause", () => {
     class Order extends Base {
       static {
@@ -2051,7 +2051,7 @@ describe("Relation#having", () => {
   });
 });
 
-describe("Relation edge cases", () => {
+describe("RelationTest", () => {
   it("where with multiple keys including null", async () => {
     const adapter = freshAdapter();
 
@@ -2337,7 +2337,7 @@ describe("Relation edge cases", () => {
   });
 });
 
-describe("Relation: pick, first(n), last(n)", () => {
+describe("RelationTest", () => {
   it("pick returns first row's columns", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2419,7 +2419,7 @@ describe("Relation: pick, first(n), last(n)", () => {
   });
 });
 
-describe("Relation: explain()", () => {
+describe("RelationTest", () => {
   it("returns explain output", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2434,7 +2434,7 @@ describe("Relation: explain()", () => {
   });
 });
 
-describe("Relation: set operations", () => {
+describe("RelationTest", () => {
   it("union combines two relations", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2522,7 +2522,7 @@ describe("Relation: set operations", () => {
   });
 });
 
-describe("Relation: lock()", () => {
+describe("RelationTest", () => {
   it("toSql includes FOR UPDATE", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2573,7 +2573,7 @@ describe("Relation: lock()", () => {
   });
 });
 
-describe("Relation: joins and leftJoins", () => {
+describe("RelationTest", () => {
   it("joins generates INNER JOIN SQL", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2612,7 +2612,7 @@ describe("Relation: joins and leftJoins", () => {
   });
 });
 
-describe("createWith()", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2634,7 +2634,7 @@ describe("createWith()", () => {
   });
 });
 
-describe("extending()", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2663,7 +2663,7 @@ describe("extending()", () => {
   });
 });
 
-describe("Relation state: isLoaded, reset, size, isEmpty, isAny, isMany", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2761,7 +2761,7 @@ describe("Relation state: isLoaded, reset, size, isEmpty, isAny, isMany", () => 
   });
 });
 
-describe("inspect()", () => {
+describe("RelationTest", () => {
   it("returns a human-readable string", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -2778,7 +2778,7 @@ describe("inspect()", () => {
   });
 });
 
-describe("load()", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2804,7 +2804,7 @@ describe("load()", () => {
   });
 });
 
-describe("length()", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -2826,7 +2826,7 @@ describe("length()", () => {
   });
 });
 
-describe("slice()", () => {
+describe("RelationTest", () => {
   it("returns a subset of attributes", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -2843,7 +2843,7 @@ describe("slice()", () => {
   });
 });
 
-describe("valuesAt()", () => {
+describe("RelationTest", () => {
   it("returns attribute values as an array", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -2859,7 +2859,7 @@ describe("valuesAt()", () => {
   });
 });
 
-describe("lockBang", () => {
+describe("RelationTest", () => {
   it("reloads the record with a lock clause", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2878,7 +2878,7 @@ describe("lockBang", () => {
   });
 });
 
-describe("reject()", () => {
+describe("RelationTest", () => {
   it("filters out matching records from loaded results", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2898,7 +2898,7 @@ describe("reject()", () => {
   });
 });
 
-describe("compactBlank()", () => {
+describe("RelationTest", () => {
   it("filters out records where column is null", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2918,7 +2918,7 @@ describe("compactBlank()", () => {
   });
 });
 
-describe("isOne()", () => {
+describe("RelationTest", () => {
   it("returns true when exactly one record matches", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2935,7 +2935,7 @@ describe("isOne()", () => {
   });
 });
 
-describe("Relation reload and records", () => {
+describe("RelationTest", () => {
   it("reload() re-queries the database", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2959,7 +2959,7 @@ describe("Relation reload and records", () => {
   });
 });
 
-describe("Relation.isReadonly", () => {
+describe("RelationTest", () => {
   it("returns false by default", () => {
     class User extends Base {
       static {
@@ -2981,7 +2981,7 @@ describe("Relation.isReadonly", () => {
   });
 });
 
-describe("Relation#extending with function", () => {
+describe("RelationTest", () => {
   it("accepts a function that modifies the relation", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -2998,7 +2998,7 @@ describe("Relation#extending with function", () => {
   });
 });
 
-describe("Relation#loadAsync", () => {
+describe("RelationTest", () => {
   it("returns the relation for chaining", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3013,7 +3013,7 @@ describe("Relation#loadAsync", () => {
   });
 });
 
-describe("Relation#invertWhere", () => {
+describe("RelationTest", () => {
   it("swaps where and whereNot clauses", async () => {
     const adapter = freshAdapter();
     class InvertWhereUser extends Base {
@@ -3039,7 +3039,7 @@ describe("Relation#invertWhere", () => {
   });
 });
 
-describe("Relation#inspect", () => {
+describe("RelationTest", () => {
   it("returns a readable string representation", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3072,7 +3072,7 @@ describe("Relation#inspect", () => {
   });
 });
 
-describe("Relation spawn/build/create", () => {
+describe("RelationTest", () => {
   it("spawn returns an independent copy of the relation", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3140,7 +3140,7 @@ describe("Relation spawn/build/create", () => {
   });
 });
 
-describe("Relation value accessors", () => {
+describe("RelationTest", () => {
   it("limitValue returns the limit", () => {
     class User extends Base {
       static {
@@ -3219,7 +3219,7 @@ describe("Relation value accessors", () => {
   });
 });
 
-describe("Relation collection convenience methods", () => {
+describe("RelationTest", () => {
   it("groupByColumn groups records by column value", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3292,7 +3292,7 @@ describe("Relation collection convenience methods", () => {
   });
 });
 
-describe("async query aliases (Rails 7.0+)", () => {
+describe("RelationTest", () => {
   it("asyncCount returns the same as count", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3369,7 +3369,7 @@ describe("async query aliases (Rails 7.0+)", () => {
   });
 });
 
-describe("Relation#size and Relation#length", () => {
+describe("RelationTest", () => {
   it("size returns count without loading records", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3399,7 +3399,7 @@ describe("Relation#size and Relation#length", () => {
   });
 });
 
-describe("Relation#toArel", () => {
+describe("RelationTest", () => {
   it.skip("returns a SelectManager", () => {
     /* needs toArel() to return Arel SelectManager */
   });
@@ -3418,7 +3418,7 @@ describe("Relation#toArel", () => {
   });
 });
 
-describe("Relation#presence", () => {
+describe("RelationTest", () => {
   it("returns self when records exist", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3451,7 +3451,7 @@ describe("Relation#presence", () => {
   });
 });
 
-describe("Relation async iterator", () => {
+describe("RelationTest", () => {
   it("supports for-await-of", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -3472,7 +3472,7 @@ describe("Relation async iterator", () => {
   });
 });
 
-describe("Relation State (Rails-guided)", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3610,7 +3610,7 @@ describe("Relation State (Rails-guided)", () => {
   });
 });
 
-describe("Lock (Rails-guided)", () => {
+describe("RelationTest", () => {
   it("lock generates FOR UPDATE SQL", () => {
     class User extends Base {
       static {
@@ -3632,7 +3632,7 @@ describe("Lock (Rails-guided)", () => {
   });
 });
 
-describe("Relation immutability (Rails-guided)", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -3689,7 +3689,7 @@ describe("Relation immutability (Rails-guided)", () => {
   });
 });
 
-describe("Relation (Rails-guided)", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
 
   class Product extends Base {
@@ -3958,7 +3958,7 @@ describe("Relation (Rails-guided)", () => {
   });
 });
 
-describe("Relation query edge cases (Rails-guided)", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
 
   class Post extends Base {
@@ -4126,7 +4126,7 @@ describe("Relation query edge cases (Rails-guided)", () => {
   });
 });
 
-describe("Rails-guided: set operations and joins", () => {
+describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();

@@ -164,7 +164,7 @@ describe("ValidationsTest", () => {
   });
 });
 
-describe("validation contexts", () => {
+describe("ValidationsTest", () => {
   it("valid uses create context when new", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -218,7 +218,7 @@ describe("validation contexts", () => {
   });
 });
 
-describe("Validations (Rails-guided)", () => {
+describe("ValidationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -315,7 +315,7 @@ describe("Validations (Rails-guided)", () => {
   });
 });
 
-describe("Rails-guided: uniqueness validations", () => {
+describe("ValidationsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();

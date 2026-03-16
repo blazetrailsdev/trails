@@ -308,7 +308,7 @@ describe("CallbacksTest", () => {
   it.skip("callback throwing abort", () => {});
 });
 
-describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
+describe("CallbacksTest", () => {
   it("trigger once on multiple deletion within transaction 2", async () => {
     const adp = freshAdapter();
     const log: string[] = [];
@@ -408,7 +408,7 @@ describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
   });
 });
 
-describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
+describe("CallbacksTest", () => {
   it("created callback called on last to save of separate instances in a transaction 2", async () => {
     const adp = freshAdapter();
     const log: string[] = [];
@@ -540,7 +540,7 @@ describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
   });
 });
 
-describe("Callbacks (extended)", () => {
+describe("CallbacksTest", () => {
   it("runs after_create and after_update at correct times", async () => {
     const adapter = freshAdapter();
     const log: string[] = [];
@@ -611,7 +611,7 @@ describe("Callbacks (extended)", () => {
   });
 });
 
-describe("after_initialize / after_find callbacks", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -654,7 +654,7 @@ describe("after_initialize / after_find callbacks", () => {
   });
 });
 
-describe("conditional callbacks", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -707,7 +707,7 @@ describe("conditional callbacks", () => {
   });
 });
 
-describe("halt callback chain", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -729,7 +729,7 @@ describe("halt callback chain", () => {
   });
 });
 
-describe("afterTouch callback", () => {
+describe("CallbacksTest", () => {
   it("fires after touch() is called", async () => {
     const adapter = freshAdapter();
     const touched: string[] = [];
@@ -750,7 +750,7 @@ describe("afterTouch callback", () => {
   });
 });
 
-describe("Callbacks (Rails-guided)", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -955,7 +955,7 @@ describe("Callbacks (Rails-guided)", () => {
   });
 });
 
-describe("Callbacks (Rails-guided)", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -1292,7 +1292,7 @@ describe("Callbacks (Rails-guided)", () => {
   });
 });
 
-describe("after_initialize / after_find (Rails-guided)", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -1394,7 +1394,7 @@ describe("after_initialize / after_find (Rails-guided)", () => {
   });
 });
 
-describe("Conditional Callbacks (Rails-guided)", () => {
+describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

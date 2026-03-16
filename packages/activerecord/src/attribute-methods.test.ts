@@ -895,7 +895,7 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 // AttributeMethodsTestExtra — additional targets for attribute_methods_test.rb
 // ==========================================================================
-describe("AttributeMethodsTestExtra", () => {
+describe("AttributeMethodsTest", () => {
   it("read_attribute", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
@@ -1435,7 +1435,7 @@ describe("AttributeMethodsTestExtra", () => {
   });
 });
 
-describe("alias_attribute", () => {
+describe("AttributeMethodsTest", () => {
   it("creates a getter/setter alias for an attribute", () => {
     class User extends Base {
       static _tableName = "users";
@@ -1452,7 +1452,7 @@ describe("alias_attribute", () => {
   });
 });
 
-describe("attributeForInspect", () => {
+describe("AttributeMethodsTest", () => {
   it("formats string attributes with quotes", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1508,7 +1508,7 @@ describe("attributeForInspect", () => {
   });
 });
 
-describe("alias_attribute (Rails-guided)", () => {
+describe("AttributeMethodsTest", () => {
   // Rails: test "alias_attribute creates accessor alias"
   it("creates a getter/setter alias", () => {
     class Person extends Base {
@@ -1546,7 +1546,7 @@ describe("alias_attribute (Rails-guided)", () => {
   });
 });
 
-describe("humanAttributeName", () => {
+describe("AttributeMethodsTest", () => {
   it("converts snake_case to human-readable form", () => {
     expect(Base.humanAttributeName("first_name")).toBe("First name");
     expect(Base.humanAttributeName("email")).toBe("Email");
@@ -1554,7 +1554,7 @@ describe("humanAttributeName", () => {
   });
 });
 
-describe("attributePresent()", () => {
+describe("AttributeMethodsTest", () => {
   it("returns true for non-null, non-empty values", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1584,7 +1584,7 @@ describe("attributePresent()", () => {
   });
 });
 
-describe("attributesBeforeTypeCast on Base", () => {
+describe("AttributeMethodsTest", () => {
   it("returns raw values before type casting", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1602,7 +1602,7 @@ describe("attributesBeforeTypeCast on Base", () => {
   });
 });
 
-describe("columnForAttribute on Base", () => {
+describe("AttributeMethodsTest", () => {
   it("returns column metadata", () => {
     class User extends Base {
       static {
@@ -1619,7 +1619,7 @@ describe("columnForAttribute on Base", () => {
   });
 });
 
-describe("Base.attributeTypes", () => {
+describe("AttributeMethodsTest", () => {
   it("returns a map of attribute name to type object", () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -1639,7 +1639,7 @@ describe("Base.attributeTypes", () => {
   });
 });
 
-describe("Base.columnsHash", () => {
+describe("AttributeMethodsTest", () => {
   it("returns a hash of column definitions", () => {
     class User extends Base {
       static {
@@ -1656,7 +1656,7 @@ describe("Base.columnsHash", () => {
   });
 });
 
-describe("Base.contentColumns", () => {
+describe("AttributeMethodsTest", () => {
   it("excludes PK, FK, and timestamp columns", () => {
     class User extends Base {
       static {
@@ -1679,7 +1679,7 @@ describe("Base.contentColumns", () => {
   });
 });
 
-describe("ignoredColumns", () => {
+describe("AttributeMethodsTest", () => {
   it("can be set and retrieved on a model class", () => {
     class User extends Base {
       static _tableName = "users";
@@ -1691,7 +1691,7 @@ describe("ignoredColumns", () => {
     expect(User.ignoredColumns).toEqual(["legacy_field"]);
   });
 });
-describe("Attributes (extended)", () => {
+describe("AttributeMethodsTest", () => {
   let adapter: DatabaseAdapter;
 
   class Person extends Base {

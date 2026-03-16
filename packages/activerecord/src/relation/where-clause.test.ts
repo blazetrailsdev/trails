@@ -16,7 +16,7 @@ function freshAdapter(): DatabaseAdapter {
 // ==========================================================================
 // WhereClauseTest — targets relation/where_clause_test.rb
 // ==========================================================================
-describe("WhereClauseTest", () => {
+describe("ActiveRecord::Relation", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();

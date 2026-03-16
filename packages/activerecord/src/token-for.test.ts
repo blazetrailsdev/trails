@@ -230,7 +230,7 @@ describe("TokenForTest", () => {
   });
 });
 
-describe("generatesTokenFor()", () => {
+describe("TokenForTest", () => {
   it("generates and resolves a token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
     const adapter = freshAdapter();

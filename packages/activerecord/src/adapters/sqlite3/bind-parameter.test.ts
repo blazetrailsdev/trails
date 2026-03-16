@@ -14,7 +14,7 @@ afterEach(() => {
   adapter.close();
 });
 
-describe("SQLite3BindParameterTest", () => {
+describe("SQLite3Adapter", () => {
   beforeEach(() => {
     adapter.exec(`CREATE TABLE "topics" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT)`);
   });

@@ -165,7 +165,7 @@ describe("DupTest", () => {
   });
 });
 
-describe("dup()", () => {
+describe("DupTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
@@ -187,7 +187,7 @@ describe("dup()", () => {
   });
 });
 
-describe("becomes()", () => {
+describe("DupTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
