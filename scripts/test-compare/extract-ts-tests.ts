@@ -100,7 +100,11 @@ function extractFileTests(filePath: string): TestFileInfo {
       if (ts.isIdentifier(expression)) {
         const funcName = expression.text;
 
-        if (funcName === "describe") {
+        if (
+          funcName === "describe" ||
+          funcName === "describeIfPg" ||
+          funcName === "describeIfMysql"
+        ) {
           const title = getFirstArgString(node);
           if (title) {
             currentAncestors.push(title);
@@ -125,9 +129,17 @@ function extractFileTests(filePath: string): TestFileInfo {
           }
         }
       } else if (ts.isPropertyAccessExpression(expression)) {
-        // Handle it.skip, it.todo, it.only, etc.
+        // Handle describe.skip, it.skip, it.todo, it.only, etc.
         const base = expression.expression;
-        if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
+        if (ts.isIdentifier(base) && base.text === "describe") {
+          const title = getFirstArgString(node);
+          if (title) {
+            currentAncestors.push(title);
+            ts.forEachChild(node, visit);
+            currentAncestors.pop();
+            return;
+          }
+        } else if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
           const modifier = expression.name.text;
           const title = getFirstArgString(node);
           if (title) {
