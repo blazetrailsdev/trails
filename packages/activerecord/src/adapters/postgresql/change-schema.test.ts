@@ -4,7 +4,7 @@
 import { describe, it, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgresAdapter", () => {
+describeIfPg("Migration", () => {
   let adapter: PostgresAdapter;
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlChangeSchemaTest", () => {
+  describe("PgChangeSchemaTest", () => {
     it.skip("change column", async () => {});
     it.skip("change column with null", async () => {});
     it.skip("change column with default", async () => {});

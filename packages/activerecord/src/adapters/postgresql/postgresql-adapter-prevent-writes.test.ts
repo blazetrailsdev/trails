@@ -23,18 +23,12 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("prevent writes allows explain", async () => {});
     it.skip("prevent writes toggle", async () => {});
     it.skip("doesnt error when a read query with cursors is called while preventing writes", async () => {});
+    it.skip("errors when an insert query is called while preventing writes", () => {});
+    it.skip("errors when an update query is called while preventing writes", () => {});
+    it.skip("errors when a delete query is called while preventing writes", () => {});
+    it.skip("doesnt error when a select query is called while preventing writes", () => {});
+    it.skip("doesnt error when a show query is called while preventing writes", () => {});
+    it.skip("doesnt error when a set query is called while preventing writes", () => {});
+    it.skip("doesnt error when a read query with leading chars is called while preventing writes", () => {});
   });
-  it.skip("errors when an insert query is called while preventing writes", () => {});
-
-  it.skip("errors when an update query is called while preventing writes", () => {});
-
-  it.skip("errors when a delete query is called while preventing writes", () => {});
-
-  it.skip("doesnt error when a select query is called while preventing writes", () => {});
-
-  it.skip("doesnt error when a show query is called while preventing writes", () => {});
-
-  it.skip("doesnt error when a set query is called while preventing writes", () => {});
-
-  it.skip("doesnt error when a read query with leading chars is called while preventing writes", () => {});
 });
