@@ -81,29 +81,27 @@ export function resolveCounterColumn(
   // If counter name was passed as a column name directly, use it
   if (counterName.endsWith("_count")) return counterName;
 
-  try {
-    const childClassName = assoc.options.className ?? camelize(singularize(assoc.name));
-    const childModel = resolveModel(childClassName);
-    const childAssocs = (childModel as any)._associations as
-      | Array<{ type: string; name: string; options: any }>
-      | undefined;
-    if (childAssocs) {
-      const belongsTo = childAssocs.find(
-        (a) =>
-          a.type === "belongsTo" &&
-          a.options.counterCache &&
-          (a.options.className === parentModel.name || camelize(a.name) === parentModel.name),
-      );
-      if (belongsTo) {
-        if (typeof belongsTo.options.counterCache === "string") {
-          return belongsTo.options.counterCache;
-        }
-        // Match updateCounterCaches default: pluralize(underscore(childModelName))_count
-        return `${pluralize(underscore(childModel.name))}_count`;
+  const childClassName = assoc.options.className ?? camelize(singularize(assoc.name));
+  if (!modelRegistry.has(childClassName)) {
+    return `${assoc.name}_count`;
+  }
+  const childModel = resolveModel(childClassName);
+  const childAssocs = (childModel as any)._associations as
+    | Array<{ type: string; name: string; options: any }>
+    | undefined;
+  if (childAssocs) {
+    const belongsTo = childAssocs.find(
+      (a) =>
+        a.type === "belongsTo" &&
+        a.options.counterCache &&
+        (a.options.className === parentModel.name || camelize(a.name) === parentModel.name),
+    );
+    if (belongsTo) {
+      if (typeof belongsTo.options.counterCache === "string") {
+        return belongsTo.options.counterCache;
       }
+      return `${pluralize(underscore(childModel.name))}_count`;
     }
-  } catch {
-    // Child model not registered — fall through to default
   }
   return `${assoc.name}_count`;
 }

@@ -506,6 +506,34 @@ describe("CounterCacheTest", () => {
     const after = await Car.find(car.id);
     expect(after.readAttribute("num_engines")).toBe(1);
   });
+  it("reset counter by custom counter column name", async () => {
+    class Car extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("num_engines", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Engine extends Base {
+      static {
+        this.attribute("car_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Engine, "car", { counterCache: "num_engines" });
+    Associations.hasMany.call(Car, "engines", { foreignKey: "car_id" });
+    registerModel(Car);
+    registerModel(Engine);
+    const car = await Car.create({ name: "Honda" });
+    await Engine.create({ car_id: car.id });
+    await Car.incrementCounter("num_engines", car.id);
+    const before = await Car.find(car.id);
+    expect(before.readAttribute("num_engines")).toBe(2);
+    await Car.resetCounters(car.id, "num_engines");
+    const after = await Car.find(car.id);
+    expect(after.readAttribute("num_engines")).toBe(1);
+  });
+
   it("counter cache columns are updated in memory after create", async () => {
     class Topic extends Base {
       static {

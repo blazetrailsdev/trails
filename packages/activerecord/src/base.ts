@@ -1557,20 +1557,41 @@ export class Base extends Model {
     const assocDefs = (this as any)._associations as
       | Array<{ type: string; name: string; options: any }>
       | undefined;
-    const { resolveCounterColumn } = await import("./associations.js");
+    const hasManyAssocs = assocDefs?.filter((a) => a.type === "hasMany") ?? [];
+    const { resolveCounterColumn, countHasMany } = await import("./associations.js");
     for (const counterName of counterNames) {
-      // Support both association name ("replies") and counter column name ("replies_count")
-      const isColumnName = counterName.endsWith("_count");
-      const assocName = isColumnName ? counterName.slice(0, -6) : counterName;
-      const assoc = assocDefs?.find((a) => a.type === "hasMany" && a.name === assocName);
-      if (!assoc) {
-        throw new Error(
-          `'${counterName}' is not a valid counter name or hasMany association on ${this.name}`,
-        );
+      // Try direct association name match first
+      let assoc = hasManyAssocs.find((a) => a.name === counterName);
+      let counterColumn: string;
+
+      if (assoc) {
+        counterColumn = resolveCounterColumn(this, assoc, counterName);
+      } else {
+        // Try stripping _count suffix to find association
+        if (counterName.endsWith("_count")) {
+          assoc = hasManyAssocs.find((a) => a.name === counterName.slice(0, -6));
+        }
+        // Try matching against resolved counter columns for each hasMany
+        if (!assoc) {
+          for (const candidate of hasManyAssocs) {
+            const col = resolveCounterColumn(this, candidate, candidate.name);
+            if (col === counterName) {
+              assoc = candidate;
+              break;
+            }
+          }
+        }
+        if (!assoc) {
+          throw new Error(
+            `'${counterName}' is not a valid counter name or hasMany association on ${this.name}`,
+          );
+        }
+        counterColumn = counterName.endsWith("_count")
+          ? counterName
+          : resolveCounterColumn(this, assoc, counterName);
       }
-      const counterColumn = resolveCounterColumn(this, assoc, counterName);
-      const { countHasMany } = await import("./associations.js");
-      const count = await countHasMany(record, assocName, assoc.options);
+
+      const count = await countHasMany(record, assoc.name, assoc.options);
       await record.updateColumn(counterColumn, count);
     }
   }
