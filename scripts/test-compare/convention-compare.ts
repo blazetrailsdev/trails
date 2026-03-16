@@ -585,7 +585,8 @@ function main() {
     for (const f of pkg.files) {
       const fileImplemented = f.matched - f.matchedSkipped;
       const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
-      const marker = !f.tsFileExists ? " ✗" : pct === 100 && f.wrongDescribe === 0 ? " ✓" : "";
+      const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
+      const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
       console.log(
         `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
