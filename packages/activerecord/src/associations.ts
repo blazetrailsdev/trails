@@ -563,13 +563,26 @@ export async function countHasMany(
   options: AssociationOptions,
 ): Promise<number> {
   if (options.through) {
-    const records = await loadHasManyThrough(record, assocName, options);
-    return records.length;
+    // Temporarily disable strict loading so through-association loading works
+    const wasStrict = (record as any)._strictLoading;
+    (record as any)._strictLoading = false;
+    try {
+      const records = await loadHasManyThrough(record, assocName, options);
+      return records.length;
+    } finally {
+      (record as any)._strictLoading = wasStrict;
+    }
   }
   const rel = buildHasManyRelation(record, assocName, options);
   if (!rel) return 0;
   const result = await rel.count();
-  return typeof result === "number" ? result : 0;
+  if (typeof result !== "number") {
+    throw new Error(
+      `countHasMany expected a numeric count but got ${typeof result} — ` +
+        `association "${assocName}" may have a grouped scope`,
+    );
+  }
+  return result;
 }
 
 /**
