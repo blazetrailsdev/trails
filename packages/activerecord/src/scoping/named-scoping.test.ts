@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, Relation } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, adapterType } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -637,8 +637,9 @@ describe("NamedScopingTest", () => {
     }
     await Post.create({ title: "A" });
     await Post.create({ title: "B" });
-    const rel = Post.order("RANDOM()").limit(1);
-    expect(rel.toSql()).toContain("RANDOM()");
+    const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
+    const rel = Post.order(randomFn).limit(1);
+    expect(rel.toSql()).toContain(randomFn);
     const result = await rel.toArray();
     expect(result.length).toBe(1);
   });

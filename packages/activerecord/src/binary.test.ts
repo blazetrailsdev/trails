@@ -16,7 +16,7 @@ describe("BinaryTest", () => {
 
   it("mixed encoding", async () => {
     const BinaryRecord = makeModel();
-    const input = "hello \x00 world";
+    const input = "hello \u00ff world \u2603";
     const r = await BinaryRecord.create({ data: input });
     const reloaded = await BinaryRecord.find(r.id);
     expect(reloaded.readAttribute("data")).toBe(input);
