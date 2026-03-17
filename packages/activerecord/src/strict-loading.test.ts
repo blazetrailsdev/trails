@@ -445,10 +445,86 @@ describe("StrictLoadingTest", () => {
     a.strictLoadingBang();
     expect(a.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading via relation is only for that relation", () => {});
-  it.skip("strict loading on a belongs to", () => {});
-  it.skip("strict loading on a has many", () => {});
-  it.skip("strict loading on a has one", () => {});
+  it.skip("strict loading via relation is only for that relation", () => {
+    /* needs Relation#strictLoading() method */
+  });
+
+  it("strict loading on a belongs to", async () => {
+    class SlBtPublisher extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SlBtBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("publisher_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SlBtPublisher", SlBtPublisher);
+    registerModel("SlBtBook", SlBtBook);
+    const book = await SlBtBook.create({ title: "Test", publisher_id: 1 });
+    book.strictLoadingBang();
+    await expect(
+      loadBelongsTo(book, "sl_bt_publisher", {
+        className: "SlBtPublisher",
+        foreignKey: "publisher_id",
+      }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+  });
+
+  it("strict loading on a has many", async () => {
+    class SlHmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SlHmBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SlHmAuthor", SlHmAuthor);
+    registerModel("SlHmBook", SlHmBook);
+    Associations.hasMany.call(SlHmAuthor, "sl_hm_books", {
+      className: "SlHmBook",
+      foreignKey: "author_id",
+    });
+    const author = await SlHmAuthor.create({ name: "Test" });
+    author.strictLoadingBang();
+    await expect(
+      loadHasMany(author, "sl_hm_books", { className: "SlHmBook", foreignKey: "author_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+  });
+
+  it("strict loading on a has one", async () => {
+    class SlHoAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SlHoProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SlHoAuthor", SlHoAuthor);
+    registerModel("SlHoProfile", SlHoProfile);
+    const author = await SlHoAuthor.create({ name: "Test" });
+    author.strictLoadingBang();
+    await expect(
+      loadHasOne(author, "sl_ho_profile", { className: "SlHoProfile", foreignKey: "author_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+  });
+
   it.skip("strict loading on a has many through", () => {});
   it.skip("strict loading on a has one through", () => {});
   it.skip("strict loading with includes prevents lazy loading", () => {});
@@ -484,7 +560,32 @@ describe("StrictLoadingTest", () => {
   it.skip("strict loading violation raises when mode is :raise", () => {});
   it.skip("strict loading violation logs when mode is :log", () => {});
   it.skip("strict loading logging mode can be set per model", () => {});
-  it.skip("strict loading all prevents lazy loading", () => {});
+  it("strict loading all prevents lazy loading", async () => {
+    class SlAllAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SlAllBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SlAllAuthor", SlAllAuthor);
+    registerModel("SlAllBook", SlAllBook);
+    Associations.hasMany.call(SlAllAuthor, "sl_all_books", {
+      className: "SlAllBook",
+      foreignKey: "author_id",
+    });
+    const author = await SlAllAuthor.create({ name: "Test" });
+    author.strictLoadingBang();
+    await expect(
+      loadHasMany(author, "sl_all_books", { className: "SlAllBook", foreignKey: "author_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+  });
   it.skip("preload does not trigger strict loading", () => {});
   it.skip("strict loading with select on relation", () => {});
   it.skip("strict loading n_plus_one_only prevents n plus one", () => {});
@@ -502,11 +603,79 @@ describe("StrictLoadingTest", () => {
   it.skip("strict loading with length does not raise", () => {});
   it.skip("strict loading with loaded does not raise", () => {});
   it.skip("strict loading with presence does not raise", () => {});
-  it.skip("strict loading!", () => {});
+  it("strict loading!", async () => {
+    class SlBangAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const author = new SlBangAuthor({ name: "Test" });
+    expect(author.isStrictLoading()).toBe(false);
+    author.strictLoadingBang();
+    expect(author.isStrictLoading()).toBe(true);
+  });
   it.skip("strict loading n plus one only mode with has many", () => {});
   it.skip("strict loading n plus one only mode with belongs to", () => {});
-  it.skip("default mode can be changed globally", () => {});
-  it.skip("raises if strict loading and lazy loading", () => {});
+  it("default mode can be changed globally", async () => {
+    class GmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class GmBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("GmAuthor", GmAuthor);
+    registerModel("GmBook", GmBook);
+    Associations.hasMany.call(GmAuthor, "gm_books", {
+      className: "GmBook",
+      foreignKey: "author_id",
+    });
+    const original = Base.strictLoadingByDefault;
+    try {
+      Base.strictLoadingByDefault = true;
+      const created = await GmAuthor.create({ name: "Global" });
+      const author = await GmAuthor.find(created.id);
+      expect(author.isStrictLoading()).toBe(true);
+      await expect(
+        loadHasMany(author, "gm_books", { className: "GmBook", foreignKey: "author_id" }),
+      ).rejects.toThrow(StrictLoadingViolationError);
+    } finally {
+      Base.strictLoadingByDefault = original;
+    }
+  });
+  it("raises if strict loading and lazy loading", async () => {
+    class RslAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class RslBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("RslAuthor", RslAuthor);
+    registerModel("RslBook", RslBook);
+    Associations.hasMany.call(RslAuthor, "rsl_books", {
+      className: "RslBook",
+      foreignKey: "author_id",
+    });
+    const author = await RslAuthor.create({ name: "Test" });
+    author.strictLoadingBang();
+    await expect(
+      loadHasMany(author, "rsl_books", { className: "RslBook", foreignKey: "author_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+  });
   it.skip("strict loading is ignored in validation context", () => {});
   it.skip("strict loading with reflection is ignored in validation context", () => {});
   it.skip("strict loading on concat is ignored", () => {});

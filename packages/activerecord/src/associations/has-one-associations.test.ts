@@ -1012,8 +1012,29 @@ describe("HasOneAssociationsTest", () => {
     expect(result).toBeNull();
   });
 
-  it.skip("has one relationship cannot have a counter cache", () => {
-    // Requires counter_cache validation error
+  it("has one relationship cannot have a counter cache", () => {
+    const ad = freshAdapter();
+    class CcFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class CcAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = ad;
+      }
+    }
+    registerModel("CcFirm", CcFirm);
+    registerModel("CcAccount", CcAccount);
+    expect(() => {
+      Associations.hasOne.call(CcFirm, "cc_account", {
+        className: "CcAccount",
+        foreignKey: "firm_id",
+        counterCache: true,
+      } as any);
+    }).toThrow(/counter_cache/);
   });
 
   it.skip("with polymorphic has one with custom columns name", () => {
@@ -1084,8 +1105,32 @@ describe("HasOneAssociationsTest", () => {
     // Requires destroyed_by_association on replace
   });
 
-  it.skip("dependency should halt parent destruction", () => {
-    // Requires dependent: :restrict_with_exception
+  it("dependency should halt parent destruction", async () => {
+    const ad = freshAdapter();
+    class DepHaltFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class DepHaltAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = ad;
+      }
+    }
+    Associations.hasOne.call(DepHaltFirm, "dep_halt_account", {
+      className: "DepHaltAccount",
+      foreignKey: "firm_id",
+      dependent: "restrictWithException",
+    });
+    registerModel("DepHaltFirm", DepHaltFirm);
+    registerModel("DepHaltAccount", DepHaltAccount);
+    const firm = await DepHaltFirm.create({ name: "Halt Corp" });
+    await DepHaltAccount.create({ firm_id: firm.id, credit_limit: 100 });
+    await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
+    expect(await DepHaltFirm.count()).toBe(1);
   });
 
   it.skip("has one with touch option on nonpersisted built associations doesnt update parent", () => {
