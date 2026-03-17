@@ -1,4 +1,5 @@
 import pg from "pg";
+import { singularize, underscore } from "@rails-ts/activesupport";
 import type { DatabaseAdapter } from "../adapter.js";
 
 /**
@@ -728,7 +729,7 @@ export class PostgresAdapter implements DatabaseAdapter {
     const { schema: fromSchema, table: fromTbl } = this.parseSchemaQualifiedName(fromTable);
     const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
 
-    const column = options.column ?? `${toTbl.replace(/s$/, "")}_id`;
+    const column = options.column ?? `${underscore(singularize(toTbl))}_id`;
     const pk = options.primaryKey ?? "id";
     const name = options.name ?? `fk_rails_${fromTbl}_${column}`;
 
