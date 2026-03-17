@@ -123,7 +123,8 @@ export class SafeBuffer {
 
   /** chr — returns first character as a SafeBuffer with same safety. */
   chr(): SafeBuffer {
-    return new SafeBuffer(this._value.charAt(0), this._safe);
+    const first = Array.from(this._value)[0] ?? "";
+    return new SafeBuffer(first, this._safe);
   }
 
   /** repeat — repeats the string n times, preserving safety status. */
