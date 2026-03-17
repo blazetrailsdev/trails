@@ -220,7 +220,7 @@ describe("CallbackChain.runAsync", () => {
     });
     await chain.runAsync("save", {}, async () => {
       log.push("block:start");
-      await new Promise((r) => setTimeout(r, 10));
+      await Promise.resolve();
       log.push("block:end");
     });
     expect(log).toEqual(["block:start", "block:end", "after"]);
@@ -258,7 +258,7 @@ describe("CallbackChain.runAsync", () => {
     });
     await chain.runAsync("save", {}, async () => {
       log.push("block:start");
-      await new Promise((r) => setTimeout(r, 10));
+      await Promise.resolve();
       log.push("block:end");
     });
     expect(log).toEqual(["around:before", "block:start", "block:end", "around:after", "after"]);
@@ -278,7 +278,7 @@ describe("CallbackChain.runAsync", () => {
     });
     await chain.runAsync("save", {}, async () => {
       log.push("block:start");
-      await new Promise((r) => setTimeout(r, 10));
+      await Promise.resolve();
       log.push("block:end");
     });
     expect(log).toEqual(["around:before", "block:start", "around:after", "block:end", "after"]);

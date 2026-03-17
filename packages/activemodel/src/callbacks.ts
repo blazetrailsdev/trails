@@ -115,14 +115,18 @@ export class CallbackChain {
         let proceedResult: Promise<void> | null = null;
         const wrappedProceed = () => {
           const result = prev();
-          if (result instanceof Promise) proceedResult = result;
+          proceedResult = result instanceof Promise ? result : null;
           return result;
         };
+        let aroundError: unknown;
         try {
           await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
-        } finally {
-          if (proceedResult) await proceedResult;
+        } catch (e) {
+          aroundError = e;
         }
+
+        if (proceedResult) await (proceedResult as unknown as Promise<void>).catch(() => {});
+        if (aroundError !== undefined) throw aroundError;
       };
     }
     await chain();
