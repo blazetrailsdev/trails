@@ -1371,7 +1371,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.limit
    */
-  static limit(value: number) {
+  static limit(value: number | null) {
     return this.all().limit(value);
   }
 
@@ -2323,8 +2323,12 @@ export class Base extends Model {
     }
     const ctor = this.constructor as typeof Base;
 
-    // Process dependent associations before destroy
-    // (restrict_with_exception will throw here, preventing the DELETE)
+    // Process dependent associations before the destroy callback chain.
+    // In Rails these are before_destroy callbacks; here we run them before
+    // the synchronous callback chain because they're async. This means
+    // restrict_with_exception correctly prevents the DELETE, but
+    // dependent: :destroy will run even if a beforeDestroy callback later
+    // halts. A full fix requires an async-capable callback runner.
     const { processDependentAssociations } = await import("./associations.js");
     await processDependentAssociations(this);
 
