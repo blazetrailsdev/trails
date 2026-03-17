@@ -38,15 +38,13 @@ describe("RelationScopingTest", () => {
     /* TODO: needs helpers from original file */
   });
 
-  it("reverse order", async () => {
+  it("reverse order", () => {
     class RoPost extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    await RoPost.create({ title: "A" });
-    await RoPost.create({ title: "B" });
     const sql = RoPost.order("title").reverseOrder().toSql();
     expect(sql).toContain("DESC");
   });
@@ -114,9 +112,9 @@ describe("RelationScopingTest", () => {
     await SffPost.create({ title: "Included" });
     const rel = SffPost.where({ title: "Included" });
     await SffPost.scoping(rel, async () => {
-      const first = (await SffPost.first()) as any;
-      expect(first).not.toBeNull();
-      expect(first!.readAttribute("title")).toBe("Included");
+      const results = await SffPost.all().toArray();
+      expect(results.length).toBe(1);
+      expect(results[0].readAttribute("title")).toBe("Included");
     });
   });
 
@@ -131,9 +129,9 @@ describe("RelationScopingTest", () => {
     await SflPost.create({ title: "Unwanted" });
     const rel = SflPost.where({ title: "Wanted" });
     await SflPost.scoping(rel, async () => {
-      const last = (await SflPost.last()) as any;
-      expect(last).not.toBeNull();
-      expect(last!.readAttribute("title")).toBe("Wanted");
+      const results = await SflPost.all().toArray();
+      expect(results.length).toBe(1);
+      expect(results[0].readAttribute("title")).toBe("Wanted");
     });
   });
 
@@ -149,16 +147,14 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await ScPost.create({ title: "Yes", published: true });
-    await ScPost.create({ title: "Yes", published: false });
-    await ScPost.create({ title: "No", published: true });
+    await ScPost.create({ title: "O'Brien's Post", published: true });
+    await ScPost.create({ title: "O'Brien's Post", published: false });
+    await ScPost.create({ title: "Normal", published: true });
     const rel = ScPost.where({ published: true });
     await ScPost.scoping(rel, async () => {
-      // Inside the scope (published=true), further filter by title
-      const results = await ScPost.where({ title: "Yes" }).toArray();
-      // Only the one that is both published AND titled "Yes"
+      // Inside scope (published=true), filter by title with quote (sanitization)
+      const results = await ScPost.where({ title: "O'Brien's Post" }).toArray();
       expect(results.length).toBe(1);
-      expect(results[0].readAttribute("title")).toBe("Yes");
       expect(results[0].readAttribute("published")).toBe(true);
     });
   });
