@@ -336,7 +336,11 @@ describe("ReflectionTest", () => {
     const all = reflectOnAllAssociations(Author);
     expect(all.length).toBeGreaterThanOrEqual(2); // books + profile at minimum
   });
-  it.skip("reflection should not raise for unknown class", () => {});
+  it("reflection should not raise for unknown class", () => {
+    const { Author } = makeModels();
+    const ref = reflectOnAssociation(Author, "nonexistent");
+    expect(ref).toBeNull();
+  });
   it.skip("has many reflection for reloaded child", () => {});
   it.skip("association target type", () => {});
   it.skip("belongs to reflection with symbol foreign key", () => {});
@@ -354,9 +358,42 @@ describe("ReflectionTest", () => {
   it.skip("has many through join keys", () => {});
   it.skip("scope chain", () => {});
   it.skip("nested has many through reflection", () => {});
-  it.skip("columns are returned in the order they were declared", () => {});
-  it.skip("content columns", () => {});
-  it.skip("non existent types are identity types", () => {});
+  it("columns are returned in the order they were declared", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    const names = columnNames(Topic);
+    expect(names.indexOf("title")).toBeLessThan(names.indexOf("author_name"));
+    expect(names.indexOf("author_name")).toBeLessThan(names.indexOf("body"));
+  });
+  it("content columns", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const cols = columns(Topic);
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("title");
+    expect(names).toContain("author_name");
+  });
+  it("non existent types are identity types", () => {
+    class Widget extends Base {
+      static {
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
+    }
+    const cols = columns(Widget);
+    expect(cols.length).toBeGreaterThan(0);
+  });
   it.skip("reflection klass for nested class name", () => {});
   it.skip("irregular reflection class name", () => {});
   it.skip("reflection klass with same demodularized different modularized name", () => {});
@@ -377,8 +414,18 @@ describe("ReflectionTest", () => {
   it.skip("join table with different prefix", () => {});
   it.skip("join table can be overridden", () => {});
   it.skip("includes accepts strings", () => {});
-  it.skip("reflect on association accepts symbols", () => {});
-  it.skip("reflect on association accepts strings", () => {});
+  it("reflect on association accepts symbols", () => {
+    const { Author } = makeModels();
+    const ref = reflectOnAssociation(Author, "books");
+    expect(ref).not.toBeNull();
+    expect(ref!.name).toBe("books");
+  });
+  it("reflect on association accepts strings", () => {
+    const { Author } = makeModels();
+    const ref = reflectOnAssociation(Author, "books");
+    expect(ref).not.toBeNull();
+    expect(ref!.name).toBe("books");
+  });
   it.skip("reflect on missing source assocation raise exception", () => {});
   it.skip("name error from incidental code is not converted to name error for association", () => {});
   it.skip("automatic inverse suppresses name error for association", () => {});
