@@ -16,7 +16,6 @@ import {
   allMonth,
   allQuarter,
   allYear,
-  beginningOfWeek,
   endOfWeek,
   beginningOfQuarter,
   changeDate,

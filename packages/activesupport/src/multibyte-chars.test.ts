@@ -322,8 +322,8 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
 
   it("slice should throw exceptions on invalid arguments", () => {
     expect(() => {
-      const chars = [...UNICODE_STRING];
-      if (typeof {} !== "number") throw new TypeError("invalid argument");
+      const arg: unknown = {};
+      if (typeof arg !== "number") throw new TypeError("invalid argument");
     }).toThrow();
   });
 
