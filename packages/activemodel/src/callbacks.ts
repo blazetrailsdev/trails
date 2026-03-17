@@ -95,7 +95,8 @@ export class CallbackChain {
    * Same as run() but awaits the block before running after callbacks,
    * ensuring after callbacks see the completed state. Around callbacks
    * receive an async proceed() and can await it.
-   * Returns false if a before callback halts the chain.
+   * Returns false if a before callback halts the chain or if an around
+   * callback does not call proceed().
    */
   async runAsync(
     event: CallbackEvent,
