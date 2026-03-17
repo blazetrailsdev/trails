@@ -271,45 +271,35 @@ describeIfPg("PostgresAdapter", () => {
 
     it("xml decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_xml" ("id" SERIAL PRIMARY KEY, "val" XML)`);
-      await adapter.executeMutation(
-        `INSERT INTO "ex_xml" ("val") VALUES ('<root>hello</root>')`,
-      );
+      await adapter.executeMutation(`INSERT INTO "ex_xml" ("val") VALUES ('<root>hello</root>')`);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_xml"`);
       expect(String(rows[0].val)).toContain("<root>hello</root>");
     });
 
     it("cidr decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_cidr" ("id" SERIAL PRIMARY KEY, "val" CIDR)`);
-      await adapter.executeMutation(
-        `INSERT INTO "ex_cidr" ("val") VALUES ('192.168.1.0/24')`,
-      );
+      await adapter.executeMutation(`INSERT INTO "ex_cidr" ("val") VALUES ('192.168.1.0/24')`);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_cidr"`);
       expect(String(rows[0].val)).toBe("192.168.1.0/24");
     });
 
     it("inet decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_inet" ("id" SERIAL PRIMARY KEY, "val" INET)`);
-      await adapter.executeMutation(
-        `INSERT INTO "ex_inet" ("val") VALUES ('192.168.1.1')`,
-      );
+      await adapter.executeMutation(`INSERT INTO "ex_inet" ("val") VALUES ('192.168.1.1')`);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_inet"`);
       expect(String(rows[0].val)).toBe("192.168.1.1");
     });
 
     it("macaddr decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_mac" ("id" SERIAL PRIMARY KEY, "val" MACADDR)`);
-      await adapter.executeMutation(
-        `INSERT INTO "ex_mac" ("val") VALUES ('08:00:2b:01:02:03')`,
-      );
+      await adapter.executeMutation(`INSERT INTO "ex_mac" ("val") VALUES ('08:00:2b:01:02:03')`);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_mac"`);
       expect(String(rows[0].val)).toBe("08:00:2b:01:02:03");
     });
 
     it("point decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_point" ("id" SERIAL PRIMARY KEY, "val" POINT)`);
-      await adapter.executeMutation(
-        `INSERT INTO "ex_point" ("val") VALUES ('(1.5, 2.5)')`,
-      );
+      await adapter.executeMutation(`INSERT INTO "ex_point" ("val") VALUES ('(1.5, 2.5)')`);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_point"`);
       const val = rows[0].val;
       expect(val).toBeTruthy();
@@ -317,9 +307,7 @@ describeIfPg("PostgresAdapter", () => {
 
     it("bit decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_bit" ("id" SERIAL PRIMARY KEY, "val" BIT(8))`);
-      await adapter.executeMutation(
-        `INSERT INTO "ex_bit" ("val") VALUES (B'10101010')`,
-      );
+      await adapter.executeMutation(`INSERT INTO "ex_bit" ("val") VALUES (B'10101010')`);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_bit"`);
       expect(String(rows[0].val)).toBe("10101010");
     });
@@ -327,9 +315,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("range decoding", async () => {});
 
     it("date time decoding", async () => {
-      const rows = await adapter.execute(
-        `SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`,
-      );
+      const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
       expect(rows[0].val).toBeInstanceOf(Date);
     });
 
@@ -345,18 +331,14 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("timestamp decoding", async () => {
-      const rows = await adapter.execute(
-        `SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`,
-      );
+      const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
       const d = rows[0].val as Date;
       expect(d).toBeInstanceOf(Date);
       expect(d.getFullYear()).toBe(2023);
     });
 
     it("timestamp with time zone decoding", async () => {
-      const rows = await adapter.execute(
-        `SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`,
-      );
+      const rows = await adapter.execute(`SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`);
       const d = rows[0].val as Date;
       expect(d).toBeInstanceOf(Date);
       expect(d.getFullYear()).toBe(2023);
@@ -399,18 +381,14 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {});
 
     it("serial sequence", async () => {
-      await adapter.exec(
-        `CREATE TABLE "ex_serial_seq" ("id" SERIAL PRIMARY KEY)`,
-      );
+      await adapter.exec(`CREATE TABLE "ex_serial_seq" ("id" SERIAL PRIMARY KEY)`);
       const result = await adapter.pkAndSequenceFor("ex_serial_seq");
       expect(result).not.toBeNull();
       expect(result![1].name).toBe("ex_serial_seq_id_seq");
     });
 
     it("default sequence name", async () => {
-      await adapter.exec(
-        `CREATE TABLE "ex_def_seq" ("id" SERIAL PRIMARY KEY)`,
-      );
+      await adapter.exec(`CREATE TABLE "ex_def_seq" ("id" SERIAL PRIMARY KEY)`);
       const result = await adapter.pkAndSequenceFor("ex_def_seq");
       expect(result).not.toBeNull();
       expect(result![1].name).toBe("ex_def_seq_id_seq");
@@ -422,9 +400,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("pk and sequence for with non standard primary key", async () => {
-      await adapter.exec(
-        `CREATE TABLE "ex_ns_pk" ("custom_id" SERIAL PRIMARY KEY, "name" TEXT)`,
-      );
+      await adapter.exec(`CREATE TABLE "ex_ns_pk" ("custom_id" SERIAL PRIMARY KEY, "name" TEXT)`);
       const result = await adapter.pkAndSequenceFor("ex_ns_pk");
       expect(result).not.toBeNull();
       expect(result![0]).toBe("custom_id");
@@ -432,9 +408,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("pk and sequence for returns nil if no seq", async () => {
-      await adapter.exec(
-        `CREATE TABLE "ex_no_seq" ("id" INTEGER PRIMARY KEY, "name" TEXT)`,
-      );
+      await adapter.exec(`CREATE TABLE "ex_no_seq" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       const result = await adapter.pkAndSequenceFor("ex_no_seq");
       expect(result).toBeNull();
     });

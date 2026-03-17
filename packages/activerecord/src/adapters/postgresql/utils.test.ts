@@ -18,14 +18,10 @@ describeIfPg("PostgresAdapter", () => {
 
   describe("PostgreSQLNameTest", () => {
     it("reset pk sequence on empty table", async () => {
-      await adapter.exec(
-        `CREATE TABLE utils_reset_pk (id serial primary key, name text)`,
-      );
+      await adapter.exec(`CREATE TABLE utils_reset_pk (id serial primary key, name text)`);
       await adapter.exec(`SELECT setval('utils_reset_pk_id_seq', 123)`);
       await adapter.resetPkSequence("utils_reset_pk");
-      const rows = await adapter.execute(
-        `SELECT nextval('utils_reset_pk_id_seq') AS val`,
-      );
+      const rows = await adapter.execute(`SELECT nextval('utils_reset_pk_id_seq') AS val`);
       expect(Number(rows[0].val)).toBe(1);
     });
 
@@ -33,12 +29,8 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(
         `CREATE TABLE utils_reset_pk_custom (custom_id serial primary key, name text)`,
       );
-      await adapter.executeMutation(
-        `INSERT INTO utils_reset_pk_custom (name) VALUES ('a')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO utils_reset_pk_custom (name) VALUES ('b')`,
-      );
+      await adapter.executeMutation(`INSERT INTO utils_reset_pk_custom (name) VALUES ('a')`);
+      await adapter.executeMutation(`INSERT INTO utils_reset_pk_custom (name) VALUES ('b')`);
       await adapter.exec(`SELECT setval('utils_reset_pk_custom_custom_id_seq', 100)`);
       await adapter.resetPkSequence("utils_reset_pk_custom");
       const rows = await adapter.execute(
@@ -81,9 +73,7 @@ describeIfPg("PostgresAdapter", () => {
 
     it("quoted returns a string representation usable in a query", () => {
       expect(new PgName(null, "articles").quoted()).toBe('"articles"');
-      expect(new PgName("public", "articles").quoted()).toBe(
-        '"public"."articles"',
-      );
+      expect(new PgName("public", "articles").quoted()).toBe('"public"."articles"');
     });
 
     it("prevents double quoting", () => {
@@ -93,35 +83,19 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("equality based on state", () => {
-      expect(
-        new PgName("access", "users").equals(new PgName("access", "users")),
-      ).toBe(true);
-      expect(
-        new PgName(null, "users").equals(new PgName(null, "users")),
-      ).toBe(true);
-      expect(
-        new PgName(null, "users").equals(new PgName("access", "users")),
-      ).toBe(false);
-      expect(
-        new PgName("access", "users").equals(new PgName("public", "users")),
-      ).toBe(false);
-      expect(
-        new PgName("public", "users").equals(new PgName("public", "articles")),
-      ).toBe(false);
+      expect(new PgName("access", "users").equals(new PgName("access", "users"))).toBe(true);
+      expect(new PgName(null, "users").equals(new PgName(null, "users"))).toBe(true);
+      expect(new PgName(null, "users").equals(new PgName("access", "users"))).toBe(false);
+      expect(new PgName("access", "users").equals(new PgName("public", "users"))).toBe(false);
+      expect(new PgName("public", "users").equals(new PgName("public", "articles"))).toBe(false);
     });
 
     it("can be used as hash key", () => {
       const map = new Map<string, string>();
       map.set(new PgName("schema", "article_seq").hashKey(), "success");
-      expect(map.get(new PgName("schema", "article_seq").hashKey())).toBe(
-        "success",
-      );
-      expect(
-        map.get(new PgName("schema", "articles").hashKey()),
-      ).toBeUndefined();
-      expect(
-        map.get(new PgName("public", "article_seq").hashKey()),
-      ).toBeUndefined();
+      expect(map.get(new PgName("schema", "article_seq").hashKey())).toBe("success");
+      expect(map.get(new PgName("schema", "articles").hashKey())).toBeUndefined();
+      expect(map.get(new PgName("public", "article_seq").hashKey())).toBeUndefined();
     });
   });
 });

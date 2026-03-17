@@ -19,52 +19,34 @@ describeIfPg("PostgresAdapter", () => {
 
   describe("PostgresqlRenameTableTest", () => {
     it("rename table", async () => {
-      await adapter.exec(
-        "CREATE TABLE before_rename (id serial primary key, name text)",
-      );
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
       await adapter.renameTable("before_rename", "after_rename");
       expect(await adapter.dataSourceExists("after_rename")).toBe(true);
       expect(await adapter.dataSourceExists("before_rename")).toBe(false);
     });
 
     it("rename table with index", async () => {
-      await adapter.exec(
-        "CREATE TABLE before_rename (id serial primary key, name text)",
-      );
-      await adapter.exec(
-        "CREATE INDEX idx_before_name ON before_rename (name)",
-      );
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
+      await adapter.exec("CREATE INDEX idx_before_name ON before_rename (name)");
       await adapter.renameTable("before_rename", "after_rename");
       const indexes = await adapter.indexes("after_rename");
       expect(indexes.some((i) => i.columns.includes("name"))).toBe(true);
     });
 
     it("rename table with sequence", async () => {
-      await adapter.exec(
-        "CREATE TABLE before_rename (id serial primary key, name text)",
-      );
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
       await adapter.renameTable("before_rename", "after_rename");
       expect(await adapter.primaryKey("after_rename")).toBe("id");
-      const id = await adapter.executeMutation(
-        `INSERT INTO after_rename (name) VALUES ('test')`,
-      );
+      const id = await adapter.executeMutation(`INSERT INTO after_rename (name) VALUES ('test')`);
       expect(id).toBeGreaterThan(0);
     });
 
     it("rename table preserves data", async () => {
-      await adapter.exec(
-        "CREATE TABLE before_rename (id serial primary key, name text)",
-      );
-      await adapter.executeMutation(
-        `INSERT INTO before_rename (name) VALUES ('alice')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO before_rename (name) VALUES ('bob')`,
-      );
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
+      await adapter.executeMutation(`INSERT INTO before_rename (name) VALUES ('alice')`);
+      await adapter.executeMutation(`INSERT INTO before_rename (name) VALUES ('bob')`);
       await adapter.renameTable("before_rename", "after_rename");
-      const rows = await adapter.execute(
-        "SELECT name FROM after_rename ORDER BY name",
-      );
+      const rows = await adapter.execute("SELECT name FROM after_rename ORDER BY name");
       expect(rows.map((r) => r.name)).toEqual(["alice", "bob"]);
     });
 
@@ -72,23 +54,17 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("renaming a table with uuid primary key and gen_random_uuid() default also renames the primary key index", async () => {});
 
     it("renaming a table also renames the primary key sequence", async () => {
-      await adapter.exec(
-        "CREATE TABLE before_rename (id serial primary key)",
-      );
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key)");
       await adapter.renameTable("before_rename", "after_rename");
       const result = await adapter.pkAndSequenceFor("after_rename");
       expect(result).not.toBeNull();
       expect(result![0]).toBe("id");
-      const id = await adapter.executeMutation(
-        "INSERT INTO after_rename DEFAULT VALUES",
-      );
+      const id = await adapter.executeMutation("INSERT INTO after_rename DEFAULT VALUES");
       expect(id).toBeGreaterThan(0);
     });
 
     it("renaming a table also renames the primary key index", async () => {
-      await adapter.exec(
-        "CREATE TABLE before_rename (id serial primary key)",
-      );
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key)");
       const beforeIdx = await adapter.execute(
         `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = 'before_rename_pkey'`,
       );
