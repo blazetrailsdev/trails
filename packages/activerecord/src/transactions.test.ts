@@ -470,8 +470,22 @@ describe("TransactionTest", () => {
     expect(log).toContain("committed:updated");
   });
 
-  it.skip("after_commit on destroy", () => {
-    /* destroy doesn't trigger afterCommit callbacks */
+  it("after_commit on destroy", async () => {
+    const adp = freshAdapter();
+    const log: string[] = [];
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit(() => {
+          log.push("committed");
+        });
+      }
+    }
+    const p = await Post.create({ title: "test" });
+    log.length = 0;
+    await p.destroy();
+    expect(log).toContain("committed");
   });
 
   it("after commit fires in correct order", async () => {

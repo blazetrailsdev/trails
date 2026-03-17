@@ -96,8 +96,7 @@ describe("SignedIdTest", () => {
     expect(() => u.signedId()).toThrow();
   });
 
-  it.skip("can get a signed ID in an after_create", async () => {
-    // _newRecord is still true when afterCreate fires, so signedId() throws
+  it("can get a signed ID in an after_create", async () => {
     const { User } = makeModel();
     let capturedToken: string | null = null;
     User.afterCreate((record: any) => {
