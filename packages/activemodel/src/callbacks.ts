@@ -118,8 +118,11 @@ export class CallbackChain {
           if (result instanceof Promise) proceedResult = result;
           return result;
         };
-        await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
-        if (proceedResult) await proceedResult;
+        try {
+          await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
+        } finally {
+          if (proceedResult) await proceedResult;
+        }
       };
     }
     await chain();
