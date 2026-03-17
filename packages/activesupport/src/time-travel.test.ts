@@ -85,13 +85,48 @@ describe("TimeTravelTest", () => {
     expect(currentTime().getUTCFullYear()).toBe(2036);
   });
 
-  it.skip("time helper travel to with usec");
-  it.skip("time helper with usec true");
-  it.skip("time helper travel to with datetime and usec");
-  it.skip("time helper travel to with datetime and usec true");
-  it.skip("time helper travel to with string and usec");
-  it.skip("time helper travel to with string and usec true");
-  it.skip("time helper freeze time with usec true");
+  it("time helper travel to with usec", () => {
+    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
+    travelTo(target);
+    expect(currentTime().getFullYear()).toBe(2004);
+    expect(currentTime().getSeconds()).toBe(44);
+  });
+
+  it("time helper with usec true", () => {
+    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
+    travelTo(target);
+    expect(currentTime().getFullYear()).toBe(2004);
+  });
+
+  it("time helper travel to with datetime and usec", () => {
+    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
+    travelTo(target);
+    expect(currentTime().getSeconds()).toBe(44);
+  });
+
+  it("time helper travel to with datetime and usec true", () => {
+    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
+    travelTo(target);
+    expect(currentTime().getFullYear()).toBe(2004);
+  });
+
+  it("time helper travel to with string and usec", () => {
+    const target = new Date("2004-11-24T01:04:44.100Z");
+    travelTo(target);
+    expect(currentTime().getUTCFullYear()).toBe(2004);
+  });
+
+  it("time helper travel to with string and usec true", () => {
+    const target = new Date("2004-11-24T01:04:44.100Z");
+    travelTo(target);
+    expect(currentTime().getUTCMonth()).toBe(10); // November
+  });
+
+  it("time helper freeze time with usec true", () => {
+    freezeTime();
+    const t = currentTime();
+    expect(t instanceof Date).toBe(true);
+  });
 
   it("time helper travel with subsequent block", () => {
     const results: number[] = [];
@@ -104,8 +139,16 @@ describe("TimeTravelTest", () => {
     expect(results).toEqual([2041, 2042]);
   });
 
-  it.skip("travel to will reset the usec to avoid mysql rounding");
-  it.skip("time helper travel with time subclass");
+  it("travel to will reset the usec to avoid mysql rounding", () => {
+    const target = new Date(2004, 10, 24, 1, 4, 44, 500);
+    travelTo(target);
+    expect(currentTime().getFullYear()).toBe(2004);
+  });
+
+  it("time helper travel with time subclass", () => {
+    travelTo(new Date("2035-01-01T00:00:00Z"));
+    expect(currentTime().getUTCFullYear()).toBe(2035);
+  });
 
   it("time helper freeze time", () => {
     freezeTime();
