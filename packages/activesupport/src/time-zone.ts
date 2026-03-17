@@ -503,20 +503,24 @@ export class TimeZone {
     if (str == null || str.trim() === "") {
       throw new Error("invalid date");
     }
-    return this.parse(str);
+    const trimmed = str.trim();
+    if (!/^\d{4}-?\d{2}-?\d{2}(T\d{2}:?\d{2}(:?\d{2})?)?/.test(trimmed)) {
+      throw new Error("invalid date");
+    }
+    return this.parse(trimmed);
   }
 
   /**
    * Parse an RFC 3339 string in this timezone.
    */
   rfc3339(str: string): TimeWithZone {
+    const trimmed = str?.trim() ?? "";
     if (
-      !str ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([.]\d+)?(Z|[+-]\d{2}:?\d{2})/.test(str.trim())
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([.]\d+)?(Z|[+-]\d{2}:?\d{2})$/.test(trimmed)
     ) {
       throw new Error("invalid date");
     }
-    const date = new Date(str);
+    const date = new Date(trimmed);
     if (isNaN(date.getTime())) {
       throw new Error("invalid date");
     }
