@@ -108,12 +108,16 @@ export class CallbackChain {
       (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
     );
 
-    let chain: () => void | Promise<void> = block;
+    let blockExecuted = false;
+    const trackedBlock = async () => {
+      await block();
+      blockExecuted = true;
+    };
+
+    let chain: () => void | Promise<void> = trackedBlock;
     for (const cb of [...arounds].reverse()) {
       const prev = chain;
       chain = async () => {
-        // Track the proceed() promise so we can await it even if the
-        // around callback doesn't
         let pendingProceed: Promise<void> | undefined;
         const wrappedProceed = () => {
           const result = prev();
@@ -126,14 +130,14 @@ export class CallbackChain {
           await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
           if (pendingProceed) await pendingProceed;
         } catch (aroundError) {
-          // Ensure proceed result is observed even if the around
-          // callback threw, then rethrow the original error
           if (pendingProceed) await pendingProceed.catch(() => {});
           throw aroundError;
         }
       };
     }
     await chain();
+
+    if (!blockExecuted) return false;
 
     this.runAfter(event, record);
 
