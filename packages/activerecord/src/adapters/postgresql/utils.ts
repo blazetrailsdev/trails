@@ -8,8 +8,8 @@ export class PgName {
   readonly identifier: string;
 
   constructor(schema: string | null, identifier: string) {
-    this.schema = schema ? schema.replace(/^"|"$/g, "") : null;
-    this.identifier = identifier.replace(/^"|"$/g, "");
+    this.schema = schema ? unquoteIdentifier(schema) : null;
+    this.identifier = unquoteIdentifier(identifier);
   }
 
   toString(): string {
@@ -44,7 +44,14 @@ export function extractSchemaQualifiedName(name: string): PgName {
   return new PgName(null, parts[0]);
 }
 
-function splitQuotedIdentifier(name: string): string[] {
+function unquoteIdentifier(name: string): string {
+  if (name.startsWith('"') && name.endsWith('"')) {
+    return name.slice(1, -1).replace(/""/g, '"');
+  }
+  return name;
+}
+
+export function splitQuotedIdentifier(name: string): string[] {
   const parts: string[] = [];
   let i = 0;
   while (i < name.length) {
