@@ -184,7 +184,7 @@ export class Associations {
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_one
    */
   static hasOne(name: string, options: AssociationOptions = {}): void {
-    if ((options as any).counterCache) {
+    if (options.counterCache) {
       throw new Error("has_one associations do not support counter_cache");
     }
     if (!Object.prototype.hasOwnProperty.call(this, "_associations")) {

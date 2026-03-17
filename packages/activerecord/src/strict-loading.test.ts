@@ -445,19 +445,8 @@ describe("StrictLoadingTest", () => {
     a.strictLoadingBang();
     expect(a.isStrictLoading()).toBe(true);
   });
-  it("strict loading via relation is only for that relation", async () => {
-    class SlrAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel("SlrAuthor", SlrAuthor);
-    const a1 = await SlrAuthor.create({ name: "A" });
-    const a2 = await SlrAuthor.create({ name: "B" });
-    a1.strictLoadingBang();
-    expect(a1.isStrictLoading()).toBe(true);
-    expect(a2.isStrictLoading()).toBe(false);
+  it.skip("strict loading via relation is only for that relation", () => {
+    /* needs Relation#strictLoading() method */
   });
 
   it("strict loading on a belongs to", async () => {
@@ -628,11 +617,35 @@ describe("StrictLoadingTest", () => {
   });
   it.skip("strict loading n plus one only mode with has many", () => {});
   it.skip("strict loading n plus one only mode with belongs to", () => {});
-  it("default mode can be changed globally", () => {
+  it("default mode can be changed globally", async () => {
+    class GmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class GmBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("GmAuthor", GmAuthor);
+    registerModel("GmBook", GmBook);
+    Associations.hasMany.call(GmAuthor, "gm_books", {
+      className: "GmBook",
+      foreignKey: "author_id",
+    });
     const original = Base.strictLoadingByDefault;
     try {
       Base.strictLoadingByDefault = true;
-      expect(Base.strictLoadingByDefault).toBe(true);
+      const created = await GmAuthor.create({ name: "Global" });
+      const author = await GmAuthor.find(created.id);
+      expect(author.isStrictLoading()).toBe(true);
+      await expect(
+        loadHasMany(author, "gm_books", { className: "GmBook", foreignKey: "author_id" }),
+      ).rejects.toThrow(StrictLoadingViolationError);
     } finally {
       Base.strictLoadingByDefault = original;
     }

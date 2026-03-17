@@ -1034,7 +1034,7 @@ describe("HasOneAssociationsTest", () => {
         foreignKey: "firm_id",
         counterCache: true,
       } as any);
-    }).toThrow();
+    }).toThrow(/counter_cache/);
   });
 
   it.skip("with polymorphic has one with custom columns name", () => {
