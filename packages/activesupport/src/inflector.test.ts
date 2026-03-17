@@ -138,8 +138,9 @@ describe("InflectorTest", () => {
   });
 
   it("camelize with nil downcases the first letter", () => {
-    expect(camelize("Capital", false)).toBe("capital");
-    expect(camelize("capital", false)).toBe("capital");
+    // Ruby nil maps to false in TS (both downcase the first letter)
+    expect(camelize("Capital", null as unknown as boolean)).toBe("capital");
+    expect(camelize("capital", null as unknown as boolean)).toBe("capital");
   });
 
   it("camelize with lower downcases the first letter", () => {

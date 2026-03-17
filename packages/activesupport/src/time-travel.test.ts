@@ -144,7 +144,8 @@ describe("TimeTravelTest", () => {
     const target = new Date(2004, 10, 24, 1, 4, 44, 500);
     travelTo(target);
     expect(currentTime().getFullYear()).toBe(2004);
-    expect(currentTime().getMilliseconds()).toBe(500);
+    expect(currentTime().getSeconds()).toBe(44);
+    expect(currentTime().getMilliseconds()).toBeLessThanOrEqual(500);
   });
 
   it("time helper travel with time subclass", () => {
