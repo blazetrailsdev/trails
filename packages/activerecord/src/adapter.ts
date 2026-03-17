@@ -269,7 +269,7 @@ export class MemoryAdapter implements DatabaseAdapter {
       if (isDistinct) {
         const seen = new Set<string>();
         rows = rows.filter((row) => {
-          const key = JSON.stringify(row.id ?? row);
+          const key = JSON.stringify(row);
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
