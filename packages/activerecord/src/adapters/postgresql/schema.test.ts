@@ -83,6 +83,9 @@ async function setupSchemas(adapter: PostgresAdapter) {
 async function teardownSchemas(adapter: PostgresAdapter) {
   await adapter.dropSchema(SCHEMA2_NAME, { ifExists: true, cascade: true });
   await adapter.dropSchema(SCHEMA_NAME, { ifExists: true, cascade: true });
+  await adapter.dropSchema("test_schema3", { ifExists: true, cascade: true });
+  await adapter.dropSchema("some_schema", { ifExists: true, cascade: true });
+  await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
 }
 
 describeIfPg("PostgresAdapter", () => {
@@ -398,6 +401,7 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.createSchema("my_schema");
     });
     afterEach(async () => {
+      await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
       await adapter.dropSchema("my_schema", { ifExists: true, cascade: true });
     });
 
@@ -421,7 +425,6 @@ describeIfPg("PostgresAdapter", () => {
       expect(await adapter.foreignKeyExists("my_other_schema.wagons", "my_schema.trains")).toBe(
         true,
       );
-      await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
     });
   });
 

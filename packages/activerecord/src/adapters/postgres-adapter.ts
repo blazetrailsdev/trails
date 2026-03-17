@@ -662,6 +662,9 @@ export class PostgresAdapter implements DatabaseAdapter {
     if (options.algorithm && options.algorithm !== "concurrently") {
       throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
     }
+    if (options.algorithm === "concurrently" && this._inTransaction) {
+      throw new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction");
+    }
 
     const unique = options.unique ? "UNIQUE " : "";
     const concurrently = options.algorithm === "concurrently" ? "CONCURRENTLY " : "";
@@ -711,6 +714,9 @@ export class PostgresAdapter implements DatabaseAdapter {
     }
     if (options.algorithm && options.algorithm !== "concurrently") {
       throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
+    }
+    if (options.algorithm === "concurrently" && this._inTransaction) {
+      throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
     const concurrently = options.algorithm === "concurrently" ? " CONCURRENTLY" : "";
     const { schema } = this.parseSchemaQualifiedName(tableName);

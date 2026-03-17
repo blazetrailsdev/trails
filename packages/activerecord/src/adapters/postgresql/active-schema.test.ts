@@ -14,6 +14,7 @@ describeIfPg("PostgresAdapter", () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
+    await adapter.exec("DROP TABLE IF EXISTS people");
     await adapter.close();
   });
 
