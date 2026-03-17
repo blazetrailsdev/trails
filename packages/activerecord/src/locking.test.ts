@@ -35,8 +35,12 @@ describe("OptimisticLockingTest", () => {
     /* destroy does not check lock_version yet */
   });
 
-  it.skip("lock destroy", () => {
-    /* destroy does not check lock_version yet */
+  it("lock destroy", async () => {
+    const { Person } = makePerson();
+    const p1 = await Person.create({ name: "Test" });
+    const p2 = await Person.find(p1.id);
+    await p1.update({ name: "Changed" });
+    await expect(p2.destroy()).rejects.toThrow("StaleObjectError");
   });
 
   it("lock new when explicitly passing nil", () => {
@@ -79,8 +83,10 @@ describe("OptimisticLockingTest", () => {
     /* primary key mutation not fully supported */
   });
 
-  it.skip("explicit update lock column raise error", () => {
-    /* no explicit lock column update guard */
+  it("explicit update lock column raise error", async () => {
+    const { Person } = makePerson();
+    const p = await Person.create({ name: "Test" });
+    await expect(p.update({ lock_version: 999 })).rejects.toThrow();
   });
 
   it("lock column name existing", () => {
@@ -118,16 +124,49 @@ describe("OptimisticLockingTest", () => {
     /* touch not implemented */
   });
 
-  it.skip("lock without default should work with null in the database", () => {
-    /* null lock_version in DB causes WHERE mismatch */
+  it("lock without default should work with null in the database", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    await p.update({ name: "Updated" });
+    expect(p.readAttribute("name")).toBe("Updated");
   });
 
-  it.skip("update with lock version without default should work on dirty value before type cast", () => {
-    /* null lock_version causes StaleObjectError */
+  it("update with lock version without default should work on dirty value before type cast", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    await p.update({ name: "Updated" });
+    expect(p.readAttribute("lock_version")).toBe(1);
   });
 
-  it.skip("destroy with lock version without default should work on dirty value before type cast", () => {
-    /* destroy does not check lock_version */
+  it("destroy with lock version without default should work on dirty value before type cast", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    await p.destroy();
+    expect(p.isDestroyed()).toBe(true);
   });
 
   it("lock without default queries count", async () => {
@@ -288,8 +327,20 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
-  it.skip("destroy dependents", () => {
-    /* destroy does not check lock_version yet */
+  it("destroy dependents", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    await p.destroy();
+    expect(p.isDestroyed()).toBe(true);
+    expect(await Person.all().toArray()).toHaveLength(0);
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
@@ -359,8 +410,20 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     await expect(p2.update({ name: "Conflict" })).rejects.toThrow("StaleObjectError");
   });
 
-  it.skip("null lock version in database allows first update", () => {
-    /* null lock_version causes WHERE mismatch in MemoryAdapter */
+  it("null lock version in database allows first update", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    // lock_version starts as null (no default), update should still work
+    await p.update({ name: "Updated" });
+    expect(p.readAttribute("lock_version")).toBe(1);
   });
 
   it("reloaded record has correct lock version", async () => {

@@ -2261,8 +2261,13 @@ export class Base extends Model {
     // Optimistic locking: include lock_version in WHERE and increment it
     let lockClause = "";
     if (ctor._attributeDefinitions.has("lock_version")) {
-      const currentVersion = Number(this.readAttribute("lock_version")) || 0;
-      lockClause = ` AND "lock_version" = ${currentVersion}`;
+      const rawVersion = this.readAttribute("lock_version");
+      const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
+      if (rawVersion == null) {
+        lockClause = ` AND "lock_version" IS NULL`;
+      } else {
+        lockClause = ` AND "lock_version" = ${currentVersion}`;
+      }
       this._attributes.set("lock_version", currentVersion + 1);
     }
 
@@ -2284,6 +2289,10 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#update
    */
   async update(attrs: Record<string, unknown>): Promise<boolean> {
+    const ctor = this.constructor as typeof Base;
+    if ("lock_version" in attrs && ctor._attributeDefinitions.has("lock_version")) {
+      throw new Error("lock_version cannot be updated explicitly");
+    }
     for (const [key, value] of Object.entries(attrs)) {
       this.writeAttribute(key, value);
     }
@@ -2325,8 +2334,20 @@ export class Base extends Model {
         return;
       }
 
-      const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}`;
-      this._pendingOperation = ctor.adapter.executeMutation(sql).then(() => {});
+      let lockClause = "";
+      if (ctor._attributeDefinitions.has("lock_version")) {
+        const currentVersion = this.readAttribute("lock_version");
+        if (currentVersion != null) {
+          lockClause = ` AND "lock_version" = ${Number(currentVersion) || 0}`;
+        }
+      }
+
+      const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}${lockClause}`;
+      this._pendingOperation = ctor.adapter.executeMutation(sql).then((affected) => {
+        if (lockClause && affected === 0) {
+          throw new StaleObjectError(this, "destroy");
+        }
+      });
     });
 
     if (this._pendingOperation) {
