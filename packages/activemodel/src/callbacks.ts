@@ -112,21 +112,25 @@ export class CallbackChain {
     for (const cb of [...arounds].reverse()) {
       const prev = chain;
       chain = async () => {
-        let proceedResult: Promise<void> | null = null;
+        // Track the proceed() promise so we can await it even if the
+        // around callback doesn't
+        let pendingProceed: Promise<void> | undefined;
         const wrappedProceed = () => {
           const result = prev();
-          proceedResult = result instanceof Promise ? result : null;
+          if (result && typeof (result as Promise<void>).then === "function") {
+            pendingProceed = result as Promise<void>;
+          }
           return result;
         };
-        let aroundError: unknown;
         try {
           await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
-        } catch (e) {
-          aroundError = e;
+          if (pendingProceed) await pendingProceed;
+        } catch (aroundError) {
+          // Ensure proceed result is observed even if the around
+          // callback threw, then rethrow the original error
+          if (pendingProceed) await pendingProceed.catch(() => {});
+          throw aroundError;
         }
-
-        if (proceedResult) await (proceedResult as unknown as Promise<void>).catch(() => {});
-        if (aroundError !== undefined) throw aroundError;
       };
     }
     await chain();
