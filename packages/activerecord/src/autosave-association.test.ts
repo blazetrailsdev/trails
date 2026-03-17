@@ -20,6 +20,11 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
+function cacheAssoc(record: Base, name: string, value: unknown) {
+  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+  (record as any)._cachedAssociations.set(name, value);
+}
+
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   let adapter: DatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
@@ -1304,35 +1309,179 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("TestAutosaveAssociationsInGeneral", () => {
-  it.skip("autosave works even when other callbacks update the parent model", () => {
-    /* fixture-dependent */
+  it("autosave works even when other callbacks update the parent model", async () => {
+    const adapter = freshAdapter();
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+        this.beforeSave(function (record: any) {
+          record.writeAttribute("catchphrase", "Ahoy!");
+        });
+      }
+    }
+    registerModel("Ship", Ship);
+    registerModel("Pirate", Pirate);
+    (Pirate as any)._associations = [
+      {
+        type: "hasOne",
+        name: "ship",
+        options: { autosave: true, foreignKey: "pirate_id", className: "Ship" },
+      },
+    ];
+
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = new Ship({ name: "Pearl" });
+    cacheAssoc(pirate, "ship", ship);
+    pirate.writeAttribute("catchphrase", "trigger save");
+    await pirate.save();
+    expect(pirate.readAttribute("catchphrase")).toBe("Ahoy!");
+    expect(ship.isNewRecord()).toBe(false);
+    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
   });
+
   it.skip("autosave does not pass through non custom validation contexts", () => {
-    /* fixture-dependent */
+    /* needs custom validation contexts on autosave */
   });
-  it.skip("autosave collection association callbacks get called once", () => {
-    /* fixture-dependent */
+
+  it("autosave collection association callbacks get called once", async () => {
+    const adapter = freshAdapter();
+    let saveCount = 0;
+    class Book extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+        this.beforeSave(() => {
+          saveCount++;
+        });
+      }
+    }
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Book", Book);
+    registerModel("Author", Author);
+    (Author as any)._associations = [
+      {
+        type: "hasMany",
+        name: "books",
+        options: { autosave: true, foreignKey: "author_id", className: "Book" },
+      },
+    ];
+
+    const author = await Author.create({ name: "Test" });
+    const book = new Book({ title: "My Book" });
+    cacheAssoc(author, "books", [book]);
+    author.writeAttribute("name", "trigger save");
+    await author.save();
+    expect(book.isNewRecord()).toBe(false);
+    expect(saveCount).toBe(1);
+    expect(book.readAttribute("author_id")).toBe(author.id);
   });
-  it.skip("autosave has one association callbacks get called once", () => {
-    /* fixture-dependent */
+
+  it("autosave has one association callbacks get called once", async () => {
+    const adapter = freshAdapter();
+    let saveCount = 0;
+    class Profile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("user_id", "integer");
+        this.adapter = adapter;
+        this.beforeSave(() => {
+          saveCount++;
+        });
+      }
+    }
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Profile", Profile);
+    registerModel("User", User);
+    (User as any)._associations = [
+      {
+        type: "hasOne",
+        name: "profile",
+        options: { autosave: true, foreignKey: "user_id", className: "Profile" },
+      },
+    ];
+
+    const user = await User.create({ name: "Test" });
+    const profile = new Profile({ bio: "Hello" });
+    cacheAssoc(user, "profile", profile);
+    user.writeAttribute("name", "trigger save");
+    await user.save();
+    expect(profile.isNewRecord()).toBe(false);
+    expect(saveCount).toBe(1);
+    expect(profile.readAttribute("user_id")).toBe(user.id);
   });
-  it.skip("autosave belongs to association callbacks get called once", () => {
-    /* fixture-dependent */
+
+  it("autosave belongs to association callbacks get called once", async () => {
+    const adapter = freshAdapter();
+    let saveCount = 0;
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.beforeSave(() => {
+          saveCount++;
+        });
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Post as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "author",
+        options: { autosave: true, foreignKey: "author_id", className: "Author" },
+      },
+    ];
+
+    const author = new Author({ name: "New Author" });
+    const post = await Post.create({ title: "Test" });
+    cacheAssoc(post, "author", author);
+    post.writeAttribute("title", "trigger save");
+    await post.save();
+    expect(author.isNewRecord()).toBe(false);
+    expect(saveCount).toBe(1);
+    expect(post.readAttribute("author_id")).toBe(author.id);
   });
+
   it.skip("should not add the same callbacks multiple times for has one", () => {
-    /* needs reflectOnAllAssociations to inspect association count */
+    /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("should not add the same callbacks multiple times for belongs to", () => {
-    /* needs reflectOnAllAssociations to inspect association count */
+    /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("should not add the same callbacks multiple times for has many", () => {
-    /* needs reflectOnAllAssociations to inspect association count */
+    /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("should not add the same callbacks multiple times for has and belongs to many", () => {
-    /* needs reflectOnAllAssociations to inspect association count */
+    /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("cyclic autosaves do not add multiple validations", () => {
-    /* fixture-dependent */
+    /* needs cyclic association detection */
   });
 });
 
@@ -1442,22 +1591,22 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   it.skip("should generate validation methods for has_many associations", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should generate validation methods for has_one associations with :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should not generate validation methods for has_one associations without :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should generate validation methods for belongs_to associations with :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should not generate validation methods for belongs_to associations without :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should generate validation methods for HABTM associations with :validate => true", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1532,20 +1681,149 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
-  it.skip("autosave new record on belongs to can be disabled per relationship", () => {
-    /* fixture-dependent */
+  it("autosave new record on belongs to can be disabled per relationship", async () => {
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    (Post as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "author",
+        options: { autosave: false, foreignKey: "author_id", className: "Author" },
+      },
+    ];
+
+    const author = new Author({ name: "Unsaved" });
+    const post = await Post.create({ title: "test" });
+    cacheAssoc(post, "author", author);
+    post.writeAttribute("title", "trigger save");
+    await post.save();
+    expect(author.isNewRecord()).toBe(true);
+    expect(post.readAttribute("author_id")).toBeNull();
   });
-  it.skip("autosave new record on has one can be disabled per relationship", () => {
-    /* fixture-dependent */
+
+  it("autosave new record on has one can be disabled per relationship", async () => {
+    const adapter = freshAdapter();
+    class Profile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Profile", Profile);
+    registerModel("User", User);
+    (User as any)._associations = [
+      {
+        type: "hasOne",
+        name: "profile",
+        options: { autosave: false, foreignKey: "user_id", className: "Profile" },
+      },
+    ];
+
+    const user = await User.create({ name: "test" });
+    const profile = new Profile({ bio: "Unsaved" });
+    cacheAssoc(user, "profile", profile);
+    user.writeAttribute("name", "trigger save");
+    await user.save();
+    expect(profile.isNewRecord()).toBe(true);
+    expect(profile.readAttribute("user_id")).toBeNull();
   });
-  it.skip("autosave new record on has many can be disabled per relationship", () => {
-    /* fixture-dependent */
+
+  it("autosave new record on has many can be disabled per relationship", async () => {
+    const adapter = freshAdapter();
+    class Book extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Book", Book);
+    registerModel("Author", Author);
+    (Author as any)._associations = [
+      {
+        type: "hasMany",
+        name: "books",
+        options: { autosave: false, foreignKey: "author_id", className: "Book" },
+      },
+    ];
+
+    const author = await Author.create({ name: "test" });
+    const book = new Book({ title: "Unsaved" });
+    cacheAssoc(author, "books", [book]);
+    author.writeAttribute("name", "trigger save");
+    await author.save();
+    expect(book.isNewRecord()).toBe(true);
+    expect(book.readAttribute("author_id")).toBeNull();
   });
-  it.skip("autosave new record with after create callback", () => {
-    /* fixture-dependent */
+
+  it("autosave new record with after create callback", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+        this.afterCreate(() => {
+          log.push("pirate_created");
+        });
+      }
+    }
+    registerModel("Ship", Ship);
+    registerModel("Pirate", Pirate);
+    (Pirate as any)._associations = [
+      {
+        type: "hasOne",
+        name: "ship",
+        options: { autosave: true, foreignKey: "pirate_id", className: "Ship" },
+      },
+    ];
+
+    const pirate = new Pirate({ catchphrase: "Yarr" });
+    const ship = new Ship({ name: "Pearl" });
+    cacheAssoc(pirate, "ship", ship);
+    await pirate.save();
+    expect(log).toContain("pirate_created");
+    expect(pirate.isNewRecord()).toBe(false);
+    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
+    expect(ship.isNewRecord()).toBe(false);
   });
+
   it.skip("autosave new record with after create callback and habtm association", () => {
-    /* fixture-dependent */
+    /* needs HABTM autosave integration */
   });
 });
 
@@ -1564,10 +1842,10 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     expect(valid).toBe(false);
   });
   it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
     const adapter = freshAdapter();
@@ -1658,10 +1936,10 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 
 describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   it.skip("should not has one through model", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it.skip("should not reversed has one through model", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1695,25 +1973,25 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
   it.skip("after save callback with autosave", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
   it.skip("should not raise error", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
 describe("TestAutosaveAssociationWithTouch", () => {
   it.skip("autosave with touch should not raise system stack error", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
   it.skip("should update children when association redefined in subclass", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
 });
 
@@ -1769,7 +2047,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 
 describe("should update children when autosave is true and parent is new but child is not", () => {
   it.skip("should update children when autosave is true and parent is new but child is not", () => {
-    /* fixture-dependent */
+    /* needs autosave association integration */
   });
   it("should automatically save the associated models", async () => {
     const adapter = freshAdapter();
