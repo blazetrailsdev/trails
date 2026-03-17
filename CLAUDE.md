@@ -57,13 +57,13 @@ It compares our test files and test names against the Rails test suite:
 npm run convention:compare
 ```
 
-Current status (8713/17172 implemented = 50.7%, 4981 skipped):
+Current status (8724/17172 implemented = 50.8%, 4970 skipped):
 
 | Package          | Implemented % | Files   | Misplaced |
 | ---------------- | ------------- | ------- | --------- |
 | arel             | 99.4%         | 59/59   | 0         |
 | activemodel      | 99.5%         | 56/56   | 0         |
-| activerecord     | 50.5%         | 340/342 | 0         |
+| activerecord     | 50.6%         | 340/342 | 0         |
 | activesupport    | 57.4%         | 157/157 | 0         |
 | rack             | 98.8%         | 40/40   | 0         |
 | actiondispatch   | 25.1%         | 16/75   | 67        |

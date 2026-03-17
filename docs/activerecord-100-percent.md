@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **50.5%** (4,231 implemented / 8,385 total Ruby tests). 340/342 files mapped, 0 misplaced, 79 wrong describes, 3,910 skipped.
+Current state: **50.6%** (4,242 implemented / 8,385 total Ruby tests). 340/342 files mapped, 0 misplaced, 79 wrong describes, 3,899 skipped.
 
 ## How coverage is measured
 
@@ -10,11 +10,11 @@ The percentage reflects **implemented** (non-skipped) tests only. Skipped stubs 
 
 Columns in the output: `OK` (implemented, non-skipped), `Skip` (matched but `it.skip`), `Desc` (wrong describe block), `Move` (misplaced — wrong file), `Miss` (no TS equivalent at all), `Tot` (total Ruby tests in file).
 
-## The gap: 4,154 tests
+## The gap: 4,143 tests
 
-To reach 100%, we need to implement 4,154 more tests (8,385 - 4,231). These break down into:
+To reach 100%, we need to implement 4,143 more tests (8,385 - 4,242). These break down into:
 
-- **3,910 skipped tests** — `it.skip()` stubs that need real implementations
+- **3,899 skipped tests** — `it.skip()` stubs that need real implementations
 - **244 unmatched tests** — Ruby tests with no TS equivalent (across existing and 2 missing files)
 
 ## Completed work
