@@ -2038,8 +2038,8 @@ describe("ActiveModel", () => {
 
       const p = new Payment({ amount: 100 });
       // Run callbacks manually
-      (Payment as any)._callbackChain.runBefore("process", p);
-      (Payment as any)._callbackChain.runAfter("process", p);
+      (Payment as any)._callbackChain.runBeforeSync("process", p);
+      (Payment as any)._callbackChain.runAfterSync("process", p);
       expect(log).toEqual(["before_process", "after_process"]);
     });
 
