@@ -19,12 +19,11 @@ function mbDowncase(str: string): string {
 }
 function mbIndex(str: string, search: string | RegExp, from?: number): number | null {
   const chars = [...str];
-  const searchStr = typeof search === "string" ? search : null;
   if (from !== undefined && from < 0) from = chars.length + from;
   for (let i = from ?? 0; i < chars.length; i++) {
     const sub = chars.slice(i).join("");
-    if (searchStr !== null) {
-      if (sub.startsWith(searchStr)) return i;
+    if (typeof search === "string") {
+      if (sub.startsWith(search)) return i;
     } else {
       if (search.test(sub)) return i;
     }
