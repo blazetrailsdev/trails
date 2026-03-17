@@ -7,6 +7,7 @@ import {
   RecordNotFound,
   RecordInvalid,
   RecordNotSaved,
+  RecordNotDestroyed,
   StaleObjectError,
   ReadOnlyRecord,
 } from "./errors.js";
@@ -46,6 +47,20 @@ export class Base extends Model {
   static _abstractClass = false;
   static _tableNamePrefix = "";
   static _tableNameSuffix = "";
+  static _protectedEnvironments: string[] = ["production"];
+
+  /**
+   * List of environments where destructive actions are prohibited.
+   *
+   * Mirrors: ActiveRecord::Base.protected_environments
+   */
+  static get protectedEnvironments(): string[] {
+    return this._protectedEnvironments;
+  }
+
+  static set protectedEnvironments(envs: string[]) {
+    this._protectedEnvironments = envs.map(String);
+  }
 
   /**
    * Mark this class as abstract — it won't have its own table.
@@ -974,6 +989,9 @@ export class Base extends Model {
   static where(conditions: Record<string, unknown>): any;
   static where(sql: string, ...binds: unknown[]): any;
   static where(conditionsOrSql: Record<string, unknown> | string, ...binds: unknown[]): any {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call where on abstract class ${this.name}`);
+    }
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...binds);
     }
@@ -1018,7 +1036,22 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.update_all
    */
   static async updateAll(updates: Record<string, unknown>): Promise<number> {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call updateAll on abstract class ${this.name}`);
+    }
     return this.all().updateAll(updates);
+  }
+
+  /**
+   * Delete all records (no callbacks).
+   *
+   * Mirrors: ActiveRecord::Base.delete_all
+   */
+  static async deleteAll(): Promise<number> {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
+    }
+    return this.all().deleteAll();
   }
 
   /**
@@ -1338,7 +1371,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.limit
    */
-  static limit(value: number) {
+  static limit(value: number | null) {
     return this.all().limit(value);
   }
 
@@ -1829,6 +1862,9 @@ export class Base extends Model {
    * and to encrypt encrypted attributes.
    */
   writeAttribute(name: string, value: unknown): void {
+    if (!/^[\p{L}\p{N}_]+$/u.test(name)) {
+      throw new Error(`Invalid attribute name: ${name}`);
+    }
     if (this._frozen) {
       throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
     }
@@ -2226,8 +2262,13 @@ export class Base extends Model {
     // Optimistic locking: include lock_version in WHERE and increment it
     let lockClause = "";
     if (ctor._attributeDefinitions.has("lock_version")) {
-      const currentVersion = Number(this.readAttribute("lock_version")) || 0;
-      lockClause = ` AND "lock_version" = ${currentVersion}`;
+      const rawVersion = this.readAttribute("lock_version");
+      const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
+      if (rawVersion == null) {
+        lockClause = ` AND "lock_version" IS NULL`;
+      } else {
+        lockClause = ` AND "lock_version" = ${currentVersion}`;
+      }
       this._attributes.set("lock_version", currentVersion + 1);
     }
 
@@ -2249,6 +2290,10 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#update
    */
   async update(attrs: Record<string, unknown>): Promise<boolean> {
+    const ctor = this.constructor as typeof Base;
+    if ("lock_version" in attrs && ctor._attributeDefinitions.has("lock_version")) {
+      throw new Error("lock_version cannot be updated explicitly");
+    }
     for (const [key, value] of Object.entries(attrs)) {
       this.writeAttribute(key, value);
     }
@@ -2272,32 +2317,54 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#destroy
    */
-  async destroy(): Promise<this> {
+  async destroy(): Promise<this | false> {
     if (this._readonly) {
       throw new ReadOnlyRecord(this);
     }
     const ctor = this.constructor as typeof Base;
 
-    // Process dependent associations before destroy
+    // Process dependent associations before the destroy callback chain.
+    // In Rails these are before_destroy callbacks; here we run them before
+    // the synchronous callback chain because they're async. This means
+    // restrict_with_exception correctly prevents the DELETE, but
+    // dependent: :destroy will run even if a beforeDestroy callback later
+    // halts. A full fix requires an async-capable callback runner.
     const { processDependentAssociations } = await import("./associations.js");
     await processDependentAssociations(this);
 
-    ctor._callbackChain.run("destroy", this, () => {
+    const halted = !ctor._callbackChain.run("destroy", this, () => {
       const table = ctor.arelTable;
       const pk = this.id;
       if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
-        // New (unpersisted) record — nothing to delete from DB
         return;
       }
 
-      const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}`;
-      this._pendingOperation = ctor.adapter.executeMutation(sql).then(() => {});
+      let lockClause = "";
+      if (ctor._attributeDefinitions.has("lock_version")) {
+        const currentVersion = this.readAttribute("lock_version");
+        if (currentVersion == null) {
+          lockClause = ` AND "lock_version" IS NULL`;
+        } else {
+          lockClause = ` AND "lock_version" = ${Number(currentVersion) || 0}`;
+        }
+      }
+
+      const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}${lockClause}`;
+      this._pendingOperation = ctor.adapter.executeMutation(sql).then((affected) => {
+        if (lockClause && affected === 0) {
+          throw new StaleObjectError(this, "destroy");
+        }
+        (this as any)._destroyedRowCount = affected;
+      });
     });
+
+    if (halted) return false;
 
     if (this._pendingOperation) {
       await this._pendingOperation;
       this._pendingOperation = null;
     }
+    const didDelete = ((this as any)._destroyedRowCount ?? 0) > 0;
 
     this._destroyed = true;
     this._frozen = true;
@@ -2305,6 +2372,22 @@ export class Base extends Model {
     // Counter cache: decrement on destroy
     const { updateCounterCaches } = await import("./associations.js");
     await updateCounterCaches(this, "decrement");
+
+    // Fire after_commit/after_rollback callbacks for destroy (only if a real DELETE occurred)
+    if (didDelete) {
+      const { currentTransaction } = await import("./transactions.js");
+      const tx = currentTransaction();
+      if (tx) {
+        tx.afterCommit(() => {
+          ctor._callbackChain.runAfter("commit", this);
+        });
+        tx.afterRollback(() => {
+          ctor._callbackChain.runAfter("rollback", this);
+        });
+      } else {
+        ctor._callbackChain.runAfter("commit", this);
+      }
+    }
 
     return this;
   }
@@ -2315,7 +2398,11 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#destroy!
    */
   async destroyBang(): Promise<this> {
-    return this.destroy();
+    const result = await this.destroy();
+    if (result === false) {
+      throw new RecordNotDestroyed("Failed to destroy the record", this);
+    }
+    return result;
   }
 
   /**

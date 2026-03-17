@@ -771,8 +771,15 @@ describe("BasicsTest", () => {
     class BlogPost extends Base {}
     expect(BlogPost.tableName).toBe("blog_posts");
   });
-  it.skip("attribute names are protected from injection", () => {
-    /* needs attribute name validation */
+  it("attribute names are protected from injection", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = new User();
+    expect(() => u.writeAttribute("name; DROP TABLE users", "val")).toThrow();
   });
 
   it.skip("inherited from scoped find", () => {
@@ -940,16 +947,37 @@ describe("BasicsTest", () => {
     // The key behavior is that abstractClass is true
     expect(AbstractModel.abstractClass).toBe(true);
   });
-  it.skip("update all on abstract class raises", () => {
-    /* needs updateAll to check abstractClass */
+  it("update all on abstract class raises", async () => {
+    class AbstractModel extends Base {
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await expect(AbstractModel.updateAll({ name: "x" })).rejects.toThrow(/abstract class/i);
   });
 
-  it.skip("delete all on abstract class raises", () => {
-    /* needs deleteAll to check abstractClass */
+  it("delete all on abstract class raises", async () => {
+    class AbstractModel extends Base {
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await expect(AbstractModel.deleteAll()).rejects.toThrow(/abstract class/i);
   });
 
-  it.skip("where on abstract class raises", () => {
-    /* needs where to check abstractClass */
+  it("where on abstract class raises", () => {
+    class AbstractModel extends Base {
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => AbstractModel.where({ name: "x" })).toThrow(/abstract class/i);
   });
 
   it("create works with optimistic locking", async () => {
@@ -1582,9 +1610,33 @@ describe("BasicsTest", () => {
     expect(Widget.primaryKey).toBe("widget_id");
   });
   it.skip("primary key and references columns should be identical type", () => {});
-  it.skip("invalid limit", () => {});
-  it.skip("limit should sanitize sql injection for limit without commas", () => {});
-  it.skip("limit should sanitize sql injection for limit with commas", () => {});
+  it("invalid limit", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => User.limit(-1)).toThrow(/invalid limit/i);
+  });
+  it("limit should sanitize sql injection for limit without commas", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => User.limit("1 ; DROP TABLE users" as any)).toThrow(/invalid limit/i);
+  });
+  it("limit should sanitize sql injection for limit with commas", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => User.limit("1, 7 ; DROP TABLE users" as any)).toThrow(/invalid limit/i);
+  });
   it.skip("preserving time objects", () => {});
   it.skip("preserving time objects with local time conversion to default timezone utc", () => {});
   it.skip("preserving time objects with time with zone conversion to default timezone utc", () => {});
@@ -1838,10 +1890,18 @@ describe("BasicsTest", () => {
   it.skip("when assigning new ignored columns it invalidates cache for column names", () => {});
   it.skip("column names are quoted when using #from clause and model has ignored columns", () => {});
   it.skip("using table name qualified column names unless having SELECT list explicitly", () => {});
-  it.skip("protected environments by default is an array with production", () => {
-    // Requires Base.protectedEnvironments to be implemented
+  it("protected environments by default is an array with production", () => {
+    expect(Base.protectedEnvironments).toEqual(["production"]);
   });
-  it.skip("protected environments are stored as an array of string", () => {});
+  it("protected environments are stored as an array of string", () => {
+    const original = Base.protectedEnvironments;
+    try {
+      Base.protectedEnvironments = ["production", "staging"];
+      expect(Base.protectedEnvironments).toEqual(["production", "staging"]);
+    } finally {
+      Base.protectedEnvironments = original;
+    }
+  });
   it.skip("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", () => {});
   it.skip("cannot call connected_to with role and shard on non-abstract classes", () => {});
   it.skip("can call connected_to with role and shard on abstract classes", () => {});

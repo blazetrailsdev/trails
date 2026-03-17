@@ -448,7 +448,12 @@ describe("SerializedAttributeTest", () => {
     /* needs concurrency testing */
   });
 
-  it.skip("json read legacy null", () => {});
+  it("json read legacy null", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "test", preferences: null });
+    const reloaded = await User.find(u.id);
+    expect(reloaded.readAttribute("preferences")).toBeNull();
+  });
   it.skip("supports permitted classes for default column serializer", () => {});
 });
 

@@ -121,15 +121,15 @@ describe("DirtyTest", () => {
   });
 
   it.skip("saved_change_to_attribute? returns whether a change occurred in the last save", () => {
-    /* needs previousChanges to be populated after create */
+    /* needs constructor to snapshot defaults before applying attrs */
   });
 
   it.skip("saved_change_to_attribute returns the change that occurred in the last save", () => {
-    /* needs previousChanges to be populated after create */
+    /* needs constructor to snapshot defaults before applying attrs */
   });
 
   it.skip("attribute_before_last_save returns the original value before saving", () => {
-    /* needs previousChanges to be populated after create */
+    /* needs constructor to snapshot defaults before applying attrs */
   });
 
   it("changed? in after callbacks returns false", async () => {

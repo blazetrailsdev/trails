@@ -81,8 +81,30 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("dont call after commit on destroy based on previous transaction", () => {
-    /* destroy doesn't trigger transaction callbacks */
+  it("dont call after commit on destroy based on previous transaction", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const called: string[] = [];
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
+    const t = await Topic.create({ title: "test" });
+    // First transaction: update triggers after_commit
+    await transaction(Topic, async () => {
+      await t.update({ title: "updated" });
+    });
+    expect(called).toEqual(["after_commit", "after_commit"]);
+    called.length = 0;
+    // Second transaction: destroy should only fire its own callback, not leak from previous
+    await transaction(Topic, async () => {
+      await t.destroy();
+    });
+    expect(called).toEqual(["after_commit"]);
   });
 
   it("only call after commit on save after transaction commits for saving record", async () => {
@@ -124,8 +146,25 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("only call after commit on destroy after transaction commits for destroyed record", () => {
-    /* destroy doesn't trigger transaction callbacks */
+  it("only call after commit on destroy after transaction commits for destroyed record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const called: string[] = [];
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
+    const t = await Topic.create({ title: "test" });
+    called.length = 0;
+    await transaction(Topic, async () => {
+      await t.destroy();
+      expect(called).toEqual([]);
+    });
+    expect(called).toEqual(["after_commit"]);
   });
 
   it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => {
@@ -226,8 +265,26 @@ describe("TransactionCallbacksTest", () => {
     /* fixture-dependent */
   });
 
-  it.skip("only call after rollback on destroy after transaction rollsback for destroyed record", () => {
-    /* destroy doesn't trigger transaction callbacks */
+  it("only call after rollback on destroy after transaction rollsback for destroyed record", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const t = await Topic.create({ title: "test" });
+    const called: string[] = [];
+    Topic.afterRollback(function () {
+      called.push("after_rollback");
+    });
+    try {
+      await transaction(Topic, async () => {
+        await t.destroy();
+        throw new Error("rollback");
+      });
+    } catch {}
+    expect(called).toEqual(["after_rollback"]);
   });
 
   it("only call after rollback on create after transaction rollsback for new record", async () => {

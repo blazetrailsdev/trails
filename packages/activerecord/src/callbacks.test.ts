@@ -172,7 +172,7 @@ describe("CallbacksTest", () => {
     expect(p.isNewRecord()).toBe(true);
   });
 
-  it.skip("before destroy returns false", async () => {
+  it("before destroy returns false", async () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
@@ -339,7 +339,7 @@ describe("CallbacksTest", () => {
     expect(result).toBe(false);
   });
 
-  it.skip("before destroy throwing abort", async () => {
+  it("before destroy throwing abort", async () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
