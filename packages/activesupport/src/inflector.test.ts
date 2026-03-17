@@ -368,9 +368,9 @@ describe("InflectorTest", () => {
 
   it("output is not frozen even if input is frozen", () => {
     const input = "plurals";
-    Object.freeze(input);
     const result = pluralize(input);
     expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
   });
 
   // Dynamic tests from SingularToPlural
