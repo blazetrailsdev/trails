@@ -307,17 +307,40 @@ describe("CallbackChain.runAsync", () => {
     const { CallbackChain } = await import("./callbacks.js");
     const chain = new CallbackChain();
     const log: string[] = [];
+
+    // Use controlled deferreds so we can prove sequential awaiting.
+    // The second callback's promise resolves before the first's, but
+    // because runAfterAsync awaits sequentially, "after1" must appear
+    // before "after2".
+    let resolveFirst!: () => void;
+    const firstDeferred = new Promise<void>((r) => {
+      resolveFirst = r;
+    });
+    let resolveSecond!: () => void;
+    const secondDeferred = new Promise<void>((r) => {
+      resolveSecond = r;
+    });
+
     chain.register("after", "save", async () => {
-      await new Promise((r) => setTimeout(r, 5));
+      await firstDeferred;
       log.push("after1");
     });
     chain.register("after", "save", async () => {
-      await new Promise((r) => setTimeout(r, 5));
+      await secondDeferred;
       log.push("after2");
     });
-    await chain.runAsync("save", {}, async () => {
+
+    const runPromise = chain.runAsync("save", {}, async () => {
       log.push("block");
     });
+
+    // Resolve second before first — if callbacks ran concurrently,
+    // "after2" would appear before "after1"
+    resolveSecond();
+    await Promise.resolve();
+    resolveFirst();
+
+    await runPromise;
     expect(log).toEqual(["block", "after1", "after2"]);
   });
 });
