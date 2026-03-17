@@ -2719,18 +2719,23 @@ export class Relation<T extends Base> {
     }
     for (const clause of this._orderClauses) {
       if (typeof clause === "string") {
-        // Parse "column ASC/DESC" or "table.column ASC/DESC" strings
-        const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
-        if (match) {
-          // Strip table prefix if present (e.g. "posts.score" → "score")
-          const rawCol = match[1];
-          const col = rawCol.includes(".") ? rawCol.split(".").pop()! : rawCol;
-          const dir = match[2].toUpperCase();
-          manager.order(dir === "DESC" ? table.get(col).desc() : table.get(col).asc());
+        // Detect SQL expressions (functions, parens, operators) and pass as raw SQL
+        if (clause.includes("(") || /\bcase\b/i.test(clause) || clause.includes("||")) {
+          manager.order(new Nodes.SqlLiteral(clause));
         } else {
-          // Strip table prefix if present
-          const col = clause.includes(".") ? clause.split(".").pop()! : clause;
-          manager.order(table.get(col).asc());
+          // Parse "column ASC/DESC" or "table.column ASC/DESC" strings
+          const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
+          if (match) {
+            // Strip table prefix if present (e.g. "posts.score" → "score")
+            const rawCol = match[1];
+            const col = rawCol.includes(".") ? rawCol.split(".").pop()! : rawCol;
+            const dir = match[2].toUpperCase();
+            manager.order(dir === "DESC" ? table.get(col).desc() : table.get(col).asc());
+          } else {
+            // Strip table prefix if present
+            const col = clause.includes(".") ? clause.split(".").pop()! : clause;
+            manager.order(table.get(col).asc());
+          }
         }
       } else {
         const [col, dir] = clause;

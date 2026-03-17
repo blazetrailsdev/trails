@@ -10,7 +10,7 @@ const JSON_CODER: Coder = {
     return JSON.stringify(value);
   },
   load(raw: unknown): unknown {
-    if (raw === null || raw === undefined) return null;
+    if (raw === null || raw === undefined || raw === "") return null;
     if (typeof raw === "string") {
       try {
         return JSON.parse(raw);

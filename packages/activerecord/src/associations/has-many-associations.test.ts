@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   SubclassNotFound,
   Base,
@@ -31,20 +31,150 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
-  it.skip("custom primary key on new record should fetch with query", () => {
-    /* fixture-dependent */
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
-  it.skip("association primary key on new record should fetch with query", () => {
-    /* fixture-dependent */
+
+  it("custom primary key on new record should fetch with query", async () => {
+    const adapter = freshAdapter();
+    class CpkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("author_code", "string");
+        this.primaryKey = "author_code";
+        this.adapter = adapter;
+      }
+    }
+    class CpkPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_code", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CpkAuthor", CpkAuthor);
+    registerModel("CpkPost", CpkPost);
+    Associations.hasMany.call(CpkAuthor, "cpk_posts", {
+      className: "CpkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const author = await CpkAuthor.create({ name: "Alice", author_code: "A1" });
+    await CpkPost.create({ title: "Post 1", author_code: "A1" });
+    const posts = await loadHasMany(author, "cpk_posts", {
+      className: "CpkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    expect(posts.length).toBe(1);
   });
-  it.skip("ids on unloaded association with custom primary key", () => {
-    /* fixture-dependent */
+
+  it("association primary key on new record should fetch with query", async () => {
+    const adapter = freshAdapter();
+    class ApkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("author_code", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ApkPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_code", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("ApkAuthor", ApkAuthor);
+    registerModel("ApkPost", ApkPost);
+    Associations.hasMany.call(ApkAuthor, "apk_posts", {
+      className: "ApkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const author = await ApkAuthor.create({ name: "Bob", author_code: "B1" });
+    await ApkPost.create({ title: "Post B", author_code: "B1" });
+    const posts = await loadHasMany(author, "apk_posts", {
+      className: "ApkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    expect(posts.length).toBe(1);
   });
-  it.skip("ids on loaded association with custom primary key", () => {
-    /* fixture-dependent */
+
+  it("ids on unloaded association with custom primary key", async () => {
+    const adapter = freshAdapter();
+    class IdsAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("author_code", "string");
+        this.primaryKey = "author_code";
+        this.adapter = adapter;
+      }
+    }
+    class IdsPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_code", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("IdsAuthor", IdsAuthor);
+    registerModel("IdsPost", IdsPost);
+    Associations.hasMany.call(IdsAuthor, "ids_posts", {
+      className: "IdsPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const author = await IdsAuthor.create({ name: "Carol", author_code: "C1" });
+    const p1 = await IdsPost.create({ title: "P1", author_code: "C1" });
+    const p2 = await IdsPost.create({ title: "P2", author_code: "C1" });
+    const posts = await loadHasMany(author, "ids_posts", {
+      className: "IdsPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const ids = posts.map((p: any) => p.id);
+    expect(ids).toContain(p1.id);
+    expect(ids).toContain(p2.id);
   });
-  it.skip("blank custom primary key on new record should not run queries", () => {
-    /* fixture-dependent */
+
+  it.skip("ids on loaded association with custom primary key", () => {});
+
+  it("blank custom primary key on new record should not run queries", async () => {
+    const adapter = freshAdapter();
+    class BlankPkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("author_code", "string");
+        this.primaryKey = "author_code";
+        this.adapter = adapter;
+      }
+    }
+    class BlankPkPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_code", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BlankPkAuthor", BlankPkAuthor);
+    registerModel("BlankPkPost", BlankPkPost);
+    Associations.hasMany.call(BlankPkAuthor, "blank_pk_posts", {
+      className: "BlankPkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const author = new BlankPkAuthor({ name: "Eve" });
+    expect(author.readAttribute("author_code")).toBeNull();
+    const executeSpy = vi.spyOn(adapter, "execute");
+    const posts = await loadHasMany(author, "blank_pk_posts", {
+      className: "BlankPkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    expect(posts).toHaveLength(0);
+    expect(executeSpy).not.toHaveBeenCalled();
   });
 });
 

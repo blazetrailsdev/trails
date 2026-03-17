@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, Relation } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, adapterType } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -627,8 +627,21 @@ describe("NamedScopingTest", () => {
     expect(rel.toSql()).toContain("SELECT");
   });
 
-  it.skip("rand should select a random object from proxy", () => {
-    /* needs RANDOM() ordering support */
+  it("rand should select a random object from proxy", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    await Post.create({ title: "A" });
+    await Post.create({ title: "B" });
+    const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
+    const rel = Post.order(randomFn).limit(1);
+    expect(rel.toSql()).toContain(randomFn);
+    const result = await rel.toArray();
+    expect(result.length).toBe(1);
   });
 
   it("index on scope", async () => {
