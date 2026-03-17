@@ -11,7 +11,7 @@ describe("DateTest", () => {
         this.adapter = adapter;
       }
     }
-    const date = new Date(2024, 0, 15);
+    const date = new Date(2024, 0, 15, 10, 30, 0);
     const e = await Event.create({ start_date: date });
     const reloaded = await Event.find(e.id);
     const val = reloaded.readAttribute("start_date");

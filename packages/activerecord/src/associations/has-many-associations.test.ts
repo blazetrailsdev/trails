@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   SubclassNotFound,
   Base,
@@ -203,13 +203,15 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     });
     const author = new BlankPkAuthor({ name: "Eve" });
     expect(author.readAttribute("author_code")).toBeNull();
-    // Loading association with null PK should return empty without querying
+    const executeSpy = vi.spyOn(adapter, "execute");
     const posts = await loadHasMany(author, "blank_pk_posts", {
       className: "BlankPkPost",
       foreignKey: "author_code",
       primaryKey: "author_code",
     });
     expect(posts).toHaveLength(0);
+    expect(executeSpy).not.toHaveBeenCalled();
+    executeSpy.mockRestore();
   });
 });
 

@@ -1894,7 +1894,7 @@ export class Base extends Model {
     if (Array.isArray(pk)) {
       if (!Array.isArray(value)) {
         throw new TypeError(
-          `Expected an array for composite primary key [${pk.join(", ")}], got ${typeof value}`,
+          `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
         );
       }
       pk.forEach((col, i) => this.writeAttribute(col, (value as unknown[])[i]));
