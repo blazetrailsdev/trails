@@ -1862,7 +1862,7 @@ export class Base extends Model {
    * and to encrypt encrypted attributes.
    */
   writeAttribute(name: string, value: unknown): void {
-    if (/[;'"\\]/.test(name)) {
+    if (!/^[\p{L}\p{N}_]+$/u.test(name)) {
       throw new Error(`Invalid attribute name: ${name}`);
     }
     if (this._frozen) {
@@ -2350,16 +2350,17 @@ export class Base extends Model {
         if (lockClause && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }
+        (this as any)._destroyedRowCount = affected;
       });
     });
 
     if (halted) return false;
 
-    const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
       await this._pendingOperation;
       this._pendingOperation = null;
     }
+    const didDelete = ((this as any)._destroyedRowCount ?? 0) > 0;
 
     this._destroyed = true;
     this._frozen = true;

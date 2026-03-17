@@ -374,10 +374,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#limit
    */
-  limit(value: number): Relation<T> {
+  limit(value: number | null): Relation<T> {
     if (value == null) {
       const rel = this._clone();
-      rel._limitValue = null as any;
+      rel._limitValue = null;
       return rel;
     }
     const num = Number(value);
