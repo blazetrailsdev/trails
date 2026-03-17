@@ -297,11 +297,8 @@ export class PostgresAdapter implements DatabaseAdapter {
       );
       return Number(rows[0].count) > 0;
     }
-    const rows = await this.execute(
-      `SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_name = $1 AND table_schema = ANY(current_schemas(false))`,
-      [table],
-    );
-    return Number(rows[0].count) > 0;
+    const rows = await this.execute(`SELECT to_regclass($1) AS oid`, [name]);
+    return rows[0].oid != null;
   }
 
   quoteTableName(name: string): string {
@@ -312,14 +309,15 @@ export class PostgresAdapter implements DatabaseAdapter {
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
-    let schemaCondition: string;
-    const binds: unknown[] = [table];
+    let tableCondition: string;
+    const binds: unknown[] = [];
 
     if (schema) {
-      schemaCondition = `n.nspname = $2`;
-      binds.push(schema);
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      schemaCondition = `n.nspname = ANY(current_schemas(false))`;
+      binds.push(table);
+      tableCondition = `t.oid = to_regclass($1)`;
     }
 
     const rows = await this.execute(
@@ -339,8 +337,7 @@ export class PostgresAdapter implements DatabaseAdapter {
        JOIN pg_class i ON i.oid = ix.indexrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        JOIN pg_am am ON am.oid = i.relam
-       WHERE t.relname = $1
-         AND ${schemaCondition}
+       WHERE ${tableCondition}
          AND ix.indisprimary = false
        ORDER BY i.relname`,
       binds,
@@ -391,14 +388,15 @@ export class PostgresAdapter implements DatabaseAdapter {
   async primaryKey(tableName: string): Promise<string | null> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
-    let schemaCondition: string;
-    const binds: unknown[] = [table];
+    let tableCondition: string;
+    const binds: unknown[] = [];
 
     if (schema) {
-      schemaCondition = `n.nspname = $2`;
-      binds.push(schema);
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      schemaCondition = `n.nspname = ANY(current_schemas(false))`;
+      binds.push(table);
+      tableCondition = `t.oid = to_regclass($1)`;
     }
 
     const rows = await this.execute(
@@ -407,8 +405,7 @@ export class PostgresAdapter implements DatabaseAdapter {
        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
        JOIN pg_class t ON t.oid = i.indrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
-       WHERE t.relname = $1
-         AND ${schemaCondition}
+       WHERE ${tableCondition}
          AND i.indisprimary = true`,
       binds,
     );
@@ -422,14 +419,15 @@ export class PostgresAdapter implements DatabaseAdapter {
   ): Promise<[string, { schema: string; name: string }] | null> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
-    let schemaCondition: string;
-    const binds: unknown[] = [table];
+    let tableCondition: string;
+    const binds: unknown[] = [];
 
     if (schema) {
-      schemaCondition = `n.nspname = $2`;
-      binds.push(schema);
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      schemaCondition = `n.nspname = ANY(current_schemas(false))`;
+      binds.push(table);
+      tableCondition = `t.oid = to_regclass($1)`;
     }
 
     const rows = await this.execute(
@@ -442,8 +440,7 @@ export class PostgresAdapter implements DatabaseAdapter {
        JOIN pg_class t ON t.oid = i.indrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        LEFT JOIN pg_attrdef ad ON ad.adrelid = t.oid AND ad.adnum = a.attnum
-       WHERE t.relname = $1
-         AND ${schemaCondition}
+       WHERE ${tableCondition}
          AND i.indisprimary = true
        LIMIT 1`,
       binds,
@@ -519,14 +516,15 @@ export class PostgresAdapter implements DatabaseAdapter {
   ): Promise<{ name: string; type: string; default: string | null }[]> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
-    let schemaCondition: string;
-    const binds: unknown[] = [table];
+    let tableCondition: string;
+    const binds: unknown[] = [];
 
     if (schema) {
-      schemaCondition = `n.nspname = $2`;
-      binds.push(schema);
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      schemaCondition = `n.nspname = ANY(current_schemas(false))`;
+      binds.push(table);
+      tableCondition = `t.oid = to_regclass($1)`;
     }
 
     const rows = await this.execute(
@@ -537,8 +535,7 @@ export class PostgresAdapter implements DatabaseAdapter {
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-       WHERE t.relname = $1
-         AND ${schemaCondition}
+       WHERE ${tableCondition}
          AND a.attnum > 0
          AND NOT a.attisdropped
        ORDER BY a.attnum`,
