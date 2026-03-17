@@ -7,6 +7,7 @@ import {
   RecordNotFound,
   RecordInvalid,
   RecordNotSaved,
+  RecordNotDestroyed,
   StaleObjectError,
   ReadOnlyRecord,
 } from "./errors.js";
@@ -2322,10 +2323,6 @@ export class Base extends Model {
     }
     const ctor = this.constructor as typeof Base;
 
-    // Process dependent associations before destroy
-    const { processDependentAssociations } = await import("./associations.js");
-    await processDependentAssociations(this);
-
     const halted = !ctor._callbackChain.run("destroy", this, () => {
       const table = ctor.arelTable;
       const pk = this.id;
@@ -2353,6 +2350,10 @@ export class Base extends Model {
     });
 
     if (halted) return false;
+
+    // Process dependent associations after beforeDestroy gate passes
+    const { processDependentAssociations } = await import("./associations.js");
+    await processDependentAssociations(this);
 
     const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
@@ -2394,7 +2395,7 @@ export class Base extends Model {
   async destroyBang(): Promise<this> {
     const result = await this.destroy();
     if (result === false) {
-      throw new RecordNotSaved("Failed to destroy the record", this);
+      throw new RecordNotDestroyed("Failed to destroy the record", this);
     }
     return result;
   }

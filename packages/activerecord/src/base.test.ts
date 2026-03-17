@@ -1895,9 +1895,12 @@ describe("BasicsTest", () => {
   });
   it("protected environments are stored as an array of string", () => {
     const original = Base.protectedEnvironments;
-    Base.protectedEnvironments = ["production", "staging"];
-    expect(Base.protectedEnvironments).toEqual(["production", "staging"]);
-    Base.protectedEnvironments = original;
+    try {
+      Base.protectedEnvironments = ["production", "staging"];
+      expect(Base.protectedEnvironments).toEqual(["production", "staging"]);
+    } finally {
+      Base.protectedEnvironments = original;
+    }
   });
   it.skip("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", () => {});
   it.skip("cannot call connected_to with role and shard on non-abstract classes", () => {});

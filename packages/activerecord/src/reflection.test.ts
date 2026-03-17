@@ -371,28 +371,11 @@ describe("ReflectionTest", () => {
     expect(names.indexOf("title")).toBeLessThan(names.indexOf("author_name"));
     expect(names.indexOf("author_name")).toBeLessThan(names.indexOf("body"));
   });
-  it("content columns", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const cols = columns(Topic);
-    const names = cols.map((c) => c.name);
-    expect(names).toContain("title");
-    expect(names).toContain("author_name");
+  it.skip("content columns", () => {
+    /* needs Base.contentColumns() that excludes PK/FK/timestamps */
   });
-  it("non existent types are identity types", () => {
-    class Widget extends Base {
-      static {
-        this.attribute("data", "string");
-        this.adapter = adapter;
-      }
-    }
-    const cols = columns(Widget);
-    expect(cols.length).toBeGreaterThan(0);
+  it.skip("non existent types are identity types", () => {
+    /* needs unknown type fallback to identity type */
   });
   it.skip("reflection klass for nested class name", () => {});
   it.skip("irregular reflection class name", () => {});
