@@ -329,8 +329,8 @@ export function secondsSinceMidnight(date: Date): number {
 }
 
 export function secondsUntilEndOfDay(date: Date): number {
-  const eod = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-  return Math.floor((eod.getTime() - date.getTime()) / 1000);
+  const eod = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return Math.max(0, Math.floor((eod.getTime() - date.getTime()) / 1000));
 }
 
 // ---------------------------------------------------------------------------

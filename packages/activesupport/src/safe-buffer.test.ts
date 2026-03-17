@@ -205,6 +205,7 @@ describe("SafeBufferTest", () => {
     const unsafe = new SafeBuffer('<script>alert("XSS");</script>', false);
     const sliced = unsafe.slice(0, 1);
     expect(sliced instanceof SafeBuffer).toBe(true);
+    expect(sliced.htmlSafe).toBe(false);
   });
 
   it("Should work with interpolation (array argument)", () => {
@@ -396,6 +397,7 @@ describe("SafeBufferTest", () => {
     const unsafe = new SafeBuffer('<script>alert("XSS");</script>', false);
     const sliced = unsafe.slice(0, 1);
     expect(sliced instanceof SafeBuffer).toBe(true);
+    expect(sliced.htmlSafe).toBe(false);
   });
 
   it("Should work with interpolation (array argument)", () => {
