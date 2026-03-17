@@ -133,9 +133,7 @@ export class SafeBuffer {
 
   /** set — assigns a value at a given index or slice, escaping if safe. */
   set(index: number, value: string, length?: number): void {
-    const escaped = this._safe
-      ? value.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c])
-      : value;
+    const escaped = this._safe ? value.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]) : value;
     const len = length ?? 1;
     this._value = this._value.slice(0, index) + escaped + this._value.slice(index + len);
   }

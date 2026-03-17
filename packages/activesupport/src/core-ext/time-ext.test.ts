@@ -19,7 +19,6 @@ import {
   formattedOffset,
   daysInMonth,
   daysInYear,
-  leapYear,
   allDay,
   isToday,
   isTomorrow,
