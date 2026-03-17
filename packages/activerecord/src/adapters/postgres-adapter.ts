@@ -1,5 +1,6 @@
 import pg from "pg";
 import { singularize, underscore } from "@rails-ts/activesupport";
+import { splitQuotedIdentifier } from "./postgresql/utils.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 /**
@@ -302,7 +303,7 @@ export class PostgresAdapter implements DatabaseAdapter {
   }
 
   quoteTableName(name: string): string {
-    const parts = this.splitQuotedIdentifier(name);
+    const parts = splitQuotedIdentifier(name);
     return parts.map((p) => this.quoteIdentifier(p)).join(".");
   }
 
@@ -316,7 +317,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -395,7 +396,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -426,7 +427,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -454,7 +455,7 @@ export class PostgresAdapter implements DatabaseAdapter {
 
     if (rows[0].seq) {
       const fullSeq = rows[0].seq as string;
-      const parts = this.splitQuotedIdentifier(fullSeq);
+      const parts = splitQuotedIdentifier(fullSeq);
       seqName = parts.length > 1 ? parts[1] : parts[0];
     } else {
       const defaultExpr = rows[0].default_expr as string | null;
@@ -462,7 +463,7 @@ export class PostgresAdapter implements DatabaseAdapter {
         const match = defaultExpr.match(/nextval\('([^']+)'::regclass\)/);
         if (match) {
           const seqRef = match[1];
-          const parts = this.splitQuotedIdentifier(seqRef);
+          const parts = splitQuotedIdentifier(seqRef);
           seqName = parts.length > 1 ? parts[1] : parts[0];
         } else {
           return null;
@@ -523,7 +524,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -814,48 +815,11 @@ export class PostgresAdapter implements DatabaseAdapter {
     schema: string | null;
     table: string;
   } {
-    const parts = this.splitQuotedIdentifier(name);
+    const parts = splitQuotedIdentifier(name);
     if (parts.length === 2) {
       return { schema: parts[0], table: parts[1] };
     }
     return { schema: null, table: parts[0] };
-  }
-
-  private splitQuotedIdentifier(name: string): string[] {
-    const parts: string[] = [];
-    let i = 0;
-    while (i < name.length) {
-      if (name[i] === '"') {
-        let value = "";
-        i++;
-        while (i < name.length) {
-          if (name[i] === '"') {
-            if (i + 1 < name.length && name[i + 1] === '"') {
-              value += '"';
-              i += 2;
-            } else {
-              i++;
-              break;
-            }
-          } else {
-            value += name[i];
-            i++;
-          }
-        }
-        parts.push(value);
-        if (i < name.length && name[i] === ".") i++;
-      } else {
-        const dot = name.indexOf(".", i);
-        if (dot === -1) {
-          parts.push(name.substring(i));
-          break;
-        }
-        const part = name.substring(i, dot);
-        if (part.length > 0) parts.push(part);
-        i = dot + 1;
-      }
-    }
-    return parts;
   }
 
   private quoteIdentifier(name: string): string {
