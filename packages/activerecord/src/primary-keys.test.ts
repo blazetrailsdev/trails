@@ -601,8 +601,19 @@ describe("CompositePrimaryKeyTest", () => {
     expect(o.isPersisted()).toBe(true);
   });
 
-  it.skip("assigning a non array value to model with composite primary key raises", () => {
-    // Needs id= setter to validate array values for composite PKs
+  it("assigning a non array value to model with composite primary key raises", () => {
+    class Order extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    const o = new Order();
+    expect(() => {
+      o.id = 42;
+    }).toThrow(TypeError);
   });
 
   it("composite primary key returns array id", async () => {

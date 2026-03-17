@@ -1892,8 +1892,12 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     const pk = ctor.primaryKey;
     if (Array.isArray(pk)) {
-      const values = value as unknown[];
-      pk.forEach((col, i) => this.writeAttribute(col, values[i]));
+      if (!Array.isArray(value)) {
+        throw new TypeError(
+          `Expected an array for composite primary key [${pk.join(", ")}], got ${typeof value}`,
+        );
+      }
+      pk.forEach((col, i) => this.writeAttribute(col, (value as unknown[])[i]));
     } else {
       this.writeAttribute(pk, value);
     }

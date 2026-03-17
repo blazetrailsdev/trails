@@ -1,7 +1,47 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { Base } from "./index.js";
+import { createTestAdapter } from "./test-adapter.js";
 
 describe("DateTest", () => {
-  it.skip("date with time value", () => {});
-  it.skip("date with string value", () => {});
-  it.skip("assign valid dates", () => {});
+  it("date with time value", async () => {
+    const adapter = createTestAdapter();
+    class Event extends Base {
+      static {
+        this.attribute("start_date", "date");
+        this.adapter = adapter;
+      }
+    }
+    const now = new Date();
+    const e = await Event.create({ start_date: now });
+    const reloaded = await Event.find(e.id);
+    expect(reloaded.readAttribute("start_date")).toBeDefined();
+  });
+
+  it("date with string value", async () => {
+    const adapter = createTestAdapter();
+    class Event extends Base {
+      static {
+        this.attribute("start_date", "date");
+        this.adapter = adapter;
+      }
+    }
+    const e = await Event.create({ start_date: "2024-01-15" });
+    const reloaded = await Event.find(e.id);
+    expect(reloaded.readAttribute("start_date")).toBeDefined();
+  });
+
+  it("assign valid dates", async () => {
+    const adapter = createTestAdapter();
+    class Event extends Base {
+      static {
+        this.attribute("start_date", "date");
+        this.adapter = adapter;
+      }
+    }
+    const e = new Event();
+    e.writeAttribute("start_date", "2024-06-15");
+    expect(e.readAttribute("start_date")).toBeDefined();
+    e.writeAttribute("start_date", new Date(2024, 5, 15));
+    expect(e.readAttribute("start_date")).toBeDefined();
+  });
 });
