@@ -94,7 +94,13 @@ describe("TransactionCallbacksTest", () => {
       called.push("after_commit");
     });
     const t = await Topic.create({ title: "test" });
+    // First transaction: update triggers after_commit
+    await transaction(Topic, async () => {
+      await t.update({ title: "updated" });
+    });
+    expect(called).toEqual(["after_commit", "after_commit"]);
     called.length = 0;
+    // Second transaction: destroy should only fire its own callback, not leak from previous
     await transaction(Topic, async () => {
       await t.destroy();
     });

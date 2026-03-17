@@ -1861,7 +1861,7 @@ export class Base extends Model {
    * and to encrypt encrypted attributes.
    */
   writeAttribute(name: string, value: unknown): void {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+    if (/[;'"\\]/.test(name)) {
       throw new Error(`Invalid attribute name: ${name}`);
     }
     if (this._frozen) {
@@ -2337,7 +2337,9 @@ export class Base extends Model {
       let lockClause = "";
       if (ctor._attributeDefinitions.has("lock_version")) {
         const currentVersion = this.readAttribute("lock_version");
-        if (currentVersion != null) {
+        if (currentVersion == null) {
+          lockClause = ` AND "lock_version" IS NULL`;
+        } else {
           lockClause = ` AND "lock_version" = ${Number(currentVersion) || 0}`;
         }
       }
@@ -2350,7 +2352,7 @@ export class Base extends Model {
       });
     });
 
-    if (halted) return false as any;
+    if (halted) return false;
 
     const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
