@@ -126,7 +126,7 @@ export function humanize(
   });
 
   if (cap) {
-    result = result.replace(/^\w/, (m) => m.toUpperCase());
+    result = result.replace(/^./u, (m) => m.toUpperCase());
   }
 
   return result;
