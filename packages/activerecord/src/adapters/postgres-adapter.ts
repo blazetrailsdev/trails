@@ -305,7 +305,7 @@ export class PostgresAdapter implements DatabaseAdapter {
 
   quoteTableName(name: string): string {
     const parts = this.splitQuotedIdentifier(name);
-    return parts.map((p) => `"${p}"`).join(".");
+    return parts.map((p) => this.quoteIdentifier(p)).join(".");
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
@@ -506,7 +506,11 @@ export class PostgresAdapter implements DatabaseAdapter {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    await this.exec(`ALTER INDEX "${oldName}" RENAME TO "${newName}"`);
+    const { schema } = this.parseSchemaQualifiedName(tableName);
+    const qualifiedOld = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(oldName)}`
+      : this.quoteIdentifier(oldName);
+    await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
   }
 
   async columns(
@@ -601,7 +605,7 @@ export class PostgresAdapter implements DatabaseAdapter {
   async createTable(
     tableName: string,
     callback: (t: TableDefinition) => void,
-    options: { id?: boolean | string } = {},
+    options: { id?: boolean } = {},
   ): Promise<void> {
     const table = new TableDefinition();
     if (options.id !== false) {
@@ -619,7 +623,9 @@ export class PostgresAdapter implements DatabaseAdapter {
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
-    await this.exec(`ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO "${newName}"`);
+    await this.exec(
+      `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteIdentifier(newName)}`,
+    );
   }
 
   async tables(): Promise<string[]> {
@@ -662,7 +668,7 @@ export class PostgresAdapter implements DatabaseAdapter {
 
     const colDefs = cols.map((col) => {
       const isExpression = col.includes("(") || col.includes(" ");
-      let result = isExpression ? col : `"${col}"`;
+      let result = isExpression ? col : this.quoteIdentifier(col);
       if (options.opclass) {
         const op = options.opclass[col];
         if (op) result += ` ${op}`;
@@ -678,10 +684,10 @@ export class PostgresAdapter implements DatabaseAdapter {
       return result;
     });
 
-    let sql = `CREATE ${unique}INDEX ${concurrently}${ifNotExists}"${indexName}" ON ${quotedTable}${using} (${colDefs.join(", ")})`;
+    let sql = `CREATE ${unique}INDEX ${concurrently}${ifNotExists}${this.quoteIdentifier(indexName)} ON ${quotedTable}${using} (${colDefs.join(", ")})`;
 
     if (options.include) {
-      sql += ` INCLUDE (${options.include.map((c) => `"${c}"`).join(", ")})`;
+      sql += ` INCLUDE (${options.include.map((c) => this.quoteIdentifier(c)).join(", ")})`;
     }
     if (options.nullsNotDistinct) {
       sql += " NULLS NOT DISTINCT";
@@ -705,7 +711,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
     }
     const concurrently = options.algorithm === "concurrently" ? " CONCURRENTLY" : "";
-    await this.exec(`DROP INDEX${concurrently} "${options.name}"`);
+    await this.exec(`DROP INDEX${concurrently} ${this.quoteIdentifier(options.name)}`);
   }
 
   async addForeignKey(
@@ -720,17 +726,41 @@ export class PostgresAdapter implements DatabaseAdapter {
     const pk = options.primaryKey ?? "id";
     const name = options.name ?? `fk_rails_${fromTbl}_${column}`;
 
-    const qualifiedFrom = fromSchema ? `"${fromSchema}"."${fromTbl}"` : `"${fromTbl}"`;
-    const qualifiedTo = toSchema ? `"${toSchema}"."${toTbl}"` : `"${toTbl}"`;
+    const qi = (s: string) => this.quoteIdentifier(s);
+    const qualifiedFrom = fromSchema ? `${qi(fromSchema)}.${qi(fromTbl)}` : qi(fromTbl);
+    const qualifiedTo = toSchema ? `${qi(toSchema)}.${qi(toTbl)}` : qi(toTbl);
 
     await this.exec(
-      `ALTER TABLE ${qualifiedFrom} ADD CONSTRAINT "${name}" FOREIGN KEY ("${column}") REFERENCES ${qualifiedTo} ("${pk}")`,
+      `ALTER TABLE ${qualifiedFrom} ADD CONSTRAINT ${qi(name)} FOREIGN KEY (${qi(column)}) REFERENCES ${qualifiedTo} (${qi(pk)})`,
     );
   }
 
   async foreignKeyExists(fromTable: string, toTable: string): Promise<boolean> {
     const { schema: fromSchema, table: fromTbl } = this.parseSchemaQualifiedName(fromTable);
     const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
+
+    let fromSchemaCondition: string;
+    let toSchemaCondition: string;
+    const binds: unknown[] = [fromTbl];
+    let idx = 1;
+
+    if (fromSchema) {
+      idx++;
+      fromSchemaCondition = `tc.table_schema = $${idx}`;
+      binds.push(fromSchema);
+    } else {
+      fromSchemaCondition = `tc.table_schema = ANY(current_schemas(false))`;
+    }
+
+    binds.push(toTbl);
+    idx = binds.length;
+
+    if (toSchema) {
+      binds.push(toSchema);
+      toSchemaCondition = `tc2.table_schema = $${binds.length}`;
+    } else {
+      toSchemaCondition = `tc2.table_schema = ANY(current_schemas(false))`;
+    }
 
     const rows = await this.execute(
       `SELECT COUNT(*) AS count
@@ -743,10 +773,10 @@ export class PostgresAdapter implements DatabaseAdapter {
          AND rc.unique_constraint_schema = tc2.constraint_schema
        WHERE tc.constraint_type = 'FOREIGN KEY'
          AND tc.table_name = $1
-         AND tc.table_schema = $2
-         AND tc2.table_name = $3
-         AND tc2.table_schema = $4`,
-      [fromTbl, fromSchema ?? "public", toTbl, toSchema ?? "public"],
+         AND ${fromSchemaCondition}
+         AND tc2.table_name = $${idx}
+         AND ${toSchemaCondition}`,
+      binds,
     );
     return Number(rows[0].count) > 0;
   }
@@ -759,11 +789,11 @@ export class PostgresAdapter implements DatabaseAdapter {
       ctype?: string;
     } = {},
   ): string {
-    let sql = `CREATE DATABASE "${name}"`;
+    let sql = `CREATE DATABASE ${this.quoteIdentifier(name)}`;
     const encoding = options.encoding ?? "utf8";
-    sql += ` ENCODING = '${encoding}'`;
-    if (options.collation) sql += ` LC_COLLATE = '${options.collation}'`;
-    if (options.ctype) sql += ` LC_CTYPE = '${options.ctype}'`;
+    sql += ` ENCODING = ${this.quoteLiteral(encoding)}`;
+    if (options.collation) sql += ` LC_COLLATE = ${this.quoteLiteral(options.collation)}`;
+    if (options.ctype) sql += ` LC_CTYPE = ${this.quoteLiteral(options.ctype)}`;
     return sql;
   }
 
@@ -787,13 +817,23 @@ export class PostgresAdapter implements DatabaseAdapter {
     let i = 0;
     while (i < name.length) {
       if (name[i] === '"') {
-        const end = name.indexOf('"', i + 1);
-        if (end === -1) {
-          parts.push(name.substring(i + 1));
-          break;
+        let value = "";
+        i++;
+        while (i < name.length) {
+          if (name[i] === '"') {
+            if (i + 1 < name.length && name[i + 1] === '"') {
+              value += '"';
+              i += 2;
+            } else {
+              i++;
+              break;
+            }
+          } else {
+            value += name[i];
+            i++;
+          }
         }
-        parts.push(name.substring(i + 1, end));
-        i = end + 1;
+        parts.push(value);
         if (i < name.length && name[i] === ".") i++;
       } else {
         const dot = name.indexOf(".", i);
@@ -809,8 +849,12 @@ export class PostgresAdapter implements DatabaseAdapter {
     return parts;
   }
 
+  private quoteIdentifier(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+
   private quoteSchemaName(name: string): string {
-    return `"${name}"`;
+    return this.quoteIdentifier(name);
   }
 
   private nativeType(type: string): string {
@@ -861,7 +905,10 @@ export class TableDefinition {
 
   string(name: string, options: { default?: string } = {}): void {
     let type = "character varying";
-    if (options.default !== undefined) type += ` DEFAULT '${options.default}'`;
+    if (options.default !== undefined) {
+      const escaped = options.default.replace(/'/g, "''");
+      type += ` DEFAULT '${escaped}'`;
+    }
     this._columns.push({ name, type });
   }
 
