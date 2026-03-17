@@ -482,12 +482,12 @@ export class PostgresAdapter implements DatabaseAdapter {
     const result = await this.pkAndSequenceFor(tableName);
     if (!result) return;
     const [pk, seq] = result;
-    const { schema, table } = this.parseSchemaQualifiedName(tableName);
-    const qualifiedTable = schema ? `"${schema}"."${table}"` : `"${table}"`;
-    const qualifiedSeq = `"${seq.schema}"."${seq.name}"`;
+    const qualifiedTable = this.quoteTableName(tableName);
+    const qi = (s: string) => this.quoteIdentifier(s);
+    const qualifiedSeq = `${qi(seq.schema)}.${qi(seq.name)}`;
 
     const maxRows = await this.execute(
-      `SELECT COALESCE(MAX("${pk}"), 0) AS max_val FROM ${qualifiedTable}`,
+      `SELECT COALESCE(MAX(${qi(pk)}), 0) AS max_val FROM ${qualifiedTable}`,
     );
     const maxVal = Number(maxRows[0].max_val);
     if (maxVal === 0) {
@@ -501,7 +501,8 @@ export class PostgresAdapter implements DatabaseAdapter {
     const result = await this.pkAndSequenceFor(tableName);
     if (!result) return;
     const [, seq] = result;
-    const qualifiedSeq = `"${seq.schema}"."${seq.name}"`;
+    const qi = (s: string) => this.quoteIdentifier(s);
+    const qualifiedSeq = `${qi(seq.schema)}.${qi(seq.name)}`;
     await this.exec(`SELECT setval('${qualifiedSeq}', ${value})`);
   }
 
@@ -567,37 +568,38 @@ export class PostgresAdapter implements DatabaseAdapter {
     let pgType = this.nativeType(type);
     if (options.array) pgType += "[]";
 
+    const quotedCol = this.quoteIdentifier(columnName);
     let usingClause = "";
     if (options.using) {
       usingClause = ` USING ${options.using}`;
     } else if (options.castAs) {
       const castType = this.nativeType(options.castAs);
       if (options.array) {
-        usingClause = ` USING ARRAY[CAST("${columnName}" AS ${castType})]`;
+        usingClause = ` USING ARRAY[CAST(${quotedCol} AS ${castType})]`;
       } else {
-        usingClause = ` USING CAST("${columnName}" AS ${castType})`;
+        usingClause = ` USING CAST(${quotedCol} AS ${castType})`;
       }
     }
 
     await this.exec(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN "${columnName}" TYPE ${pgType}${usingClause}`,
+      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${usingClause}`,
     );
 
     if (options.default !== undefined) {
       if (options.default === null) {
-        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN "${columnName}" DROP DEFAULT`);
+        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
       } else {
         await this.exec(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN "${columnName}" SET DEFAULT ${this.quoteLiteral(options.default)}`,
+          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${this.quoteLiteral(options.default)}`,
         );
       }
     }
 
     if (options.null !== undefined) {
       if (options.null) {
-        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN "${columnName}" DROP NOT NULL`);
+        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP NOT NULL`);
       } else {
-        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN "${columnName}" SET NOT NULL`);
+        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`);
       }
     }
   }
@@ -613,7 +615,7 @@ export class PostgresAdapter implements DatabaseAdapter {
     }
     callback(table);
     const quotedTable = this.quoteTableName(tableName);
-    const columnDefs = table.getColumns().map((c) => `"${c.name}" ${c.type}`);
+    const columnDefs = table.getColumns().map((c) => `${this.quoteIdentifier(c.name)} ${c.type}`);
     await this.exec(`CREATE TABLE ${quotedTable} (${columnDefs.join(", ")})`);
   }
 
