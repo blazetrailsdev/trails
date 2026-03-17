@@ -5,6 +5,24 @@ import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { getInheritanceColumn, isStiSubclass } from "./sti.js";
 
+function _toUnderscore(name: string): string {
+  return name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+}
+
+function _camelize(str: string): string {
+  return str.replace(/(^|_)([a-z])/g, (_, __, c) => c.toUpperCase());
+}
+
+function _singularize(str: string): string {
+  if (str.endsWith("ies")) return str.slice(0, -3) + "y";
+  if (str.endsWith("ses") || str.endsWith("xes") || str.endsWith("zes")) return str.slice(0, -2);
+  if (str.endsWith("s") && !str.endsWith("ss")) return str.slice(0, -1);
+  return str;
+}
+
 /**
  * Range — represents a BETWEEN range for where clauses.
  *
@@ -197,13 +215,21 @@ export class Relation<T extends Base> {
       }
 
       if (assocDef.type === "belongsTo") {
-        const _underscore = (n: string) =>
-          n
-            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-            .toLowerCase();
-        const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
+        const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.whereNot({ [foreignKey]: null });
+      } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
+        const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
+        const targetModel = modelRegistry.get(targetClassName);
+        if (targetModel) {
+          const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+          const targetTable = targetModel.tableName;
+          const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
+          const cloned = rel._clone();
+          cloned._whereRawClauses.push(
+            `"${pk}" IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL)`,
+          );
+          rel = cloned;
+        }
       }
     }
     return rel;
@@ -228,13 +254,21 @@ export class Relation<T extends Base> {
       }
 
       if (assocDef.type === "belongsTo") {
-        const _underscore = (n: string) =>
-          n
-            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-            .toLowerCase();
-        const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
+        const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.where({ [foreignKey]: null });
+      } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
+        const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
+        const targetModel = modelRegistry.get(targetClassName);
+        if (targetModel) {
+          const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+          const targetTable = targetModel.tableName;
+          const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
+          const cloned = rel._clone();
+          cloned._whereRawClauses.push(
+            `"${pk}" NOT IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL)`,
+          );
+          rel = cloned;
+        }
       }
     }
     return rel;

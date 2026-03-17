@@ -206,10 +206,12 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // Handle JOIN queries
     const joinMatch = cleanedSql.match(
-      /SELECT\s+(.+?)\s+FROM\s+"(\w+)"\s+((?:(?:INNER|LEFT\s+OUTER)\s+JOIN\s+.+?\s+ON\s+.+?\s*)+)(?:WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i,
+      /SELECT\s+(DISTINCT\s+)?(.+?)\s+FROM\s+"(\w+)"\s+((?:(?:INNER|LEFT\s+OUTER)\s+JOIN\s+.+?\s+ON\s+.+?\s*)+)(?:WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?(?:\s+OFFSET\s+(\d+))?$/i,
     );
     if (joinMatch) {
-      const [, projections, tableName, joinsPart, where, orderBy, limit, offset] = joinMatch;
+      const [, distinctFlag, projections, tableName, joinsPart, where, orderBy, limit, offset] =
+        joinMatch;
+      const isDistinct = !!distinctFlag;
       let rows = [...(this.tables.get(tableName) ?? [])];
 
       // Parse and apply joins
@@ -262,6 +264,15 @@ export class MemoryAdapter implements DatabaseAdapter {
             result[col] = row[col];
           }
           return result;
+        });
+      }
+      if (isDistinct) {
+        const seen = new Set<string>();
+        rows = rows.filter((row) => {
+          const key = JSON.stringify(row.id ?? row);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
       }
       return rows;
@@ -646,6 +657,36 @@ export class MemoryAdapter implements DatabaseAdapter {
     const getCol = (tableOrCol: string, col?: string): string =>
       col !== undefined ? col : tableOrCol;
 
+    // NOT IN (SELECT ...) — must come before simpler matchers that match substrings
+    const notInSubMatch = condition.match(
+      /^"?(\w+)"?(?:\."?(\w+)"?)?\s+NOT\s+IN\s+\(SELECT\s+"(\w+)"\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+))?\)$/i,
+    );
+    if (notInSubMatch) {
+      const col = getCol(notInSubMatch[1], notInSubMatch[2]);
+      const selectCol = notInSubMatch[3];
+      const fromTable = notInSubMatch[4];
+      const subWhere = notInSubMatch[5];
+      let subRows = [...(this.tables.get(fromTable) ?? [])];
+      if (subWhere) subRows = subRows.filter((r) => this.evaluateWhere(r, subWhere));
+      const values = subRows.map((r) => r[selectCol]);
+      return !values.some((v) => row[col] == v);
+    }
+
+    // IN (SELECT ...) — must come before simpler matchers
+    const inSubMatch = condition.match(
+      /^"?(\w+)"?(?:\."?(\w+)"?)?\s+IN\s+\(SELECT\s+"(\w+)"\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+))?\)$/i,
+    );
+    if (inSubMatch) {
+      const col = getCol(inSubMatch[1], inSubMatch[2]);
+      const selectCol = inSubMatch[3];
+      const fromTable = inSubMatch[4];
+      const subWhere = inSubMatch[5];
+      let subRows = [...(this.tables.get(fromTable) ?? [])];
+      if (subWhere) subRows = subRows.filter((r) => this.evaluateWhere(r, subWhere));
+      const values = subRows.map((r) => r[selectCol]);
+      return values.some((v) => row[col] == v);
+    }
+
     // BETWEEN
     const betweenMatch = condition.match(
       /"?(\w+)"?(?:\."?(\w+)"?)?\s+BETWEEN\s+(.+?)\s+AND\s+(.+)/i,
@@ -702,6 +743,14 @@ export class MemoryAdapter implements DatabaseAdapter {
       const col = getCol(neqMatch2[1], neqMatch2[2]);
       const val = this.parseSingleValue(neqMatch2[3].trim());
       return row[col] != val;
+    }
+
+    // column = column (column-to-column comparison, e.g., in JOIN ON)
+    const colEqColMatch = condition.match(/^"?(\w+)"?(?:\."?(\w+)"?)?\s*=\s*"(\w+)"\."(\w+)"$/);
+    if (colEqColMatch) {
+      const leftCol = getCol(colEqColMatch[1], colEqColMatch[2]);
+      const rightCol = colEqColMatch[4];
+      return row[leftCol] == row[rightCol];
     }
 
     // column = value
