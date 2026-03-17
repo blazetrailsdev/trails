@@ -49,8 +49,8 @@ export function xmlNameEscape(str: string): string {
  * Safe strings can be concatenated without escaping; unsafe strings are escaped when added.
  */
 export class SafeBuffer {
-  private readonly _value: string;
-  private readonly _safe: boolean;
+  private _value: string;
+  private _safe: boolean;
 
   constructor(value: string = "", safe: boolean = false) {
     this._value = value;
@@ -119,6 +119,47 @@ export class SafeBuffer {
 
   valueOf(): string {
     return this._value;
+  }
+
+  /** chr — returns first character as a SafeBuffer with same safety. */
+  chr(): SafeBuffer {
+    return new SafeBuffer(this._value.charAt(0), this._safe);
+  }
+
+  /** repeat — repeats the string n times, preserving safety status. */
+  repeat(count: number): SafeBuffer {
+    return new SafeBuffer(this._value.repeat(count), this._safe);
+  }
+
+  /** set — assigns a value at a given index or slice, escaping if safe. */
+  set(index: number, value: string, length?: number): void {
+    const escaped = this._safe
+      ? value.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c])
+      : value;
+    const len = length ?? 1;
+    this._value = this._value.slice(0, index) + escaped + this._value.slice(index + len);
+  }
+
+  /** format — sprintf-like interpolation, escaping unsafe args. */
+  format(args: Record<string, string | SafeBuffer> | (string | SafeBuffer)[]): SafeBuffer {
+    let result: string;
+    if (Array.isArray(args)) {
+      let i = 0;
+      result = this._value.replace(/%s/g, () => {
+        const arg = args[i++];
+        if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
+        const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);
+        return this._safe ? str.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]) : str;
+      });
+    } else {
+      result = this._value.replace(/%\{(\w+)\}/g, (_, key) => {
+        const arg = args[key];
+        if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
+        const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);
+        return this._safe ? str.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]) : str;
+      });
+    }
+    return new SafeBuffer(result, this._safe);
   }
 }
 
