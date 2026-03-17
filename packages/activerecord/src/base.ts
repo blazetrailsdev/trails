@@ -2350,6 +2350,7 @@ export class Base extends Model {
       });
     });
 
+    const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
       await this._pendingOperation;
       this._pendingOperation = null;
@@ -2361,6 +2362,22 @@ export class Base extends Model {
     // Counter cache: decrement on destroy
     const { updateCounterCaches } = await import("./associations.js");
     await updateCounterCaches(this, "decrement");
+
+    // Fire after_commit/after_rollback callbacks for destroy (only if a real DELETE occurred)
+    if (didDelete) {
+      const { currentTransaction } = await import("./transactions.js");
+      const tx = currentTransaction();
+      if (tx) {
+        tx.afterCommit(() => {
+          ctor._callbackChain.runAfter("commit", this);
+        });
+        tx.afterRollback(() => {
+          ctor._callbackChain.runAfter("rollback", this);
+        });
+      } else {
+        ctor._callbackChain.runAfter("commit", this);
+      }
+    }
 
     return this;
   }
