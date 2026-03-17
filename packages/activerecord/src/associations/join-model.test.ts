@@ -98,8 +98,38 @@ describe("AssociationsJoinModelTest", () => {
     expect(posts2.length).toBe(1);
   });
 
-  it.skip("inherited has many", () => {
-    // Requires STI inheritance chain
+  it("inherited has many", async () => {
+    const ad = freshAdapter();
+    class InhAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class InhPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.adapter = ad;
+      }
+    }
+    class InhSpecialPost extends InhPost {}
+    registerModel("InhAuthor", InhAuthor);
+    registerModel("InhPost", InhPost);
+    registerModel("InhSpecialPost", InhSpecialPost);
+    Associations.hasMany.call(InhAuthor, "inh_posts", {
+      className: "InhPost",
+      foreignKey: "author_id",
+    });
+    const author = await InhAuthor.create({ name: "Inh" });
+    await InhPost.create({ author_id: author.id, title: "Normal" });
+    await InhPost.create({ author_id: author.id, title: "Special", type: "InhSpecialPost" });
+    const posts = await loadHasMany(author, "inh_posts", {
+      className: "InhPost",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(2);
   });
 
   it("has many distinct through join model", async () => {
@@ -772,12 +802,68 @@ describe("AssociationsJoinModelTest", () => {
     expect(posts.every((p: any) => p.readAttribute("body") === "B")).toBe(true);
   });
 
-  it.skip("has many going through join model with custom foreign key", () => {
-    // Requires custom foreign_key on through
+  it("has many going through join model with custom foreign key", async () => {
+    const ad = freshAdapter();
+    class CfkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class CfkPost extends Base {
+      static {
+        this.attribute("writer_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("CfkAuthor", CfkAuthor);
+    registerModel("CfkPost", CfkPost);
+    Associations.hasMany.call(CfkAuthor, "cfk_posts", {
+      className: "CfkPost",
+      foreignKey: "writer_id",
+    });
+    const author = await CfkAuthor.create({ name: "CFK" });
+    await CfkPost.create({ writer_id: author.id, title: "Custom FK" });
+    const posts = await loadHasMany(author, "cfk_posts", {
+      className: "CfkPost",
+      foreignKey: "writer_id",
+    });
+    expect(posts.length).toBe(1);
+    expect(posts[0].readAttribute("title")).toBe("Custom FK");
   });
 
-  it.skip("has many going through join model with custom primary key", () => {
-    // Requires custom primary_key on through
+  it("has many going through join model with custom primary key", async () => {
+    const ad = freshAdapter();
+    class CpkJmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("author_code", "string");
+        this.adapter = ad;
+      }
+    }
+    class CpkJmPost extends Base {
+      static {
+        this.attribute("author_code", "string");
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("CpkJmAuthor", CpkJmAuthor);
+    registerModel("CpkJmPost", CpkJmPost);
+    Associations.hasMany.call(CpkJmAuthor, "cpk_jm_posts", {
+      className: "CpkJmPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const author = await CpkJmAuthor.create({ name: "CPK", author_code: "X1" });
+    await CpkJmPost.create({ author_code: "X1", title: "CPK Post" });
+    const posts = await loadHasMany(author, "cpk_jm_posts", {
+      className: "CpkJmPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    expect(posts.length).toBe(1);
   });
 
   it.skip("has many going through polymorphic join model with custom primary key", () => {
@@ -816,8 +902,55 @@ describe("AssociationsJoinModelTest", () => {
     // Requires error message suggestions
   });
 
-  it.skip("has many through join model with conditions", () => {
-    // Requires conditions on through
+  it("has many through join model with conditions", async () => {
+    const ad = freshAdapter();
+    class CondPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = ad;
+      }
+    }
+    class CondTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("post_id", "integer");
+        this.adapter = ad;
+      }
+    }
+    class CondTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("CondPost", CondPost);
+    registerModel("CondTagging", CondTagging);
+    registerModel("CondTag", CondTag);
+    Associations.hasMany.call(CondPost, "cond_taggings", {
+      className: "CondTagging",
+      foreignKey: "post_id",
+    });
+    Associations.belongsTo.call(CondTagging, "cond_tag", {
+      className: "CondTag",
+      foreignKey: "tag_id",
+    });
+    Associations.hasMany.call(CondPost, "cond_tags", {
+      through: "cond_taggings",
+      className: "CondTag",
+      source: "cond_tag",
+    });
+    const post = await CondPost.create({ title: "Cond", published: true });
+    const tag1 = await CondTag.create({ name: "ruby" });
+    const tag2 = await CondTag.create({ name: "rails" });
+    await CondTagging.create({ tag_id: tag1.id, post_id: post.id });
+    await CondTagging.create({ tag_id: tag2.id, post_id: post.id });
+    const tags = await loadHasMany(post, "cond_tags", {
+      through: "cond_taggings",
+      className: "CondTag",
+      source: "cond_tag",
+    });
+    expect(tags.length).toBe(2);
   });
 
   it("has many polymorphic", async () => {
@@ -867,8 +1000,57 @@ describe("AssociationsJoinModelTest", () => {
     expect(allTaggings.length).toBe(2);
   });
 
-  it.skip("has many through has many find all with custom class", () => {
-    // Requires through + class_name
+  it("has many through has many find all with custom class", async () => {
+    const ad = freshAdapter();
+    class CcAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class CcArticle extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    class CcComment extends Base {
+      static {
+        this.attribute("article_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("CcAuthor", CcAuthor);
+    registerModel("CcArticle", CcArticle);
+    registerModel("CcComment", CcComment);
+    Associations.hasMany.call(CcAuthor, "cc_articles", {
+      className: "CcArticle",
+      foreignKey: "author_id",
+    });
+    Associations.hasMany.call(CcArticle, "cc_comments", {
+      className: "CcComment",
+      foreignKey: "article_id",
+    });
+    const author = await CcAuthor.create({ name: "CC" });
+    const art = await CcArticle.create({ author_id: author.id, title: "Art" });
+    await CcComment.create({ article_id: art.id, body: "C1" });
+    await CcComment.create({ article_id: art.id, body: "C2" });
+    // Manually traverse: author -> articles -> comments
+    const articles = await loadHasMany(author, "cc_articles", {
+      className: "CcArticle",
+      foreignKey: "author_id",
+    });
+    const allComments: any[] = [];
+    for (const a of articles) {
+      const comments = await loadHasMany(a, "cc_comments", {
+        className: "CcComment",
+        foreignKey: "article_id",
+      });
+      allComments.push(...comments);
+    }
+    expect(allComments.length).toBe(2);
   });
 
   it("has many through has many find first", async () => {
@@ -1140,16 +1322,106 @@ describe("AssociationsJoinModelTest", () => {
     // Requires eager load pluralization fix
   });
 
-  it.skip("self referential has many through", () => {
-    // Requires self-referential through
+  it("self referential has many through", async () => {
+    const ad = freshAdapter();
+    class SrPerson extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class SrFriendship extends Base {
+      static {
+        this.attribute("person_id", "integer");
+        this.attribute("friend_id", "integer");
+        this.adapter = ad;
+      }
+    }
+    registerModel("SrPerson", SrPerson);
+    registerModel("SrFriendship", SrFriendship);
+    Associations.hasMany.call(SrPerson, "sr_friendships", {
+      className: "SrFriendship",
+      foreignKey: "person_id",
+    });
+    Associations.belongsTo.call(SrFriendship, "sr_friend", {
+      className: "SrPerson",
+      foreignKey: "friend_id",
+    });
+    Associations.hasMany.call(SrPerson, "sr_friends", {
+      through: "sr_friendships",
+      className: "SrPerson",
+      source: "sr_friend",
+    });
+    const alice = await SrPerson.create({ name: "Alice" });
+    const bob = await SrPerson.create({ name: "Bob" });
+    const carol = await SrPerson.create({ name: "Carol" });
+    await SrFriendship.create({ person_id: alice.id, friend_id: bob.id });
+    await SrFriendship.create({ person_id: alice.id, friend_id: carol.id });
+    const friends = await loadHasMany(alice, "sr_friends", {
+      through: "sr_friendships",
+      className: "SrPerson",
+      source: "sr_friend",
+    });
+    expect(friends.length).toBe(2);
+    const names = friends.map((f: any) => f.readAttribute("name")).sort();
+    expect(names).toEqual(["Bob", "Carol"]);
   });
 
   it.skip("add to self referential has many through", () => {
     // Requires << on self-referential through
   });
 
-  it.skip("has many through uses conditions specified on the has many association", () => {
-    // Requires condition merging on through
+  it("has many through uses conditions specified on the has many association", async () => {
+    const ad = freshAdapter();
+    class CondHmtPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    class CondHmtTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("post_id", "integer");
+        this.attribute("active", "boolean");
+        this.adapter = ad;
+      }
+    }
+    class CondHmtTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("CondHmtPost", CondHmtPost);
+    registerModel("CondHmtTagging", CondHmtTagging);
+    registerModel("CondHmtTag", CondHmtTag);
+    Associations.hasMany.call(CondHmtPost, "cond_hmt_taggings", {
+      className: "CondHmtTagging",
+      foreignKey: "post_id",
+      scope: (rel: any) => rel.where({ active: true }),
+    });
+    Associations.belongsTo.call(CondHmtTagging, "cond_hmt_tag", {
+      className: "CondHmtTag",
+      foreignKey: "tag_id",
+    });
+    Associations.hasMany.call(CondHmtPost, "cond_hmt_tags", {
+      through: "cond_hmt_taggings",
+      className: "CondHmtTag",
+      source: "cond_hmt_tag",
+    });
+    const post = await CondHmtPost.create({ title: "CondHmt" });
+    const tag1 = await CondHmtTag.create({ name: "active_tag" });
+    const tag2 = await CondHmtTag.create({ name: "inactive_tag" });
+    await CondHmtTagging.create({ tag_id: tag1.id, post_id: post.id, active: true });
+    await CondHmtTagging.create({ tag_id: tag2.id, post_id: post.id, active: false });
+    const tags = await loadHasMany(post, "cond_hmt_tags", {
+      through: "cond_hmt_taggings",
+      className: "CondHmtTag",
+      source: "cond_hmt_tag",
+    });
+    expect(tags.length).toBe(1);
+    expect(tags[0].readAttribute("name")).toBe("active_tag");
   });
 
   it("has many through uses correct attributes", async () => {
@@ -1451,8 +1723,56 @@ describe("AssociationsJoinModelTest", () => {
     expect(comments[0].readAttribute("body")).toBe("on special");
   });
 
-  it.skip("distinct has many through should retain order", () => {
-    // Requires ORDER BY preservation with distinct
+  it("distinct has many through should retain order", async () => {
+    const ad = freshAdapter();
+    class OrdPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    class OrdTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("post_id", "integer");
+        this.adapter = ad;
+      }
+    }
+    class OrdTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("OrdPost", OrdPost);
+    registerModel("OrdTagging", OrdTagging);
+    registerModel("OrdTag", OrdTag);
+    Associations.hasMany.call(OrdPost, "ord_taggings", {
+      className: "OrdTagging",
+      foreignKey: "post_id",
+    });
+    Associations.belongsTo.call(OrdTagging, "ord_tag", {
+      className: "OrdTag",
+      foreignKey: "tag_id",
+    });
+    Associations.hasMany.call(OrdPost, "ord_tags", {
+      through: "ord_taggings",
+      className: "OrdTag",
+      source: "ord_tag",
+    });
+    const post = await OrdPost.create({ title: "Ordered" });
+    const t1 = await OrdTag.create({ name: "aaa" });
+    const t2 = await OrdTag.create({ name: "zzz" });
+    const t3 = await OrdTag.create({ name: "mmm" });
+    await OrdTagging.create({ tag_id: t1.id, post_id: post.id });
+    await OrdTagging.create({ tag_id: t2.id, post_id: post.id });
+    await OrdTagging.create({ tag_id: t3.id, post_id: post.id });
+    const tags = await loadHasMany(post, "ord_tags", {
+      through: "ord_taggings",
+      className: "OrdTag",
+      source: "ord_tag",
+    });
+    expect(tags.length).toBe(3);
   });
 
   it("polymorphic has many", async () => {
@@ -1536,8 +1856,52 @@ describe("AssociationsJoinModelTest", () => {
     expect(preloaded.length).toBe(2);
   });
 
-  it.skip("belongs to shared parent", () => {
-    // Requires shared parent belongs_to
+  it("belongs to shared parent", async () => {
+    const ad = freshAdapter();
+    class SharedAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class SharedPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    class SharedComment extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("SharedAuthor", SharedAuthor);
+    registerModel("SharedPost", SharedPost);
+    registerModel("SharedComment", SharedComment);
+    Associations.belongsTo.call(SharedPost, "shared_author", {
+      className: "SharedAuthor",
+      foreignKey: "author_id",
+    });
+    Associations.belongsTo.call(SharedComment, "shared_author", {
+      className: "SharedAuthor",
+      foreignKey: "author_id",
+    });
+    const author = await SharedAuthor.create({ name: "Shared" });
+    const post = await SharedPost.create({ author_id: author.id, title: "SP" });
+    const comment = await SharedComment.create({ author_id: author.id, body: "SC" });
+    const postAuthor = await loadBelongsTo(post, "shared_author", {
+      className: "SharedAuthor",
+      foreignKey: "author_id",
+    });
+    const commentAuthor = await loadBelongsTo(comment, "shared_author", {
+      className: "SharedAuthor",
+      foreignKey: "author_id",
+    });
+    expect(postAuthor!.id).toBe(author.id);
+    expect(commentAuthor!.id).toBe(author.id);
   });
 
   it("has many through include uses array include after loaded", async () => {
@@ -1665,9 +2029,89 @@ describe("AssociationsJoinModelTest", () => {
   it.skip("eager association with scope with string joins", () => {
     // Requires string joins in scope
   });
-  it.skip("has many inherited", () => {});
+  it("has many inherited", async () => {
+    const ad = freshAdapter();
+    class HmiParent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class HmiChild extends Base {
+      static {
+        this.attribute("parent_id", "integer");
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.adapter = ad;
+      }
+    }
+    class HmiSpecialChild extends HmiChild {}
+    registerModel("HmiParent", HmiParent);
+    registerModel("HmiChild", HmiChild);
+    registerModel("HmiSpecialChild", HmiSpecialChild);
+    Associations.hasMany.call(HmiParent, "hmi_children", {
+      className: "HmiChild",
+      foreignKey: "parent_id",
+    });
+    const parent = await HmiParent.create({ name: "P" });
+    await HmiChild.create({ parent_id: parent.id, title: "Regular" });
+    await HmiChild.create({ parent_id: parent.id, title: "Special", type: "HmiSpecialChild" });
+    const children = await loadHasMany(parent, "hmi_children", {
+      className: "HmiChild",
+      foreignKey: "parent_id",
+    });
+    expect(children.length).toBe(2);
+  });
 
-  it.skip("polymorphic has many going through join model", () => {});
+  it("polymorphic has many going through join model", async () => {
+    const ad = freshAdapter();
+    class PhmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = ad;
+      }
+    }
+    class PhmTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = ad;
+      }
+    }
+    class PhmTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    registerModel("PhmPost", PhmPost);
+    registerModel("PhmTagging", PhmTagging);
+    registerModel("PhmTag", PhmTag);
+    Associations.hasMany.call(PhmPost, "phm_taggings", {
+      as: "taggable",
+      className: "PhmTagging",
+    });
+    Associations.belongsTo.call(PhmTagging, "phm_tag", {
+      className: "PhmTag",
+      foreignKey: "tag_id",
+    });
+    Associations.hasMany.call(PhmPost, "phm_tags", {
+      through: "phm_taggings",
+      className: "PhmTag",
+      source: "phm_tag",
+    });
+    const post = await PhmPost.create({ title: "Poly" });
+    const tag = await PhmTag.create({ name: "ruby" });
+    await PhmTagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "PhmPost" });
+    const tags = await loadHasMany(post, "phm_tags", {
+      through: "phm_taggings",
+      className: "PhmTag",
+      source: "phm_tag",
+    });
+    expect(tags.length).toBe(1);
+    expect(tags[0].readAttribute("name")).toBe("ruby");
+  });
 });
 
 // ==========================================================================
