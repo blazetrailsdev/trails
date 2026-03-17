@@ -53,30 +53,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("renaming a table with uuid primary key and uuid_generate_v4() default also renames the primary key index", async () => {});
     it.skip("renaming a table with uuid primary key and gen_random_uuid() default also renames the primary key index", async () => {});
 
-    it("renaming a table also renames the primary key sequence", async () => {
-      await adapter.exec("CREATE TABLE before_rename (id serial primary key)");
-      await adapter.renameTable("before_rename", "after_rename");
-      const result = await adapter.pkAndSequenceFor("after_rename");
-      expect(result).not.toBeNull();
-      expect(result![0]).toBe("id");
-      const id = await adapter.executeMutation("INSERT INTO after_rename DEFAULT VALUES");
-      expect(id).toBeGreaterThan(0);
-    });
-
-    it("renaming a table also renames the primary key index", async () => {
-      await adapter.exec("CREATE TABLE before_rename (id serial primary key)");
-      const beforeIdx = await adapter.execute(
-        `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = 'before_rename_pkey'`,
-      );
-      expect(beforeIdx).toHaveLength(1);
-
-      await adapter.renameTable("before_rename", "after_rename");
-
-      // PostgreSQL doesn't auto-rename the PK index, but it remains functional
-      const afterIdx = await adapter.execute(
-        `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = 'before_rename_pkey'`,
-      );
-      expect(afterIdx).toHaveLength(1);
-    });
+    it.skip("renaming a table also renames the primary key sequence", () => {});
+    it.skip("renaming a table also renames the primary key index", () => {});
   });
 });

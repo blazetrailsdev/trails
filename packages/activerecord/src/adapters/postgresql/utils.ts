@@ -20,10 +20,11 @@ export class PgName {
   }
 
   quoted(): string {
+    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
     if (this.schema) {
-      return `"${this.schema}"."${this.identifier}"`;
+      return `${esc(this.schema)}.${esc(this.identifier)}`;
     }
-    return `"${this.identifier}"`;
+    return esc(this.identifier);
   }
 
   equals(other: PgName): boolean {
@@ -31,7 +32,7 @@ export class PgName {
   }
 
   hashKey(): string {
-    return `${this.schema ?? ""}.${this.identifier}`;
+    return JSON.stringify([this.schema, this.identifier]);
   }
 }
 

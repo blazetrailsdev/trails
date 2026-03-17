@@ -12,10 +12,10 @@ describeIfPg("PostgresAdapter", () => {
   afterEach(async () => {
     // Clean up test tables
     try {
-      const tables = await adapter.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items', 'Items', 'Items'))`,
-      );
       await adapter.exec(`DROP TABLE IF EXISTS "Items" CASCADE`);
+      const tables = await adapter.execute(
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items'))`,
+      );
       for (const t of tables) {
         await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
       }
