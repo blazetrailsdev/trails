@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   SubclassNotFound,
   Base,
@@ -31,6 +31,10 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("custom primary key on new record should fetch with query", async () => {
     const adapter = freshAdapter();
     class CpkAuthor extends Base {
@@ -211,7 +215,6 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     });
     expect(posts).toHaveLength(0);
     expect(executeSpy).not.toHaveBeenCalled();
-    executeSpy.mockRestore();
   });
 });
 
