@@ -185,6 +185,18 @@ describe("CallbacksTest", () => {
     expect(result).toBe(false);
   });
 
+  it("destroy bang throws when before destroy halts", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.beforeDestroy(() => false);
+      }
+    }
+    const p = await CbPost.create({ title: "test" });
+    await expect(p.destroyBang()).rejects.toThrow(/destroy/i);
+  });
+
   it("before save returns false", async () => {
     class CbPost extends Base {
       static {
