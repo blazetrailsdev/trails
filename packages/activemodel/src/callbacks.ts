@@ -100,7 +100,7 @@ export class CallbackChain {
   async runAsync(
     event: CallbackEvent,
     record: AnyRecord,
-    block: () => Promise<void>,
+    block: () => void | Promise<void>,
   ): Promise<boolean> {
     if (!this.runBefore(event, record)) return false;
 
@@ -108,7 +108,7 @@ export class CallbackChain {
       (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
     );
 
-    let chain: () => Promise<void> = block;
+    let chain: () => void | Promise<void> = block;
     for (const cb of [...arounds].reverse()) {
       const prev = chain;
       chain = async () => {

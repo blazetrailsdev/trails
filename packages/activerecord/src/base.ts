@@ -2070,6 +2070,7 @@ export class Base extends Model {
     let saved = false;
     if (!ctor._callbackChain.runBefore("save", this)) return false;
 
+    const wasNewRecord = this._newRecord;
     if (this._newRecord) {
       const createResult = await ctor._callbackChain.runAsync("create", this, async () => {
         this._performInsert();
@@ -2077,6 +2078,9 @@ export class Base extends Model {
           await this._pendingOperation;
           this._pendingOperation = null;
         }
+        this._previouslyNewRecord = true;
+        this._newRecord = false;
+        this.changesApplied();
         saved = true;
       });
       if (!createResult) saved = false;
@@ -2087,6 +2091,8 @@ export class Base extends Model {
           await this._pendingOperation;
           this._pendingOperation = null;
         }
+        this._previouslyNewRecord = false;
+        this.changesApplied();
         saved = true;
       });
       if (!updateResult) saved = false;
@@ -2094,11 +2100,6 @@ export class Base extends Model {
     this._skipTouch = false;
 
     if (saved) {
-      const wasNewRecord = this._newRecord;
-      this._previouslyNewRecord = wasNewRecord;
-      this._newRecord = false;
-      this.changesApplied();
-
       ctor._callbackChain.runAfter("save", this);
 
       // Counter cache: increment on create
