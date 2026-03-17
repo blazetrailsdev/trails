@@ -164,11 +164,15 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("today with offset", () => {
-    expect(isToday(new Date())).toBe(true);
+    const now = new Date();
+    expect(isToday(now)).toBe(true);
+    expect(isToday(prevDay(now))).toBe(false);
   });
 
   it("today without offset", () => {
-    expect(isToday(new Date())).toBe(true);
+    const now = new Date();
+    expect(isToday(now)).toBe(true);
+    expect(isToday(nextDay(now))).toBe(false);
   });
 
   it("yesterday with offset", () => {
@@ -250,9 +254,9 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("utc?", () => {
-    const dt = new Date("2005-02-22T10:10:10Z");
-    const isUtc = dt.getTimezoneOffset() === 0;
-    expect(typeof isUtc).toBe("boolean");
+    const utcDate = new Date(Date.UTC(2005, 1, 22, 10, 10, 10));
+    expect(utcDate.getUTCHours()).toBe(10);
+    expect(utcDate.toISOString()).toContain("T10:10:10");
   });
 
   it("utc offset", () => {

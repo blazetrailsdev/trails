@@ -174,8 +174,9 @@ describe("StringInflectionsTest", () => {
 
   it("strip heredoc on a frozen string", () => {
     const str = "  hello\n  world";
-    Object.freeze(str);
-    expect(stripHeredoc(str)).toBe("hello\nworld");
+    const result = stripHeredoc(str);
+    expect(result).toBe("hello\nworld");
+    expect(str).toBe("  hello\n  world");
   });
 
   it("strip heredoc on a string with no lines", () => {

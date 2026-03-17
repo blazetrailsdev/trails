@@ -197,18 +197,24 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("indexed insert should raise on index overflow", () => {
-    expect(() => {
-      const chars = [...UNICODE_STRING];
-      if (10 >= chars.length) throw new RangeError("index out of bounds");
-      chars[10] = "a";
-    }).toThrow();
+    function mbSet(str: string, idx: number, val: string): string {
+      const chars = [...str];
+      if (idx < 0 || idx >= chars.length) throw new RangeError("index out of bounds");
+      chars[idx] = val;
+      return chars.join("");
+    }
+    expect(() => mbSet(UNICODE_STRING, 10, "a")).toThrow(RangeError);
+    expect(() => mbSet(UNICODE_STRING, -10, "a")).toThrow(RangeError);
   });
 
   it("indexed insert should raise on range overflow", () => {
-    expect(() => {
-      const chars = [...UNICODE_STRING];
-      if (10 >= chars.length) throw new RangeError("range out of bounds");
-    }).toThrow();
+    function mbSetRange(str: string, start: number, _end: number, val: string): string {
+      const chars = [...str];
+      if (start >= chars.length) throw new RangeError("range out of bounds");
+      chars.splice(start, _end - start, val);
+      return chars.join("");
+    }
+    expect(() => mbSetRange(UNICODE_STRING, 10, 12, "a")).toThrow(RangeError);
   });
 
   it("rjust should raise argument errors on bad arguments", () => {

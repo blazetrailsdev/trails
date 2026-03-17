@@ -89,37 +89,38 @@ describe("TimeTravelTest", () => {
     const target = new Date(2004, 10, 24, 1, 4, 44, 100);
     travelTo(target);
     expect(currentTime().getFullYear()).toBe(2004);
-    expect(currentTime().getSeconds()).toBe(44);
+    expect(currentTime().getMilliseconds()).toBe(100);
   });
 
   it("time helper with usec true", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
+    const target = new Date(2004, 10, 24, 1, 4, 44, 250);
     travelTo(target);
-    expect(currentTime().getFullYear()).toBe(2004);
+    expect(currentTime().getMilliseconds()).toBe(250);
   });
 
   it("time helper travel to with datetime and usec", () => {
     const target = new Date(2004, 10, 24, 1, 4, 44, 100);
     travelTo(target);
     expect(currentTime().getSeconds()).toBe(44);
+    expect(currentTime().getMilliseconds()).toBe(100);
   });
 
   it("time helper travel to with datetime and usec true", () => {
-    const target = new Date(2004, 10, 24, 1, 4, 44, 100);
+    const target = new Date(2004, 10, 24, 1, 4, 44, 333);
     travelTo(target);
-    expect(currentTime().getFullYear()).toBe(2004);
+    expect(currentTime().getMilliseconds()).toBe(333);
   });
 
   it("time helper travel to with string and usec", () => {
     const target = new Date("2004-11-24T01:04:44.100Z");
     travelTo(target);
-    expect(currentTime().getUTCFullYear()).toBe(2004);
+    expect(currentTime().getUTCMilliseconds()).toBe(100);
   });
 
   it("time helper travel to with string and usec true", () => {
-    const target = new Date("2004-11-24T01:04:44.100Z");
+    const target = new Date("2004-11-24T01:04:44.500Z");
     travelTo(target);
-    expect(currentTime().getUTCMonth()).toBe(10); // November
+    expect(currentTime().getUTCMilliseconds()).toBe(500);
   });
 
   it("time helper freeze time with usec true", () => {

@@ -94,8 +94,9 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("compare to time", () => {
-    const yesterday = prevDay(new Date());
-    expect(yesterday.getTime()).toBeLessThan(Date.now());
+    const ref = d(2023, 6, 15, 12, 0, 0);
+    const before = prevDay(ref);
+    expect(before.getTime()).toBeLessThan(ref.getTime());
   });
 
   it("to datetime", () => {

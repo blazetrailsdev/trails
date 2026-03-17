@@ -367,10 +367,9 @@ describe("InflectorTest", () => {
   it.skip("clear inflections with acronyms");
 
   it("output is not frozen even if input is frozen", () => {
-    const input = "plurals";
+    const input = "word";
     const result = pluralize(input);
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
+    expect(result).toBe("words");
   });
 
   // Dynamic tests from SingularToPlural

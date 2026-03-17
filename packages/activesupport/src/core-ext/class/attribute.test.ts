@@ -61,10 +61,12 @@ describe("ClassAttributeTest", () => {
   });
 
   it("instance predicate", () => {
-    const object = new Klass();
-    expect(!!object.setting).toBe(false);
-    object.setting = 1;
-    expect(!!object.setting).toBe(true);
+    const Cls = class {};
+    classAttribute(Cls, "active", { instancePredicate: true });
+    const object = new (Cls as any)();
+    expect(object.isActive).toBe(false);
+    object.active = 1;
+    expect(object.isActive).toBe(true);
   });
 
   it("disabling instance writer", () => {
