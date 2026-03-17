@@ -5,7 +5,10 @@ type AnyRecord = any;
  * Callback types.
  */
 export type CallbackFn = (record: AnyRecord) => void | boolean | Promise<void | boolean>;
-export type AroundCallbackFn = (record: AnyRecord, proceed: () => void) => void;
+export type AroundCallbackFn = (
+  record: AnyRecord,
+  proceed: () => void | Promise<void>,
+) => void | Promise<void>;
 
 export type CallbackTiming = "before" | "after" | "around";
 export type CallbackEvent = string;
@@ -81,6 +84,61 @@ export class CallbackChain {
       chain = () => (cb.fn as AroundCallbackFn)(record, prev);
     }
     chain();
+
+    this.runAfter(event, record);
+
+    return true;
+  }
+
+  /**
+   * Run callbacks for a given event around an async block.
+   * Same as run() but awaits the block before running after callbacks,
+   * ensuring after callbacks see the completed state. Around callbacks
+   * receive an async proceed() and can await it.
+   * Returns false if a before callback halts the chain or if an around
+   * callback does not call proceed().
+   */
+  async runAsync(
+    event: CallbackEvent,
+    record: AnyRecord,
+    block: () => void | Promise<void>,
+  ): Promise<boolean> {
+    if (!this.runBefore(event, record)) return false;
+
+    const arounds = this.callbacks.filter(
+      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
+    );
+
+    let blockExecuted = false;
+    const trackedBlock = async () => {
+      await block();
+      blockExecuted = true;
+    };
+
+    let chain: () => void | Promise<void> = trackedBlock;
+    for (const cb of [...arounds].reverse()) {
+      const prev = chain;
+      chain = async () => {
+        let pendingProceed: Promise<void> | undefined;
+        const wrappedProceed = () => {
+          const result = prev();
+          if (result && typeof (result as Promise<void>).then === "function") {
+            pendingProceed = result as Promise<void>;
+          }
+          return result;
+        };
+        try {
+          await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
+          if (pendingProceed) await pendingProceed;
+        } catch (aroundError) {
+          if (pendingProceed) await pendingProceed.catch(() => {});
+          throw aroundError;
+        }
+      };
+    }
+    await chain();
+
+    if (!blockExecuted) return false;
 
     this.runAfter(event, record);
 
