@@ -46,6 +46,20 @@ export class Base extends Model {
   static _abstractClass = false;
   static _tableNamePrefix = "";
   static _tableNameSuffix = "";
+  static _protectedEnvironments: string[] = ["production"];
+
+  /**
+   * List of environments where destructive actions are prohibited.
+   *
+   * Mirrors: ActiveRecord::Base.protected_environments
+   */
+  static get protectedEnvironments(): string[] {
+    return this._protectedEnvironments;
+  }
+
+  static set protectedEnvironments(envs: string[]) {
+    this._protectedEnvironments = envs.map(String);
+  }
 
   /**
    * Mark this class as abstract — it won't have its own table.
@@ -974,6 +988,9 @@ export class Base extends Model {
   static where(conditions: Record<string, unknown>): any;
   static where(sql: string, ...binds: unknown[]): any;
   static where(conditionsOrSql: Record<string, unknown> | string, ...binds: unknown[]): any {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call where on abstract class ${this.name}`);
+    }
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...binds);
     }
@@ -1018,7 +1035,22 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.update_all
    */
   static async updateAll(updates: Record<string, unknown>): Promise<number> {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call updateAll on abstract class ${this.name}`);
+    }
     return this.all().updateAll(updates);
+  }
+
+  /**
+   * Delete all records (no callbacks).
+   *
+   * Mirrors: ActiveRecord::Base.delete_all
+   */
+  static async deleteAll(): Promise<number> {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
+    }
+    return this.all().deleteAll();
   }
 
   /**
@@ -1829,6 +1861,9 @@ export class Base extends Model {
    * and to encrypt encrypted attributes.
    */
   writeAttribute(name: string, value: unknown): void {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      throw new Error(`Invalid attribute name: ${name}`);
+    }
     if (this._frozen) {
       throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
     }

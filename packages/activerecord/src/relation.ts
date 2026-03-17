@@ -375,6 +375,12 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#limit
    */
   limit(value: number): Relation<T> {
+    if (value !== undefined && value !== null) {
+      const num = Number(value);
+      if (!Number.isFinite(num) || num < 0) {
+        throw new Error(`Invalid limit value: ${JSON.stringify(value)}`);
+      }
+    }
     const rel = this._clone();
     rel._limitValue = value;
     return rel;
