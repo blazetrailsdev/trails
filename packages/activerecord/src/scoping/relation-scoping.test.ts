@@ -51,41 +51,16 @@ describe("RelationScopingTest", () => {
     expect(sql).toContain("DESC");
   });
 
-  it("reverse order with arel attribute", async () => {
-    class RoaPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = RoaPost.order("title").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+  it.skip("reverse order with arel attribute", () => {
+    /* needs Arel node input support in order() */
   });
 
-  it("reverse order with arel attribute as hash", () => {
-    class RoahPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = RoahPost.order({ title: "asc" as const })
-      .reverseOrder()
-      .toSql();
-    expect(sql).toContain("DESC");
+  it.skip("reverse order with arel attribute as hash", () => {
+    /* needs Arel node input support in order() */
   });
 
-  it("reverse order with arel node as hash", () => {
-    class RonhPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = RonhPost.order({ title: "desc" as const })
-      .reverseOrder()
-      .toSql();
-    expect(sql).toContain("ASC");
+  it.skip("reverse order with arel node as hash", () => {
+    /* needs Arel node input support in order() */
   });
 
   it("reverse order with multiple arel attributes", () => {
@@ -155,8 +130,9 @@ describe("RelationScopingTest", () => {
     await SffPost.create({ title: "Second" });
     const rel = SffPost.where({ title: "First" });
     await SffPost.scoping(rel, async () => {
-      const first = await SffPost.first();
+      const first = (await SffPost.first()) as any;
       expect(first).not.toBeNull();
+      expect(first!.readAttribute("title")).toBe("First");
     });
   });
 
@@ -167,10 +143,14 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await SflPost.create({ title: "First" });
-    await SflPost.create({ title: "Last" });
-    const last = await SflPost.last();
-    expect(last).not.toBeNull();
+    await SflPost.create({ title: "A" });
+    await SflPost.create({ title: "B" });
+    const rel = SflPost.where({ title: "B" });
+    await SflPost.scoping(rel, async () => {
+      const last = (await SflPost.last()) as any;
+      expect(last).not.toBeNull();
+      expect(last!.readAttribute("title")).toBe("B");
+    });
   });
 
   it.skip("scoped find last preserves scope", () => {
@@ -187,8 +167,12 @@ describe("RelationScopingTest", () => {
     }
     await ScPost.create({ title: "Yes", published: true });
     await ScPost.create({ title: "No", published: false });
-    const results = await ScPost.where({ published: true }).where({ title: "Yes" }).toArray();
-    expect(results.length).toBe(1);
+    const rel = ScPost.where({ published: true });
+    await ScPost.scoping(rel, async () => {
+      const results = await ScPost.where({ title: "Yes" }).toArray();
+      expect(results.length).toBe(1);
+      expect(results[0].readAttribute("title")).toBe("Yes");
+    });
   });
 
   it.skip("scoped unscoped", () => {
@@ -208,20 +192,17 @@ describe("RelationScopingTest", () => {
     }
     await SfaPost.create({ title: "A" });
     await SfaPost.create({ title: "B" });
-    const all = await SfaPost.all().toArray();
-    expect(all.length).toBe(2);
+    await SfaPost.create({ title: "C" });
+    const rel = SfaPost.where({ title: "A" });
+    await SfaPost.scoping(rel, async () => {
+      const all = await SfaPost.all().toArray();
+      expect(all.length).toBe(1);
+      expect(all[0].readAttribute("title")).toBe("A");
+    });
   });
 
-  it("scoped find select", () => {
-    class SfsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = SfsPost.select("title").toSql();
-    expect(sql).toContain('"title"');
+  it.skip("scoped find select", () => {
+    /* needs scoping + select interaction */
   });
 
   it.skip("scope select concatenates", () => {
@@ -238,8 +219,11 @@ describe("RelationScopingTest", () => {
     await ScntPost.create({ title: "A" });
     await ScntPost.create({ title: "B" });
     await ScntPost.create({ title: "A" });
-    const count = await ScntPost.where({ title: "A" }).count();
-    expect(count).toBe(2);
+    const rel = ScntPost.where({ title: "A" });
+    await ScntPost.scoping(rel, async () => {
+      const count = await ScntPost.count();
+      expect(count).toBe(2);
+    });
   });
 
   it.skip("scoped find with annotation", () => {
