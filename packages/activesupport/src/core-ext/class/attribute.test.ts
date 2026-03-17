@@ -11,9 +11,6 @@ describe("ClassAttributeTest", () => {
     classAttribute(Klass, "timeout", { default: 5 });
     classAttribute(Klass, "system");
     Sub = class extends Klass {};
-    classAttribute(Sub, "setting");
-    classAttribute(Sub, "timeout", { default: 5 });
-    classAttribute(Sub, "system");
   });
 
   it("defaults to nil", () => {
@@ -93,11 +90,13 @@ describe("ClassAttributeTest", () => {
   });
 
   it("disabling instance predicate", () => {
-    const Cls = class {};
-    classAttribute(Cls, "setting", { instancePredicate: false });
-    const object = new (Cls as any)();
-    const predDesc = Object.getOwnPropertyDescriptor(Cls.prototype, "isSetting");
-    expect(predDesc).toBeUndefined();
+    const WithPred = class {};
+    classAttribute(WithPred, "setting", { instancePredicate: true });
+    expect(Object.getOwnPropertyDescriptor(WithPred.prototype, "isSetting")).toBeDefined();
+
+    const Without = class {};
+    classAttribute(Without, "setting", { instancePredicate: false });
+    expect(Object.getOwnPropertyDescriptor(Without.prototype, "isSetting")).toBeUndefined();
   });
 
   it.skip("works well with singleton classes");

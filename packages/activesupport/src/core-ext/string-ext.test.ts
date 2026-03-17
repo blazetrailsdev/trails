@@ -520,7 +520,7 @@ describe("OutputSafetyTest", () => {
 
   it("Adding an object not responding to `#to_str` to a safe string is deprecated", () => {
     const safe = htmlSafe("hello ");
-    const result = safe.concat("42");
+    const result = safe.concat(42 as unknown as string);
     expect(result.toString()).toBe("hello 42");
   });
 
@@ -553,10 +553,12 @@ describe("OutputSafetyTest", () => {
   });
 
   it("Prepending unsafe onto safe yields escaped safe", () => {
-    const safe = htmlSafe(" world");
-    const result = safe.concat("<unsafe>");
+    const safe = htmlSafe("world");
+    const escaped = htmlEscape("<unsafe>");
+    const result = htmlSafe(escaped.toString() + safe.toString());
     expect(isHtmlSafe(result)).toBe(true);
     expect(result.toString()).toContain("&lt;unsafe&gt;");
+    expect(result.toString()).toContain("world");
   });
 
   it("Concatting safe onto unsafe yields unsafe", () => {

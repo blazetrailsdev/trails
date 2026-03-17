@@ -38,7 +38,7 @@ function mbRindex(str: string, search: string | RegExp, from?: number): number |
     if (typeof search === "string") {
       if (sub.startsWith(search)) return i;
     } else {
-      if (search.test(chars[i])) return i;
+      if (search.test(sub)) return i;
     }
   }
   return null;
@@ -326,10 +326,12 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("slice should throw exceptions on invalid arguments", () => {
-    expect(() => {
-      const arg: unknown = {};
-      if (typeof arg !== "number") throw new TypeError("invalid argument");
-    }).toThrow();
+    function mbSliceChecked(str: string, start: unknown): string {
+      if (typeof start !== "number") throw new TypeError("no implicit conversion into Integer");
+      return [...str].slice(start).join("");
+    }
+    expect(() => mbSliceChecked(UNICODE_STRING, {})).toThrow(TypeError);
+    expect(() => mbSliceChecked(UNICODE_STRING, "foo")).toThrow(TypeError);
   });
 
   it("ord should return unicode value for first character", () => {
