@@ -49,7 +49,7 @@ export function xmlNameEscape(str: string): string {
  * Safe strings can be concatenated without escaping; unsafe strings are escaped when added.
  */
 export class SafeBuffer {
-  private readonly _value: string;
+  private _value: string;
   private readonly _safe: boolean;
 
   constructor(value: string = "", safe: boolean = false) {
@@ -119,6 +119,48 @@ export class SafeBuffer {
 
   valueOf(): string {
     return this._value;
+  }
+
+  /** chr — returns first character as a SafeBuffer with same safety. */
+  chr(): SafeBuffer {
+    const first = Array.from(this._value)[0] ?? "";
+    return new SafeBuffer(first, this._safe);
+  }
+
+  /** repeat — repeats the string n times, preserving safety status. */
+  repeat(count: number): SafeBuffer {
+    return new SafeBuffer(this._value.repeat(count), this._safe);
+  }
+
+  /** set — assigns a value at a given index or slice, escaping if safe. */
+  set(index: number, value: string, length?: number): void {
+    const escaped = this._safe ? value.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]) : value;
+    const len = length ?? 1;
+    this._value = this._value.slice(0, index) + escaped + this._value.slice(index + len);
+  }
+
+  /** format — sprintf-like interpolation, escaping unsafe args. Indices are UTF-16 code units. */
+  format(args: Record<string, unknown> | unknown[]): SafeBuffer {
+    let result: string;
+    if (Array.isArray(args)) {
+      let i = 0;
+      result = this._value.replace(/%s/g, () => {
+        if (i >= args.length) throw new Error("too few arguments");
+        const arg = args[i++];
+        if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
+        const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);
+        return this._safe ? str.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]) : str;
+      });
+    } else {
+      result = this._value.replace(/%\{(\w+)\}/g, (_, key) => {
+        if (!Object.hasOwn(args, key)) throw new Error(`key{${key}} not found`);
+        const arg = args[key];
+        if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
+        const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);
+        return this._safe ? str.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]) : str;
+      });
+    }
+    return new SafeBuffer(result, this._safe);
   }
 }
 

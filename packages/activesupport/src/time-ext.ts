@@ -296,14 +296,26 @@ export function advance(
     if (d.getMonth() !== expectedMonth) d.setDate(0);
   }
 
+  if (options.weeks) {
+    const wholeDays = Math.trunc(options.weeks * 7);
+    const fractionalDayMs = (options.weeks * 7 - wholeDays) * 24 * 3600 * 1000;
+    d.setDate(d.getDate() + wholeDays);
+    if (fractionalDayMs) d = new Date(d.getTime() + fractionalDayMs);
+  }
+
+  if (options.days) {
+    const wholeDays = Math.trunc(options.days);
+    const fractionalDayMs = (options.days - wholeDays) * 24 * 3600 * 1000;
+    d.setDate(d.getDate() + wholeDays);
+    if (fractionalDayMs) d = new Date(d.getTime() + fractionalDayMs);
+  }
+
   let ms = 0;
-  if (options.weeks) ms += options.weeks * 7 * 24 * 3600 * 1000;
-  if (options.days) ms += options.days * 24 * 3600 * 1000;
   if (options.hours) ms += options.hours * 3600 * 1000;
   if (options.minutes) ms += options.minutes * 60 * 1000;
   if (options.seconds) ms += options.seconds * 1000;
 
-  d = new Date(d.getTime() + ms);
+  if (ms) d = new Date(d.getTime() + ms);
   return d;
 }
 
@@ -312,16 +324,13 @@ export function advance(
 // ---------------------------------------------------------------------------
 
 export function secondsSinceMidnight(date: Date): number {
-  return (
-    date.getHours() * 3600 +
-    date.getMinutes() * 60 +
-    date.getSeconds() +
-    date.getMilliseconds() / 1000
-  );
+  const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return (date.getTime() - midnight.getTime()) / 1000;
 }
 
 export function secondsUntilEndOfDay(date: Date): number {
-  return 86399 - Math.floor(secondsSinceMidnight(date));
+  const eod = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return Math.max(0, Math.floor((eod.getTime() - date.getTime()) / 1000));
 }
 
 // ---------------------------------------------------------------------------

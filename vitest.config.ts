@@ -16,5 +16,6 @@ export default defineConfig({
   test: {
     globals: true,
     include: ["packages/*/src/**/*.test.ts"],
+    poolMatchGlobs: [["**/core-ext/time-ext.test.ts", "forks"]],
   },
 });
