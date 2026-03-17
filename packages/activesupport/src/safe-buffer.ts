@@ -139,12 +139,13 @@ export class SafeBuffer {
     this._value = this._value.slice(0, index) + escaped + this._value.slice(index + len);
   }
 
-  /** format — sprintf-like interpolation, escaping unsafe args. */
-  format(args: Record<string, string | SafeBuffer> | (string | SafeBuffer)[]): SafeBuffer {
+  /** format — sprintf-like interpolation, escaping unsafe args. Indices are UTF-16 code units. */
+  format(args: Record<string, unknown> | unknown[]): SafeBuffer {
     let result: string;
     if (Array.isArray(args)) {
       let i = 0;
       result = this._value.replace(/%s/g, () => {
+        if (i >= args.length) throw new Error("too few arguments");
         const arg = args[i++];
         if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
         const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);
@@ -152,6 +153,7 @@ export class SafeBuffer {
       });
     } else {
       result = this._value.replace(/%\{(\w+)\}/g, (_, key) => {
+        if (!(key in args)) throw new Error(`key{${key}} not found`);
         const arg = args[key];
         if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
         const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);
