@@ -221,7 +221,7 @@ describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
   it("iso8601", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
-    const twz = zone.parse("2024-01-15T12:00:00-05:00");
+    const twz = zone.iso8601("2024-01-15T12:00:00-05:00");
     expect(twz.hour).toBe(12);
     expect(twz.day).toBe(15);
   });
@@ -243,7 +243,7 @@ describe("TimeZoneTest", () => {
 
   it("iso8601 with invalid string", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
-    expect(() => zone.parse("foobar")).toThrow();
+    expect(() => zone.iso8601("foobar")).toThrow();
   });
 
   it("iso8601 with nil", () => {
@@ -277,7 +277,7 @@ describe("TimeZoneTest", () => {
 
   it("iso8601 doesnt use local dst", () => {
     const zone = TimeZone.find("UTC");
-    const twz = zone.parse("2013-03-10T02:00:00Z");
+    const twz = zone.iso8601("2013-03-10T02:00:00Z");
     expect(twz.hour).toBe(2);
     expect(twz.day).toBe(10);
   });
@@ -408,7 +408,7 @@ describe("TimeZoneTest", () => {
 
   it("rfc3339 with invalid string", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
-    expect(() => zone.parse("not-a-valid-rfc3339")).toThrow();
+    expect(() => zone.rfc3339("not-a-valid-rfc3339")).toThrow();
   });
 
   it("rfc3339 with old date", () => {
