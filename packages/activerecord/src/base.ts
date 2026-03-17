@@ -2354,14 +2354,14 @@ export class Base extends Model {
       });
     }
 
-    // Run afterDestroy callbacks
-    ctor._callbackChain.runAfter("destroy", this);
-
     const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
       await this._pendingOperation;
       this._pendingOperation = null;
     }
+
+    // Run afterDestroy callbacks (after DELETE succeeds)
+    ctor._callbackChain.runAfter("destroy", this);
 
     this._destroyed = true;
     this._frozen = true;
