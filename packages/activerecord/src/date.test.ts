@@ -11,10 +11,11 @@ describe("DateTest", () => {
         this.adapter = adapter;
       }
     }
-    const now = new Date();
-    const e = await Event.create({ start_date: now });
+    const date = new Date(2024, 0, 15);
+    const e = await Event.create({ start_date: date });
     const reloaded = await Event.find(e.id);
-    expect(reloaded.readAttribute("start_date")).toBeDefined();
+    const val = reloaded.readAttribute("start_date");
+    expect(val).not.toBeNull();
   });
 
   it("date with string value", async () => {
@@ -27,10 +28,12 @@ describe("DateTest", () => {
     }
     const e = await Event.create({ start_date: "2024-01-15" });
     const reloaded = await Event.find(e.id);
-    expect(reloaded.readAttribute("start_date")).toBeDefined();
+    const val = reloaded.readAttribute("start_date");
+    expect(val).not.toBeNull();
+    expect(String(val)).toContain("2024");
   });
 
-  it("assign valid dates", async () => {
+  it("assign valid dates", () => {
     const adapter = createTestAdapter();
     class Event extends Base {
       static {
@@ -40,8 +43,8 @@ describe("DateTest", () => {
     }
     const e = new Event();
     e.writeAttribute("start_date", "2024-06-15");
-    expect(e.readAttribute("start_date")).toBeDefined();
+    expect(e.readAttribute("start_date")).not.toBeNull();
     e.writeAttribute("start_date", new Date(2024, 5, 15));
-    expect(e.readAttribute("start_date")).toBeDefined();
+    expect(e.readAttribute("start_date")).not.toBeNull();
   });
 });

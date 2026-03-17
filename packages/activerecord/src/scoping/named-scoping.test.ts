@@ -637,7 +637,9 @@ describe("NamedScopingTest", () => {
     }
     await Post.create({ title: "A" });
     await Post.create({ title: "B" });
-    const result = await Post.order("RANDOM()").limit(1).toArray();
+    const rel = Post.order("RANDOM()").limit(1);
+    expect(rel.toSql()).toContain("RANDOM()");
+    const result = await rel.toArray();
     expect(result.length).toBe(1);
   });
 

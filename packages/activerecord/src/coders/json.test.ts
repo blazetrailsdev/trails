@@ -1,16 +1,33 @@
 import { describe, it, expect } from "vitest";
+import { Base, serialize } from "../index.js";
+import { createTestAdapter } from "../test-adapter.js";
 
 describe("JSONTest", () => {
-  function jsonLoad(value: string | null | undefined): unknown {
-    if (value == null || value === "") return null;
-    return JSON.parse(value);
-  }
-
-  it("returns nil if empty string given", () => {
-    expect(jsonLoad("")).toBeNull();
+  it("returns nil if empty string given", async () => {
+    const adapter = createTestAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
+    }
+    serialize(Topic, "content");
+    const t = await Topic.create({ content: "" });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.readAttribute("content")).toBeNull();
   });
 
-  it("returns nil if nil given", () => {
-    expect(jsonLoad(null)).toBeNull();
+  it("returns nil if nil given", async () => {
+    const adapter = createTestAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
+    }
+    serialize(Topic, "content");
+    const t = await Topic.create({ content: null });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.readAttribute("content")).toBeNull();
   });
 });

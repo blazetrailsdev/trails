@@ -177,7 +177,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     expect(posts2.length).toBe(1);
   });
 
-  it("blank custom primary key on new record should not run queries", () => {
+  it("blank custom primary key on new record should not run queries", async () => {
     const adapter = freshAdapter();
     class BlankPkAuthor extends Base {
       static {
@@ -187,10 +187,29 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
         this.adapter = adapter;
       }
     }
-    // A new record with blank primary key shouldn't try to load associations
+    class BlankPkPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_code", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BlankPkAuthor", BlankPkAuthor);
+    registerModel("BlankPkPost", BlankPkPost);
+    Associations.hasMany.call(BlankPkAuthor, "blank_pk_posts", {
+      className: "BlankPkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
     const author = new BlankPkAuthor({ name: "Eve" });
     expect(author.readAttribute("author_code")).toBeNull();
-    expect(author.isNewRecord()).toBe(true);
+    // Loading association with null PK should return empty without querying
+    const posts = await loadHasMany(author, "blank_pk_posts", {
+      className: "BlankPkPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    expect(posts).toHaveLength(0);
   });
 });
 
