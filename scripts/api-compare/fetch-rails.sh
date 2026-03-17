@@ -27,6 +27,7 @@ git sparse-checkout set \
   activerecord/lib/active_record \
   activerecord/lib/arel \
   activemodel/lib/active_model \
+  activesupport/lib/active_support \
   actionpack/lib/action_dispatch \
   actionpack/lib/action_controller
 

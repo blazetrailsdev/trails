@@ -14,11 +14,25 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-const PACKAGES = ["arel", "activemodel", "activerecord", "actiondispatch"];
+const PACKAGES = [
+  "arel",
+  "activemodel",
+  "activerecord",
+  "activesupport",
+  "actiondispatch",
+  "actioncontroller",
+];
 
 /** Override package → directory mapping when they differ */
 const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actiondispatch: "actionpack",
+  actioncontroller: "actionpack",
+};
+
+/** Override package → src subdirectory when package shares a dir */
+const PACKAGE_SRC_SUBDIR: Record<string, string> = {
+  actiondispatch: "actiondispatch",
+  actioncontroller: "actioncontroller",
 };
 
 function main() {
@@ -30,7 +44,10 @@ function main() {
 
   for (const pkg of PACKAGES) {
     const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
-    const pkgDir = path.join(ROOT_DIR, "packages", dirName, "src");
+    const subDir = PACKAGE_SRC_SUBDIR[pkg];
+    const pkgDir = subDir
+      ? path.join(ROOT_DIR, "packages", dirName, "src", subDir)
+      : path.join(ROOT_DIR, "packages", dirName, "src");
     manifest.packages[pkg] = extractPackage(pkg, pkgDir);
   }
 
@@ -58,7 +75,8 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   const info: PackageInfo = { classes: {}, modules: {} };
 
   // Create a TypeScript program
-  const tsConfigPath = path.join(ROOT_DIR, "packages", pkgName, "tsconfig.json");
+  const dirName = PACKAGE_DIR_OVERRIDES[pkgName] ?? pkgName;
+  const tsConfigPath = path.join(ROOT_DIR, "packages", dirName, "tsconfig.json");
   let compilerOptions: ts.CompilerOptions = {
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.NodeNext,
