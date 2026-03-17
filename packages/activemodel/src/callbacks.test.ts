@@ -209,3 +209,56 @@ describe("CallbacksTest", () => {
     expect(log).toContain("after");
   });
 });
+
+describe("CallbackChain.runAsync", () => {
+  it("runs after callbacks only after the async block completes", async () => {
+    const { CallbackChain } = await import("./callbacks.js");
+    const chain = new CallbackChain();
+    const log: string[] = [];
+    chain.register("after", "save", () => {
+      log.push("after");
+    });
+    await chain.runAsync("save", {}, async () => {
+      log.push("block:start");
+      await new Promise((r) => setTimeout(r, 10));
+      log.push("block:end");
+    });
+    expect(log).toEqual(["block:start", "block:end", "after"]);
+  });
+
+  it("returns false and skips block when before callback halts", async () => {
+    const { CallbackChain } = await import("./callbacks.js");
+    const chain = new CallbackChain();
+    const log: string[] = [];
+    chain.register("before", "save", () => {
+      log.push("before");
+      return false;
+    });
+    chain.register("after", "save", () => {
+      log.push("after");
+    });
+    const result = await chain.runAsync("save", {}, async () => {
+      log.push("block");
+    });
+    expect(result).toBe(false);
+    expect(log).toEqual(["before"]);
+  });
+
+  it("around callbacks wrap the async block", async () => {
+    const { CallbackChain } = await import("./callbacks.js");
+    const chain = new CallbackChain();
+    const log: string[] = [];
+    chain.register("around", "save", (_record: any, proceed: () => void) => {
+      log.push("around:before");
+      proceed();
+      log.push("around:after");
+    });
+    chain.register("after", "save", () => {
+      log.push("after");
+    });
+    await chain.runAsync("save", {}, async () => {
+      log.push("block");
+    });
+    expect(log).toEqual(["around:before", "block", "around:after", "after"]);
+  });
+});
