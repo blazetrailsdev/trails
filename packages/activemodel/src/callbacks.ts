@@ -5,7 +5,10 @@ type AnyRecord = any;
  * Callback types.
  */
 export type CallbackFn = (record: AnyRecord) => void | boolean | Promise<void | boolean>;
-export type AroundCallbackFn = (record: AnyRecord, proceed: () => void) => void;
+export type AroundCallbackFn = (
+  record: AnyRecord,
+  proceed: () => void | Promise<void>,
+) => void | Promise<void>;
 
 export type CallbackTiming = "before" | "after" | "around";
 export type CallbackEvent = string;
@@ -90,7 +93,8 @@ export class CallbackChain {
   /**
    * Run callbacks for a given event around an async block.
    * Same as run() but awaits the block before running after callbacks,
-   * ensuring after callbacks see the completed state.
+   * ensuring after callbacks see the completed state. Around callbacks
+   * receive an async proceed() and can await it.
    * Returns false if a before callback halts the chain.
    */
   async runAsync(
@@ -104,21 +108,14 @@ export class CallbackChain {
       (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
     );
 
-    // Around callbacks are synchronous wrappers — they call proceed()
-    // which schedules the async work. We capture the promise to await it.
-    let asyncResult: Promise<void> | undefined;
-    const syncBlock = () => {
-      asyncResult = block();
-    };
-
-    let chain = syncBlock;
+    let chain: () => Promise<void> = block;
     for (const cb of [...arounds].reverse()) {
       const prev = chain;
-      chain = () => (cb.fn as AroundCallbackFn)(record, prev);
+      chain = async () => {
+        await (cb.fn as AroundCallbackFn)(record, prev);
+      };
     }
-    chain();
-
-    if (asyncResult) await asyncResult;
+    await chain();
 
     this.runAfter(event, record);
 

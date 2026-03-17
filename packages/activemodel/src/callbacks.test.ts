@@ -248,17 +248,19 @@ describe("CallbackChain.runAsync", () => {
     const { CallbackChain } = await import("./callbacks.js");
     const chain = new CallbackChain();
     const log: string[] = [];
-    chain.register("around", "save", (_record: any, proceed: () => void) => {
+    chain.register("around", "save", async (_record: any, proceed: () => void | Promise<void>) => {
       log.push("around:before");
-      proceed();
+      await proceed();
       log.push("around:after");
     });
     chain.register("after", "save", () => {
       log.push("after");
     });
     await chain.runAsync("save", {}, async () => {
-      log.push("block");
+      log.push("block:start");
+      await new Promise((r) => setTimeout(r, 10));
+      log.push("block:end");
     });
-    expect(log).toEqual(["around:before", "block", "around:after", "after"]);
+    expect(log).toEqual(["around:before", "block:start", "block:end", "around:after", "after"]);
   });
 });
