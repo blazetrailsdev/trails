@@ -515,9 +515,7 @@ export class TimeZone {
    */
   rfc3339(str: string): TimeWithZone {
     const trimmed = str?.trim() ?? "";
-    if (
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([.]\d+)?(Z|[+-]\d{2}:?\d{2})$/.test(trimmed)
-    ) {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([.]\d+)?(Z|[+-]\d{2}:?\d{2})$/.test(trimmed)) {
       throw new Error("invalid date");
     }
     const date = new Date(trimmed);
