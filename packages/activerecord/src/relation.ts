@@ -2720,7 +2720,7 @@ export class Relation<T extends Base> {
     for (const clause of this._orderClauses) {
       if (typeof clause === "string") {
         // Detect SQL expressions (functions, parens, operators) and pass as raw SQL
-        if (clause.includes("(") || clause.includes(" CASE ") || clause.includes("||")) {
+        if (clause.includes("(") || /\bcase\b/i.test(clause) || clause.includes("||")) {
           manager.order(new Nodes.SqlLiteral(clause));
         } else {
           // Parse "column ASC/DESC" or "table.column ASC/DESC" strings
