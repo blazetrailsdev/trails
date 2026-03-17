@@ -13,8 +13,9 @@ describeIfPg("PostgresAdapter", () => {
     // Clean up test tables
     try {
       const tables = await adapter.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items'))`,
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items', 'Items', 'Items'))`,
       );
+      await adapter.exec(`DROP TABLE IF EXISTS "Items" CASCADE`);
       for (const t of tables) {
         await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
       }
@@ -268,35 +269,186 @@ describeIfPg("PostgresAdapter", () => {
     // ── Transaction tests ─────────────────────────────────────────────
     // Our adapter manages transactions, savepoints, and rollbacks.
 
-    it.skip("xml decoding", async () => {});
-    it.skip("cidr decoding", async () => {});
-    it.skip("inet decoding", async () => {});
-    it.skip("macaddr decoding", async () => {});
-    it.skip("point decoding", async () => {});
-    it.skip("bit decoding", async () => {});
+    it("xml decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_xml" ("id" SERIAL PRIMARY KEY, "val" XML)`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_xml" ("val") VALUES ('<root>hello</root>')`,
+      );
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_xml"`);
+      expect(String(rows[0].val)).toContain("<root>hello</root>");
+    });
+
+    it("cidr decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_cidr" ("id" SERIAL PRIMARY KEY, "val" CIDR)`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_cidr" ("val") VALUES ('192.168.1.0/24')`,
+      );
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_cidr"`);
+      expect(String(rows[0].val)).toBe("192.168.1.0/24");
+    });
+
+    it("inet decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_inet" ("id" SERIAL PRIMARY KEY, "val" INET)`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_inet" ("val") VALUES ('192.168.1.1')`,
+      );
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_inet"`);
+      expect(String(rows[0].val)).toBe("192.168.1.1");
+    });
+
+    it("macaddr decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_mac" ("id" SERIAL PRIMARY KEY, "val" MACADDR)`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_mac" ("val") VALUES ('08:00:2b:01:02:03')`,
+      );
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_mac"`);
+      expect(String(rows[0].val)).toBe("08:00:2b:01:02:03");
+    });
+
+    it("point decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_point" ("id" SERIAL PRIMARY KEY, "val" POINT)`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_point" ("val") VALUES ('(1.5, 2.5)')`,
+      );
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_point"`);
+      const val = rows[0].val;
+      expect(val).toBeTruthy();
+    });
+
+    it("bit decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_bit" ("id" SERIAL PRIMARY KEY, "val" BIT(8))`);
+      await adapter.executeMutation(
+        `INSERT INTO "ex_bit" ("val") VALUES (B'10101010')`,
+      );
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_bit"`);
+      expect(String(rows[0].val)).toBe("10101010");
+    });
+
     it.skip("range decoding", async () => {});
-    it.skip("date time decoding", async () => {});
-    it.skip("date decoding", async () => {});
-    it.skip("time decoding", async () => {});
-    it.skip("timestamp decoding", async () => {});
-    it.skip("timestamp with time zone decoding", async () => {});
-    it.skip("interval decoding", async () => {});
-    it.skip("money decoding", async () => {});
-    it.skip("oid decoding", async () => {});
+
+    it("date time decoding", async () => {
+      const rows = await adapter.execute(
+        `SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`,
+      );
+      expect(rows[0].val).toBeInstanceOf(Date);
+    });
+
+    it("date decoding", async () => {
+      const rows = await adapter.execute(`SELECT DATE '2023-06-15' AS val`);
+      expect(rows[0].val).toBeInstanceOf(Date);
+    });
+
+    it("time decoding", async () => {
+      const rows = await adapter.execute(`SELECT TIME '14:30:00' AS val`);
+      expect(rows[0].val).toBeTruthy();
+      expect(String(rows[0].val)).toContain("14:30");
+    });
+
+    it("timestamp decoding", async () => {
+      const rows = await adapter.execute(
+        `SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`,
+      );
+      const d = rows[0].val as Date;
+      expect(d).toBeInstanceOf(Date);
+      expect(d.getFullYear()).toBe(2023);
+    });
+
+    it("timestamp with time zone decoding", async () => {
+      const rows = await adapter.execute(
+        `SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`,
+      );
+      const d = rows[0].val as Date;
+      expect(d).toBeInstanceOf(Date);
+      expect(d.getFullYear()).toBe(2023);
+    });
+
+    it("interval decoding", async () => {
+      const rows = await adapter.execute(`SELECT INTERVAL '1 day 2 hours' AS val`);
+      expect(rows[0].val).toBeTruthy();
+    });
+
+    it("money decoding", async () => {
+      const rows = await adapter.execute(`SELECT '$12.34'::money AS val`);
+      expect(String(rows[0].val)).toContain("12.34");
+    });
+
+    it("oid decoding", async () => {
+      const rows = await adapter.execute(`SELECT 42::oid AS val`);
+      expect(Number(rows[0].val)).toBe(42);
+    });
+
     it.skip("bad connection to postgres database", async () => {});
     it.skip("reconnect after bad connection on check version", async () => {});
-    it.skip("primary key works tables containing capital letters", async () => {});
-    it.skip("non standard primary key", async () => {});
+
+    it("primary key works tables containing capital letters", async () => {
+      await adapter.exec(`CREATE TABLE "Items" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      const pk = await adapter.primaryKey('"Items"');
+      expect(pk).toBe("id");
+    });
+
+    it("non standard primary key", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_custom_pk" ("custom_id" SERIAL PRIMARY KEY, "name" TEXT)`,
+      );
+      const pk = await adapter.primaryKey("ex_custom_pk");
+      expect(pk).toBe("custom_id");
+    });
+
     it.skip("exec insert with returning disabled and no sequence name given", async () => {});
     it.skip("exec insert default values with returning disabled and no sequence name given", async () => {});
     it.skip("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {});
-    it.skip("serial sequence", async () => {});
-    it.skip("default sequence name", async () => {});
-    it.skip("default sequence name bad table", async () => {});
-    it.skip("pk and sequence for with non standard primary key", async () => {});
-    it.skip("pk and sequence for returns nil if no seq", async () => {});
-    it.skip("pk and sequence for returns nil if no pk", async () => {});
-    it.skip("pk and sequence for returns nil if table not found", async () => {});
+
+    it("serial sequence", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_serial_seq" ("id" SERIAL PRIMARY KEY)`,
+      );
+      const result = await adapter.pkAndSequenceFor("ex_serial_seq");
+      expect(result).not.toBeNull();
+      expect(result![1].name).toBe("ex_serial_seq_id_seq");
+    });
+
+    it("default sequence name", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_def_seq" ("id" SERIAL PRIMARY KEY)`,
+      );
+      const result = await adapter.pkAndSequenceFor("ex_def_seq");
+      expect(result).not.toBeNull();
+      expect(result![1].name).toBe("ex_def_seq_id_seq");
+    });
+
+    it("default sequence name bad table", async () => {
+      const result = await adapter.pkAndSequenceFor("nonexistent_table_xyz");
+      expect(result).toBeNull();
+    });
+
+    it("pk and sequence for with non standard primary key", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_ns_pk" ("custom_id" SERIAL PRIMARY KEY, "name" TEXT)`,
+      );
+      const result = await adapter.pkAndSequenceFor("ex_ns_pk");
+      expect(result).not.toBeNull();
+      expect(result![0]).toBe("custom_id");
+      expect(result![1].name).toBe("ex_ns_pk_custom_id_seq");
+    });
+
+    it("pk and sequence for returns nil if no seq", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_no_seq" ("id" INTEGER PRIMARY KEY, "name" TEXT)`,
+      );
+      const result = await adapter.pkAndSequenceFor("ex_no_seq");
+      expect(result).toBeNull();
+    });
+
+    it("pk and sequence for returns nil if no pk", async () => {
+      await adapter.exec(`CREATE TABLE "ex_no_pk" ("name" TEXT, "val" INTEGER)`);
+      const result = await adapter.pkAndSequenceFor("ex_no_pk");
+      expect(result).toBeNull();
+    });
+
+    it("pk and sequence for returns nil if table not found", async () => {
+      const result = await adapter.pkAndSequenceFor("does_not_exist_xyz");
+      expect(result).toBeNull();
+    });
     it.skip("pk and sequence for with collision pg class oid", async () => {});
     it.skip("partial index on column named like keyword", async () => {});
     it.skip("include index", async () => {});

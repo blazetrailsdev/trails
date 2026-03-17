@@ -316,7 +316,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -395,7 +395,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -426,7 +426,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
@@ -523,7 +523,7 @@ export class PostgresAdapter implements DatabaseAdapter {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(table);
+      binds.push(tableName);
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
