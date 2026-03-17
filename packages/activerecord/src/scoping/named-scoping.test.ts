@@ -627,8 +627,18 @@ describe("NamedScopingTest", () => {
     expect(rel.toSql()).toContain("SELECT");
   });
 
-  it.skip("rand should select a random object from proxy", () => {
-    /* needs RANDOM() ordering support */
+  it("rand should select a random object from proxy", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    await Post.create({ title: "A" });
+    await Post.create({ title: "B" });
+    const result = await Post.order("RANDOM()").limit(1).toArray();
+    expect(result.length).toBe(1);
   });
 
   it("index on scope", async () => {
