@@ -470,6 +470,81 @@ export class TimeZone {
     return getZoneInfo(this.tzinfo, date).abbreviation;
   }
 
+  /**
+   * Today's date in this timezone.
+   */
+  today(): { year: number; month: number; day: number } {
+    const n = this.now();
+    return { year: n.year, month: n.month, day: n.day };
+  }
+
+  /**
+   * Tomorrow's date in this timezone.
+   */
+  tomorrow(): { year: number; month: number; day: number } {
+    const t = this.today();
+    const d = new Date(Date.UTC(t.year, t.month - 1, t.day + 1));
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  }
+
+  /**
+   * Yesterday's date in this timezone.
+   */
+  yesterday(): { year: number; month: number; day: number } {
+    const t = this.today();
+    const d = new Date(Date.UTC(t.year, t.month - 1, t.day - 1));
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  }
+
+  /**
+   * Parse an ISO 8601 string in this timezone.
+   */
+  iso8601(str: string | null | undefined): TimeWithZone {
+    if (str == null || str.trim() === "") {
+      throw new Error("invalid date");
+    }
+    return this.parse(str);
+  }
+
+  /**
+   * Parse an RFC 3339 string in this timezone.
+   */
+  rfc3339(str: string): TimeWithZone {
+    if (
+      !str ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([.]\d+)?(Z|[+-]\d{2}:?\d{2})/.test(str.trim())
+    ) {
+      throw new Error("invalid date");
+    }
+    const date = new Date(str);
+    if (isNaN(date.getTime())) {
+      throw new Error("invalid date");
+    }
+    return new TimeWithZone(date, this);
+  }
+
+  /**
+   * Whether this timezone matches a given identifier.
+   */
+  match(identifier: string): boolean {
+    return this.name === identifier || this.tzinfo === identifier;
+  }
+
+  /** US zones */
+  static usZones(): TimeZone[] {
+    const usNames = [
+      "Hawaii",
+      "Alaska",
+      "Pacific Time (US & Canada)",
+      "Arizona",
+      "Mountain Time (US & Canada)",
+      "Central Time (US & Canada)",
+      "Eastern Time (US & Canada)",
+      "Indiana (East)",
+    ];
+    return usNames.map((n) => TimeZone.find(n));
+  }
+
   toString(): string {
     return `(GMT${this.formattedOffset()}) ${this.name}`;
   }
