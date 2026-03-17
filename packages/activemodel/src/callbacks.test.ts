@@ -308,11 +308,11 @@ describe("CallbackChain.runAsync", () => {
     const chain = new CallbackChain();
     const log: string[] = [];
     chain.register("after", "save", async () => {
-      await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 5));
       log.push("after1");
     });
     chain.register("after", "save", async () => {
-      await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 5));
       log.push("after2");
     });
     await chain.runAsync("save", {}, async () => {
