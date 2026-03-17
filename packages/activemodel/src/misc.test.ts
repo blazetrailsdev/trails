@@ -2096,7 +2096,7 @@ describe("ActiveModel", () => {
   });
 
   describe("callbacks with prepend option", () => {
-    it("prepend: true puts callback first in the chain", () => {
+    it("prepend: true puts callback first in the chain", async () => {
       class User extends Model {
         static {
           this.attribute("name", "string");
@@ -2114,7 +2114,7 @@ describe("ActiveModel", () => {
       );
 
       const u = new User({ name: "Alice" });
-      (User as any)._callbackChain.runBefore("save", u);
+      await (User as any)._callbackChain.runBefore("save", u);
       expect(order).toEqual(["prepended", "first"]);
     });
   });

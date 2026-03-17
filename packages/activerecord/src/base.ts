@@ -1653,7 +1653,7 @@ export class Base extends Model {
       record._strictLoading = true;
     }
     // Fire after_find callbacks
-    this._callbackChain.runAfter("find", record);
+    this._callbackChain.runAfterSync("find", record);
     return record;
   }
 
@@ -2072,11 +2072,11 @@ export class Base extends Model {
     // Use runBefore/runAfter to control the lifecycle:
     // before_save → before_create/update → INSERT/UPDATE → after_create/update → after_save
     let saved = false;
-    if (!ctor._callbackChain.runBefore("save", this)) return false;
+    if (!(await ctor._callbackChain.runBefore("save", this))) return false;
 
     const wasNewRecord = this._newRecord;
     if (this._newRecord) {
-      const createResult = await ctor._callbackChain.runAsync("create", this, async () => {
+      const createResult = await ctor._callbackChain.run("create", this, async () => {
         this._performInsert();
         if (this._pendingOperation) {
           await this._pendingOperation;
@@ -2089,7 +2089,7 @@ export class Base extends Model {
       });
       if (!createResult) saved = false;
     } else {
-      const updateResult = await ctor._callbackChain.runAsync("update", this, async () => {
+      const updateResult = await ctor._callbackChain.run("update", this, async () => {
         this._performUpdate();
         if (this._pendingOperation) {
           await this._pendingOperation;
@@ -2104,7 +2104,7 @@ export class Base extends Model {
     this._skipTouch = false;
 
     if (saved) {
-      ctor._callbackChain.runAfter("save", this);
+      await ctor._callbackChain.runAfter("save", this);
 
       // Counter cache: increment on create
       if (wasNewRecord) {
@@ -2127,14 +2127,14 @@ export class Base extends Model {
       if (tx) {
         // Inside a transaction — defer to commit
         tx.afterCommit(() => {
-          ctor._callbackChain.runAfter("commit", this);
+          ctor._callbackChain.runAfterSync("commit", this);
         });
         tx.afterRollback(() => {
-          ctor._callbackChain.runAfter("rollback", this);
+          ctor._callbackChain.runAfterSync("rollback", this);
         });
       } else {
         // Not in a transaction — fire immediately
-        ctor._callbackChain.runAfter("commit", this);
+        ctor._callbackChain.runAfterSync("commit", this);
       }
     }
 
@@ -2332,7 +2332,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
 
     let didDelete = false;
-    const halted = !(await ctor._callbackChain.runAsync("destroy", this, async () => {
+    const halted = !(await ctor._callbackChain.run("destroy", this, async () => {
       const { processDependentAssociations } = await import("./associations.js");
       await processDependentAssociations(this);
 
@@ -2371,13 +2371,13 @@ export class Base extends Model {
       const tx = currentTransaction();
       if (tx) {
         tx.afterCommit(() => {
-          ctor._callbackChain.runAfter("commit", this);
+          ctor._callbackChain.runAfterSync("commit", this);
         });
         tx.afterRollback(() => {
-          ctor._callbackChain.runAfter("rollback", this);
+          ctor._callbackChain.runAfterSync("rollback", this);
         });
       } else {
-        ctor._callbackChain.runAfter("commit", this);
+        ctor._callbackChain.runAfterSync("commit", this);
       }
     }
 
@@ -2638,7 +2638,7 @@ export class Base extends Model {
     await this.updateColumns(attrs);
 
     // Fire after_touch callbacks
-    ctor._callbackChain.runAfter("touch", this);
+    await ctor._callbackChain.runAfter("touch", this);
     return true;
   }
 

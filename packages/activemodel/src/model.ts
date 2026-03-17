@@ -822,7 +822,7 @@ export class Model {
 
     // Fire after_initialize callbacks
     const ctor2 = this.constructor as typeof Model;
-    ctor2._callbackChain.runAfter("initialize", this);
+    ctor2._callbackChain.runAfterSync("initialize", this);
   }
 
   // -- Attribute access --
@@ -948,7 +948,7 @@ export class Model {
     const effectiveContext = context ?? this._validationContext;
 
     // Run before_validation callbacks
-    if (!ctor._callbackChain.runBefore("validation", this)) return false;
+    if (!ctor._callbackChain.runBeforeSync("validation", this)) return false;
 
     // Run attribute validations
     for (const entry of ctor._validations) {
@@ -981,7 +981,7 @@ export class Model {
     }
 
     // Run after_validation callbacks
-    ctor._callbackChain.runAfter("validation", this);
+    ctor._callbackChain.runAfterSync("validation", this);
 
     return this.errors.empty;
   }
@@ -1430,6 +1430,6 @@ export class Model {
   // -- Callbacks helper for subclasses --
 
   runCallbacks(event: string, block: () => void): boolean {
-    return (this.constructor as typeof Model)._callbackChain.run(event, this, block);
+    return (this.constructor as typeof Model)._callbackChain.runSync(event, this, block);
   }
 }
