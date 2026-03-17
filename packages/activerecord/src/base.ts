@@ -2323,14 +2323,19 @@ export class Base extends Model {
     }
     const ctor = this.constructor as typeof Base;
 
-    const halted = !ctor._callbackChain.run("destroy", this, () => {
-      const table = ctor.arelTable;
-      const pk = this.id;
-      if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
-        // New (unpersisted) record — nothing to delete from DB
-        return;
-      }
+    // Run beforeDestroy callbacks — halt if any return false
+    if (!ctor._callbackChain.runBefore("destroy", this)) {
+      return false;
+    }
 
+    // Process dependent associations (after beforeDestroy passes, before DELETE)
+    const { processDependentAssociations } = await import("./associations.js");
+    await processDependentAssociations(this);
+
+    // Perform the actual DELETE
+    const table = ctor.arelTable;
+    const pk = this.id;
+    if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
       let lockClause = "";
       if (ctor._attributeDefinitions.has("lock_version")) {
         const currentVersion = this.readAttribute("lock_version");
@@ -2347,13 +2352,10 @@ export class Base extends Model {
           throw new StaleObjectError(this, "destroy");
         }
       });
-    });
+    }
 
-    if (halted) return false;
-
-    // Process dependent associations after beforeDestroy gate passes
-    const { processDependentAssociations } = await import("./associations.js");
-    await processDependentAssociations(this);
+    // Run afterDestroy callbacks
+    ctor._callbackChain.runAfter("destroy", this);
 
     const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
