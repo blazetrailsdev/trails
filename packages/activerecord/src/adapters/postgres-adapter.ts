@@ -285,7 +285,7 @@ export class PostgresAdapter implements DatabaseAdapter {
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
     if (searchPath == null) return;
-    await this.exec(`SET search_path TO ${searchPath}`);
+    await this.execute("SELECT set_config('search_path', $1, false)", [searchPath]);
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
@@ -457,16 +457,15 @@ export class PostgresAdapter implements DatabaseAdapter {
 
     if (rows[0].seq) {
       const fullSeq = rows[0].seq as string;
-      const parts = fullSeq.split(".");
+      const parts = this.splitQuotedIdentifier(fullSeq);
       seqName = parts.length > 1 ? parts[1] : parts[0];
-      seqName = seqName.replace(/^"|"$/g, "");
     } else {
       const defaultExpr = rows[0].default_expr as string | null;
       if (defaultExpr) {
         const match = defaultExpr.match(/nextval\('([^']+)'::regclass\)/);
         if (match) {
           const seqRef = match[1];
-          const parts = seqRef.split(".");
+          const parts = this.splitQuotedIdentifier(seqRef);
           seqName = parts.length > 1 ? parts[1] : parts[0];
         } else {
           return null;
