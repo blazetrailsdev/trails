@@ -148,3 +148,13 @@ Three people could work simultaneously on:
 3. **Track C: Core ORM + PostgreSQL** — Areas 2B and 4. Implements ORM features and PG adapter.
 
 Each track touches different files and can merge independently.
+
+---
+
+## Follow-up PRs (callback chain)
+
+These were identified during PR #102 (async callback chain) and deferred:
+
+1. **Async-aware `runBefore`/`runAfter`** — `CallbackFn` allows `Promise<void | boolean>` but `runBefore()`/`runAfter()` don't await promise-returning callbacks. An async before callback that resolves to `false` won't halt the chain. Fix: add `runBeforeAsync()`/`runAfterAsync()` variants and use them from `runAsync()`.
+
+2. **Split `AroundCallbackFn` type for sync vs async** — `AroundCallbackFn` now allows returning a `Promise`, but the synchronous `run()` doesn't await it. This means async around callbacks silently run out-of-order when used with `run()`. Fix: keep `AroundCallbackFn` sync-only for `run()`, introduce `AsyncAroundCallbackFn` for `runAsync()`.
