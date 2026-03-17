@@ -263,4 +263,24 @@ describe("CallbackChain.runAsync", () => {
     });
     expect(log).toEqual(["around:before", "block:start", "block:end", "around:after", "after"]);
   });
+
+  it("sync around callback still waits for async block", async () => {
+    const { CallbackChain } = await import("./callbacks.js");
+    const chain = new CallbackChain();
+    const log: string[] = [];
+    chain.register("around", "save", (_record: any, proceed: () => void) => {
+      log.push("around:before");
+      proceed();
+      log.push("around:after");
+    });
+    chain.register("after", "save", () => {
+      log.push("after");
+    });
+    await chain.runAsync("save", {}, async () => {
+      log.push("block:start");
+      await new Promise((r) => setTimeout(r, 10));
+      log.push("block:end");
+    });
+    expect(log).toEqual(["around:before", "block:start", "around:after", "block:end", "after"]);
+  });
 });

@@ -2316,7 +2316,8 @@ export class Base extends Model {
   }
 
   /**
-   * Destroy the record.
+   * Destroy the record. Returns `false` if a beforeDestroy callback
+   * halts the chain, otherwise returns the destroyed record.
    *
    * Mirrors: ActiveRecord::Base#destroy
    */

@@ -112,7 +112,14 @@ export class CallbackChain {
     for (const cb of [...arounds].reverse()) {
       const prev = chain;
       chain = async () => {
-        await (cb.fn as AroundCallbackFn)(record, prev);
+        let proceedResult: Promise<void> | null = null;
+        const wrappedProceed = () => {
+          const result = prev();
+          if (result instanceof Promise) proceedResult = result;
+          return result;
+        };
+        await (cb.fn as AroundCallbackFn)(record, wrappedProceed);
+        if (proceedResult) await proceedResult;
       };
     }
     await chain();
