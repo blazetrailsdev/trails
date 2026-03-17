@@ -283,4 +283,41 @@ describe("CallbackChain.runAsync", () => {
     });
     expect(log).toEqual(["around:before", "block:start", "around:after", "block:end", "after"]);
   });
+
+  it("async before callback that resolves to false halts the chain", async () => {
+    const { CallbackChain } = await import("./callbacks.js");
+    const chain = new CallbackChain();
+    const log: string[] = [];
+    chain.register("before", "save", async () => {
+      await Promise.resolve();
+      log.push("before");
+      return false;
+    });
+    chain.register("after", "save", () => {
+      log.push("after");
+    });
+    const result = await chain.runAsync("save", {}, async () => {
+      log.push("block");
+    });
+    expect(result).toBe(false);
+    expect(log).toEqual(["before"]);
+  });
+
+  it("async after callbacks are awaited in order", async () => {
+    const { CallbackChain } = await import("./callbacks.js");
+    const chain = new CallbackChain();
+    const log: string[] = [];
+    chain.register("after", "save", async () => {
+      await Promise.resolve();
+      log.push("after1");
+    });
+    chain.register("after", "save", async () => {
+      await Promise.resolve();
+      log.push("after2");
+    });
+    await chain.runAsync("save", {}, async () => {
+      log.push("block");
+    });
+    expect(log).toEqual(["block", "after1", "after2"]);
+  });
 });
