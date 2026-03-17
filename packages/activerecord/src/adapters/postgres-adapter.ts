@@ -606,10 +606,10 @@ export class PostgresAdapter implements DatabaseAdapter {
 
   async createTable(
     tableName: string,
-    callback: (t: TableDefinition) => void,
+    callback: (t: SimpleTableBuilder) => void,
     options: { id?: boolean } = {},
   ): Promise<void> {
-    const table = new TableDefinition();
+    const table = new SimpleTableBuilder();
     if (options.id !== false) {
       table.column("id", "serial primary key");
     }
@@ -713,7 +713,11 @@ export class PostgresAdapter implements DatabaseAdapter {
       throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
     }
     const concurrently = options.algorithm === "concurrently" ? " CONCURRENTLY" : "";
-    await this.exec(`DROP INDEX${concurrently} ${this.quoteIdentifier(options.name)}`);
+    const { schema } = this.parseSchemaQualifiedName(tableName);
+    const qualifiedIndex = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(options.name)}`
+      : this.quoteIdentifier(options.name);
+    await this.exec(`DROP INDEX${concurrently} ${qualifiedIndex}`);
   }
 
   async addForeignKey(
@@ -898,7 +902,7 @@ export interface IndexDefinition {
   orders?: Record<string, string> | string;
 }
 
-export class TableDefinition {
+class SimpleTableBuilder {
   private _columns: { name: string; type: string }[] = [];
 
   column(name: string, type: string): void {
