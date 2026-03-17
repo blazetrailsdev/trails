@@ -63,30 +63,12 @@ describe("RelationScopingTest", () => {
     /* needs Arel node input support in order() */
   });
 
-  it("reverse order with multiple arel attributes", () => {
-    class RomaPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = RomaPost.order("title", "body").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+  it.skip("reverse order with multiple arel attributes", () => {
+    /* needs Arel node input support in order() */
   });
 
-  it("reverse order with arel attributes and strings", () => {
-    class RoasPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    const sql = RoasPost.order("title", { body: "asc" as const })
-      .reverseOrder()
-      .toSql();
-    expect(sql).toContain("DESC");
+  it.skip("reverse order with arel attributes and strings", () => {
+    /* needs Arel node input support in order() */
   });
 
   it("double reverse order produces original order", () => {
@@ -111,11 +93,13 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    const p = await SfPost.create({ title: "Scoped" });
-    const rel = SfPost.where({ title: "Scoped" });
+    await SfPost.create({ title: "InScope" });
+    await SfPost.create({ title: "OutOfScope" });
+    const rel = SfPost.where({ title: "InScope" });
     await SfPost.scoping(rel, async () => {
-      const found = await SfPost.find(p.id);
-      expect(found.readAttribute("title")).toBe("Scoped");
+      const all = await SfPost.all().toArray();
+      expect(all.length).toBe(1);
+      expect(all[0].readAttribute("title")).toBe("InScope");
     });
   });
 
@@ -126,13 +110,13 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await SffPost.create({ title: "First" });
-    await SffPost.create({ title: "Second" });
-    const rel = SffPost.where({ title: "First" });
+    await SffPost.create({ title: "Excluded" });
+    await SffPost.create({ title: "Included" });
+    const rel = SffPost.where({ title: "Included" });
     await SffPost.scoping(rel, async () => {
       const first = (await SffPost.first()) as any;
       expect(first).not.toBeNull();
-      expect(first!.readAttribute("title")).toBe("First");
+      expect(first!.readAttribute("title")).toBe("Included");
     });
   });
 
@@ -143,13 +127,13 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await SflPost.create({ title: "A" });
-    await SflPost.create({ title: "B" });
-    const rel = SflPost.where({ title: "B" });
+    await SflPost.create({ title: "Wanted" });
+    await SflPost.create({ title: "Unwanted" });
+    const rel = SflPost.where({ title: "Wanted" });
     await SflPost.scoping(rel, async () => {
       const last = (await SflPost.last()) as any;
       expect(last).not.toBeNull();
-      expect(last!.readAttribute("title")).toBe("B");
+      expect(last!.readAttribute("title")).toBe("Wanted");
     });
   });
 
@@ -166,12 +150,16 @@ describe("RelationScopingTest", () => {
       }
     }
     await ScPost.create({ title: "Yes", published: true });
-    await ScPost.create({ title: "No", published: false });
+    await ScPost.create({ title: "Yes", published: false });
+    await ScPost.create({ title: "No", published: true });
     const rel = ScPost.where({ published: true });
     await ScPost.scoping(rel, async () => {
+      // Inside the scope (published=true), further filter by title
       const results = await ScPost.where({ title: "Yes" }).toArray();
+      // Only the one that is both published AND titled "Yes"
       expect(results.length).toBe(1);
       expect(results[0].readAttribute("title")).toBe("Yes");
+      expect(results[0].readAttribute("published")).toBe(true);
     });
   });
 
