@@ -2316,7 +2316,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#destroy
    */
-  async destroy(): Promise<this> {
+  async destroy(): Promise<this | false> {
     if (this._readonly) {
       throw new ReadOnlyRecord(this);
     }
@@ -2326,7 +2326,7 @@ export class Base extends Model {
     const { processDependentAssociations } = await import("./associations.js");
     await processDependentAssociations(this);
 
-    ctor._callbackChain.run("destroy", this, () => {
+    const halted = !ctor._callbackChain.run("destroy", this, () => {
       const table = ctor.arelTable;
       const pk = this.id;
       if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
@@ -2349,6 +2349,8 @@ export class Base extends Model {
         }
       });
     });
+
+    if (halted) return false as any;
 
     const didDelete = this._pendingOperation != null;
     if (this._pendingOperation) {
@@ -2388,7 +2390,11 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#destroy!
    */
   async destroyBang(): Promise<this> {
-    return this.destroy();
+    const result = await this.destroy();
+    if (result === false) {
+      throw new RecordNotSaved("Failed to destroy the record", this);
+    }
+    return result;
   }
 
   /**
