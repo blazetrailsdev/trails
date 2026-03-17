@@ -3,7 +3,8 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, transaction } from "./index.js";
+import { Base, transaction, registerModel } from "./index.js";
+import { Associations } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -329,7 +330,7 @@ describe("OptimisticLockingTest", () => {
 describe("OptimisticLockingWithSchemaChangeTest", () => {
   it("destroy dependents", async () => {
     const adapter = freshAdapter();
-    class Person extends Base {
+    class LockPerson extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
@@ -337,10 +338,28 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
         this.adapter = adapter;
       }
     }
-    const p = await Person.create({ name: "Test" });
+    class LockPet extends Base {
+      static {
+        this._tableName = "pets";
+        this.attribute("name", "string");
+        this.attribute("person_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("LockPerson", LockPerson);
+    registerModel("LockPet", LockPet);
+    Associations.hasMany.call(LockPerson, "lock_pets", {
+      className: "LockPet",
+      foreignKey: "person_id",
+      dependent: "destroy",
+    });
+    const p = await LockPerson.create({ name: "Test" });
+    await LockPet.create({ name: "Fido", person_id: p.id });
+    await LockPet.create({ name: "Rex", person_id: p.id });
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
-    expect(await Person.all().toArray()).toHaveLength(0);
+    expect(await LockPerson.all().toArray()).toHaveLength(0);
+    expect(await LockPet.where({ person_id: p.id }).toArray()).toHaveLength(0);
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
