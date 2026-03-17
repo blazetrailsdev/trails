@@ -50,7 +50,7 @@ export function xmlNameEscape(str: string): string {
  */
 export class SafeBuffer {
   private _value: string;
-  private _safe: boolean;
+  private readonly _safe: boolean;
 
   constructor(value: string = "", safe: boolean = false) {
     this._value = value;
