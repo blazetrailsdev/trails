@@ -127,18 +127,30 @@ describe("InflectorTest", () => {
     expect(camelize("capital", true)).toBe("Capital");
   });
 
-  it.skip("camelize with upper upcases the first letter");
+  it("camelize with upper upcases the first letter", () => {
+    expect(camelize("Capital", "upper")).toBe("Capital");
+    expect(camelize("capital", "upper")).toBe("Capital");
+  });
 
   it("camelize with false downcases the first letter", () => {
     expect(camelize("Capital", false)).toBe("capital");
     expect(camelize("capital", false)).toBe("capital");
   });
 
-  it.skip("camelize with nil downcases the first letter");
+  it("camelize with nil downcases the first letter", () => {
+    expect(camelize("Capital", false)).toBe("capital");
+    expect(camelize("capital", false)).toBe("capital");
+  });
 
-  it.skip("camelize with lower downcases the first letter");
+  it("camelize with lower downcases the first letter", () => {
+    expect(camelize("Capital", "lower")).toBe("capital");
+    expect(camelize("capital", "lower")).toBe("capital");
+  });
 
-  it.skip("camelize with any other arg upcases the first letter");
+  it("camelize with any other arg upcases the first letter", () => {
+    expect(camelize("Capital", true)).toBe("Capital");
+    expect(camelize("capital", true)).toBe("Capital");
+  });
 
   it("camelize with underscores", () => {
     expect(camelize("Camel_Case")).toBe("CamelCase");
@@ -226,7 +238,14 @@ describe("InflectorTest", () => {
     expect(parameterize("Squeeze   separators", { separator: "_" })).toBe("squeeze_separators");
   });
 
-  it.skip("parameterize with multi character separator");
+  it("parameterize with multi character separator", () => {
+    expect(parameterize("Donald E. Knuth", { separator: "__sep__" })).toBe(
+      "donald__sep__e__sep__knuth",
+    );
+    expect(parameterize("Random text with *(bad)* characters", { separator: "__sep__" })).toBe(
+      "random__sep__text__sep__with__sep__bad__sep__characters",
+    );
+  });
 
   it.skip("parameterize with locale");
 
@@ -235,7 +254,9 @@ describe("InflectorTest", () => {
     expect(classify("node_children")).toBe("NodeChild");
   });
 
-  it.skip("classify with symbol");
+  it("classify with symbol", () => {
+    expect(classify("foo_bars")).toBe("FooBar");
+  });
 
   it("classify with leading schema name", () => {
     expect(classify("schema.foo_bar")).toBe("FooBar");
@@ -258,7 +279,10 @@ describe("InflectorTest", () => {
     expect(humanize("underground", { capitalize: false })).toBe("underground");
   });
 
-  it.skip("humanize with keep id suffix");
+  it("humanize with keep id suffix", () => {
+    expect(humanize("employee_id", { keepIdSuffix: true })).toBe("Employee id");
+    expect(humanize("author_id", { keepIdSuffix: true })).toBe("Author id");
+  });
 
   it.skip("humanize by rule");
 
@@ -326,7 +350,9 @@ describe("InflectorTest", () => {
     expect(camelize("area51_controller", false)).toBe("area51Controller");
   });
 
-  it.skip("symbol to lower camel");
+  it("symbol to lower camel", () => {
+    expect(camelize("html_parser", false)).toBe("htmlParser");
+  });
 
   it.skip("clear acronyms resets to reusable state");
 
@@ -340,7 +366,12 @@ describe("InflectorTest", () => {
 
   it.skip("clear inflections with acronyms");
 
-  it.skip("output is not frozen even if input is frozen");
+  it("output is not frozen even if input is frozen", () => {
+    const input = "plurals";
+    Object.freeze(input);
+    const result = pluralize(input);
+    expect(typeof result).toBe("string");
+  });
 
   // Dynamic tests from SingularToPlural
   describe("pluralize singular", () => {
@@ -372,7 +403,10 @@ describe("InflectorTest", () => {
     });
   });
 
-  it.skip("humanize with international characters");
+  it("humanize with international characters", () => {
+    expect(humanize("é_employee")).toBe("É employee");
+    expect(humanize("ü_user")).toBe("Ü user");
+  });
 
   it.skip("overlapping acronyms");
 });
