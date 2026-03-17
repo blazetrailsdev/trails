@@ -74,9 +74,7 @@ describeIfPg("PostgresAdapter", () => {
 
     it("remove index", async () => {
       await adapter.exec("DROP TABLE IF EXISTS people");
-      await adapter.exec(
-        "CREATE TABLE people (id serial primary key, last_name varchar)",
-      );
+      await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");
       await adapter.exec('CREATE INDEX index_people_on_last_name ON people ("last_name")');
       await adapter.removeIndex("people", {
         name: "index_people_on_last_name",
@@ -88,9 +86,7 @@ describeIfPg("PostgresAdapter", () => {
 
     it("remove index when name is specified", async () => {
       await adapter.exec("DROP TABLE IF EXISTS people");
-      await adapter.exec(
-        "CREATE TABLE people (id serial primary key, last_name varchar)",
-      );
+      await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");
       await adapter.exec('CREATE INDEX index_people_on_last_name ON people ("last_name")');
       await adapter.removeIndex("people", {
         name: "index_people_on_last_name",

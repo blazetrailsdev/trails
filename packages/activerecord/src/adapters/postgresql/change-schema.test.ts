@@ -9,9 +9,7 @@ describeIfPg("Migration", () => {
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
     await adapter.exec("DROP TABLE IF EXISTS strings");
-    await adapter.exec(
-      `CREATE TABLE strings (id serial primary key, somedate character varying)`,
-    );
+    await adapter.exec(`CREATE TABLE strings (id serial primary key, somedate character varying)`);
   });
   afterEach(async () => {
     await adapter.exec("DROP TABLE IF EXISTS strings");
