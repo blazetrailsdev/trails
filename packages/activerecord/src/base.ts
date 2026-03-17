@@ -2071,23 +2071,25 @@ export class Base extends Model {
     if (!ctor._callbackChain.runBefore("save", this)) return false;
 
     if (this._newRecord) {
-      const createResult = ctor._callbackChain.run("create", this, () => {
+      const createResult = await ctor._callbackChain.runAsync("create", this, async () => {
         this._performInsert();
+        if (this._pendingOperation) {
+          await this._pendingOperation;
+          this._pendingOperation = null;
+        }
         saved = true;
       });
       if (!createResult) saved = false;
     } else {
-      const updateResult = ctor._callbackChain.run("update", this, () => {
+      const updateResult = await ctor._callbackChain.runAsync("update", this, async () => {
         this._performUpdate();
+        if (this._pendingOperation) {
+          await this._pendingOperation;
+          this._pendingOperation = null;
+        }
         saved = true;
       });
       if (!updateResult) saved = false;
-    }
-
-    // Wait for the async operation
-    if (this._pendingOperation) {
-      await this._pendingOperation;
-      this._pendingOperation = null;
     }
     this._skipTouch = false;
 
@@ -2323,57 +2325,41 @@ export class Base extends Model {
     }
     const ctor = this.constructor as typeof Base;
 
-    // Process dependent associations before the destroy callback chain.
-    // In Rails these are before_destroy callbacks; here we run them before
-    // the synchronous callback chain because they're async. This means
-    // restrict_with_exception correctly prevents the DELETE, but
-    // dependent: :destroy will run even if a beforeDestroy callback later
-    // halts. A full fix requires an async-capable callback runner.
-    const { processDependentAssociations } = await import("./associations.js");
-    await processDependentAssociations(this);
+    let didDelete = false;
+    const halted = !(await ctor._callbackChain.runAsync("destroy", this, async () => {
+      const { processDependentAssociations } = await import("./associations.js");
+      await processDependentAssociations(this);
 
-    const halted = !ctor._callbackChain.run("destroy", this, () => {
       const table = ctor.arelTable;
       const pk = this.id;
-      if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
-        return;
-      }
-
-      let lockClause = "";
-      if (ctor._attributeDefinitions.has("lock_version")) {
-        const currentVersion = this.readAttribute("lock_version");
-        if (currentVersion == null) {
-          lockClause = ` AND "lock_version" IS NULL`;
-        } else {
-          lockClause = ` AND "lock_version" = ${Number(currentVersion) || 0}`;
+      if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
+        let lockClause = "";
+        if (ctor._attributeDefinitions.has("lock_version")) {
+          const currentVersion = this.readAttribute("lock_version");
+          if (currentVersion == null) {
+            lockClause = ` AND "lock_version" IS NULL`;
+          } else {
+            lockClause = ` AND "lock_version" = ${Number(currentVersion) || 0}`;
+          }
         }
-      }
 
-      const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}${lockClause}`;
-      this._pendingOperation = ctor.adapter.executeMutation(sql).then((affected) => {
+        const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}${lockClause}`;
+        const affected = await ctor.adapter.executeMutation(sql);
         if (lockClause && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }
-        (this as any)._destroyedRowCount = affected;
-      });
-    });
+        didDelete = affected > 0;
+      }
+
+      this._destroyed = true;
+      this._frozen = true;
+    }));
 
     if (halted) return false;
 
-    if (this._pendingOperation) {
-      await this._pendingOperation;
-      this._pendingOperation = null;
-    }
-    const didDelete = ((this as any)._destroyedRowCount ?? 0) > 0;
-
-    this._destroyed = true;
-    this._frozen = true;
-
-    // Counter cache: decrement on destroy
     const { updateCounterCaches } = await import("./associations.js");
     await updateCounterCaches(this, "decrement");
 
-    // Fire after_commit/after_rollback callbacks for destroy (only if a real DELETE occurred)
     if (didDelete) {
       const { currentTransaction } = await import("./transactions.js");
       const tx = currentTransaction();

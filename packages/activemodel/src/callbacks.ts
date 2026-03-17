@@ -88,6 +88,44 @@ export class CallbackChain {
   }
 
   /**
+   * Run callbacks for a given event around an async block.
+   * Same as run() but awaits the block before running after callbacks,
+   * ensuring after callbacks see the completed state.
+   * Returns false if a before callback halts the chain.
+   */
+  async runAsync(
+    event: CallbackEvent,
+    record: AnyRecord,
+    block: () => Promise<void>,
+  ): Promise<boolean> {
+    if (!this.runBefore(event, record)) return false;
+
+    const arounds = this.callbacks.filter(
+      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
+    );
+
+    // Around callbacks are synchronous wrappers — they call proceed()
+    // which schedules the async work. We capture the promise to await it.
+    let asyncResult: Promise<void> | undefined;
+    const syncBlock = () => {
+      asyncResult = block();
+    };
+
+    let chain = syncBlock;
+    for (const cb of [...arounds].reverse()) {
+      const prev = chain;
+      chain = () => (cb.fn as AroundCallbackFn)(record, prev);
+    }
+    chain();
+
+    if (asyncResult) await asyncResult;
+
+    this.runAfter(event, record);
+
+    return true;
+  }
+
+  /**
    * Run only before callbacks for an event.
    * Returns false if a callback halts the chain.
    */
