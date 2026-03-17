@@ -153,7 +153,7 @@ export class SafeBuffer {
       });
     } else {
       result = this._value.replace(/%\{(\w+)\}/g, (_, key) => {
-        if (!(key in args)) throw new Error(`key{${key}} not found`);
+        if (!Object.hasOwn(args, key)) throw new Error(`key{${key}} not found`);
         const arg = args[key];
         if (arg instanceof SafeBuffer && arg.htmlSafe) return arg.toString();
         const str = arg instanceof SafeBuffer ? arg.toString() : String(arg);

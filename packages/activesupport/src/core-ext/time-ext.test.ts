@@ -61,27 +61,27 @@ afterEach(() => {
 
 describe("TimeExtCalculationsTest", () => {
   it("seconds since midnight at daylight savings time start", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       expect(secondsSinceMidnight(new Date(2005, 3, 3, 1, 59, 59))).toBe(2 * 3600 - 1);
       expect(secondsSinceMidnight(new Date(2005, 3, 3, 3, 0, 1))).toBe(2 * 3600 + 1);
     });
   });
 
   it("seconds since midnight at daylight savings time end", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       expect(secondsSinceMidnight(new Date(2005, 9, 30, 0, 59, 59))).toBe(1 * 3600 - 1);
     });
   });
 
   it("seconds until end of day at daylight savings time start", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       expect(secondsUntilEndOfDay(new Date(2005, 3, 3, 1, 59, 59))).toBe(21 * 3600);
       expect(secondsUntilEndOfDay(new Date(2005, 3, 3, 3, 0, 1))).toBe(21 * 3600 - 2);
     });
   });
 
   it("seconds until end of day at daylight savings time end", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       expect(secondsUntilEndOfDay(new Date(2005, 9, 30, 0, 59, 59))).toBe(24 * 3600);
     });
   });
@@ -106,7 +106,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward start", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       // dt: US: 2005 April 3rd 4:18am
       // ago(86400) = subtract 86400 seconds (simple time arithmetic)
       const dt = new Date(2005, 3, 3, 4, 18, 0); // April 3 EDT
@@ -120,7 +120,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward end", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       // st: US: 2005 October 30th 4:03am
       const st = new Date(2005, 9, 30, 4, 3, 0); // Oct 30 EST
       const result = ago(st, 86400);
@@ -133,7 +133,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward start 1day", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       // advance(days: -1) uses calendar arithmetic
       const dt = new Date(2005, 3, 3, 4, 18, 0);
       const result = advance(dt, { days: -1 });
@@ -144,7 +144,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward end 1day", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const st = new Date(2005, 9, 30, 4, 3, 0);
       const result = advance(st, { days: -1 });
       expect(result.getDate()).toBe(29);
@@ -159,7 +159,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward start", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       // st: US: 2005 April 2nd 7:27pm
       const st = new Date(2005, 3, 2, 19, 27, 0);
       const result = since(st, 86400);
@@ -171,7 +171,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward start 1day", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const st = new Date(2005, 3, 2, 19, 27, 0);
       const result = advance(st, { days: 1 });
       expect(result.getDate()).toBe(3);
@@ -181,7 +181,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward start tomorrow", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const st = new Date(2005, 3, 2, 19, 27, 0);
       const result = nextDay(st);
       expect(result.getDate()).toBe(3);
@@ -191,7 +191,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward start yesterday", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const dt = new Date(2005, 3, 3, 19, 27, 0);
       const result = prevDay(dt);
       expect(result.getDate()).toBe(2);
@@ -201,7 +201,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward end", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       // dt: US: 2005 October 30th 12:45am
       const dt = new Date(2005, 9, 30, 0, 45, 0);
       const result = since(dt, 86400);
@@ -212,7 +212,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward end 1day", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const dt = new Date(2005, 9, 30, 0, 45, 0);
       const result = advance(dt, { days: 1 });
       expect(result.getDate()).toBe(31);
@@ -222,7 +222,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings forward end tomorrow", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const dt = new Date(2005, 9, 30, 0, 45, 0);
       const result = nextDay(dt);
       expect(result.getDate()).toBe(31);
@@ -232,7 +232,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("daylight savings time crossings backward end yesterday", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const st = new Date(2005, 9, 31, 0, 45, 0);
       const result = prevDay(st);
       expect(result.getDate()).toBe(30);
@@ -318,7 +318,7 @@ describe("TimeExtCalculationsTest", () => {
   it.skip("advance preserves fractional hour offset for zoned times around end of dst");
 
   it("last week", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const result = lastWeek(new Date(2005, 2, 1, 15, 15, 10), "monday");
       expect(result.getDay()).toBe(1); // Monday
       expect(result.getDate()).toBe(21);
@@ -326,7 +326,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("next week near daylight start", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const result = nextWeek(new Date(2006, 3, 2, 23, 1, 0), "monday");
       expect(result.getDate()).toBe(3);
       expect(result.getMonth()).toBe(3); // April
@@ -334,7 +334,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("next week near daylight end", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const result = nextWeek(new Date(2006, 9, 29, 23, 1, 0), "monday");
       expect(result.getDate()).toBe(30);
       expect(result.getMonth()).toBe(9); // October
@@ -517,7 +517,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("formatted offset with local", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const t = new Date(2000, 0, 1); // January = EST
       expect(formattedOffset(t)).toBe("-05:00");
       const t2 = new Date(2000, 6, 1); // July = EDT
@@ -566,7 +566,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with datetime returns local time", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const utcMs = Date.UTC(2000, 0, 1, 0, 0, 0);
       const t = new Date(utcMs);
       expect(t.getFullYear()).toBe(1999);
@@ -592,7 +592,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with time with zone returns local time", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const utcMs = Date.UTC(2000, 0, 1, 0, 0, 0);
       const t = new Date(utcMs);
       expect(t.getHours()).toBe(19);
@@ -606,7 +606,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with utc time", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const t = utc(2000);
       expect(t.getUTCFullYear()).toBe(2000);
       expect(t.getUTCMonth()).toBe(0);
@@ -614,7 +614,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with local time", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       const t = new Date(2000, 0, 1);
       expect(t.getFullYear()).toBe(2000);
       expect(t.getTimezoneOffset()).toBe(300); // EST = -5h = 300min
@@ -644,7 +644,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("time created with local constructor cannot represent times during hour skipped by dst", () => {
-    withEnvTz("US/Eastern", () => {
+    withEnvTz("America/New_York", () => {
       // On Apr 2 2006 at 2:00AM EST, clocks moved to 3:00AM EDT
       // Creating 2:00AM on that day should give 3:00AM EDT
       const t = new Date(2006, 3, 2, 2, 0, 0);
