@@ -2126,15 +2126,15 @@ export class Base extends Model {
       const tx = currentTransaction();
       if (tx) {
         // Inside a transaction — defer to commit
-        tx.afterCommit(() => {
-          ctor._callbackChain.runAfterSync("commit", this);
+        tx.afterCommit(async () => {
+          await ctor._callbackChain.runAfter("commit", this);
         });
-        tx.afterRollback(() => {
-          ctor._callbackChain.runAfterSync("rollback", this);
+        tx.afterRollback(async () => {
+          await ctor._callbackChain.runAfter("rollback", this);
         });
       } else {
         // Not in a transaction — fire immediately
-        ctor._callbackChain.runAfterSync("commit", this);
+        await ctor._callbackChain.runAfter("commit", this);
       }
     }
 
@@ -2370,14 +2370,14 @@ export class Base extends Model {
       const { currentTransaction } = await import("./transactions.js");
       const tx = currentTransaction();
       if (tx) {
-        tx.afterCommit(() => {
-          ctor._callbackChain.runAfterSync("commit", this);
+        tx.afterCommit(async () => {
+          await ctor._callbackChain.runAfter("commit", this);
         });
-        tx.afterRollback(() => {
-          ctor._callbackChain.runAfterSync("rollback", this);
+        tx.afterRollback(async () => {
+          await ctor._callbackChain.runAfter("rollback", this);
         });
       } else {
-        ctor._callbackChain.runAfterSync("commit", this);
+        await ctor._callbackChain.runAfter("commit", this);
       }
     }
 
