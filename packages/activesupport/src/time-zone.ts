@@ -504,7 +504,11 @@ export class TimeZone {
       throw new Error("invalid date");
     }
     const trimmed = str.trim();
-    if (!/^\d{4}-?\d{2}-?\d{2}(T\d{2}:?\d{2}(:?\d{2}([.]\d+)?)?)?([Zz]|[+-]\d{2}:?\d{2})?$/.test(trimmed)) {
+    if (
+      !/^\d{4}-?\d{2}-?\d{2}(T\d{2}:?\d{2}(:?\d{2}([.]\d+)?)?)?([Zz]|[+-]\d{2}:?\d{2})?$/.test(
+        trimmed,
+      )
+    ) {
       throw new Error("invalid date");
     }
     return this.parse(trimmed);
