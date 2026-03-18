@@ -780,7 +780,8 @@ export class MemoryAdapter implements DatabaseAdapter {
     }
 
     // column = column (column-to-column comparison, e.g., in JOIN ON)
-    const colEqColMatch = condition.match(/^"?(\w+)"?(?:\."?(\w+)"?)?\s*=\s*"(\w+)"\."(\w+)"$/);
+    // Requires at least one quote on RHS to distinguish from column = numeric_value
+    const colEqColMatch = condition.match(/^"?(\w+)"?(?:\."?(\w+)"?)?\s*=\s*"(\w+)"\.?"?(\w+)"?$/i);
     if (colEqColMatch) {
       const leftCol = getCol(colEqColMatch[1], colEqColMatch[2]);
       const rightCol = getCol(colEqColMatch[3], colEqColMatch[4]);

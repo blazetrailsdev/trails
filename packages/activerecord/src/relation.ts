@@ -278,6 +278,15 @@ export class Relation<T extends Base> {
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
       onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}"`;
     }
+    const inheritanceCol = getInheritanceColumn(targetModel);
+    if (inheritanceCol && isStiSubclass(targetModel)) {
+      const stiNames = [
+        targetModel.name,
+        ...(targetModel.descendants ?? []).map((d: any) => d.name),
+      ];
+      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+      onClause += ` AND "${targetTable}"."${inheritanceCol}" IN (${inList})`;
+    }
     return { targetTable, foreignKey, onClause };
   }
 
