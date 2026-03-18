@@ -349,6 +349,9 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Inheritance.compute_type
    */
   static computeType(typeName: string): typeof Base {
+    // Unlike findStiClass (which always throws SubclassNotFound),
+    // computeType distinguishes unknown constants (NameError) from
+    // known classes that aren't subclasses (SubclassNotFound).
     const klass = modelRegistry.get(typeName);
     if (!klass) {
       throw new NameError(`uninitialized constant ${typeName}`);
@@ -482,7 +485,13 @@ export class Base extends Model {
   static set ignoredColumns(columns: string[]) {
     this._ignoredColumns = columns;
     for (const col of columns) {
-      if (Object.prototype.hasOwnProperty.call(this.prototype, col)) {
+      // Delete own accessor or shadow inherited one with undefined descriptor
+      if (col in this.prototype) {
+        Object.defineProperty(this.prototype, col, {
+          get: undefined,
+          set: undefined,
+          configurable: true,
+        });
         delete (this.prototype as any)[col];
       }
     }
