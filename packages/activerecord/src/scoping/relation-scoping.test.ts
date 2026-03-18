@@ -2,8 +2,8 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, beforeEach } from "vitest";
-import { Base } from "../index.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Base, RecordNotFound } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -38,52 +38,128 @@ describe("RelationScopingTest", () => {
     /* TODO: needs helpers from original file */
   });
 
-  it.skip("reverse order", () => {
-    /* TODO: needs helpers from original file */
+  it("reverse order", () => {
+    class RoPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const sql = RoPost.order("title").reverseOrder().toSql();
+    expect(sql).toContain("DESC");
   });
 
   it.skip("reverse order with arel attribute", () => {
-    /* TODO: needs helpers from original file */
+    /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with arel attribute as hash", () => {
-    /* TODO: needs helpers from original file */
+    /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with arel node as hash", () => {
-    /* TODO: needs helpers from original file */
+    /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with multiple arel attributes", () => {
-    /* TODO: needs helpers from original file */
+    /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with arel attributes and strings", () => {
-    /* TODO: needs helpers from original file */
+    /* needs Arel node input support in order() */
   });
 
-  it.skip("double reverse order produces original order", () => {
-    /* TODO: needs helpers from original file */
+  it("double reverse order produces original order", () => {
+    class DroPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const original = DroPost.order({ title: "asc" as const }).toSql();
+    const doubled = DroPost.order({ title: "asc" as const })
+      .reverseOrder()
+      .reverseOrder()
+      .toSql();
+    expect(original).toBe(doubled);
   });
 
-  it.skip("scoped find", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped find", async () => {
+    class SfPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const inScope = await SfPost.create({ title: "InScope" });
+    const outOfScope = await SfPost.create({ title: "OutOfScope" });
+    const rel = SfPost.where({ title: "InScope" });
+    await SfPost.scoping(rel, async () => {
+      const found = await SfPost.find(inScope.id);
+      expect(found.readAttribute("title")).toBe("InScope");
+      await expect(SfPost.find(outOfScope.id)).rejects.toThrow(RecordNotFound);
+    });
   });
 
-  it.skip("scoped find first", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped find first", async () => {
+    class SffPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("salary", "integer");
+        this.adapter = adapter;
+      }
+    }
+    await SffPost.create({ title: "Target", salary: 100000 });
+    await SffPost.create({ title: "Other", salary: 50000 });
+    const rel = SffPost.where({ salary: 100000 });
+    await SffPost.scoping(rel, async () => {
+      const first = (await SffPost.first()) as Base | null;
+      expect(first).not.toBeNull();
+      expect(first!.readAttribute("title")).toBe("Target");
+    });
   });
 
-  it.skip("scoped find last", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped find last", async () => {
+    class SflPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("salary", "integer");
+        this.adapter = adapter;
+      }
+    }
+    await SflPost.create({ title: "A", salary: 50000 });
+    await SflPost.create({ title: "B", salary: 80000 });
+    await SflPost.create({ title: "C", salary: 50000 });
+    const highestSalary = await SflPost.order("salary DESC").first();
+    const rel = SflPost.order("salary");
+    await SflPost.scoping(rel, async () => {
+      const last = (await SflPost.last()) as Base | null;
+      expect(last).not.toBeNull();
+      expect(last!.readAttribute("salary")).toBe((highestSalary as Base).readAttribute("salary"));
+    });
   });
 
   it.skip("scoped find last preserves scope", () => {
-    /* TODO: needs helpers from original file */
+    /* TODO: needs scoping + last interaction */
   });
 
-  it.skip("scoped find combines and sanitizes conditions", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped find combines and sanitizes conditions", async () => {
+    class ScPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    await ScPost.create({ title: "O'Brien's Post", published: true });
+    await ScPost.create({ title: "O'Brien's Post", published: false });
+    await ScPost.create({ title: "Normal", published: true });
+    const rel = ScPost.where({ published: true });
+    await ScPost.scoping(rel, async () => {
+      const found = (await ScPost.where({ title: "O'Brien's Post" }).first()) as Base | null;
+      expect(found).not.toBeNull();
+      expect(found!.readAttribute("published")).toBe(true);
+    });
   });
 
   it.skip("scoped unscoped", () => {
@@ -94,20 +170,47 @@ describe("RelationScopingTest", () => {
     /* TODO: needs helpers from original file */
   });
 
-  it.skip("scoped find all", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped find all", async () => {
+    class SfaPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await SfaPost.create({ title: "A" });
+    await SfaPost.create({ title: "B" });
+    await SfaPost.create({ title: "C" });
+    const rel = SfaPost.where({ title: "A" });
+    await SfaPost.scoping(rel, async () => {
+      const all = await SfaPost.all().toArray();
+      expect(all.length).toBe(1);
+      expect(all[0].readAttribute("title")).toBe("A");
+    });
   });
 
   it.skip("scoped find select", () => {
-    /* TODO: needs helpers from original file */
+    /* needs scoping + select interaction */
   });
 
   it.skip("scope select concatenates", () => {
-    /* TODO: needs helpers from original file */
+    /* select overwrites instead of concatenating */
   });
 
-  it.skip("scoped count", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped count", async () => {
+    class ScntPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await ScntPost.create({ title: "A" });
+    await ScntPost.create({ title: "B" });
+    await ScntPost.create({ title: "A" });
+    const rel = ScntPost.where({ title: "A" });
+    await ScntPost.scoping(rel, async () => {
+      const count = await ScntPost.count();
+      expect(count).toBe(2);
+    });
   });
 
   it.skip("scoped find with annotation", () => {

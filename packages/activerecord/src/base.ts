@@ -955,6 +955,10 @@ export class Base extends Model {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
+    // If a current scope is set (via scoping()), return a clone to avoid stale caches
+    if (this._currentScope) {
+      return this._currentScope._clone();
+    }
     let rel = new _RelationCtor(this);
     rel = _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
     // Apply default scope if defined
