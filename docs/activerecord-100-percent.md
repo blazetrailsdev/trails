@@ -30,15 +30,23 @@ Partially implemented in #128: through-aware `build`/`create` on `CollectionProx
 49 new passing tests covering basic through CRUD, polymorphic/STI through,
 nested through chains, and collection proxy operations (push/delete/replace/setIds).
 
-Remaining ~103 skipped tests need:
+Further progress in #130: 24 more tests unskipped covering collection proxy operations,
+scope filtering on targets, composite/nonstandard PKs, polymorphic through, and error
+handling. Also adds error classes (`HasManyThroughCantAssociateThroughHasOneOrManyReflection`,
+`HasManyThroughNestedAssociationsAreReadonly`, `HasOneThroughNestedAssociationsAreReadonly`,
+`HasManyThroughOrderError`) — these aren't wired into CollectionProxy enforcement yet,
+that should be a separate PR when the write protection logic is implemented.
+
+Remaining ~79 skipped tests need:
 
 - **SQL join generation** (~20): `joins`, `left_joins`, `inner_join`, `explicitly_joining_join_table`, `joining_has_many_through_*`
-- **Scope merging on through** (~15): `source_scope`, `through_scope_with_includes/joins`, `unscope`, `default_scope_on_target`, `rewhere`
+- **Scope merging on through** (~15): `source_scope`, `through_scope_with_includes/joins`, `unscope`, `default_scope_on_target`
 - **Preload for nested through** (~25): all `*_preload` and `*_preload_via_joins` tests in nested-through
 - **Counter caches** (6): `update_counter_caches_on_*`
 - **Transactions** (2): `transaction_method_starts_transaction`, `through_model_to_create_transactions`
-- **Reflection metadata** (1): `modifying_has_many_through_has_one_reflection_should_raise` (needs `HasManyThroughCantAssociateThroughHasOneOrManyReflection`)
+- **Write protection enforcement** (~3): wire `HasManyThroughNestedAssociationsAreReadonly` etc. into CollectionProxy to raise on nested through writes
 - **Validation propagation** (3): `create_bang_should_raise`, `save_bang_should_raise`, `save_returns_falsy` when join record has errors
+- **Distinct on through** (~2): distinct through source/through reflection
 - **`_pushThrough` FK resolution**: currently uses convention-based `sourceFk`; should resolve the source association's configured `foreignKey` option to handle nonstandard FK columns correctly
 - **Order preservation**: through loader uses WHERE IN which returns by PK order; true order preservation needs ORDER BY support
 
