@@ -67,6 +67,8 @@ async function autosaveAssociation(record: Base, assoc: AssociationDefinition): 
     return autosaveHasOne(record, assoc);
   } else if (assoc.type === "belongsTo") {
     return autosaveBelongsTo(record, assoc);
+  } else if (assoc.type === "hasAndBelongsToMany") {
+    return autosaveHabtm(record, assoc);
   }
 
   return true;
@@ -171,6 +173,33 @@ async function autosaveBelongsTo(record: Base, assoc: AssociationDefinition): Pr
     const pkValue = assocRecord.readAttribute(primaryKey as string);
     if (pkValue !== null && pkValue !== undefined) {
       record.writeAttribute(foreignKey as string, pkValue);
+    }
+  }
+
+  return true;
+}
+
+async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promise<boolean> {
+  const cached =
+    (record as any)._cachedAssociations?.get(assoc.name) ??
+    (record as any)._preloadedAssociations?.get(assoc.name);
+
+  const children: Base[] = Array.isArray(cached) ? cached : [];
+
+  for (const child of children) {
+    if (isMarkedForDestruction(child)) {
+      if (!child.isNewRecord()) {
+        await child.destroy();
+      }
+      continue;
+    }
+
+    if (child.isNewRecord() || child.changed) {
+      const saved = await child.save();
+      if (!saved) {
+        propagateErrors(record, child, assoc.name);
+        return false;
+      }
     }
   }
 
