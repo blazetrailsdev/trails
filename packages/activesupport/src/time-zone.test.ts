@@ -272,8 +272,27 @@ describe("TimeZoneTest", () => {
     expect(twz.utc().getUTCFullYear()).toBe(2050);
   });
 
-  it.skip("iso8601 should not black out system timezone dst jump");
-  it.skip("iso8601 should black out app timezone dst jump");
+  it("iso8601 should not black out system timezone dst jump", () => {
+    const zone = TimeZone.find("Pacific Time (US & Canada)");
+    const twz = zone.iso8601("2012-03-25T03:29:00");
+    expect(twz.sec).toBe(0);
+    expect(twz.min).toBe(29);
+    expect(twz.hour).toBe(3);
+    expect(twz.day).toBe(25);
+    expect(twz.month).toBe(3);
+    expect(twz.year).toBe(2012);
+  });
+
+  it("iso8601 should black out app timezone dst jump", () => {
+    const zone = TimeZone.find("Pacific Time (US & Canada)");
+    const twz = zone.iso8601("2012-03-11T02:29:00");
+    expect(twz.sec).toBe(0);
+    expect(twz.min).toBe(29);
+    expect(twz.hour).toBe(3);
+    expect(twz.day).toBe(11);
+    expect(twz.month).toBe(3);
+    expect(twz.year).toBe(2012);
+  });
 
   it("iso8601 doesnt use local dst", () => {
     const zone = TimeZone.find("UTC");
@@ -288,9 +307,25 @@ describe("TimeZoneTest", () => {
     expect(twz.hour).toBe(3); // 2AM doesn't exist, springs forward to 3AM
   });
 
-  it.skip("iso8601 with ambiguous time");
-  it.skip("iso8601 with ordinal date value");
-  it.skip("iso8601 with invalid ordinal date value");
+  it("iso8601 with ambiguous time", () => {
+    const zone = TimeZone.find("Moscow");
+    const twz = zone.iso8601("2014-10-26T01:00:00");
+    expect(twz.utc().getTime()).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+  });
+  it("iso8601 with ordinal date value", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("21087");
+    expect(twz.year).toBe(2021);
+    expect(twz.month).toBe(3);
+    expect(twz.day).toBe(28);
+    expect(twz.hour).toBe(0);
+    expect(twz.timeZone).toBe(zone);
+  });
+
+  it("iso8601 with invalid ordinal date value", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(() => zone.iso8601("21367")).toThrow("invalid date");
+  });
 
   // ---------------------------------------------------------------------------
   // parse
@@ -344,8 +379,25 @@ describe("TimeZoneTest", () => {
     expect(twz.month).toBe(2);
   });
 
-  it.skip("parse should not black out system timezone dst jump");
-  it.skip("parse should black out app timezone dst jump");
+  it("parse should not black out system timezone dst jump", () => {
+    const zone = TimeZone.find("Pacific Time (US & Canada)");
+    const twz = zone.parse("2012-03-25 03:29:00");
+    expect(twz.hour).toBe(3);
+    expect(twz.min).toBe(29);
+    expect(twz.day).toBe(25);
+    expect(twz.month).toBe(3);
+    expect(twz.year).toBe(2012);
+  });
+
+  it("parse should black out app timezone dst jump", () => {
+    const zone = TimeZone.find("Pacific Time (US & Canada)");
+    const twz = zone.parse("2012-03-11 02:29:00");
+    expect(twz.hour).toBe(3);
+    expect(twz.min).toBe(29);
+    expect(twz.day).toBe(11);
+    expect(twz.month).toBe(3);
+    expect(twz.year).toBe(2012);
+  });
 
   it("parse with missing time components", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
@@ -378,7 +430,11 @@ describe("TimeZoneTest", () => {
     expect(() => zone.parse("")).toThrow();
   });
 
-  it.skip("parse with ambiguous time");
+  it("parse with ambiguous time", () => {
+    const zone = TimeZone.find("Moscow");
+    const twz = zone.parse("2014-10-26 01:00:00");
+    expect(twz.utc().getTime()).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+  });
 
   // ---------------------------------------------------------------------------
   // rfc3339
@@ -423,8 +479,19 @@ describe("TimeZoneTest", () => {
     expect(twz.utc().getUTCFullYear()).toBe(2050);
   });
 
-  it.skip("rfc3339 should not black out system timezone dst jump");
-  it.skip("rfc3339 should black out app timezone dst jump");
+  it("rfc3339 should not black out system timezone dst jump", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("2006-07-15T12:00:00-04:00");
+    expect(twz.hour).toBe(12);
+    expect(twz.day).toBe(15);
+  });
+
+  it("rfc3339 should black out app timezone dst jump", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("2006-04-02T03:00:00-04:00");
+    expect(twz.hour).toBe(3);
+    expect(twz.day).toBe(2);
+  });
 
   it("rfc3339 doesnt use local dst", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
