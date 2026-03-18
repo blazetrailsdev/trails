@@ -1,10 +1,10 @@
 # ActiveRecord: Road to 100% Test Coverage
 
-Current state: **52.2%** (4,374 / 8,385 tests). 3,767 skipped, 52 wrong describes, 244 unmatched.
+Current state: **52.2%** (4,374 OK / 8,385 Ruby tests). Additionally: 3,767 skipped stubs, 52 in wrong describe blocks, 244 with no TS equivalent.
 
 ## How coverage is measured
 
-`npm run convention:compare` matches our test names against the Rails test suite. `OK` = matched and not skipped, `Skip` = `it.skip` stub, `Desc` = wrong describe block, `Miss` = no TS equivalent.
+`npm run convention:compare` matches our test names against the Rails test suite. `OK` = matched, in correct describe, not skipped. `Skip` = matched but `it.skip`. `Desc` = matched but in wrong describe block. `Miss` = Ruby test with no TS equivalent.
 
 ## Two workstreams
 
@@ -27,9 +27,9 @@ Implement has-many-through join logic, nested through chains, and through-source
 
 #### PR A2: Eager loading (~76 skipped)
 
-| File                       | Skipped            |
-| -------------------------- | ------------------ |
-| associations/eager.test.ts | 76 (+20 unmatched) |
+| File                       | Skipped | Notes        |
+| -------------------------- | ------- | ------------ |
+| associations/eager.test.ts | 76      | 20 unmatched |
 
 Continue `includes`/`preload`/`eagerLoad` work started in #114. Preloader, batch loading, nested eager loading.
 
@@ -62,9 +62,9 @@ Continue has-one work from #107/#109. Through associations for has-one, replacem
 
 #### PR A6: Scoping & finders (~53 skipped)
 
-| File                             | Skipped                |
-| -------------------------------- | ---------------------- |
-| scoping/relation-scoping.test.ts | 53 (+1 wrong describe) |
+| File                             | Skipped | Notes            |
+| -------------------------------- | ------- | ---------------- |
+| scoping/relation-scoping.test.ts | 53      | 1 wrong describe |
 
 Default scopes, `unscoped`, nested scoping, scoped create, annotation scoping.
 
@@ -77,12 +77,12 @@ Default scopes, `unscoped`, nested scoping, scoped create, annotation scoping.
 
 `where.not`, OR/AND chaining, polymorphic where, inverse association edge cases.
 
-#### PR A8: Remaining association files (~46 skipped)
+#### PR A8: Remaining association files (~28 skipped)
 
-| File                                                             | Skipped               |
-| ---------------------------------------------------------------- | --------------------- |
-| associations/has-many-through-disable-joins-associations.test.ts | 28                    |
-| nested-attributes.test.ts                                        | ~18 (wrong describes) |
+| File                                                             | Skipped | Notes              |
+| ---------------------------------------------------------------- | ------- | ------------------ |
+| associations/has-many-through-disable-joins-associations.test.ts | 28      |                    |
+| nested-attributes.test.ts                                        | 0       | 18 wrong describes |
 
 Disable-joins mode, fix 18 wrong describes in nested-attributes.
 
@@ -102,11 +102,11 @@ Attribute API, type casting, inheritance, abstract classes, configuration.
 
 #### PR B2: PostgreSQL types — range, hstore, array (~131 skipped)
 
-| File                               | Skipped                 |
-| ---------------------------------- | ----------------------- |
-| adapters/postgresql/range.test.ts  | 46                      |
-| adapters/postgresql/hstore.test.ts | 44 (+3 wrong describes) |
-| adapters/postgresql/array.test.ts  | 41                      |
+| File                               | Skipped | Notes             |
+| ---------------------------------- | ------- | ----------------- |
+| adapters/postgresql/range.test.ts  | 46      |                   |
+| adapters/postgresql/hstore.test.ts | 44      | 3 wrong describes |
+| adapters/postgresql/array.test.ts  | 41      |                   |
 
 PG-specific type casting, serialization, querying. Requires `PG_TEST_URL`.
 
