@@ -374,4 +374,30 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it.skip("eager load with string joins", () => {});
+
+  it("joins a has_and_belongs_to_many association", async () => {
+    class HabtmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HabtmTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasAndBelongsToMany.call(HabtmPost, "habtmTags", {
+      className: "HabtmTag",
+      joinTable: "habtm_posts_habtm_tags",
+    });
+    registerModel(HabtmPost);
+    registerModel(HabtmTag);
+
+    const sql = HabtmPost.joins("habtmTags").toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("habtm_posts_habtm_tags");
+    expect(sql).toContain("habtm_tags");
+  });
 });
