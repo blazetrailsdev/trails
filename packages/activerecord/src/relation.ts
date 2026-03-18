@@ -3269,12 +3269,26 @@ export class Relation<T extends Base> {
           let targetMap: Map<unknown, any>;
           let getTargetsForThrough: (throughRec: any) => any[];
 
+          // Filter through records by sourceType if set (polymorphic source)
+          let filteredThroughRecords = throughRecords;
+          if (
+            assocDef.options.sourceType &&
+            sourceAssocDef?.options?.polymorphic &&
+            sourceType === "belongsTo"
+          ) {
+            const typeCol = `${underscore(sourceName)}_type`;
+            filteredThroughRecords = throughRecords.filter(
+              (r: any) => r.readAttribute(typeCol) === assocDef.options.sourceType,
+            );
+          }
+
           if (sourceType === "belongsTo") {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
             const targetFk = `${underscore(sourceName)}_id`;
+
             const targetIds = [
               ...new Set(
-                throughRecords
+                filteredThroughRecords
                   .map((r: any) => r.readAttribute(targetFk))
                   .filter((v: any) => v != null),
               ),
@@ -3315,7 +3329,7 @@ export class Relation<T extends Base> {
             if (!(record as any)._preloadedAssociations)
               (record as any)._preloadedAssociations = new Map();
             const pkVal = record.readAttribute(primaryKey);
-            const myThroughRecords = throughRecords.filter(
+            const myThroughRecords = filteredThroughRecords.filter(
               (tr: any) => tr.readAttribute(throughFk) == pkVal,
             );
             const myTargets = myThroughRecords.flatMap(getTargetsForThrough);

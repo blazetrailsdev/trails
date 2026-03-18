@@ -19,6 +19,7 @@ export interface AssociationOptions {
   inverseOf?: string;
   through?: string;
   source?: string;
+  sourceType?: string;
   polymorphic?: boolean;
   as?: string;
   counterCache?: boolean | string;
@@ -695,7 +696,17 @@ export async function loadHasManyThrough(
   if (sourceType === "belongsTo") {
     // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
     const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
-    const targetIds = throughRecords
+
+    // If sourceType is set, filter through records by the polymorphic type column
+    let filteredThrough = throughRecords;
+    if (options.sourceType && sourceAssoc?.options?.polymorphic) {
+      const typeCol = `${underscore(sourceName)}_type`;
+      filteredThrough = throughRecords.filter(
+        (r) => r.readAttribute(typeCol) === options.sourceType,
+      );
+    }
+
+    const targetIds = filteredThrough
       .map((r) => r.readAttribute(targetFk as string))
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];

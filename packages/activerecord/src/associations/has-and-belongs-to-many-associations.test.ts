@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { loadHasMany, loadHabtm } from "../associations.js";
+import { loadHasMany, loadHabtm, association, Associations } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -47,6 +47,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     registerModel(Developer);
     registerModel(Project);
     registerModel(DeveloperProject);
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+    });
   });
 
   it.skip("marshal dump", () => {
@@ -995,11 +999,71 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(join.readAttribute("project_id")).toBe(proj.id);
   });
 
-  it.skip("habtm adding before save", () => {});
-  it.skip("deleting all", () => {});
-  it.skip("destroying many", () => {});
-  it.skip("destroy associations destroys multiple associations", () => {});
-  it.skip("destroying", () => {
-    /* TODO: needs helpers from original file */
+  it("habtm adding before save", async () => {
+    const dev = new Developer({ name: "BeforeSave", salary: 50000 });
+    await dev.save();
+    const proj = await Project.create({ name: "BSProj" });
+    const proxy = association(dev, "projects");
+    await proxy.push(proj);
+    const projects = await proxy.toArray();
+    expect(projects).toHaveLength(1);
+    expect(projects[0].readAttribute("name")).toBe("BSProj");
+  });
+
+  it("deleting all", async () => {
+    const dev = await Developer.create({ name: "DelAllDev", salary: 60000 });
+    const p1 = await Project.create({ name: "DAP1" });
+    const p2 = await Project.create({ name: "DAP2" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p1, p2);
+    expect(await proxy.count()).toBe(2);
+
+    await proxy.clear();
+    expect(await proxy.count()).toBe(0);
+    // Projects still exist, just the join records are gone
+    const p1Reloaded = await Project.find(p1.id!);
+    expect(p1Reloaded).toBeDefined();
+  });
+
+  it("destroying many", async () => {
+    const dev = await Developer.create({ name: "DestroyManyDev", salary: 60000 });
+    const p1 = await Project.create({ name: "DMP1" });
+    const p2 = await Project.create({ name: "DMP2" });
+    const p3 = await Project.create({ name: "DMP3" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p1, p2, p3);
+    expect(await proxy.count()).toBe(3);
+
+    await proxy.destroy(p1, p2);
+    // destroy removes the records themselves
+    expect(p1.isDestroyed()).toBe(true);
+    expect(p2.isDestroyed()).toBe(true);
+  });
+
+  it("destroy associations destroys multiple associations", async () => {
+    const dev = await Developer.create({ name: "DmaDev", salary: 60000 });
+    const p1 = await Project.create({ name: "DMAP1" });
+    const p2 = await Project.create({ name: "DMAP2" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p1, p2);
+    expect(await proxy.count()).toBe(2);
+
+    await proxy.destroyAll();
+    // After destroyAll, the projects should be destroyed in the DB
+    const allProjects = await Project.all().toArray();
+    const names = allProjects.map((p: any) => p.readAttribute("name"));
+    expect(names).not.toContain("DMAP1");
+    expect(names).not.toContain("DMAP2");
+  });
+
+  it("destroying", async () => {
+    const dev = await Developer.create({ name: "DestroyDev", salary: 60000 });
+    const proj = await Project.create({ name: "DestroyProj" });
+    const proxy = association(dev, "projects");
+    await proxy.push(proj);
+    expect(await proxy.count()).toBe(1);
+
+    await proxy.destroy(proj);
+    expect(proj.isDestroyed()).toBe(true);
   });
 });
