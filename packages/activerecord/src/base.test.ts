@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { SubclassNotFound } from "./errors.js";
+import { SubclassNotFound, NameError } from "./errors.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
@@ -1306,7 +1306,7 @@ describe("BasicsTest", () => {
         registerModel(this);
       }
     }
-    expect(() => Vehicle.computeType("NonExistent")).toThrow();
+    expect(() => Vehicle.computeType("NonExistent")).toThrow(NameError);
   });
   it("compute type raises SubclassNotFound for wrong class", () => {
     class Plant extends Base {
