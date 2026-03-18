@@ -4,15 +4,15 @@ Current state: **52.2%** (4,374 / 8,385 tests). 3,767 skipped, 52 wrong describe
 
 ## How coverage is measured
 
-`npm run convention:compare` matches our test names against the Rails test suite. `OK` = passing, `Skip` = `it.skip` stub, `Desc` = wrong describe block, `Miss` = no TS equivalent.
+`npm run convention:compare` matches our test names against the Rails test suite. `OK` = matched and not skipped, `Skip` = `it.skip` stub, `Desc` = wrong describe block, `Miss` = no TS equivalent.
 
 ## Two workstreams
 
-The remaining 4,011 tests split cleanly into two parallel tracks that rarely touch the same files.
+The remaining 4,011 tests split into two parallel tracks that rarely touch the same files. The PRs below cover the largest files (20+ skipped); ~1,700 additional skipped tests are spread across many smaller files not listed here.
 
 ---
 
-### Workstream A: Associations & Querying (~815 skipped)
+### Workstream A: Associations & Querying (~690 skipped in listed files)
 
 Covers association features, eager loading, scoping, where clauses, and finders.
 
@@ -88,7 +88,7 @@ Disable-joins mode, fix 18 wrong describes in nested-attributes.
 
 ---
 
-### Workstream B: Core ORM & Infrastructure (~2,950 skipped)
+### Workstream B: Core ORM & Infrastructure (~1,370 skipped in listed files)
 
 Covers base class features, adapters, fixtures, schema, encryption, and connections.
 
@@ -176,7 +176,7 @@ Connection pooling, MySQL adapter, DB config resolution.
 
 Continue insert-all/upsert work from #90, reflection API, optimistic/pessimistic locking.
 
-#### PR B10: Remaining core files (~240 skipped)
+#### PR B10: Remaining core files (~278 skipped)
 
 | File                                        | Skipped |
 | ------------------------------------------- | ------- |
