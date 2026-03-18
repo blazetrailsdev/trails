@@ -30,7 +30,7 @@ export function compositeIdentify(label: string, keyColumns: string[]): Record<s
   const baseId = identify(label);
   const result: Record<string, number> = {};
   for (let i = 0; i < keyColumns.length; i++) {
-    result[keyColumns[i]] = (((baseId << i) % MAX_ID) + MAX_ID) % MAX_ID;
+    result[keyColumns[i]] = Number((BigInt(baseId) * (1n << BigInt(i))) % BigInt(MAX_ID));
   }
   return result;
 }

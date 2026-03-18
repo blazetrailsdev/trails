@@ -15,7 +15,7 @@ describe("FixturesTest", () => {
     expect(set.size).toBe(2);
     set.forEach((label, fixture) => {
       for (const key of Object.keys(fixture)) {
-        expect(key).toMatch(/^[a-zA-Z][-\w]*/);
+        expect(key).toMatch(/^[a-zA-Z][-\w]*$/);
       }
     });
   });
