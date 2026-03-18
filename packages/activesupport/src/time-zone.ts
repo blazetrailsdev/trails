@@ -504,6 +504,23 @@ export class TimeZone {
       throw new Error("invalid date");
     }
     const trimmed = str.trim();
+
+    // Ordinal date: YYDDD (2-digit year + 3-digit day-of-year)
+    const ordinalMatch = /^(\d{2})(\d{3})$/.exec(trimmed);
+    if (ordinalMatch) {
+      const year = 2000 + parseInt(ordinalMatch[1], 10);
+      const dayOfYear = parseInt(ordinalMatch[2], 10);
+      if (dayOfYear < 1 || dayOfYear > 366) {
+        throw new Error("invalid date");
+      }
+      const jan1 = new Date(Date.UTC(year, 0, 1));
+      const target = new Date(jan1.getTime() + (dayOfYear - 1) * 86400000);
+      if (target.getUTCFullYear() !== year) {
+        throw new Error("invalid date");
+      }
+      return this.local(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate());
+    }
+
     if (
       !/^\d{4}-?\d{2}-?\d{2}(T\d{2}:?\d{2}(:?\d{2}([.]\d+)?)?)?([Zz]|[+-]\d{2}:?\d{2})?$/.test(
         trimmed,
