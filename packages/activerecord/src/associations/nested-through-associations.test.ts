@@ -387,6 +387,8 @@ describe("NestedThroughAssociationsTest", () => {
       if (tag) tags.push(tag);
     }
     expect(tags.length).toBe(2);
+    const names = tags.map((t: any) => t.readAttribute("name")).sort();
+    expect(names).toEqual(["hc1", "hc2"]);
   });
 
   it.skip("has many through has many with has many through habtm source reflection preload", () => {

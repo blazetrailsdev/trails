@@ -2149,11 +2149,8 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const people = await proxy.toArray();
     expect(people).toHaveLength(3);
-    // Verify all three are present
-    const names = people.map((p) => p.readAttribute("first_name"));
-    expect(names).toContain("Alice");
-    expect(names).toContain("Bob");
-    expect(names).toContain("Carol");
+    const ids = people.map((p) => p.id);
+    expect(new Set(ids)).toEqual(new Set([p1.id, p2.id, p3.id]));
   });
   it("replace by id order is preserved", async () => {
     class RbiPost extends Base {
@@ -2207,9 +2204,8 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const people = await proxy.toArray();
     expect(people).toHaveLength(2);
-    const names = people.map((p) => p.readAttribute("first_name"));
-    expect(names).toContain("Alice");
-    expect(names).toContain("Bob");
+    const ids = people.map((p) => p.id);
+    expect(new Set(ids)).toEqual(new Set([p1.id, p2.id]));
   });
 
   it("associate with create", async () => {
@@ -3001,13 +2997,25 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const author = await MhrAuthor.create({ name: "David" });
     const post = await MhrPost.create({ mhr_author_id: author.id, title: "Hello" });
+    const comment = await MhrComment.create({ mhr_post_id: post.id, body: "Hi" });
 
+    // Loading works fine
     const comments = await loadHasManyThrough(author, "mhrComments", {
       through: "mhrPost",
       source: "mhrComments",
       className: "MhrComment",
     });
-    expect(comments).toEqual([]);
+    expect(comments).toHaveLength(1);
+
+    // Modifying through a has_one reflection should raise
+    const proxy = association(author, "mhrComments");
+    const newComment = await MhrComment.create({ mhr_post_id: post.id, body: "New" });
+    // push creates a join record, but the through is has_one so this is invalid.
+    // For now we verify that the through association loads correctly;
+    // the Rails error (HasManyThroughCantAssociateThroughHasOneOrManyReflection)
+    // requires reflection metadata we don't have yet.
+    const allComments = await proxy.toArray();
+    expect(allComments.length).toBeGreaterThanOrEqual(1);
   });
   it("associate existing with nonstandard primary key on belongs to", async () => {
     class NskPost extends Base {
@@ -5260,10 +5268,8 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "OhtPost",
     });
     expect(posts.length).toBe(3);
-    const titles = posts.map((p) => p.readAttribute("title"));
-    expect(titles).toContain("First");
-    expect(titles).toContain("Second");
-    expect(titles).toContain("Third");
+    const ids = posts.map((p) => p.id);
+    expect(new Set(ids)).toEqual(new Set([post1.id, post2.id, post3.id]));
   });
   it("no pk join model callbacks", async () => {
     class NpcLesson extends Base {
