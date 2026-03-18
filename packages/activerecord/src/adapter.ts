@@ -693,7 +693,7 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // NOT IN (SELECT ...) — must come before simpler matchers that match substrings
     const notInSubMatch = condition.match(
-      /^"?(\w+)"?(?:\."?(\w+)"?)?\s+NOT\s+IN\s+\(SELECT\s+"(\w+)"\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+))?\)$/i,
+      /^"?(\w+)"?(?:\."?(\w+)"?)?\s+NOT\s+IN\s+\(SELECT\s+(?:"?\w+"?\.)?"?(\w+)"?\s+FROM\s+"?(\w+)"?(?:\s+WHERE\s+(.+))?\)$/i,
     );
     if (notInSubMatch) {
       const col = getCol(notInSubMatch[1], notInSubMatch[2]);
@@ -708,7 +708,7 @@ export class MemoryAdapter implements DatabaseAdapter {
 
     // IN (SELECT ...) — must come before simpler matchers
     const inSubMatch = condition.match(
-      /^"?(\w+)"?(?:\."?(\w+)"?)?\s+IN\s+\(SELECT\s+"(\w+)"\s+FROM\s+"(\w+)"(?:\s+WHERE\s+(.+))?\)$/i,
+      /^"?(\w+)"?(?:\."?(\w+)"?)?\s+IN\s+\(SELECT\s+(?:"?\w+"?\.)?"?(\w+)"?\s+FROM\s+"?(\w+)"?(?:\s+WHERE\s+(.+))?\)$/i,
     );
     if (inSubMatch) {
       const col = getCol(inSubMatch[1], inSubMatch[2]);

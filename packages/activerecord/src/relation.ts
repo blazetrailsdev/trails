@@ -205,13 +205,19 @@ export class Relation<T extends Base> {
         const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.whereNot({ [foreignKey]: null });
       } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
-        const { targetTable, foreignKey, onClause } = this._resolveHasManyJoin(
+        const { targetTable, foreignKey, typeClause } = this._resolveHasManySubquery(
           modelClass,
           assocDef,
           assocName,
         );
-        rel = rel.joins(targetTable, onClause);
-        rel = rel.distinct();
+        const sourceTable = modelClass.tableName;
+        const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
+        const whereClause = typeClause ? `WHERE ${typeClause}` : "";
+        const cloned = rel._clone();
+        cloned._whereRawClauses.push(
+          `"${sourceTable}"."${pk}" IN (SELECT "${targetTable}"."${foreignKey}" FROM "${targetTable}"${whereClause ? " " + whereClause : ""})`,
+        );
+        rel = cloned;
       }
     }
     return rel;
@@ -239,18 +245,57 @@ export class Relation<T extends Base> {
         const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.where({ [foreignKey]: null });
       } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
-        const { targetTable, foreignKey, onClause } = this._resolveHasManyJoin(
+        const { targetTable, foreignKey, typeClause } = this._resolveHasManySubquery(
           modelClass,
           assocDef,
           assocName,
         );
-        rel = rel.leftJoins(targetTable, onClause);
+        const sourceTable = modelClass.tableName;
+        const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
+        const whereClause = typeClause ? `WHERE ${typeClause}` : "";
         const cloned = rel._clone();
-        cloned._whereRawClauses.push(`"${targetTable}"."${foreignKey}" IS NULL`);
+        cloned._whereRawClauses.push(
+          `"${sourceTable}"."${pk}" NOT IN (SELECT "${targetTable}"."${foreignKey}" FROM "${targetTable}"${whereClause ? " " + whereClause : ""})`,
+        );
         rel = cloned;
       }
     }
     return rel;
+  }
+
+  private _resolveHasManySubquery(
+    modelClass: any,
+    assocDef: any,
+    assocName: string,
+  ): { targetTable: string; foreignKey: string; typeClause: string | null } {
+    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
+    const targetModel = modelRegistry.get(targetClassName);
+    if (!targetModel) {
+      throw new Error(
+        `Model '${targetClassName}' not found in registry for association '${assocName}'`,
+      );
+    }
+    const targetTable = targetModel.tableName;
+    let foreignKey: string;
+    let typeClause: string | null = null;
+    if (assocDef.options.as) {
+      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
+      const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
+      typeClause = `"${targetTable}"."${typeCol}" = '${modelClass.name}'`;
+    } else {
+      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+    }
+    const inheritanceCol = getInheritanceColumn(targetModel);
+    if (inheritanceCol && isStiSubclass(targetModel)) {
+      const stiNames = [
+        targetModel.name,
+        ...(targetModel.descendants ?? []).map((d: any) => d.name),
+      ];
+      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+      const stiClause = `"${targetTable}"."${inheritanceCol}" IN (${inList})`;
+      typeClause = typeClause ? `${typeClause} AND ${stiClause}` : stiClause;
+    }
+    return { targetTable, foreignKey, typeClause };
   }
 
   private _resolveHasManyJoin(
@@ -1065,26 +1110,11 @@ export class Relation<T extends Base> {
     const assocDef = associations.find((a: any) => a.name === name);
     if (!assocDef) return null;
 
-    const _underscore = (n: string) =>
-      n
-        .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-        .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-        .toLowerCase();
-    const _camelize = (n: string) => n.replace(/(^|_)(.)/g, (_m, _p1, p2) => p2.toUpperCase());
-    const _singularize = (n: string) =>
-      n.endsWith("ies")
-        ? n.slice(0, -3) + "y"
-        : n.endsWith("ses")
-          ? n.slice(0, -2)
-          : n.endsWith("s")
-            ? n.slice(0, -1)
-            : n;
-
     const sourceTable = modelClass.tableName;
     const sourcePk = modelClass.primaryKey ?? "id";
 
     if (assocDef.type === "belongsTo") {
-      const foreignKey = assocDef.options.foreignKey ?? `${_underscore(name)}_id`;
+      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(name)}_id`;
       const className = assocDef.options.className ?? _camelize(name);
       const targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
@@ -1114,12 +1144,12 @@ export class Relation<T extends Base> {
       if (!targetModel) return null;
       const targetTable = targetModel.tableName;
       const primaryKey = assocDef.options.primaryKey ?? sourcePk;
-      const foreignKey = assocDef.options.foreignKey ?? `${_underscore(modelClass.name)}_id`;
+      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
       let onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${primaryKey}"`;
 
       // Polymorphic type condition
       if (assocDef.options.as) {
-        const typeCol = `${_underscore(assocDef.options.as)}_type`;
+        const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
         onClause += ` AND "${targetTable}"."${typeCol}" = '${modelClass.name}'`;
       }
 
@@ -2894,12 +2924,12 @@ export class Relation<T extends Base> {
             .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
             .replace(/([a-z\d])([A-Z])/g, "$1_$2")
             .toLowerCase();
-        const foreignKey = assocDef.options.foreignKey ?? `${_underscore(assocName)}_id`;
+        const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         const primaryKey = assocDef.options.primaryKey ?? "id";
 
         if (assocDef.options.polymorphic) {
           // Polymorphic belongsTo: group records by type column, query each model
-          const typeCol = `${_underscore(assocName)}_type`;
+          const typeCol = `${_toUnderscore(assocName)}_type`;
           const byType = new Map<string, any[]>();
           for (const record of records) {
             const typeName = record.readAttribute(typeCol) as string | null;
