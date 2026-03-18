@@ -3497,6 +3497,71 @@ export class Relation<T extends Base> {
             (child as any)._cachedAssociations.set(assocDef.options.inverseOf, record);
           }
         }
+      } else if (assocDef.type === "hasAndBelongsToMany") {
+        const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
+        const targetModel = _mr.get(targetClassName);
+        if (!targetModel) continue;
+        const targetTable = (targetModel as any).tableName;
+        const targetPk = (targetModel as any).primaryKey ?? "id";
+        if (Array.isArray(targetPk)) continue;
+
+        const ownerPk = modelClass.primaryKey ?? "id";
+        if (Array.isArray(ownerPk)) continue;
+
+        const pkValues = [
+          ...new Set(records.map((r) => r.readAttribute(ownerPk)).filter((v) => v != null)),
+        ];
+        if (pkValues.length === 0) continue;
+
+        // Compute join table name (same convention as defaultJoinTableName in associations.ts)
+        const ownerKey = _pluralize(_toUnderscore(modelClass.name));
+        const assocKey = _toUnderscore(assocName);
+        const defaultJoinTable = [ownerKey, assocKey].sort().join("_");
+        const joinTable = assocDef.options.joinTable ?? defaultJoinTable;
+        const ownerFk =
+          typeof assocDef.options.foreignKey === "string"
+            ? assocDef.options.foreignKey
+            : `${_toUnderscore(modelClass.name)}_id`;
+        const targetFk = `${_toUnderscore(_singularize(assocName))}_id`;
+
+        // Query join table for all owner PKs
+        const pkList = pkValues
+          .map((v) => (typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`))
+          .join(", ");
+        const joinRows = await modelClass.adapter.execute(
+          `SELECT "${ownerFk}", "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" IN (${pkList})`,
+        );
+
+        // Collect target IDs and build owner->targetIds map
+        const ownerToTargetIds = new Map<unknown, unknown[]>();
+        const allTargetIds = new Set<unknown>();
+        for (const row of joinRows) {
+          const ownerId = row[ownerFk];
+          const targetId = row[targetFk];
+          allTargetIds.add(targetId);
+          if (!ownerToTargetIds.has(ownerId)) ownerToTargetIds.set(ownerId, []);
+          ownerToTargetIds.get(ownerId)!.push(targetId);
+        }
+
+        // Batch-load target records
+        const targetIds = [...allTargetIds];
+        let targetRecords: any[] = [];
+        if (targetIds.length > 0) {
+          let targetRel = (targetModel as any).all().where({ [targetPk]: targetIds });
+          if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
+          targetRecords = await targetRel.toArray();
+        }
+        const targetMap = new Map<unknown, any>();
+        for (const r of targetRecords) targetMap.set(r.readAttribute(targetPk), r);
+
+        // Assign preloaded associations
+        for (const record of records) {
+          if (!(record as any)._preloadedAssociations)
+            (record as any)._preloadedAssociations = new Map();
+          const myTargetIds = ownerToTargetIds.get(record.readAttribute(ownerPk)) ?? [];
+          const myTargets = myTargetIds.map((id) => targetMap.get(id)).filter((r) => r != null);
+          (record as any)._preloadedAssociations.set(assocName, myTargets);
+        }
       }
     }
   }
