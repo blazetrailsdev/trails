@@ -2149,6 +2149,11 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const people = await proxy.toArray();
     expect(people).toHaveLength(3);
+    // Verify all three are present
+    const names = people.map((p) => p.readAttribute("first_name"));
+    expect(names).toContain("Alice");
+    expect(names).toContain("Bob");
+    expect(names).toContain("Carol");
   });
   it("replace by id order is preserved", async () => {
     class RbiPost extends Base {
@@ -2202,6 +2207,9 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const people = await proxy.toArray();
     expect(people).toHaveLength(2);
+    const names = people.map((p) => p.readAttribute("first_name"));
+    expect(names).toContain("Alice");
+    expect(names).toContain("Bob");
   });
 
   it("associate with create", async () => {
@@ -2374,6 +2382,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag = await proxy.create({ name: "Sports" });
     expect(tag.readAttribute("name")).toBe("Sports");
     expect(tag.isNewRecord()).toBe(false);
+
+    // Verify the join record was created linking post to tag
+    const taggings = await loadHasMany(post, "accTaggings", {
+      className: "AccTagging",
+      foreignKey: "acc_post_id",
+    });
+    expect(taggings).toHaveLength(1);
+    expect(taggings[0].readAttribute("acc_tag_id")).toBe(tag.id);
   });
   it("associate with create exclamation and no options", async () => {
     class HmtBangNoOptOwner extends Base {
@@ -3273,11 +3289,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await SpkPost.create({ title: "Hello" });
     await SpkReader.create({ spk_person_id: person.id, spk_post_id: post.id });
 
-    const posts = await loadHasManyThrough(person, "spkPosts", {
-      through: "spkReaders",
-      source: "spkPost",
-      className: "SpkPost",
-    });
+    const proxy = association(person, "spkPosts");
+    const posts = await proxy.toArray();
     const ids = posts.map((p) => p.id);
     expect(ids).toContain(post.id);
   });
@@ -5246,7 +5259,11 @@ describe("HasManyThroughAssociationsTest", () => {
       source: "ohtPost",
       className: "OhtPost",
     });
-    expect(posts.length).toBeGreaterThan(1);
+    expect(posts.length).toBe(3);
+    const titles = posts.map((p) => p.readAttribute("title"));
+    expect(titles).toContain("First");
+    expect(titles).toContain("Second");
+    expect(titles).toContain("Third");
   });
   it("no pk join model callbacks", async () => {
     class NpcLesson extends Base {

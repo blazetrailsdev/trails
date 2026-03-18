@@ -998,7 +998,10 @@ export class CollectionProxy {
   }
 
   /**
-   * Build a new associated record (unsaved) with the FK set.
+   * Build a new associated record (unsaved).
+   * For direct has_many, sets the FK on the target.
+   * For through associations, builds the target without FK — the join
+   * record is created later via create() or push().
    */
   build(attrs: Record<string, unknown> = {}): Base {
     // Through association: build the target record (no FK on target)
