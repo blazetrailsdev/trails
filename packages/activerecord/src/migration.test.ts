@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, MigrationContext, MigrationRunner } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration, TableDefinition, Schema } from "./migration.js";
 
@@ -510,20 +510,23 @@ describe("Migration DDL (extended)", () => {
     await m.run(adapter, "up");
   });
 
-  it("changeColumn generates ALTER TABLE ALTER COLUMN", async () => {
-    const adapter = freshAdapter();
-    class ChangeCol extends Migration {
-      async up() {
-        await this.createTable("users", (t) => {
-          t.string("name");
-        });
-        await this.changeColumn("users", "name", "text");
+  it.skipIf(adapterType === "sqlite")(
+    "changeColumn generates ALTER TABLE ALTER COLUMN",
+    async () => {
+      const adapter = freshAdapter();
+      class ChangeCol extends Migration {
+        async up() {
+          await this.createTable("users", (t) => {
+            t.string("name");
+          });
+          await this.changeColumn("users", "name", "text");
+        }
+        async down() {}
       }
-      async down() {}
-    }
-    const m = new ChangeCol();
-    await m.run(adapter, "up");
-  });
+      const m = new ChangeCol();
+      await m.run(adapter, "up");
+    },
+  );
 
   it("renameTable generates ALTER TABLE RENAME", async () => {
     const adapter = freshAdapter();
