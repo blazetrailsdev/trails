@@ -211,3 +211,39 @@ export class NameError extends Error {
     this.name = "NameError";
   }
 }
+
+export class HasManyThroughCantAssociateThroughHasOneOrManyReflection extends Error {
+  constructor(owner: string, association: string) {
+    super(
+      `Cannot modify association '${association}' on ${owner} because the source reflection is through a has_one or has_many reflection.`,
+    );
+    this.name = "HasManyThroughCantAssociateThroughHasOneOrManyReflection";
+  }
+}
+
+export class HasManyThroughNestedAssociationsAreReadonly extends Error {
+  constructor(owner: string, association: string) {
+    super(
+      `Cannot modify association '${association}' on ${owner} because it goes through a nested through association.`,
+    );
+    this.name = "HasManyThroughNestedAssociationsAreReadonly";
+  }
+}
+
+export class HasOneThroughNestedAssociationsAreReadonly extends Error {
+  constructor(owner: string, association: string) {
+    super(
+      `Cannot modify association '${association}' on ${owner} because it goes through a nested through association.`,
+    );
+    this.name = "HasOneThroughNestedAssociationsAreReadonly";
+  }
+}
+
+export class HasManyThroughOrderError extends Error {
+  constructor(owner: string, association: string) {
+    super(
+      `Cannot have a has_many :through association '${association}' on ${owner} which goes through '${association}' before the through association is defined.`,
+    );
+    this.name = "HasManyThroughOrderError";
+  }
+}

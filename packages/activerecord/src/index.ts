@@ -51,6 +51,10 @@ export {
   SubclassNotFound,
   NameError,
   InverseOfAssociationNotFoundError,
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection,
+  HasManyThroughNestedAssociationsAreReadonly,
+  HasOneThroughNestedAssociationsAreReadonly,
+  HasManyThroughOrderError,
 } from "./errors.js";
 export {
   AssociationReflection,
