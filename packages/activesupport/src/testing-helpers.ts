@@ -3,19 +3,17 @@
  * Provides time travel helpers and method call assertion utilities.
  */
 
-// ── Time Travel ───────────────────────────────────────────────────────────────
+import { setFrozenTime, setTimeOffset, currentTime as _currentTime } from "./time-travel.js";
 
-let _frozenTime: Date | null = null;
-let _timeOffset: number = 0;
-const _usingFakeTimers = false;
+// ── Time Travel ───────────────────────────────────────────────────────────────
 
 /**
  * travelTo — sets the current time to the given Date.
  * Use travelBack() to restore.
  */
 export function travelTo(time: Date, fn?: () => void): void {
-  _frozenTime = new Date(time);
-  _timeOffset = time.getTime() - Date.now();
+  setFrozenTime(new Date(time));
+  setTimeOffset(time.getTime() - Date.now());
   if (fn) {
     try {
       fn();
@@ -44,16 +42,15 @@ export function freezeTime(fn?: () => void): void {
  * travelBack — restores real time.
  */
 export function travelBack(): void {
-  _frozenTime = null;
-  _timeOffset = 0;
+  setFrozenTime(null);
+  setTimeOffset(0);
 }
 
 /**
  * currentTime — returns the current (possibly frozen/traveled) time.
  */
 export function currentTime(): Date {
-  if (_frozenTime) return new Date(_frozenTime);
-  return new Date(Date.now() + _timeOffset);
+  return _currentTime();
 }
 
 // ── Method Call Assertions ────────────────────────────────────────────────────
