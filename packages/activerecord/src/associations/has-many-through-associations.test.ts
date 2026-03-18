@@ -8,6 +8,7 @@ import type { DatabaseAdapter } from "../adapter.js";
 import {
   Associations,
   association,
+  CollectionProxy,
   loadHasMany,
   loadHasManyThrough,
   processDependentAssociations,
@@ -25,8 +26,11 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it.skip("marshal dump", () => {});
+
   it.skip("through association with joins", () => {});
+
   it.skip("through association with left joins", () => {});
+
   it.skip("through association with through scope and nested where", () => {});
   it("preload with nested association", async () => {
     class PnAuthor extends Base {
@@ -2577,6 +2581,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(join.readAttribute("hmt_bang_val_item_id")).toBe(item.readAttribute("id"));
   });
   it.skip("push with invalid record", () => {});
+
   it.skip("push with invalid join record", () => {});
   it("clear associations", async () => {
     class HmtClrOwner extends Base {
@@ -2650,9 +2655,93 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
   });
-  it.skip("association callback ordering", () => {});
+  it("association callback ordering", async () => {
+    const log: [string, string, string][] = [];
+    class AcoOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class AcoJoin extends Base {
+      static {
+        this.attribute("aco_owner_id", "integer");
+        this.attribute("aco_person_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class AcoPerson extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (AcoOwner as any)._associations = [
+      {
+        type: "hasMany",
+        name: "acoJoins",
+        options: { className: "AcoJoin", foreignKey: "aco_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "acoPersons",
+        options: {
+          through: "acoJoins",
+          source: "acoPerson",
+          className: "AcoPerson",
+          beforeAdd: (owner: Base, record: Base) => {
+            log.push(["added", "before", record.readAttribute("first_name") as string]);
+          },
+          afterAdd: (owner: Base, record: Base) => {
+            log.push(["added", "after", record.readAttribute("first_name") as string]);
+          },
+        },
+      },
+    ];
+    (AcoJoin as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "acoPerson",
+        options: { className: "AcoPerson", foreignKey: "aco_person_id" },
+      },
+    ];
+    registerModel("AcoOwner", AcoOwner);
+    registerModel("AcoJoin", AcoJoin);
+    registerModel("AcoPerson", AcoPerson);
+
+    const owner = await AcoOwner.create({ name: "O" });
+    const michael = await AcoPerson.create({ first_name: "Michael" });
+
+    const proxy = new CollectionProxy(owner, "acoPersons", {
+      type: "hasManyThrough" as any,
+      name: "acoPersons",
+      options: {
+        through: "acoJoins",
+        source: "acoPerson",
+        className: "AcoPerson",
+        beforeAdd: (AcoOwner as any)._associations[1].options.beforeAdd,
+        afterAdd: (AcoOwner as any)._associations[1].options.afterAdd,
+      },
+    });
+
+    await proxy.push(michael);
+    expect(log.slice(-2)).toEqual([
+      ["added", "before", "Michael"],
+      ["added", "after", "Michael"],
+    ]);
+
+    const david = await AcoPerson.create({ first_name: "David" });
+    await proxy.push(david);
+    expect(log.slice(-2)).toEqual([
+      ["added", "before", "David"],
+      ["added", "after", "David"],
+    ]);
+  });
+
   it.skip("dynamic find should respect association include", () => {});
+
   it.skip("count with include should alias join table", () => {});
+
   it.skip("inner join with quoted table name", () => {});
   it("get ids for has many through with conditions should not preload", async () => {
     class HmtIdsCondOwner extends Base {
@@ -2786,6 +2875,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(members[0].readAttribute("id")).toBe(m1.readAttribute("id"));
   });
   it.skip("association proxy transaction method starts transaction in association class", () => {});
+
   it.skip("has many through uses the through model to create transactions", () => {});
   it("has many association through a belongs to association where the association doesnt exist", async () => {
     class HmtNoBtOwner extends Base {
@@ -2896,7 +2986,69 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(items).toHaveLength(1);
     expect(items[0].readAttribute("label")).toBe("I");
   });
-  it.skip("find on has many association collection with include and conditions", () => {});
+  it("find on has many association collection with include and conditions", async () => {
+    class FicOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FicJoin extends Base {
+      static {
+        this.attribute("fic_owner_id", "integer");
+        this.attribute("fic_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class FicPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    (FicOwner as any)._associations = [
+      {
+        type: "hasMany",
+        name: "ficJoins",
+        options: { className: "FicJoin", foreignKey: "fic_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "ficPosts",
+        options: {
+          through: "ficJoins",
+          source: "ficPost",
+          className: "FicPost",
+          scope: (rel: any) => rel.where({ title: "Authorless" }),
+        },
+      },
+    ];
+    (FicJoin as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "ficPost",
+        options: { className: "FicPost", foreignKey: "fic_post_id" },
+      },
+    ];
+    registerModel("FicOwner", FicOwner);
+    registerModel("FicJoin", FicJoin);
+    registerModel("FicPost", FicPost);
+
+    const owner = await FicOwner.create({ name: "Michael" });
+    const p1 = await FicPost.create({ title: "Authorless" });
+    const p2 = await FicPost.create({ title: "With Author" });
+    await FicJoin.create({ fic_owner_id: owner.id, fic_post_id: p1.id });
+    await FicJoin.create({ fic_owner_id: owner.id, fic_post_id: p2.id });
+
+    const posts = await loadHasManyThrough(owner, "ficPosts", {
+      through: "ficJoins",
+      source: "ficPost",
+      className: "FicPost",
+      scope: (rel: any) => rel.where({ title: "Authorless" }),
+    });
+    expect(posts).toHaveLength(1);
+    expect(posts[0].readAttribute("title")).toBe("Authorless");
+  });
   it("has many through has one reflection", async () => {
     class HmtHoReflOwner extends Base {
       static {
@@ -3775,8 +3927,11 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(reloaded.readAttribute("label")).toBe("Modified");
   });
   it.skip("has many through with source scope", () => {});
+
   it.skip("has many through with through scope with includes", () => {});
+
   it.skip("has many through with through scope with joins", () => {});
+
   it.skip("duplicated has many through with through scope with joins", () => {});
   it("has many through polymorphic with rewhere", async () => {
     class RwPost extends Base {
@@ -4034,6 +4189,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(joins).toHaveLength(1);
   });
   it.skip("joining has many through with distinct", () => {});
+
   it.skip("joining has many through belongs to", () => {});
   it("select chosen fields only", async () => {
     class HmtSelOwner extends Base {
@@ -4092,8 +4248,136 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(items).toHaveLength(1);
     expect(items[0].readAttribute("label")).toBe("L");
   });
-  it.skip("get has many through belongs to ids with conditions", () => {});
-  it.skip("get collection singular ids on has many through with conditions and include", () => {});
+  it("get has many through belongs to ids with conditions", async () => {
+    class GidAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class GidCategorization extends Base {
+      static {
+        this.attribute("gid_author_id", "integer");
+        this.attribute("gid_category_id", "integer");
+        this.attribute("special", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    class GidCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (GidAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "gidCategorizations",
+        options: { className: "GidCategorization", foreignKey: "gid_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "gidCategoriesLikeGeneral",
+        options: {
+          through: "gidCategorizations",
+          source: "gidCategory",
+          className: "GidCategory",
+          scope: (rel: any) => rel.where({ name: "General" }),
+        },
+      },
+    ];
+    (GidCategorization as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "gidCategory",
+        options: { className: "GidCategory", foreignKey: "gid_category_id" },
+      },
+    ];
+    registerModel("GidAuthor", GidAuthor);
+    registerModel("GidCategorization", GidCategorization);
+    registerModel("GidCategory", GidCategory);
+
+    const author = await GidAuthor.create({ name: "Mary" });
+    const general = await GidCategory.create({ name: "General" });
+    const cooking = await GidCategory.create({ name: "Cooking" });
+    await GidCategorization.create({ gid_author_id: author.id, gid_category_id: general.id });
+    await GidCategorization.create({ gid_author_id: author.id, gid_category_id: cooking.id });
+
+    const categories = await loadHasManyThrough(author, "gidCategoriesLikeGeneral", {
+      through: "gidCategorizations",
+      source: "gidCategory",
+      className: "GidCategory",
+      scope: (rel: any) => rel.where({ name: "General" }),
+    });
+    const ids = categories.map((c) => c.id);
+    expect(ids).toEqual([general.id]);
+  });
+
+  it("get collection singular ids on has many through with conditions and include", async () => {
+    class GcsOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class GcsJoin extends Base {
+      static {
+        this.attribute("gcs_owner_id", "integer");
+        this.attribute("gcs_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GcsPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("comments_count", "integer");
+        this.adapter = adapter;
+      }
+    }
+    (GcsOwner as any)._associations = [
+      {
+        type: "hasMany",
+        name: "gcsJoins",
+        options: { className: "GcsJoin", foreignKey: "gcs_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "gcsPostsNoComments",
+        options: {
+          through: "gcsJoins",
+          source: "gcsPost",
+          className: "GcsPost",
+          scope: (rel: any) => rel.where({ comments_count: 0 }),
+        },
+      },
+    ];
+    (GcsJoin as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "gcsPost",
+        options: { className: "GcsPost", foreignKey: "gcs_post_id" },
+      },
+    ];
+    registerModel("GcsOwner", GcsOwner);
+    registerModel("GcsJoin", GcsJoin);
+    registerModel("GcsPost", GcsPost);
+
+    const owner = await GcsOwner.create({ name: "Michael" });
+    const p1 = await GcsPost.create({ title: "Authorless", comments_count: 0 });
+    const p2 = await GcsPost.create({ title: "Has Comments", comments_count: 5 });
+    await GcsJoin.create({ gcs_owner_id: owner.id, gcs_post_id: p1.id });
+    await GcsJoin.create({ gcs_owner_id: owner.id, gcs_post_id: p2.id });
+
+    const posts = await loadHasManyThrough(owner, "gcsPostsNoComments", {
+      through: "gcsJoins",
+      source: "gcsPost",
+      className: "GcsPost",
+      scope: (rel: any) => rel.where({ comments_count: 0 }),
+    });
+    const ids = posts.map((p) => p.id);
+    expect(ids).toEqual([p1.id]);
+  });
+
   it.skip("count has many through with named scope", () => {});
   it("has many through belongs to should update when the through foreign key changes", async () => {
     class HmtFkOwner extends Base {
@@ -4376,7 +4660,9 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(labels).toEqual(["I1", "I2", "I3"]);
   });
   it.skip("create bang should raise exception when join record has errors", () => {});
+
   it.skip("save bang should raise exception when join record has errors", () => {});
+
   it.skip("save returns falsy when join record has errors", () => {});
   it("preloading empty through association via joins", async () => {
     class HmtEmptyThrOwner extends Base {
@@ -4669,10 +4955,15 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(posts).toHaveLength(2);
   });
   it.skip("has many through associations sum on columns", () => {});
+
   it.skip("has many through with default scope on the target", () => {});
+
   it.skip("has many through with includes in through association scope", () => {});
+
   it.skip("insert records via has many through association with scope", () => {});
+
   it.skip("insert records via has many through association with scope and association name different from the joining table name", () => {});
+
   it.skip("has many through unscope default scope", () => {});
   it("has many through add with sti middle relation", async () => {
     class StiAddClub extends Base {
@@ -4803,15 +5094,51 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(postThrough).toBeDefined();
   });
   it.skip("has many through with scope that should not be fully merged", () => {});
+
   it.skip("has many through do not cache association reader if the though method has default scopes", () => {});
+
   it.skip("has many through with scope that has joined same table with parent relation", () => {});
+
   it.skip("has many through with left joined same table with through table", () => {});
+
   it.skip("has many through with unscope should affect to through scope", () => {});
+
   it.skip("has many through with scope should accept string and hash join", () => {});
+
   it.skip("has many through with scope should respect table alias", () => {});
+
   it.skip("through scope is affected by unscoping", () => {});
+
   it.skip("through scope isnt affected by scoping", () => {});
-  it.skip("incorrectly ordered through associations", () => {});
+
+  it("incorrectly ordered through associations", async () => {
+    class IoOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    // Define through association BEFORE the through source
+    (IoOwner as any)._associations = [
+      {
+        type: "hasManyThrough",
+        name: "ioItems",
+        options: { through: "ioJoins", source: "ioItem", className: "IoItem" },
+      },
+    ];
+    registerModel("IoOwner", IoOwner);
+
+    const owner = await IoOwner.create({ name: "O" });
+    // Loading through should fail because the through association doesn't exist
+    await expect(
+      loadHasManyThrough(owner, "ioItems", {
+        through: "ioJoins",
+        source: "ioItem",
+        className: "IoItem",
+      }),
+    ).rejects.toThrow();
+  });
+
   it.skip("has many through update ids with conditions", () => {});
   it("single has many through association with unpersisted parent instance", async () => {
     class HmtUnpOwner extends Base {
@@ -4920,9 +5247,79 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(targets).toHaveLength(0);
   });
-  it.skip("child is visible to join model in add association callbacks", () => {});
+  it("child is visible to join model in add association callbacks", async () => {
+    class CvOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class CvPetTreasure extends Base {
+      static {
+        this.attribute("cv_owner_id", "integer");
+        this.attribute("cv_pet_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CvPet extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    let callbackFired = false;
+    (CvOwner as any)._associations = [
+      {
+        type: "hasMany",
+        name: "cvPetTreasures",
+        options: { className: "CvPetTreasure", foreignKey: "cv_owner_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "cvPets",
+        options: {
+          through: "cvPetTreasures",
+          source: "cvPet",
+          className: "CvPet",
+          beforeAdd: (_owner: Base, record: Base) => {
+            // The child should be visible (have an id) by the time the callback fires
+            if (record.readAttribute("name")) callbackFired = true;
+          },
+        },
+      },
+    ];
+    (CvPetTreasure as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "cvPet",
+        options: { className: "CvPet", foreignKey: "cv_pet_id" },
+      },
+    ];
+    registerModel("CvOwner", CvOwner);
+    registerModel("CvPetTreasure", CvPetTreasure);
+    registerModel("CvPet", CvPet);
+
+    const owner = await CvOwner.create({ name: "O" });
+    const pet = await CvPet.create({ name: "Mochi" });
+
+    const proxy = new CollectionProxy(owner, "cvPets", {
+      type: "hasManyThrough" as any,
+      name: "cvPets",
+      options: {
+        through: "cvPetTreasures",
+        source: "cvPet",
+        className: "CvPet",
+        beforeAdd: (CvOwner as any)._associations[1].options.beforeAdd,
+      },
+    });
+    await proxy.push(pet);
+    expect(callbackFired).toBe(true);
+  });
+
   it.skip("circular autosave association correctly saves multiple records", () => {});
+
   it.skip("post has many tags through association with composite query constraints", () => {});
+
   it.skip("tags has manu posts through association with composite query constraints", () => {});
   it("loading cpk association with unpersisted owner", async () => {
     class CpkHmtOwner extends Base {

@@ -108,13 +108,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.readAttribute("name")).toBe("nested-tag");
   });
 
-  it.skip("has many through has many with has many through source reflection preload", () => {
-    // Requires preload for nested through
-  });
+  it.skip("has many through has many with has many through source reflection preload", () => {});
 
-  it.skip("has many through has many with has many through source reflection preload via joins", () => {
-    // Requires joins-based preload
-  });
+  it.skip("has many through has many with has many through source reflection preload via joins", () => {});
 
   it("has many through has many through with has many source reflection", async () => {
     // Author -> Posts -> Taggings (3 levels, manual chaining)
@@ -145,13 +141,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(allTaggings.length).toBe(2);
   });
 
-  it.skip("has many through has many through with has many source reflection preload", () => {
-    // Requires 3-level preload
-  });
+  it.skip("has many through has many through with has many source reflection preload", () => {});
 
-  it.skip("has many through has many through with has many source reflection preload via joins", () => {
-    // Requires 3-level preload via joins
-  });
+  it.skip("has many through has many through with has many source reflection preload via joins", () => {});
 
   it("has many through has one with has one through source reflection", async () => {
     // Author -> Post (has_many) -> each post has one first tagging
@@ -175,13 +167,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(tagging!.readAttribute("tag_id")).toBe(tag.id);
   });
 
-  it.skip("has many through has one with has one through source reflection preload", () => {
-    // Requires preload has_one through
-  });
+  it.skip("has many through has one with has one through source reflection preload", () => {});
 
-  it.skip("has many through has one with has one through source reflection preload via joins", () => {
-    // Requires joins preload has_one through
-  });
+  it.skip("has many through has one with has one through source reflection preload via joins", () => {});
 
   it("has many through has one through with has one source reflection", async () => {
     // Chain: Author -> Posts -> first Tagging per post -> Tag
@@ -209,13 +197,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.readAttribute("name")).toBe("nested");
   });
 
-  it.skip("has many through has one through with has one source reflection preload", () => {
-    // Requires preload nested has_one through
-  });
+  it.skip("has many through has one through with has one source reflection preload", () => {});
 
-  it.skip("has many through has one through with has one source reflection preload via joins", () => {
-    // Requires joins preload nested has_one
-  });
+  it.skip("has many through has one through with has one source reflection preload via joins", () => {});
 
   it("has many through has one with has many through source reflection", async () => {
     // Author -> Post (has_many) -> Taggings (has_many per post)
@@ -238,13 +222,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(taggings.length).toBe(2);
   });
 
-  it.skip("has many through has one with has many through source reflection preload", () => {
-    // Requires preload mixed through
-  });
+  it.skip("has many through has one with has many through source reflection preload", () => {});
 
-  it.skip("has many through has one with has many through source reflection preload via joins", () => {
-    // Requires joins preload mixed
-  });
+  it.skip("has many through has one with has many through source reflection preload via joins", () => {});
 
   it("has many through has one through with has many source reflection", async () => {
     // Author -> Post -> Taggings (multiple per post)
@@ -269,13 +249,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(taggings.length).toBe(3);
   });
 
-  it.skip("has many through has one through with has many source reflection preload", () => {
-    // Requires preload
-  });
+  it.skip("has many through has one through with has many source reflection preload", () => {});
 
-  it.skip("has many through has one through with has many source reflection preload via joins", () => {
-    // Requires joins preload
-  });
+  it.skip("has many through has one through with has many source reflection preload via joins", () => {});
 
   it("has many through has many with has and belongs to many source reflection", async () => {
     // Author -> Posts -> Taggings -> Tags (multi-hop through)
@@ -311,13 +287,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(names).toContain("hs_tag2");
   });
 
-  it.skip("has many through has many with has and belongs to many source reflection preload", () => {
-    // Requires preload through HABTM
-  });
+  it.skip("has many through has many with has and belongs to many source reflection preload", () => {});
 
-  it.skip("has many through has many with has and belongs to many source reflection preload via joins", () => {
-    // Requires joins preload through HABTM
-  });
+  it.skip("has many through has many with has and belongs to many source reflection preload via joins", () => {});
 
   it("has many through has and belongs to many with has many source reflection", async () => {
     // Tag -> Taggings (has_many) -> Posts (each tagging belongs_to a post)
@@ -347,13 +319,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(titles).toContain("HM2");
   });
 
-  it.skip("has many through has and belongs to many with has many source reflection preload", () => {
-    // Requires preload HABTM through
-  });
+  it.skip("has many through has and belongs to many with has many source reflection preload", () => {});
 
-  it.skip("has many through has and belongs to many with has many source reflection preload via joins", () => {
-    // Requires joins preload HABTM through
-  });
+  it.skip("has many through has and belongs to many with has many source reflection preload via joins", () => {});
 
   it("has many through has many with has many through habtm source reflection", async () => {
     // Author -> Posts -> Taggings -> Tags (3-level chain)
@@ -391,13 +359,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(names).toEqual(["hc1", "hc2"]);
   });
 
-  it.skip("has many through has many with has many through habtm source reflection preload", () => {
-    // Requires complex preload
-  });
+  it.skip("has many through has many with has many through habtm source reflection preload", () => {});
 
-  it.skip("has many through has many with has many through habtm source reflection preload via joins", () => {
-    // Requires complex joins preload
-  });
+  it.skip("has many through has many with has many through habtm source reflection preload via joins", () => {});
 
   it("has many through has many through with belongs to source reflection", async () => {
     // Author -> Posts -> Taggings -> Tag (belongs_to from tagging)
@@ -428,13 +392,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.readAttribute("name")).toBe("bt_tag");
   });
 
-  it.skip("has many through has many through with belongs to source reflection preload", () => {
-    // Requires preload
-  });
+  it.skip("has many through has many through with belongs to source reflection preload", () => {});
 
-  it.skip("has many through has many through with belongs to source reflection preload via joins", () => {
-    // Requires joins preload
-  });
+  it.skip("has many through has many through with belongs to source reflection preload via joins", () => {});
 
   it("has many through belongs to with has many through source reflection", async () => {
     // Post belongs_to Author -> Author has_many Posts -> Posts have Taggings
@@ -462,13 +422,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(allPosts.length).toBe(2);
   });
 
-  it.skip("has many through belongs to with has many through source reflection preload", () => {
-    // Requires preload belongs_to through
-  });
+  it.skip("has many through belongs to with has many through source reflection preload", () => {});
 
-  it.skip("has many through belongs to with has many through source reflection preload via joins", () => {
-    // Requires joins preload belongs_to through
-  });
+  it.skip("has many through belongs to with has many through source reflection preload via joins", () => {});
 
   it("has one through has one with has one through source reflection", async () => {
     // Chain: Author -> first Post (has_one) -> first Tagging (has_one) -> Tag
@@ -498,13 +454,9 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.readAttribute("name")).toBe("hoc_tag");
   });
 
-  it.skip("has one through has one with has one through source reflection preload", () => {
-    // Requires preload
-  });
+  it.skip("has one through has one with has one through source reflection preload", () => {});
 
-  it.skip("has one through has one with has one through source reflection preload via joins", () => {
-    // Requires joins preload
-  });
+  it.skip("has one through has one with has one through source reflection preload via joins", () => {});
 
   it("has one through has one through with belongs to source reflection", async () => {
     // Chain: Tag -> first Tagging (has_one via tag_id) -> Post (belongs_to via taggable_id)
@@ -528,33 +480,19 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedPost!.readAttribute("title")).toBe("BC");
   });
 
-  it.skip("joins and includes from through models not included in association", () => {
-    // Requires joins on intermediate model
-  });
+  it.skip("joins and includes from through models not included in association", () => {});
 
-  it.skip("has one through has one through with belongs to source reflection preload", () => {
-    // Requires preload
-  });
+  it.skip("has one through has one through with belongs to source reflection preload", () => {});
 
-  it.skip("has one through has one through with belongs to source reflection preload via joins", () => {
-    // Requires joins preload
-  });
+  it.skip("has one through has one through with belongs to source reflection preload via joins", () => {});
 
-  it.skip("distinct has many through a has many through association on source reflection", () => {
-    // Requires distinct on source reflection
-  });
+  it.skip("distinct has many through a has many through association on source reflection", () => {});
 
-  it.skip("distinct has many through a has many through association on through reflection", () => {
-    // Requires distinct on through reflection
-  });
+  it.skip("distinct has many through a has many through association on through reflection", () => {});
 
-  it.skip("nested has many through with a table referenced multiple times", () => {
-    // Requires multiple reference handling
-  });
+  it.skip("nested has many through with a table referenced multiple times", () => {});
 
-  it.skip("nested has many through with scope on polymorphic reflection", () => {
-    // Requires scope on polymorphic nested through
-  });
+  it.skip("nested has many through with scope on polymorphic reflection", () => {});
 
   it("has many through with foreign key option on through reflection", async () => {
     class FkThrAuthor extends Base {
@@ -743,73 +681,39 @@ describe("NestedThroughAssociationsTest", () => {
     expect(members[0].readAttribute("name")).toBe("Alice");
   });
 
-  it.skip("has many through with sti on nested through reflection", () => {
-    // Requires STI on nested through
-  });
+  it.skip("has many through with sti on nested through reflection", () => {});
 
-  it.skip("nested has many through writers should raise error", () => {
-    // Requires error on nested through write
-  });
+  it.skip("nested has many through writers should raise error", () => {});
 
-  it.skip("nested has one through writers should raise error", () => {
-    // Requires error on nested has_one through write
-  });
+  it.skip("nested has one through writers should raise error", () => {});
 
-  it.skip("nested has many through with conditions on through associations", () => {
-    // Requires conditions on through
-  });
+  it.skip("nested has many through with conditions on through associations", () => {});
 
-  it.skip("nested has many through with conditions on through associations preload", () => {
-    // Requires preload with conditions
-  });
+  it.skip("nested has many through with conditions on through associations preload", () => {});
 
-  it.skip("nested has many through with conditions on through associations preload via joins", () => {
-    // Requires joins preload with conditions
-  });
+  it.skip("nested has many through with conditions on through associations preload via joins", () => {});
 
-  it.skip("nested has many through with conditions on source associations", () => {
-    // Requires conditions on source
-  });
+  it.skip("nested has many through with conditions on source associations", () => {});
 
-  it.skip("nested has many through with conditions on source associations preload", () => {
-    // Requires preload source conditions
-  });
+  it.skip("nested has many through with conditions on source associations preload", () => {});
 
-  it.skip("through association preload doesnt reset source association if already preloaded", () => {
-    // Requires preload idempotence
-  });
+  it.skip("through association preload doesnt reset source association if already preloaded", () => {});
 
-  it.skip("nested has many through with conditions on source associations preload via joins", () => {
-    // Requires joins preload source conditions
-  });
+  it.skip("nested has many through with conditions on source associations preload via joins", () => {});
 
-  it.skip("nested has many through with foreign key option on the source reflection through reflection", () => {
-    // Requires FK on source-through reflection
-  });
+  it.skip("nested has many through with foreign key option on the source reflection through reflection", () => {});
 
-  it.skip("nested has many through should not be autosaved", () => {
-    // Requires autosave: false on nested
-  });
+  it.skip("nested has many through should not be autosaved", () => {});
 
-  it.skip("polymorphic has many through when through association has not loaded", () => {
-    // Requires polymorphic through unloaded
-  });
+  it.skip("polymorphic has many through when through association has not loaded", () => {});
 
-  it.skip("polymorphic has many through when through association has already loaded", () => {
-    // Requires polymorphic through loaded
-  });
+  it.skip("polymorphic has many through when through association has already loaded", () => {});
 
-  it.skip("polymorphic has many through joined different table twice", () => {
-    // Requires double-join on polymorphic through
-  });
+  it.skip("polymorphic has many through joined different table twice", () => {});
 
-  it.skip("has many through polymorphic with scope", () => {
-    // Requires scope on polymorphic through
-  });
+  it.skip("has many through polymorphic with scope", () => {});
 
-  it.skip("has many through reset source reflection after loading is complete", () => {
-    // Requires source reflection reset after load
-  });
+  it.skip("has many through reset source reflection after loading is complete", () => {});
 });
 
 // ==========================================================================
