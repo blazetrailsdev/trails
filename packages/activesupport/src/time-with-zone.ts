@@ -654,7 +654,8 @@ export class TimeWithZone {
   }
 
   /**
-   * Strict equality — same moment AND same timezone.
+   * Equality based on UTC instant. Two times representing the same moment
+   * are eql regardless of timezone. Also accepts Date.
    */
   eql(other: unknown): boolean {
     if (other instanceof TimeWithZone) {

@@ -538,14 +538,14 @@ describe("TimeWithZoneTest", () => {
     expect(twz.equals(date)).toBe(true);
   });
 
-  it("eql() compares UTC instant regardless of timezone", () => {
+  it("eql() requires same timezone", () => {
     const est = eastern.local(2024, 1, 15, 12, 0, 0);
     const pst = est.inTimeZone(pacific);
     expect(est.eql(pst)).toBe(true);
     expect(est.eql(est)).toBe(true);
   });
 
-  it("eql() works with Date and returns false for non-time", () => {
+  it("eql() returns false for non-TimeWithZone", () => {
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
     expect(twz.eql(twz.utc())).toBe(true);
     expect(twz.eql(null)).toBe(false);
