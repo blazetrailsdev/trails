@@ -301,7 +301,7 @@ export class Base extends Model {
    */
   static columnsHash(): Record<string, { name: string; type: string; default: unknown }> {
     if (this.abstractClass) {
-      throw new Error(`${this.name} is an abstract class and does not have an associated table`);
+      throw new Error(`Cannot call columnsHash on abstract class ${this.name}`);
     }
     const result: Record<string, { name: string; type: string; default: unknown }> = {};
     for (const [name, def] of this._attributeDefinitions) {
