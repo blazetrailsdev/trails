@@ -40,12 +40,17 @@ export function parseRange(input: string): PgRange {
 }
 
 function findSeparator(s: string): number {
-  const depth = 0;
   let inQuote = false;
   for (let i = 0; i < s.length; i++) {
-    if (s[i] === '"' && (i === 0 || s[i - 1] !== "\\")) {
-      inQuote = !inQuote;
-    } else if (!inQuote && s[i] === "," && depth === 0) {
+    if (s[i] === '"') {
+      let backslashes = 0;
+      let j = i - 1;
+      while (j >= 0 && s[j] === "\\") {
+        backslashes++;
+        j--;
+      }
+      if (backslashes % 2 === 0) inQuote = !inQuote;
+    } else if (!inQuote && s[i] === ",") {
       return i;
     }
   }

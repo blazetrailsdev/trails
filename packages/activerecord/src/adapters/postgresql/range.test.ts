@@ -9,8 +9,8 @@ describeIfPg("PostgresAdapter", () => {
   let adapter: PostgresAdapter;
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
-    await adapter.execute(`DROP TABLE IF EXISTS postgresql_ranges`);
-    await adapter.execute(`
+    await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
+    await adapter.exec(`
       CREATE TABLE postgresql_ranges (
         id serial primary key,
         date_range daterange,
@@ -23,7 +23,7 @@ describeIfPg("PostgresAdapter", () => {
     `);
   });
   afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS postgresql_ranges`);
+    await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.close();
   });
 

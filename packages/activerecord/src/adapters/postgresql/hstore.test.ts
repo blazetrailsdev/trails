@@ -1,17 +1,23 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/hstore_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 import { parseHstore, serializeHstore } from "./hstore.js";
 
 describeIfPg("PostgresAdapter", () => {
   let adapter: PostgresAdapter;
+
+  beforeAll(async () => {
+    const setup = new PostgresAdapter(PG_TEST_URL);
+    await setup.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
+    await setup.close();
+  });
+
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
-    await adapter.execute(`CREATE EXTENSION IF NOT EXISTS hstore`);
-    await adapter.execute(`DROP TABLE IF EXISTS hstores`);
-    await adapter.execute(`
+    await adapter.exec(`DROP TABLE IF EXISTS hstores`);
+    await adapter.exec(`
       CREATE TABLE hstores (
         id serial primary key,
         tags hstore DEFAULT '',
@@ -21,7 +27,7 @@ describeIfPg("PostgresAdapter", () => {
     `);
   });
   afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS hstores`);
+    await adapter.exec(`DROP TABLE IF EXISTS hstores`);
     await adapter.close();
   });
 

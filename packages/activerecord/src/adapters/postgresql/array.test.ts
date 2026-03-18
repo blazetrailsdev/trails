@@ -8,8 +8,8 @@ describeIfPg("PostgresAdapter", () => {
   let adapter: PostgresAdapter;
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
-    await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`);
-    await adapter.execute(`
+    await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
+    await adapter.exec(`
       CREATE TABLE pg_arrays (
         id serial primary key,
         tags character varying(255)[],
@@ -20,7 +20,7 @@ describeIfPg("PostgresAdapter", () => {
     `);
   });
   afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`);
+    await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
     await adapter.close();
   });
 
@@ -74,8 +74,8 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
       const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
       const id = rows[0].id;
-      await adapter.execute(`UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = ${id}`);
-      const updated = await adapter.execute(`SELECT tags FROM pg_arrays WHERE id = ${id}`);
+      await adapter.execute(`UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = $1`, [id]);
+      const updated = await adapter.execute(`SELECT tags FROM pg_arrays WHERE id = $1`, [id]);
       expect(updated[0].tags).toEqual(["1", "2", "3", "4"]);
     });
 
@@ -89,8 +89,8 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
       const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
       const id = rows[0].id;
-      await adapter.execute(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = ${id}`);
-      const updated = await adapter.execute(`SELECT ratings FROM pg_arrays WHERE id = ${id}`);
+      await adapter.execute(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = $1`, [id]);
+      const updated = await adapter.execute(`SELECT ratings FROM pg_arrays WHERE id = $1`, [id]);
       expect(updated[0].ratings).toEqual([2, 3, 4]);
     });
 
