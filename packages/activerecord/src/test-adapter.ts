@@ -314,14 +314,11 @@ class SchemaAdapter implements DatabaseAdapter {
       sql = sql.replace(/(OFFSET)/i, "LIMIT -1 $1");
     }
     // SQLite doesn't support parenthesized compound SELECT: (SELECT ...) UNION (SELECT ...)
-    // Unwrap to: SELECT ... UNION SELECT ...
-    sql = sql.replace(/\(\s*(SELECT\s)/gi, "$1");
-    // Remove trailing ) that closed the parenthesized subquery before UNION/INTERSECT/EXCEPT or at end
-    sql = sql.replace(/\)\s*(UNION\s+ALL|UNION|INTERSECT|EXCEPT)/gi, " $1");
-    // Remove trailing ) at end of statement if it was from parenthesized compound
-    if (/(UNION|INTERSECT|EXCEPT)/i.test(sql) && sql.trimEnd().endsWith(")")) {
-      sql = sql.replace(/\)\s*$/, "");
-    }
+    // Only unwrap parens around top-level compound operands, not subqueries like IN (SELECT ...)
+    sql = sql.replace(
+      /^\(\s*(SELECT\b.+?)\)\s+(UNION\s+ALL|UNION|INTERSECT|EXCEPT)\s+\(\s*(SELECT\b.+?)\)$/gis,
+      "$1 $2 $3",
+    );
     return sql;
   }
 
