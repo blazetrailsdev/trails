@@ -16,7 +16,6 @@
  * creation from model definitions — not SQL guessing.
  */
 
-import { MemoryAdapter } from "./adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { _setOnAdapterSetHook } from "./base.js";
 
@@ -24,11 +23,11 @@ const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
 /** Which adapter backend is active. */
-export const adapterType: "memory" | "postgres" | "mysql" = PG_TEST_URL
+export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
   ? "postgres"
   : MYSQL_TEST_URL
     ? "mysql"
-    : "memory";
+    : "sqlite";
 
 const isPg = (): boolean => !!PG_TEST_URL;
 const isMysql = (): boolean => !!MYSQL_TEST_URL;
@@ -210,7 +209,9 @@ async function dropAllTables(inner: any): Promise<void> {
       try {
         const sql = isMysql()
           ? `DROP TABLE IF EXISTS \`${table}\``
-          : `DROP TABLE IF EXISTS "${table}" CASCADE`;
+          : isPg()
+            ? `DROP TABLE IF EXISTS "${table}" CASCADE`
+            : `DROP TABLE IF EXISTS "${table}"`;
         await inner.exec(sql);
       } catch {}
     }
@@ -247,13 +248,13 @@ if (PG_TEST_URL) {
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else {
-  _factory = () => new MemoryAdapter();
+  const { SqliteAdapter } = await import("./adapters/sqlite-adapter.js");
+  _sharedAdapter = new SqliteAdapter(":memory:");
+  _factory = () => new SchemaAdapter(_sharedAdapter);
 }
 
 // Register hook so Base.adapter = x triggers model registration
-if (_sharedAdapter) {
-  _setOnAdapterSetHook(registerModel);
-}
+_setOnAdapterSetHook(registerModel);
 
 /**
  * Create a fresh adapter for testing.
@@ -304,8 +305,29 @@ class SchemaAdapter implements DatabaseAdapter {
     }
   }
 
+  private fixSqliteCompat(sql: string): string {
+    if (isPg() || isMysql()) return sql;
+    // SQLite doesn't support FOR UPDATE / FOR SHARE
+    sql = sql.replace(/\s+FOR\s+(UPDATE|SHARE)(\s+OF\s+\w+)?(\s+NOWAIT|\s+SKIP\s+LOCKED)?/gi, "");
+    // SQLite doesn't support OFFSET without LIMIT
+    if (/OFFSET/i.test(sql) && !/LIMIT/i.test(sql)) {
+      sql = sql.replace(/(OFFSET)/i, "LIMIT -1 $1");
+    }
+    // SQLite doesn't support parenthesized compound SELECT: (SELECT ...) UNION (SELECT ...)
+    // Unwrap to: SELECT ... UNION SELECT ...
+    sql = sql.replace(/\(\s*(SELECT\s)/gi, "$1");
+    // Remove trailing ) that closed the parenthesized subquery before UNION/INTERSECT/EXCEPT or at end
+    sql = sql.replace(/\)\s*(UNION\s+ALL|UNION|INTERSECT|EXCEPT)/gi, " $1");
+    // Remove trailing ) at end of statement if it was from parenthesized compound
+    if (/(UNION|INTERSECT|EXCEPT)/i.test(sql) && sql.trimEnd().endsWith(")")) {
+      sql = sql.replace(/\)\s*$/, "");
+    }
+    return sql;
+  }
+
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     await this.setup();
+    sql = this.fixSqliteCompat(sql);
     try {
       return await this.inner.execute(sql, binds);
     } catch (e: any) {
@@ -318,6 +340,7 @@ class SchemaAdapter implements DatabaseAdapter {
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
     await this.setup();
+    sql = this.fixSqliteCompat(sql);
 
     // Track DDL so we know what tables exist
     const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
@@ -361,7 +384,8 @@ class SchemaAdapter implements DatabaseAdapter {
     const msg = e?.message || e?.sqlMessage || "";
     const tableMatch =
       msg.match(/relation "(\w+)" does not exist/i) ||
-      msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i);
+      msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i) ||
+      msg.match(/no such table: (\w+)/i);
     if (!tableMatch) return false;
 
     const tableName = tableMatch[1];
