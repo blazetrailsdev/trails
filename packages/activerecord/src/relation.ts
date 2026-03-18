@@ -2617,13 +2617,22 @@ export class Relation<T extends Base> {
 
   private _toSqlWithoutSetOp(): string {
     const table = this._modelClass.arelTable;
-    const projections = this._selectColumns
-      ? this._selectColumns.map((c) => {
-          // If the column contains special chars (parens, spaces, *), treat as raw SQL
-          if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
-          return table.get(c);
-        })
-      : ["*"];
+    let projections: any[];
+    if (this._selectColumns) {
+      projections = this._selectColumns.map((c) => {
+        // If the column contains special chars (parens, spaces, *), treat as raw SQL
+        if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
+        return table.get(c);
+      });
+    } else if (this._modelClass._ignoredColumns.length > 0) {
+      const ignored = new Set(this._modelClass._ignoredColumns);
+      projections = this._modelClass
+        .columnNames()
+        .filter((c) => !ignored.has(c))
+        .map((c) => table.get(c));
+    } else {
+      projections = ["*"];
+    }
     const manager = table.project(...(projections as any));
 
     // Apply joins
