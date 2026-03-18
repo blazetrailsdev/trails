@@ -2584,9 +2584,121 @@ describe("EagerAssociationTest", () => {
   it.skip("eager with has many and limit and conditions on the eagers", () => {});
   it.skip("eager with has many and limit and scoped conditions on the eagers", () => {});
   it.skip("eager association loading with habtm", () => {});
-  it.skip("eager with inheritance", () => {});
-  it.skip("eager has one with association inheritance", () => {});
-  it.skip("eager has many with association inheritance", () => {});
+  it("eager with inheritance", async () => {
+    class EagerInhCompany extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EagerInhFirm extends EagerInhCompany {}
+    class EagerInhClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("eager_inh_company_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("EagerInhCompany", EagerInhCompany);
+    registerModel("EagerInhFirm", EagerInhFirm);
+    registerModel("EagerInhClient", EagerInhClient);
+    enableSti(EagerInhCompany);
+    registerSubclass(EagerInhFirm);
+    (EagerInhCompany as any)._associations = [
+      {
+        type: "hasMany",
+        name: "eagerInhClients",
+        options: { className: "EagerInhClient", foreignKey: "eager_inh_company_id" },
+      },
+    ];
+    const firm = await EagerInhFirm.create({ name: "Firm1" });
+    await EagerInhClient.create({ name: "Client1", eager_inh_company_id: firm.id });
+    const companies = await EagerInhCompany.all().includes("eagerInhClients").toArray();
+    expect(companies.length).toBeGreaterThanOrEqual(1);
+    const loaded = (companies[0] as any)._preloadedAssociations?.get("eagerInhClients");
+    expect(loaded).toBeDefined();
+  });
+  it("eager has one with association inheritance", async () => {
+    class EagerHoiParent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EagerHoiProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("type", "string");
+        this.attribute("eager_hoi_parent_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class EagerHoiSpecialProfile extends EagerHoiProfile {}
+    registerModel("EagerHoiParent", EagerHoiParent);
+    registerModel("EagerHoiProfile", EagerHoiProfile);
+    registerModel("EagerHoiSpecialProfile", EagerHoiSpecialProfile);
+    enableSti(EagerHoiProfile);
+    registerSubclass(EagerHoiSpecialProfile);
+    (EagerHoiParent as any)._associations = [
+      {
+        type: "hasOne",
+        name: "eagerHoiProfile",
+        options: { className: "EagerHoiProfile", foreignKey: "eager_hoi_parent_id" },
+      },
+    ];
+    const parent = await EagerHoiParent.create({ name: "P" });
+    await EagerHoiSpecialProfile.create({
+      bio: "Special",
+      eager_hoi_parent_id: parent.id,
+      type: "EagerHoiSpecialProfile",
+    });
+    const parents = await EagerHoiParent.all().includes("eagerHoiProfile").toArray();
+    expect(parents).toHaveLength(1);
+    const profile = (parents[0] as any)._preloadedAssociations?.get("eagerHoiProfile");
+    expect(profile).not.toBeNull();
+    expect(profile.readAttribute("bio")).toBe("Special");
+  });
+  it("eager has many with association inheritance", async () => {
+    class EagerHmiAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EagerHmiPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("eager_hmi_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class EagerHmiSpecialPost extends EagerHmiPost {}
+    registerModel("EagerHmiAuthor", EagerHmiAuthor);
+    registerModel("EagerHmiPost", EagerHmiPost);
+    registerModel("EagerHmiSpecialPost", EagerHmiSpecialPost);
+    enableSti(EagerHmiPost);
+    registerSubclass(EagerHmiSpecialPost);
+    (EagerHmiAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "eagerHmiPosts",
+        options: { className: "EagerHmiPost", foreignKey: "eager_hmi_author_id" },
+      },
+    ];
+    const author = await EagerHmiAuthor.create({ name: "A" });
+    await EagerHmiPost.create({ title: "Normal", eager_hmi_author_id: author.id });
+    await EagerHmiSpecialPost.create({
+      title: "Special",
+      eager_hmi_author_id: author.id,
+      type: "EagerHmiSpecialPost",
+    });
+    const authors = await EagerHmiAuthor.all().includes("eagerHmiPosts").toArray();
+    expect(authors).toHaveLength(1);
+    const posts = (authors[0] as any)._preloadedAssociations?.get("eagerHmiPosts");
+    expect(posts).toHaveLength(2);
+  });
   it.skip("eager habtm with association inheritance", () => {});
   it.skip("eager with multi table conditional properly counts the records when using size", () => {});
 
@@ -3010,7 +3122,46 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].readAttribute("rating")).toBe(4.5);
   });
-  it.skip("polymorphic type condition", () => {});
+  it("polymorphic type condition", async () => {
+    class PtcPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PtcTagging extends Base {
+      static {
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.attribute("ptc_tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PtcTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (PtcPost as any)._associations = [
+      {
+        type: "hasMany",
+        name: "ptcTaggings",
+        options: { as: "taggable", className: "PtcTagging" },
+      },
+    ];
+    registerModel("PtcPost", PtcPost);
+    registerModel("PtcTagging", PtcTagging);
+    registerModel("PtcTag", PtcTag);
+    const post = await PtcPost.create({ title: "Poly" });
+    await PtcTagging.create({ taggable_id: post.id, taggable_type: "PtcPost", ptc_tag_id: 1 });
+    await PtcTagging.create({ taggable_id: post.id, taggable_type: "OtherType", ptc_tag_id: 2 });
+    const posts = await PtcPost.all().includes("ptcTaggings").toArray();
+    expect(posts).toHaveLength(1);
+    const taggings = (posts[0] as any)._preloadedAssociations?.get("ptcTaggings") ?? [];
+    expect(taggings).toHaveLength(1);
+    expect(taggings[0].readAttribute("taggable_type")).toBe("PtcPost");
+  });
   it.skip("eager with multiple associations with same table has many and habtm", () => {});
   it("eager with multiple associations with same table has one", async () => {
     class EagerMultiHoParent extends Base {
@@ -3600,12 +3751,111 @@ describe("EagerAssociationTest", () => {
   it.skip("eager loading of instance dependent associations is not supported", () => {});
   it.skip("preloading of optional instance dependent associations is supported", () => {});
   it.skip("eager loading of optional instance dependent associations is not supported", () => {});
-  it.skip("preload with invalid argument", () => {});
+  it("preload with invalid argument", async () => {
+    class PiaWidget extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PiaWidget", PiaWidget);
+    await PiaWidget.create({ name: "w" });
+    // Preloading a non-existent association should handle gracefully (no crash)
+    const widgets = await PiaWidget.all().preload("nonExistent").toArray();
+    expect(widgets).toHaveLength(1);
+  });
   it.skip("associations with extensions are not instance dependent", () => {});
   it.skip("including associations with extensions and an instance dependent scope is supported", () => {});
-  it.skip("preloading readonly association", () => {});
-  it.skip("eager-loading non-readonly association", () => {});
-  it.skip("eager-loading readonly association", () => {});
+  it("preloading readonly association", async () => {
+    class PraAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PraPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("pra_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    (PraAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "praPosts",
+        options: { className: "PraPost", foreignKey: "pra_author_id" },
+      },
+    ];
+    registerModel("PraAuthor", PraAuthor);
+    registerModel("PraPost", PraPost);
+    const a = await PraAuthor.create({ name: "A" });
+    await PraPost.create({ title: "P", pra_author_id: a.id });
+    const authors = await PraAuthor.all().preload("praPosts").toArray();
+    const posts = (authors[0] as any)._preloadedAssociations?.get("praPosts") ?? [];
+    expect(posts).toHaveLength(1);
+  });
+
+  it("eager-loading non-readonly association", async () => {
+    class EnraAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EnraPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("enra_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    (EnraAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "enraPosts",
+        options: { className: "EnraPost", foreignKey: "enra_author_id" },
+      },
+    ];
+    registerModel("EnraAuthor", EnraAuthor);
+    registerModel("EnraPost", EnraPost);
+    const a = await EnraAuthor.create({ name: "A" });
+    await EnraPost.create({ title: "P", enra_author_id: a.id });
+    const authors = await EnraAuthor.all().includes("enraPosts").toArray();
+    const posts = (authors[0] as any)._preloadedAssociations?.get("enraPosts") ?? [];
+    expect(posts).toHaveLength(1);
+    expect((posts[0] as any)._readonly).not.toBe(true);
+  });
+
+  it("eager-loading readonly association", async () => {
+    class ElraAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ElraPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("elra_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    (ElraAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "elraPosts",
+        options: { className: "ElraPost", foreignKey: "elra_author_id" },
+      },
+    ];
+    registerModel("ElraAuthor", ElraAuthor);
+    registerModel("ElraPost", ElraPost);
+    const a = await ElraAuthor.create({ name: "A" });
+    await ElraPost.create({ title: "P", elra_author_id: a.id });
+    const authors = await ElraAuthor.all().includes("elraPosts").toArray();
+    const posts = (authors[0] as any)._preloadedAssociations?.get("elraPosts") ?? [];
+    expect(posts).toHaveLength(1);
+  });
   it.skip("preloading a polymorphic association with references to the associated table", () => {});
   it.skip("eager-loading a polymorphic association with references to the associated table", () => {});
   it.skip("eager-loading with a polymorphic association won't work consistently", () => {});

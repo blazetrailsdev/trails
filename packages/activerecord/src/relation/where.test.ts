@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Range, defineEnum } from "../index.js";
+import { Base, Range, defineEnum, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
@@ -472,7 +472,37 @@ describe("WhereTest", () => {
     expect(result).toHaveLength(1);
     expect(result[0].readAttribute("title")).toBe("Owned");
   });
-  it.skip("where associated with has many association", () => {});
+  it("where associated with has many association", async () => {
+    class WahmAuthor extends Base {
+      static {
+        this._tableName = "wahm_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class WahmPost extends Base {
+      static {
+        this._tableName = "wahm_posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("wahm_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(WahmAuthor, "wahmPosts", {
+      className: "WahmPost",
+      foreignKey: "wahm_author_id",
+    });
+    registerModel("WahmAuthor", WahmAuthor);
+    registerModel("WahmPost", WahmPost);
+    const a1 = await WahmAuthor.create({ name: "With Posts" });
+    const a2 = await WahmAuthor.create({ name: "No Posts" });
+    await WahmPost.create({ title: "P1", wahm_author_id: a1.id });
+    const result = await WahmAuthor.all().whereAssociated("wahmPosts").toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].readAttribute("name")).toBe("With Posts");
+  });
   it("where associated with multiple associations", async () => {
     class Author extends Base {
       static {
@@ -505,9 +535,103 @@ describe("WhereTest", () => {
     const result = await Post.all().whereAssociated("author", "editor").toArray();
     expect(result).toHaveLength(1);
   });
-  it.skip("where not associated with association", () => {});
-  it.skip("where not associated with has many association", () => {});
-  it.skip("where not associated with multiple associations", () => {});
+  it("where not associated with association", async () => {
+    class WnaPost extends Base {
+      static {
+        this._tableName = "wna_posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(WnaPost, "author", { foreignKey: "author_id" });
+    registerModel("WnaPost", WnaPost);
+    await WnaPost.create({ title: "Orphan", author_id: null });
+    await WnaPost.create({ title: "Owned", author_id: 1 });
+    const result = await WnaPost.all().whereMissing("author").toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].readAttribute("title")).toBe("Orphan");
+  });
+
+  it("where not associated with has many association", async () => {
+    class WnahmAuthor extends Base {
+      static {
+        this._tableName = "wnahm_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class WnahmPost extends Base {
+      static {
+        this._tableName = "wnahm_posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("wnahm_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(WnahmAuthor, "wnahmPosts", {
+      className: "WnahmPost",
+      foreignKey: "wnahm_author_id",
+    });
+    registerModel("WnahmAuthor", WnahmAuthor);
+    registerModel("WnahmPost", WnahmPost);
+    const a1 = await WnahmAuthor.create({ name: "With Posts" });
+    const a2 = await WnahmAuthor.create({ name: "No Posts" });
+    await WnahmPost.create({ title: "P1", wnahm_author_id: a1.id });
+    const result = await WnahmAuthor.all().whereMissing("wnahmPosts").toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].readAttribute("name")).toBe("No Posts");
+  });
+
+  it("where not associated with multiple associations", async () => {
+    class WnammAuthor extends Base {
+      static {
+        this._tableName = "wnamm_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class WnammPost extends Base {
+      static {
+        this._tableName = "wnamm_posts";
+        this.attribute("id", "integer");
+        this.attribute("wnamm_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class WnammComment extends Base {
+      static {
+        this._tableName = "wnamm_comments";
+        this.attribute("id", "integer");
+        this.attribute("wnamm_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(WnammAuthor, "wnamm_posts", {
+      className: "WnammPost",
+      foreignKey: "wnamm_author_id",
+    });
+    Associations.hasMany.call(WnammAuthor, "wnamm_comments", {
+      className: "WnammComment",
+      foreignKey: "wnamm_author_id",
+    });
+    registerModel("WnammAuthor", WnammAuthor);
+    registerModel("WnammPost", WnammPost);
+    registerModel("WnammComment", WnammComment);
+    const a1 = await WnammAuthor.create({ name: "Has Both" });
+    const a2 = await WnammAuthor.create({ name: "Has Posts Only" });
+    const a3 = await WnammAuthor.create({ name: "Has Nothing" });
+    await WnammPost.create({ wnamm_author_id: a1.id });
+    await WnammComment.create({ wnamm_author_id: a1.id });
+    await WnammPost.create({ wnamm_author_id: a2.id });
+    const result = await WnammAuthor.all().whereMissing("wnamm_posts", "wnamm_comments").toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].readAttribute("name")).toBe("Has Nothing");
+  });
   it("where with enum conditions", async () => {
     class Post extends Base {
       static {

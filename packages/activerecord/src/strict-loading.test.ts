@@ -445,8 +445,20 @@ describe("StrictLoadingTest", () => {
     a.strictLoadingBang();
     expect(a.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading via relation is only for that relation", () => {
-    /* needs Relation#strictLoading() method */
+  it("strict loading via relation is only for that relation", async () => {
+    class SlvrAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SlvrAuthor", SlvrAuthor);
+    await SlvrAuthor.create({ name: "A" });
+    await SlvrAuthor.create({ name: "B" });
+    const strictRecords = await SlvrAuthor.all().strictLoading().toArray();
+    expect(strictRecords[0].isStrictLoading()).toBe(true);
+    const normalRecords = await SlvrAuthor.all().toArray();
+    expect(normalRecords[0].isStrictLoading()).toBe(false);
   });
 
   it("strict loading on a belongs to", async () => {
