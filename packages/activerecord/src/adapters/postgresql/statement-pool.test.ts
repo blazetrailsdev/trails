@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlStatementPoolTest", () => {
+  describe("StatementPoolTest", () => {
     it.skip("statement pool", async () => {});
     it.skip("statement pool max", async () => {});
     it.skip("statement pool clear", async () => {});

@@ -23,10 +23,11 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("raises SerializationFailure when a serialization failure occurs", async () => {});
     it.skip("raises QueryCanceled when statement timeout exceeded", async () => {});
     it.skip("raises Interrupt when canceling statement via interrupt", async () => {});
+
+    it.skip("raises Deadlocked when a deadlock is encountered", () => {});
+
+    it.skip("raises LockWaitTimeout when lock wait timeout exceeded", () => {});
+
+    it.skip("raises QueryCanceled when canceling statement due to user request", () => {});
   });
-  it.skip("raises Deadlocked when a deadlock is encountered", () => {});
-
-  it.skip("raises LockWaitTimeout when lock wait timeout exceeded", () => {});
-
-  it.skip("raises QueryCanceled when canceling statement due to user request", () => {});
 });

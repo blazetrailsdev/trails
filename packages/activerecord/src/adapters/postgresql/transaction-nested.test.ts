@@ -21,6 +21,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("unserializable transaction raises SerializationFailure inside nested SavepointTransaction", async () => {});
     it.skip("SerializationFailure inside nested SavepointTransaction is recoverable", async () => {});
     it.skip("deadlock raises Deadlocked inside nested SavepointTransaction", async () => {});
+
+    it.skip("deadlock inside nested SavepointTransaction is recoverable", () => {});
   });
-  it.skip("deadlock inside nested SavepointTransaction is recoverable", () => {});
 });

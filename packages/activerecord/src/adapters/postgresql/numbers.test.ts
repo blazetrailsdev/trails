@@ -23,8 +23,8 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("values", async () => {});
     it.skip("reassigning infinity does not mark record as changed", async () => {});
     it.skip("reassigning nan does not mark record as changed", async () => {});
-  });
-  it.skip("update", () => {
-    /* TODO: needs imports from original file */
+    it.skip("update", () => {
+      /* TODO: needs imports from original file */
+    });
   });
 });

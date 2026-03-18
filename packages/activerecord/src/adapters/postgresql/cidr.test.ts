@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgresqlCidrTest", () => {
+  describe("CidrTest", () => {
     it.skip("cidr column", async () => {});
     it.skip("cidr type cast", async () => {});
     it.skip("cidr invalid", async () => {});

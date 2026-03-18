@@ -96,10 +96,11 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("hstore with serialized attributes", () => {});
     it.skip("clone hstore with serialized attributes", () => {});
     it.skip("supports to unsafe h values", () => {});
+
+    it.skip("select", async () => {});
+
+    it.skip("contains nils", async () => {});
+
+    it.skip("schema dump with shorthand", async () => {});
   });
-  it.skip("select", async () => {});
-
-  it.skip("contains nils", async () => {});
-
-  it.skip("schema dump with shorthand", async () => {});
 });
