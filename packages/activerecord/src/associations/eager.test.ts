@@ -2583,7 +2583,59 @@ describe("EagerAssociationTest", () => {
   it.skip("has and belongs to many should not instantiate same records multiple times", () => {});
   it.skip("eager with has many and limit and conditions on the eagers", () => {});
   it.skip("eager with has many and limit and scoped conditions on the eagers", () => {});
-  it.skip("eager association loading with habtm", () => {});
+  it("eager association loading with habtm", async () => {
+    class HabtmEagerPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HabtmEagerCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasAndBelongsToMany.call(HabtmEagerPost, "habtmEagerCategories", {
+      className: "HabtmEagerCategory",
+      joinTable: "habtm_eager_categories_habtm_eager_posts",
+    });
+    registerModel(HabtmEagerPost);
+    registerModel(HabtmEagerCategory);
+
+    const p1 = await HabtmEagerPost.create({ title: "P1" });
+    const p2 = await HabtmEagerPost.create({ title: "P2" });
+    const p3 = await HabtmEagerPost.create({ title: "P3" });
+    const tech = await HabtmEagerCategory.create({ name: "Technology" });
+    const gen = await HabtmEagerCategory.create({ name: "General" });
+
+    // p1 has 2 categories, p2 has 1, p3 has 0
+    const { CollectionProxy } = await import("../associations.js");
+    const proxy1 = new CollectionProxy(
+      p1,
+      "habtmEagerCategories",
+      (HabtmEagerPost as any)._associations[0],
+    );
+    await proxy1.push(tech, gen);
+    const proxy2 = new CollectionProxy(
+      p2,
+      "habtmEagerCategories",
+      (HabtmEagerPost as any)._associations[0],
+    );
+    await proxy2.push(gen);
+
+    const posts = await HabtmEagerPost.all()
+      .includes("habtmEagerCategories")
+      .order("id", "asc")
+      .toArray();
+    expect(posts).toHaveLength(3);
+    const cats0 = (posts[0] as any)._preloadedAssociations.get("habtmEagerCategories");
+    const cats1 = (posts[1] as any)._preloadedAssociations.get("habtmEagerCategories");
+    const cats2 = (posts[2] as any)._preloadedAssociations.get("habtmEagerCategories");
+    expect(cats0).toHaveLength(2);
+    expect(cats1).toHaveLength(1);
+    expect(cats2).toHaveLength(0);
+  });
   it("eager with inheritance", async () => {
     class EagerInhCompany extends Base {
       static {
@@ -2699,7 +2751,49 @@ describe("EagerAssociationTest", () => {
     const posts = (authors[0] as any)._preloadedAssociations?.get("eagerHmiPosts");
     expect(posts).toHaveLength(2);
   });
-  it.skip("eager habtm with association inheritance", () => {});
+  it("eager habtm with association inheritance", async () => {
+    class HabtmInhPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HabtmInhCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HabtmInhSpecialCategory extends HabtmInhCategory {}
+    enableSti(HabtmInhCategory);
+    registerSubclass(HabtmInhSpecialCategory);
+    Associations.hasAndBelongsToMany.call(HabtmInhPost, "habtmInhSpecialCategories", {
+      className: "HabtmInhSpecialCategory",
+      joinTable: "habtm_inh_categories_habtm_inh_posts",
+    });
+    registerModel(HabtmInhPost);
+    registerModel(HabtmInhCategory);
+    registerModel(HabtmInhSpecialCategory);
+
+    const post = await HabtmInhPost.create({ title: "STI Post" });
+    const special = await HabtmInhSpecialCategory.create({ name: "Special" });
+
+    const { CollectionProxy } = await import("../associations.js");
+    const proxy = new CollectionProxy(
+      post,
+      "habtmInhSpecialCategories",
+      (HabtmInhPost as any)._associations[0],
+    );
+    await proxy.push(special);
+
+    const posts = await HabtmInhPost.all()
+      .includes("habtmInhSpecialCategories")
+      .where({ id: post.id })
+      .toArray();
+    const cats = (posts[0] as any)._preloadedAssociations.get("habtmInhSpecialCategories");
+    expect(cats).toHaveLength(1);
+  });
   it.skip("eager with multi table conditional properly counts the records when using size", () => {});
 
   it("eager with invalid association reference", async () => {
@@ -3162,7 +3256,58 @@ describe("EagerAssociationTest", () => {
     expect(taggings).toHaveLength(1);
     expect(taggings[0].readAttribute("taggable_type")).toBe("PtcPost");
   });
-  it.skip("eager with multiple associations with same table has many and habtm", () => {});
+  it("eager with multiple associations with same table has many and habtm", async () => {
+    class MaHabtmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class MaHabtmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ma_habtm_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class MaHabtmCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(MaHabtmAuthor, "maHabtmPosts", {
+      foreignKey: "ma_habtm_author_id",
+    });
+    Associations.hasAndBelongsToMany.call(MaHabtmAuthor, "maHabtmCategories", {
+      className: "MaHabtmCategory",
+      joinTable: "ma_habtm_authors_ma_habtm_categories",
+    });
+    registerModel(MaHabtmAuthor);
+    registerModel(MaHabtmPost);
+    registerModel(MaHabtmCategory);
+
+    const author = await MaHabtmAuthor.create({ name: "David" });
+    await MaHabtmPost.create({ title: "P1", ma_habtm_author_id: author.id });
+    const cat = await MaHabtmCategory.create({ name: "General" });
+
+    const { CollectionProxy } = await import("../associations.js");
+    const proxy = new CollectionProxy(
+      author,
+      "maHabtmCategories",
+      (MaHabtmAuthor as any)._associations[1],
+    );
+    await proxy.push(cat);
+
+    const authors = await MaHabtmAuthor.all()
+      .includes("maHabtmPosts", "maHabtmCategories")
+      .toArray();
+    expect(authors).toHaveLength(1);
+    const posts = (authors[0] as any)._preloadedAssociations.get("maHabtmPosts");
+    const cats = (authors[0] as any)._preloadedAssociations.get("maHabtmCategories");
+    expect(posts).toHaveLength(1);
+    expect(cats).toHaveLength(1);
+  });
   it("eager with multiple associations with same table has one", async () => {
     class EagerMultiHoParent extends Base {
       static {
@@ -3361,8 +3506,113 @@ describe("EagerAssociationTest", () => {
     expect(preloaded?.readAttribute("value")).toBe("V");
   });
   it.skip("eager association with scope with joins", () => {});
-  it.skip("preconfigured includes with habtm", () => {});
-  it.skip("preconfigured includes with has many and habtm", () => {});
+  it("preconfigured includes with habtm", async () => {
+    class PciAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PciPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("pci_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PciCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(PciAuthor, "pciPosts", { foreignKey: "pci_author_id" });
+    Associations.hasAndBelongsToMany.call(PciPost, "pciCategories", {
+      className: "PciCategory",
+      joinTable: "pci_categories_pci_posts",
+    });
+    registerModel(PciAuthor);
+    registerModel(PciPost);
+    registerModel(PciCategory);
+
+    const author = await PciAuthor.create({ name: "David" });
+    const post = await PciPost.create({ title: "P1", pci_author_id: author.id });
+    const cat1 = await PciCategory.create({ name: "Tech" });
+    const cat2 = await PciCategory.create({ name: "General" });
+
+    const { CollectionProxy } = await import("../associations.js");
+    const proxy = new CollectionProxy(post, "pciCategories", (PciPost as any)._associations[0]);
+    await proxy.push(cat1, cat2);
+
+    // Load author's posts, then preload categories on posts
+    const posts = await PciPost.all()
+      .where({ pci_author_id: author.id })
+      .includes("pciCategories")
+      .toArray();
+    expect(posts).toHaveLength(1);
+    const cats = (posts[0] as any)._preloadedAssociations.get("pciCategories");
+    expect(cats).toHaveLength(2);
+  });
+
+  it("preconfigured includes with has many and habtm", async () => {
+    class PcihAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PcihPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("pcih_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PcihComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("pcih_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PcihCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(PcihAuthor, "pcihPosts", { foreignKey: "pcih_author_id" });
+    Associations.hasMany.call(PcihPost, "pcihComments", { foreignKey: "pcih_post_id" });
+    Associations.hasAndBelongsToMany.call(PcihPost, "pcihCategories", {
+      className: "PcihCategory",
+      joinTable: "pcih_categories_pcih_posts",
+    });
+    registerModel(PcihAuthor);
+    registerModel(PcihPost);
+    registerModel(PcihComment);
+    registerModel(PcihCategory);
+
+    const author = await PcihAuthor.create({ name: "David" });
+    const post = await PcihPost.create({ title: "P1", pcih_author_id: author.id });
+    await PcihComment.create({ body: "C1", pcih_post_id: post.id });
+    await PcihComment.create({ body: "C2", pcih_post_id: post.id });
+    const cat1 = await PcihCategory.create({ name: "Tech" });
+    const cat2 = await PcihCategory.create({ name: "General" });
+
+    const { CollectionProxy } = await import("../associations.js");
+    const proxy = new CollectionProxy(post, "pcihCategories", (PcihPost as any)._associations[1]);
+    await proxy.push(cat1, cat2);
+
+    const posts = await PcihPost.all()
+      .where({ pcih_author_id: author.id })
+      .includes("pcihComments", "pcihCategories")
+      .toArray();
+    expect(posts).toHaveLength(1);
+    const comments = (posts[0] as any)._preloadedAssociations.get("pcihComments");
+    const cats = (posts[0] as any)._preloadedAssociations.get("pcihCategories");
+    expect(comments).toHaveLength(2);
+    expect(cats).toHaveLength(2);
+  });
 
   it("count with include", async () => {
     class EagerCountPost extends Base {
@@ -3397,7 +3647,37 @@ describe("EagerAssociationTest", () => {
 
   it.skip("association loading notification", () => {});
   it.skip("base messages", () => {});
-  it.skip("load with sti sharing association", () => {});
+  it("load with sti sharing association", async () => {
+    class StiShareComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("type", "string");
+        this.attribute("sti_share_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class StiSharePost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    enableSti(StiShareComment);
+    Associations.belongsTo.call(StiShareComment, "stiSharePost", {
+      foreignKey: "sti_share_post_id",
+    });
+    registerModel(StiShareComment);
+    registerModel(StiSharePost);
+
+    const post = await StiSharePost.create({ title: "T" });
+    await StiShareComment.create({ body: "C", sti_share_post_id: post.id });
+
+    const comments = await StiShareComment.all().includes("stiSharePost").toArray();
+    expect(comments).toHaveLength(1);
+    const loaded = (comments[0] as any)._preloadedAssociations.get("stiSharePost");
+    expect(loaded).not.toBeNull();
+    expect(loaded.readAttribute("title")).toBe("T");
+  });
   it.skip("conditions on join table with include and limit", () => {});
   it.skip("dont create temporary active record instances", () => {});
   it.skip("order on join table with include and limit", () => {});
@@ -3669,9 +3949,13 @@ describe("EagerAssociationTest", () => {
     expect(devs[0].readAttribute("name")).toBe("David");
   });
   it.skip("scoping with a circular preload", () => {});
+
   it.skip("circular preload does not modify unscoped", () => {});
+
   it.skip("belongs_to association ignores the scoping", () => {});
+
   it.skip("has_many association ignores the scoping", () => {});
+
   it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {});
   it("preloading a through association twice does not reset it", async () => {
     class EagerTwiceOwner extends Base {
@@ -3859,7 +4143,49 @@ describe("EagerAssociationTest", () => {
   it.skip("preloading a polymorphic association with references to the associated table", () => {});
   it.skip("eager-loading a polymorphic association with references to the associated table", () => {});
   it.skip("eager-loading with a polymorphic association won't work consistently", () => {});
-  it.skip("preloading has_many_through association avoids calling association.reader", () => {});
+  it("preloading has_many_through association avoids calling association.reader", async () => {
+    class PhmtAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("phmt_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("phmt_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(PhmtAuthor, "phmtPosts", { foreignKey: "phmt_author_id" });
+    Associations.hasMany.call(PhmtAuthor, "phmtComments", {
+      through: "phmtPosts",
+      source: "phmtComment",
+      className: "PhmtComment",
+    });
+    Associations.hasMany.call(PhmtPost, "phmtComments", { foreignKey: "phmt_post_id" });
+    registerModel(PhmtAuthor);
+    registerModel(PhmtPost);
+    registerModel(PhmtComment);
+
+    const author = await PhmtAuthor.create({ name: "David" });
+    const post = await PhmtPost.create({ title: "T", phmt_author_id: author.id });
+    await PhmtComment.create({ body: "C", phmt_post_id: post.id });
+
+    // Preloading the through association should work without calling association.reader
+    const authors = await PhmtAuthor.all().preload("phmtComments").toArray();
+    expect(authors).toHaveLength(1);
+    const comments = (authors[0] as any)._preloadedAssociations.get("phmtComments");
+    expect(comments).toHaveLength(1);
+    expect(comments[0].readAttribute("body")).toBe("C");
+  });
   it.skip("preloading through a polymorphic association doesn't require the association to exist", () => {});
   it.skip("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", () => {});
   it.skip("preloading a regular association with a typo through a polymorphic association still raises", () => {});
@@ -3869,7 +4195,9 @@ describe("EagerAssociationTest", () => {
   it.skip("preloading has_many through association associated by a composite query_constraints", () => {});
   it.skip("preloading belongs_to CPK model with one of the keys being shared between models", () => {});
   it.skip("preloading belongs_to with cpk", () => {});
+
   it.skip("preloading has_many with cpk", () => {});
+
   it.skip("preloading has_one with cpk", () => {});
 });
 
