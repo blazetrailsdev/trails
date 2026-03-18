@@ -3263,7 +3263,7 @@ export class Relation<T extends Base> {
           const sourceAssocDef =
             throughModelAssociations.find((a: any) => a.name === sourceName) ??
             throughModelAssociations.find((a: any) => a.name === pluralize(sourceName));
-          const sourceType = sourceAssocDef?.type ?? "belongsTo";
+          const sourceAssocKind = sourceAssocDef?.type ?? "belongsTo";
 
           let targetRecords: any[];
           let targetMap: Map<unknown, any>;
@@ -3274,7 +3274,7 @@ export class Relation<T extends Base> {
           if (
             assocDef.options.sourceType &&
             sourceAssocDef?.options?.polymorphic &&
-            sourceType === "belongsTo"
+            sourceAssocKind === "belongsTo"
           ) {
             const typeCol = `${underscore(sourceName)}_type`;
             filteredThroughRecords = throughRecords.filter(
@@ -3282,9 +3282,10 @@ export class Relation<T extends Base> {
             );
           }
 
-          if (sourceType === "belongsTo") {
+          if (sourceAssocKind === "belongsTo") {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
-            const targetFk = `${underscore(sourceName)}_id`;
+            const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+            const targetPk = (targetModel as any).primaryKey ?? "id";
 
             const targetIds = [
               ...new Set(
@@ -3293,11 +3294,11 @@ export class Relation<T extends Base> {
                   .filter((v: any) => v != null),
               ),
             ];
-            let targetRel = (targetModel as any).all().where({ id: targetIds });
+            let targetRel = (targetModel as any).all().where({ [targetPk]: targetIds });
             if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
             targetRecords = targetIds.length > 0 ? await targetRel.toArray() : [];
             targetMap = new Map<unknown, any>();
-            for (const r of targetRecords) targetMap.set(r.readAttribute("id"), r);
+            for (const r of targetRecords) targetMap.set(r.readAttribute(targetPk), r);
             getTargetsForThrough = (tr: any) => {
               const target = targetMap.get(tr.readAttribute(targetFk));
               return target ? [target] : [];

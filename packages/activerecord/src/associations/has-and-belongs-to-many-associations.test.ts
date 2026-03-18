@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { loadHasMany, loadHabtm, association, Associations } from "../associations.js";
+import { loadHasMany, loadHabtm, association } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -47,10 +47,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     registerModel(Developer);
     registerModel(Project);
     registerModel(DeveloperProject);
-    Associations.hasAndBelongsToMany.call(Developer, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-    });
+    // Reset associations to avoid accumulation across tests
+    (Developer as any)._associations = [
+      {
+        type: "hasAndBelongsToMany",
+        name: "projects",
+        options: { className: "Project", joinTable: "developer_projects" },
+      },
+    ];
   });
 
   it.skip("marshal dump", () => {
@@ -1000,9 +1004,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("habtm adding before save", async () => {
-    const dev = new Developer({ name: "BeforeSave", salary: 50000 });
-    await dev.save();
-    const proj = await Project.create({ name: "BSProj" });
+    const dev = await Developer.create({ name: "BeforeSave", salary: 50000 });
+    const proj = new Project({ name: "BSProj" });
+    await proj.save();
     const proxy = association(dev, "projects");
     await proxy.push(proj);
     const projects = await proxy.toArray();

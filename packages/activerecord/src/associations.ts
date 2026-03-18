@@ -691,9 +691,9 @@ export async function loadHasManyThrough(
   const sourceAssoc =
     throughModelAssocs.find((a) => a.name === sourceName) ??
     throughModelAssocs.find((a) => a.name === pluralize(sourceName));
-  const sourceType = sourceAssoc?.type ?? "belongsTo";
+  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
 
-  if (sourceType === "belongsTo") {
+  if (sourceAssocKind === "belongsTo") {
     // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
     const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
 
