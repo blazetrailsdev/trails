@@ -30,14 +30,13 @@ Partially implemented in #128: through-aware `build`/`create` on `CollectionProx
 49 new passing tests covering basic through CRUD, polymorphic/STI through,
 nested through chains, and collection proxy operations (push/delete/replace/setIds).
 
-Further progress in #130: 24 more tests unskipped covering collection proxy operations,
-scope filtering on targets, composite/nonstandard PKs, polymorphic through, and error
-handling. Also adds error classes (`HasManyThroughCantAssociateThroughHasOneOrManyReflection`,
+Further progress in #130: 6 more tests unskipped covering callback ordering,
+scope filtering on targets, and error handling. Also adds error classes (`HasManyThroughCantAssociateThroughHasOneOrManyReflection`,
 `HasManyThroughNestedAssociationsAreReadonly`, `HasOneThroughNestedAssociationsAreReadonly`,
 `HasManyThroughOrderError`) — these aren't wired into CollectionProxy enforcement yet,
 that should be a separate PR when the write protection logic is implemented.
 
-Remaining ~79 skipped tests need:
+Remaining ~97 skipped tests need:
 
 - **SQL join generation** (~20): `joins`, `left_joins`, `inner_join`, `explicitly_joining_join_table`, `joining_has_many_through_*`
 - **Scope merging on through** (~15): `source_scope`, `through_scope_with_includes/joins`, `unscope`, `default_scope_on_target`
