@@ -260,8 +260,69 @@ describe("InnerJoinAssociationTest", () => {
     expect(results[0].readAttribute("title")).toBe("P1");
   });
 
-  it.skip("find with conditions on through reflection", () => {
-    /* needs has_many through join */
+  it("find with conditions on through reflection", async () => {
+    class ThrAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ThrPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("thr_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ThrTagging extends Base {
+      static {
+        this.attribute("thr_post_id", "integer");
+        this.attribute("thr_tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ThrTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(ThrAuthor, "thrPosts", { foreignKey: "thr_author_id" });
+    Associations.hasMany.call(ThrAuthor, "thrTags", {
+      through: "thrPosts",
+      source: "thrTag",
+      className: "ThrTag",
+    });
+    Associations.hasMany.call(ThrPost, "thrTaggings", { foreignKey: "thr_post_id" });
+    Associations.hasMany.call(ThrPost, "thrTags", {
+      through: "thrTaggings",
+      source: "thrTag",
+      className: "ThrTag",
+    });
+    Associations.belongsTo.call(ThrTagging, "thrTag", {
+      foreignKey: "thr_tag_id",
+      className: "ThrTag",
+    });
+    registerModel(ThrAuthor);
+    registerModel(ThrPost);
+    registerModel(ThrTagging);
+    registerModel(ThrTag);
+
+    // Verify the through join generates correct SQL
+    const sql = ThrPost.joins("thrTags").toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("thr_taggings");
+    expect(sql).toContain("thr_tags");
+
+    // Verify it works end-to-end
+    const author = await ThrAuthor.create({ name: "Alice" });
+    const post = await ThrPost.create({ title: "P1", thr_author_id: author.id });
+    const tag = await ThrTag.create({ name: "ruby" });
+    await ThrTagging.create({ thr_post_id: post.id, thr_tag_id: tag.id });
+
+    const results = await ThrPost.joins("thrTags").where({ id: post.id }).toArray();
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].readAttribute("title")).toBe("P1");
   });
 
   it("the default scope of the target is applied when joining associations", () => {

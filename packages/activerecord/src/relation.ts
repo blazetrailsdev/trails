@@ -8,6 +8,7 @@ import {
   underscore as _toUnderscore,
   camelize as _camelize,
   singularize as _singularize,
+  pluralize as _pluralize,
 } from "@rails-ts/activesupport";
 
 /**
@@ -1069,7 +1070,13 @@ export class Relation<T extends Base> {
     } else {
       const resolved = rel._resolveAssociationJoin(tableOrSql);
       if (resolved) {
-        rel._joinClauses.push({ type: "inner", table: resolved.table, on: resolved.on });
+        if (Array.isArray(resolved)) {
+          for (const join of resolved) {
+            rel._joinClauses.push({ type: "inner", table: join.table, on: join.on });
+          }
+        } else {
+          rel._joinClauses.push({ type: "inner", table: resolved.table, on: resolved.on });
+        }
       } else {
         rel._rawJoins.push(tableOrSql);
       }
@@ -1090,7 +1097,13 @@ export class Relation<T extends Base> {
     } else {
       const resolved = rel._resolveAssociationJoin(table);
       if (resolved) {
-        rel._joinClauses.push({ type: "left", table: resolved.table, on: resolved.on });
+        if (Array.isArray(resolved)) {
+          for (const join of resolved) {
+            rel._joinClauses.push({ type: "left", table: join.table, on: join.on });
+          }
+        } else {
+          rel._joinClauses.push({ type: "left", table: resolved.table, on: resolved.on });
+        }
       } else {
         rel._joinClauses.push({ type: "left", table, on: "1=1" });
       }
@@ -1109,10 +1122,15 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolve an association name to a JOIN table and ON condition.
+   * Resolve an association name to one or more JOIN table/ON pairs.
    * Returns null if the name is not a recognized association.
+   *
+   * Through and HABTM associations produce multiple joins (the intermediate
+   * table(s) plus the final target).
    */
-  private _resolveAssociationJoin(name: string): { table: string; on: string } | null {
+  private _resolveAssociationJoin(
+    name: string,
+  ): { table: string; on: string } | Array<{ table: string; on: string }> | null {
     const modelClass = this._modelClass as any;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === name);
@@ -1145,6 +1163,11 @@ export class Relation<T extends Base> {
     }
 
     if (assocDef.type === "hasOne" || assocDef.type === "hasMany") {
+      // Through association: join through the intermediate model, then the target
+      if (assocDef.options.through) {
+        return this._resolveThroughJoin(modelClass, assocDef);
+      }
+
       const className =
         assocDef.options.className ??
         _camelize(assocDef.type === "hasMany" ? _singularize(name) : name);
@@ -1175,7 +1198,140 @@ export class Relation<T extends Base> {
       return { table: targetTable, on: onClause };
     }
 
+    // hasManyThrough (test-data style where type is literally "hasManyThrough")
+    if (
+      (assocDef.type as string) === "hasManyThrough" ||
+      (assocDef.type as string) === "hasOneThrough"
+    ) {
+      return this._resolveThroughJoin(modelClass, assocDef);
+    }
+
+    // HABTM: join through the join table, then the target
+    if (assocDef.type === "hasAndBelongsToMany") {
+      return this._resolveHabtmJoin(modelClass, assocDef);
+    }
+
     return null;
+  }
+
+  /**
+   * Resolve a has_many/has_one :through association into multiple JOIN clauses.
+   */
+  private _resolveThroughJoin(
+    modelClass: any,
+    assocDef: any,
+  ): Array<{ table: string; on: string }> | null {
+    const sourceTable = modelClass.tableName;
+    const sourcePk = modelClass.primaryKey ?? "id";
+    const associations: any[] = modelClass._associations ?? [];
+
+    const throughName = assocDef.options.through;
+    const throughAssocDef = associations.find((a: any) => a.name === throughName);
+    if (!throughAssocDef) return null;
+
+    // Resolve the through (intermediate) model
+    const throughClassName =
+      throughAssocDef.options.className ??
+      _camelize(throughAssocDef.type === "hasMany" ? _singularize(throughName) : throughName);
+    const throughModel = modelRegistry.get(throughClassName);
+    if (!throughModel) return null;
+    const throughTable = (throughModel as any).tableName;
+
+    // Build the first JOIN: source -> through
+    const throughPk = throughAssocDef.options.primaryKey ?? sourcePk;
+    let throughFk: string;
+    let throughOn: string;
+
+    if (throughAssocDef.type === "belongsTo") {
+      throughFk = throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughName)}_id`;
+      const throughTargetPk = throughModel.primaryKey ?? "id";
+      throughOn = `"${throughTable}"."${throughTargetPk}" = "${sourceTable}"."${throughFk}"`;
+    } else {
+      // hasMany or hasOne
+      const throughAsName = throughAssocDef.options.as;
+      throughFk = throughAsName
+        ? (throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughAsName)}_id`)
+        : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+      throughOn = `"${throughTable}"."${throughFk}" = "${sourceTable}"."${throughPk}"`;
+      if (throughAsName) {
+        const typeCol = `${_toUnderscore(throughAsName)}_type`;
+        throughOn += ` AND "${throughTable}"."${typeCol}" = '${modelClass.name}'`;
+      }
+    }
+
+    const joins: Array<{ table: string; on: string }> = [{ table: throughTable, on: throughOn }];
+
+    // Resolve the source association on the through model to build the second JOIN
+    const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
+    const throughModelAssocs: any[] = (throughModel as any)._associations ?? [];
+    const sourceAssocDef =
+      throughModelAssocs.find((a: any) => a.name === sourceName) ??
+      throughModelAssocs.find((a: any) => a.name === _pluralize(sourceName));
+
+    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocDef.name));
+    const targetModel = modelRegistry.get(targetClassName);
+    if (!targetModel) return joins; // Return at least the through join
+    const targetTable = (targetModel as any).tableName;
+
+    const sourceType = sourceAssocDef?.type ?? "belongsTo";
+
+    if (sourceType === "belongsTo") {
+      const targetFk = sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
+      const targetPk = targetModel.primaryKey ?? "id";
+      joins.push({
+        table: targetTable,
+        on: `"${targetTable}"."${targetPk}" = "${throughTable}"."${targetFk}"`,
+      });
+    } else {
+      // hasMany or hasOne: target has FK pointing to through
+      const sourceAsName = sourceAssocDef?.options?.as;
+      const sourceFk = sourceAsName
+        ? (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceAsName)}_id`)
+        : (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`);
+      const throughPkCol = throughModel.primaryKey ?? "id";
+      let targetOn = `"${targetTable}"."${sourceFk}" = "${throughTable}"."${throughPkCol}"`;
+      if (sourceAsName) {
+        const typeCol = `${_toUnderscore(sourceAsName)}_type`;
+        targetOn += ` AND "${targetTable}"."${typeCol}" = '${throughClassName}'`;
+      }
+      joins.push({ table: targetTable, on: targetOn });
+    }
+
+    return joins;
+  }
+
+  /**
+   * Resolve a HABTM association into JOIN clauses through the join table.
+   */
+  private _resolveHabtmJoin(
+    modelClass: any,
+    assocDef: any,
+  ): Array<{ table: string; on: string }> | null {
+    const sourceTable = modelClass.tableName;
+    const sourcePk = modelClass.primaryKey ?? "id";
+
+    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocDef.name));
+    const targetModel = modelRegistry.get(targetClassName);
+    if (!targetModel) return null;
+    const targetTable = (targetModel as any).tableName;
+    const targetPk = targetModel.primaryKey ?? "id";
+
+    // Join table name
+    const tables = [sourceTable, targetTable].sort();
+    const joinTable = assocDef.options.joinTable ?? `${tables[0]}_${tables[1]}`;
+    const ownerFk = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+    const targetFk = `${_toUnderscore(_singularize(assocDef.name))}_id`;
+
+    return [
+      {
+        table: joinTable,
+        on: `"${joinTable}"."${ownerFk}" = "${sourceTable}"."${sourcePk}"`,
+      },
+      {
+        table: targetTable,
+        on: `"${targetTable}"."${targetPk}" = "${joinTable}"."${targetFk}"`,
+      },
+    ];
   }
 
   /**
