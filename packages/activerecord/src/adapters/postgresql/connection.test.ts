@@ -96,8 +96,7 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("reset with transaction", async () => {});
     it.skip("prepare false with binds", async () => {});
     it.skip("reconnection after actual disconnection with verify", async () => {});
+    it.skip("get and release advisory lock", () => {});
+    it.skip("release non existent advisory lock", () => {});
   });
-  it.skip("get and release advisory lock", () => {});
-
-  it.skip("release non existent advisory lock", () => {});
 });

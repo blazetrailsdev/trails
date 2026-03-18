@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgreSQLDataTypeTest", () => {
+  describe("PostgreSQLInternalDatatypeTest", () => {
     it.skip("money column", async () => {});
     it.skip("number column", async () => {});
     it.skip("time column", async () => {});

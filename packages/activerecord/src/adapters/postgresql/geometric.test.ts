@@ -60,9 +60,6 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("geometric where", async () => {});
     it.skip("geometric invalid", async () => {});
     it.skip("geometric nil", async () => {});
-    it.skip("geometric types", () => {});
-    it.skip("alternative format", () => {});
-    it.skip("geometric function", () => {});
     it.skip("creating column with point type", () => {});
     it.skip("creating column with line type", () => {});
     it.skip("creating column with lseg type", () => {});
@@ -70,6 +67,12 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("creating column with path type", () => {});
     it.skip("creating column with polygon type", () => {});
     it.skip("creating column with circle type", () => {});
+  });
+
+  describe("PostgreSQLGeometricTest", () => {
+    it.skip("geometric types", () => {});
+    it.skip("alternative format", () => {});
+    it.skip("geometric function", () => {});
   });
 
   describe("PostgreSQLGeometricLineTest", () => {

@@ -21,8 +21,8 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("xml schema dump", async () => {});
     it.skip("null xml", async () => {});
     it.skip("round trip", async () => {});
-  });
-  it.skip("update all", () => {
-    /* TODO: needs imports from original file */
+    it.skip("update all", () => {
+      /* TODO: needs imports from original file */
+    });
   });
 });

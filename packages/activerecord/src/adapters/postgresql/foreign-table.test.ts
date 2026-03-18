@@ -30,8 +30,8 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("insert record", async () => {});
     it.skip("update record", async () => {});
     it.skip("delete record", async () => {});
-  });
-  it.skip("attribute names", () => {
-    /* TODO: needs imports from original file */
+    it.skip("attribute names", () => {
+      /* TODO: needs imports from original file */
+    });
   });
 });
