@@ -1,6 +1,5 @@
 export { Base } from "./base.js";
 export { Relation, Range } from "./relation.js";
-export { MemoryAdapter } from "./adapter.js";
 export type { DatabaseAdapter } from "./adapter.js";
 export { Migration, TableDefinition, Schema, MigrationContext } from "./migration.js";
 export type { ColumnType, ColumnOptions } from "./migration.js";

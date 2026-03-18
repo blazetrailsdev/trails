@@ -4,7 +4,7 @@
  * Returns the appropriate adapter based on environment variables:
  *   - PG_TEST_URL    → PostgresAdapter (wrapped in SchemaAdapter)
  *   - MYSQL_TEST_URL → MysqlAdapter (wrapped in SchemaAdapter)
- *   - (default)      → MemoryAdapter
+ *   - (default)      → SqliteAdapter (:memory:)
  *
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
@@ -16,7 +16,6 @@
  * creation from model definitions — not SQL guessing.
  */
 
-import { MemoryAdapter } from "./adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { _setOnAdapterSetHook } from "./base.js";
 
@@ -24,11 +23,11 @@ const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
 /** Which adapter backend is active. */
-export const adapterType: "memory" | "postgres" | "mysql" = PG_TEST_URL
+export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
   ? "postgres"
   : MYSQL_TEST_URL
     ? "mysql"
-    : "memory";
+    : "sqlite";
 
 const isPg = (): boolean => !!PG_TEST_URL;
 const isMysql = (): boolean => !!MYSQL_TEST_URL;
@@ -210,7 +209,9 @@ async function dropAllTables(inner: any): Promise<void> {
       try {
         const sql = isMysql()
           ? `DROP TABLE IF EXISTS \`${table}\``
-          : `DROP TABLE IF EXISTS "${table}" CASCADE`;
+          : isPg()
+            ? `DROP TABLE IF EXISTS "${table}" CASCADE`
+            : `DROP TABLE IF EXISTS "${table}"`;
         await inner.exec(sql);
       } catch {}
     }
@@ -247,13 +248,13 @@ if (PG_TEST_URL) {
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else {
-  _factory = () => new MemoryAdapter();
+  const { SqliteAdapter } = await import("./adapters/sqlite-adapter.js");
+  _sharedAdapter = new SqliteAdapter(":memory:");
+  _factory = () => new SchemaAdapter(_sharedAdapter);
 }
 
 // Register hook so Base.adapter = x triggers model registration
-if (_sharedAdapter) {
-  _setOnAdapterSetHook(registerModel);
-}
+_setOnAdapterSetHook(registerModel);
 
 /**
  * Create a fresh adapter for testing.
@@ -285,7 +286,7 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner = inner;
   }
 
-  /** Expose created tables for test introspection (mirrors MemoryAdapter.tables). */
+  /** Expose created tables for test introspection. */
   get tables(): Set<string> {
     return _createdTables;
   }
@@ -304,8 +305,54 @@ class SchemaAdapter implements DatabaseAdapter {
     }
   }
 
+  private unwrapCompoundSelect(sql: string): string {
+    const ops = /^\s*(UNION\s+ALL|UNION|INTERSECT|EXCEPT)\s+/i;
+    const trimmed = sql.trim();
+    if (trimmed[0] !== "(") return sql;
+
+    // Find the matching close-paren for the opening paren
+    let depth = 0;
+    let i = 0;
+    for (; i < trimmed.length; i++) {
+      if (trimmed[i] === "(") depth++;
+      else if (trimmed[i] === ")") {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    if (depth !== 0) return sql;
+
+    const left = trimmed.slice(1, i).trim();
+    const rest = trimmed.slice(i + 1).trim();
+    const opMatch = rest.match(ops);
+    if (!opMatch) return sql;
+
+    const op = opMatch[1];
+    let right = rest.slice(opMatch[0].length).trim();
+    // Unwrap right-side parens if present
+    if (right.startsWith("(") && right.endsWith(")")) {
+      right = right.slice(1, -1).trim();
+    }
+    return `${left} ${op} ${right}`;
+  }
+
+  private fixSqliteCompat(sql: string): string {
+    if (isPg() || isMysql()) return sql;
+    // SQLite doesn't support FOR UPDATE / FOR SHARE
+    sql = sql.replace(/\s+FOR\s+(UPDATE|SHARE)(\s+OF\s+\w+)?(\s+NOWAIT|\s+SKIP\s+LOCKED)?/gi, "");
+    // SQLite doesn't support OFFSET without LIMIT
+    if (/OFFSET/i.test(sql) && !/LIMIT/i.test(sql)) {
+      sql = sql.replace(/(OFFSET)/i, "LIMIT -1 $1");
+    }
+    // SQLite doesn't support parenthesized compound SELECT: (SELECT ...) UNION (SELECT ...)
+    // Unwrap only top-level parens by tracking nesting depth
+    sql = this.unwrapCompoundSelect(sql);
+    return sql;
+  }
+
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     await this.setup();
+    sql = this.fixSqliteCompat(sql);
     try {
       return await this.inner.execute(sql, binds);
     } catch (e: any) {
@@ -318,6 +365,7 @@ class SchemaAdapter implements DatabaseAdapter {
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
     await this.setup();
+    sql = this.fixSqliteCompat(sql);
 
     // Track DDL so we know what tables exist
     const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
@@ -361,7 +409,8 @@ class SchemaAdapter implements DatabaseAdapter {
     const msg = e?.message || e?.sqlMessage || "";
     const tableMatch =
       msg.match(/relation "(\w+)" does not exist/i) ||
-      msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i);
+      msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i) ||
+      msg.match(/no such table: (\w+)/i);
     if (!tableMatch) return false;
 
     const tableName = tableMatch[1];

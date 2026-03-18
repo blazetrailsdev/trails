@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 
-import { createTestAdapter, adapterType } from "../test-adapter.js";
+import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -144,7 +144,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   // Real DBs reject queries referencing nonexistent columns
-  it.skipIf(adapterType !== "memory")("validate uniqueness with scope invalid syntax", async () => {
+  it.skip("validate uniqueness with scope invalid syntax", async () => {
     const adp = freshAdapter();
     class Post extends Base {
       static {
