@@ -860,12 +860,29 @@ describe("BasicsTest", () => {
     expect(t!.readAttribute("title")).toBe("hello");
   });
 
-  it.skip("attributes_before_type_cast returns user input for integers", () => {
-    /* needs attributeBeforeTypeCast API */
+  it("attributes_before_type_cast returns user input for integers", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ views: "42" });
+    expect(t.readAttribute("views")).toBe(42);
+    expect(t.readAttributeBeforeTypeCast("views")).toBe("42");
+    expect(t.attributesBeforeTypeCast.views).toBe("42");
   });
 
-  it.skip("raise no method error for nonexistent method", () => {
-    /* needs method_missing-style error handling */
+  it("raise no method error for nonexistent method", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ title: "hello" });
+    expect(t.respondTo("title")).toBe(true);
+    expect(t.respondTo("nonexistent")).toBe(false);
   });
   it("table exists? is true for existing tables", () => {
     class User extends Base {
@@ -1711,8 +1728,36 @@ describe("BasicsTest", () => {
   });
   it.skip("utc as time zone", () => {});
   it.skip("utc as time zone and new", () => {});
-  it.skip("out of range slugs", () => {});
-  it.skip("find by slug with array", () => {});
+  it("out of range slugs", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "first" });
+    const results = await Topic.where({
+      id: [`${t1.id}-meowmeow`, "9223372036854775808-hello"],
+    }).toArray();
+    expect(results).toHaveLength(1);
+    expect(results[0].readAttribute("title")).toBe("first");
+  });
+  it("find by slug with array", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "first" });
+    const t2 = await Topic.create({ title: "second" });
+    const results = await Topic.find([`${t1.id}-meowmeow`, `${t2.id}-hello`]);
+    expect(results).toHaveLength(2);
+    expect(results[0].readAttribute("title")).toBe("first");
+    expect(results[1].readAttribute("title")).toBe("second");
+    const reversed = await Topic.find([`${t2.id}-hello`, `${t1.id}-meowmeow`]);
+    expect(reversed[0].readAttribute("title")).toBe("second");
+  });
   it.skip("find by slug with range", () => {});
   it.skip("equality of relation and collection proxy", () => {});
   it.skip("equality of relation and association relation", () => {});
@@ -1762,10 +1807,26 @@ describe("BasicsTest", () => {
     expect(reloaded.readAttribute("title")).toBe("Original");
   });
   it.skip("readonly attributes on belongs to association", () => {});
-  it.skip("respect internal encoding", () => {});
-  it.skip("non valid identifier column name", () => {});
-  it.skip("attributes on dummy time", () => {});
-  it.skip("attributes on dummy time with invalid time", () => {});
+  it.skip("respect internal encoding", () => {
+    /* Ruby-specific: tests Encoding.default_internal (EUC-JP) on column names — no JS equivalent */
+  });
+  it("non valid identifier column name", async () => {
+    class Weird extends Base {
+      static {
+        this.attribute("a$b", "string");
+        this.adapter = adapter;
+      }
+    }
+    const w = await Weird.create({ a$b: "value" });
+    const reloaded = await Weird.find(w.id);
+    expect(reloaded.readAttribute("a$b")).toBe("value");
+  });
+  it.skip("attributes on dummy time", () => {
+    /* needs time-string parsing ("5:42:00AM" -> dummy date 2000-01-01) with timezone config */
+  });
+  it.skip("attributes on dummy time with invalid time", () => {
+    /* needs time-string parsing — invalid time should return null */
+  });
   it("previously persisted returns boolean", async () => {
     class User extends Base {
       static {
@@ -1857,7 +1918,21 @@ describe("BasicsTest", () => {
     const sql = User.where({ name: "test" }).toSql();
     expect(sql).toContain('"name"');
   });
-  it.skip("quoting arrays", () => {});
+  it("quoting arrays", async () => {
+    class Reply extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const r1 = await Reply.create({ title: "first" });
+    const r2 = await Reply.create({ title: "second" });
+    await Reply.create({ title: "third" });
+    const results = await Reply.where({ id: [r1.id, r2.id] }).toArray();
+    expect(results).toHaveLength(2);
+    const emptyResults = await Reply.where({ id: [] }).toArray();
+    expect(emptyResults).toHaveLength(0);
+  });
   it("dont clear sequence name when setting explicitly", () => {
     class User extends Base {
       static {

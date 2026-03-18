@@ -833,6 +833,18 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find
    */
+  /** @internal Cast a value through an attribute's type, with parseInt fallback for the default PK. */
+  static _castAttributeValue(key: string, value: unknown): unknown {
+    if (typeof value !== "string") return value;
+    const def = this._attributeDefinitions.get(key);
+    if (def) return def.type.cast(value);
+    if (typeof this.primaryKey === "string" && key === this.primaryKey) {
+      const parsed = parseInt(value, 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return value;
+  }
+
   static async find(...ids: unknown[]): Promise<any> {
     // Variadic: User.find(1, 2, 3)
     if (ids.length > 1) {
@@ -898,13 +910,14 @@ export class Base extends Model {
           [],
         );
       }
+      const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
       const records = await this.all()
-        .where({ [this.primaryKey as string]: id })
+        .where({ [this.primaryKey as string]: castIds })
         .toArray();
       // Ensure all IDs were found
-      if (records.length !== id.length) {
+      if (records.length !== castIds.length) {
         const foundIds = new Set(records.map((r: Base) => r.id));
-        const missing = id.filter((i) => !foundIds.has(i));
+        const missing = castIds.filter((i) => !foundIds.has(i));
         throw new RecordNotFound(
           `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
           this.name,
@@ -912,11 +925,15 @@ export class Base extends Model {
           id,
         );
       }
-      return records;
+      // Return in input order, matching Rails' in_order_of behavior
+      const idToRecord = new Map<unknown, Base>();
+      for (const r of records) idToRecord.set(r.id, r);
+      return castIds.map((cid) => idToRecord.get(cid)!);
     }
-    // Single ID — use all() so STI type filter is applied
+    // Single ID — cast through PK type, then use all() so STI type filter is applied
+    const castId = this._castAttributeValue(this.primaryKey as string, id);
     const record = await this.all()
-      .where({ [this.primaryKey as string]: id })
+      .where({ [this.primaryKey as string]: castId })
       .first();
     if (!record) {
       throw new RecordNotFound(
