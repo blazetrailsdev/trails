@@ -7,7 +7,7 @@
 
 import { TimeZone, getLocalComponents } from "./time-zone.js";
 import { Duration } from "./duration.js";
-import { currentTime } from "./testing-helpers.js";
+import { currentTime } from "./time-travel.js";
 
 /**
  * Options for the change() method.
@@ -694,14 +694,18 @@ export class TimeWithZone {
 
   isTomorrow(): boolean {
     const now = new TimeWithZone(currentTime(), this._timeZone);
-    const tom = now.advance({ days: 1 });
-    return this.year === tom.year && this.month === tom.month && this.day === tom.day;
+    const tomorrow = now.advance({ days: 1 });
+    return (
+      this.year === tomorrow.year && this.month === tomorrow.month && this.day === tomorrow.day
+    );
   }
 
   isYesterday(): boolean {
     const now = new TimeWithZone(currentTime(), this._timeZone);
-    const yes = now.advance({ days: -1 });
-    return this.year === yes.year && this.month === yes.month && this.day === yes.day;
+    const yesterday = now.advance({ days: -1 });
+    return (
+      this.year === yesterday.year && this.month === yesterday.month && this.day === yesterday.day
+    );
   }
 
   /** Returns true if this time is before the given time */
