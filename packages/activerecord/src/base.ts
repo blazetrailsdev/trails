@@ -833,15 +833,12 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find
    */
-  /**
-   * Cast a value through the primary key's type, mimicking Rails' id coercion.
-   * For integer PKs, "1-meowmeow".to_i → 1 in Ruby; parseInt("1-meowmeow") → 1 in JS.
-   */
-  private static _castPrimaryKeyValue(value: unknown): unknown {
-    if (typeof this.primaryKey !== "string") return value;
-    const def = this._attributeDefinitions.get(this.primaryKey);
+  /** @internal Cast a value through an attribute's type, with parseInt fallback for the default PK. */
+  static _castAttributeValue(key: string, value: unknown): unknown {
+    if (typeof value !== "string") return value;
+    const def = this._attributeDefinitions.get(key);
     if (def) return def.type.cast(value);
-    if (typeof value === "string") {
+    if (typeof this.primaryKey === "string" && key === this.primaryKey) {
       const parsed = parseInt(value, 10);
       if (!isNaN(parsed)) return parsed;
     }
@@ -913,7 +910,7 @@ export class Base extends Model {
           [],
         );
       }
-      const castIds = id.map((i) => this._castPrimaryKeyValue(i));
+      const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
       const records = await this.all()
         .where({ [this.primaryKey as string]: castIds })
         .toArray();
@@ -928,10 +925,13 @@ export class Base extends Model {
           id,
         );
       }
-      return records;
+      // Return in input order, matching Rails' in_order_of behavior
+      const idToRecord = new Map<unknown, Base>();
+      for (const r of records) idToRecord.set(r.id, r);
+      return castIds.map((cid) => idToRecord.get(cid)!);
     }
     // Single ID — cast through PK type, then use all() so STI type filter is applied
-    const castId = this._castPrimaryKeyValue(id);
+    const castId = this._castAttributeValue(this.primaryKey as string, id);
     const record = await this.all()
       .where({ [this.primaryKey as string]: castId })
       .first();

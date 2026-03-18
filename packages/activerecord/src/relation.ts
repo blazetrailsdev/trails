@@ -2840,17 +2840,8 @@ export class Relation<T extends Base> {
   }
 
   private _castWhereValue(key: string, value: unknown): unknown {
-    if (value === null || value === undefined) return value;
-    if (value instanceof Range) return value;
-    if (typeof value !== "string") return value;
-    const def = this._modelClass._attributeDefinitions.get(key);
-    if (def) return def.type.cast(value);
-    const pk = this._modelClass.primaryKey;
-    if (typeof pk === "string" && key === pk) {
-      const parsed = parseInt(value, 10);
-      if (!isNaN(parsed)) return parsed;
-    }
-    return value;
+    if (value === null || value === undefined || value instanceof Range) return value;
+    return this._modelClass._castAttributeValue(key, value);
   }
 
   private _buildWhereStrings(table: Table): string[] {

@@ -1755,6 +1755,8 @@ describe("BasicsTest", () => {
     expect(results).toHaveLength(2);
     expect(results[0].readAttribute("title")).toBe("first");
     expect(results[1].readAttribute("title")).toBe("second");
+    const reversed = await Topic.find([`${t2.id}-hello`, `${t1.id}-meowmeow`]);
+    expect(reversed[0].readAttribute("title")).toBe("second");
   });
   it.skip("find by slug with range", () => {});
   it.skip("equality of relation and collection proxy", () => {});
