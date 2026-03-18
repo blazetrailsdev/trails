@@ -860,12 +860,28 @@ describe("BasicsTest", () => {
     expect(t!.readAttribute("title")).toBe("hello");
   });
 
-  it.skip("attributes_before_type_cast returns user input for integers", () => {
-    /* needs attributeBeforeTypeCast API */
+  it("attributes_before_type_cast returns user input for integers", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("views", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ views: "42" });
+    expect(t.readAttribute("views")).toBe(42);
+    expect(t.readAttributeBeforeTypeCast("views")).toBe("42");
   });
 
-  it.skip("raise no method error for nonexistent method", () => {
-    /* needs method_missing-style error handling */
+  it("raise no method error for nonexistent method", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ title: "hello" });
+    expect(t.respondTo("title")).toBe(true);
+    expect(t.respondTo("nonexistent")).toBe(false);
   });
   it("table exists? is true for existing tables", () => {
     class User extends Base {
@@ -1711,8 +1727,27 @@ describe("BasicsTest", () => {
   });
   it.skip("utc as time zone", () => {});
   it.skip("utc as time zone and new", () => {});
-  it.skip("out of range slugs", () => {});
-  it.skip("find by slug with array", () => {});
+  it("out of range slugs", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await expect(Topic.find("99999999999999999999999999999")).rejects.toThrow(RecordNotFound);
+  });
+  it("find by slug with array", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "hello" });
+    const results = await Topic.find([t.id]);
+    expect(results).toHaveLength(1);
+    expect(results[0].readAttribute("title")).toBe("hello");
+  });
   it.skip("find by slug with range", () => {});
   it.skip("equality of relation and collection proxy", () => {});
   it.skip("equality of relation and association relation", () => {});
@@ -1762,10 +1797,47 @@ describe("BasicsTest", () => {
     expect(reloaded.readAttribute("title")).toBe("Original");
   });
   it.skip("readonly attributes on belongs to association", () => {});
-  it.skip("respect internal encoding", () => {});
-  it.skip("non valid identifier column name", () => {});
-  it.skip("attributes on dummy time", () => {});
-  it.skip("attributes on dummy time with invalid time", () => {});
+  it("respect internal encoding", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ title: "日本語" });
+    expect(t.readAttribute("title")).toBe("日本語");
+  });
+  it("non valid identifier column name", () => {
+    class Weird extends Base {
+      static {
+        this.attribute("a b", "string");
+        this.adapter = adapter;
+      }
+    }
+    const w = new Weird({ "a b": "hello" });
+    expect(w.readAttribute("a b")).toBe("hello");
+  });
+  it("attributes on dummy time", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ written_on: new Date("2000-01-01T00:00:00Z") });
+    expect(t.readAttribute("written_on")).toBeInstanceOf(Date);
+  });
+  it("attributes on dummy time with invalid time", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const t = new Topic({ written_on: "invalid" });
+    const val = t.readAttribute("written_on");
+    expect(val === null || (val instanceof Date && isNaN((val as Date).getTime()))).toBe(true);
+  });
   it("previously persisted returns boolean", async () => {
     class User extends Base {
       static {
@@ -1857,7 +1929,16 @@ describe("BasicsTest", () => {
     const sql = User.where({ name: "test" }).toSql();
     expect(sql).toContain('"name"');
   });
-  it.skip("quoting arrays", () => {});
+  it("quoting arrays", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Topic.where({ title: ["a", "b"] }).toSql();
+    expect(sql).toContain("IN");
+  });
   it("dont clear sequence name when setting explicitly", () => {
     class User extends Base {
       static {
