@@ -26,6 +26,11 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   where they improve the developer experience without breaking Rails parity.
 - **No magic strings where types work**: Prefer typed column references over
   raw strings when possible, but always support the string form for parity.
+- **Implementation-first**: The goal is to implement Rails features in
+  TypeScript. Tests being unskipped is a side effect of implementation, not
+  the goal. Don't scan for easy tests to flip — build the feature, then
+  unskip the tests that prove it works. Read the Rails source to understand
+  the feature before implementing.
 - **Test-driven against Rails**: Progress is measured by `convention:compare`,
   which matches our test files and test names against the actual Rails test suite.
 

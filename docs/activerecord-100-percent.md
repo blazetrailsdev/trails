@@ -1,207 +1,211 @@
-# ActiveRecord: Road to 100% Test Coverage
+# ActiveRecord: Road to Feature Completeness
 
 Current state: **52.2%** (4,374 OK / 8,385 Ruby tests). Additionally: 3,767 skipped stubs, 52 in wrong describe blocks, 244 with no TS equivalent.
 
 ## How coverage is measured
 
-`npm run convention:compare` matches our test names against the Rails test suite. `OK` = matched, in correct describe, not skipped. `Skip` = matched but `it.skip`. `Desc` = matched but in wrong describe block. `Miss` = Ruby test with no TS equivalent.
+`npm run convention:compare` matches our test names against the Rails test suite. Test coverage is a trailing indicator — it goes up as a side effect of implementing features, not as a goal in itself.
 
 ## Two workstreams
 
-The remaining 4,011 tests split into two parallel tracks that rarely touch the same files. The PRs below cover the largest files (20+ skipped); ~1,700 additional skipped tests are spread across many smaller files not listed here.
+These can be worked on in parallel — they touch different files.
 
 ---
 
-### Workstream A: Associations & Querying (~690 skipped in listed files)
+### Workstream A: Associations & Querying
 
-Covers association features, eager loading, scoping, where clauses, and finders.
+The goal is to make ActiveRecord associations work the way a Rails developer expects. Someone reading the Rails guides on associations should be able to write equivalent TypeScript.
 
-#### PR A1: Through associations (~152 skipped)
+#### A1: Through associations
 
-| File                                               | Skipped |
-| -------------------------------------------------- | ------- |
-| associations/has-many-through-associations.test.ts | 98      |
-| associations/nested-through-associations.test.ts   | 54      |
+Implement `has_many :through` so you can do things like:
 
-Implement has-many-through join logic, nested through chains, and through-source reflection.
+```ts
+// class Post extends Base { static { this.hasMany('tags', { through: 'taggings' }) } }
+const tags = await post.tags;
+Post.joins("tags").where({ tags: { name: "ruby" } });
+```
 
-#### PR A2: Eager loading (~76 skipped)
+This is the biggest missing feature — it unlocks join models, nested through chains, and through-source reflection. Also covers `has_one :through`.
 
-| File                       | Skipped | Notes        |
-| -------------------------- | ------- | ------------ |
-| associations/eager.test.ts | 76      | 20 unmatched |
+#### A2: Eager loading
 
-Continue `includes`/`preload`/`eagerLoad` work started in #114. Preloader, batch loading, nested eager loading.
+Implement `includes`/`preload`/`eagerLoad` so N+1 queries can be avoided:
 
-#### PR A3: General associations & autosave (~140 skipped)
+```ts
+const posts = await Post.includes("comments", "author").all();
+// comments and author are preloaded, no additional queries
+```
 
-| File                         | Skipped |
-| ---------------------------- | ------- |
-| associations.test.ts         | 72      |
-| autosave-association.test.ts | 68      |
+Partially started in #114. Needs: preloader, batch loading, nested eager loading, polymorphic eager loading.
 
-General association edge cases, autosave with nested attributes, validation propagation, `markForDestruction`.
+#### A3: Autosave associations
 
-#### PR A4: HABTM & join models (~91 skipped)
+When you save a parent, its dirty children should be saved too:
 
-| File                                                      | Skipped |
-| --------------------------------------------------------- | ------- |
-| associations/has-and-belongs-to-many-associations.test.ts | 48      |
-| associations/join-model.test.ts                           | 43      |
+```ts
+const post = await Post.find(1);
+post.comments[0].body = "updated";
+await post.save(); // also saves the updated comment
+```
 
-Join table management, bidirectional syncing, through-join-model queries.
+Includes `markForDestruction`, validation propagation through nested models, and `accepts_nested_attributes_for`.
 
-#### PR A5: Has-one & has-one-through (~60 skipped)
+#### A4: HABTM
 
-| File                                              | Skipped |
-| ------------------------------------------------- | ------- |
-| associations/has-one-associations.test.ts         | 31      |
-| associations/has-one-through-associations.test.ts | 29      |
+Implement `has_and_belongs_to_many` — the simpler many-to-many without an explicit join model:
 
-Continue has-one work from #107/#109. Through associations for has-one, replacement, autosave.
+```ts
+// class Assembly extends Base { static { this.hasAndBelongsToMany('parts') } }
+await assembly.parts; // queries through assemblies_parts join table
+```
 
-#### PR A6: Scoping & finders (~53 skipped)
+Join table management, bidirectional syncing.
 
-| File                             | Skipped | Notes            |
-| -------------------------------- | ------- | ---------------- |
-| scoping/relation-scoping.test.ts | 53      | 1 wrong describe |
+#### A5: Scoping
 
-Default scopes, `unscoped`, nested scoping, scoped create, annotation scoping.
+Make `default_scope`, `unscoped`, and `scoping` work so queries are composable:
 
-#### PR A7: Where clause & inverse (~71 skipped)
+```ts
+class PublishedPost extends Post {
+  static {
+    this.defaultScope((rel) => rel.where({ published: true }));
+  }
+}
+PublishedPost.all(); // automatically filtered
+PublishedPost.unscoped().all(); // bypasses default scope
+```
 
-| File                                      | Skipped |
-| ----------------------------------------- | ------- |
-| relation/where.test.ts                    | 36      |
-| associations/inverse-associations.test.ts | 35      |
+#### A6: Where clause features
 
-`where.not`, OR/AND chaining, polymorphic where, inverse association edge cases.
+`where.not`, `or`, `and`, polymorphic where, range conditions:
 
-#### PR A8: Remaining association files (~28 skipped)
-
-| File                                                             | Skipped | Notes              |
-| ---------------------------------------------------------------- | ------- | ------------------ |
-| associations/has-many-through-disable-joins-associations.test.ts | 28      |                    |
-| nested-attributes.test.ts                                        | 0       | 18 wrong describes |
-
-Disable-joins mode, fix 18 wrong describes in nested-attributes.
+```ts
+Post.where.not({ status: "draft" });
+Post.where({ status: "published" }).or(Post.where({ featured: true }));
+Post.where({ created_at: [startDate, endDate] }); // BETWEEN
+```
 
 ---
 
-### Workstream B: Core ORM & Infrastructure (~1,370 skipped in listed files)
+### Workstream B: Core ORM & Infrastructure
 
-Covers base class features, adapters, fixtures, schema, encryption, and connections.
+The goal is to make ActiveRecord work as a real ORM — connecting to databases, managing schemas, caching queries, and handling the lifecycle of records.
 
-#### PR B1: Base class features (~69 skipped)
+#### B1: Base class features
 
-| File         | Skipped |
-| ------------ | ------- |
-| base.test.ts | 69      |
+The core `Base` class needs attribute API completions, type casting, STI (single table inheritance), abstract classes, and configuration:
 
-Attribute API, type casting, inheritance, abstract classes, configuration.
+```ts
+class Animal extends Base {}
+class Dog extends Animal {} // STI: stored in animals table with type='Dog'
+```
 
-#### PR B2: PostgreSQL types — range, hstore, array (~131 skipped)
+#### B2: PostgreSQL types
 
-| File                               | Skipped | Notes             |
-| ---------------------------------- | ------- | ----------------- |
-| adapters/postgresql/range.test.ts  | 46      |                   |
-| adapters/postgresql/hstore.test.ts | 44      | 3 wrong describes |
-| adapters/postgresql/array.test.ts  | 41      |                   |
+Implement PG-specific types so you can store and query rich data:
 
-PG-specific type casting, serialization, querying. Requires `PG_TEST_URL`.
+```ts
+// Range columns
+Post.where({ published_during: new Range(startDate, endDate) });
+// Array columns
+Post.where("tags @> ARRAY[?]", ["ruby"]);
+// HStore columns
+Post.where("metadata -> 'color' = ?", "red");
+```
 
-#### PR B3: PostgreSQL adapter & schema (~127 skipped)
+Requires `PG_TEST_URL` for integration tests.
 
-| File                                           | Skipped |
-| ---------------------------------------------- | ------- |
-| adapters/postgresql/postgresql-adapter.test.ts | 51      |
-| adapters/postgresql/schema.test.ts             | 39      |
-| adapters/postgresql/postgresql-rake.test.ts    | 37      |
+#### B3: PostgreSQL adapter & schema
 
-Adapter features, schema introspection, rake task equivalents.
+Schema introspection, DDL generation, and adapter-specific features so migrations and schema dumps work against real Postgres.
 
-#### PR B4: Fixtures (~149 skipped)
+#### B4: Fixtures
 
-| File             | Skipped |
-| ---------------- | ------- |
-| fixtures.test.ts | 149     |
+Implement fixture loading so tests can use declarative test data:
 
-Fixture loading, caching, transactional fixtures, YAML parsing.
+```ts
+// test/fixtures/posts.yml equivalent
+const post = fixtures("posts", "first");
+```
 
-#### PR B5: Query cache & logging (~87 skipped)
+YAML parsing, caching, transactional fixtures for test isolation.
 
-| File                | Skipped |
-| ------------------- | ------- |
-| query-cache.test.ts | 62      |
-| query-logs.test.ts  | 25      |
+#### B5: Query cache
 
-Query caching layer, invalidation, notification hooks, query log tags.
+Cache repeated queries within a request/block so the same SELECT doesn't hit the DB twice:
 
-#### PR B6: Schema & migrations (~230 skipped)
+```ts
+await QueryCache.run(async () => {
+  await Post.find(1); // hits DB
+  await Post.find(1); // served from cache
+});
+```
 
-| File                         | Skipped |
-| ---------------------------- | ------- |
-| tasks/database-tasks.test.ts | 78      |
-| schema-dumper.test.ts        | 67      |
-| migration.test.ts            | 50      |
-| migrator.test.ts             | 35      |
+#### B6: Schema & migrations
 
-DDL generation, schema dumper, migrator, database tasks.
+DDL generation so you can define schema changes in code:
 
-#### PR B7: Encryption (~51 skipped)
+```ts
+class CreatePosts extends Migration {
+  async change() {
+    await this.createTable("posts", (t) => {
+      t.string("title");
+      t.text("body");
+      t.timestamps();
+    });
+  }
+}
+```
 
-| File                                  | Skipped |
-| ------------------------------------- | ------- |
-| encryption/encryptable-record.test.ts | 51      |
+Schema dumper, migrator, database tasks.
 
-Encrypted attributes, key management, querying encrypted columns.
+#### B7: Encryption
 
-#### PR B8: Connections & adapters (~141 skipped)
+Encrypted attributes so sensitive data is encrypted at rest:
 
-| File                                                             | Skipped |
-| ---------------------------------------------------------------- | ------- |
-| connection-pool.test.ts                                          | 50      |
-| adapters/trilogy/trilogy-adapter.test.ts                         | 51      |
-| connection-adapters/merge-and-resolve-default-url-config.test.ts | 40      |
+```ts
+class User extends Base {
+  static {
+    this.encryptsAttribute("email", { deterministic: true });
+  }
+}
+await User.findBy({ email: "dean@example.com" }); // queries encrypted column
+```
 
-Connection pooling, MySQL adapter, DB config resolution.
+#### B8: Connections
 
-#### PR B9: Reflection, insert-all, locking (~107 skipped)
+Connection pooling, multi-database support, and adapter resolution:
 
-| File               | Skipped |
-| ------------------ | ------- |
-| insert-all.test.ts | 42      |
-| reflection.test.ts | 40      |
-| locking.test.ts    | 25      |
+```ts
+Base.establishConnection({ adapter: 'postgresql', database: 'myapp' });
+Base.connectedTo({ role: 'reading' }, async () => { ... });
+```
 
-Continue insert-all/upsert work from #90, reflection API, optimistic/pessimistic locking.
+#### B9: Reflection & insert-all
 
-#### PR B10: Remaining core files (~278 skipped)
+The reflection API lets you introspect associations and columns at runtime. Insert-all/upsert for bulk operations:
 
-| File                                        | Skipped |
-| ------------------------------------------- | ------- |
-| unsafe-raw-sql.test.ts                      | 37      |
-| multiparameter-attributes.test.ts           | 37      |
-| strict-loading.test.ts                      | 34      |
-| database-configurations/hash-config.test.ts | 34      |
-| integration.test.ts                         | 33      |
-| counter-cache.test.ts                       | 31      |
-| collection-cache-key.test.ts                | 30      |
-| transaction-instrumentation.test.ts         | 21      |
-| log-subscriber.test.ts                      | 21      |
+```ts
+Post.reflectOnAssociation("comments"); // => HasManyReflection
+Post.insertAll([{ title: "A" }, { title: "B" }]); // single INSERT
+Post.upsertAll([{ id: 1, title: "Updated" }]); // INSERT ... ON CONFLICT
+```
 
-Grab bag of smaller core ORM features. Can be split further if needed.
+#### B10: Locking, strict loading, and remaining features
+
+Optimistic locking (`lock_version`), pessimistic locking (`lock!`), strict loading modes, counter caches, collection cache keys, instrumentation, and other smaller features.
 
 ---
 
 ### Wrong describes (52 remaining)
 
-Can be picked up alongside whichever PR touches the relevant file:
+Fix alongside whichever PR touches the relevant file:
 
-- nested-attributes.test.ts (18) — PR A8
-- PostgreSQL adapter files (26 across ~12 files) — PRs B2/B3
-- scoping/relation-scoping.test.ts (1) — PR A6
-- associations/nested-error.test.ts (3) — PR A3
+- nested-attributes.test.ts (18) — A3
+- PostgreSQL adapter files (26 across ~12 files) — B2/B3
+- scoping/relation-scoping.test.ts (1) — A5
+- associations/nested-error.test.ts (3) — A3
 
 ---
 
@@ -210,5 +214,3 @@ Can be picked up alongside whichever PR touches the relevant file:
 ```bash
 npm run convention:compare -- --package activerecord
 ```
-
-Target: `activerecord — 8385/8385 tests (100%)`
