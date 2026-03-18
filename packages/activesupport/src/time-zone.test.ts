@@ -309,7 +309,7 @@ describe("TimeZoneTest", () => {
 
   it("iso8601 with ambiguous time", () => {
     const zone = TimeZone.find("Moscow");
-    const twz = zone.parse("2014-10-26T01:00:00");
+    const twz = zone.iso8601("2014-10-26T01:00:00");
     expect(twz.utc().getTime()).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
   it("iso8601 with ordinal date value", () => {
