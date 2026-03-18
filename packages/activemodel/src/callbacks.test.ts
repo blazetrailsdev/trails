@@ -310,7 +310,7 @@ describe("CallbackChain.runAsync", () => {
 
     // Use controlled deferreds so we can prove sequential awaiting.
     // The second callback's promise resolves before the first's, but
-    // because runAfterAsync awaits sequentially, "after1" must appear
+    // because runAfter awaits sequentially, "after1" must appear
     // before "after2".
     let resolveFirst!: () => void;
     const firstDeferred = new Promise<void>((r) => {
