@@ -4,8 +4,10 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
+import { SubclassNotFound } from "./errors.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { registerModel } from "./associations.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -1274,11 +1276,62 @@ describe("BasicsTest", () => {
     const u = await User.create({ name: "a" });
     expect(u.toParam()).toBe(String(u.id));
   });
-  it.skip("compute type encodes any characters", () => {});
-  it.skip("compute type returns constant of the type", () => {});
-  it.skip("compute type raises NameError for unknown class", () => {});
-  it.skip("compute type raises SubclassNotFound for wrong class", () => {});
-  it.skip("type condition only applies to STI models", () => {});
+  it("compute type encodes any characters", () => {
+    class Shape extends Base {
+      static {
+        this.inheritanceColumn = "type";
+        registerModel(this);
+      }
+    }
+    expect(() => Shape.computeType("Shape::Circle")).toThrow();
+  });
+  it("compute type returns constant of the type", () => {
+    class Animal extends Base {
+      static {
+        this.inheritanceColumn = "type";
+        registerModel(this);
+      }
+    }
+    class Dog extends Animal {
+      static {
+        registerModel(this);
+      }
+    }
+    expect(Animal.computeType("Dog")).toBe(Dog);
+  });
+  it("compute type raises NameError for unknown class", () => {
+    class Vehicle extends Base {
+      static {
+        this.inheritanceColumn = "type";
+        registerModel(this);
+      }
+    }
+    expect(() => Vehicle.computeType("NonExistent")).toThrow();
+  });
+  it("compute type raises SubclassNotFound for wrong class", () => {
+    class Plant extends Base {
+      static {
+        this.inheritanceColumn = "type";
+        registerModel(this);
+      }
+    }
+    class Unrelated extends Base {
+      static {
+        registerModel(this);
+      }
+    }
+    expect(() => Plant.computeType("Unrelated")).toThrow(SubclassNotFound);
+  });
+  it("type condition only applies to STI models", () => {
+    class NonSti extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const sql = NonSti.all().toSql();
+    expect(sql).not.toContain("type");
+  });
   it("where with hash conditions returns only matching records", async () => {
     class User extends Base {
       static {
@@ -1692,7 +1745,22 @@ describe("BasicsTest", () => {
     }
     expect(ConcreteModel.readonlyAttributes).toContain("code");
   });
-  it.skip("readonly attributes when configured to not raise", () => {});
+  it("readonly attributes when configured to not raise", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.attrReadonly("title");
+        this.adapter = adp;
+      }
+    }
+    const p = await Post.create({ title: "Original", body: "Content" });
+    p.writeAttribute("title", "Changed");
+    await p.save();
+    const reloaded = await Post.find(p.id);
+    expect(reloaded.readAttribute("title")).toBe("Original");
+  });
   it.skip("readonly attributes on belongs to association", () => {});
   it.skip("respect internal encoding", () => {});
   it.skip("non valid identifier column name", () => {});
@@ -1790,7 +1858,16 @@ describe("BasicsTest", () => {
     expect(sql).toContain('"name"');
   });
   it.skip("quoting arrays", () => {});
-  it.skip("dont clear sequence name when setting explicitly", () => {});
+  it("dont clear sequence name when setting explicitly", () => {
+    class User extends Base {
+      static {
+        this.sequenceName = "my_seq";
+      }
+    }
+    expect(User.sequenceName).toBe("my_seq");
+    User.tableName = "people";
+    expect(User.sequenceName).toBe("my_seq");
+  });
   it("set table name symbol converted to string", () => {
     class User extends Base {
       static {
@@ -1811,8 +1888,23 @@ describe("BasicsTest", () => {
     // but non-STI children compute their own
     expect(Parent.tableName).toBe("custom_parents");
   });
-  it.skip("sequence name with abstract class", () => {});
-  it.skip("sequence name for cpk model", () => {});
+  it("sequence name with abstract class", () => {
+    class AbstractModel extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    class ConcreteModel extends AbstractModel {}
+    expect(ConcreteModel.sequenceName).toBe("concrete_models_id_seq");
+  });
+  it("sequence name for cpk model", () => {
+    class CpkModel extends Base {
+      static {
+        this.primaryKey = ["store_id", "department_id"] as any;
+      }
+    }
+    expect(CpkModel.sequenceName).toBeNull();
+  });
   it("find multiple ordered last", async () => {
     class User extends Base {
       static {
@@ -1827,7 +1919,21 @@ describe("BasicsTest", () => {
     expect(Array.isArray(lastTwo)).toBe(true);
     expect((lastTwo as any[]).length).toBe(2);
   });
-  it.skip("find on abstract base class doesnt use type condition", () => {});
+  it("find on abstract base class doesnt use type condition", () => {
+    class ApplicationRecord extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    class Post extends ApplicationRecord {
+      static {
+        this.attribute("title", "string");
+        this.adapter = freshAdapter();
+      }
+    }
+    const sql = Post.all().toSql();
+    expect(sql).not.toContain("type");
+  });
   it.skip("assert queries count", () => {});
   it.skip("benchmark with use silence", () => {});
   it.skip("clear cache!", () => {});
@@ -1874,8 +1980,25 @@ describe("BasicsTest", () => {
     // ignoredColumns is set
     expect(User.ignoredColumns).toContain("secret");
   });
-  it.skip(".columns_hash raises an error if the record has an empty table name", () => {});
-  it.skip("ignored columns have no attribute methods", () => {});
+  it(".columns_hash raises an error if the record has an empty table name", () => {
+    class AbstractBase extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    expect(() => AbstractBase.columnsHash()).toThrow();
+  });
+  it("ignored columns have no attribute methods", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+      }
+    }
+    expect(User.columnNames()).not.toContain("secret");
+    expect(User.columnNames()).toContain("name");
+  });
   it("ignored columns are stored as an array of string", () => {
     class User extends Base {
       static {
@@ -1885,11 +2008,70 @@ describe("BasicsTest", () => {
     expect(Array.isArray(User.ignoredColumns)).toBe(true);
     expect(User.ignoredColumns).toEqual(["col1", "col2"]);
   });
-  it.skip("when #reload called, ignored columns' attribute methods are not defined", () => {});
-  it.skip("when ignored attribute is loaded, cast type should be preferred over DB type", () => {});
-  it.skip("when assigning new ignored columns it invalidates cache for column names", () => {});
-  it.skip("column names are quoted when using #from clause and model has ignored columns", () => {});
-  it.skip("using table name qualified column names unless having SELECT list explicitly", () => {});
+  it("when #reload called, ignored columns' attribute methods are not defined", async () => {
+    const adp = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+        this.adapter = adp;
+      }
+    }
+    const u = await User.create({ name: "test" });
+    await u.reload();
+    expect(User.columnNames()).not.toContain("secret");
+  });
+  it("when ignored attribute is loaded, cast type should be preferred over DB type", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.ignoredColumns = ["age"];
+      }
+    }
+    expect(User.columnNames()).not.toContain("age");
+    expect(User.hasAttributeDefinition("age")).toBe(true);
+  });
+  it("when assigning new ignored columns it invalidates cache for column names", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.attribute("hidden", "string");
+      }
+    }
+    expect(User.columnNames()).toContain("secret");
+    User.ignoredColumns = ["secret"];
+    expect(User.columnNames()).not.toContain("secret");
+    User.ignoredColumns = ["secret", "hidden"];
+    expect(User.columnNames()).not.toContain("hidden");
+  });
+  it("column names are quoted when using #from clause and model has ignored columns", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+        this.adapter = freshAdapter();
+      }
+    }
+    const sql = User.from("users").toSql();
+    expect(sql).not.toContain("secret");
+  });
+  it("using table name qualified column names unless having SELECT list explicitly", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("secret", "string");
+        this.ignoredColumns = ["secret"];
+        this.adapter = freshAdapter();
+      }
+    }
+    const sql = User.all().toSql();
+    expect(sql).not.toContain("secret");
+    expect(sql).toContain("name");
+  });
   it("protected environments by default is an array with production", () => {
     expect(Base.protectedEnvironments).toEqual(["production"]);
   });

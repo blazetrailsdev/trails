@@ -2,7 +2,13 @@ import { Model } from "@rails-ts/activemodel";
 import { Table } from "@rails-ts/arel";
 import { pluralize, underscore } from "@rails-ts/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
-import { getInheritanceColumn, isStiSubclass, getStiBase, instantiateSti } from "./sti.js";
+import {
+  getInheritanceColumn,
+  isStiSubclass,
+  getStiBase,
+  instantiateSti,
+  findStiClass,
+} from "./sti.js";
 import {
   RecordNotFound,
   RecordInvalid,
@@ -266,7 +272,8 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.column_names
    */
   static columnNames(): string[] {
-    return Array.from(this._attributeDefinitions.keys());
+    const ignored = new Set(this._ignoredColumns);
+    return Array.from(this._attributeDefinitions.keys()).filter((name) => !ignored.has(name));
   }
 
   /**
@@ -293,6 +300,9 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.columns_hash
    */
   static columnsHash(): Record<string, { name: string; type: string; default: unknown }> {
+    if (this.abstractClass) {
+      throw new Error(`Cannot call columnsHash on abstract class ${this.name}`);
+    }
     const result: Record<string, { name: string; type: string; default: unknown }> = {};
     for (const [name, def] of this._attributeDefinitions) {
       result[name] = { name, type: def.type.name, default: def.defaultValue };
@@ -334,6 +344,16 @@ export class Base extends Model {
    */
   static get baseClass(): typeof Base {
     return getStiBase(this);
+  }
+
+  /**
+   * Resolve a type name string to a model class.
+   * Used by STI to look up subclasses by their type column value.
+   *
+   * Mirrors: ActiveRecord::Inheritance.compute_type
+   */
+  static computeType(typeName: string): typeof Base {
+    return findStiClass(this, typeName);
   }
 
   /**
@@ -422,6 +442,24 @@ export class Base extends Model {
    */
   static get isTouchingSuppressed(): boolean {
     return this._noTouching;
+  }
+
+  // -- Sequence name --
+  static _sequenceName: string | null = null;
+
+  /**
+   * The sequence name used for auto-incrementing the primary key.
+   * Defaults to "${tableName}_${primaryKey}_seq" for PostgreSQL.
+   *
+   * Mirrors: ActiveRecord::Base.sequence_name
+   */
+  static get sequenceName(): string | null {
+    const pk = this.primaryKey;
+    if (Array.isArray(pk)) return this._sequenceName;
+    return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+  }
+  static set sequenceName(name: string | null) {
+    this._sequenceName = name;
   }
 
   // -- Ignored columns --

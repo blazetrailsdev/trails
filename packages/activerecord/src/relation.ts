@@ -2572,14 +2572,27 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#arel
    */
+  private _buildProjections(table: Table): any[] {
+    if (this._selectColumns) {
+      return this._selectColumns.map((c) => {
+        if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
+        return table.get(c);
+      });
+    }
+    if (this._modelClass.ignoredColumns.length > 0) {
+      let cols = this._modelClass.columnNames();
+      const pk = this._modelClass.primaryKey;
+      if (typeof pk === "string" && !cols.includes(pk)) {
+        cols = [pk, ...cols];
+      }
+      return cols.length > 0 ? cols.map((c) => table.get(c)) : ["*"];
+    }
+    return ["*"];
+  }
+
   toArel(): SelectManager {
     const table = this._modelClass.arelTable;
-    const projections = this._selectColumns
-      ? this._selectColumns.map((c) => {
-          if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
-          return table.get(c);
-        })
-      : ["*"];
+    const projections = this._buildProjections(table);
     const manager = table.project(...(projections as any));
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
@@ -2617,13 +2630,7 @@ export class Relation<T extends Base> {
 
   private _toSqlWithoutSetOp(): string {
     const table = this._modelClass.arelTable;
-    const projections = this._selectColumns
-      ? this._selectColumns.map((c) => {
-          // If the column contains special chars (parens, spaces, *), treat as raw SQL
-          if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
-          return table.get(c);
-        })
-      : ["*"];
+    const projections = this._buildProjections(table);
     const manager = table.project(...(projections as any));
 
     // Apply joins
