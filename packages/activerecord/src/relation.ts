@@ -205,29 +205,13 @@ export class Relation<T extends Base> {
         const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.whereNot({ [foreignKey]: null });
       } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
-        const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
-        const targetModel = modelRegistry.get(targetClassName);
-        if (!targetModel) {
-          throw new Error(
-            `Model '${targetClassName}' not found in registry for association '${assocName}'`,
-          );
-        }
-        const targetTable = targetModel.tableName;
-        const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
-        let foreignKey: string;
-        let typeCondition = "";
-        if (assocDef.options.as) {
-          foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
-          const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-          typeCondition = ` AND "${typeCol}" = '${modelClass.name}'`;
-        } else {
-          foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
-        }
-        const cloned = rel._clone();
-        cloned._whereRawClauses.push(
-          `"${modelClass.tableName}"."${pk}" IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL${typeCondition})`,
+        const { targetTable, foreignKey, onClause } = this._resolveHasManyJoin(
+          modelClass,
+          assocDef,
+          assocName,
         );
-        rel = cloned;
+        rel = rel.joins(targetTable, onClause);
+        rel = rel.distinct();
       }
     }
     return rel;
@@ -255,32 +239,46 @@ export class Relation<T extends Base> {
         const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.where({ [foreignKey]: null });
       } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
-        const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
-        const targetModel = modelRegistry.get(targetClassName);
-        if (!targetModel) {
-          throw new Error(
-            `Model '${targetClassName}' not found in registry for association '${assocName}'`,
-          );
-        }
-        const targetTable = targetModel.tableName;
-        const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
-        let foreignKey: string;
-        let typeCondition = "";
-        if (assocDef.options.as) {
-          foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
-          const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-          typeCondition = ` AND "${typeCol}" = '${modelClass.name}'`;
-        } else {
-          foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
-        }
-        const cloned = rel._clone();
-        cloned._whereRawClauses.push(
-          `"${modelClass.tableName}"."${pk}" NOT IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL${typeCondition})`,
+        const { targetTable, foreignKey, onClause } = this._resolveHasManyJoin(
+          modelClass,
+          assocDef,
+          assocName,
         );
+        rel = rel.leftJoins(targetTable, onClause);
+        const cloned = rel._clone();
+        cloned._whereRawClauses.push(`"${targetTable}"."${foreignKey}" IS NULL`);
         rel = cloned;
       }
     }
     return rel;
+  }
+
+  private _resolveHasManyJoin(
+    modelClass: any,
+    assocDef: any,
+    assocName: string,
+  ): { targetTable: string; foreignKey: string; onClause: string } {
+    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
+    const targetModel = modelRegistry.get(targetClassName);
+    if (!targetModel) {
+      throw new Error(
+        `Model '${targetClassName}' not found in registry for association '${assocName}'`,
+      );
+    }
+    const targetTable = targetModel.tableName;
+    const sourceTable = modelClass.tableName;
+    const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
+    let foreignKey: string;
+    let onClause: string;
+    if (assocDef.options.as) {
+      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
+      const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
+      onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}" AND "${targetTable}"."${typeCol}" = '${modelClass.name}'`;
+    } else {
+      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+      onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}"`;
+    }
+    return { targetTable, foreignKey, onClause };
   }
 
   /**

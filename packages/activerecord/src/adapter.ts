@@ -212,11 +212,18 @@ export class MemoryAdapter implements DatabaseAdapter {
       const [, distinctFlag, projections, tableName, joinsPart, where, orderBy, limit, offset] =
         joinMatch;
       const isDistinct = !!distinctFlag;
-      let rows = [...(this.tables.get(tableName) ?? [])];
+      // Add table-qualified keys to base table rows for JOIN resolution
+      let rows = [...(this.tables.get(tableName) ?? [])].map((row) => {
+        const qualified: Record<string, unknown> = { ...row };
+        for (const [k, v] of Object.entries(row)) {
+          qualified[`${tableName}.${k}`] = v;
+        }
+        return qualified;
+      });
 
       // Parse and apply joins
       const joinRegex =
-        /(INNER|LEFT\s+OUTER)\s+JOIN\s+"(\w+)"\s+ON\s+(.+?)(?=\s+(?:INNER|LEFT\s+OUTER)\s+JOIN|\s+WHERE|\s+ORDER|\s+LIMIT|\s+OFFSET|$)/gi;
+        /(INNER|LEFT\s+OUTER)\s+JOIN\s+"?(\w+)"?\s+ON\s+(.+?)(?=\s+(?:INNER|LEFT\s+OUTER)\s+JOIN|\s+WHERE|\s+ORDER|\s+LIMIT|\s+OFFSET|$)/gi;
       let jm: RegExpExecArray | null;
       while ((jm = joinRegex.exec(joinsPart)) !== null) {
         const [, joinType, joinTable, onCondition] = jm;
@@ -227,15 +234,26 @@ export class MemoryAdapter implements DatabaseAdapter {
         for (const leftRow of rows) {
           let matched = false;
           for (const rightRow of rightRows) {
-            const combinedRow: Record<string, unknown> = { ...leftRow, ...rightRow };
+            const combinedRow: Record<string, unknown> = {};
+            // Preserve left row values (both bare and any existing qualified keys)
+            for (const [k, v] of Object.entries(leftRow)) {
+              combinedRow[k] = v;
+            }
+            // Add right row with table-qualified keys to avoid collisions
+            for (const [k, v] of Object.entries(rightRow)) {
+              combinedRow[`${joinTable}.${k}`] = v;
+              // Only set bare key if it doesn't already exist from left side
+              if (!(k in combinedRow)) {
+                combinedRow[k] = v;
+              }
+            }
             if (this.evaluateWhere(combinedRow, onCondition.trim())) {
               newRows.push(combinedRow);
               matched = true;
             }
           }
           if (!matched && isLeft) {
-            const nullRow: Record<string, unknown> = { ...leftRow };
-            newRows.push(nullRow);
+            newRows.push({ ...leftRow });
           }
         }
         rows = newRows;
@@ -275,6 +293,14 @@ export class MemoryAdapter implements DatabaseAdapter {
       if (limit) {
         rows = rows.slice(0, parseInt(limit));
       }
+      // Strip table-qualified keys from output (return bare column names only)
+      rows = rows.map((row) => {
+        const clean: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(row)) {
+          if (!k.includes(".")) clean[k] = v;
+        }
+        return clean;
+      });
       return rows;
     }
 
@@ -653,9 +679,17 @@ export class MemoryAdapter implements DatabaseAdapter {
       return !this.evaluateCondition(row, notMatch[1].trim());
     }
 
-    // Helper to get column name from a "table"."col" or just "col" pattern
-    const getCol = (tableOrCol: string, col?: string): string =>
-      col !== undefined ? col : tableOrCol;
+    // Helper to resolve column value from a "table"."col" or just "col" pattern.
+    // Prefers table-qualified keys (e.g. "posts.id") when available to avoid
+    // collisions from JOIN merges.
+    const getCol = (tableOrCol: string, col?: string): string => {
+      if (col !== undefined) {
+        const qualified = `${tableOrCol}.${col}`;
+        if (qualified in row) return qualified;
+        return col;
+      }
+      return tableOrCol;
+    };
 
     // NOT IN (SELECT ...) — must come before simpler matchers that match substrings
     const notInSubMatch = condition.match(
@@ -749,7 +783,7 @@ export class MemoryAdapter implements DatabaseAdapter {
     const colEqColMatch = condition.match(/^"?(\w+)"?(?:\."?(\w+)"?)?\s*=\s*"(\w+)"\."(\w+)"$/);
     if (colEqColMatch) {
       const leftCol = getCol(colEqColMatch[1], colEqColMatch[2]);
-      const rightCol = colEqColMatch[4];
+      const rightCol = getCol(colEqColMatch[3], colEqColMatch[4]);
       return row[leftCol] == row[rightCol];
     }
 
