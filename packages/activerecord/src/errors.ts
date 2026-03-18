@@ -240,9 +240,9 @@ export class HasOneThroughNestedAssociationsAreReadonly extends Error {
 }
 
 export class HasManyThroughOrderError extends Error {
-  constructor(owner: string, association: string) {
+  constructor(owner: string, association: string, through: string) {
     super(
-      `Cannot have a has_many :through association '${association}' on ${owner} which goes through '${association}' before the through association is defined.`,
+      `Cannot have a has_many :through association '${association}' on ${owner} which goes through '${through}' before the through association is defined.`,
     );
     this.name = "HasManyThroughOrderError";
   }
