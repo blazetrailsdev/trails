@@ -79,8 +79,24 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows).toHaveLength(1);
     });
 
-    it.skip("expression index", async () => {});
-    it.skip("index with opclass", async () => {});
+    it("expression index", async () => {
+      await adapter.exec(`CREATE TABLE "ex_expr" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.addIndex("ex_expr", ["lower(name)"], { name: "idx_expr_lower_name" });
+      const indexes = await adapter.indexes("ex_expr");
+      const idx = indexes.find((i) => i.name === "idx_expr_lower_name");
+      expect(idx).toBeDefined();
+    });
+
+    it("index with opclass", async () => {
+      await adapter.exec(`CREATE TABLE "ex_opclass" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.addIndex("ex_opclass", ["name"], {
+        name: "idx_opclass_name",
+        opclass: { name: "varchar_pattern_ops" },
+      });
+      const indexes = await adapter.indexes("ex_opclass");
+      const idx = indexes.find((i) => i.name === "idx_opclass_name");
+      expect(idx).toBeDefined();
+    });
 
     it("pk and sequence for table with serial pk", async () => {
       await adapter.exec(`CREATE TABLE "ex_serial" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
@@ -100,11 +116,39 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows[0].data_type).toBe("bigint");
     });
 
-    it.skip("pk and sequence for table with custom sequence", async () => {});
-    it.skip("columns for distinct", async () => {});
-    it.skip("columns for distinct with order", async () => {});
-    it.skip("columns for distinct with order and a column prefix", async () => {});
-    it.skip("translate exception class", async () => {});
+    it("pk and sequence for table with custom sequence", async () => {
+      await adapter.exec(`DROP SEQUENCE IF EXISTS "ex_custom_seq" CASCADE`);
+      await adapter.exec(`CREATE SEQUENCE "ex_custom_seq"`);
+      await adapter.exec(
+        `CREATE TABLE "ex_custom_seqt" ("id" INTEGER NOT NULL DEFAULT nextval('ex_custom_seq'), "name" TEXT, CONSTRAINT ex_custom_seqt_pkey PRIMARY KEY ("id"))`,
+      );
+      const result = await adapter.pkAndSequenceFor("ex_custom_seqt");
+      expect(result).not.toBeNull();
+      expect(result![0]).toBe("id");
+      expect(result![1].name).toBe("ex_custom_seq");
+    });
+
+    it("columns for distinct", async () => {
+      expect(adapter.columnsForDistinct("posts.id", [])).toBe("posts.id");
+    });
+
+    it("columns for distinct with order", async () => {
+      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc"])).toBe(
+        "posts.id, posts.created_at",
+      );
+    });
+
+    it("columns for distinct with order and a column prefix", async () => {
+      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc", "posts.title"])).toBe(
+        "posts.id, posts.created_at, posts.title",
+      );
+    });
+    it("translate exception class", async () => {
+      await adapter.exec(`CREATE TABLE "ex_class" ("id" SERIAL PRIMARY KEY, "name" TEXT NOT NULL)`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_class" ("name") VALUES (NULL)`),
+      ).rejects.toThrow();
+    });
 
     it("translate exception unique violation", async () => {
       await adapter.exec(`CREATE TABLE "ex_uniq" ("id" SERIAL PRIMARY KEY, "name" TEXT UNIQUE)`);
@@ -133,9 +177,19 @@ describeIfPg("PostgresAdapter", () => {
       ).rejects.toThrow(/foreign key|violates/i);
     });
 
-    it.skip("translate exception value too long", async () => {});
-    it.skip("translate exception lock wait timeout", async () => {});
-    it.skip("translate exception deadlock", async () => {});
+    it("translate exception value too long", async () => {
+      await adapter.exec(`CREATE TABLE "ex_long" ("id" SERIAL PRIMARY KEY, "name" VARCHAR(5))`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "ex_long" ("name") VALUES ('toolongvalue')`),
+      ).rejects.toThrow(/too long|value too long/i);
+    });
+
+    it.skip("translate exception lock wait timeout", async () => {
+      /* needs concurrent connections with lock contention */
+    });
+    it.skip("translate exception deadlock", async () => {
+      /* needs concurrent connections with deadlock scenario */
+    });
 
     it("translate exception numeric value out of range", async () => {
       await adapter.exec(`CREATE TABLE "ex_num" ("id" SERIAL PRIMARY KEY, "val" SMALLINT)`);
@@ -157,11 +211,34 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("type map for results", async () => {});
     it.skip("only reload type map once for every unrecognized type", async () => {});
     it.skip("only warn on first encounter of unrecognized oid", async () => {});
-    it.skip("extension enabled", async () => {});
-    it.skip("extension available", async () => {});
-    it.skip("extension enabled returns false for nonexistent", async () => {});
-    it.skip("enable extension", async () => {});
-    it.skip("disable extension", async () => {});
+    it("extension enabled", async () => {
+      await adapter.enableExtension("citext");
+      expect(await adapter.extensionEnabled("citext")).toBe(true);
+      await adapter.disableExtension("citext", { force: "cascade" });
+    });
+
+    it("extension available", async () => {
+      expect(await adapter.extensionAvailable("hstore")).toBe(true);
+      expect(await adapter.extensionAvailable("nonexistent_ext_xyz")).toBe(false);
+    });
+
+    it("extension enabled returns false for nonexistent", async () => {
+      expect(await adapter.extensionEnabled("nonexistent_ext_xyz")).toBe(false);
+    });
+
+    it("enable extension", async () => {
+      await adapter.disableExtension("citext", { force: "cascade" });
+      expect(await adapter.extensionEnabled("citext")).toBe(false);
+      await adapter.enableExtension("citext");
+      expect(await adapter.extensionEnabled("citext")).toBe(true);
+      await adapter.disableExtension("citext", { force: "cascade" });
+    });
+
+    it("disable extension", async () => {
+      await adapter.enableExtension("citext");
+      await adapter.disableExtension("citext", { force: "cascade" });
+      expect(await adapter.extensionEnabled("citext")).toBe(false);
+    });
     it.skip("prepared statements", async () => {});
     it.skip("prepared statements with multiple binds", async () => {});
     it.skip("prepared statements disabled", async () => {});
@@ -245,7 +322,14 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows[0].val).toEqual({ b: 2 });
     });
 
-    it.skip("hstore decoding", async () => {});
+    it("hstore decoding", async () => {
+      await adapter.enableExtension("hstore");
+      await adapter.exec(`CREATE TABLE "ex_hs" ("id" SERIAL PRIMARY KEY, "val" HSTORE)`);
+      await adapter.executeMutation(`INSERT INTO "ex_hs" ("val") VALUES ('"a"=>"1", "b"=>"2"')`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_hs"`);
+      expect(typeof rows[0].val).toBe("string");
+      expect(String(rows[0].val)).toContain("a");
+    });
 
     it("array decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_arr" ("id" SERIAL PRIMARY KEY, "val" INTEGER[])`);
@@ -312,7 +396,13 @@ describeIfPg("PostgresAdapter", () => {
       expect(String(rows[0].val)).toBe("10101010");
     });
 
-    it.skip("range decoding", async () => {});
+    it("range decoding", async () => {
+      await adapter.exec(`CREATE TABLE "ex_rng" ("id" SERIAL PRIMARY KEY, "val" INT4RANGE)`);
+      await adapter.executeMutation(`INSERT INTO "ex_rng" ("val") VALUES ('[1,10)')`);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_rng"`);
+      expect(typeof rows[0].val).toBe("string");
+      expect(String(rows[0].val)).toContain("1");
+    });
 
     it("date time decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
@@ -359,8 +449,15 @@ describeIfPg("PostgresAdapter", () => {
       expect(Number(rows[0].val)).toBe(42);
     });
 
-    it.skip("bad connection to postgres database", async () => {});
-    it.skip("reconnect after bad connection on check version", async () => {});
+    it("bad connection to postgres database", async () => {
+      const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
+      await expect(bad.execute("SELECT 1")).rejects.toThrow();
+      await bad.close();
+    });
+
+    it.skip("reconnect after bad connection on check version", async () => {
+      /* needs reconnection logic */
+    });
 
     it("primary key works tables containing capital letters", async () => {
       await adapter.exec(`CREATE TABLE "Items" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
@@ -423,16 +520,96 @@ describeIfPg("PostgresAdapter", () => {
       const result = await adapter.pkAndSequenceFor("does_not_exist_xyz");
       expect(result).toBeNull();
     });
-    it.skip("pk and sequence for with collision pg class oid", async () => {});
-    it.skip("partial index on column named like keyword", async () => {});
-    it.skip("include index", async () => {});
-    it.skip("include multiple columns index", async () => {});
-    it.skip("include keyword column name", async () => {});
-    it.skip("include escaped quotes column name", async () => {});
-    it.skip("invalid index", async () => {});
-    it.skip("index with not distinct nulls", async () => {});
-    it.skip("columns for distinct with nulls", async () => {});
-    it.skip("columns for distinct without order specifiers", async () => {});
+    it.skip("pk and sequence for with collision pg class oid", async () => {
+      /* needs specific OID collision scenario */
+    });
+
+    it("partial index on column named like keyword", async () => {
+      await adapter.exec(`CREATE TABLE "ex_keyword" ("id" SERIAL PRIMARY KEY, "order" INTEGER)`);
+      await adapter.addIndex("ex_keyword", ["order"], {
+        name: "idx_keyword_order",
+        where: '"order" > 10',
+      });
+      const indexes = await adapter.indexes("ex_keyword");
+      expect(indexes.find((i) => i.name === "idx_keyword_order")).toBeDefined();
+    });
+
+    it("include index", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_include" ("id" SERIAL PRIMARY KEY, "name" TEXT, "email" TEXT)`,
+      );
+      await adapter.addIndex("ex_include", ["name"], {
+        name: "idx_include_name",
+        include: ["email"],
+      });
+      const indexes = await adapter.indexes("ex_include");
+      expect(indexes.find((i) => i.name === "idx_include_name")).toBeDefined();
+    });
+
+    it("include multiple columns index", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_include2" ("id" SERIAL PRIMARY KEY, "a" TEXT, "b" TEXT, "c" TEXT)`,
+      );
+      await adapter.addIndex("ex_include2", ["a"], {
+        name: "idx_include_multi",
+        include: ["b", "c"],
+      });
+      const indexes = await adapter.indexes("ex_include2");
+      expect(indexes.find((i) => i.name === "idx_include_multi")).toBeDefined();
+    });
+
+    it("include keyword column name", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_incl_kw" ("id" SERIAL PRIMARY KEY, "name" TEXT, "order" INTEGER)`,
+      );
+      await adapter.addIndex("ex_incl_kw", ["name"], {
+        name: "idx_incl_kw",
+        include: ["order"],
+      });
+      const indexes = await adapter.indexes("ex_incl_kw");
+      expect(indexes.find((i) => i.name === "idx_incl_kw")).toBeDefined();
+    });
+
+    it("include escaped quotes column name", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_incl_esc" ("id" SERIAL PRIMARY KEY, "name" TEXT, "desc" TEXT)`,
+      );
+      await adapter.addIndex("ex_incl_esc", ["name"], {
+        name: "idx_incl_esc",
+        include: ["desc"],
+      });
+      const indexes = await adapter.indexes("ex_incl_esc");
+      expect(indexes.find((i) => i.name === "idx_incl_esc")).toBeDefined();
+    });
+
+    it("invalid index", async () => {
+      await adapter.exec(`CREATE TABLE "ex_invalid_idx" ("id" SERIAL PRIMARY KEY)`);
+      await expect(
+        adapter.addIndex("ex_invalid_idx", ["nonexistent_column"], { name: "idx_bad" }),
+      ).rejects.toThrow();
+    });
+
+    it("index with not distinct nulls", async () => {
+      await adapter.exec(`CREATE TABLE "ex_nulls_nd" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.addIndex("ex_nulls_nd", ["name"], {
+        name: "idx_nulls_nd",
+        unique: true,
+        nullsNotDistinct: true,
+      });
+      const indexes = await adapter.indexes("ex_nulls_nd");
+      expect(indexes.find((i) => i.name === "idx_nulls_nd")).toBeDefined();
+    });
+    it("columns for distinct with nulls", async () => {
+      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc NULLS FIRST"])).toBe(
+        "posts.id, posts.created_at",
+      );
+    });
+
+    it("columns for distinct without order specifiers", async () => {
+      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at"])).toBe(
+        "posts.id, posts.created_at",
+      );
+    });
     it.skip("raise error when cannot translate exception", async () => {});
     it.skip("translate no connection exception to not established", async () => {});
     it.skip("reload type map for newly defined types", async () => {});
@@ -452,23 +629,69 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("date decoding disabled", async () => {});
     it.skip("disable extension with schema", async () => {});
     it.skip("disable extension without schema", async () => {});
-    it.skip("connection error", () => {});
-    it.skip("reconnection error", () => {});
-    it.skip("database exists returns true when the database exists", () => {});
-    it.skip("columns for distinct zero orders", () => {});
-    it.skip("columns for distinct one order", () => {});
-    it.skip("columns for distinct few orders", () => {});
-    it.skip("columns for distinct with case", () => {});
-    it.skip("columns for distinct blank not nil orders", () => {});
-    it.skip("columns for distinct with arel order", () => {});
-    it.skip("bad connection", () => {});
+    it("connection error", async () => {
+      const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
+      await expect(bad.execute("SELECT 1")).rejects.toThrow();
+      await bad.close();
+    });
+
+    it.skip("reconnection error", () => {
+      /* needs reconnection logic */
+    });
+
+    it.skip("database exists returns true when the database exists", () => {
+      /* needs adapter.databaseExists() API */
+    });
+
+    it("columns for distinct zero orders", () => {
+      expect(adapter.columnsForDistinct("posts.id", [])).toBe("posts.id");
+    });
+
+    it("columns for distinct one order", () => {
+      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc"])).toBe(
+        "posts.id, posts.created_at",
+      );
+    });
+
+    it("columns for distinct few orders", () => {
+      expect(
+        adapter.columnsForDistinct("posts.id", ["posts.created_at desc", "posts.updated_at asc"]),
+      ).toBe("posts.id, posts.created_at, posts.updated_at");
+    });
+
+    it("columns for distinct with case", () => {
+      expect(adapter.columnsForDistinct("posts.id", ["UPPER(posts.name)"])).toBe(
+        "posts.id, UPPER(posts.name)",
+      );
+    });
+
+    it("columns for distinct blank not nil orders", () => {
+      expect(adapter.columnsForDistinct("posts.id", [""])).toBe("posts.id");
+    });
+
+    it.skip("columns for distinct with arel order", () => {
+      /* needs Arel order node support */
+    });
+
+    it("bad connection", async () => {
+      const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
+      await expect(bad.execute("SELECT 1")).rejects.toThrow();
+      await bad.close();
+    });
+
     it.skip("database exists returns false when the database does not exist", () => {
       /* needs adapter.databaseExists() API */
     });
     it.skip("exec insert with returning disabled", () => {
-      /* needs table setup and RETURNING-disabled adapter mode */
+      /* needs RETURNING-disabled adapter mode */
     });
-    it.skip("pk and sequence for", async () => {});
+
+    it("pk and sequence for", async () => {
+      await adapter.exec(`CREATE TABLE "ex_pk_seq" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      const result = await adapter.pkAndSequenceFor("ex_pk_seq");
+      expect(result).not.toBeNull();
+      expect(result![0]).toBe("id");
+    });
   });
 
   // ── Transaction lifecycle tests ───────────────────────────────────
