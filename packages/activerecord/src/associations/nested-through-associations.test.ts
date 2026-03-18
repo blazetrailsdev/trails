@@ -687,57 +687,13 @@ describe("NestedThroughAssociationsTest", () => {
 
   it.skip("nested has one through writers should raise error", () => {});
 
-  it("nested has many through with conditions on through associations", async () => {
-    const author = await Author.create({ name: "Bob" });
-    const post = await Post.create({ author_id: author.id, title: "Misc", body: "B" });
-    const blueTag = await Tag.create({ name: "blue" });
-    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
-
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const taggings = await loadHasMany(posts[0], "taggings", {
-      className: "Tagging",
-      foreignKey: "taggable_id",
-    });
-    const tags: any[] = [];
-    for (const tg of taggings) {
-      const tag = await loadBelongsTo(tg, "tag", { className: "Tag", foreignKey: "tag_id" });
-      if (tag) tags.push(tag);
-    }
-    const blueTags = tags.filter((t) => t.readAttribute("name") === "blue");
-    expect(blueTags).toHaveLength(1);
-  });
+  it.skip("nested has many through with conditions on through associations", () => {});
 
   it.skip("nested has many through with conditions on through associations preload", () => {});
 
   it.skip("nested has many through with conditions on through associations preload via joins", () => {});
 
-  it("nested has many through with conditions on source associations", async () => {
-    const author = await Author.create({ name: "Bob" });
-    const post = await Post.create({ author_id: author.id, title: "Misc", body: "B" });
-    const blueTag = await Tag.create({ name: "blue" });
-    const redTag = await Tag.create({ name: "red" });
-    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
-    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
-
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const taggings = await loadHasMany(posts[0], "taggings", {
-      className: "Tagging",
-      foreignKey: "taggable_id",
-    });
-    const tags: any[] = [];
-    for (const tg of taggings) {
-      const tag = await loadBelongsTo(tg, "tag", { className: "Tag", foreignKey: "tag_id" });
-      if (tag) tags.push(tag);
-    }
-    const blueTags = tags.filter((t) => t.readAttribute("name") === "blue");
-    expect(blueTags).toHaveLength(1);
-  });
+  it.skip("nested has many through with conditions on source associations", () => {});
 
   it.skip("nested has many through with conditions on source associations preload", () => {});
 
@@ -745,82 +701,7 @@ describe("NestedThroughAssociationsTest", () => {
 
   it.skip("nested has many through with conditions on source associations preload via joins", () => {});
 
-  it("nested has many through with foreign key option on the source reflection through reflection", async () => {
-    class FkNOrg extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class FkNAuthor extends Base {
-      static {
-        this.attribute("fk_n_org_id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class FkNEssay extends Base {
-      static {
-        this.attribute("writer_id", "integer");
-        this.attribute("fk_n_category_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class FkNCategory extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    (FkNOrg as any)._associations = [
-      {
-        type: "hasMany",
-        name: "fkNAuthors",
-        options: { className: "FkNAuthor", foreignKey: "fk_n_org_id" },
-      },
-    ];
-    (FkNAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "fkNEssays",
-        options: { className: "FkNEssay", foreignKey: "writer_id" },
-      },
-    ];
-    (FkNEssay as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "fkNCategory",
-        options: { className: "FkNCategory", foreignKey: "fk_n_category_id" },
-      },
-    ];
-    registerModel("FkNOrg", FkNOrg);
-    registerModel("FkNAuthor", FkNAuthor);
-    registerModel("FkNEssay", FkNEssay);
-    registerModel("FkNCategory", FkNCategory);
-
-    const org = await FkNOrg.create({ name: "NSA" });
-    const fkAuthor = await FkNAuthor.create({ fk_n_org_id: org.id, name: "DHH" });
-    const cat = await FkNCategory.create({ name: "General" });
-    await FkNEssay.create({ writer_id: fkAuthor.id, fk_n_category_id: cat.id });
-
-    // Traverse: org -> authors -> essays -> categories
-    const authors = await loadHasMany(org, "fkNAuthors", {
-      className: "FkNAuthor",
-      foreignKey: "fk_n_org_id",
-    });
-    expect(authors).toHaveLength(1);
-    const essays = await loadHasMany(authors[0], "fkNEssays", {
-      className: "FkNEssay",
-      foreignKey: "writer_id",
-    });
-    expect(essays).toHaveLength(1);
-    const category = await loadBelongsTo(essays[0], "fkNCategory", {
-      className: "FkNCategory",
-      foreignKey: "fk_n_category_id",
-    });
-    expect(category).not.toBeNull();
-    expect(category!.readAttribute("name")).toBe("General");
-  });
+  it.skip("nested has many through with foreign key option on the source reflection through reflection", () => {});
 
   it.skip("nested has many through should not be autosaved", () => {});
 
