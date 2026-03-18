@@ -26,6 +26,22 @@ const tags = await post.tags;
 Post.joins("tags").where({ tags: { name: "ruby" } });
 ```
 
+Partially implemented in #128: through-aware `build`/`create` on `CollectionProxy`,
+49 new passing tests covering basic through CRUD, polymorphic/STI through,
+nested through chains, and collection proxy operations (push/delete/replace/setIds).
+
+Remaining ~103 skipped tests need:
+
+- **SQL join generation** (~20): `joins`, `left_joins`, `inner_join`, `explicitly_joining_join_table`, `joining_has_many_through_*`
+- **Scope merging on through** (~15): `source_scope`, `through_scope_with_includes/joins`, `unscope`, `default_scope_on_target`, `rewhere`
+- **Preload for nested through** (~25): all `*_preload` and `*_preload_via_joins` tests in nested-through
+- **Counter caches** (6): `update_counter_caches_on_*`
+- **Transactions** (2): `transaction_method_starts_transaction`, `through_model_to_create_transactions`
+- **Reflection metadata** (1): `modifying_has_many_through_has_one_reflection_should_raise` (needs `HasManyThroughCantAssociateThroughHasOneOrManyReflection`)
+- **Validation propagation** (3): `create_bang_should_raise`, `save_bang_should_raise`, `save_returns_falsy` when join record has errors
+- **`_pushThrough` FK resolution**: currently uses convention-based `sourceFk`; should resolve the source association's configured `foreignKey` option to handle nonstandard FK columns correctly
+- **Order preservation**: through loader uses WHERE IN which returns by PK order; true order preservation needs ORDER BY support
+
 This is the biggest missing feature — it unlocks join models, nested through chains, and through-source reflection. Also covers `has_one :through`.
 
 #### A2: Eager loading
