@@ -7012,6 +7012,9 @@ describe("PreloaderTest", () => {
       expect((p as any)._preloadedAssociations.has("pkbaAuthor")).toBe(true);
     }
   });
+});
+
+describe("OverridingAssociationsTest", () => {
   it("habtm association redefinition callbacks should differ and not inherited", () => {
     const oaAdapter = freshAdapter();
     class OAParent extends Base {
@@ -7220,7 +7223,9 @@ describe("PreloaderTest", () => {
       loadBelongsTo(record, "nonexistent", { foreignKey: "nonexistent_id" }),
     ).rejects.toThrow(/not found in registry/);
   });
+});
 
+describe("GeneratedMethodsTest", () => {
   it("association methods override attribute methods of same name", () => {
     const adapter = freshAdapter();
     class Post extends Base {
@@ -7263,7 +7268,9 @@ describe("PreloaderTest", () => {
     expect(ref).not.toBeNull();
     expect(ref!.name).toBe("tag");
   });
+});
 
+describe("WithAnnotationsTest", () => {
   it("belongs to with annotation includes a query comment", () => {
     const adapter = freshAdapter();
     class Post extends Base {

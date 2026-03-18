@@ -1212,7 +1212,9 @@ describe("HasOneAssociationsTest", () => {
     });
     expect((loaded as any).readAttribute("name")).toBe("Acme");
   });
+});
 
+describe("AsyncHasOneAssociationsTest", () => {
   it("async load has one", async () => {
     const adapter = freshAdapter();
     class AHFirm extends Base {

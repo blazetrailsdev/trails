@@ -1497,14 +1497,14 @@ describe("MigrationTest", () => {
         }
         expect(new NoTs().version).toBe("99999999999999");
       });
-    }); // MigrationValidationTest
 
-    it("copied migrations at timestamp boundary are valid", () => {
-      class Boundary extends Migration {
-        static version = "20231231235959";
-        async change() {}
-      }
-      expect(new Boundary().version).toBe("20231231235959");
-    });
+      it("copied migrations at timestamp boundary are valid", () => {
+        class Boundary extends Migration {
+          static version = "20231231235959";
+          async change() {}
+        }
+        expect(new Boundary().version).toBe("20231231235959");
+      });
+    }); // MigrationValidationTest
   }); // CopyMigrationsTest
 });

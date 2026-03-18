@@ -279,7 +279,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe("TooManyOrTest", () => {
   it("too many or", () => {
     const adapter = freshAdapter();
     class Post extends Base {
