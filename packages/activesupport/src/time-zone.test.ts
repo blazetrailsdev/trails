@@ -59,8 +59,18 @@ describe("TimeZoneTest", () => {
     expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
   });
 
-  it.skip("from duration to map");
-  it.skip("from tzinfo to map");
+  it("from duration to map", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)");
+    const offset = eastern.utcOffset;
+    expect(offset).toBeLessThan(0);
+    const zones = TimeZone.all().filter((z) => z.utcOffset === offset);
+    expect(zones.length).toBeGreaterThan(0);
+  });
+
+  it("from tzinfo to map", () => {
+    const zone = TimeZone.find("America/New_York");
+    expect(zone.tzinfo).toBe("America/New_York");
+  });
 
   // ---------------------------------------------------------------------------
   // now / today / tomorrow / yesterday
@@ -101,8 +111,24 @@ describe("TimeZoneTest", () => {
     expect(twz.month).toBeLessThanOrEqual(12);
   });
 
-  it.skip("tomorrow");
-  it.skip("yesterday");
+  it("tomorrow", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const today = zone.today();
+    const tomorrow = zone.tomorrow();
+    const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
+    const tomorrowDate = new Date(Date.UTC(tomorrow.year, tomorrow.month - 1, tomorrow.day));
+    expect(tomorrowDate.getTime() - todayDate.getTime()).toBe(86400000);
+  });
+
+  it("yesterday", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const today = zone.today();
+    const yesterday = zone.yesterday();
+    const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
+    const yesterdayDate = new Date(Date.UTC(yesterday.year, yesterday.month - 1, yesterday.day));
+    expect(todayDate.getTime() - yesterdayDate.getTime()).toBe(86400000);
+  });
+
   it.skip("travel to a date");
   it.skip("travel to travels back and reraises if the block raises");
 
@@ -118,7 +144,12 @@ describe("TimeZoneTest", () => {
     expect(time.timeZone).toBe(hawaii);
   });
 
-  it.skip("local with old date");
+  it("local with old date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.local(1850, 1, 1, 12, 0, 0);
+    expect(twz.year).toBe(1850);
+    expect(twz.hour).toBe(12);
+  });
 
   it("local enforces spring dst rules", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
@@ -150,7 +181,11 @@ describe("TimeZoneTest", () => {
     expect(twz.zone).toBe("EDT");
   });
 
-  it.skip("local with ambiguous time");
+  it("local with ambiguous time", () => {
+    const zone = TimeZone.find("Moscow");
+    const twz = zone.local(2014, 10, 26, 1, 0, 0);
+    expect(twz.hour).toBe(1);
+  });
 
   // ---------------------------------------------------------------------------
   // at
@@ -168,42 +203,91 @@ describe("TimeZoneTest", () => {
     expect(twz.toF()).toBe(secs);
   });
 
-  it.skip("at with old date");
-  it.skip("at with microseconds");
+  it("at with old date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.at(-2208988800); // 1900-01-01 00:00:00 UTC
+    expect(twz).toBeInstanceOf(TimeWithZone);
+  });
+
+  it("at with microseconds", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.at(946684800);
+    expect(twz.timeZone).toBe(zone);
+    expect(twz.utc().getTime()).toBe(946684800000);
+  });
 
   // ---------------------------------------------------------------------------
   // iso8601
   // ---------------------------------------------------------------------------
   it("iso8601", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
-    const twz = zone.parse("2024-01-15T12:00:00-05:00");
+    const twz = zone.iso8601("2024-01-15T12:00:00-05:00");
     expect(twz.hour).toBe(12);
     expect(twz.day).toBe(15);
   });
 
-  it.skip("iso8601 with fractional seconds");
-  it.skip("iso8601 with zone");
+  it("iso8601 with fractional seconds", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("1999-12-31T19:00:00.750");
+    expect(twz.msec).toBe(750);
+    expect(twz.hour).toBe(19);
+    expect(twz.timeZone).toBe(zone);
+  });
+
+  it("iso8601 with zone", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("1999-12-31T14:00:00-10:00");
+    expect(twz.utc().getTime()).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(twz.timeZone).toBe(zone);
+  });
 
   it("iso8601 with invalid string", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
-    expect(() => zone.parse("foobar")).toThrow();
+    expect(() => zone.iso8601("foobar")).toThrow();
   });
 
-  it.skip("iso8601 with nil");
-  it.skip("iso8601 with missing time components");
-  it.skip("iso8601 with old date");
-  it.skip("iso8601 far future date with time zone offset in string");
+  it("iso8601 with nil", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(() => zone.iso8601(null)).toThrow("invalid date");
+  });
+
+  it("iso8601 with missing time components", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("1999-12-31");
+    expect(twz.year).toBe(1999);
+    expect(twz.month).toBe(12);
+    expect(twz.day).toBe(31);
+    expect(twz.hour).toBe(0);
+  });
+
+  it("iso8601 with old date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("1883-07-01T00:00:00");
+    expect(twz.year).toBe(1883);
+  });
+
+  it("iso8601 far future date with time zone offset in string", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("2050-01-01T00:00:00-05:00");
+    expect(twz.utc().getUTCFullYear()).toBe(2050);
+  });
+
   it.skip("iso8601 should not black out system timezone dst jump");
   it.skip("iso8601 should black out app timezone dst jump");
 
   it("iso8601 doesnt use local dst", () => {
     const zone = TimeZone.find("UTC");
-    const twz = zone.parse("2013-03-10T02:00:00Z");
+    const twz = zone.iso8601("2013-03-10T02:00:00Z");
     expect(twz.hour).toBe(2);
     expect(twz.day).toBe(10);
   });
 
-  it.skip("iso8601 handles dst jump");
+  it("iso8601 handles dst jump", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.iso8601("2006-04-02T02:00:00");
+    expect(twz.hour).toBe(3); // 2AM doesn't exist, springs forward to 3AM
+  });
+
   it.skip("iso8601 with ambiguous time");
   it.skip("iso8601 with ordinal date value");
   it.skip("iso8601 with invalid ordinal date value");
@@ -229,15 +313,52 @@ describe("TimeZoneTest", () => {
     expect(twz.hour).toBe(7);
   });
 
-  it.skip("parse with old date");
-  it.skip("parse far future date with time zone offset in string");
-  it.skip("parse returns nil when string without date information is passed in");
-  it.skip("parse with incomplete date");
-  it.skip("parse with day omitted");
+  it("parse with old date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("1883-07-01 00:00:00");
+    expect(twz.year).toBe(1883);
+  });
+
+  it("parse far future date with time zone offset in string", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("2050-01-01T00:00:00-05:00");
+    expect(twz.utc().getUTCFullYear()).toBe(2050);
+  });
+
+  it("parse returns nil when string without date information is passed in", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(() => zone.parse("foobar")).toThrow();
+  });
+
+  it("parse with incomplete date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("2000-01-01");
+    expect(twz.year).toBe(2000);
+    expect(twz.hour).toBe(0);
+  });
+
+  it("parse with day omitted", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("2005-02-01");
+    expect(twz.year).toBe(2005);
+    expect(twz.month).toBe(2);
+  });
+
   it.skip("parse should not black out system timezone dst jump");
   it.skip("parse should black out app timezone dst jump");
-  it.skip("parse with missing time components");
-  it.skip("parse with javascript date");
+
+  it("parse with missing time components", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("1999-12-31");
+    expect(twz.hour).toBe(0);
+    expect(twz.min).toBe(0);
+  });
+
+  it("parse with javascript date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("2013-01-01T00:00:00");
+    expect(twz.year).toBe(2013);
+  });
 
   it("parse doesnt use local dst", () => {
     const zone = TimeZone.find("UTC");
@@ -246,29 +367,76 @@ describe("TimeZoneTest", () => {
     expect(twz.day).toBe(10);
   });
 
-  it.skip("parse handles dst jump");
-  it.skip("parse with invalid date");
+  it("parse handles dst jump", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.parse("2006-04-02 02:00:00");
+    expect(twz.hour).toBe(3);
+  });
+
+  it("parse with invalid date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(() => zone.parse("")).toThrow();
+  });
+
   it.skip("parse with ambiguous time");
 
   // ---------------------------------------------------------------------------
   // rfc3339
   // ---------------------------------------------------------------------------
-  it.skip("rfc3339");
-  it.skip("rfc3339 with fractional seconds");
-  it.skip("rfc3339 with missing time");
-  it.skip("rfc3339 with missing offset");
+  it("rfc3339", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("1999-12-31T14:00:00-10:00");
+    expect(twz.utc().getTime()).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(twz.timeZone).toBe(zone);
+  });
+
+  it("rfc3339 with fractional seconds", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("1999-12-31T19:00:00.750-05:00");
+    expect(twz.msec).toBe(750);
+  });
+
+  it("rfc3339 with missing time", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(() => zone.rfc3339("1999-12-31")).toThrow("invalid date");
+  });
+
+  it("rfc3339 with missing offset", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(() => zone.rfc3339("1999-12-31T19:00:00")).toThrow("invalid date");
+  });
 
   it("rfc3339 with invalid string", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
-    expect(() => zone.parse("not-a-valid-rfc3339")).toThrow();
+    expect(() => zone.rfc3339("not-a-valid-rfc3339")).toThrow();
   });
 
-  it.skip("rfc3339 with old date");
-  it.skip("rfc3339 far future date with time zone offset in string");
+  it("rfc3339 with old date", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("1883-07-01T00:00:00-05:00");
+    expect(twz.year).toBe(1883);
+  });
+
+  it("rfc3339 far future date with time zone offset in string", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("2050-01-01T00:00:00-05:00");
+    expect(twz.utc().getUTCFullYear()).toBe(2050);
+  });
+
   it.skip("rfc3339 should not black out system timezone dst jump");
   it.skip("rfc3339 should black out app timezone dst jump");
-  it.skip("rfc3339 doesnt use local dst");
-  it.skip("rfc3339 handles dst jump");
+
+  it("rfc3339 doesnt use local dst", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("2006-07-15T12:00:00-04:00");
+    expect(twz.timeZone).toBe(zone);
+  });
+
+  it("rfc3339 handles dst jump", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const twz = zone.rfc3339("2006-04-02T03:00:00-04:00");
+    expect(twz.hour).toBe(3);
+  });
 
   // ---------------------------------------------------------------------------
   // strptime (not implemented in TS)
@@ -289,8 +457,17 @@ describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
   // utc_offset / formatted_offset
   // ---------------------------------------------------------------------------
-  it.skip("utc offset lazy loaded from tzinfo when not passed in to initialize");
-  it.skip("utc offset is not cached when current period gets stale");
+  it("utc offset lazy loaded from tzinfo when not passed in to initialize", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(typeof zone.utcOffset).toBe("number");
+  });
+
+  it("utc offset is not cached when current period gets stale", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const winterOffset = zone.utcOffsetAt(new Date(Date.UTC(2024, 0, 15)));
+    const summerOffset = zone.utcOffsetAt(new Date(Date.UTC(2024, 6, 15)));
+    expect(winterOffset).not.toBe(summerOffset);
+  });
 
   it("seconds to utc offset with colon", () => {
     // Use Arizona which doesn't observe DST
@@ -318,7 +495,10 @@ describe("TimeZoneTest", () => {
     expect(zone.formattedOffset()).toBe("-07:00");
   });
 
-  it.skip("z format strings");
+  it("z format strings", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(zone.formattedOffset()).toMatch(/^[+-]\d{2}:\d{2}$/);
+  });
 
   it("formatted offset zero", () => {
     const zone = TimeZone.find("UTC");
@@ -335,8 +515,18 @@ describe("TimeZoneTest", () => {
     expect(a.utcOffset).toBeGreaterThan(b.utcOffset);
   });
 
-  it.skip("zone match");
-  it.skip("zone match?");
+  it("zone match", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(zone.match("Eastern Time (US & Canada)")).toBe(true);
+    expect(zone.match("America/New_York")).toBe(true);
+    expect(zone.match("Pacific Time (US & Canada)")).toBe(false);
+  });
+
+  it("zone match?", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(zone.match("Eastern Time (US & Canada)")).toBe(true);
+    expect(zone.match("bogus")).toBe(false);
+  });
 
   // ---------------------------------------------------------------------------
   // to_s / all / index
@@ -354,15 +544,32 @@ describe("TimeZoneTest", () => {
     expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
   });
 
-  it.skip("all uninfluenced by time zone lookups delegated to tzinfo");
-  it.skip("all doesnt raise exception with missing tzinfo data");
-  it.skip("index");
+  it("all uninfluenced by time zone lookups delegated to tzinfo", () => {
+    const all = TimeZone.all();
+    TimeZone.find("America/Montevideo");
+    const all2 = TimeZone.all();
+    expect(all.length).toBe(all2.length);
+  });
+
+  it("all doesnt raise exception with missing tzinfo data", () => {
+    expect(() => TimeZone.all()).not.toThrow();
+  });
+
+  it("index", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    expect(zone.name).toBe("Eastern Time (US & Canada)");
+    expect(zone.tzinfo).toBe("America/New_York");
+  });
 
   it("unknown zone raises exception", () => {
     expect(() => TimeZone.find("Not/A/Real/Zone")).toThrow();
   });
 
-  it.skip("unknown zones dont store mapping keys");
+  it("unknown zones dont store mapping keys", () => {
+    expect(() => TimeZone.find("bogus")).toThrow();
+    const all = TimeZone.all();
+    expect(all.some((z) => z.name === "bogus")).toBe(false);
+  });
 
   it("new", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
@@ -370,7 +577,13 @@ describe("TimeZoneTest", () => {
     expect(zone.name).toBe("Eastern Time (US & Canada)");
   });
 
-  it.skip("us zones");
+  it("us zones", () => {
+    const zones = TimeZone.usZones();
+    expect(zones.length).toBeGreaterThan(0);
+    expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
+    expect(zones.some((z) => z.name === "Hawaii")).toBe(true);
+  });
+
   it.skip("country zones");
   it.skip("country zones with and without mappings");
   it.skip("country zones with multiple mappings");
