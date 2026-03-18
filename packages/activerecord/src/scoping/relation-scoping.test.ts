@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base } from "../index.js";
+import { Base, RecordNotFound } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -92,11 +92,12 @@ describe("RelationScopingTest", () => {
       }
     }
     const inScope = await SfPost.create({ title: "InScope" });
-    await SfPost.create({ title: "OutOfScope" });
+    const outOfScope = await SfPost.create({ title: "OutOfScope" });
     const rel = SfPost.where({ title: "InScope" });
     await SfPost.scoping(rel, async () => {
       const found = await SfPost.find(inScope.id);
       expect(found.readAttribute("title")).toBe("InScope");
+      await expect(SfPost.find(outOfScope.id)).rejects.toThrow(RecordNotFound);
     });
   });
 
@@ -108,7 +109,7 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    const target = await SffPost.create({ title: "Target", salary: 100000 });
+    await SffPost.create({ title: "Target", salary: 100000 });
     await SffPost.create({ title: "Other", salary: 50000 });
     const rel = SffPost.where({ salary: 100000 });
     await SffPost.scoping(rel, async () => {
@@ -155,10 +156,9 @@ describe("RelationScopingTest", () => {
     await ScPost.create({ title: "Normal", published: true });
     const rel = ScPost.where({ published: true });
     await ScPost.scoping(rel, async () => {
-      // Inside scope (published=true), filter by title with quote (sanitization)
-      const results = await ScPost.where({ title: "O'Brien's Post" }).toArray();
-      expect(results.length).toBe(1);
-      expect(results[0].readAttribute("published")).toBe(true);
+      const found = (await ScPost.where({ title: "O'Brien's Post" }).first()) as Base | null;
+      expect(found).not.toBeNull();
+      expect(found!.readAttribute("published")).toBe(true);
     });
   });
 
