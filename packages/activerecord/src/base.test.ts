@@ -1903,7 +1903,7 @@ describe("BasicsTest", () => {
         this.primaryKey = ["store_id", "department_id"] as any;
       }
     }
-    expect(CpkModel.sequenceName).toBeDefined();
+    expect(CpkModel.sequenceName).toBeNull();
   });
   it("find multiple ordered last", async () => {
     class User extends Base {
