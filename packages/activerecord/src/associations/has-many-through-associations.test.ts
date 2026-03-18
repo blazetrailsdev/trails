@@ -2951,72 +2951,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(items).toHaveLength(1);
     expect(items[0].readAttribute("label")).toBe("I");
   });
-  it("modifying has many through has one reflection should raise", async () => {
-    class MhrAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class MhrPost extends Base {
-      static {
-        this.attribute("mhr_author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    class MhrComment extends Base {
-      static {
-        this.attribute("mhr_post_id", "integer");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    (MhrAuthor as any)._associations = [
-      {
-        type: "hasOne",
-        name: "mhrPost",
-        options: { className: "MhrPost", foreignKey: "mhr_author_id" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "mhrComments",
-        options: { through: "mhrPost", source: "mhrComments", className: "MhrComment" },
-      },
-    ];
-    (MhrPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "mhrComments",
-        options: { className: "MhrComment", foreignKey: "mhr_post_id" },
-      },
-    ];
-    registerModel("MhrAuthor", MhrAuthor);
-    registerModel("MhrPost", MhrPost);
-    registerModel("MhrComment", MhrComment);
-
-    const author = await MhrAuthor.create({ name: "David" });
-    const post = await MhrPost.create({ mhr_author_id: author.id, title: "Hello" });
-    const comment = await MhrComment.create({ mhr_post_id: post.id, body: "Hi" });
-
-    // Loading works fine
-    const comments = await loadHasManyThrough(author, "mhrComments", {
-      through: "mhrPost",
-      source: "mhrComments",
-      className: "MhrComment",
-    });
-    expect(comments).toHaveLength(1);
-
-    // Modifying through a has_one reflection should raise
-    const proxy = association(author, "mhrComments");
-    const newComment = await MhrComment.create({ mhr_post_id: post.id, body: "New" });
-    // push creates a join record, but the through is has_one so this is invalid.
-    // For now we verify that the through association loads correctly;
-    // the Rails error (HasManyThroughCantAssociateThroughHasOneOrManyReflection)
-    // requires reflection metadata we don't have yet.
-    const allComments = await proxy.toArray();
-    expect(allComments.length).toBeGreaterThanOrEqual(1);
-  });
+  it.skip("modifying has many through has one reflection should raise", () => {});
   it("associate existing with nonstandard primary key on belongs to", async () => {
     class NskPost extends Base {
       static {

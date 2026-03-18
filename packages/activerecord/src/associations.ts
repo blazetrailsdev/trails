@@ -1066,15 +1066,12 @@ export class CollectionProxy {
 
   private async _createThrough(attrs: Record<string, unknown> = {}): Promise<Base> {
     const ctor = this._record.constructor as typeof Base;
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey as string);
-    if (pkValue === null || pkValue === undefined) {
-      throw new Error(
-        `Cannot create through association on an unpersisted ${ctor.name} (missing primary key)`,
-      );
+    if (this._record.isNewRecord()) {
+      throw new Error(`Cannot create through association on an unpersisted ${ctor.name}`);
     }
     const record = this._buildThrough(attrs);
-    await record.save();
+    const saved = await record.save();
+    if (!saved) return record;
     await this._pushThrough([record]);
     return record;
   }
