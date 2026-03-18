@@ -170,15 +170,13 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     }
 
     const key = cacheKey(sql, binds);
+    const wasHit = this.cache.enabled && this.cache.get(key) !== undefined;
     return this.cache
       .computeIfAbsent(key, async () => {
-        const result = await this.inner.execute(sql, binds);
-        return result;
+        return this.inner.execute(sql, binds);
       })
       .then((result) => {
-        if (this.cache.enabled && this.cache.get(key) !== undefined) {
-          this._cacheHits++;
-        }
+        if (wasHit) this._cacheHits++;
         return result;
       });
   }
