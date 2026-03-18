@@ -305,6 +305,37 @@ class SchemaAdapter implements DatabaseAdapter {
     }
   }
 
+  private unwrapCompoundSelect(sql: string): string {
+    const ops = /^\s*(UNION\s+ALL|UNION|INTERSECT|EXCEPT)\s+/i;
+    const trimmed = sql.trim();
+    if (trimmed[0] !== "(") return sql;
+
+    // Find the matching close-paren for the opening paren
+    let depth = 0;
+    let i = 0;
+    for (; i < trimmed.length; i++) {
+      if (trimmed[i] === "(") depth++;
+      else if (trimmed[i] === ")") {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    if (depth !== 0) return sql;
+
+    const left = trimmed.slice(1, i).trim();
+    const rest = trimmed.slice(i + 1).trim();
+    const opMatch = rest.match(ops);
+    if (!opMatch) return sql;
+
+    const op = opMatch[1];
+    let right = rest.slice(opMatch[0].length).trim();
+    // Unwrap right-side parens if present
+    if (right.startsWith("(") && right.endsWith(")")) {
+      right = right.slice(1, -1).trim();
+    }
+    return `${left} ${op} ${right}`;
+  }
+
   private fixSqliteCompat(sql: string): string {
     if (isPg() || isMysql()) return sql;
     // SQLite doesn't support FOR UPDATE / FOR SHARE
@@ -314,11 +345,8 @@ class SchemaAdapter implements DatabaseAdapter {
       sql = sql.replace(/(OFFSET)/i, "LIMIT -1 $1");
     }
     // SQLite doesn't support parenthesized compound SELECT: (SELECT ...) UNION (SELECT ...)
-    // Only unwrap parens around top-level compound operands, not subqueries like IN (SELECT ...)
-    sql = sql.replace(
-      /^\(\s*(SELECT\b.+?)\)\s+(UNION\s+ALL|UNION|INTERSECT|EXCEPT)\s+\(\s*(SELECT\b.+?)\)$/gis,
-      "$1 $2 $3",
-    );
+    // Unwrap only top-level parens by tracking nesting depth
+    sql = this.unwrapCompoundSelect(sql);
     return sql;
   }
 
