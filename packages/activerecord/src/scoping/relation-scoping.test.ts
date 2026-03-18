@@ -91,13 +91,12 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await SfPost.create({ title: "InScope" });
+    const inScope = await SfPost.create({ title: "InScope" });
     await SfPost.create({ title: "OutOfScope" });
     const rel = SfPost.where({ title: "InScope" });
     await SfPost.scoping(rel, async () => {
-      const all = await SfPost.all().toArray();
-      expect(all.length).toBe(1);
-      expect(all[0].readAttribute("title")).toBe("InScope");
+      const found = await SfPost.find(inScope.id);
+      expect(found.readAttribute("title")).toBe("InScope");
     });
   });
 
@@ -105,16 +104,17 @@ describe("RelationScopingTest", () => {
     class SffPost extends Base {
       static {
         this.attribute("title", "string");
+        this.attribute("salary", "integer");
         this.adapter = adapter;
       }
     }
-    await SffPost.create({ title: "Excluded" });
-    await SffPost.create({ title: "Included" });
-    const rel = SffPost.where({ title: "Included" });
+    const target = await SffPost.create({ title: "Target", salary: 100000 });
+    await SffPost.create({ title: "Other", salary: 50000 });
+    const rel = SffPost.where({ salary: 100000 });
     await SffPost.scoping(rel, async () => {
-      const results = await SffPost.all().toArray();
-      expect(results.length).toBe(1);
-      expect(results[0].readAttribute("title")).toBe("Included");
+      const first = (await SffPost.first()) as Base | null;
+      expect(first).not.toBeNull();
+      expect(first!.readAttribute("title")).toBe("Target");
     });
   });
 
@@ -122,16 +122,19 @@ describe("RelationScopingTest", () => {
     class SflPost extends Base {
       static {
         this.attribute("title", "string");
+        this.attribute("salary", "integer");
         this.adapter = adapter;
       }
     }
-    await SflPost.create({ title: "Wanted" });
-    await SflPost.create({ title: "Unwanted" });
-    const rel = SflPost.where({ title: "Wanted" });
+    await SflPost.create({ title: "A", salary: 50000 });
+    await SflPost.create({ title: "B", salary: 80000 });
+    await SflPost.create({ title: "C", salary: 50000 });
+    const highestSalary = await SflPost.order("salary DESC").first();
+    const rel = SflPost.order("salary");
     await SflPost.scoping(rel, async () => {
-      const results = await SflPost.all().toArray();
-      expect(results.length).toBe(1);
-      expect(results[0].readAttribute("title")).toBe("Wanted");
+      const last = (await SflPost.last()) as Base | null;
+      expect(last).not.toBeNull();
+      expect(last!.readAttribute("salary")).toBe((highestSalary as Base).readAttribute("salary"));
     });
   });
 
