@@ -6121,8 +6121,8 @@ describe("CalculationsTest", () => {
     (Order as any).beforeShip(() => log.push("before_ship"));
     (Order as any).afterDeliver(() => log.push("after_deliver"));
     const o = new Order({});
-    (Order as any)._callbackChain.runBefore("ship", o);
-    (Order as any)._callbackChain.runAfter("deliver", o);
+    (Order as any)._callbackChain.runBeforeSync("ship", o);
+    (Order as any)._callbackChain.runAfterSync("deliver", o);
     expect(log).toEqual(["before_ship", "after_deliver"]);
   });
 
@@ -6165,7 +6165,7 @@ describe("CalculationsTest", () => {
       { prepend: true },
     );
     const u = new User({});
-    (User as any)._callbackChain.runBefore("destroy", u);
+    (User as any)._callbackChain.runBeforeSync("destroy", u);
     expect(order[0]).toBe("prepended");
   });
 

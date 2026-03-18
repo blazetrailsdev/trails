@@ -30,6 +30,11 @@ interface CallbackEntry {
  * Callbacks mixin — lifecycle hooks on models.
  *
  * Mirrors: ActiveModel::Callbacks
+ *
+ * The primary API is async (run/runBefore/runAfter) which properly
+ * awaits promise-returning callbacks. Sync variants (runSync/
+ * runBeforeSync/runAfterSync) exist for contexts that can't be async
+ * (constructors, synchronous validation).
  */
 export class CallbackChain {
   private callbacks: CallbackEntry[] = [];
@@ -48,18 +53,12 @@ export class CallbackChain {
     }
   }
 
-  /**
-   * Check if a callback's conditions are met.
-   */
   private _shouldRun(entry: CallbackEntry, record: AnyRecord): boolean {
     if (entry.conditions?.if && !entry.conditions.if(record)) return false;
     if (entry.conditions?.unless && entry.conditions.unless(record)) return false;
     return true;
   }
 
-  /**
-   * Create a copy of this chain (used for subclass inheritance).
-   */
   clone(): CallbackChain {
     const copy = new CallbackChain();
     copy.callbacks = [...this.callbacks];
@@ -67,43 +66,17 @@ export class CallbackChain {
   }
 
   /**
-   * Run callbacks for a given event around a block.
-   * Returns false if a before callback returns false (halting the chain).
-   */
-  run(event: CallbackEvent, record: AnyRecord, block: () => void): boolean {
-    if (!this.runBefore(event, record)) return false;
-
-    // Around callbacks wrap the block
-    const arounds = this.callbacks.filter(
-      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
-    );
-
-    let chain = block;
-    for (const cb of [...arounds].reverse()) {
-      const prev = chain;
-      chain = () => (cb.fn as AroundCallbackFn)(record, prev);
-    }
-    chain();
-
-    this.runAfter(event, record);
-
-    return true;
-  }
-
-  /**
    * Run callbacks for a given event around an async block.
-   * Same as run() but awaits the block before running after callbacks,
-   * ensuring after callbacks see the completed state. Around callbacks
-   * receive an async proceed() and can await it.
-   * Returns false if a before callback halts the chain or if an around
-   * callback does not call proceed().
+   * Awaits the block and all callbacks. Returns false if a before
+   * callback resolves to false or if an around callback does not
+   * call proceed().
    */
-  async runAsync(
+  async run(
     event: CallbackEvent,
     record: AnyRecord,
     block: () => void | Promise<void>,
   ): Promise<boolean> {
-    if (!(await this.runBeforeAsync(event, record))) return false;
+    if (!(await this.runBefore(event, record))) return false;
 
     const arounds = this.callbacks.filter(
       (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
@@ -140,30 +113,39 @@ export class CallbackChain {
 
     if (!blockExecuted) return false;
 
-    await this.runAfterAsync(event, record);
+    await this.runAfter(event, record);
 
     return true;
   }
 
   /**
-   * Run only before callbacks for an event (synchronous).
-   * Returns false if a callback halts the chain.
+   * Synchronous variant of run() for contexts that can't be async
+   * (constructors, synchronous validation). Does not await promises.
    */
-  runBefore(event: CallbackEvent, record: AnyRecord): boolean {
-    const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
-    for (const cb of befores) {
-      if (!this._shouldRun(cb, record)) continue;
-      const result = (cb.fn as CallbackFn)(record);
-      if (result === false) return false;
+  runSync(event: CallbackEvent, record: AnyRecord, block: () => void): boolean {
+    if (!this.runBeforeSync(event, record)) return false;
+
+    const arounds = this.callbacks.filter(
+      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
+    );
+
+    let chain = block;
+    for (const cb of [...arounds].reverse()) {
+      const prev = chain;
+      chain = () => (cb.fn as AroundCallbackFn)(record, prev);
     }
+    chain();
+
+    this.runAfterSync(event, record);
+
     return true;
   }
 
   /**
-   * Run only before callbacks for an event, awaiting async callbacks.
+   * Run before callbacks, awaiting async callbacks.
    * Returns false if a callback resolves to false (halting the chain).
    */
-  async runBeforeAsync(event: CallbackEvent, record: AnyRecord): Promise<boolean> {
+  async runBefore(event: CallbackEvent, record: AnyRecord): Promise<boolean> {
     const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
     for (const cb of befores) {
       if (!this._shouldRun(cb, record)) continue;
@@ -174,24 +156,37 @@ export class CallbackChain {
   }
 
   /**
-   * Run only after callbacks for an event (synchronous).
+   * Synchronous before callbacks. Does not await promises.
    */
-  runAfter(event: CallbackEvent, record: AnyRecord): void {
-    const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
-    for (const cb of afters) {
+  runBeforeSync(event: CallbackEvent, record: AnyRecord): boolean {
+    const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
+    for (const cb of befores) {
       if (!this._shouldRun(cb, record)) continue;
-      (cb.fn as CallbackFn)(record);
+      const result = (cb.fn as CallbackFn)(record);
+      if (result === false) return false;
     }
+    return true;
   }
 
   /**
-   * Run only after callbacks for an event, awaiting async callbacks.
+   * Run after callbacks, awaiting async callbacks.
    */
-  async runAfterAsync(event: CallbackEvent, record: AnyRecord): Promise<void> {
+  async runAfter(event: CallbackEvent, record: AnyRecord): Promise<void> {
     const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
     for (const cb of afters) {
       if (!this._shouldRun(cb, record)) continue;
       await (cb.fn as CallbackFn)(record);
+    }
+  }
+
+  /**
+   * Synchronous after callbacks. Does not await promises.
+   */
+  runAfterSync(event: CallbackEvent, record: AnyRecord): void {
+    const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
+    for (const cb of afters) {
+      if (!this._shouldRun(cb, record)) continue;
+      (cb.fn as CallbackFn)(record);
     }
   }
 }

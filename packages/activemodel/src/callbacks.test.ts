@@ -51,7 +51,7 @@ describe("CallbacksTest", () => {
     expect(p.isValid()).toBe(true);
   });
 
-  it("after_create callbacks with both callbacks declared in different lines", () => {
+  it("after_create callbacks with both callbacks declared in different lines", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -65,7 +65,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    (p.constructor as typeof Model)._callbackChain.runAfter("create", p);
+    await (p.constructor as typeof Model)._callbackChain.runAfter("create", p);
     expect(log).toEqual(["first", "second"]);
   });
 
@@ -218,7 +218,7 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    await chain.runAsync("save", {}, async () => {
+    await chain.run("save", {}, async () => {
       log.push("block:start");
       await Promise.resolve();
       log.push("block:end");
@@ -237,7 +237,7 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    const result = await chain.runAsync("save", {}, async () => {
+    const result = await chain.run("save", {}, async () => {
       log.push("block");
     });
     expect(result).toBe(false);
@@ -256,7 +256,7 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    await chain.runAsync("save", {}, async () => {
+    await chain.run("save", {}, async () => {
       log.push("block:start");
       await Promise.resolve();
       log.push("block:end");
@@ -276,7 +276,7 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    await chain.runAsync("save", {}, async () => {
+    await chain.run("save", {}, async () => {
       log.push("block:start");
       await Promise.resolve();
       log.push("block:end");
@@ -296,7 +296,7 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    const result = await chain.runAsync("save", {}, async () => {
+    const result = await chain.run("save", {}, async () => {
       log.push("block");
     });
     expect(result).toBe(false);
@@ -310,7 +310,7 @@ describe("CallbackChain.runAsync", () => {
 
     // Use controlled deferreds so we can prove sequential awaiting.
     // The second callback's promise resolves before the first's, but
-    // because runAfterAsync awaits sequentially, "after1" must appear
+    // because runAfter awaits sequentially, "after1" must appear
     // before "after2".
     let resolveFirst!: () => void;
     const firstDeferred = new Promise<void>((r) => {
@@ -330,7 +330,7 @@ describe("CallbackChain.runAsync", () => {
       log.push("after2");
     });
 
-    const runPromise = chain.runAsync("save", {}, async () => {
+    const runPromise = chain.run("save", {}, async () => {
       log.push("block");
     });
 
