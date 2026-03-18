@@ -101,6 +101,14 @@ export class TimeWithZone {
     return this._timeZone;
   }
 
+  /** Returns the local time as a Date (wall-clock time expressed as UTC Date) */
+  get time(): Date {
+    const l = this._local();
+    return new Date(
+      Date.UTC(l.year, l.month - 1, l.day, l.hour, l.minute, l.second, l.millisecond),
+    );
+  }
+
   /** Timezone abbreviation (e.g., "EST", "EDT") */
   get zone(): string {
     return this._timeZone.abbreviation(this._utc);
@@ -128,8 +136,16 @@ export class TimeWithZone {
 
   /** Whether the timezone is UTC */
   isUtc(): boolean {
+    const tz = this._timeZone.tzinfo;
     return (
-      this.utcOffset === 0 && (this._timeZone.tzinfo === "Etc/UTC" || this._timeZone.name === "UTC")
+      this.utcOffset === 0 &&
+      (tz === "Etc/UTC" ||
+        tz === "UTC" ||
+        tz === "UCT" ||
+        tz === "Etc/UCT" ||
+        tz === "Etc/Universal" ||
+        tz === "Universal" ||
+        this._timeZone.name === "UTC")
     );
   }
 
@@ -280,9 +296,10 @@ export class TimeWithZone {
     return this._utc.getTime() / 1000;
   }
 
-  /** Convert to a different timezone */
+  /** Convert to a different timezone. Returns this if the zone is the same. */
   inTimeZone(zone: string | TimeZone): TimeWithZone {
     const tz = typeof zone === "string" ? TimeZone.find(zone) : zone;
+    if (tz.tzinfo === this._timeZone.tzinfo) return this;
     return new TimeWithZone(this._utc, tz);
   }
 
@@ -308,15 +325,16 @@ export class TimeWithZone {
     return (
       `${l.year}-${pad2(l.month)}-${pad2(l.day)} ` +
       `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
-      `${this.formattedOffset()} ${this.zone}`
+      `${this.formattedOffset(false)}`
     );
   }
 
   inspect(): string {
     const l = this._local();
+    const ns = String(l.millisecond * 1_000_000).padStart(9, "0");
     return (
-      `${DAY_NAMES[this.wday]}, ${pad2(l.day)} ${MONTH_NAMES[l.month - 1]} ${l.year} ` +
-      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}.${pad3(l.millisecond)} ` +
+      `${l.year}-${pad2(l.month)}-${pad2(l.day)} ` +
+      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}.${ns} ` +
       `${this.zone} ${this.formattedOffset()}`
     );
   }
@@ -423,8 +441,13 @@ export class TimeWithZone {
   /** Named format strings, matching Rails to_fs / to_formatted_s */
   toFs(format: string = "default"): string {
     switch (format) {
-      case "db":
-        return this.strftime("%Y-%m-%d %H:%M:%S");
+      case "db": {
+        const u = this._utc;
+        return (
+          `${u.getUTCFullYear()}-${pad2(u.getUTCMonth() + 1)}-${pad2(u.getUTCDate())} ` +
+          `${pad2(u.getUTCHours())}:${pad2(u.getUTCMinutes())}:${pad2(u.getUTCSeconds())}`
+        );
+      }
       case "long":
         return this.strftime("%B %d, %Y %H:%M");
       case "short":
@@ -435,8 +458,15 @@ export class TimeWithZone {
       case "iso8601":
       case "xmlschema":
         return this.xmlschema();
-      case "inspect":
-        return this.inspect();
+      case "inspect": {
+        const li = this._local();
+        const nsi = String(li.millisecond * 1_000_000).padStart(9, "0");
+        return (
+          `${li.year}-${pad2(li.month)}-${pad2(li.day)} ` +
+          `${pad2(li.hour)}:${pad2(li.minute)}:${pad2(li.second)}.${nsi} ` +
+          `${this.formattedOffset(false)}`
+        );
+      }
       default:
         return this.toString();
     }
@@ -627,11 +657,13 @@ export class TimeWithZone {
    * Strict equality — same moment AND same timezone.
    */
   eql(other: unknown): boolean {
-    if (!(other instanceof TimeWithZone)) return false;
-    return (
-      this._utc.getTime() === other._utc.getTime() &&
-      this._timeZone.tzinfo === other._timeZone.tzinfo
-    );
+    if (other instanceof TimeWithZone) {
+      return this._utc.getTime() === other._utc.getTime();
+    }
+    if (other instanceof Date) {
+      return this._utc.getTime() === other.getTime();
+    }
+    return false;
   }
 
   /**
@@ -670,6 +702,26 @@ export class TimeWithZone {
     return (
       this.year === yesterday.year && this.month === yesterday.month && this.day === yesterday.day
     );
+  }
+
+  /** Returns true if this time is before the given time */
+  isBefore(other: TimeWithZone | Date): boolean {
+    return this.compareTo(other) < 0;
+  }
+
+  /** Returns true if this time is after the given time */
+  isAfter(other: TimeWithZone | Date): boolean {
+    return this.compareTo(other) > 0;
+  }
+
+  /** Alias for isYesterday */
+  isPrevDay(): boolean {
+    return this.isYesterday();
+  }
+
+  /** Alias for isTomorrow */
+  isNextDay(): boolean {
+    return this.isTomorrow();
   }
 
   // ---------------------------------------------------------------------------

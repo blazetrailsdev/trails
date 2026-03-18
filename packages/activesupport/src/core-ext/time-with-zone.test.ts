@@ -14,61 +14,156 @@ describe("TimeWithZoneTest", () => {
     utcZone = TimeZone.find("UTC");
   });
 
-  it.skip("utc");
+  // @twz = 2000-01-01 00:00:00 UTC in Eastern = 1999-12-31 19:00:00 EST
+  const maketwz = () => new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
 
-  it.skip("time");
+  it("utc", () => {
+    const twz = maketwz();
+    expect(twz.utc().getTime()).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(twz.utc()).toBeInstanceOf(Date);
+  });
 
-  it.skip("time zone");
+  it("time", () => {
+    const twz = maketwz();
+    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 19, 0, 0));
+  });
+
+  it("time zone", () => {
+    const twz = maketwz();
+    expect(twz.timeZone).toBe(eastern);
+  });
 
   it.skip("in time zone");
 
-  it.skip("in time zone with argument");
+  it("in time zone with argument", () => {
+    const twz = maketwz();
+    const alaska = TimeZone.find("Alaska");
+    const result = twz.inTimeZone("Alaska");
+    expect(result.timeZone.name).toBe(alaska.name);
+    expect(result.utc().getTime()).toBe(twz.utc().getTime());
+  });
 
-  it.skip("in time zone with new zone equal to old zone does not create new object");
+  it("in time zone with new zone equal to old zone does not create new object", () => {
+    const twz = maketwz();
+    expect(twz.inTimeZone(eastern)).toBe(twz);
+  });
 
-  it.skip("in time zone with bad argument");
+  it("in time zone with bad argument", () => {
+    const twz = maketwz();
+    expect(() => twz.inTimeZone("No such timezone exists")).toThrow();
+  });
 
   it.skip("in time zone with ambiguous time");
 
-  it.skip("localtime");
+  it("localtime", () => {
+    const twz = maketwz();
+    const local = twz.localtime();
+    expect(local).toBeInstanceOf(Date);
+  });
 
-  it.skip("utc?");
+  it("utc?", () => {
+    const twz = maketwz();
+    expect(twz.isUtc()).toBe(false);
+    expect(new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), utcZone).isUtc()).toBe(true);
+  });
 
-  it.skip("formatted offset");
+  it("formatted offset", () => {
+    const twz = maketwz();
+    expect(twz.formattedOffset()).toBe("-05:00");
+    const summer = new TimeWithZone(new Date(Date.UTC(2000, 5, 1)), eastern);
+    expect(summer.formattedOffset()).toBe("-04:00");
+  });
 
-  it.skip("dst?");
+  it("dst?", () => {
+    const twz = maketwz();
+    expect(twz.dst()).toBe(false);
+    const summer = new TimeWithZone(new Date(Date.UTC(2000, 5, 1)), eastern);
+    expect(summer.dst()).toBe(true);
+  });
 
-  it.skip("zone");
+  it("zone", () => {
+    const twz = maketwz();
+    expect(twz.zone).toBe("EST");
+    const summer = new TimeWithZone(new Date(Date.UTC(2000, 5, 1)), eastern);
+    expect(summer.zone).toBe("EDT");
+  });
 
-  it.skip("nsec");
+  it("nsec", () => {
+    const twz = maketwz();
+    expect(twz.nsec).toBe(0);
+  });
 
-  it.skip("strftime");
+  it("strftime", () => {
+    const twz = maketwz();
+    expect(twz.strftime("%Y-%m-%d %H:%M:%S %Z %z")).toBe("1999-12-31 19:00:00 EST -0500");
+  });
 
-  it.skip("strftime with escaping");
+  it("strftime with escaping", () => {
+    const twz = maketwz();
+    expect(twz.strftime("%%Z %%z")).toBe("%Z %z");
+    expect(twz.strftime("%%%Z %%%z")).toBe("%EST %-0500");
+  });
 
-  it.skip("inspect");
+  it("inspect", () => {
+    const twz = maketwz();
+    expect(twz.inspect()).toBe("1999-12-31 19:00:00.000000000 EST -05:00");
+  });
 
-  it.skip("to s");
+  it("to s", () => {
+    const twz = maketwz();
+    expect(twz.toString()).toBe("1999-12-31 19:00:00 -0500");
+  });
 
-  it.skip("to fs");
+  it("to fs", () => {
+    const twz = maketwz();
+    expect(twz.toFs()).toBe("1999-12-31 19:00:00 -0500");
+  });
 
-  it.skip("to fs db");
+  it("to fs db", () => {
+    const twz = maketwz();
+    expect(twz.toFs("db")).toBe("2000-01-01 00:00:00");
+    expect(twz.toFormattedS("db")).toBe("2000-01-01 00:00:00");
+  });
 
-  it.skip("to fs inspect");
+  it("to fs inspect", () => {
+    const twz = maketwz();
+    expect(twz.toFs("inspect")).toBe("1999-12-31 19:00:00.000000000 -0500");
+  });
 
-  it.skip("to fs not existent");
+  it("to fs not existent", () => {
+    const twz = maketwz();
+    expect(twz.toFs("not_existent")).toBe("1999-12-31 19:00:00 -0500");
+  });
 
-  it.skip("xmlschema");
+  it("xmlschema", () => {
+    const twz = maketwz();
+    expect(twz.xmlschema()).toBe("1999-12-31T19:00:00-05:00");
+  });
 
-  it.skip("xmlschema with fractional seconds");
+  it("xmlschema with fractional seconds", () => {
+    const twz = maketwz().plus(0.123456);
+    expect(twz.xmlschema(3)).toBe("1999-12-31T19:00:00.123-05:00");
+  });
 
-  it.skip("xmlschema with fractional seconds lower than hundred thousand");
+  it("xmlschema with fractional seconds lower than hundred thousand", () => {
+    const twz = maketwz().plus(0.001234);
+    expect(twz.xmlschema(3)).toBe("1999-12-31T19:00:00.001-05:00");
+  });
 
-  it.skip("xmlschema with nil fractional seconds");
+  it("xmlschema with nil fractional seconds", () => {
+    const twz = maketwz();
+    expect(twz.xmlschema(0)).toBe("1999-12-31T19:00:00-05:00");
+  });
 
-  it.skip("iso8601 with fractional seconds");
+  it("iso8601 with fractional seconds", () => {
+    const twz = maketwz().plus(0.125);
+    expect(twz.iso8601(3)).toBe("1999-12-31T19:00:00.125-05:00");
+  });
 
-  it.skip("rfc3339 with fractional seconds");
+  it("rfc3339 with fractional seconds", () => {
+    const twz = maketwz().plus(0.125);
+    expect(twz.rfc3339(3)).toBe("1999-12-31T19:00:00.125-05:00");
+  });
 
   it.skip("to yaml");
 
@@ -78,17 +173,50 @@ describe("TimeWithZoneTest", () => {
 
   it.skip("ruby yaml load");
 
-  it.skip("httpdate");
+  it("httpdate", () => {
+    const twz = maketwz();
+    expect(twz.httpdate()).toBe("Sat, 01 Jan 2000 00:00:00 GMT");
+  });
 
-  it.skip("rfc2822");
+  it("rfc2822", () => {
+    const twz = maketwz();
+    expect(twz.rfc2822()).toBe("Fri, 31 Dec 1999 19:00:00 -0500");
+  });
 
-  it.skip("compare with time");
+  it("compare with time", () => {
+    const twz = maketwz();
+    expect(twz.compareTo(new Date(Date.UTC(1999, 11, 31, 23, 59, 59)))).toBe(1);
+    expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)))).toBe(0);
+    expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(-1);
+  });
 
   it.skip("compare with datetime");
 
-  it.skip("compare with time with zone");
+  it("compare with time with zone", () => {
+    const twz = maketwz();
+    expect(
+      twz.compareTo(new TimeWithZone(new Date(Date.UTC(1999, 11, 31, 23, 59, 59)), utcZone)),
+    ).toBe(1);
+    expect(twz.compareTo(new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), utcZone))).toBe(
+      0,
+    );
+    expect(twz.compareTo(new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)), utcZone))).toBe(
+      -1,
+    );
+  });
 
-  it.skip("between?");
+  it("between?", () => {
+    const twz = maketwz();
+    expect(
+      twz.between(
+        new Date(Date.UTC(1999, 11, 31, 23, 59, 59)),
+        new Date(Date.UTC(2000, 0, 1, 0, 0, 1)),
+      ),
+    ).toBe(true);
+    expect(
+      twz.between(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)), new Date(Date.UTC(2000, 0, 1, 0, 0, 2))),
+    ).toBe(false);
+  });
 
   it.skip("today");
 
@@ -108,11 +236,41 @@ describe("TimeWithZoneTest", () => {
 
   it.skip("future with time current as time with zone");
 
-  it.skip("before");
+  it("before", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 0)), eastern);
+    expect(
+      twz.isBefore(new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 11, 59, 59)), eastern)),
+    ).toBe(false);
+    expect(twz.isBefore(new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 0)), eastern))).toBe(
+      false,
+    );
+    expect(twz.isBefore(new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 1)), eastern))).toBe(
+      true,
+    );
+  });
 
-  it.skip("after");
+  it("after", () => {
+    const twz = new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 0)), eastern);
+    expect(twz.isAfter(new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 11, 59, 59)), eastern))).toBe(
+      true,
+    );
+    expect(twz.isAfter(new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 0)), eastern))).toBe(
+      false,
+    );
+    expect(twz.isAfter(new TimeWithZone(new Date(Date.UTC(2017, 2, 6, 12, 0, 1)), eastern))).toBe(
+      false,
+    );
+  });
 
-  it.skip("eql?");
+  it("eql?", () => {
+    const twz = maketwz();
+    expect(twz.eql(new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), eastern))).toBe(true);
+    expect(twz.eql(new Date(Date.UTC(2000, 0, 1)))).toBe(true);
+    expect(twz.eql(new TimeWithZone(new Date(Date.UTC(2000, 0, 1)), TimeZone.find("Hawaii")))).toBe(
+      true,
+    );
+    expect(twz.eql(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(false);
+  });
 
   it("plus with integer", () => {
     const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);

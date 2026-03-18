@@ -182,13 +182,13 @@ describe("TimeWithZoneTest", () => {
   it("to s (formatting)", () => {
     // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
-    expect(twz.toString()).toBe("2024-01-15 10:30:45 -05:00 EST");
+    expect(twz.toString()).toBe("2024-01-15 10:30:45 -0500");
   });
 
   it("inspect()", () => {
     // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
-    expect(twz.inspect()).toBe("Monday, 15 January 2024 10:30:45.000 EST -05:00");
+    expect(twz.inspect()).toBe("2024-01-15 10:30:45.000000000 EST -05:00");
   });
 
   it("formattedOffset() with colon", () => {
@@ -538,16 +538,16 @@ describe("TimeWithZoneTest", () => {
     expect(twz.equals(date)).toBe(true);
   });
 
-  it("eql() requires same timezone", () => {
+  it("eql() compares UTC instant regardless of timezone", () => {
     const est = eastern.local(2024, 1, 15, 12, 0, 0);
     const pst = est.inTimeZone(pacific);
-    expect(est.eql(pst)).toBe(false);
+    expect(est.eql(pst)).toBe(true);
     expect(est.eql(est)).toBe(true);
   });
 
-  it("eql() returns false for non-TimeWithZone", () => {
+  it("eql() works with Date and returns false for non-time", () => {
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-    expect(twz.eql(new Date())).toBe(false);
+    expect(twz.eql(twz.utc())).toBe(true);
     expect(twz.eql(null)).toBe(false);
   });
 
