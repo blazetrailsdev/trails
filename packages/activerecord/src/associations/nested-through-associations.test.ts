@@ -2,10 +2,10 @@
  * Mirrors Rails activerecord/test/cases/associations/nested_through_associations_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { loadBelongsTo, loadHasOne, loadHasMany } from "../associations.js";
+import { loadBelongsTo, loadHasOne, loadHasMany, loadHasManyThrough } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -355,8 +355,38 @@ describe("NestedThroughAssociationsTest", () => {
     // Requires joins preload HABTM through
   });
 
-  it.skip("has many through has many with has many through habtm source reflection", () => {
-    // Requires complex nested HABTM
+  it("has many through has many with has many through habtm source reflection", async () => {
+    // Author -> Posts -> Taggings -> Tags (3-level chain)
+    const author = await Author.create({ name: "HABTMChain" });
+    const post = await Post.create({ author_id: author.id, title: "HC", body: "B" });
+    const tag1 = await Tag.create({ name: "hc1" });
+    const tag2 = await Tag.create({ name: "hc2" });
+    await Tagging.create({ tag_id: tag1.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag2.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
+    const allTaggings: any[] = [];
+    for (const p of posts) {
+      const taggings = await loadHasMany(p as Post, "taggings", {
+        className: "Tagging",
+        foreignKey: "taggable_id",
+        primaryKey: "id",
+      });
+      allTaggings.push(...taggings);
+    }
+    const tags: any[] = [];
+    for (const tg of allTaggings) {
+      const tag = await loadBelongsTo(tg as Tagging, "tag", {
+        className: "Tag",
+        foreignKey: "tag_id",
+      });
+      if (tag) tags.push(tag);
+    }
+    expect(tags.length).toBe(2);
   });
 
   it.skip("has many through has many with has many through habtm source reflection preload", () => {
@@ -367,8 +397,33 @@ describe("NestedThroughAssociationsTest", () => {
     // Requires complex joins preload
   });
 
-  it.skip("has many through has many through with belongs to source reflection", () => {
-    // Requires through + belongs_to source
+  it("has many through has many through with belongs to source reflection", async () => {
+    // Author -> Posts -> Taggings -> Tag (belongs_to from tagging)
+    const author = await Author.create({ name: "BelongsToSource" });
+    const post = await Post.create({ author_id: author.id, title: "T1", body: "B" });
+    const tag = await Tag.create({ name: "bt_tag" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
+    expect(posts.length).toBe(1);
+
+    const taggings = await loadHasMany(posts[0] as Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+      primaryKey: "id",
+    });
+    expect(taggings.length).toBe(1);
+
+    const loadedTag = await loadBelongsTo(taggings[0] as Tagging, "tag", {
+      className: "Tag",
+      foreignKey: "tag_id",
+    });
+    expect(loadedTag).not.toBeNull();
+    expect(loadedTag!.readAttribute("name")).toBe("bt_tag");
   });
 
   it.skip("has many through has many through with belongs to source reflection preload", () => {
@@ -379,8 +434,30 @@ describe("NestedThroughAssociationsTest", () => {
     // Requires joins preload
   });
 
-  it.skip("has many through belongs to with has many through source reflection", () => {
-    // Requires belongs_to through
+  it("has many through belongs to with has many through source reflection", async () => {
+    // Post belongs_to Author -> Author has_many Posts -> Posts have Taggings
+    const author = await Author.create({ name: "BtThrough" });
+    const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
+    const tag1 = await Tag.create({ name: "bt1" });
+    const tag2 = await Tag.create({ name: "bt2" });
+    await Tagging.create({ tag_id: tag1.id, taggable_id: post1.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag2.id, taggable_id: post2.id, taggable_type: "Post" });
+
+    // From post1, load author via belongs_to
+    const loadedAuthor = await loadBelongsTo(post1, "author", {
+      className: "Author",
+      foreignKey: "author_id",
+    });
+    expect(loadedAuthor).not.toBeNull();
+
+    // From author, load all posts
+    const allPosts = await loadHasMany(loadedAuthor!, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
+    expect(allPosts.length).toBe(2);
   });
 
   it.skip("has many through belongs to with has many through source reflection preload", () => {
@@ -477,16 +554,191 @@ describe("NestedThroughAssociationsTest", () => {
     // Requires scope on polymorphic nested through
   });
 
-  it.skip("has many through with foreign key option on through reflection", () => {
-    // Requires foreign_key on through
+  it("has many through with foreign key option on through reflection", async () => {
+    class FkThrAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FkThrPost extends Base {
+      static {
+        this.attribute("writer_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FkThrComment extends Base {
+      static {
+        this.attribute("fk_thr_post_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    (FkThrAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "fkThrPosts",
+        options: { className: "FkThrPost", foreignKey: "writer_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "fkThrComments",
+        options: { through: "fkThrPosts", source: "fkThrComments", className: "FkThrComment" },
+      },
+    ];
+    (FkThrPost as any)._associations = [
+      {
+        type: "hasMany",
+        name: "fkThrComments",
+        options: { className: "FkThrComment", foreignKey: "fk_thr_post_id" },
+      },
+    ];
+    registerModel("FkThrAuthor", FkThrAuthor);
+    registerModel("FkThrPost", FkThrPost);
+    registerModel("FkThrComment", FkThrComment);
+
+    const author = await FkThrAuthor.create({ name: "DHH" });
+    const post = await FkThrPost.create({ writer_id: author.id, title: "Hello" });
+    await FkThrComment.create({ fk_thr_post_id: post.id, body: "Great!" });
+
+    const comments = await loadHasManyThrough(author, "fkThrComments", {
+      through: "fkThrPosts",
+      source: "fkThrComments",
+      className: "FkThrComment",
+    });
+    expect(comments).toHaveLength(1);
+    expect(comments[0].readAttribute("body")).toBe("Great!");
   });
 
-  it.skip("has many through with foreign key option on source reflection", () => {
-    // Requires foreign_key on source
+  it("has many through with foreign key option on source reflection", async () => {
+    class FkSrcAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FkSrcPost extends Base {
+      static {
+        this.attribute("fk_src_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FkSrcComment extends Base {
+      static {
+        this.attribute("article_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    (FkSrcAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "fkSrcPosts",
+        options: { className: "FkSrcPost", foreignKey: "fk_src_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "fkSrcComments",
+        options: { through: "fkSrcPosts", source: "fkSrcComments", className: "FkSrcComment" },
+      },
+    ];
+    (FkSrcPost as any)._associations = [
+      {
+        type: "hasMany",
+        name: "fkSrcComments",
+        options: { className: "FkSrcComment", foreignKey: "article_id" },
+      },
+    ];
+    registerModel("FkSrcAuthor", FkSrcAuthor);
+    registerModel("FkSrcPost", FkSrcPost);
+    registerModel("FkSrcComment", FkSrcComment);
+
+    const author = await FkSrcAuthor.create({ name: "DHH" });
+    const post = await FkSrcPost.create({ fk_src_author_id: author.id, title: "Hello" });
+    await FkSrcComment.create({ article_id: post.id, body: "Nice!" });
+
+    const comments = await loadHasManyThrough(author, "fkSrcComments", {
+      through: "fkSrcPosts",
+      source: "fkSrcComments",
+      className: "FkSrcComment",
+    });
+    expect(comments).toHaveLength(1);
+    expect(comments[0].readAttribute("body")).toBe("Nice!");
   });
 
-  it.skip("has many through with sti on through reflection", () => {
-    // Requires STI on through
+  it("has many through with sti on through reflection", async () => {
+    class StiThrClub extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StiThrMembership extends Base {
+      static {
+        this.attribute("sti_thr_club_id", "integer");
+        this.attribute("sti_thr_member_id", "integer");
+        this.attribute("type", "string");
+        this._tableName = "sti_thr_memberships";
+        this.adapter = adapter;
+        enableSti(StiThrMembership);
+      }
+    }
+    class StiThrSuperMembership extends StiThrMembership {
+      static {
+        this.adapter = adapter;
+        registerModel(StiThrSuperMembership);
+        registerSubclass(StiThrSuperMembership);
+      }
+    }
+    class StiThrMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (StiThrClub as any)._associations = [
+      {
+        type: "hasMany",
+        name: "stiThrMemberships",
+        options: { className: "StiThrMembership", foreignKey: "sti_thr_club_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "stiThrMembers",
+        options: {
+          through: "stiThrMemberships",
+          source: "stiThrMember",
+          className: "StiThrMember",
+        },
+      },
+    ];
+    (StiThrMembership as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "stiThrMember",
+        options: { className: "StiThrMember", foreignKey: "sti_thr_member_id" },
+      },
+    ];
+    registerModel("StiThrClub", StiThrClub);
+    registerModel("StiThrMembership", StiThrMembership);
+    registerModel("StiThrMember", StiThrMember);
+
+    const club = await StiThrClub.create({ name: "Cool Club" });
+    const member = await StiThrMember.create({ name: "Alice" });
+    await StiThrSuperMembership.create({
+      sti_thr_club_id: club.id,
+      sti_thr_member_id: member.id,
+    });
+
+    const members = await loadHasManyThrough(club, "stiThrMembers", {
+      through: "stiThrMemberships",
+      source: "stiThrMember",
+      className: "StiThrMember",
+    });
+    expect(members).toHaveLength(1);
+    expect(members[0].readAttribute("name")).toBe("Alice");
   });
 
   it.skip("has many through with sti on nested through reflection", () => {

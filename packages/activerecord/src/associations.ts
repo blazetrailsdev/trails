@@ -993,10 +993,19 @@ export class CollectionProxy {
     return loadHasMany(this._record, this._assocName, this._assocDef.options);
   }
 
+  private get _isThrough(): boolean {
+    return !!this._assocDef.options.through;
+  }
+
   /**
    * Build a new associated record (unsaved) with the FK set.
    */
   build(attrs: Record<string, unknown> = {}): Base {
+    // Through association: build the target record (no FK on target)
+    if (this._isThrough) {
+      return this._buildThrough(attrs);
+    }
+
     const ctor = this._record.constructor as typeof Base;
     const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
@@ -1027,12 +1036,36 @@ export class CollectionProxy {
     return new targetModel(buildAttrs);
   }
 
+  private _buildThrough(attrs: Record<string, unknown> = {}): Base {
+    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+    let targetModel = resolveModel(className);
+
+    const inheritanceCol = getInheritanceColumn(targetModel);
+    if (inheritanceCol && attrs[inheritanceCol]) {
+      const typeName = attrs[inheritanceCol] as string;
+      targetModel = findStiClass(targetModel, typeName);
+    }
+
+    return new targetModel(attrs);
+  }
+
   /**
    * Build and save a new associated record.
    */
   async create(attrs: Record<string, unknown> = {}): Promise<Base> {
+    if (this._isThrough) {
+      return this._createThrough(attrs);
+    }
     const record = this.build(attrs);
     await record.save();
+    return record;
+  }
+
+  private async _createThrough(attrs: Record<string, unknown> = {}): Promise<Base> {
+    const record = this._buildThrough(attrs);
+    await record.save();
+    // Create the join record
+    await this._pushThrough([record]);
     return record;
   }
 
