@@ -112,11 +112,8 @@ describe("FixturesTest", () => {
     expect(rows[0].id).toBeDefined();
   });
 
-  it("inserts with pre and suffix", () => {
-    const data = { first: { title: "hello" } };
-    const set = new FixtureSet("topics", data);
-    const rows = set.toRows();
-    expect(rows[0].title).toBe("hello");
+  it.skip("inserts with pre and suffix", () => {
+    /* needs table name prefix/suffix support */
   });
 
   it.skip("insert with datetime", () => {
@@ -534,18 +531,16 @@ describe("FoxyFixturesTest", () => {
     expect(set.get("alice")!.name).toBe("Alice");
   });
 
-  it("supports label interpolation", () => {
-    const label = "ruby";
-    const id = identify(label);
-    expect(id).toBe(207281424);
+  it.skip("supports label interpolation", () => {
+    /* needs $LABEL replacement in fixture values */
   });
 
-  it("supports label string interpolation", () => {
-    expect(identify("foo")).toBe(identify("foo"));
+  it.skip("supports label string interpolation", () => {
+    /* needs $LABEL replacement in fixture values */
   });
 
-  it("supports label interpolation for integer label", () => {
-    expect(typeof identify("123")).toBe("number");
+  it.skip("supports label interpolation for integer label", () => {
+    /* needs $LABEL replacement in fixture values */
   });
 
   it.skip("supports polymorphic belongs to", () => {
