@@ -1247,8 +1247,7 @@ export class Schema {
 
 /**
  * MigrationContext — wraps an adapter with schema-aware migration methods
- * and synchronous schema inspection.
- * in tests and for defining migrations programmatically.
+ * and synchronous schema inspection, for use in tests and programmatic migrations.
  *
  * Mirrors: ActiveRecord::MigrationContext
  */
