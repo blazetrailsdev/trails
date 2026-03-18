@@ -230,8 +230,17 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("pluck with qualified schema name", () => {});
     it.skip("classes with qualified schema name", () => {});
     it.skip("raise on unquoted schema name", () => {});
-    it.skip("without schema search path", () => {});
-    it.skip("ignore nil schema search path", () => {});
+    it("without schema search path", async () => {
+      await adapter.setSchemaSearchPath("public");
+      expect(await adapter.dataSourceExists(TABLE_NAME)).toBe(false);
+      expect(await adapter.dataSourceExists(`${SCHEMA_NAME}.${TABLE_NAME}`)).toBe(true);
+    });
+
+    it("ignore nil schema search path", async () => {
+      await adapter.setSchemaSearchPath(null);
+      const path = await adapter.schemaSearchPath;
+      expect(path).toBeDefined();
+    });
 
     it("index name exists", async () => {
       await adapter.setSchemaSearchPath(SCHEMA_NAME);
@@ -302,8 +311,21 @@ describeIfPg("PostgresAdapter", () => {
       expect(indexes).toHaveLength(5);
     });
 
-    it.skip("with uppercase index name", () => {});
-    it.skip("remove index when schema specified", () => {});
+    it("with uppercase index name", async () => {
+      await adapter.setSchemaSearchPath(SCHEMA_NAME);
+      await adapter.addIndex(TABLE_NAME, ["name"], { name: "UpperCaseIdx" });
+      expect(await adapter.indexNameExists(TABLE_NAME, "UpperCaseIdx")).toBe(true);
+      await adapter.removeIndex(TABLE_NAME, { name: "UpperCaseIdx" });
+      expect(await adapter.indexNameExists(TABLE_NAME, "UpperCaseIdx")).toBe(false);
+    });
+
+    it("remove index when schema specified", async () => {
+      await adapter.setSchemaSearchPath(SCHEMA_NAME);
+      await adapter.addIndex(TABLE_NAME, ["email"], { name: "removable_idx" });
+      expect(await adapter.indexNameExists(TABLE_NAME, "removable_idx")).toBe(true);
+      await adapter.removeIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, { name: "removable_idx" });
+      expect(await adapter.indexNameExists(TABLE_NAME, "removable_idx")).toBe(false);
+    });
 
     it("primary key with schema specified", async () => {
       for (const given of [

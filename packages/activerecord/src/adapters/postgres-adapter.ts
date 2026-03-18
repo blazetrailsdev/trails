@@ -307,6 +307,45 @@ export class PostgresAdapter implements DatabaseAdapter {
     return parts.map((p) => this.quoteIdentifier(p)).join(".");
   }
 
+  columnsForDistinct(columns: string, orders: string[]): string {
+    if (!orders || orders.length === 0) return columns;
+    const orderColumns = orders
+      .map((o) => o.replace(/\s+(ASC|DESC)\s*(NULLS\s+(FIRST|LAST))?\s*/gi, "").trim())
+      .filter((c) => c.length > 0);
+    if (orderColumns.length === 0) return columns;
+    return `${columns}, ${orderColumns.join(", ")}`;
+  }
+
+  async extensions(): Promise<string[]> {
+    const rows = await this.execute(`SELECT extname FROM pg_extension WHERE extname != 'plpgsql'`);
+    return rows.map((r) => r.extname as string);
+  }
+
+  async extensionEnabled(name: string): Promise<boolean> {
+    const rows = await this.execute(
+      `SELECT COUNT(*) AS count FROM pg_extension WHERE extname = $1`,
+      [name],
+    );
+    return Number(rows[0].count) > 0;
+  }
+
+  async extensionAvailable(name: string): Promise<boolean> {
+    const rows = await this.execute(
+      `SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1`,
+      [name],
+    );
+    return Number(rows[0].count) > 0;
+  }
+
+  async enableExtension(name: string): Promise<void> {
+    await this.exec(`CREATE EXTENSION IF NOT EXISTS "${name}"`);
+  }
+
+  async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
+    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+  }
+
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
