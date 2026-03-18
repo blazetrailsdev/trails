@@ -2,23 +2,24 @@
  * PostgreSQL range parsing and serialization.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range
+ *
+ * Rails deserializes PG ranges into Ruby Range objects with typed bounds.
+ * We do the same — parseRange returns a Range (from relation.ts) with
+ * bounds cast through an optional subtype function, or null for empty ranges.
  */
 
-export interface PgRange {
-  begin: string | null;
-  end: string | null;
-  excludeBegin: boolean;
-  excludeEnd: boolean;
-  empty: boolean;
-}
+import { Range } from "../../relation.js";
+
+export type SubtypeCast = (value: string) => unknown;
 
 /**
- * Parse a PG range string like "[1,10)" into a PgRange object.
+ * Parse a PG range string like "[1,10)" into a Range object.
+ *
+ * Returns null for empty ranges (matching Rails, which returns nil).
+ * Throws if the range excludes its beginning (Ruby Range doesn't support this).
  */
-export function parseRange(input: string): PgRange {
-  if (!input || input === "empty") {
-    return { begin: null, end: null, excludeBegin: false, excludeEnd: false, empty: true };
-  }
+export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
+  if (!input || input === "empty") return null;
 
   const excludeBegin = input[0] === "(";
   const excludeEnd = input[input.length - 1] === ")";
@@ -26,17 +27,26 @@ export function parseRange(input: string): PgRange {
   const inner = input.slice(1, -1);
   const commaIdx = findSeparator(inner);
 
-  let beginVal: string | null = inner.slice(0, commaIdx).trim();
-  let endVal: string | null = inner.slice(commaIdx + 1).trim();
+  let rawBegin: string | null = inner.slice(0, commaIdx).trim();
+  let rawEnd: string | null = inner.slice(commaIdx + 1).trim();
 
-  if (beginVal === "" || beginVal === "-infinity") beginVal = null;
-  if (endVal === "" || endVal === "infinity") endVal = null;
+  if (rawBegin === "" || rawBegin === "-infinity") rawBegin = null;
+  if (rawEnd === "" || rawEnd === "infinity") rawEnd = null;
 
-  // Unquote if quoted
-  beginVal = beginVal && unquote(beginVal);
-  endVal = endVal && unquote(endVal);
+  rawBegin = rawBegin && unquoteRange(rawBegin);
+  rawEnd = rawEnd && unquoteRange(rawEnd);
 
-  return { begin: beginVal, end: endVal, excludeBegin, excludeEnd, empty: false };
+  if (excludeBegin && rawBegin !== null) {
+    throw new Error(
+      "The Range object does not support excluding the beginning of a Range. " +
+        `(unsupported value: '${input}')`,
+    );
+  }
+
+  const castBegin = rawBegin !== null && subtype ? subtype(rawBegin) : rawBegin;
+  const castEnd = rawEnd !== null && subtype ? subtype(rawEnd) : rawEnd;
+
+  return new Range(castBegin, castEnd, excludeEnd);
 }
 
 function findSeparator(s: string): number {
@@ -57,9 +67,13 @@ function findSeparator(s: string): number {
   return s.length;
 }
 
-function unquote(s: string): string {
+/**
+ * Unquote a range bound value.
+ * PG uses "" for literal " and \\\\ for literal \\ inside double-quoted bounds.
+ */
+function unquoteRange(s: string): string {
   if (s.startsWith('"') && s.endsWith('"')) {
-    return s.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    return s.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");
   }
   return s;
 }

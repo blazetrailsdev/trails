@@ -4,6 +4,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
+import { Range } from "../../relation.js";
+
+const toInt = (s: string) => parseInt(s, 10);
+const toFloat = (s: string) => parseFloat(s);
 
 describeIfPg("PostgresAdapter", () => {
   let adapter: PostgresAdapter;
@@ -31,9 +35,11 @@ describeIfPg("PostgresAdapter", () => {
     it("int4range column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[1,10]')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
-      expect(range.begin).toBe("1");
-      expect(range.end).toBe("11");
+      const range = parseRange(rows[0].int4_range as string, toInt)!;
+      expect(range).toBeInstanceOf(Range);
+      expect(range.begin).toBe(1);
+      // PG normalizes [1,10] to [1,11) for discrete integer ranges
+      expect(range.end).toBe(11);
       expect(range.excludeEnd).toBe(true);
     });
 
@@ -45,19 +51,18 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("int4range type cast", async () => {
-      const range = parseRange("[1,10)");
-      expect(range.begin).toBe("1");
-      expect(range.end).toBe("10");
-      expect(range.excludeBegin).toBe(false);
+      const range = parseRange("[1,10)", toInt)!;
+      expect(range.begin).toBe(1);
+      expect(range.end).toBe(10);
       expect(range.excludeEnd).toBe(true);
     });
 
     it("int4range write", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[1,10)')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
-      expect(range.begin).toBe("1");
-      expect(range.end).toBe("10");
+      const range = parseRange(rows[0].int4_range as string, toInt)!;
+      expect(range.begin).toBe(1);
+      expect(range.end).toBe(10);
     });
 
     it("int4range where", async () => {
@@ -79,14 +84,14 @@ describeIfPg("PostgresAdapter", () => {
     it("int4range empty", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('empty')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
-      expect(range.empty).toBe(true);
+      const range = parseRange(rows[0].int4_range as string, toInt);
+      expect(range).toBeNull();
     });
 
     it("int4range infinity", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[,]')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
+      const range = parseRange(rows[0].int4_range as string, toInt)!;
       expect(range.begin).toBeNull();
       expect(range.end).toBeNull();
     });
@@ -94,14 +99,14 @@ describeIfPg("PostgresAdapter", () => {
     it("int8range column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int8_range) VALUES ('[10,100]')`);
       const rows = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int8_range as string);
-      expect(range.begin).toBe("10");
+      const range = parseRange(rows[0].int8_range as string, toInt)!;
+      expect(range.begin).toBe(10);
     });
 
     it("int8range type cast", async () => {
-      const range = parseRange("[10,100)");
-      expect(range.begin).toBe("10");
-      expect(range.end).toBe("100");
+      const range = parseRange("[10,100)", toInt)!;
+      expect(range.begin).toBe(10);
+      expect(range.end).toBe(100);
     });
 
     it("int8range write", async () => {
@@ -113,16 +118,16 @@ describeIfPg("PostgresAdapter", () => {
     it("numrange column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (num_range) VALUES ('[0.1,0.2]')`);
       const rows = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].num_range as string);
-      expect(range.begin).toBe("0.1");
-      expect(range.end).toBe("0.2");
+      const range = parseRange(rows[0].num_range as string, toFloat)!;
+      expect(range.begin).toBeCloseTo(0.1);
+      expect(range.end).toBeCloseTo(0.2);
       expect(range.excludeEnd).toBe(false);
     });
 
     it("numrange type cast", async () => {
-      const range = parseRange("[0.1,0.2)");
-      expect(range.begin).toBe("0.1");
-      expect(range.end).toBe("0.2");
+      const range = parseRange("[0.1,0.2)", toFloat)!;
+      expect(range.begin).toBeCloseTo(0.1);
+      expect(range.end).toBeCloseTo(0.2);
       expect(range.excludeEnd).toBe(true);
     });
 
@@ -137,14 +142,14 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO postgresql_ranges (ts_range) VALUES ('[2010-01-01 14:30,2011-01-01 14:30]')`,
       );
       const rows = await adapter.execute(`SELECT ts_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].ts_range as string);
-      expect(range.begin).toContain("2010-01-01");
-      expect(range.end).toContain("2011-01-01");
+      const range = parseRange(rows[0].ts_range as string)!;
+      expect(range.begin as string).toContain("2010-01-01");
+      expect(range.end as string).toContain("2011-01-01");
     });
 
     it("tsrange type cast", async () => {
-      const range = parseRange('["2010-01-01 14:30:00","2011-01-01 14:30:00")');
-      expect(range.begin).toContain("2010-01-01");
+      const range = parseRange('["2010-01-01 14:30:00","2011-01-01 14:30:00")')!;
+      expect(range.begin as string).toContain("2010-01-01");
       expect(range.excludeEnd).toBe(true);
     });
 
@@ -161,13 +166,13 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO postgresql_ranges (tstz_range) VALUES ('[2010-01-01 14:30+00,2011-01-01 14:30+00]')`,
       );
       const rows = await adapter.execute(`SELECT tstz_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].tstz_range as string);
-      expect(range.begin).toContain("2010-01-01");
+      const range = parseRange(rows[0].tstz_range as string)!;
+      expect(range.begin as string).toContain("2010-01-01");
     });
 
     it("tstzrange type cast", async () => {
-      const range = parseRange('["2010-01-01 14:30:00+00","2011-01-01 14:30:00+00")');
-      expect(range.begin).toContain("2010-01-01");
+      const range = parseRange('["2010-01-01 14:30:00+00","2011-01-01 14:30:00+00")')!;
+      expect(range.begin as string).toContain("2010-01-01");
     });
 
     it("tstzrange write", async () => {
@@ -183,12 +188,12 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO postgresql_ranges (date_range) VALUES ('[2012-01-02,2012-01-04]')`,
       );
       const rows = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].date_range as string);
+      const range = parseRange(rows[0].date_range as string)!;
       expect(range.begin).toBe("2012-01-02");
     });
 
     it("daterange type cast", async () => {
-      const range = parseRange("[2012-01-02,2012-01-04)");
+      const range = parseRange("[2012-01-02,2012-01-04)")!;
       expect(range.begin).toBe("2012-01-02");
       expect(range.end).toBe("2012-01-04");
     });
@@ -237,23 +242,23 @@ describeIfPg("PostgresAdapter", () => {
 
     it("range intersection", async () => {
       const rows = await adapter.execute(`SELECT int4range(1,10) * int4range(5,15) as r`);
-      const range = parseRange(rows[0].r as string);
-      expect(range.begin).toBe("5");
-      expect(range.end).toBe("10");
+      const range = parseRange(rows[0].r as string, toInt)!;
+      expect(range.begin).toBe(5);
+      expect(range.end).toBe(10);
     });
 
     it("range union", async () => {
       const rows = await adapter.execute(`SELECT int4range(1,10) + int4range(5,15) as r`);
-      const range = parseRange(rows[0].r as string);
-      expect(range.begin).toBe("1");
-      expect(range.end).toBe("15");
+      const range = parseRange(rows[0].r as string, toInt)!;
+      expect(range.begin).toBe(1);
+      expect(range.end).toBe(15);
     });
 
     it("range difference", async () => {
       const rows = await adapter.execute(`SELECT int4range(1,10) - int4range(5,15) as r`);
-      const range = parseRange(rows[0].r as string);
-      expect(range.begin).toBe("1");
-      expect(range.end).toBe("5");
+      const range = parseRange(rows[0].r as string, toInt)!;
+      expect(range.begin).toBe(1);
+      expect(range.end).toBe(5);
     });
 
     it("range adjacent", async () => {
@@ -297,50 +302,49 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("data type of range types", () => {
-      const int4 = parseRange("[1,10)");
-      expect(int4.empty).toBe(false);
-      expect(int4.begin).toBe("1");
+      const int4 = parseRange("[1,10)", toInt)!;
+      expect(int4).toBeInstanceOf(Range);
+      expect(int4.begin).toBe(1);
 
       const empty = parseRange("empty");
-      expect(empty.empty).toBe(true);
+      expect(empty).toBeNull();
     });
 
     it("int4range values", () => {
-      const r = parseRange("[1,10)");
-      expect(r.begin).toBe("1");
-      expect(r.end).toBe("10");
-      expect(r.excludeBegin).toBe(false);
+      const r = parseRange("[1,10)", toInt)!;
+      expect(r.begin).toBe(1);
+      expect(r.end).toBe(10);
       expect(r.excludeEnd).toBe(true);
     });
 
     it("int8range values", () => {
-      const r = parseRange("[10,100)");
-      expect(r.begin).toBe("10");
-      expect(r.end).toBe("100");
+      const r = parseRange("[10,100)", toInt)!;
+      expect(r.begin).toBe(10);
+      expect(r.end).toBe(100);
     });
 
     it("daterange values", () => {
-      const r = parseRange("[2012-01-02,2012-01-05)");
+      const r = parseRange("[2012-01-02,2012-01-05)")!;
       expect(r.begin).toBe("2012-01-02");
       expect(r.end).toBe("2012-01-05");
     });
 
     it("numrange values", () => {
-      const r = parseRange("[0.1,0.2]");
-      expect(r.begin).toBe("0.1");
-      expect(r.end).toBe("0.2");
+      const r = parseRange("[0.1,0.2]", toFloat)!;
+      expect(r.begin).toBeCloseTo(0.1);
+      expect(r.end).toBeCloseTo(0.2);
       expect(r.excludeEnd).toBe(false);
     });
 
     it("tsrange values", () => {
-      const r = parseRange('["2010-01-01 14:30:00","2011-01-01 14:30:00")');
-      expect(r.begin).toContain("2010-01-01");
-      expect(r.end).toContain("2011-01-01");
+      const r = parseRange('["2010-01-01 14:30:00","2011-01-01 14:30:00")')!;
+      expect(r.begin as string).toContain("2010-01-01");
+      expect(r.end as string).toContain("2011-01-01");
     });
 
     it("tstzrange values", () => {
-      const r = parseRange('["2010-01-01 14:30:00+00","2011-01-01 14:30:00+00")');
-      expect(r.begin).toContain("2010-01-01");
+      const r = parseRange('["2010-01-01 14:30:00+00","2011-01-01 14:30:00+00")')!;
+      expect(r.begin as string).toContain("2010-01-01");
     });
 
     it.skip("custom range values", () => {
@@ -455,7 +459,7 @@ describeIfPg("PostgresAdapter", () => {
     it("infinity values", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('(,)')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
+      const range = parseRange(rows[0].int4_range as string, toInt)!;
       expect(range.begin).toBeNull();
       expect(range.end).toBeNull();
     });
@@ -463,16 +467,16 @@ describeIfPg("PostgresAdapter", () => {
     it("endless range values", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[1,)')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
-      expect(range.begin).toBe("1");
+      const range = parseRange(rows[0].int4_range as string, toInt)!;
+      expect(range.begin).toBe(1);
       expect(range.end).toBeNull();
     });
 
     it("empty string range values", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('empty')`);
       const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int4_range as string);
-      expect(range.empty).toBe(true);
+      const range = parseRange(rows[0].int4_range as string, toInt);
+      expect(range).toBeNull();
     });
   });
 });
