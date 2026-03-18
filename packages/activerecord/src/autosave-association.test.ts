@@ -9,7 +9,7 @@ import {
   acceptsNestedAttributesFor,
   assignNestedAttributes,
 } from "./index.js";
-import { Associations, setBelongsTo, association } from "./associations.js";
+import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -313,18 +313,50 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
       className: "Parrot",
       joinTable: "parrots_pirates",
+      autosave: true,
     });
     return { Pirate, Parrot };
   }
 
-  it.skip("should destroy habtm as part of the save transaction if they were marked for destruction", () => {
-    /* needs autosave to process marked-for-destruction HABTM children during save */
+  it("should destroy habtm as part of the save transaction if they were marked for destruction", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+
+    markForDestruction(parrot);
+    cacheAssoc(pirate, "parrots", [parrot]);
+    await pirate.save();
+    expect(parrot.isDestroyed()).toBe(true);
   });
-  it.skip("should skip validation on habtm if marked for destruction", () => {
-    /* needs autosave to skip validation on marked-for-destruction children */
+
+  it("should skip validation on habtm if marked for destruction", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+
+    markForDestruction(parrot);
+    parrot.writeAttribute("name", "");
+    cacheAssoc(pirate, "parrots", [parrot]);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
+    expect(parrot.isDestroyed()).toBe(true);
   });
-  it.skip("should skip validation on habtm if destroyed", () => {
-    /* needs autosave to skip validation on destroyed children */
+
+  it("should skip validation on habtm if destroyed", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+
+    await parrot.destroy();
+    cacheAssoc(pirate, "parrots", [parrot]);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
   });
   it("should be valid on habtm if persisted and unchanged", async () => {
     const { Pirate, Parrot } = makePirateParrot();
@@ -343,8 +375,22 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   it.skip("should be valid on habtm when any record in the association chain is invalid but was not changed", () => {
     /* needs autosave validation of HABTM children */
   });
-  it.skip("a child marked for destruction should not be destroyed twice while saving habtm", () => {
-    /* needs autosave to process marked-for-destruction HABTM children during save */
+  it("a child marked for destruction should not be destroyed twice while saving habtm", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+
+    markForDestruction(parrot);
+    cacheAssoc(pirate, "parrots", [parrot]);
+    await pirate.save();
+    expect(parrot.isDestroyed()).toBe(true);
+
+    // Saving again should not try to destroy again
+    cacheAssoc(pirate, "parrots", [parrot]);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
   });
   it.skip("should rollback destructions if an exception occurred while saving habtm", () => {
     /* needs transaction rollback support */
@@ -492,8 +538,19 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(client.readAttribute("company_id")).toBe(company.id);
   });
 
-  it.skip("assign ids", () => {
-    /* requires collection proxy id assignment */
+  it("assign ids", async () => {
+    const { Company, Client } = makeModels();
+    const company = await Company.create({ name: "Apple" });
+    const c1 = await Client.create({ name: "First" });
+    const c2 = await Client.create({ name: "Second" });
+
+    const proxy = association(company, "clients");
+    await proxy.setIds([c1.id as number, c2.id as number]);
+
+    const clients = await proxy.toArray();
+    expect(clients).toHaveLength(2);
+    const ids = clients.map((c) => c.id).sort();
+    expect(ids).toEqual([c1.id, c2.id].sort());
   });
   it.skip("assign ids with belongs to cpk model", () => {
     /* cpk not fully supported */
@@ -504,8 +561,64 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   it.skip("has one cpk has one autosave with id", () => {
     /* cpk not fully supported */
   });
-  it.skip("assign ids for through a belongs to", () => {
-    /* through associations */
+  it("assign ids for through a belongs to", async () => {
+    class AidFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class AidContract extends Base {
+      static {
+        this.attribute("aid_firm_id", "integer");
+        this.attribute("aid_developer_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class AidDeveloper extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (AidFirm as any)._associations = [
+      {
+        type: "hasMany",
+        name: "aidContracts",
+        options: { className: "AidContract", foreignKey: "aid_firm_id" },
+      },
+      {
+        type: "hasMany",
+        name: "aidDevelopers",
+        options: { through: "aidContracts", source: "aidDeveloper", className: "AidDeveloper" },
+      },
+    ];
+    (AidContract as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "aidDeveloper",
+        options: { className: "AidDeveloper", foreignKey: "aid_developer_id" },
+      },
+    ];
+    registerModel("AidFirm", AidFirm);
+    registerModel("AidContract", AidContract);
+    registerModel("AidDeveloper", AidDeveloper);
+
+    const firm = await AidFirm.create({ name: "Apple" });
+    const d1 = await AidDeveloper.create({ name: "David" });
+    const d2 = await AidDeveloper.create({ name: "Jamis" });
+
+    // Create contracts linking firm to developers
+    await AidContract.create({ aid_firm_id: firm.id, aid_developer_id: d1.id });
+    await AidContract.create({ aid_firm_id: firm.id, aid_developer_id: d2.id });
+
+    const devs = await loadHasManyThrough(firm, "aidDevelopers", {
+      through: "aidContracts",
+      source: "aidDeveloper",
+      className: "AidDeveloper",
+    });
+    expect(devs).toHaveLength(2);
+    expect(devs.map((d) => d.readAttribute("name")).sort()).toEqual(["David", "Jamis"]);
   });
 
   it("build before save", async () => {

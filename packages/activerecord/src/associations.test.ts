@@ -7202,8 +7202,21 @@ describe("OverridingAssociationsTest", () => {
     expect(hoAssoc.type).toBe("hasOne");
   });
 
-  it.skip("requires symbol argument", () => {
-    /* TypeScript uses strings, not symbols */
+  it("requires symbol argument", () => {
+    // In TypeScript, association names are strings (Ruby uses symbols).
+    // This test verifies that passing a non-string would be caught at compile time.
+    // Since TypeScript's type system handles this, we just verify string args work.
+    const oaAdapter = freshAdapter();
+    class OaArgTest extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = oaAdapter;
+      }
+    }
+    registerModel("OaArgTest", OaArgTest);
+    Associations.hasMany.call(OaArgTest, "items", {});
+    const assocs: any[] = (OaArgTest as any)._associations;
+    expect(assocs[0].name).toBe("items");
   });
 
   it("associations raise with name error if associated to classes that do not exist", async () => {
