@@ -3,15 +3,14 @@ import type { DatabaseAdapter } from "./adapter.js";
 /** Detect adapter type from an adapter instance. */
 function detectAdapterName(
   adapter: DatabaseAdapter | null | undefined,
-): "sqlite" | "postgres" | "mysql" | "memory" {
+): "sqlite" | "postgres" | "mysql" {
   const name = adapter?.constructor?.name ?? "";
   if (name.includes("Postgres") || name === "SchemaAdapter") {
     if (process.env.PG_TEST_URL) return "postgres";
     if (process.env.MYSQL_TEST_URL) return "mysql";
-    return "memory";
+    return "sqlite";
   }
   if (name.includes("Mysql") || name.includes("Maria")) return "mysql";
-  if (name.includes("Memory")) return "memory";
   return "sqlite";
 }
 
@@ -64,11 +63,11 @@ export class TableDefinition {
   readonly columns: ColumnDefinition[] = [];
   readonly indexes: IndexDefinition[] = [];
   private _id: boolean;
-  private _adapterName: "sqlite" | "postgres" | "mysql" | "memory";
+  private _adapterName: "sqlite" | "postgres" | "mysql";
 
   constructor(
     tableName: string,
-    options: { id?: boolean; adapterName?: "sqlite" | "postgres" | "mysql" | "memory" } = {},
+    options: { id?: boolean; adapterName?: "sqlite" | "postgres" | "mysql" } = {},
   ) {
     this.tableName = tableName;
     this._adapterName = options.adapterName ?? "sqlite";
@@ -257,7 +256,7 @@ export abstract class Migration {
   private _version?: string;
 
   /** Determine adapter type from the adapter class name. */
-  protected get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
+  protected get _adapterName(): "sqlite" | "postgres" | "mysql" {
     return detectAdapterName(this.adapter);
   }
 
@@ -1235,7 +1234,7 @@ export class Schema {
     this.adapter = adapter;
   }
 
-  private get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
+  private get _adapterName(): "sqlite" | "postgres" | "mysql" {
     return detectAdapterName(this.adapter);
   }
 
@@ -1248,7 +1247,7 @@ export class Schema {
 
 /**
  * MigrationContext — wraps an adapter with schema-aware migration methods
- * and synchronous schema inspection. Designed for use with MemoryAdapter
+ * and synchronous schema inspection.
  * in tests and for defining migrations programmatically.
  *
  * Mirrors: ActiveRecord::MigrationContext
@@ -1262,7 +1261,7 @@ export class MigrationContext {
 
   constructor(private adapter: DatabaseAdapter) {}
 
-  private get _adapterName(): "sqlite" | "postgres" | "mysql" | "memory" {
+  private get _adapterName(): "sqlite" | "postgres" | "mysql" {
     return detectAdapterName(this.adapter);
   }
 

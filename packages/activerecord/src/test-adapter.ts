@@ -4,7 +4,7 @@
  * Returns the appropriate adapter based on environment variables:
  *   - PG_TEST_URL    → PostgresAdapter (wrapped in SchemaAdapter)
  *   - MYSQL_TEST_URL → MysqlAdapter (wrapped in SchemaAdapter)
- *   - (default)      → MemoryAdapter
+ *   - (default)      → SqliteAdapter (:memory:)
  *
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
@@ -286,7 +286,7 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner = inner;
   }
 
-  /** Expose created tables for test introspection (mirrors MemoryAdapter.tables). */
+  /** Expose created tables for test introspection. */
   get tables(): Set<string> {
     return _createdTables;
   }

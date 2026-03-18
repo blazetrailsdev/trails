@@ -3127,7 +3127,7 @@ export class Base extends Model {
   }
 
   static async tableExists(): Promise<boolean> {
-    return true; // MemoryAdapter always has tables
+    return true; // TODO: query adapter for table existence
   }
 
   static hasAttribute(name: string): boolean {
