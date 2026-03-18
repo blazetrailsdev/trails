@@ -7,6 +7,7 @@
 
 import { TimeZone, getLocalComponents } from "./time-zone.js";
 import { Duration } from "./duration.js";
+import { currentTime } from "./testing-helpers.js";
 
 /**
  * Options for the change() method.
@@ -679,30 +680,28 @@ export class TimeWithZone {
   // ---------------------------------------------------------------------------
 
   isPast(): boolean {
-    return this._utc.getTime() < Date.now();
+    return this._utc.getTime() < currentTime().getTime();
   }
 
   isFuture(): boolean {
-    return this._utc.getTime() > Date.now();
+    return this._utc.getTime() > currentTime().getTime();
   }
 
   isToday(): boolean {
-    const now = this._timeZone.now();
+    const now = new TimeWithZone(currentTime(), this._timeZone);
     return this.year === now.year && this.month === now.month && this.day === now.day;
   }
 
   isTomorrow(): boolean {
-    const tomorrow = this._timeZone.now().advance({ days: 1 });
-    return (
-      this.year === tomorrow.year && this.month === tomorrow.month && this.day === tomorrow.day
-    );
+    const now = new TimeWithZone(currentTime(), this._timeZone);
+    const tom = now.advance({ days: 1 });
+    return this.year === tom.year && this.month === tom.month && this.day === tom.day;
   }
 
   isYesterday(): boolean {
-    const yesterday = this._timeZone.now().advance({ days: -1 });
-    return (
-      this.year === yesterday.year && this.month === yesterday.month && this.day === yesterday.day
-    );
+    const now = new TimeWithZone(currentTime(), this._timeZone);
+    const yes = now.advance({ days: -1 });
+    return this.year === yes.year && this.month === yes.month && this.day === yes.day;
   }
 
   /** Returns true if this time is before the given time */
