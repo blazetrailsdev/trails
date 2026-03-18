@@ -870,6 +870,7 @@ describe("BasicsTest", () => {
     const t = new Topic({ views: "42" });
     expect(t.readAttribute("views")).toBe(42);
     expect(t.readAttributeBeforeTypeCast("views")).toBe("42");
+    expect(t.attributesBeforeTypeCast.views).toBe("42");
   });
 
   it("raise no method error for nonexistent method", () => {
@@ -1727,26 +1728,11 @@ describe("BasicsTest", () => {
   });
   it.skip("utc as time zone", () => {});
   it.skip("utc as time zone and new", () => {});
-  it("out of range slugs", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    await expect(Topic.find("99999999999999999999999999999")).rejects.toThrow(RecordNotFound);
+  it.skip("out of range slugs", () => {
+    /* needs slug parsing in find() — Rails extracts integer prefix from "1-meowmeow" */
   });
-  it("find by slug with array", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const t = await Topic.create({ title: "hello" });
-    const results = await Topic.find([t.id]);
-    expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("hello");
+  it.skip("find by slug with array", () => {
+    /* needs slug parsing in find() */
   });
   it.skip("find by slug with range", () => {});
   it.skip("equality of relation and collection proxy", () => {});
@@ -1797,46 +1783,25 @@ describe("BasicsTest", () => {
     expect(reloaded.readAttribute("title")).toBe("Original");
   });
   it.skip("readonly attributes on belongs to association", () => {});
-  it("respect internal encoding", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const t = new Topic({ title: "日本語" });
-    expect(t.readAttribute("title")).toBe("日本語");
+  it.skip("respect internal encoding", () => {
+    /* Ruby-specific: tests Encoding.default_internal (EUC-JP) on column names — no JS equivalent */
   });
-  it("non valid identifier column name", () => {
+  it("non valid identifier column name", async () => {
     class Weird extends Base {
       static {
-        this.attribute("a b", "string");
+        this.attribute("a$b", "string");
         this.adapter = adapter;
       }
     }
-    const w = new Weird({ "a b": "hello" });
-    expect(w.readAttribute("a b")).toBe("hello");
+    const w = await Weird.create({ a$b: "value" });
+    const reloaded = await Weird.find(w.id);
+    expect(reloaded.readAttribute("a$b")).toBe("value");
   });
-  it("attributes on dummy time", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-        this.adapter = adapter;
-      }
-    }
-    const t = new Topic({ written_on: new Date("2000-01-01T00:00:00Z") });
-    expect(t.readAttribute("written_on")).toBeInstanceOf(Date);
+  it.skip("attributes on dummy time", () => {
+    /* needs time-string parsing ("5:42:00AM" -> dummy date 2000-01-01) with timezone config */
   });
-  it("attributes on dummy time with invalid time", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-        this.adapter = adapter;
-      }
-    }
-    const t = new Topic({ written_on: "invalid" });
-    const val = t.readAttribute("written_on");
-    expect(val === null || (val instanceof Date && isNaN((val as Date).getTime()))).toBe(true);
+  it.skip("attributes on dummy time with invalid time", () => {
+    /* needs time-string parsing — invalid time should return null */
   });
   it("previously persisted returns boolean", async () => {
     class User extends Base {
@@ -1929,15 +1894,20 @@ describe("BasicsTest", () => {
     const sql = User.where({ name: "test" }).toSql();
     expect(sql).toContain('"name"');
   });
-  it("quoting arrays", () => {
-    class Topic extends Base {
+  it("quoting arrays", async () => {
+    class Reply extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    const sql = Topic.where({ title: ["a", "b"] }).toSql();
-    expect(sql).toContain("IN");
+    const r1 = await Reply.create({ title: "first" });
+    const r2 = await Reply.create({ title: "second" });
+    await Reply.create({ title: "third" });
+    const results = await Reply.where({ id: [r1.id, r2.id] }).toArray();
+    expect(results).toHaveLength(2);
+    const emptyResults = await Reply.where({ id: [] }).toArray();
+    expect(emptyResults).toHaveLength(0);
   });
   it("dont clear sequence name when setting explicitly", () => {
     class User extends Base {
