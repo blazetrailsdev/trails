@@ -2624,12 +2624,8 @@ export class Relation<T extends Base> {
         if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
         return table.get(c);
       });
-    } else if (this._modelClass._ignoredColumns.length > 0) {
-      const ignored = new Set(this._modelClass._ignoredColumns);
-      projections = this._modelClass
-        .columnNames()
-        .filter((c) => !ignored.has(c))
-        .map((c) => table.get(c));
+    } else if (this._modelClass.ignoredColumns.length > 0) {
+      projections = this._modelClass.columnNames().map((c) => table.get(c));
     } else {
       projections = ["*"];
     }

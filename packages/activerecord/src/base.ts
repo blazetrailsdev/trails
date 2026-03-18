@@ -301,7 +301,7 @@ export class Base extends Model {
    */
   static columnsHash(): Record<string, { name: string; type: string; default: unknown }> {
     if (this.abstractClass) {
-      throw new Error(`${this.name} is an abstract class and does not have a table name`);
+      throw new Error(`${this.name} is an abstract class and does not have an associated table`);
     }
     const result: Record<string, { name: string; type: string; default: unknown }> = {};
     for (const [name, def] of this._attributeDefinitions) {
@@ -454,7 +454,9 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.sequence_name
    */
   static get sequenceName(): string | null {
-    return this._sequenceName ?? `${this.tableName}_${this.primaryKey}_seq`;
+    const pk = this.primaryKey;
+    if (Array.isArray(pk)) return this._sequenceName;
+    return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
   }
   static set sequenceName(name: string | null) {
     this._sequenceName = name;
