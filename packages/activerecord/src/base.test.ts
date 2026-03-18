@@ -1728,11 +1728,33 @@ describe("BasicsTest", () => {
   });
   it.skip("utc as time zone", () => {});
   it.skip("utc as time zone and new", () => {});
-  it.skip("out of range slugs", () => {
-    /* needs slug parsing in find() — Rails extracts integer prefix from "1-meowmeow" */
+  it("out of range slugs", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "first" });
+    const results = await Topic.where({
+      id: [`${t1.id}-meowmeow`, "9223372036854775808-hello"],
+    }).toArray();
+    expect(results).toHaveLength(1);
+    expect(results[0].readAttribute("title")).toBe("first");
   });
-  it.skip("find by slug with array", () => {
-    /* needs slug parsing in find() */
+  it("find by slug with array", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "first" });
+    const t2 = await Topic.create({ title: "second" });
+    const results = await Topic.find([`${t1.id}-meowmeow`, `${t2.id}-hello`]);
+    expect(results).toHaveLength(2);
+    expect(results[0].readAttribute("title")).toBe("first");
+    expect(results[1].readAttribute("title")).toBe("second");
   });
   it.skip("find by slug with range", () => {});
   it.skip("equality of relation and collection proxy", () => {});

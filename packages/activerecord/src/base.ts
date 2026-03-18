@@ -833,6 +833,21 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find
    */
+  /**
+   * Cast a value through the primary key's type, mimicking Rails' id coercion.
+   * For integer PKs, "1-meowmeow".to_i → 1 in Ruby; parseInt("1-meowmeow") → 1 in JS.
+   */
+  private static _castPrimaryKeyValue(value: unknown): unknown {
+    if (typeof this.primaryKey !== "string") return value;
+    const def = this._attributeDefinitions.get(this.primaryKey);
+    if (def) return def.type.cast(value);
+    if (typeof value === "string") {
+      const parsed = parseInt(value, 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return value;
+  }
+
   static async find(...ids: unknown[]): Promise<any> {
     // Variadic: User.find(1, 2, 3)
     if (ids.length > 1) {
@@ -898,13 +913,14 @@ export class Base extends Model {
           [],
         );
       }
+      const castIds = id.map((i) => this._castPrimaryKeyValue(i));
       const records = await this.all()
-        .where({ [this.primaryKey as string]: id })
+        .where({ [this.primaryKey as string]: castIds })
         .toArray();
       // Ensure all IDs were found
-      if (records.length !== id.length) {
+      if (records.length !== castIds.length) {
         const foundIds = new Set(records.map((r: Base) => r.id));
-        const missing = id.filter((i) => !foundIds.has(i));
+        const missing = castIds.filter((i) => !foundIds.has(i));
         throw new RecordNotFound(
           `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
           this.name,
@@ -914,9 +930,10 @@ export class Base extends Model {
       }
       return records;
     }
-    // Single ID — use all() so STI type filter is applied
+    // Single ID — cast through PK type, then use all() so STI type filter is applied
+    const castId = this._castPrimaryKeyValue(id);
     const record = await this.all()
-      .where({ [this.primaryKey as string]: id })
+      .where({ [this.primaryKey as string]: castId })
       .first();
     if (!record) {
       throw new RecordNotFound(

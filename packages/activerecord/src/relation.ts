@@ -141,7 +141,9 @@ export class Relation<T extends Base> {
           const subSql = value.toSql();
           rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${key}" IN (${subSql})`);
         } else {
-          normalConditions[key] = value;
+          normalConditions[key] = Array.isArray(value)
+            ? value.map((v) => this._castWhereValue(key, v))
+            : this._castWhereValue(key, value);
         }
       }
       if (Object.keys(normalConditions).length > 0) {
@@ -342,7 +344,13 @@ export class Relation<T extends Base> {
    */
   whereNot(conditions: Record<string, unknown>): Relation<T> {
     const rel = this._clone();
-    rel._whereNotClauses.push(conditions);
+    const castConditions: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(conditions)) {
+      castConditions[key] = Array.isArray(value)
+        ? value.map((v) => this._castWhereValue(key, v))
+        : this._castWhereValue(key, value);
+    }
+    rel._whereNotClauses.push(castConditions);
     return rel;
   }
 
@@ -2829,6 +2837,20 @@ export class Relation<T extends Base> {
         manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
       }
     }
+  }
+
+  private _castWhereValue(key: string, value: unknown): unknown {
+    if (value === null || value === undefined) return value;
+    if (value instanceof Range) return value;
+    if (typeof value !== "string") return value;
+    const def = this._modelClass._attributeDefinitions.get(key);
+    if (def) return def.type.cast(value);
+    const pk = this._modelClass.primaryKey;
+    if (typeof pk === "string" && key === pk) {
+      const parsed = parseInt(value, 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return value;
   }
 
   private _buildWhereStrings(table: Table): string[] {
