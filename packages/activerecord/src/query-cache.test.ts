@@ -246,11 +246,11 @@ describe("QueryCacheTest", () => {
     const { cached } = setup();
     cached.enableQueryCache();
     await cached.execute("SELECT 1 AS val");
-    expect(cached.cache.size).toBeGreaterThan(0);
-    // FOR UPDATE queries bypass the cache
+    const sizeAfterSelect = cached.cache.size;
+    expect(sizeAfterSelect).toBeGreaterThan(0);
     const forUpdateSql = 'SELECT 1 AS val FROM "tasks" FOR UPDATE';
     await cached.execute(forUpdateSql);
-    // The FOR UPDATE query result should not be cached under the same key
+    expect(cached.cache.size).toBe(sizeAfterSelect);
   });
 
   it.skip("cache is available when connection is connected", () => {

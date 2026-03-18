@@ -9,7 +9,7 @@
 
 export type TagValue = string | number | boolean | null | undefined;
 export type TagHandler = () => TagValue;
-export type TagDefinition = string | TagHandler | Record<string, string | TagHandler>;
+export type TagDefinition = string | TagHandler | Record<string, TagValue | TagHandler>;
 
 export interface QueryLogsFormatter {
   format(key: string, value: TagValue): string;
@@ -87,6 +87,7 @@ export class QueryLogs {
     } else {
       throw new Error(`Formatter is unsupported: ${format}`);
     }
+    this._cachedComment = null;
   }
 
   /**
