@@ -244,15 +244,6 @@ export class MemoryAdapter implements DatabaseAdapter {
       if (where) {
         rows = rows.filter((row) => this.evaluateWhere(row, where));
       }
-      if (orderBy) {
-        rows = this.applyOrder(rows, orderBy);
-      }
-      if (offset) {
-        rows = rows.slice(parseInt(offset));
-      }
-      if (limit) {
-        rows = rows.slice(0, parseInt(limit));
-      }
       if (projections.trim() !== "*") {
         const cols = projections.split(",").map((c) => {
           const parts = c.trim().replace(/"/g, "").split(".");
@@ -274,6 +265,15 @@ export class MemoryAdapter implements DatabaseAdapter {
           seen.add(key);
           return true;
         });
+      }
+      if (orderBy) {
+        rows = this.applyOrder(rows, orderBy);
+      }
+      if (offset) {
+        rows = rows.slice(parseInt(offset));
+      }
+      if (limit) {
+        rows = rows.slice(0, parseInt(limit));
       }
       return rows;
     }

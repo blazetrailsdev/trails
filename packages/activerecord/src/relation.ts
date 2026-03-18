@@ -225,7 +225,7 @@ export class Relation<T extends Base> {
         }
         const cloned = rel._clone();
         cloned._whereRawClauses.push(
-          `"${pk}" IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL${typeCondition})`,
+          `"${modelClass.tableName}"."${pk}" IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL${typeCondition})`,
         );
         rel = cloned;
       }
@@ -275,7 +275,7 @@ export class Relation<T extends Base> {
         }
         const cloned = rel._clone();
         cloned._whereRawClauses.push(
-          `"${pk}" NOT IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL${typeCondition})`,
+          `"${modelClass.tableName}"."${pk}" NOT IN (SELECT "${foreignKey}" FROM "${targetTable}" WHERE "${foreignKey}" IS NOT NULL${typeCondition})`,
         );
         rel = cloned;
       }
