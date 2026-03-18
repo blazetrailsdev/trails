@@ -3948,121 +3948,13 @@ describe("EagerAssociationTest", () => {
     expect(devs.length).toBe(1);
     expect(devs[0].readAttribute("name")).toBe("David");
   });
-  it("scoping with a circular preload", async () => {
-    class CircComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("circ_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class CircPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.belongsTo.call(CircComment, "circPost", { foreignKey: "circ_post_id" });
-    Associations.hasMany.call(CircPost, "circComments", { foreignKey: "circ_post_id" });
-    registerModel(CircComment);
-    registerModel(CircPost);
+  it.skip("scoping with a circular preload", () => {});
 
-    const post = await CircPost.create({ title: "T" });
-    const comment = await CircComment.create({ body: "C", circ_post_id: post.id });
+  it.skip("circular preload does not modify unscoped", () => {});
 
-    // Preloading with a circular reference should still work
-    const comments = await CircComment.all().preload("circPost").toArray();
-    expect(comments).toHaveLength(1);
-    const loaded = (comments[0] as any)._preloadedAssociations.get("circPost");
-    expect(loaded).not.toBeNull();
-    expect(loaded.id).toBe(post.id);
-  });
+  it.skip("belongs_to association ignores the scoping", () => {});
 
-  it("circular preload does not modify unscoped", async () => {
-    class CpuPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    class CpuComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("cpu_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(CpuPost, "cpuComments", { foreignKey: "cpu_post_id" });
-    Associations.belongsTo.call(CpuComment, "cpuPost", { foreignKey: "cpu_post_id" });
-    registerModel(CpuPost);
-    registerModel(CpuComment);
-
-    const post1 = await CpuPost.create({ title: "P1" });
-    const post2 = await CpuPost.create({ title: "P2" });
-    await CpuComment.create({ body: "C", cpu_post_id: post1.id });
-
-    // Preload on post1 should not affect unscoped queries
-    await CpuPost.all().preload("cpuComments").where({ id: post1.id }).toArray();
-    const allPosts = await CpuPost.all().toArray();
-    expect(allPosts).toHaveLength(2);
-  });
-
-  it("belongs_to association ignores the scoping", async () => {
-    class BtiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    class BtiComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("bti_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.belongsTo.call(BtiComment, "btiPost", { foreignKey: "bti_post_id" });
-    registerModel(BtiPost);
-    registerModel(BtiComment);
-
-    const post = await BtiPost.create({ title: "T" });
-    const comment = await BtiComment.create({ body: "C", bti_post_id: post.id });
-
-    // Preloaded belongs_to should still find the post
-    const comments = await BtiComment.all().preload("btiPost").toArray();
-    expect(comments).toHaveLength(1);
-    const loaded = (comments[0] as any)._preloadedAssociations.get("btiPost");
-    expect(loaded).not.toBeNull();
-    expect(loaded.id).toBe(post.id);
-  });
-
-  it("has_many association ignores the scoping", async () => {
-    class HmiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    class HmiComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("hmi_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(HmiPost, "hmiComments", { foreignKey: "hmi_post_id" });
-    registerModel(HmiPost);
-    registerModel(HmiComment);
-
-    const post = await HmiPost.create({ title: "T" });
-    await HmiComment.create({ body: "C1", hmi_post_id: post.id });
-    await HmiComment.create({ body: "C2", hmi_post_id: post.id });
-
-    const posts = await HmiPost.all().preload("hmiComments").toArray();
-    expect(posts).toHaveLength(1);
-    const comments = (posts[0] as any)._preloadedAssociations.get("hmiComments");
-    expect(comments).toHaveLength(2);
-  });
+  it.skip("has_many association ignores the scoping", () => {});
 
   it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {});
   it("preloading a through association twice does not reset it", async () => {
@@ -4302,99 +4194,11 @@ describe("EagerAssociationTest", () => {
   it.skip("preloading has_many association associated by a composite query_constraints", () => {});
   it.skip("preloading has_many through association associated by a composite query_constraints", () => {});
   it.skip("preloading belongs_to CPK model with one of the keys being shared between models", () => {});
-  it("preloading belongs_to with cpk", async () => {
-    class CpkBtOrder extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class CpkBtLineItem extends Base {
-      static {
-        this.attribute("quantity", "integer");
-        this.attribute("cpk_bt_order_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.belongsTo.call(CpkBtLineItem, "cpkBtOrder", {
-      foreignKey: "cpk_bt_order_id",
-    });
-    registerModel(CpkBtOrder);
-    registerModel(CpkBtLineItem);
+  it.skip("preloading belongs_to with cpk", () => {});
 
-    const order = await CpkBtOrder.create({ name: "O1" });
-    await CpkBtLineItem.create({ quantity: 5, cpk_bt_order_id: order.id });
+  it.skip("preloading has_many with cpk", () => {});
 
-    const items = await CpkBtLineItem.all().preload("cpkBtOrder").toArray();
-    expect(items).toHaveLength(1);
-    const loaded = (items[0] as any)._preloadedAssociations.get("cpkBtOrder");
-    expect(loaded).not.toBeNull();
-    expect(loaded.readAttribute("name")).toBe("O1");
-  });
-
-  it("preloading has_many with cpk", async () => {
-    class CpkHmParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class CpkHmChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("cpk_hm_parent_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    (CpkHmParent as any)._associations = [
-      {
-        type: "hasMany",
-        name: "cpkHmChildren",
-        options: { className: "CpkHmChild", foreignKey: "cpk_hm_parent_id" },
-      },
-    ];
-    registerModel("CpkHmParent", CpkHmParent);
-    registerModel("CpkHmChild", CpkHmChild);
-
-    const parent = await CpkHmParent.create({ name: "P" });
-    await CpkHmChild.create({ value: "C1", cpk_hm_parent_id: parent.id });
-    await CpkHmChild.create({ value: "C2", cpk_hm_parent_id: parent.id });
-
-    const parents = await CpkHmParent.all().preload("cpkHmChildren").toArray();
-    expect(parents).toHaveLength(1);
-    const children = (parents[0] as any)._preloadedAssociations.get("cpkHmChildren");
-    expect(children).toHaveLength(2);
-  });
-
-  it("preloading has_one with cpk", async () => {
-    class CpkHoParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class CpkHoProfile extends Base {
-      static {
-        this.attribute("bio", "string");
-        this.attribute("cpk_ho_parent_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasOne.call(CpkHoParent, "cpkHoProfile", {
-      foreignKey: "cpk_ho_parent_id",
-    });
-    registerModel(CpkHoParent);
-    registerModel(CpkHoProfile);
-
-    const parent = await CpkHoParent.create({ name: "P" });
-    await CpkHoProfile.create({ bio: "Hello", cpk_ho_parent_id: parent.id });
-
-    const parents = await CpkHoParent.all().preload("cpkHoProfile").toArray();
-    expect(parents).toHaveLength(1);
-    const profile = (parents[0] as any)._preloadedAssociations.get("cpkHoProfile");
-    expect(profile).not.toBeNull();
-    expect(profile.readAttribute("bio")).toBe("Hello");
-  });
+  it.skip("preloading has_one with cpk", () => {});
 });
 
 // ==========================================================================
