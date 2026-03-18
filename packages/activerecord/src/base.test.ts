@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { SubclassNotFound } from "./errors.js";
+import { SubclassNotFound, NameError } from "./errors.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
@@ -1306,7 +1306,7 @@ describe("BasicsTest", () => {
         registerModel(this);
       }
     }
-    expect(() => Vehicle.computeType("NonExistent")).toThrow();
+    expect(() => Vehicle.computeType("NonExistent")).toThrow(NameError);
   });
   it("compute type raises SubclassNotFound for wrong class", () => {
     class Plant extends Base {
@@ -1998,6 +1998,9 @@ describe("BasicsTest", () => {
     }
     expect(User.columnNames()).not.toContain("secret");
     expect(User.columnNames()).toContain("name");
+    const u = new User();
+    expect("name" in u).toBe(true);
+    expect("secret" in u).toBe(false);
   });
   it("ignored columns are stored as an array of string", () => {
     class User extends Base {
@@ -2021,6 +2024,7 @@ describe("BasicsTest", () => {
     const u = await User.create({ name: "test" });
     await u.reload();
     expect(User.columnNames()).not.toContain("secret");
+    expect("secret" in u).toBe(false);
   });
   it("when ignored attribute is loaded, cast type should be preferred over DB type", () => {
     class User extends Base {
@@ -2044,8 +2048,10 @@ describe("BasicsTest", () => {
     expect(User.columnNames()).toContain("secret");
     User.ignoredColumns = ["secret"];
     expect(User.columnNames()).not.toContain("secret");
+    expect("secret" in User.prototype).toBe(false);
     User.ignoredColumns = ["secret", "hidden"];
     expect(User.columnNames()).not.toContain("hidden");
+    expect("hidden" in User.prototype).toBe(false);
   });
   it("column names are quoted when using #from clause and model has ignored columns", () => {
     class User extends Base {

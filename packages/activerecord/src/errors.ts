@@ -204,3 +204,10 @@ export class InverseOfAssociationNotFoundError extends Error {
     return this.message;
   }
 }
+
+export class NameError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NameError";
+  }
+}

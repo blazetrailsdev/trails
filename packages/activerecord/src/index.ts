@@ -49,6 +49,7 @@ export {
   DeleteRestrictionError,
   UnknownAttributeError,
   SubclassNotFound,
+  NameError,
   InverseOfAssociationNotFoundError,
 } from "./errors.js";
 export {

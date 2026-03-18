@@ -2,13 +2,9 @@ import { Model } from "@rails-ts/activemodel";
 import { Table } from "@rails-ts/arel";
 import { pluralize, underscore } from "@rails-ts/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
-import {
-  getInheritanceColumn,
-  isStiSubclass,
-  getStiBase,
-  instantiateSti,
-  findStiClass,
-} from "./sti.js";
+import { NameError, SubclassNotFound } from "./errors.js";
+import { modelRegistry } from "./associations.js";
+import { getInheritanceColumn, isStiSubclass, getStiBase, instantiateSti } from "./sti.js";
 import {
   RecordNotFound,
   RecordInvalid,
@@ -353,7 +349,19 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Inheritance.compute_type
    */
   static computeType(typeName: string): typeof Base {
-    return findStiClass(this, typeName);
+    // Unlike findStiClass (which always throws SubclassNotFound),
+    // computeType distinguishes unknown constants (NameError) from
+    // known classes that aren't subclasses (SubclassNotFound).
+    const klass = modelRegistry.get(typeName);
+    if (!klass) {
+      throw new NameError(`uninitialized constant ${typeName}`);
+    }
+    if (klass !== this && !(klass.prototype instanceof this)) {
+      throw new SubclassNotFound(
+        `Invalid single-table inheritance type: ${typeName} is not a subclass of ${this.name}`,
+      );
+    }
+    return klass;
   }
 
   /**
@@ -476,6 +484,17 @@ export class Base extends Model {
 
   static set ignoredColumns(columns: string[]) {
     this._ignoredColumns = columns;
+    for (const col of columns) {
+      // Delete own accessor or shadow inherited one with undefined descriptor
+      if (col in this.prototype) {
+        Object.defineProperty(this.prototype, col, {
+          get: undefined,
+          set: undefined,
+          configurable: true,
+        });
+        delete (this.prototype as any)[col];
+      }
+    }
   }
 
   // -- Readonly attributes --
