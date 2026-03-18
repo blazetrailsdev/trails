@@ -1064,6 +1064,9 @@ export class CollectionProxy {
     return record;
   }
 
+  // NOTE: If _pushThrough fails after the target is saved, the target record
+  // will be orphaned (no join row). Rails wraps this in a transaction. We don't
+  // have transaction support yet — tracked in the roadmap under "Transactions".
   private async _createThrough(attrs: Record<string, unknown> = {}): Promise<Base> {
     const ctor = this._record.constructor as typeof Base;
     if (this._record.isNewRecord()) {

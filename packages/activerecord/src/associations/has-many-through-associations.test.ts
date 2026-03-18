@@ -2150,6 +2150,9 @@ describe("HasManyThroughAssociationsTest", () => {
     const people = await proxy.toArray();
     expect(people).toHaveLength(3);
     const ids = people.map((p) => p.id);
+    // Through loader uses WHERE IN which returns by PK order, not insertion
+    // order. True order preservation needs ORDER BY support — tracked in
+    // the roadmap. For now we verify all records are present.
     expect(new Set(ids)).toEqual(new Set([p1.id, p2.id, p3.id]));
   });
   it("replace by id order is preserved", async () => {
@@ -2205,6 +2208,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const people = await proxy.toArray();
     expect(people).toHaveLength(2);
     const ids = people.map((p) => p.id);
+    // See "replace order" comment above — order not yet preserved.
     expect(new Set(ids)).toEqual(new Set([p1.id, p2.id]));
   });
 
@@ -5204,6 +5208,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(posts.length).toBe(3);
     const ids = posts.map((p) => p.id);
+    // See "replace order" comment — order not yet preserved via through loader.
     expect(new Set(ids)).toEqual(new Set([post1.id, post2.id, post3.id]));
   });
   it("no pk join model callbacks", async () => {
