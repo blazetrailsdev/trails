@@ -1001,7 +1001,9 @@ describe("DefaultScopingTest", () => {
     const results = await (Post as any).includingDrafts().toArray();
     expect(results.length).toBe(2);
   });
+});
 
+describe("DefaultScopingWithThreadTest", () => {
   it("default scope is threadsafe", async () => {
     const adp = freshAdapter();
     class Post extends Base {

@@ -1484,7 +1484,7 @@ describe("UniquenessWithCompositeKey", () => {
   });
 });
 
-describe("UniquenessValidator", () => {
+describe("UniquenessValidationTest", () => {
   it("validate uniqueness", async () => {
     const adapter = freshAdapter();
 

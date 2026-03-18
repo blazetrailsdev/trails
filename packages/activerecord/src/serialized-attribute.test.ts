@@ -454,10 +454,10 @@ describe("SerializedAttributeTest", () => {
     const reloaded = await User.find(u.id);
     expect(reloaded.readAttribute("preferences")).toBeNull();
   });
-  it.skip("supports permitted classes for default column serializer", () => {});
 });
 
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
+  it.skip("supports permitted classes for default column serializer", () => {});
   // These tests cover YAML safe_load behavior which is Ruby/YAML-specific.
   // TypeScript uses JSON serialization instead, so these are not applicable.
   it.skip("serialized attribute — YAML-specific, not applicable to TypeScript", () => {});

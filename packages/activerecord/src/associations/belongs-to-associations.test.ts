@@ -3746,6 +3746,14 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.readAttribute("title")).toBe("Hello");
   });
+});
+
+describe("AsyncBelongsToAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
   it("async load belongs to", async () => {
     class AlbtCompany extends Base {
       static {
@@ -3770,6 +3778,14 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.readAttribute("name")).toBe("AsyncCo");
   });
+});
+
+describe("BelongsToAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
   it("belongs to", async () => {
     // Rails: test_belongs_to
     class BtCompany extends Base {

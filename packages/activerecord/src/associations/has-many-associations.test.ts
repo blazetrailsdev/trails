@@ -7845,6 +7845,13 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(remaining.length).toBe(0);
   });
+});
+
+describe("HasManyAssociationsTestPrimaryKeys", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
 
   it("has many custom primary key", async () => {
     class CpkAuthor extends Base {
@@ -7890,6 +7897,14 @@ describe("HasManyAssociationsTest", () => {
     const post = await CpkAsgPost.create({ author_id: author.id, title: "A" });
     expect((post as any).readAttribute("author_id")).toBe(author.id);
   });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
   it("do not call callbacks for delete all", async () => {
     class NoCbAuthor extends Base {
       static {
@@ -8171,6 +8186,14 @@ describe("HasManyAssociationsTest", () => {
     expect(posts1.length).toBe(2);
     expect(posts2.length).toBe(2);
   });
+});
+
+describe("AsyncHasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
   it("async load has many", async () => {
     class AsyncAuthor extends Base {
       static {
@@ -8196,6 +8219,14 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(posts.length).toBe(2);
   });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
   it("custom named counter cache", async () => {
     // Rails: test_custom_named_counter_cache / test_custom_counter_cache
     class CnPost extends Base {
