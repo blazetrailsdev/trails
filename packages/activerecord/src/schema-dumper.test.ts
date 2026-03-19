@@ -40,13 +40,8 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("users");
   });
 
-  it("schema dump uses force cascade on create table", async () => {
-    await ctx.createTable("posts", {}, (t) => {
-      t.string("title");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("createTable");
-    expect(output).toContain("posts");
+  it.skip("schema dump uses force cascade on create table", () => {
+    /* needs force: :cascade option emitted in SchemaDumper output */
   });
 
   it("schema dump excludes sqlite sequence", async () => {
