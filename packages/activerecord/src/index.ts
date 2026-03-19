@@ -37,6 +37,9 @@ export { store, storeAccessor, storedAttributes } from "./store.js";
 export { SqliteAdapter } from "./adapters/sqlite-adapter.js";
 export { PostgresAdapter } from "./adapters/postgres-adapter.js";
 export { MysqlAdapter } from "./adapters/mysql-adapter.js";
+export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
+export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
+export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
 export {
   RecordNotFound,
   RecordInvalid,
