@@ -2,21 +2,28 @@
 
 TypeScript packages that mirror the Ruby on Rails API.
 
-The goal of this project is to be **100% API compatible with Rails**, matching behavior **test for test** against the Rails source. If you can read the [Rails API docs](https://api.rubyonrails.org/), you already know how to use this — class names, method signatures, and behavior are designed to match Rails as closely as TypeScript allows, while adding the type safety that Ruby can't.
+The goal is to be **100% API compatible with Rails**, matching behavior **test for test** against the Rails source. The current focus is getting ActiveRecord to full parity — it's the heart of Rails and the package with the most ground to cover. If you can read the [Rails API docs](https://api.rubyonrails.org/), you already know how to use this — class names, method signatures, and behavior are designed to match Rails as closely as TypeScript allows, while adding the type safety that Ruby can't.
 
 ## Packages
 
-| Package                      | Rails Equivalent                                                              | Convention Compare | Description                                                |
-| ---------------------------- | ----------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------- |
-| `@rails-ts/arel`             | [Arel](https://api.rubyonrails.org/classes/Arel.html)                         | **99.4%**          | SQL AST builder and query generation                       |
-| `@rails-ts/activemodel`      | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)           | **100%**           | Attributes, validations, callbacks, dirty tracking, i18n   |
-| `@rails-ts/rack`             | [Rack](https://rack.github.io/)                                               | **99%**            | Modular web server interface, request/response, middleware |
-| `@rails-ts/activerecord`     | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)         | **75.7%**          | ORM — persistence, querying, associations, migrations      |
-| `@rails-ts/activesupport`    | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **94.6%**          | Core utilities, inflection, caching, notifications         |
-| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **25.1%**          | Routing, middleware stack, cookies, sessions, security     |
-| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**           | Controller layer, rendering, filters, parameters           |
+**Active focus** — these packages are where development effort is concentrated:
 
-**69.3%** complete — 11,900 tests matched against 17,172 Rails tests.
+| Package                   | Rails Equivalent                                                        | Convention Compare | Description                                                |
+| ------------------------- | ----------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------- |
+| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **54.7%**          | ORM — persistence, querying, associations, migrations      |
+| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **70.9%**          | Core utilities, inflection, caching, notifications         |
+| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%**          | SQL AST builder and query generation                       |
+| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%**          | Attributes, validations, callbacks, dirty tracking, i18n   |
+| `@rails-ts/rack`          | [Rack](https://rack.github.io/)                                         | **98.8%**          | Modular web server interface, request/response, middleware |
+
+**ActionPack** — started but not the current priority:
+
+| Package                      | Rails Equivalent                                                              | Convention Compare | Description                                            |
+| ---------------------------- | ----------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------ |
+| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **28.4%**          | Routing, middleware stack, cookies, sessions, security |
+| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**           | Controller layer, rendering, filters, parameters       |
+
+**66%** of the active focus packages — 9,039 of 13,690 tests matched. (55.7% including actionpack.)
 
 Progress is measured by `npm run convention:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.
 

@@ -62,16 +62,16 @@ It compares our test files and test names against the Rails test suite:
 npm run convention:compare
 ```
 
-Current status (9190/17172 implemented, 4504 skipped):
+Current status (9452/16982 implemented, 4244 skipped):
 
 | Package          | OK / Total | Files   | Misplaced |
 | ---------------- | ---------- | ------- | --------- |
 | arel             | 703/707    | 59/59   | 0         |
 | activemodel      | 958/963    | 56/56   | 0         |
-| activerecord     | 4374/8385  | 340/342 | 0         |
-| activesupport    | 1977/2862  | 157/157 | 0         |
+| activerecord     | 4584/8385  | 340/342 | 0         |
+| activesupport    | 2030/2862  | 157/157 | 0         |
 | rack             | 764/773    | 40/40   | 0         |
-| actiondispatch   | 407/1622   | 16/75   | 67        |
+| actiondispatch   | 406/1432   | 16/60   | 27        |
 | actioncontroller | 7/1860     | 8/91    | 229       |
 
 "Misplaced" means tests that exist but are in the wrong file according to
