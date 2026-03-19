@@ -141,6 +141,20 @@ describe("MigrationTest", () => {
     expect(ctx.indexExists("users", "email")).toBe(false);
   });
 
+  it("inline index from createTable block is tracked", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("posts", {}, (t) => {
+      t.string("slug");
+      t.index(["slug"], { unique: true });
+    });
+    expect(ctx.indexExists("posts", "slug")).toBe(true);
+    const indexes = ctx.indexes("posts");
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0].columns).toEqual(["slug"]);
+    expect(indexes[0].unique).toBe(true);
+    expect(indexes[0].name).toBe("index_posts_on_slug");
+  });
+
   it("rename table", async () => {
     const { ctx } = freshContext();
     await ctx.createTable("old_name", {}, (t) => {

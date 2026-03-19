@@ -84,8 +84,9 @@ export class SchemaDumper {
       if (col.default !== undefined && col.default !== null) {
         opts.push(`default: ${JSON.stringify(col.default)}`);
       }
-      if (col.limit) opts.push(`limit: ${col.limit}`);
-      if (col.precision) opts.push(`precision: ${col.precision}`);
+      if (col.limit !== undefined && col.limit !== null) opts.push(`limit: ${col.limit}`);
+      if (col.precision !== undefined && col.precision !== null)
+        opts.push(`precision: ${col.precision}`);
       if (col.scale !== undefined) opts.push(`scale: ${col.scale}`);
       const optionsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       lines.push(`    t.${col.type}(${JSON.stringify(col.name)}${optionsStr});`);

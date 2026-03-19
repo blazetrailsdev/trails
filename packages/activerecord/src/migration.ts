@@ -413,7 +413,7 @@ export abstract class Migration {
 
     // Create indexes
     for (const idx of td.indexes) {
-      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
+      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
       const unique = idx.unique ? "UNIQUE " : "";
       const cols = idx.columns.map((c) => `"${c}"`).join(", ");
       await this.adapter.executeMutation(
