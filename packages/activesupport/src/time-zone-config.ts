@@ -23,6 +23,7 @@ export function getZone(): TimeZone | null {
 
 /**
  * Set Time.zone. Accepts a TimeZone, a string name, or null.
+ * Passing null resets to zone_default.
  */
 export function setZone(zone: TimeZone | string | null): void {
   if (zone === null) {
@@ -37,7 +38,15 @@ export function setZone(zone: TimeZone | string | null): void {
     _zone = TimeZone.find(zone);
     return;
   }
-  throw new ArgumentError(`Invalid Timezone: ${zone}`);
+  throw new ArgumentError(`Invalid time zone: ${zone}`);
+}
+
+/**
+ * Reset Time.zone to its unset state (falls through to zone_default).
+ * Useful in test teardown to restore exact prior state.
+ */
+export function resetZone(): void {
+  _zone = undefined;
 }
 
 /**
@@ -52,17 +61,24 @@ export function setZoneDefault(zone: TimeZone | null): void {
 }
 
 /**
- * Execute a block with a temporary Time.zone, restoring afterwards.
- * Matches Rails' Time.use_zone.
+ * Execute a synchronous block with a temporary Time.zone, restoring afterwards.
+ * Matches Rails' Time.use_zone. Only supports synchronous callbacks — async
+ * callbacks would observe the wrong zone after the first await.
  */
 export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
   if (typeof zone === "string") {
-    zone = TimeZone.find(zone); // throws Error if invalid
+    zone = TimeZone.find(zone);
   }
   const prev = _zone;
   _zone = zone;
   try {
-    return fn();
+    const result = fn();
+    if (result instanceof Promise) {
+      throw new Error(
+        "useZone does not support async callbacks; the zone would be restored before awaited work runs",
+      );
+    }
+    return result;
   } finally {
     _zone = prev;
   }
@@ -101,13 +117,13 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === false) return false;
   if (zone instanceof TimeZone) return zone;
   if (typeof zone === "string") {
-    return TimeZone.find(zone); // throws on invalid
+    return TimeZone.find(zone);
   }
   if (typeof zone === "number") {
     try {
       return TimeZone.find(zone.toString());
     } catch {
-      throw new ArgumentError(`Invalid Timezone: ${zone}`);
+      throw new ArgumentError(`Invalid time zone: ${zone}`);
     }
   }
   throw new ArgumentError(`invalid argument to TimeZone[]`);

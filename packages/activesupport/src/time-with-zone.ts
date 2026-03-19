@@ -830,6 +830,9 @@ export class TimeWithZone {
    * Round to the nearest precision in seconds (default: 1 second).
    */
   round(precision = 1): TimeWithZone {
+    if (!Number.isFinite(precision) || precision <= 0) {
+      throw new RangeError(`precision must be a positive number, got ${precision}`);
+    }
     const ms = this._utc.getTime();
     const precisionMs = precision * 1000;
     const rounded = Math.round(ms / precisionMs) * precisionMs;

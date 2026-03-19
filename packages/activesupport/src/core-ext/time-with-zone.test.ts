@@ -6,6 +6,7 @@ import { travelTo } from "../testing-helpers.js";
 import {
   getZone,
   setZone,
+  resetZone,
   getZoneDefault,
   setZoneDefault,
   useZone,
@@ -1028,14 +1029,8 @@ describe("TimeWithZoneTest", () => {
 });
 
 describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
-  let savedZone: ReturnType<typeof getZone>;
-
-  beforeEach(() => {
-    savedZone = getZone();
-  });
-
   afterEach(() => {
-    setZone(savedZone);
+    resetZone();
   });
 
   const t = new Date(Date.UTC(2000, 0, 1));
@@ -1174,7 +1169,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("find zone with bang raises if time zone can not be found", () => {
     expect(() => findZoneBang("No such timezone exists")).toThrow(/Invalid time zone/);
-    expect(() => findZoneBang(-54000)).toThrow(/Invalid Timezone/);
+    expect(() => findZoneBang(-54000)).toThrow(/Invalid time zone/);
     expect(() => findZoneBang({})).toThrow(/invalid argument/);
   });
 
@@ -1218,14 +1213,8 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 });
 
 describe("TimeWithZoneMethodsForDate", () => {
-  let savedZone: ReturnType<typeof getZone>;
-
-  beforeEach(() => {
-    savedZone = getZone();
-  });
-
   afterEach(() => {
-    setZone(savedZone);
+    resetZone();
   });
 
   it("in time zone", () => {
@@ -1261,14 +1250,8 @@ describe("TimeWithZoneMethodsForDate", () => {
 });
 
 describe("TimeWithZoneMethodsForString", () => {
-  let savedZone: ReturnType<typeof getZone>;
-
-  beforeEach(() => {
-    savedZone = getZone();
-  });
-
   afterEach(() => {
-    setZone(savedZone);
+    resetZone();
   });
 
   it("in time zone", () => {
