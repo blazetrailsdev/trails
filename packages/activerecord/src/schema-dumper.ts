@@ -39,7 +39,7 @@ export class SchemaDumper {
     lines.push("// This file is auto-generated from the current state of the database.");
     lines.push("// Instead of editing this file, please use the migrations feature.");
     lines.push("");
-    lines.push("export default function defineSchema(ctx) {");
+    lines.push("export default function defineSchema(ctx: any) {");
   }
 
   private trailer(lines: string[]): void {

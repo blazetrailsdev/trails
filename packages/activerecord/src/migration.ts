@@ -416,9 +416,8 @@ export abstract class Migration {
       const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
       const unique = idx.unique ? "UNIQUE " : "";
       const cols = idx.columns.map((c) => `"${c}"`).join(", ");
-      const ifNotExists = options.ifNotExists ? "IF NOT EXISTS " : "";
       await this.adapter.executeMutation(
-        `CREATE ${unique}INDEX ${ifNotExists}"${indexName}" ON "${name}" (${cols})`,
+        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${cols})`,
       );
     }
   }
@@ -1285,6 +1284,21 @@ export class Schema {
 export class MigrationContext {
   private _tables = new Set<string>();
   private _columns = new Map<string, Set<string>>();
+  private _columnMeta = new Map<
+    string,
+    Map<
+      string,
+      {
+        type: string;
+        primaryKey?: boolean;
+        null?: boolean;
+        default?: unknown;
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      }
+    >
+  >();
   private _indexes = new Map<string, { columns: string[]; unique: boolean; name?: string }[]>();
   tableNamePrefix = "";
   tableNameSuffix = "";
@@ -1321,6 +1335,34 @@ export class MigrationContext {
       cols.add(col.name);
     }
     this._columns.set(name, cols);
+
+    // Store column metadata
+    const meta = new Map<
+      string,
+      {
+        type: string;
+        primaryKey?: boolean;
+        null?: boolean;
+        default?: unknown;
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      }
+    >();
+    if (options?.id !== false) {
+      meta.set("id", { type: "integer", primaryKey: true });
+    }
+    for (const col of td.columns) {
+      meta.set(col.name, {
+        type: col.type,
+        null: col.options.null,
+        default: col.options.default,
+        limit: col.options.limit,
+        precision: col.options.precision,
+        scale: col.options.scale,
+      });
+    }
+    this._columnMeta.set(name, meta);
 
     // Create indexes from table definition
     for (const idx of td.indexes) {
@@ -1391,6 +1433,15 @@ export class MigrationContext {
     );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
+    if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
+    this._columnMeta.get(table)!.set(column, {
+      type,
+      null: _options?.null,
+      default: _options?.default,
+      limit: _options?.limit,
+      precision: _options?.precision,
+      scale: _options?.scale,
+    });
   }
 
   async removeColumn(
@@ -1550,6 +1601,10 @@ export class MigrationContext {
     precision?: number;
     scale?: number;
   }> {
+    const meta = this._columnMeta.get(tableName);
+    if (meta) {
+      return Array.from(meta.entries()).map(([name, info]) => ({ name, ...info }));
+    }
     const cols = this._columns.get(tableName);
     if (!cols) return [];
     return Array.from(cols).map((name) => ({ name, type: "string" }));

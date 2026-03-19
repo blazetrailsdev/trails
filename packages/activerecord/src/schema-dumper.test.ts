@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { createTestAdapter } from "./test-adapter.js";
@@ -15,6 +15,9 @@ describe("SchemaDumperTest", () => {
   beforeEach(async () => {
     const f = freshCtx();
     ctx = f.ctx;
+  });
+  afterEach(() => {
+    SchemaDumper.ignoreTables = [];
   });
 
   it.skip("dump schema information with empty versions", () => {
@@ -78,10 +81,11 @@ describe("SchemaDumperTest", () => {
 
   it("schema dump includes not null columns", async () => {
     await ctx.createTable("strict", {}, (t) => {
-      t.string("name");
+      t.string("name", { null: false });
     });
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("strict");
+    expect(output).toContain("null: false");
   });
 
   it.skip("schema dump includes limit constraint for integer columns", () => {
@@ -95,7 +99,6 @@ describe("SchemaDumperTest", () => {
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("users");
     expect(output).not.toContain("ignored_table");
-    SchemaDumper.ignoreTables = [];
   });
 
   it("schema dump with regexp ignored table", async () => {
@@ -105,7 +108,6 @@ describe("SchemaDumperTest", () => {
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("users");
     expect(output).not.toContain("temp_cache");
-    SchemaDumper.ignoreTables = [];
   });
 
   it("schema dumps index columns in right order", async () => {
