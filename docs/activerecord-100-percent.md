@@ -183,6 +183,21 @@ class CreatePosts extends Migration {
 
 Schema dumper, migrator, database tasks.
 
+Implemented in #143: SchemaDumper foundation, `ifNotExists`/`ifExists` migration options,
+table name length validation, MigrationContext schema introspection (`tables`/`columns`/`indexes`).
+19 tests unskipped.
+
+Remaining follow-ups from review:
+
+- **Adapter-specific existence checks**: `tableExists()` and `columnExists()` use SQLite-specific queries; need adapter-aware implementations for Postgres/MySQL
+- **Adapter-specific identifier length**: Hard-coded to 64 (Rails default); PostgreSQL limit is 63. Should use adapter-provided `maxIdentifierLength`
+- **SchemaDumper force:cascade**: Emit `force: :cascade` on `createTable` for idempotent schema loads
+- **SchemaDumper prefix/suffix**: `tableNamePrefix`/`tableNameSuffix` filtering for dump-to-file workflow
+- **SchemaDumper roundtrip**: Validate dumped schema can execute against MigrationContext and reproduce original structure
+- **Migration version tracking**: `schema_migrations` table, version ordering, `dump_schema_information`
+- **File-system migration discovery**: Loading migration files from a directory
+- **Advisory locking, multi-database, database task runners**
+
 #### B7: Encryption
 
 Encrypted attributes so sensitive data is encrypted at rest:
