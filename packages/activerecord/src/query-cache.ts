@@ -164,13 +164,25 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     this._queryCount++;
 
+    if (!this.cache.enabled) {
+      return this.inner.execute(sql, binds);
+    }
+
+    const trimmed = sql.trimStart().toUpperCase();
+
+    // Only cache SELECT and WITH (CTE) queries
+    if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
+      this.cache.clear();
+      return this.inner.execute(sql, binds);
+    }
+
     // Don't cache locked queries (SELECT ... FOR UPDATE)
-    if (this.cache.enabled && /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i.test(sql)) {
+    if (/\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i.test(sql)) {
       return this.inner.execute(sql, binds);
     }
 
     const key = cacheKey(sql, binds);
-    const wasHit = this.cache.enabled && this.cache.get(key) !== undefined;
+    const wasHit = this.cache.get(key) !== undefined;
     return this.cache
       .computeIfAbsent(key, async () => {
         return this.inner.execute(sql, binds);
