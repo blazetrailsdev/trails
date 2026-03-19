@@ -73,9 +73,9 @@ export class SchemaDumper {
     if (!hasId) {
       options.push("id: false");
     }
-    const optStr = options.length > 0 ? `, { ${options.join(", ")} }` : "";
+    const optStr = options.length > 0 ? `{ ${options.join(", ")} }` : "{}";
 
-    lines.push(`  await ctx.createTable("${tableName}"${optStr}, (t) => {`);
+    lines.push(`  await ctx.createTable("${tableName}", ${optStr}, (t) => {`);
 
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
