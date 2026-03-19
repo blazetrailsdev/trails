@@ -41,26 +41,21 @@ export class ScaffoldGenerator extends GeneratorBase {
     );
 
     // EJS view templates
+    const viewDir = dasherize(resourceName);
     this.createFile(
-      `src/app/views/${resourceName}/index.html.ejs`,
+      `src/app/views/${viewDir}/index.html.ejs`,
       this.indexView(resourceName, singular, columns),
     );
+    this.createFile(`src/app/views/${viewDir}/show.html.ejs`, this.showView(singular, columns));
     this.createFile(
-      `src/app/views/${resourceName}/show.html.ejs`,
-      this.showView(singular, columns),
-    );
-    this.createFile(
-      `src/app/views/${resourceName}/new.html.ejs`,
+      `src/app/views/${viewDir}/new.html.ejs`,
       this.newView(singular, resourceName, columns),
     );
     this.createFile(
-      `src/app/views/${resourceName}/edit.html.ejs`,
+      `src/app/views/${viewDir}/edit.html.ejs`,
       this.editView(singular, resourceName, columns),
     );
-    this.createFile(
-      `src/app/views/${resourceName}/_form.html.ejs`,
-      this.formPartial(singular, columns),
-    );
+    this.createFile(`src/app/views/${viewDir}/_form.html.ejs`, this.formPartial(singular, columns));
 
     // Create layout if it doesn't exist
     if (!this.fileExists("src/app/views/layouts/application.html.ejs")) {
