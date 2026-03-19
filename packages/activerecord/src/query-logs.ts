@@ -8,7 +8,7 @@
  */
 
 export type TagValue = string | number | boolean | null | undefined;
-export type TagHandler = () => TagValue;
+export type TagHandler = (context?: Record<string, TagValue>) => TagValue;
 export type TagDefinition = string | TagHandler | Record<string, TagValue | TagHandler>;
 
 export interface QueryLogsFormatter {
@@ -35,7 +35,7 @@ export const LegacyFormatter: QueryLogsFormatter = {
  */
 export const SQLCommenter: QueryLogsFormatter = {
   format(key: string, value: TagValue): string {
-    return `${encodeURIComponent(key)}='${encodeURIComponent(String(value))}'`;
+    return `${sqlCommenterEncode(key)}='${sqlCommenterEncode(String(value))}'`;
   },
   join(pairs: string[]): string {
     return pairs.join(",");
@@ -138,13 +138,13 @@ export class QueryLogs {
           pairs.push(this._formatter.format(tag, value));
         }
       } else if (typeof tag === "function") {
-        const value = tag();
+        const value = tag(this._context);
         if (value != null) {
           pairs.push(this._formatter.format("custom", value));
         }
       } else if (typeof tag === "object") {
         for (const [key, handler] of Object.entries(tag)) {
-          const value = typeof handler === "function" ? handler() : handler;
+          const value = typeof handler === "function" ? handler(this._context) : handler;
           if (value != null) {
             pairs.push(this._formatter.format(key, value));
           }
@@ -161,6 +161,14 @@ export class QueryLogs {
  * Sanitize a string for safe inclusion in a SQL comment.
  * Mirrors: ActiveRecord::QueryLogs.escape_sql_comment
  */
+/**
+ * Encode a value for SQLCommenter format.
+ * Uses encodeURIComponent plus additional escaping for single quotes.
+ */
+function sqlCommenterEncode(value: string): string {
+  return encodeURIComponent(value).replace(/'/g, "%27");
+}
+
 export function escapeComment(content: string): string {
   let s = content;
   // Replace comment markers to prevent SQL comment injection

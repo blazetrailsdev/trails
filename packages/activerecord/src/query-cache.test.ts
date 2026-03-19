@@ -119,10 +119,13 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = setup();
     const t = await Task.create({ title: "test" });
     await cached.withCache(async () => {
+      cached.resetCounters();
       const r1 = await Task.find(t.id);
+      const hitsAfterFirst = cached.cacheHits;
       const r2 = await Task.find(t.id);
       expect(r1.readAttribute("title")).toBe("test");
       expect(r2.readAttribute("title")).toBe("test");
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
