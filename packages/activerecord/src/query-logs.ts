@@ -25,7 +25,7 @@ export const LegacyFormatter: QueryLogsFormatter = {
     return `${key}:${value}`;
   },
   join(pairs: string[]): string {
-    return pairs.join(",");
+    return pairs.join(", ");
   },
 };
 
@@ -50,7 +50,7 @@ export class QueryLogs {
   private _formatter: QueryLogsFormatter = LegacyFormatter;
   private _prependComment = false;
   private _cacheEnabled = false;
-  private _cachedComment: string | null = null;
+  private _cachedComment: string | null | undefined = undefined;
   private _context: Record<string, TagValue> = {};
 
   get tags(): TagDefinition[] {
@@ -59,7 +59,7 @@ export class QueryLogs {
 
   set tags(tags: TagDefinition[]) {
     this._tags = tags;
-    this._cachedComment = null;
+    this._cachedComment = undefined;
   }
 
   get prependComment(): boolean {
@@ -76,7 +76,7 @@ export class QueryLogs {
 
   set cacheQueryLogTags(value: boolean) {
     this._cacheEnabled = value;
-    if (!value) this._cachedComment = null;
+    if (!value) this._cachedComment = undefined;
   }
 
   set formatter(format: "legacy" | "sqlcommenter") {
@@ -87,7 +87,7 @@ export class QueryLogs {
     } else {
       throw new Error(`Formatter is unsupported: ${format}`);
     }
-    this._cachedComment = null;
+    this._cachedComment = undefined;
   }
 
   /**
@@ -96,12 +96,12 @@ export class QueryLogs {
    */
   updateContext(ctx: Record<string, TagValue>): void {
     this._context = { ...this._context, ...ctx };
-    this._cachedComment = null;
+    this._cachedComment = undefined;
   }
 
   clearContext(): void {
     this._context = {};
-    this._cachedComment = null;
+    this._cachedComment = undefined;
   }
 
   /**
@@ -115,11 +115,11 @@ export class QueryLogs {
   }
 
   clearCache(): void {
-    this._cachedComment = null;
+    this._cachedComment = undefined;
   }
 
   private comment(): string | null {
-    if (this._cacheEnabled && this._cachedComment !== null) {
+    if (this._cacheEnabled && this._cachedComment !== undefined) {
       return this._cachedComment;
     }
     const result = this.uncachedComment();
