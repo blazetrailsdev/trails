@@ -1006,9 +1006,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("habtm adding before save", async () => {
     const dev = await Developer.create({ name: "BeforeSave", salary: 50000 });
     const proj = new Project({ name: "BSProj" });
-    await proj.save();
+    expect(proj.isNewRecord()).toBe(true);
     const proxy = association(dev, "projects");
     await proxy.push(proj);
+    // push should save the unsaved target record
+    expect(proj.isNewRecord()).toBe(false);
     const projects = await proxy.toArray();
     expect(projects).toHaveLength(1);
     expect(projects[0].readAttribute("name")).toBe("BSProj");
