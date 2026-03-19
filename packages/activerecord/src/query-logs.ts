@@ -79,11 +79,13 @@ export class QueryLogs {
     if (!value) this._cachedComment = undefined;
   }
 
-  set formatter(format: "legacy" | "sqlcommenter") {
+  set formatter(format: "legacy" | "sqlcommenter" | QueryLogsFormatter) {
     if (format === "legacy") {
       this._formatter = LegacyFormatter;
     } else if (format === "sqlcommenter") {
       this._formatter = SQLCommenter;
+    } else if (typeof format === "object" && format !== null) {
+      this._formatter = format;
     } else {
       throw new Error(`Formatter is unsupported: ${format}`);
     }

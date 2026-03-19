@@ -220,6 +220,17 @@ describe("QueryCacheTest", () => {
     await expect(Task.all().toArray()).resolves.toBeDefined();
   });
 
+  it("cache works with prepended sql comments", async () => {
+    const { cached } = setup();
+    cached.enableQueryCache();
+    const sql = "/*app:MyApp*/ SELECT 1 AS val";
+    await cached.execute(sql);
+    expect(cached.cache.size).toBeGreaterThan(0);
+    cached.resetCounters();
+    await cached.execute(sql);
+    expect(cached.cacheHits).toBe(1);
+  });
+
   it("query cache does not allow sql key mutation", async () => {
     const { cached } = setup();
     cached.enableQueryCache();

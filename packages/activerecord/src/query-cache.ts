@@ -171,7 +171,12 @@ export class QueryCacheAdapter implements DatabaseAdapter {
       return this.inner.execute(sql, binds);
     }
 
-    const trimmed = sql.trimStart().toUpperCase();
+    // Strip leading SQL comments (e.g. from QueryLogs prepend) before detecting statement type
+    const trimmed = sql
+      .trimStart()
+      .replace(/^(\/\*[\s\S]*?\*\/\s*)*/g, "")
+      .trimStart()
+      .toUpperCase();
 
     // Only cache SELECT and read-only WITH (CTE) queries.
     // WITH can prefix write CTEs (WITH ... INSERT/UPDATE/DELETE), so check for those.
