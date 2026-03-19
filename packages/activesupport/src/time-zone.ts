@@ -415,6 +415,230 @@ export class TimeZone {
   }
 
   /**
+   * Parse a time string using a strftime-style format.
+   * The parsed time is interpreted in this timezone unless the format
+   * extracts an explicit timezone offset from the string.
+   */
+  strptime(str: string, format: string, base?: TimeWithZone): TimeWithZone {
+    const now = base ?? this.now();
+    let year = now.year;
+    let month = now.month;
+    let day = now.day;
+    let hour = 0;
+    let minute = 0;
+    let second = 0;
+    const ms = 0;
+    let explicitOffsetSeconds: number | null = null;
+    let epochMs: number | null = null;
+
+    // Build a regex from the format string and extract components
+    let pos = 0;
+    let strPos = 0;
+
+    while (pos < format.length) {
+      if (format[pos] === "%" && pos + 1 < format.length) {
+        // Check for escaped %
+        if (format[pos + 1] === "%") {
+          if (str[strPos] !== "%") {
+            throw new Error(`ArgumentError: strptime: input does not match format`);
+          }
+          strPos++;
+          pos += 2;
+          continue;
+        }
+
+        // Handle optional : prefix for zone formats
+        let spec = format[pos + 1];
+        let specLen = 2;
+        if (spec === ":" && pos + 2 < format.length) {
+          if (
+            format[pos + 2] === ":" &&
+            pos + 3 < format.length &&
+            format[pos + 3] === ":" &&
+            pos + 4 < format.length &&
+            format[pos + 4] === "z"
+          ) {
+            spec = ":::z";
+            specLen = 5;
+          } else if (
+            format[pos + 2] === ":" &&
+            pos + 3 < format.length &&
+            format[pos + 3] === "z"
+          ) {
+            spec = "::z";
+            specLen = 4;
+          } else if (format[pos + 2] === "z") {
+            spec = ":z";
+            specLen = 3;
+          }
+        }
+
+        switch (spec) {
+          case "Y": {
+            const m = str.slice(strPos).match(/^(\d{4})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            year = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
+          }
+          case "m": {
+            const m = str.slice(strPos).match(/^(\d{1,2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            month = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
+          }
+          case "b": {
+            const m = str
+              .slice(strPos)
+              .match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            const months: Record<string, number> = {
+              jan: 1,
+              feb: 2,
+              mar: 3,
+              apr: 4,
+              may: 5,
+              jun: 6,
+              jul: 7,
+              aug: 8,
+              sep: 9,
+              oct: 10,
+              nov: 11,
+              dec: 12,
+            };
+            month = months[m[1].toLowerCase()];
+            strPos += m[1].length;
+            break;
+          }
+          case "d":
+          case "e": {
+            const m = str.slice(strPos).match(/^\s*(\d{1,2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            day = parseInt(m[1], 10);
+            strPos += m[0].length;
+            break;
+          }
+          case "H": {
+            const m = str.slice(strPos).match(/^(\d{1,2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            hour = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
+          }
+          case "M": {
+            const m = str.slice(strPos).match(/^(\d{1,2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            minute = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
+          }
+          case "S": {
+            const m = str.slice(strPos).match(/^(\d{1,2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            second = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
+          }
+          case "s": {
+            const m = str.slice(strPos).match(/^(\d+)/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            epochMs = parseInt(m[1], 10) * 1000;
+            strPos += m[1].length;
+            break;
+          }
+          case "Q": {
+            const m = str.slice(strPos).match(/^(\d+)/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            epochMs = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
+          }
+          case "Z": {
+            // Timezone abbreviation like PST, EST
+            const m = str.slice(strPos).match(/^([A-Z]{3,5})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            const abbrevOffsets: Record<string, number> = {
+              PST: -8 * 3600,
+              PDT: -7 * 3600,
+              MST: -7 * 3600,
+              MDT: -6 * 3600,
+              CST: -6 * 3600,
+              CDT: -5 * 3600,
+              EST: -5 * 3600,
+              EDT: -4 * 3600,
+              UTC: 0,
+              GMT: 0,
+            };
+            if (m[1] in abbrevOffsets) {
+              explicitOffsetSeconds = abbrevOffsets[m[1]];
+            }
+            strPos += m[1].length;
+            break;
+          }
+          case ":z": {
+            // +HH:MM
+            const m = str.slice(strPos).match(/^([+-])(\d{2}):(\d{2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            const sign = m[1] === "+" ? 1 : -1;
+            explicitOffsetSeconds = sign * (parseInt(m[2], 10) * 3600 + parseInt(m[3], 10) * 60);
+            strPos += m[0].length;
+            break;
+          }
+          case "::z": {
+            // +HH:MM:SS
+            const m = str.slice(strPos).match(/^([+-])(\d{2}):(\d{2}):(\d{2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            const sign = m[1] === "+" ? 1 : -1;
+            explicitOffsetSeconds =
+              sign * (parseInt(m[2], 10) * 3600 + parseInt(m[3], 10) * 60 + parseInt(m[4], 10));
+            strPos += m[0].length;
+            break;
+          }
+          case ":::z": {
+            // +HH (minimal)
+            const m = str.slice(strPos).match(/^([+-])(\d{2})/);
+            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
+            const sign = m[1] === "+" ? 1 : -1;
+            explicitOffsetSeconds = sign * parseInt(m[2], 10) * 3600;
+            strPos += m[0].length;
+            break;
+          }
+          default:
+            throw new Error(`ArgumentError: strptime: unsupported format directive %${spec}`);
+        }
+        pos += specLen;
+      } else {
+        // Literal character
+        if (str[strPos] !== format[pos]) {
+          throw new Error("ArgumentError: strptime: input does not match format");
+        }
+        strPos++;
+        pos++;
+      }
+    }
+
+    // Verify remaining input was consumed (allow trailing whitespace)
+    if (strPos < str.length && str.slice(strPos).trim().length > 0) {
+      throw new Error("ArgumentError: strptime: input does not match format");
+    }
+
+    if (epochMs !== null) {
+      return new TimeWithZone(new Date(epochMs), this);
+    }
+
+    if (explicitOffsetSeconds !== null) {
+      // The parsed time was in an explicit offset — convert to UTC then to this zone
+      const utcMs =
+        Date.UTC(year, month - 1, day, hour, minute, second, ms) - explicitOffsetSeconds * 1000;
+      return new TimeWithZone(new Date(utcMs), this);
+    }
+
+    // No explicit offset — interpret as local time in this zone
+    return this.local(year, month, day, hour, minute, second, ms);
+  }
+
+  /**
    * Create a TimeWithZone from a Unix timestamp.
    */
   at(secondsSinceEpoch: number): TimeWithZone {
