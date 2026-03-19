@@ -519,7 +519,9 @@ export class TimeWithZone {
       return new TimeWithZone(new Date(this._utc.getTime() + ms), this._timeZone);
     }
     if (typeof interval !== "number") {
-      throw new TypeError(`no implicit conversion of ${typeof interval} into number`);
+      const desc =
+        interval === null ? "null" : interval === undefined ? "undefined" : typeof interval;
+      throw new TypeError(`no implicit conversion of ${desc} into number`);
     }
     // Number of seconds
     return new TimeWithZone(new Date(this._utc.getTime() + interval * 1000), this._timeZone);

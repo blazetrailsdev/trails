@@ -10,6 +10,10 @@ import { TimeZone } from "./time-zone.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 
+// NOTE: Zone state is stored in module-level variables, mirroring Rails'
+// thread-local Time.zone. This is process-wide and NOT safe for concurrent
+// async request handling. For server contexts with overlapping requests,
+// consider using AsyncLocalStorage or passing the zone explicitly.
 let _zoneDefault: TimeZone | null = null;
 let _zone: TimeZone | null | undefined = undefined; // undefined = not set (falls through to default)
 
@@ -155,7 +159,7 @@ export function dateInTimeZone(date: Date, zone: string | TimeZone): TimeWithZon
   return tz.local(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
-class ArgumentError extends Error {
+export class ArgumentError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ArgumentError";
