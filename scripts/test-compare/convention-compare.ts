@@ -16,6 +16,10 @@
  * both IsDistinctFrom and IsNotDistinctFrom), matching is count-aware: the Nth
  * Ruby test with a given description consumes the Nth TS test with that description.
  *
+ * By default, detailed per-file tables, misplaced tests, and wrong-describe
+ * output are only shown for the focus packages (arel, activemodel, activerecord,
+ * activesupport, rack). Using --package overrides this and always shows detail.
+ *
  * Usage:
  *   npx tsx scripts/test-compare/convention-compare.ts [--missing] [--json] [--package activesupport]
  */
@@ -531,7 +535,7 @@ function main() {
     );
     console.log(`${"=".repeat(90)}\n`);
 
-    if (DETAIL_PACKAGES.has(pkg.package)) {
+    if (DETAIL_PACKAGES.has(pkg.package) || filterPkg) {
       // Show files with misplaced tests first as a moves summary
       const filesWithMisplaced = pkg.files.filter(
         (f) => f.misplacedTests && f.misplacedTests.length > 0,
