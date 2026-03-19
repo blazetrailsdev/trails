@@ -1335,6 +1335,12 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
    */
   async destroy(...records: Base[]): Promise<void> {
+    // For HABTM, also remove join table rows
+    if (this._isHabtm) {
+      await this._deleteHabtm(records);
+    } else if (this._isThrough) {
+      await this._deleteThrough(records);
+    }
     for (const record of records) {
       await record.destroy();
     }
@@ -1498,9 +1504,7 @@ export class CollectionProxy {
    */
   async destroyAll(): Promise<void> {
     const records = await this.toArray();
-    for (const record of records) {
-      await record.destroy();
-    }
+    await this.destroy(...records);
   }
 
   /**

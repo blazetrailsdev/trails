@@ -3284,7 +3284,8 @@ export class Relation<T extends Base> {
           if (sourceAssocKind === "belongsTo") {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
             const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
-            const targetPk = (targetModel as any).primaryKey ?? "id";
+            const targetPk =
+              sourceAssocDef?.options?.primaryKey ?? (targetModel as any).primaryKey ?? "id";
 
             const targetIds = [
               ...new Set(

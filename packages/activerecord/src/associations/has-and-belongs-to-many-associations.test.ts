@@ -1041,9 +1041,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await proxy.count()).toBe(3);
 
     await proxy.destroy(p1, p2);
-    // destroy removes the records themselves
     expect(p1.isDestroyed()).toBe(true);
     expect(p2.isDestroyed()).toBe(true);
+    // Join rows for destroyed projects should also be gone
+    const remaining = await proxy.toArray();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].readAttribute("name")).toBe("DMP3");
   });
 
   it("destroy associations destroys multiple associations", async () => {
@@ -1055,11 +1058,13 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await proxy.count()).toBe(2);
 
     await proxy.destroyAll();
-    // After destroyAll, the projects should be destroyed in the DB
     const allProjects = await Project.all().toArray();
     const names = allProjects.map((p: any) => p.readAttribute("name"));
     expect(names).not.toContain("DMAP1");
     expect(names).not.toContain("DMAP2");
+    // Join rows should also be gone
+    const joinRows = await DeveloperProject.all().where({ developer_id: dev.id }).toArray();
+    expect(joinRows).toHaveLength(0);
   });
 
   it("destroying", async () => {
