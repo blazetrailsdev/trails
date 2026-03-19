@@ -872,7 +872,7 @@ export abstract class Migration {
    */
   indexName(tableName: string, options: { column?: string | string[] }): string {
     const cols = Array.isArray(options.column) ? options.column : [options.column ?? ""];
-    return `index_${tableName}_on_${cols.join("_")}`;
+    return `index_${tableName}_on_${cols.join("_and_")}`;
   }
 
   /**
