@@ -512,6 +512,9 @@ export class TimeWithZone {
       const ms = interval.inSeconds() * 1000;
       return new TimeWithZone(new Date(this._utc.getTime() + ms), this._timeZone);
     }
+    if (typeof interval !== "number") {
+      throw new TypeError(`no implicit conversion of ${typeof interval} into TimeWithZone`);
+    }
     // Number of seconds
     return new TimeWithZone(new Date(this._utc.getTime() + interval * 1000), this._timeZone);
   }
@@ -542,6 +545,11 @@ export class TimeWithZone {
   /** Alias for minus with seconds */
   ago(seconds: number): TimeWithZone {
     return this.plus(-seconds);
+  }
+
+  /** Alias for since — matches Rails `in` method */
+  in(seconds: number): TimeWithZone {
+    return this.plus(seconds);
   }
 
   // ---------------------------------------------------------------------------
@@ -726,6 +734,99 @@ export class TimeWithZone {
   /** Alias for isTomorrow */
   isNextDay(): boolean {
     return this.isTomorrow();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Weekday query methods
+  // ---------------------------------------------------------------------------
+
+  isSunday(): boolean {
+    return this.wday === 0;
+  }
+
+  isMonday(): boolean {
+    return this.wday === 1;
+  }
+
+  isTuesday(): boolean {
+    return this.wday === 2;
+  }
+
+  isWednesday(): boolean {
+    return this.wday === 3;
+  }
+
+  isThursday(): boolean {
+    return this.wday === 4;
+  }
+
+  isFriday(): boolean {
+    return this.wday === 5;
+  }
+
+  isSaturday(): boolean {
+    return this.wday === 6;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Beginning / End of period methods
+  // ---------------------------------------------------------------------------
+
+  beginningOfYear(): TimeWithZone {
+    return this.change({ month: 1, day: 1, hour: 0, min: 0, sec: 0 });
+  }
+
+  beginningOfMonth(): TimeWithZone {
+    return this.change({ day: 1, hour: 0, min: 0, sec: 0 });
+  }
+
+  beginningOfDay(): TimeWithZone {
+    return this.change({ hour: 0, min: 0, sec: 0 });
+  }
+
+  beginningOfHour(): TimeWithZone {
+    return this.change({ min: 0, sec: 0 });
+  }
+
+  beginningOfMinute(): TimeWithZone {
+    return this.change({ sec: 0 });
+  }
+
+  endOfYear(): TimeWithZone {
+    return this.change({ month: 12, day: 31, hour: 23, min: 59, sec: 59, nsec: 999999999 });
+  }
+
+  endOfMonth(): TimeWithZone {
+    const l = this._local();
+    const lastDay = daysInMonth(l.year, l.month);
+    return this.change({ day: lastDay, hour: 23, min: 59, sec: 59, nsec: 999999999 });
+  }
+
+  endOfDay(): TimeWithZone {
+    return this.change({ hour: 23, min: 59, sec: 59, nsec: 999999999 });
+  }
+
+  endOfHour(): TimeWithZone {
+    return this.change({ min: 59, sec: 59, nsec: 999999999 });
+  }
+
+  endOfMinute(): TimeWithZone {
+    return this.change({ sec: 59, nsec: 999999999 });
+  }
+
+  /** Seconds elapsed since midnight in the local timezone */
+  secondsSinceMidnight(): number {
+    return this.hour * 3600 + this.min * 60 + this.sec;
+  }
+
+  /**
+   * Round to the nearest precision (default: 1 second).
+   */
+  round(precision = 0): TimeWithZone {
+    if (precision === 0) {
+      return this.change({ sec: this.sec });
+    }
+    return this;
   }
 
   // ---------------------------------------------------------------------------
