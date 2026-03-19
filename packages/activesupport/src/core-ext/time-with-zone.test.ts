@@ -1170,7 +1170,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   it("find zone with bang raises if time zone can not be found", () => {
     expect(() => findZoneBang("No such timezone exists")).toThrow(/Invalid time zone/);
     expect(() => findZoneBang(-54000)).toThrow(/Invalid time zone/);
-    expect(() => findZoneBang({})).toThrow(/invalid argument/);
+    expect(() => findZoneBang({})).toThrow(/Invalid time zone/);
   });
 
   it("find zone with bang doesnt raises with nil and false", () => {

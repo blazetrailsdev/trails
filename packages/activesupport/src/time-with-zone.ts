@@ -299,8 +299,8 @@ export class TimeWithZone {
   }
 
   /** Convert to a different timezone. No-argument form uses Time.zone. */
-  inTimeZone(zone?: string | TimeZone): TimeWithZone {
-    if (zone === undefined) {
+  inTimeZone(zone?: string | TimeZone | null): TimeWithZone {
+    if (zone == null) {
       const currentZone = getZone();
       if (!currentZone) return this;
       zone = currentZone;

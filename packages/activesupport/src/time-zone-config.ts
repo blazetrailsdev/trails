@@ -73,7 +73,7 @@ export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
   _zone = zone;
   try {
     const result = fn();
-    if (result instanceof Promise) {
+    if (result != null && typeof (result as any).then === "function") {
       throw new Error(
         "useZone does not support async callbacks; the zone would be restored before awaited work runs",
       );
@@ -117,7 +117,11 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === false) return false;
   if (zone instanceof TimeZone) return zone;
   if (typeof zone === "string") {
-    return TimeZone.find(zone);
+    try {
+      return TimeZone.find(zone);
+    } catch {
+      throw new ArgumentError(`Invalid time zone: ${zone}`);
+    }
   }
   if (typeof zone === "number") {
     try {
@@ -126,7 +130,7 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
       throw new ArgumentError(`Invalid time zone: ${zone}`);
     }
   }
-  throw new ArgumentError(`invalid argument to TimeZone[]`);
+  throw new ArgumentError(`Invalid time zone: invalid argument to TimeZone[]`);
 }
 
 /**
