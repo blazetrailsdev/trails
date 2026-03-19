@@ -75,7 +75,7 @@ export class SchemaDumper {
     }
     const optStr = options.length > 0 ? `{ ${options.join(", ")} }` : "{}";
 
-    lines.push(`  await ctx.createTable("${tableName}", ${optStr}, (t) => {`);
+    lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${optStr}, (t) => {`);
 
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
@@ -88,7 +88,7 @@ export class SchemaDumper {
       if (col.precision) opts.push(`precision: ${col.precision}`);
       if (col.scale !== undefined) opts.push(`scale: ${col.scale}`);
       const optionsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      lines.push(`    t.${col.type}("${col.name}"${optionsStr});`);
+      lines.push(`    t.${col.type}(${JSON.stringify(col.name)}${optionsStr});`);
     }
 
     lines.push("  });");
@@ -96,13 +96,13 @@ export class SchemaDumper {
     for (const idx of indexes) {
       const cols =
         idx.columns.length === 1
-          ? `"${idx.columns[0]}"`
-          : `[${idx.columns.map((c: string) => `"${c}"`).join(", ")}]`;
+          ? JSON.stringify(idx.columns[0])
+          : `[${idx.columns.map((c: string) => JSON.stringify(c)).join(", ")}]`;
       const idxOpts: string[] = [];
       if (idx.unique) idxOpts.push("unique: true");
-      if (idx.name) idxOpts.push(`name: "${idx.name}"`);
+      if (idx.name) idxOpts.push(`name: ${JSON.stringify(idx.name)}`);
       const idxOptStr = idxOpts.length > 0 ? `, { ${idxOpts.join(", ")} }` : "";
-      lines.push(`  await ctx.addIndex("${tableName}", ${cols}${idxOptStr});`);
+      lines.push(`  await ctx.addIndex(${JSON.stringify(tableName)}, ${cols}${idxOptStr});`);
     }
 
     lines.push("");

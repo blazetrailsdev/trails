@@ -1481,6 +1481,12 @@ export class MigrationContext {
       cols.delete(from);
       cols.add(to);
     }
+    const meta = this._columnMeta.get(table);
+    if (meta && meta.has(from)) {
+      const entry = meta.get(from)!;
+      meta.delete(from);
+      meta.set(to, entry);
+    }
   }
 
   async changeColumn(
@@ -1497,6 +1503,19 @@ export class MigrationContext {
       await this.adapter.executeMutation(
         `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`,
       );
+    }
+    const meta = this._columnMeta.get(table);
+    if (meta && meta.has(column)) {
+      const entry = meta.get(column)!;
+      meta.set(column, {
+        ...entry,
+        type,
+        null: _options?.null ?? entry.null,
+        default: _options?.default ?? entry.default,
+        limit: _options?.limit ?? entry.limit,
+        precision: _options?.precision ?? entry.precision,
+        scale: _options?.scale ?? entry.scale,
+      });
     }
   }
 
@@ -1553,6 +1572,11 @@ export class MigrationContext {
     if (cols) {
       this._columns.delete(fullFrom);
       this._columns.set(fullTo, cols);
+    }
+    const meta = this._columnMeta.get(fullFrom);
+    if (meta) {
+      this._columnMeta.delete(fullFrom);
+      this._columnMeta.set(fullTo, meta);
     }
     const indexes = this._indexes.get(fullFrom);
     if (indexes) {
