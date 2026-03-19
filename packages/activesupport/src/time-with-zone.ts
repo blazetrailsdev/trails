@@ -8,6 +8,7 @@
 import { TimeZone, getLocalComponents } from "./time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
+import { getZone } from "./time-zone-config.js";
 
 /**
  * Options for the change() method.
@@ -297,8 +298,13 @@ export class TimeWithZone {
     return this._utc.getTime() / 1000;
   }
 
-  /** Convert to a different timezone. Returns this if the zone is the same. */
-  inTimeZone(zone: string | TimeZone): TimeWithZone {
+  /** Convert to a different timezone. No-argument form uses Time.zone. */
+  inTimeZone(zone?: string | TimeZone): TimeWithZone {
+    if (zone === undefined) {
+      const currentZone = getZone();
+      if (!currentZone) return this;
+      zone = currentZone;
+    }
     const tz = typeof zone === "string" ? TimeZone.find(zone) : zone;
     if (tz.tzinfo === this._timeZone.tzinfo) return this;
     return new TimeWithZone(this._utc, tz);
