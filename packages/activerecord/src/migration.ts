@@ -369,14 +369,16 @@ export abstract class Migration {
    */
   async createTable(
     name: string,
-    optionsOrFn?: { id?: boolean } | ((t: TableDefinition) => void),
+    optionsOrFn?:
+      | { id?: boolean; force?: boolean; ifNotExists?: boolean }
+      | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "createTable", args: [name, optionsOrFn, fn] });
       return;
     }
-    let options: { id?: boolean } = {};
+    let options: { id?: boolean; force?: boolean; ifNotExists?: boolean } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 
     if (typeof optionsOrFn === "function") {
@@ -384,6 +386,24 @@ export abstract class Migration {
     } else if (optionsOrFn) {
       options = optionsOrFn;
       definer = fn;
+    }
+
+    if (name.length > 64) {
+      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+    }
+
+    if (options.force && options.ifNotExists) {
+      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
+    }
+
+    if (options.force) {
+      if (await this.tableExists(name)) {
+        await this.dropTable(name);
+      }
+    }
+
+    if (options.ifNotExists && (await this.tableExists(name))) {
+      return;
     }
 
     const td = new TableDefinition(name, { ...options, adapterName: this._adapterName });
@@ -396,8 +416,9 @@ export abstract class Migration {
       const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
       const unique = idx.unique ? "UNIQUE " : "";
       const cols = idx.columns.map((c) => `"${c}"`).join(", ");
+      const ifNotExists = options.ifNotExists ? "IF NOT EXISTS " : "";
       await this.adapter.executeMutation(
-        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${cols})`,
+        `CREATE ${unique}INDEX ${ifNotExists}"${indexName}" ON "${name}" (${cols})`,
       );
     }
   }
@@ -424,10 +445,13 @@ export abstract class Migration {
     tableName: string,
     columnName: string,
     type: ColumnType,
-    options: ColumnOptions = {},
+    options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addColumn", args: [tableName, columnName, type, options] });
+      return;
+    }
+    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
       return;
     }
     const sqlType = this._sqlType(type, options);
@@ -444,9 +468,16 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#remove_column
    */
-  async removeColumn(tableName: string, columnName: string): Promise<void> {
+  async removeColumn(
+    tableName: string,
+    columnName: string,
+    options: { ifExists?: boolean } = {},
+  ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName] });
+      return;
+    }
+    if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
     }
     await this.adapter.executeMutation(`ALTER TABLE "${tableName}" DROP COLUMN "${columnName}"`);
@@ -1266,11 +1297,20 @@ export class MigrationContext {
 
   async createTable(
     name: string,
-    options?: { primaryKey?: string | false; force?: boolean; id?: boolean },
+    options?: { primaryKey?: string | false; force?: boolean; ifNotExists?: boolean; id?: boolean },
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
+    if (name.length > 64) {
+      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+    }
+    if (options?.force && options?.ifNotExists) {
+      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
+    }
     if (options?.force) {
       await this.dropTable(name).catch(() => {});
+    }
+    if (options?.ifNotExists && this.tableExists(name)) {
+      return;
     }
     const td = new TableDefinition(name, { id: options?.id, adapterName: this._adapterName });
     if (fn) fn(td);
@@ -1281,6 +1321,18 @@ export class MigrationContext {
       cols.add(col.name);
     }
     this._columns.set(name, cols);
+
+    // Create indexes from table definition
+    for (const idx of td.indexes) {
+      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
+      const unique = idx.unique ? "UNIQUE " : "";
+      const colsList = idx.columns.map((c) => `"${c}"`).join(", ");
+      await this.adapter.executeMutation(
+        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${colsList})`,
+      );
+      if (!this._indexes.has(name)) this._indexes.set(name, []);
+      this._indexes.get(name)!.push(idx);
+    }
   }
 
   async dropTable(name: string): Promise<void> {
@@ -1341,11 +1393,26 @@ export class MigrationContext {
     this._columns.get(table)!.add(column);
   }
 
-  async removeColumn(table: string, ...columns: string[]): Promise<void> {
-    for (const column of columns) {
-      await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${column}"`);
-      this._columns.get(table)?.delete(column);
+  async removeColumn(
+    table: string,
+    columnOrColumns: string,
+    optionsOrColumn?: string | { ifExists?: boolean },
+    ...rest: string[]
+  ): Promise<void> {
+    // Support variadic: removeColumn("t", "a", "b", "c")
+    if (typeof optionsOrColumn === "string") {
+      const allCols = [columnOrColumns, optionsOrColumn, ...rest];
+      for (const col of allCols) {
+        await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
+        this._columns.get(table)?.delete(col);
+      }
+      return;
     }
+    if (optionsOrColumn?.ifExists && !this.columnExists(table, columnOrColumns)) {
+      return;
+    }
+    await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${columnOrColumns}"`);
+    this._columns.get(table)?.delete(columnOrColumns);
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
@@ -1467,5 +1534,28 @@ export class MigrationContext {
 
   indexExists(table: string, column: string): boolean {
     return this._indexes.get(table)?.some((i) => i.columns.includes(column)) ?? false;
+  }
+
+  tables(): string[] {
+    return Array.from(this._tables).sort();
+  }
+
+  columns(tableName: string): Array<{
+    name: string;
+    type: string;
+    primaryKey?: boolean;
+    null?: boolean;
+    default?: unknown;
+    limit?: number;
+    precision?: number;
+    scale?: number;
+  }> {
+    const cols = this._columns.get(tableName);
+    if (!cols) return [];
+    return Array.from(cols).map((name) => ({ name, type: "string" }));
+  }
+
+  indexes(tableName: string): Array<{ columns: string[]; unique: boolean; name?: string }> {
+    return this._indexes.get(tableName) ?? [];
   }
 }
