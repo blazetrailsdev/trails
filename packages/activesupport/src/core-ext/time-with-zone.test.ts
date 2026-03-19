@@ -46,7 +46,14 @@ describe("TimeWithZoneTest", () => {
     expect(twz.timeZone).toBe(eastern);
   });
 
-  it.skip("in time zone");
+  it("in time zone", () => {
+    useZone("Alaska", () => {
+      const twz = maketwz();
+      const result = twz.inTimeZone();
+      expect(result.timeZone.name).toBe("Alaska");
+      expect(result.utc().getTime()).toBe(twz.utc().getTime());
+    });
+  });
 
   it("in time zone with argument", () => {
     const twz = maketwz();
@@ -66,7 +73,12 @@ describe("TimeWithZoneTest", () => {
     expect(() => twz.inTimeZone("No such timezone exists")).toThrow();
   });
 
-  it.skip("in time zone with ambiguous time");
+  it("in time zone with ambiguous time", () => {
+    // 2014-10-26 01:00:00 Moscow time was ambiguous due to DST change
+    const moscow = TimeZone.find("Moscow");
+    const twz = moscow.local(2014, 10, 26, 1, 0, 0);
+    expect(twz.utc().getTime()).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+  });
 
   it("localtime", () => {
     const twz = maketwz();
@@ -203,7 +215,13 @@ describe("TimeWithZoneTest", () => {
     expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(-1);
   });
 
-  it.skip("compare with datetime");
+  it("compare with datetime", () => {
+    const twz = maketwz();
+    // DateTime in Rails is equivalent to Date in JS — compare by UTC instant
+    expect(twz.compareTo(new Date(Date.UTC(1999, 11, 31, 23, 59, 59)))).toBe(1);
+    expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)))).toBe(0);
+    expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(-1);
+  });
 
   it("compare with time with zone", () => {
     const twz = maketwz();
