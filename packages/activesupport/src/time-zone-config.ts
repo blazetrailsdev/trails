@@ -57,7 +57,7 @@ export function setZoneDefault(zone: TimeZone | null): void {
  */
 export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
   if (typeof zone === "string") {
-    zone = TimeZone.find(zone); // throws ArgumentError if invalid
+    zone = TimeZone.find(zone); // throws Error if invalid
   }
   const prev = _zone;
   _zone = zone;
@@ -96,9 +96,9 @@ export function findZone(zone: unknown): TimeZone | null {
  * Find a timezone, raising if not found.
  * Matches Rails' Time.find_zone!
  */
-export function findZoneBang(zone: unknown): TimeZone | null {
+export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === null || zone === undefined) return null;
-  if (zone === false) return false as unknown as null;
+  if (zone === false) return false;
   if (zone instanceof TimeZone) return zone;
   if (typeof zone === "string") {
     return TimeZone.find(zone); // throws on invalid

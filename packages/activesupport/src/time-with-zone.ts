@@ -519,7 +519,7 @@ export class TimeWithZone {
       return new TimeWithZone(new Date(this._utc.getTime() + ms), this._timeZone);
     }
     if (typeof interval !== "number") {
-      throw new TypeError(`no implicit conversion of ${typeof interval} into TimeWithZone`);
+      throw new TypeError(`no implicit conversion of ${typeof interval} into number`);
     }
     // Number of seconds
     return new TimeWithZone(new Date(this._utc.getTime() + interval * 1000), this._timeZone);
@@ -822,17 +822,18 @@ export class TimeWithZone {
 
   /** Seconds elapsed since midnight in the local timezone */
   secondsSinceMidnight(): number {
-    return this.hour * 3600 + this.min * 60 + this.sec;
+    const l = this._local();
+    return l.hour * 3600 + l.minute * 60 + l.second;
   }
 
   /**
-   * Round to the nearest precision (default: 1 second).
+   * Round to the nearest precision in seconds (default: 1 second).
    */
-  round(precision = 0): TimeWithZone {
-    if (precision === 0) {
-      return this.change({ sec: this.sec });
-    }
-    return this;
+  round(precision = 1): TimeWithZone {
+    const ms = this._utc.getTime();
+    const precisionMs = precision * 1000;
+    const rounded = Math.round(ms / precisionMs) * precisionMs;
+    return new TimeWithZone(new Date(rounded), this._timeZone);
   }
 
   // ---------------------------------------------------------------------------

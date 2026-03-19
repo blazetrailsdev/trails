@@ -1124,13 +1124,11 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     const oldDefault = getZoneDefault();
     try {
       setZoneDefault(TimeZone.find("Alaska"));
-      // With no explicit zone set, falls through to default
+      expect(getZone()!.name).toBe("Alaska");
+      setZone(TimeZone.find("Hawaii"));
+      expect(getZone()!.name).toBe("Hawaii");
       setZone(null);
-      // null means explicitly set to null, so returns null
-      // Actually in Rails: Time.zone = nil resets to zone_default
-      // Let me re-check the Rails behavior...
-      // Rails: Time.zone = nil -> Time.zone returns zone_default
-      // So we need _zone = undefined when set to nil
+      expect(getZone()!.name).toBe("Alaska");
     } finally {
       setZoneDefault(oldDefault);
     }
