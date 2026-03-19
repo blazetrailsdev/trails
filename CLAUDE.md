@@ -42,7 +42,7 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - Prefer small, focused modules over large files.
 - Do NOT use subagents unless explicitly requested. Do the work directly.
 - Do use worktrees for any changes. Leave the default worktree for the user.
-- All PRs should request Copilot's review.
+- Copilot automatically reviews every PR and every push, so no need to request review.
 - Do NOT add code comments that just describe what the line does. Only add
   comments when they provide additional value — a potential bug hidden, or
   explanation about the larger context.
@@ -62,17 +62,7 @@ It compares our test files and test names against the Rails test suite:
 npm run convention:compare
 ```
 
-Current status (9190/17172 implemented, 4504 skipped):
-
-| Package          | OK / Total | Files   | Misplaced |
-| ---------------- | ---------- | ------- | --------- |
-| arel             | 703/707    | 59/59   | 0         |
-| activemodel      | 958/963    | 56/56   | 0         |
-| activerecord     | 4374/8385  | 340/342 | 0         |
-| activesupport    | 1977/2862  | 157/157 | 0         |
-| rack             | 764/773    | 40/40   | 0         |
-| actiondispatch   | 407/1622   | 16/75   | 67        |
-| actioncontroller | 7/1860     | 8/91    | 229       |
+Run it to see current stats per package. Use `--package <name>` for a single package.
 
 "Misplaced" means tests that exist but are in the wrong file according to
 Rails conventions. These need to be moved, not rewritten.

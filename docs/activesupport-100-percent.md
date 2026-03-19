@@ -1,6 +1,6 @@
 # ActiveSupport: Road to 100% Test Coverage
 
-Current state: **94.6%** (2,708 matched / 2,862 total Ruby tests). 157/157 files matched, 0 misplaced, 0 wrong describes.
+Current state: **70.9%** (2,030 / 2,862 total Ruby tests). 678 skipped, 157/157 files matched, 0 misplaced.
 
 ## How coverage is measured
 
@@ -8,63 +8,78 @@ The compare script (`npm run convention:compare`) extracts test names from both 
 
 ## What's left
 
-### Missing files (7 files, 81 tests)
+### Biggest gaps (sorted by total missing + skipped)
 
-These files exist in Rails but have no TypeScript counterpart yet:
+| File                        | OK  | Skipped | Missing | Total |
+| --------------------------- | --- | ------- | ------- | ----- |
+| time-with-zone              | 95  | 8       | 76      | 179   |
+| hash-ext                    | 44  | 44      | 5       | 93    |
+| time-zone                   | 87  | 21      | 0       | 108   |
+| xml-mini                    | 12  | 31      | 4       | 47    |
+| mem-cache-store             | 0   | 35      | 0       | 35    |
+| numeric-ext                 | 14  | 0       | 19      | 33    |
+| redis-cache-store           | 0   | 27      | 1       | 28    |
+| share-lock                  | 0   | 25      | 0       | 25    |
+| inflector                   | 35  | 21      | 0       | 56    |
+| date-and-time-compatibility | 0   | 21      | 0       | 21    |
+| i18n                        | 0   | 21      | 0       | 21    |
+| time-ext                    | 99  | 9       | 11      | 119   |
+| xml-mini-engine             | 0   | 20      | 0       | 20    |
+| string-ext                  | 130 | 17      | 1       | 148   |
+| json/encoding               | 29  | 17      | 0       | 46    |
+| number-helper-i18n          | 0   | 16      | 0       | 16    |
+| encrypted-file              | 0   | 15      | 0       | 15    |
+| log-subscriber              | 0   | 15      | 0       | 15    |
+| message-encryptor           | 0   | 2       | 13      | 15    |
+| array/conversions           | 13  | 12      | 0       | 25    |
+| encrypted-configuration     | 0   | 12      | 0       | 12    |
+| date-ext                    | 44  | 9       | 3       | 56    |
+| tagged-logging              | 20  | 3       | 6       | 29    |
 
-| Ruby file                         | Tests | Notes                          |
-| --------------------------------- | ----- | ------------------------------ |
-| i18n_test.rb                      | 21    | i18n integration               |
-| core_ext/class/attribute_test.rb  | 19    | Class attribute extensions     |
-| log_subscriber_test.rb            | 15    | Log subscriber                 |
-| message_verifier_test.rb          | 10    | Message verifier (mostly done) |
-| core_ext/object/deep_dup_test.rb  | 10    | Deep dup                       |
-| security_utils_test.rb            | 4     | Security utilities             |
-| core_ext/object/json_gem_encoding | 2     | JSON gem encoding              |
+### Fully skipped files (0 passing tests)
 
-### Wrong describe (17 tests)
+These have test files but no passing tests yet:
 
-Tests that are in the correct file but under the wrong `describe` block name. These need their describe renamed to match the Ruby test class.
-
-### Skipped tests (~1,008)
-
-Tests that are `it.skip()` stubs matching Ruby test names. The biggest concentrations:
-
-| Area              | Skipped | Notes                              |
-| ----------------- | ------- | ---------------------------------- |
-| time_ext          | ~88     | DST handling, time zone edge cases |
-| time_with_zone    | ~52     | TimeWithZone calculations          |
-| date_ext          | ~47     | Date calculation edge cases        |
-| date_time_ext     | ~57     | DateTime extensions                |
-| hash_ext          | ~44     | Hash deep merge, to_xml edge cases |
-| share_lock        | ~25     | Thread concurrency (hard in JS)    |
-| xml_mini          | ~31     | XML parsing edge cases             |
-| mem_cache_store   | ~35     | Memcached store (needs adapter)    |
-| redis_cache_store | ~27     | Redis store (needs adapter)        |
-| inflector         | ~30     | Transliteration, locale-specific   |
-| safe_buffer       | ~22     | HTML-safe string edge cases        |
-| json/encoding     | ~17     | JSON encoding edge cases           |
+- **mem-cache-store** (35 skipped) — needs memcached adapter
+- **redis-cache-store** (27 skipped) — needs Redis adapter
+- **share-lock** (25 skipped) — thread concurrency, fundamentally hard in JS
+- **date-and-time-compatibility** (21 skipped)
+- **i18n** (21 skipped) — i18n integration
+- **xml-mini-engine** (20 skipped)
+- **number-helper-i18n** (16 skipped) — depends on i18n
+- **encrypted-file** (15 skipped) — encryption infrastructure
+- **log-subscriber** (15 skipped)
+- **encrypted-configuration** (12 skipped) — depends on encrypted-file
 
 ## Recommended next targets
 
-### Highest ROI
+### Highest ROI (big gap, mostly implementation work)
 
-1. **core_ext/class/attribute** (19 tests) — Missing file, class_attribute is foundational
-2. **i18n** (21 tests) — Missing file, i18n integration
-3. **core_ext/object/deep_dup** (10 tests) — Missing file, small and self-contained
-4. **message_verifier** (10 tests) — Mostly implemented, just needs the test file recreated
+1. **time-with-zone** (76 missing, 8 skipped) — largest single gap by far, lots of recent momentum
+2. **hash-ext** (44 skipped, 5 missing) — deep merge, to_xml edges, self-contained
+3. **numeric-ext** (19 missing) — number formatting/conversions, no skips to convert
+4. **inflector** (21 skipped) — transliteration, locale-specific rules
+5. **string-ext** (17 skipped, 1 missing) — already at 130/148, close to done
 
-### Converting skips to real tests
+### Medium effort
 
-5. **time_ext** (88 skipped) — Already 20 passing, DST/timezone edge cases
-6. **hash_ext** (44 skipped) — Already 49 passing, deep merge and to_xml
-7. **safe_buffer** (22 skipped) — Already 19 passing, HTML safety
-8. **json/encoding** (17 skipped) — Already 29 passing, JSON edge cases
+6. **time-zone** (21 skipped) — already at 87/108
+7. **json/encoding** (17 skipped) — already at 29/46
+8. **date-ext** (9 skipped, 3 missing) — already at 44/56
+9. **tagged-logging** (3 skipped, 6 missing) — already at 20/29
+10. **message-encryptor** (2 skipped, 13 missing) — crypto implementation
+
+### Hard / blocked
+
+- **mem-cache-store** (35) — needs external memcached adapter
+- **redis-cache-store** (27) — needs external Redis adapter
+- **share-lock** (25) — JS is single-threaded, concurrency primitives don't map well
+- **encrypted-file / encrypted-configuration** (27 combined) — encryption infrastructure
 
 ## Tracking progress
 
 ```bash
-npm run convention:compare --package activesupport
+npm run convention:compare -- --package activesupport
 ```
 
 Target: 2,862/2,862 tests matched, 0 skipped, 0 misplaced.
