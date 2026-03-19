@@ -662,10 +662,48 @@ export async function loadHasManyThrough(
     throw new Error(`Through association "${options.through}" not found on ${ctor.name}`);
   }
 
+  // Resolve the target model
+  const className = options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveModel(className);
+
+  // The source defaults to the singularized association name
+  const sourceName = options.source ?? singularize(assocName);
+
+  // Look up the source association on the through model early so we can
+  // push sourceType filtering into the through query
+  const throughClassName =
+    throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+  const throughModel = resolveModel(throughClassName);
+  const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
+  const sourceAssoc =
+    throughModelAssocs.find((a) => a.name === sourceName) ??
+    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+
   // Load through records
   let throughRecords: Base[];
   if (throughAssoc.type === "hasMany") {
-    throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+    // If sourceType is set, add the type filter to the through query
+    if (
+      options.sourceType &&
+      sourceAssoc?.options?.polymorphic &&
+      sourceAssocKind === "belongsTo"
+    ) {
+      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
+      const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
+      const originalScope = throughAssoc.options.scope;
+      const augmentedOptions = {
+        ...throughAssoc.options,
+        scope: (rel: any) => {
+          let r = rel.where({ [sourceTypeCol]: options.sourceType });
+          if (originalScope) r = originalScope(r);
+          return r;
+        },
+      };
+      throughRecords = await loadHasMany(record, throughAssoc.name, augmentedOptions);
+    } else {
+      throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+    }
   } else if (throughAssoc.type === "hasOne") {
     const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
     throughRecords = one ? [one] : [];
@@ -678,36 +716,11 @@ export async function loadHasManyThrough(
 
   if (throughRecords.length === 0) return [];
 
-  // Resolve the target model
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
-
-  // The source defaults to the singularized association name
-  const sourceName = options.source ?? singularize(assocName);
-
-  // Look up the source association on the through model (try singular and plural)
-  const throughCtor = throughRecords[0].constructor as typeof Base;
-  const throughModelAssocs: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
-  const sourceAssoc =
-    throughModelAssocs.find((a) => a.name === sourceName) ??
-    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
-  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
-
   if (sourceAssocKind === "belongsTo") {
     // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
     const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
 
-    // If sourceType is set, filter through records by the polymorphic type column
-    let filteredThrough = throughRecords;
-    if (options.sourceType && sourceAssoc?.options?.polymorphic) {
-      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
-      const typeCol = `${underscore(resolvedSourceName)}_type`;
-      filteredThrough = throughRecords.filter(
-        (r) => r.readAttribute(typeCol) === options.sourceType,
-      );
-    }
-
-    const targetIds = filteredThrough
+    const targetIds = throughRecords
       .map((r) => r.readAttribute(targetFk as string))
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
