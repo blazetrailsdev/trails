@@ -19,6 +19,7 @@ export interface AssociationOptions {
   inverseOf?: string;
   through?: string;
   source?: string;
+  sourceType?: string;
   polymorphic?: boolean;
   as?: string;
   counterCache?: boolean | string;
@@ -661,10 +662,48 @@ export async function loadHasManyThrough(
     throw new Error(`Through association "${options.through}" not found on ${ctor.name}`);
   }
 
+  // Resolve the target model
+  const className = options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveModel(className);
+
+  // The source defaults to the singularized association name
+  const sourceName = options.source ?? singularize(assocName);
+
+  // Look up the source association on the through model early so we can
+  // push sourceType filtering into the through query
+  const throughClassName =
+    throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+  const throughModel = resolveModel(throughClassName);
+  const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
+  const sourceAssoc =
+    throughModelAssocs.find((a) => a.name === sourceName) ??
+    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+
   // Load through records
   let throughRecords: Base[];
   if (throughAssoc.type === "hasMany") {
-    throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+    // If sourceType is set, add the type filter to the through query
+    if (
+      options.sourceType &&
+      sourceAssoc?.options?.polymorphic &&
+      sourceAssocKind === "belongsTo"
+    ) {
+      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
+      const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
+      const originalScope = throughAssoc.options.scope;
+      const augmentedOptions = {
+        ...throughAssoc.options,
+        scope: (rel: any) => {
+          let r = rel.where({ [sourceTypeCol]: options.sourceType });
+          if (originalScope) r = originalScope(r);
+          return r;
+        },
+      };
+      throughRecords = await loadHasMany(record, throughAssoc.name, augmentedOptions);
+    } else {
+      throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
+    }
   } else if (throughAssoc.type === "hasOne") {
     const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
     throughRecords = one ? [one] : [];
@@ -677,24 +716,10 @@ export async function loadHasManyThrough(
 
   if (throughRecords.length === 0) return [];
 
-  // Resolve the target model
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
-
-  // The source defaults to the singularized association name
-  const sourceName = options.source ?? singularize(assocName);
-
-  // Look up the source association on the through model (try singular and plural)
-  const throughCtor = throughRecords[0].constructor as typeof Base;
-  const throughModelAssocs: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
-  const sourceAssoc =
-    throughModelAssocs.find((a) => a.name === sourceName) ??
-    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
-  const sourceType = sourceAssoc?.type ?? "belongsTo";
-
-  if (sourceType === "belongsTo") {
+  if (sourceAssocKind === "belongsTo") {
     // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
     const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+
     const targetIds = throughRecords
       .map((r) => r.readAttribute(targetFk as string))
       .filter((v) => v !== null && v !== undefined);
@@ -1324,8 +1349,18 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
    */
   async destroy(...records: Base[]): Promise<void> {
+    const destroyed: Base[] = [];
     for (const record of records) {
       await record.destroy();
+      if (record.isDestroyed()) destroyed.push(record);
+    }
+    // Remove join/through rows only for successfully destroyed records
+    if (destroyed.length > 0) {
+      if (this._isHabtm) {
+        await this._deleteHabtm(destroyed);
+      } else if (this._isThrough) {
+        await this._deleteThrough(destroyed);
+      }
     }
   }
 
@@ -1487,9 +1522,7 @@ export class CollectionProxy {
    */
   async destroyAll(): Promise<void> {
     const records = await this.toArray();
-    for (const record of records) {
-      await record.destroy();
-    }
+    await this.destroy(...records);
   }
 
   /**

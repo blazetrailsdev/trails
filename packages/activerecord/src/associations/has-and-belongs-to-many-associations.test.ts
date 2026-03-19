@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { loadHasMany, loadHabtm } from "../associations.js";
+import { loadHasMany, loadHabtm, association } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -47,6 +47,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     registerModel(Developer);
     registerModel(Project);
     registerModel(DeveloperProject);
+    // Reset associations to avoid accumulation across tests
+    (Developer as any)._associations = [
+      {
+        type: "hasAndBelongsToMany",
+        name: "projects",
+        options: { className: "Project", joinTable: "developer_projects" },
+      },
+    ];
   });
 
   it.skip("marshal dump", () => {
@@ -995,11 +1003,78 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(join.readAttribute("project_id")).toBe(proj.id);
   });
 
-  it.skip("habtm adding before save", () => {});
-  it.skip("deleting all", () => {});
-  it.skip("destroying many", () => {});
-  it.skip("destroy associations destroys multiple associations", () => {});
-  it.skip("destroying", () => {
-    /* TODO: needs helpers from original file */
+  it("habtm adding before save", async () => {
+    const dev = await Developer.create({ name: "BeforeSave", salary: 50000 });
+    const proj = new Project({ name: "BSProj" });
+    expect(proj.isNewRecord()).toBe(true);
+    const proxy = association(dev, "projects");
+    await proxy.push(proj);
+    // push should save the unsaved target record
+    expect(proj.isNewRecord()).toBe(false);
+    const projects = await proxy.toArray();
+    expect(projects).toHaveLength(1);
+    expect(projects[0].readAttribute("name")).toBe("BSProj");
+  });
+
+  it("deleting all", async () => {
+    const dev = await Developer.create({ name: "DelAllDev", salary: 60000 });
+    const p1 = await Project.create({ name: "DAP1" });
+    const p2 = await Project.create({ name: "DAP2" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p1, p2);
+    expect(await proxy.count()).toBe(2);
+
+    await proxy.clear();
+    expect(await proxy.count()).toBe(0);
+    // Projects still exist, just the join records are gone
+    const p1Reloaded = await Project.find(p1.id!);
+    expect(p1Reloaded).toBeDefined();
+  });
+
+  it("destroying many", async () => {
+    const dev = await Developer.create({ name: "DestroyManyDev", salary: 60000 });
+    const p1 = await Project.create({ name: "DMP1" });
+    const p2 = await Project.create({ name: "DMP2" });
+    const p3 = await Project.create({ name: "DMP3" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p1, p2, p3);
+    expect(await proxy.count()).toBe(3);
+
+    await proxy.destroy(p1, p2);
+    expect(p1.isDestroyed()).toBe(true);
+    expect(p2.isDestroyed()).toBe(true);
+    // Join rows for destroyed projects should also be gone
+    const remaining = await proxy.toArray();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].readAttribute("name")).toBe("DMP3");
+  });
+
+  it("destroy associations destroys multiple associations", async () => {
+    const dev = await Developer.create({ name: "DmaDev", salary: 60000 });
+    const p1 = await Project.create({ name: "DMAP1" });
+    const p2 = await Project.create({ name: "DMAP2" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p1, p2);
+    expect(await proxy.count()).toBe(2);
+
+    await proxy.destroyAll();
+    const allProjects = await Project.all().toArray();
+    const names = allProjects.map((p: any) => p.readAttribute("name"));
+    expect(names).not.toContain("DMAP1");
+    expect(names).not.toContain("DMAP2");
+    // Join rows should also be gone
+    const joinRows = await DeveloperProject.all().where({ developer_id: dev.id }).toArray();
+    expect(joinRows).toHaveLength(0);
+  });
+
+  it("destroying", async () => {
+    const dev = await Developer.create({ name: "DestroyDev", salary: 60000 });
+    const proj = await Project.create({ name: "DestroyProj" });
+    const proxy = association(dev, "projects");
+    await proxy.push(proj);
+    expect(await proxy.count()).toBe(1);
+
+    await proxy.destroy(proj);
+    expect(proj.isDestroyed()).toBe(true);
   });
 });

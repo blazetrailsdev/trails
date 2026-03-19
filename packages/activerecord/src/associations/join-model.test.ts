@@ -961,16 +961,160 @@ describe("AssociationsJoinModelTest", () => {
     expect(taggings.length).toBe(1);
   });
 
-  it.skip("has many polymorphic with source type", () => {
-    // Requires source_type option
+  it("has many polymorphic with source type", async () => {
+    // Tag has_many :tagged_posts, through: :taggings, source: :taggable, source_type: "Post"
+    class StTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StTagging extends Base {
+      static {
+        this.attribute("st_tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    (StTag as any)._associations = [
+      {
+        type: "hasMany",
+        name: "stTaggings",
+        options: { className: "StTagging", foreignKey: "st_tag_id" },
+      },
+      {
+        type: "hasMany",
+        name: "taggedPosts",
+        options: {
+          through: "stTaggings",
+          source: "taggable",
+          sourceType: "StPost",
+          className: "StPost",
+        },
+      },
+    ];
+    (StTagging as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "taggable",
+        options: { polymorphic: true, foreignKey: "taggable_id" },
+      },
+    ];
+    registerModel("StTag", StTag);
+    registerModel("StTagging", StTagging);
+    registerModel("StPost", StPost);
+    registerModel("StComment", StComment);
+
+    const tag = await StTag.create({ name: "ruby" });
+    const post = await StPost.create({ title: "Tagged Post" });
+    const comment = await StComment.create({ body: "Tagged Comment" });
+    await StTagging.create({ st_tag_id: tag.id, taggable_id: post.id, taggable_type: "StPost" });
+    await StTagging.create({
+      st_tag_id: tag.id,
+      taggable_id: comment.id,
+      taggable_type: "StComment",
+    });
+
+    const taggedPosts = await loadHasManyThrough(tag, "taggedPosts", {
+      through: "stTaggings",
+      source: "taggable",
+      sourceType: "StPost",
+      className: "StPost",
+    });
+    // Should only return the Post, not the Comment
+    expect(taggedPosts).toHaveLength(1);
+    expect(taggedPosts[0].readAttribute("title")).toBe("Tagged Post");
   });
 
   it.skip("has many polymorphic associations merges through scope", () => {
     // Requires scope merging
   });
 
-  it.skip("eager has many polymorphic with source type", () => {
-    // Requires eager load with source_type
+  it("eager has many polymorphic with source type", async () => {
+    class EstTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EstTagging extends Base {
+      static {
+        this.attribute("est_tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EstPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EstComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    (EstTag as any)._associations = [
+      {
+        type: "hasMany",
+        name: "estTaggings",
+        options: { className: "EstTagging", foreignKey: "est_tag_id" },
+      },
+      {
+        type: "hasMany",
+        name: "taggedPosts",
+        options: {
+          through: "estTaggings",
+          source: "taggable",
+          sourceType: "EstPost",
+          className: "EstPost",
+        },
+      },
+    ];
+    (EstTagging as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "taggable",
+        options: { polymorphic: true, foreignKey: "taggable_id" },
+      },
+    ];
+    registerModel("EstTag", EstTag);
+    registerModel("EstTagging", EstTagging);
+    registerModel("EstPost", EstPost);
+    registerModel("EstComment", EstComment);
+
+    const tag = await EstTag.create({ name: "ruby" });
+    const post = await EstPost.create({ title: "Eager Post" });
+    const comment = await EstComment.create({ body: "Eager Comment" });
+    await EstTagging.create({ est_tag_id: tag.id, taggable_id: post.id, taggable_type: "EstPost" });
+    await EstTagging.create({
+      est_tag_id: tag.id,
+      taggable_id: comment.id,
+      taggable_type: "EstComment",
+    });
+
+    // Preload with source_type filtering
+    const tags = await EstTag.all().includes("taggedPosts").toArray();
+    expect(tags).toHaveLength(1);
+    const taggedPosts = (tags[0] as any)._preloadedAssociations.get("taggedPosts");
+    expect(taggedPosts).toHaveLength(1);
+    expect(taggedPosts[0].readAttribute("title")).toBe("Eager Post");
   });
 
   it("has many through has many find all", async () => {

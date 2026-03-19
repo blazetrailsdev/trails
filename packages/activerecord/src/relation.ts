@@ -3246,32 +3246,48 @@ export class Relation<T extends Base> {
           ];
           if (pkValues.length === 0) continue;
 
-          const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
-          if (throughAsName)
-            throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
-          const throughRecords = await (throughModel as any)
-            .all()
-            .where(throughWhereConditions)
-            .toArray();
-
           const sourceName = assocDef.options.source ?? singularize(assocName);
-          const targetModel = _mr.get(className);
-          if (!targetModel) continue;
 
           // Look up the source association on the through model (try singular and plural)
           const throughModelAssociations: any[] = (throughModel as any)._associations ?? [];
           const sourceAssocDef =
             throughModelAssociations.find((a: any) => a.name === sourceName) ??
             throughModelAssociations.find((a: any) => a.name === pluralize(sourceName));
-          const sourceType = sourceAssocDef?.type ?? "belongsTo";
+          const sourceAssocKind = sourceAssocDef?.type ?? "belongsTo";
+
+          const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
+          if (throughAsName)
+            throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
+
+          // Push sourceType filter into the DB query instead of filtering in-memory
+          if (
+            assocDef.options.sourceType &&
+            sourceAssocDef?.options?.polymorphic &&
+            sourceAssocKind === "belongsTo"
+          ) {
+            const resolvedSourceName = sourceAssocDef?.name ?? sourceName;
+            const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
+            throughWhereConditions[sourceTypeCol] = assocDef.options.sourceType;
+          }
+
+          const throughRecords = await (throughModel as any)
+            .all()
+            .where(throughWhereConditions)
+            .toArray();
+
+          const targetModel = _mr.get(className);
+          if (!targetModel) continue;
 
           let targetRecords: any[];
           let targetMap: Map<unknown, any>;
           let getTargetsForThrough: (throughRec: any) => any[];
 
-          if (sourceType === "belongsTo") {
+          if (sourceAssocKind === "belongsTo") {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
-            const targetFk = `${underscore(sourceName)}_id`;
+            const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+            const targetPk =
+              sourceAssocDef?.options?.primaryKey ?? (targetModel as any).primaryKey ?? "id";
+
             const targetIds = [
               ...new Set(
                 throughRecords
@@ -3279,11 +3295,11 @@ export class Relation<T extends Base> {
                   .filter((v: any) => v != null),
               ),
             ];
-            let targetRel = (targetModel as any).all().where({ id: targetIds });
+            let targetRel = (targetModel as any).all().where({ [targetPk]: targetIds });
             if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
             targetRecords = targetIds.length > 0 ? await targetRel.toArray() : [];
             targetMap = new Map<unknown, any>();
-            for (const r of targetRecords) targetMap.set(r.readAttribute("id"), r);
+            for (const r of targetRecords) targetMap.set(r.readAttribute(targetPk), r);
             getTargetsForThrough = (tr: any) => {
               const target = targetMap.get(tr.readAttribute(targetFk));
               return target ? [target] : [];
