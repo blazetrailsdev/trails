@@ -68,13 +68,19 @@ describe("QueryLogsTest", () => {
   });
 
   it("retrieves comment from cache when enabled and set", () => {
-    logs.tags = [{ app: "MyApp" }];
+    let callCount = 0;
+    logs.tags = [
+      {
+        app: () => {
+          callCount++;
+          return "MyApp";
+        },
+      },
+    ];
     logs.cacheQueryLogTags = true;
-    const sql1 = logs.call("SELECT 1");
-    const sql2 = logs.call("SELECT 2");
-    const comment1 = sql1.match(/\/\*.*\*\//)?.[0];
-    const comment2 = sql2.match(/\/\*.*\*\//)?.[0];
-    expect(comment1).toBe(comment2);
+    logs.call("SELECT 1");
+    logs.call("SELECT 2");
+    expect(callCount).toBe(1);
   });
 
   it("resets cache on context update", () => {

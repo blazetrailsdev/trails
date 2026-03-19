@@ -231,11 +231,10 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return this.inner.rollbackToSavepoint(name);
   }
 
-  get explain(): ((sql: string) => Promise<string>) | undefined {
-    const inner = this.inner as any;
-    if (typeof inner.explain === "function") {
-      return (sql: string) => inner.explain(sql);
+  async explain(sql: string): Promise<string> {
+    if (typeof (this.inner as any).explain === "function") {
+      return (this.inner as any).explain(sql);
     }
-    return undefined;
+    return "EXPLAIN is not supported by the underlying adapter";
   }
 }
