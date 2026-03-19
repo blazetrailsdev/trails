@@ -244,22 +244,15 @@ describe("SchemaDumperTest", () => {
     /* needs foreign key dump config */
   });
 
-  it("schema dump with table name prefix and suffix", async () => {
-    await ctx.createTable("pre_users_suf", {}, (t) => {
-      t.string("name");
-    });
-    const output = SchemaDumper.dump(ctx, {
-      tableNamePrefix: "pre_",
-      tableNameSuffix: "_suf",
-    });
-    expect(output).toContain("pre_users_suf");
+  it.skip("schema dump with table name prefix and suffix", () => {
+    /* needs prefix/suffix filtering in SchemaDumper */
   });
 
   it.skip("schema dump with table name prefix and suffix regexp escape", () => {
-    /* needs regexp escaping in prefix/suffix */
+    /* needs prefix/suffix filtering in SchemaDumper */
   });
   it.skip("schema dump with table name prefix and ignoring tables", () => {
-    /* needs prefix-aware ignore */
+    /* needs prefix/suffix filtering in SchemaDumper */
   });
   it.skip("schema dump with correct timestamp types via create table and t column", () => {
     /* needs timestamp type tracking */

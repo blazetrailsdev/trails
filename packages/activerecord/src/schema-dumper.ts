@@ -7,24 +7,17 @@
 
 import type { MigrationContext } from "./migration.js";
 
-export interface SchemaDumperOptions {
-  tableNamePrefix?: string;
-  tableNameSuffix?: string;
-}
-
 export class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
 
   private _ctx: MigrationContext;
-  private _options: SchemaDumperOptions;
 
-  constructor(ctx: MigrationContext, options: SchemaDumperOptions = {}) {
+  constructor(ctx: MigrationContext) {
     this._ctx = ctx;
-    this._options = options;
   }
 
-  static dump(ctx: MigrationContext, options: SchemaDumperOptions = {}): string {
-    return new SchemaDumper(ctx, options).dump();
+  static dump(ctx: MigrationContext): string {
+    return new SchemaDumper(ctx).dump();
   }
 
   dump(): string {
@@ -39,7 +32,7 @@ export class SchemaDumper {
     lines.push("// This file is auto-generated from the current state of the database.");
     lines.push("// Instead of editing this file, please use the migrations feature.");
     lines.push("");
-    lines.push("export default function defineSchema(ctx: any) {");
+    lines.push("export default async function defineSchema(ctx: any) {");
   }
 
   private trailer(lines: string[]): void {
@@ -48,20 +41,9 @@ export class SchemaDumper {
 
   private tables(lines: string[]): void {
     const tableNames = this._ctx.tables();
-    const prefix = this._options.tableNamePrefix ?? "";
-    const suffix = this._options.tableNameSuffix ?? "";
 
     for (const tableName of tableNames.sort()) {
       if (this.shouldIgnore(tableName)) continue;
-
-      let displayName = tableName;
-      if (prefix && displayName.startsWith(prefix)) {
-        displayName = displayName.slice(prefix.length);
-      }
-      if (suffix && displayName.endsWith(suffix)) {
-        displayName = displayName.slice(0, -suffix.length);
-      }
-
       this.table(lines, tableName);
     }
   }
@@ -73,8 +55,9 @@ export class SchemaDumper {
     for (const pattern of SchemaDumper.ignoreTables) {
       if (typeof pattern === "string") {
         if (tableName === pattern) return true;
-      } else if (pattern instanceof RegExp && ((pattern.lastIndex = 0), pattern.test(tableName))) {
-        return true;
+      } else if (pattern instanceof RegExp) {
+        pattern.lastIndex = 0;
+        if (pattern.test(tableName)) return true;
       }
     }
     return false;
@@ -92,7 +75,7 @@ export class SchemaDumper {
     }
     const optStr = options.length > 0 ? `, { ${options.join(", ")} }` : "";
 
-    lines.push(`  ctx.createTable("${tableName}"${optStr}, (t) => {`);
+    lines.push(`  await ctx.createTable("${tableName}"${optStr}, (t) => {`);
 
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
@@ -119,7 +102,7 @@ export class SchemaDumper {
       if (idx.unique) idxOpts.push("unique: true");
       if (idx.name) idxOpts.push(`name: "${idx.name}"`);
       const idxOptStr = idxOpts.length > 0 ? `, { ${idxOpts.join(", ")} }` : "";
-      lines.push(`  ctx.addIndex("${tableName}", ${cols}${idxOptStr});`);
+      lines.push(`  await ctx.addIndex("${tableName}", ${cols}${idxOptStr});`);
     }
 
     lines.push("");

@@ -1455,6 +1455,9 @@ export class MigrationContext {
   ): Promise<void> {
     // Support variadic: removeColumn("t", "a", "b", "c")
     if (typeof optionsOrColumn === "string") {
+      if (rest.length > 0 && typeof rest[rest.length - 1] === "object") {
+        throw new Error("Cannot mix variadic column names with options object in removeColumn");
+      }
       const allCols = [columnOrColumns, optionsOrColumn, ...rest];
       for (const col of allCols) {
         await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
