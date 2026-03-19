@@ -512,7 +512,7 @@ export abstract class Migration {
       return;
     }
     const cols = Array.isArray(columns) ? columns : [columns];
-    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_")}`;
+    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_and_")}`;
     const unique = options.unique ? "UNIQUE " : "";
 
     await this.adapter.executeMutation(
@@ -538,7 +538,7 @@ export abstract class Migration {
       indexName = options.name;
     } else if (options.column) {
       const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${tableName}_on_${cols.join("_")}`;
+      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
     } else {
       throw new Error("Must specify either name or column for remove_index");
     }
@@ -1643,6 +1643,8 @@ export class MigrationContext {
   }
 
   indexes(tableName: string): Array<{ columns: string[]; unique: boolean; name?: string }> {
-    return this._indexes.get(tableName) ?? [];
+    const idxs = this._indexes.get(tableName);
+    if (!idxs) return [];
+    return idxs.map((i) => ({ ...i, columns: [...i.columns] }));
   }
 }
