@@ -57,8 +57,11 @@ export class QueryCacheStore {
     }
 
     return compute().then((result) => {
-      if (this._maxSize > 0 && this._map.size >= this._maxSize) {
-        // Evict oldest entry
+      if (this._maxSize <= 0) {
+        // maxSize of 0 or negative disables caching — return without storing
+        return result;
+      }
+      if (this._map.size >= this._maxSize) {
         const firstKey = this._map.keys().next().value;
         if (firstKey !== undefined) this._map.delete(firstKey);
       }
@@ -170,8 +173,11 @@ export class QueryCacheAdapter implements DatabaseAdapter {
 
     const trimmed = sql.trimStart().toUpperCase();
 
-    // Only cache SELECT and WITH (CTE) queries
-    if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
+    // Only cache SELECT and read-only WITH (CTE) queries.
+    // WITH can prefix write CTEs (WITH ... INSERT/UPDATE/DELETE), so check for those.
+    const isSelect = trimmed.startsWith("SELECT");
+    const isReadOnlyCte = trimmed.startsWith("WITH") && !/\b(INSERT|UPDATE|DELETE)\b/.test(trimmed);
+    if (!isSelect && !isReadOnlyCte) {
       this.cache.clear();
       return this.inner.execute(sql, binds);
     }
@@ -223,5 +229,12 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   async rollbackToSavepoint(name: string): Promise<void> {
     this.cache.clear();
     return this.inner.rollbackToSavepoint(name);
+  }
+
+  async explain(sql: string): Promise<string> {
+    if (typeof (this.inner as any).explain === "function") {
+      return (this.inner as any).explain(sql);
+    }
+    throw new Error("explain is not supported by the underlying adapter");
   }
 }
