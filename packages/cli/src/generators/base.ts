@@ -1,5 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  underscore as _underscore,
+  camelize as _camelize,
+  tableize as _tableize,
+  dasherize as _dasherize,
+} from "@rails-ts/activesupport";
 
 export interface GeneratorOptions {
   cwd: string;
@@ -73,33 +79,15 @@ export function migrationTimestamp(): string {
   return `${y}${m}${d}${h}${min}${sec}`;
 }
 
+export const tableize = _tableize;
+export const underscore = _underscore;
+
 export function classify(name: string): string {
-  return name
-    .replace(/[-_](.)/g, (_, c) => c.toUpperCase())
-    .replace(/^(.)/, (_, c) => c.toUpperCase());
-}
-
-export function tableize(name: string): string {
-  // Simple pluralization: add "s", handle common cases
-  const snake = name
-    .replace(/([A-Z])/g, "_$1")
-    .toLowerCase()
-    .replace(/^_/, "");
-  if (snake.endsWith("y")) return snake.slice(0, -1) + "ies";
-  if (snake.endsWith("s") || snake.endsWith("x") || snake.endsWith("sh") || snake.endsWith("ch"))
-    return snake + "es";
-  return snake + "s";
-}
-
-export function underscore(name: string): string {
-  return name
-    .replace(/([A-Z])/g, "_$1")
-    .toLowerCase()
-    .replace(/^_/, "");
+  return _camelize(name.replace(/-/g, "_"));
 }
 
 export function dasherize(name: string): string {
-  return underscore(name).replace(/_/g, "-");
+  return _dasherize(_underscore(name));
 }
 
 export type ColumnType =

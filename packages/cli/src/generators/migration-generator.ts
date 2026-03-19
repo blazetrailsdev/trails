@@ -4,6 +4,7 @@ import {
   migrationTimestamp,
   classify,
   underscore,
+  dasherize,
   parseColumns,
   ColumnType,
 } from "./base.js";
@@ -87,12 +88,4 @@ ${body.down}
       down: "    // TODO: implement rollback",
     };
   }
-}
-
-function dasherize(name: string): string {
-  return name
-    .replace(/([A-Z])/g, "-$1")
-    .toLowerCase()
-    .replace(/^-/, "")
-    .replace(/_/g, "-");
 }

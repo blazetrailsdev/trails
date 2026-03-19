@@ -40,7 +40,8 @@ export class ScaffoldGenerator extends GeneratorBase {
       this.controllerTestSource(controllerClassName, controllerFileName),
     );
 
-    // EJS view templates
+    // EJS view templates — use resourceName (underscored plural) to match
+    // ActionController's template lookup (controller class name lowercased)
     this.createFile(
       `src/app/views/${resourceName}/index.html.ejs`,
       this.indexView(resourceName, singular, columns),
