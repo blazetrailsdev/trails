@@ -700,7 +700,8 @@ export async function loadHasManyThrough(
     // If sourceType is set, filter through records by the polymorphic type column
     let filteredThrough = throughRecords;
     if (options.sourceType && sourceAssoc?.options?.polymorphic) {
-      const typeCol = `${underscore(sourceName)}_type`;
+      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
+      const typeCol = `${underscore(resolvedSourceName)}_type`;
       filteredThrough = throughRecords.filter(
         (r) => r.readAttribute(typeCol) === options.sourceType,
       );
@@ -1335,14 +1336,18 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
    */
   async destroy(...records: Base[]): Promise<void> {
-    // For HABTM, also remove join table rows
-    if (this._isHabtm) {
-      await this._deleteHabtm(records);
-    } else if (this._isThrough) {
-      await this._deleteThrough(records);
-    }
+    const destroyed: Base[] = [];
     for (const record of records) {
       await record.destroy();
+      if (record.isDestroyed()) destroyed.push(record);
+    }
+    // Remove join/through rows only for successfully destroyed records
+    if (destroyed.length > 0) {
+      if (this._isHabtm) {
+        await this._deleteHabtm(destroyed);
+      } else if (this._isThrough) {
+        await this._deleteThrough(destroyed);
+      }
     }
   }
 

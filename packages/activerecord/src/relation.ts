@@ -3265,7 +3265,8 @@ export class Relation<T extends Base> {
             sourceAssocDef?.options?.polymorphic &&
             sourceAssocKind === "belongsTo"
           ) {
-            const sourceTypeCol = `${underscore(sourceName)}_type`;
+            const resolvedSourceName = sourceAssocDef?.name ?? sourceName;
+            const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
             throughWhereConditions[sourceTypeCol] = assocDef.options.sourceType;
           }
 
