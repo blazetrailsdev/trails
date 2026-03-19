@@ -145,6 +145,15 @@ describe("SchemaDumperTest", () => {
     /* needs unique constraint support */
   });
 
+  it("schema dump does not emit id false for normal tables", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).not.toContain("id: false");
+    expect(output).not.toContain('t.integer("id"');
+  });
+
   it("schema dump should honor nonstandard primary keys", async () => {
     await ctx.createTable("custom_pk", { id: false }, (t) => {
       t.string("code");

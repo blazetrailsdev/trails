@@ -73,7 +73,7 @@ export class SchemaDumper {
     for (const pattern of SchemaDumper.ignoreTables) {
       if (typeof pattern === "string") {
         if (tableName === pattern) return true;
-      } else if (pattern.test(tableName)) {
+      } else if (pattern instanceof RegExp && ((pattern.lastIndex = 0), pattern.test(tableName))) {
         return true;
       }
     }

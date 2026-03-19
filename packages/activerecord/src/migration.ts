@@ -473,7 +473,7 @@ export abstract class Migration {
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName] });
+      this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName, options] });
       return;
     }
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
@@ -1353,8 +1353,10 @@ export class MigrationContext {
       meta.set("id", { type: "integer", primaryKey: true });
     }
     for (const col of td.columns) {
+      if (col.name === "id" && meta.has("id")) continue;
       meta.set(col.name, {
         type: col.type,
+        primaryKey: col.options.primaryKey,
         null: col.options.null,
         default: col.options.default,
         limit: col.options.limit,
@@ -1366,14 +1368,14 @@ export class MigrationContext {
 
     // Create indexes from table definition
     for (const idx of td.indexes) {
-      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
+      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
       const unique = idx.unique ? "UNIQUE " : "";
       const colsList = idx.columns.map((c) => `"${c}"`).join(", ");
       await this.adapter.executeMutation(
         `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${colsList})`,
       );
       if (!this._indexes.has(name)) this._indexes.set(name, []);
-      this._indexes.get(name)!.push(idx);
+      this._indexes.get(name)!.push({ ...idx, name: indexName });
     }
   }
 
@@ -1381,6 +1383,7 @@ export class MigrationContext {
     await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
     this._tables.delete(name);
     this._columns.delete(name);
+    this._columnMeta.delete(name);
     this._indexes.delete(name);
   }
 
@@ -1456,6 +1459,7 @@ export class MigrationContext {
       for (const col of allCols) {
         await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
         this._columns.get(table)?.delete(col);
+        this._columnMeta.get(table)?.delete(col);
       }
       return;
     }
@@ -1464,6 +1468,7 @@ export class MigrationContext {
     }
     await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${columnOrColumns}"`);
     this._columns.get(table)?.delete(columnOrColumns);
+    this._columnMeta.get(table)?.delete(columnOrColumns);
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
