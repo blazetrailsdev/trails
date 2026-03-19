@@ -420,14 +420,16 @@ export class TimeZone {
    * extracts an explicit timezone offset from the string.
    */
   strptime(str: string, format: string, base?: TimeWithZone): TimeWithZone {
-    let year = base ? base.year : 2000;
-    let month = base ? base.month : 1;
-    let day = base ? base.day : 1;
+    const now = base ?? this.now();
+    let year = now.year;
+    let month = now.month;
+    let day = now.day;
     let hour = 0;
     let minute = 0;
     let second = 0;
     const ms = 0;
     let explicitOffsetSeconds: number | null = null;
+    let epochMs: number | null = null;
 
     // Build a regex from the format string and extract components
     let pos = 0;
@@ -541,12 +543,16 @@ export class TimeZone {
           case "s": {
             const m = str.slice(strPos).match(/^(\d+)/);
             if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            return new TimeWithZone(new Date(parseInt(m[1], 10) * 1000), this);
+            epochMs = parseInt(m[1], 10) * 1000;
+            strPos += m[1].length;
+            break;
           }
           case "Q": {
             const m = str.slice(strPos).match(/^(\d+)/);
             if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            return new TimeWithZone(new Date(parseInt(m[1], 10)), this);
+            epochMs = parseInt(m[1], 10);
+            strPos += m[1].length;
+            break;
           }
           case "Z": {
             // Timezone abbreviation like PST, EST
@@ -598,11 +604,8 @@ export class TimeZone {
             strPos += m[0].length;
             break;
           }
-          default: {
-            // Unknown spec — skip literal
-            strPos++;
-            break;
-          }
+          default:
+            throw new Error(`ArgumentError: strptime: unsupported format directive %${spec}`);
         }
         pos += specLen;
       } else {
@@ -618,6 +621,10 @@ export class TimeZone {
     // Verify remaining input was consumed (allow trailing whitespace)
     if (strPos < str.length && str.slice(strPos).trim().length > 0) {
       throw new Error("ArgumentError: strptime: input does not match format");
+    }
+
+    if (epochMs !== null) {
+      return new TimeWithZone(new Date(epochMs), this);
     }
 
     if (explicitOffsetSeconds !== null) {
