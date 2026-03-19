@@ -178,9 +178,11 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = setup();
     await Task.create({ title: "all" });
     await cached.withCache(async () => {
-      const r1 = await Task.all().toArray();
-      const r2 = await Task.all().toArray();
-      expect(r1).toEqual(r2);
+      cached.resetCounters();
+      await Task.all().toArray();
+      const hitsAfterFirst = cached.cacheHits;
+      await Task.all().toArray();
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
@@ -198,13 +200,14 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache dups results correctly", async () => {
-    const { cached, Task } = setup();
-    await Task.create({ title: "dup" });
-    await cached.withCache(async () => {
-      const r1 = await Task.all().toArray();
-      const r2 = await Task.all().toArray();
-      expect(r1[0]).not.toBe(r2[0]);
-    });
+    const { cached } = setup();
+    cached.enableQueryCache();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('dup')");
+    const sql = 'SELECT * FROM "tasks"';
+    const r1 = await cached.execute(sql);
+    const r2 = await cached.execute(sql);
+    expect(r1[0]).not.toBe(r2[0]);
+    expect(r1[0]).toEqual(r2[0]);
   });
 
   it.skip("cache notifications can be overridden", () => {

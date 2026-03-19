@@ -158,10 +158,6 @@ export class QueryLogs {
 }
 
 /**
- * Sanitize a string for safe inclusion in a SQL comment.
- * Mirrors: ActiveRecord::QueryLogs.escape_sql_comment
- */
-/**
  * Encode a value for SQLCommenter format.
  * Uses encodeURIComponent plus additional escaping for single quotes.
  */
@@ -169,6 +165,10 @@ function sqlCommenterEncode(value: string): string {
   return encodeURIComponent(value).replace(/'/g, "%27");
 }
 
+/**
+ * Sanitize a string for safe inclusion in a SQL comment.
+ * Mirrors: ActiveRecord::QueryLogs.escape_sql_comment
+ */
 export function escapeComment(content: string): string {
   let s = content;
   // Replace comment markers to prevent SQL comment injection
