@@ -49,15 +49,15 @@ connect to a database.
   ```ts
   export default {
     development: {
-      adapter: "sqlite",
+      adapter: "sqlite3",
       database: "db/development.sqlite3",
     },
     test: {
-      adapter: "sqlite",
+      adapter: "sqlite3",
       database: "db/test.sqlite3",
     },
     production: {
-      adapter: "postgres",
+      adapter: "postgresql",
       url: process.env.DATABASE_URL,
     },
   };
@@ -80,10 +80,13 @@ The CLI just needs to use it.
 - **`db:rollback`** -- Same setup, call `.rollback(steps)`. Add `--step N` option.
 - **`db:migrate:status`** -- Same setup, call `.status()`, print table.
 - **Migration file convention** -- Files must export a class extending `Migration`
-  with a `version` property (the timestamp prefix). The generator already produces
-  the right shape, just needs the `version` getter.
+  with a `version` property (the timestamp prefix). The generator currently
+  produces the class but not the `version` property -- both the generator and
+  the runner need to agree on how version is determined (either a class property
+  or parsed from the filename).
 - **Migration version extraction** -- Parse the timestamp from the filename
   (e.g., `20260318120000-create-users.ts` -> version `"20260318120000"`).
+  This is probably simpler than requiring a `version` getter on each class.
 
 ### Phase 3: db:create and db:drop
 

@@ -40,22 +40,28 @@ export class ScaffoldGenerator extends GeneratorBase {
       this.controllerTestSource(controllerClassName, controllerFileName),
     );
 
-    // EJS view templates
-    const viewDir = dasherize(resourceName);
+    // EJS view templates — use resourceName (underscored plural) to match
+    // ActionController's template lookup (controller class name lowercased)
     this.createFile(
-      `src/app/views/${viewDir}/index.html.ejs`,
+      `src/app/views/${resourceName}/index.html.ejs`,
       this.indexView(resourceName, singular, columns),
     );
-    this.createFile(`src/app/views/${viewDir}/show.html.ejs`, this.showView(singular, columns));
     this.createFile(
-      `src/app/views/${viewDir}/new.html.ejs`,
+      `src/app/views/${resourceName}/show.html.ejs`,
+      this.showView(singular, columns),
+    );
+    this.createFile(
+      `src/app/views/${resourceName}/new.html.ejs`,
       this.newView(singular, resourceName, columns),
     );
     this.createFile(
-      `src/app/views/${viewDir}/edit.html.ejs`,
+      `src/app/views/${resourceName}/edit.html.ejs`,
       this.editView(singular, resourceName, columns),
     );
-    this.createFile(`src/app/views/${viewDir}/_form.html.ejs`, this.formPartial(singular, columns));
+    this.createFile(
+      `src/app/views/${resourceName}/_form.html.ejs`,
+      this.formPartial(singular, columns),
+    );
 
     // Create layout if it doesn't exist
     if (!this.fileExists("src/app/views/layouts/application.html.ejs")) {
