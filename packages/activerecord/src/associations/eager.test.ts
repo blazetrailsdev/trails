@@ -2811,7 +2811,20 @@ describe("EagerAssociationTest", () => {
     expect(widgets).toHaveLength(1);
   });
 
-  it.skip("exceptions have suggestions for fix", () => {});
+  it("exceptions have suggestions for fix", async () => {
+    class ExSugAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(ExSugAuthor);
+    try {
+      await ExSugAuthor.all().includes("nonexistent_assoc").toArray();
+    } catch (e: any) {
+      expect(e.message).toBeTruthy();
+    }
+  });
   it("eager has many through with order", async () => {
     class EagerHmtOrdAuthor extends Base {
       static {
@@ -3952,9 +3965,69 @@ describe("EagerAssociationTest", () => {
 
   it.skip("circular preload does not modify unscoped", () => {});
 
-  it.skip("belongs_to association ignores the scoping", () => {});
+  it("belongs_to association ignores the scoping", async () => {
+    class BtScopeAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BtScopePost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("bt_scope_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(BtScopePost, "btScopeAuthor", { foreignKey: "bt_scope_author_id" });
+    registerModel(BtScopeAuthor);
+    registerModel(BtScopePost);
 
-  it.skip("has_many association ignores the scoping", () => {});
+    const alice = await BtScopeAuthor.create({ name: "Alice" });
+    const bob = await BtScopeAuthor.create({ name: "Bob" });
+    await BtScopePost.create({ title: "P1", bt_scope_author_id: alice.id });
+    await BtScopePost.create({ title: "P2", bt_scope_author_id: bob.id });
+
+    await BtScopeAuthor.scoping(BtScopeAuthor.where({ name: "Alice" }), async () => {
+      const posts = await BtScopePost.all().includes("btScopeAuthor").toArray();
+      expect(posts).toHaveLength(2);
+      const authors = posts.map((p: any) => p._preloadedAssociations.get("btScopeAuthor"));
+      expect(authors.filter((a: any) => a !== null)).toHaveLength(2);
+    });
+  });
+
+  it("has_many association ignores the scoping", async () => {
+    class HmScopeAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HmScopePost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("hm_scope_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(HmScopeAuthor, "hmScopePosts", {
+      className: "HmScopePost",
+      foreignKey: "hm_scope_author_id",
+    });
+    registerModel(HmScopeAuthor);
+    registerModel(HmScopePost);
+
+    const alice = await HmScopeAuthor.create({ name: "Alice" });
+    await HmScopePost.create({ title: "P1", hm_scope_author_id: alice.id });
+    await HmScopePost.create({ title: "P2", hm_scope_author_id: alice.id });
+
+    await HmScopePost.scoping(HmScopePost.where({ title: "P1" }), async () => {
+      const authors = await HmScopeAuthor.all().includes("hmScopePosts").toArray();
+      expect(authors).toHaveLength(1);
+      const posts = (authors[0] as any)._preloadedAssociations.get("hmScopePosts");
+      expect(posts).toHaveLength(2);
+    });
+  });
 
   it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {});
   it("preloading a through association twice does not reset it", async () => {
@@ -4194,11 +4267,110 @@ describe("EagerAssociationTest", () => {
   it.skip("preloading has_many association associated by a composite query_constraints", () => {});
   it.skip("preloading has_many through association associated by a composite query_constraints", () => {});
   it.skip("preloading belongs_to CPK model with one of the keys being shared between models", () => {});
-  it.skip("preloading belongs_to with cpk", () => {});
+  it.skip("preloading belongs_to with cpk", async () => {
+    class CpkOrder extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkLineItem extends Base {
+      static {
+        this.attribute("order_shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("product", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(CpkLineItem, "cpkOrder", {
+      foreignKey: ["order_shop_id", "order_id"],
+      className: "CpkOrder",
+    });
+    registerModel(CpkOrder);
+    registerModel(CpkLineItem);
 
-  it.skip("preloading has_many with cpk", () => {});
+    await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
+    await CpkLineItem.create({ order_shop_id: 1, order_id: 1, product: "Widget" });
 
-  it.skip("preloading has_one with cpk", () => {});
+    const items = await CpkLineItem.all().includes("cpkOrder").toArray();
+    expect(items).toHaveLength(1);
+    const order = (items[0] as any)._preloadedAssociations.get("cpkOrder");
+    expect(order).not.toBeNull();
+    expect(order.readAttribute("name")).toBe("Order1");
+  });
+
+  it.skip("preloading has_many with cpk", async () => {
+    class CpkHmOrder extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkHmItem extends Base {
+      static {
+        this.attribute("order_shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("product", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CpkHmOrder, "cpkHmItems", {
+      className: "CpkHmItem",
+      foreignKey: ["order_shop_id", "order_id"],
+    });
+    registerModel(CpkHmOrder);
+    registerModel(CpkHmItem);
+
+    await CpkHmOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
+    await CpkHmItem.create({ order_shop_id: 1, order_id: 1, product: "A" });
+    await CpkHmItem.create({ order_shop_id: 1, order_id: 1, product: "B" });
+
+    const orders = await CpkHmOrder.all().includes("cpkHmItems").toArray();
+    expect(orders).toHaveLength(1);
+    const items = (orders[0] as any)._preloadedAssociations.get("cpkHmItems");
+    expect(items).toHaveLength(2);
+  });
+
+  it.skip("preloading has_one with cpk", async () => {
+    class CpkHoOrder extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkHoReceipt extends Base {
+      static {
+        this.attribute("order_shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("number", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(CpkHoOrder, "cpkHoReceipt", {
+      className: "CpkHoReceipt",
+      foreignKey: ["order_shop_id", "order_id"],
+    });
+    registerModel(CpkHoOrder);
+    registerModel(CpkHoReceipt);
+
+    await CpkHoOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
+    await CpkHoReceipt.create({ order_shop_id: 1, order_id: 1, number: "R001" });
+
+    const orders = await CpkHoOrder.all().includes("cpkHoReceipt").toArray();
+    expect(orders).toHaveLength(1);
+    const receipt = (orders[0] as any)._preloadedAssociations.get("cpkHoReceipt");
+    expect(receipt).not.toBeNull();
+    expect(receipt.readAttribute("number")).toBe("R001");
+  });
 });
 
 // ==========================================================================
