@@ -2604,24 +2604,25 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#with_lock
    */
-  async withLock<T = void>(
-    lockOrFn?: string | ((record: this) => Promise<T> | T),
-    fn?: (record: this) => Promise<T> | T,
-  ): Promise<T> {
+  async withLock(lock: string, fn: (record: this) => Promise<void> | void): Promise<void>;
+  async withLock(fn: (record: this) => Promise<void> | void): Promise<void>;
+  async withLock(
+    lockOrFn?: string | ((record: this) => Promise<void> | void),
+    fn?: (record: this) => Promise<void> | void,
+  ): Promise<void> {
     let lockClause = "FOR UPDATE";
     let callback = fn;
 
     if (typeof lockOrFn === "function") {
-      callback = lockOrFn as (record: this) => Promise<T> | T;
+      callback = lockOrFn;
     } else if (typeof lockOrFn === "string") {
       lockClause = lockOrFn;
     }
 
     const { transaction } = await import("./transactions.js");
-    return transaction(this.constructor as typeof Base, async () => {
+    await transaction(this.constructor as typeof Base, async () => {
       await this.lockBang(lockClause);
-      if (callback) return callback(this);
-      return undefined as T;
+      if (callback) await callback(this);
     });
   }
 

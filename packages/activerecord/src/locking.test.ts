@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, transaction, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
@@ -741,20 +741,19 @@ describe("PessimisticLockingTest", () => {
     // delegate to the real adapter so the record reloads properly
     const capturedSql: string[] = [];
     const origExecute = adapter.execute.bind(adapter);
-    (adapter as any).execute = async (sql: string, binds?: unknown[]) => {
-      capturedSql.push(sql);
-      const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
-      return origExecute(cleaned, binds);
-    };
-    try {
-      await transaction(Person, async () => {
-        await p.lockBang("FOR UPDATE NOWAIT");
+    const spy = vi
+      .spyOn(adapter, "execute")
+      .mockImplementation(async (sql: string, binds?: unknown[]) => {
+        capturedSql.push(sql);
+        const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
+        return origExecute(cleaned, binds);
       });
-      const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
-      expect(lockSql).toBeDefined();
-    } finally {
-      adapter.execute = origExecute;
-    }
+    await transaction(Person, async () => {
+      await p.lockBang("FOR UPDATE NOWAIT");
+    });
+    const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
+    expect(lockSql).toBeDefined();
+    spy.mockRestore();
   });
 
   it.skip("with lock sets isolation", () => {
