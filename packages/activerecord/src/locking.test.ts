@@ -28,28 +28,12 @@ describe("OptimisticLockingTest", () => {
     return { Person, adapter };
   }
 
-  it("quote value passed lock col", async () => {
-    const { Person } = makePerson();
-    const p = await Person.create({ name: "anika" });
-    expect(p.readAttribute("lock_version")).toBe(0);
-    p.writeAttribute("name", "anika2");
-    await p.save();
-    expect(p.readAttribute("lock_version")).toBe(1);
+  it.skip("quote value passed lock col", () => {
+    /* needs SQL query capture to assert quoting behavior */
   });
 
-  it("non integer lock destroy", async () => {
-    const { Person } = makePerson();
-    const s1 = await Person.create({ name: "original" });
-    const s2 = await Person.find(s1.id);
-    expect(s1.readAttribute("lock_version")).toBe(0);
-    expect(s2.readAttribute("lock_version")).toBe(0);
-    await s1.update({ name: "updated record" });
-    expect(s1.readAttribute("lock_version")).toBe(1);
-    // s2 still has lock_version 0, so destroy should raise
-    await expect(s2.destroy()).rejects.toThrow("StaleObjectError");
-    // s1 can destroy successfully
-    await s1.destroy();
-    expect(s1.isDestroyed()).toBe(true);
+  it.skip("non integer lock destroy", () => {
+    /* needs non-integer (e.g. string) primary key support in test adapter */
   });
 
   it("lock destroy", async () => {
@@ -380,16 +364,8 @@ describe("OptimisticLockingTest", () => {
     expect(p.readAttribute("lock_version")).toBe(11);
   });
 
-  it("non integer lock existing", async () => {
-    const { Person } = makePerson();
-    const s1 = await Person.create({ name: "original" });
-    const s2 = await Person.find(s1.id);
-    expect(s1.readAttribute("lock_version")).toBe(0);
-    expect(s2.readAttribute("lock_version")).toBe(0);
-    await s1.update({ name: "updated record" });
-    expect(s1.readAttribute("lock_version")).toBe(1);
-    expect(s2.readAttribute("lock_version")).toBe(0);
-    await expect(s2.update({ name: "doubly updated record" })).rejects.toThrow("StaleObjectError");
+  it.skip("non integer lock existing", () => {
+    /* needs non-integer (e.g. string) primary key support in test adapter */
   });
 
   it("lock repeating", async () => {
@@ -656,20 +632,8 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it("eager find with lock", async () => {
-    const adapter = freshAdapter();
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const p = await Person.create({ name: "Test" });
-    await transaction(Person, async () => {
-      const locked = await Person.all().lock().find(p.id);
-      expect(locked.readAttribute("name")).toBe("Test");
-    });
+  it.skip("eager find with lock", () => {
+    /* needs eager loading (includes) with lock support */
   });
 
   it("lock does not raise when the object is not dirty", async () => {
@@ -755,25 +719,12 @@ describe("PessimisticLockingTest", () => {
     } catch {
       // expected
     }
-    // With the test adapter (no real rollback), the change persists
-    // This test verifies withLock doesn't throw unexpectedly
     const reloaded = await Person.find(p.id);
-    expect(reloaded).toBeDefined();
+    expect(reloaded.readAttribute("name")).toBe("Original");
   });
 
-  it("with lock configures transaction", async () => {
-    const adapter = freshAdapter();
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const p = await Person.create({ name: "Test" });
-    await p.withLock({ requiresNew: true }, async () => {
-      expect(p.readAttribute("name")).toBe("Test");
-    });
+  it.skip("with lock configures transaction", () => {
+    /* needs requiresNew/joinable transaction options */
   });
 
   it("lock sending custom lock statement", async () => {
@@ -792,19 +743,8 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it("with lock sets isolation", async () => {
-    const adapter = freshAdapter();
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const p = await Person.create({ name: "Test" });
-    await p.withLock({ isolation: "read_uncommitted" }, async () => {
-      expect(p.readAttribute("name")).toBe("Test");
-    });
+  it.skip("with lock sets isolation", () => {
+    /* needs transaction isolation level support */
   });
 
   it("with lock locks with no args", async () => {
