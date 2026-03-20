@@ -50,8 +50,7 @@ export class ConnectionPool {
       return conn;
     }
     throw new Error(
-      `Could not obtain a connection from the pool within ${this.checkoutTimeout} seconds. ` +
-        `All ${this.size} connections are in use.`,
+      `Could not obtain a connection from the pool. All ${this.size} connections are in use.`,
     );
   }
 
@@ -65,9 +64,15 @@ export class ConnectionPool {
   withConnection<T>(fn: (conn: DatabaseAdapter) => T): T {
     const conn = this.checkout();
     try {
-      return fn(conn);
-    } finally {
+      const result = fn(conn);
+      if (result && typeof (result as any).then === "function") {
+        return (result as any).finally(() => this.checkin(conn));
+      }
       this.checkin(conn);
+      return result;
+    } catch (error) {
+      this.checkin(conn);
+      throw error;
     }
   }
 
