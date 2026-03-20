@@ -743,16 +743,18 @@ describe("PessimisticLockingTest", () => {
     const origExecute = adapter.execute.bind(adapter);
     (adapter as any).execute = async (sql: string, binds?: unknown[]) => {
       capturedSql.push(sql);
-      // Strip the custom lock clause before sending to the DB so it
-      // works on all backends (SQLite, MariaDB, PostgreSQL)
       const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
       return origExecute(cleaned, binds);
     };
-    await transaction(Person, async () => {
-      await p.lockBang("FOR UPDATE NOWAIT");
-    });
-    const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
-    expect(lockSql).toBeDefined();
+    try {
+      await transaction(Person, async () => {
+        await p.lockBang("FOR UPDATE NOWAIT");
+      });
+      const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
+      expect(lockSql).toBeDefined();
+    } finally {
+      adapter.execute = origExecute;
+    }
   });
 
   it.skip("with lock sets isolation", () => {
