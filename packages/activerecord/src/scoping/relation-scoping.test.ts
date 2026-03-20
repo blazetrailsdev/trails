@@ -690,8 +690,9 @@ describe("Static shorthands (Rails-guided)", () => {
     }
     await Post.create({ title: "First" });
     await Post.create({ title: "Second" });
-    const first = await Post.first();
+    const first = (await Post.first()) as Base;
     expect(first).not.toBeNull();
+    expect(first.readAttribute("title")).toBe("First");
   });
 
   it("Base.last returns the last record", async () => {
@@ -703,8 +704,9 @@ describe("Static shorthands (Rails-guided)", () => {
     }
     await Post.create({ title: "First" });
     await Post.create({ title: "Last" });
-    const last = await Post.last();
+    const last = (await Post.last()) as Base;
     expect(last).not.toBeNull();
+    expect(last.readAttribute("title")).toBe("Last");
   });
 
   it("Base.count returns count", async () => {
