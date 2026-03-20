@@ -3,6 +3,9 @@ import {
   StrictLoadingViolationError,
   DeleteRestrictionError,
   InverseOfAssociationNotFoundError,
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection,
+  HasManyThroughNestedAssociationsAreReadonly,
+  HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
 import { getInheritanceColumn, findStiClass } from "./sti.js";
@@ -1022,6 +1025,33 @@ export class CollectionProxy {
     return !!this._assocDef.options.through;
   }
 
+  private _ensureThroughWritable(): void {
+    if (!this._isThrough) return;
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) return;
+
+    if (throughAssoc.type === "hasOne") {
+      throw new HasManyThroughCantAssociateThroughHasOneOrManyReflection(
+        ctor.name,
+        this._assocName,
+      );
+    }
+
+    // Nested through: the through association is itself a through association
+    const isNestedThrough =
+      throughAssoc.options.through ||
+      (throughAssoc.type as string) === "hasManyThrough" ||
+      (throughAssoc.type as string) === "hasOneThrough";
+    if (isNestedThrough) {
+      if (this._assocDef.type === "hasOne" || (this._assocDef.type as string) === "hasOneThrough") {
+        throw new HasOneThroughNestedAssociationsAreReadonly(ctor.name, this._assocName);
+      }
+      throw new HasManyThroughNestedAssociationsAreReadonly(ctor.name, this._assocName);
+    }
+  }
+
   /**
    * Build a new associated record (unsaved).
    * For direct has_many, sets the FK on the target.
@@ -1136,6 +1166,7 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
    */
   async push(...records: Base[]): Promise<void> {
+    this._ensureThroughWritable();
     // HABTM: insert into join table
     if (this._isHabtm) {
       await this._pushHabtm(records);
@@ -1254,6 +1285,7 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
    */
   async delete(...records: Base[]): Promise<void> {
+    this._ensureThroughWritable();
     // HABTM: remove join table records
     if (this._isHabtm) {
       await this._deleteHabtm(records);
@@ -1511,6 +1543,7 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#replace
    */
   async replace(records: Base[]): Promise<void> {
+    this._ensureThroughWritable();
     await this.clear();
     await this.push(...records);
   }

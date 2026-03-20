@@ -2866,6 +2866,16 @@ export class Relation<T extends Base> {
     return sql;
   }
 
+  private _resolveColumn(table: Table, key: string): Nodes.Attribute {
+    const dotIdx = key.indexOf(".");
+    if (dotIdx !== -1) {
+      const tableName = key.slice(0, dotIdx);
+      const colName = key.slice(dotIdx + 1);
+      return new Table(tableName).get(colName);
+    }
+    return table.get(key);
+  }
+
   private _buildWhereNodes(
     table: Table,
     whereClauses: Array<Record<string, unknown>>,
@@ -2874,32 +2884,34 @@ export class Relation<T extends Base> {
     const nodes: Nodes.Node[] = [];
     for (const clause of whereClauses) {
       for (const [key, value] of Object.entries(clause)) {
+        const attr = this._resolveColumn(table, key);
         if (value === null) {
-          nodes.push(table.get(key).isNull());
+          nodes.push(attr.isNull());
         } else if (value instanceof Range) {
           if (value.excludeEnd) {
-            nodes.push(table.get(key).gteq(value.begin));
-            nodes.push(table.get(key).lt(value.end));
+            nodes.push(attr.gteq(value.begin));
+            nodes.push(attr.lt(value.end));
           } else {
-            nodes.push(table.get(key).between(value.begin, value.end));
+            nodes.push(attr.between(value.begin, value.end));
           }
         } else if (Array.isArray(value)) {
-          nodes.push(table.get(key).in(value));
+          nodes.push(attr.in(value));
         } else {
-          nodes.push(table.get(key).eq(value));
+          nodes.push(attr.eq(value));
         }
       }
     }
     for (const clause of whereNotClauses) {
       for (const [key, value] of Object.entries(clause)) {
+        const attr = this._resolveColumn(table, key);
         if (value === null) {
-          nodes.push(table.get(key).isNotNull());
+          nodes.push(attr.isNotNull());
         } else if (value instanceof Range) {
-          nodes.push(table.get(key).notBetween(value.begin, value.end));
+          nodes.push(attr.notBetween(value.begin, value.end));
         } else if (Array.isArray(value)) {
-          nodes.push(table.get(key).notIn(value));
+          nodes.push(attr.notIn(value));
         } else {
-          nodes.push(table.get(key).notEq(value));
+          nodes.push(attr.notEq(value));
         }
       }
     }
@@ -2935,32 +2947,34 @@ export class Relation<T extends Base> {
 
     for (const clause of this._whereClauses) {
       for (const [key, value] of Object.entries(clause)) {
+        const attr = this._resolveColumn(table, key);
         if (value === null) {
-          manager.where(table.get(key).isNull());
+          manager.where(attr.isNull());
         } else if (value instanceof Range) {
           if (value.excludeEnd) {
-            manager.where(table.get(key).gteq(value.begin));
-            manager.where(table.get(key).lt(value.end));
+            manager.where(attr.gteq(value.begin));
+            manager.where(attr.lt(value.end));
           } else {
-            manager.where(table.get(key).between(value.begin, value.end));
+            manager.where(attr.between(value.begin, value.end));
           }
         } else if (Array.isArray(value)) {
-          manager.where(table.get(key).in(value));
+          manager.where(attr.in(value));
         } else {
-          manager.where(table.get(key).eq(value));
+          manager.where(attr.eq(value));
         }
       }
     }
     for (const clause of this._whereNotClauses) {
       for (const [key, value] of Object.entries(clause)) {
+        const attr = this._resolveColumn(table, key);
         if (value === null) {
-          manager.where(table.get(key).isNotNull());
+          manager.where(attr.isNotNull());
         } else if (value instanceof Range) {
-          manager.where(table.get(key).notBetween(value.begin, value.end));
+          manager.where(attr.notBetween(value.begin, value.end));
         } else if (Array.isArray(value)) {
-          manager.where(table.get(key).notIn(value));
+          manager.where(attr.notIn(value));
         } else {
-          manager.where(table.get(key).notEq(value));
+          manager.where(attr.notEq(value));
         }
       }
     }
@@ -3007,12 +3021,21 @@ export class Relation<T extends Base> {
     return this._modelClass._castAttributeValue(key, value);
   }
 
+  private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {
+    const dotIdx = key.indexOf(".");
+    if (dotIdx !== -1) {
+      return { tbl: key.slice(0, dotIdx), col: key.slice(dotIdx + 1) };
+    }
+    return { tbl: table.name, col: key };
+  }
+
   private _buildWhereStrings(table: Table): string[] {
     const conditions: string[] = [];
     for (const clause of this._whereClauses) {
       for (const [key, value] of Object.entries(clause)) {
+        const { tbl, col } = this._qualifiedCol(table, key);
         if (value === null) {
-          conditions.push(`"${table.name}"."${key}" IS NULL`);
+          conditions.push(`"${tbl}"."${col}" IS NULL`);
         } else if (value instanceof Range) {
           const begin =
             typeof value.begin === "number"
@@ -3023,16 +3046,14 @@ export class Relation<T extends Base> {
               ? String(value.end)
               : `'${String(value.end).replace(/'/g, "''")}'`;
           if (value.excludeEnd) {
-            conditions.push(
-              `"${table.name}"."${key}" >= ${begin} AND "${table.name}"."${key}" < ${end}`,
-            );
+            conditions.push(`"${tbl}"."${col}" >= ${begin} AND "${tbl}"."${col}" < ${end}`);
           } else {
-            conditions.push(`"${table.name}"."${key}" BETWEEN ${begin} AND ${end}`);
+            conditions.push(`"${tbl}"."${col}" BETWEEN ${begin} AND ${end}`);
           }
         } else if (typeof value === "boolean") {
-          conditions.push(`"${table.name}"."${key}" = ${value ? "TRUE" : "FALSE"}`);
+          conditions.push(`"${tbl}"."${col}" = ${value ? "TRUE" : "FALSE"}`);
         } else if (typeof value === "number") {
-          conditions.push(`"${table.name}"."${key}" = ${value}`);
+          conditions.push(`"${tbl}"."${col}" = ${value}`);
         } else if (Array.isArray(value)) {
           const vals = value
             .map((v) => {
@@ -3041,16 +3062,17 @@ export class Relation<T extends Base> {
               return `'${String(v).replace(/'/g, "''")}'`;
             })
             .join(", ");
-          conditions.push(`"${table.name}"."${key}" IN (${vals})`);
+          conditions.push(`"${tbl}"."${col}" IN (${vals})`);
         } else {
-          conditions.push(`"${table.name}"."${key}" = '${String(value).replace(/'/g, "''")}'`);
+          conditions.push(`"${tbl}"."${col}" = '${String(value).replace(/'/g, "''")}'`);
         }
       }
     }
     for (const clause of this._whereNotClauses) {
       for (const [key, value] of Object.entries(clause)) {
+        const { tbl, col } = this._qualifiedCol(table, key);
         if (value === null) {
-          conditions.push(`"${table.name}"."${key}" IS NOT NULL`);
+          conditions.push(`"${tbl}"."${col}" IS NOT NULL`);
         } else if (value instanceof Range) {
           const begin =
             typeof value.begin === "number"
@@ -3060,11 +3082,11 @@ export class Relation<T extends Base> {
             typeof value.end === "number"
               ? String(value.end)
               : `'${String(value.end).replace(/'/g, "''")}'`;
-          conditions.push(`NOT ("${table.name}"."${key}" BETWEEN ${begin} AND ${end})`);
+          conditions.push(`NOT ("${tbl}"."${col}" BETWEEN ${begin} AND ${end})`);
         } else if (typeof value === "boolean") {
-          conditions.push(`"${table.name}"."${key}" != ${value ? "TRUE" : "FALSE"}`);
+          conditions.push(`"${tbl}"."${col}" != ${value ? "TRUE" : "FALSE"}`);
         } else if (typeof value === "number") {
-          conditions.push(`"${table.name}"."${key}" != ${value}`);
+          conditions.push(`"${tbl}"."${col}" != ${value}`);
         } else if (Array.isArray(value)) {
           const vals = value
             .map((v) => {
@@ -3073,9 +3095,9 @@ export class Relation<T extends Base> {
               return `'${String(v).replace(/'/g, "''")}'`;
             })
             .join(", ");
-          conditions.push(`"${table.name}"."${key}" NOT IN (${vals})`);
+          conditions.push(`"${tbl}"."${col}" NOT IN (${vals})`);
         } else {
-          conditions.push(`"${table.name}"."${key}" != '${String(value).replace(/'/g, "''")}'`);
+          conditions.push(`"${tbl}"."${col}" != '${String(value).replace(/'/g, "''")}'`);
         }
       }
     }

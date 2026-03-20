@@ -683,9 +683,144 @@ describe("NestedThroughAssociationsTest", () => {
 
   it.skip("has many through with sti on nested through reflection", () => {});
 
-  it.skip("nested has many through writers should raise error", () => {});
+  it("nested has many through writers should raise error", async () => {
+    const { CollectionProxy } = await import("../associations.js");
 
-  it.skip("nested has one through writers should raise error", () => {});
+    class NwrAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NwrPost extends Base {
+      static {
+        this.attribute("nwr_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NwrTagging extends Base {
+      static {
+        this.attribute("nwr_post_id", "integer");
+        this.attribute("nwr_tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NwrTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (NwrAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "nwrPosts",
+        options: { className: "NwrPost", foreignKey: "nwr_author_id" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "nwrTaggings",
+        options: { through: "nwrPosts", source: "nwrTaggings", className: "NwrTagging" },
+      },
+      {
+        type: "hasManyThrough",
+        name: "nwrTags",
+        options: { through: "nwrTaggings", source: "nwrTag", className: "NwrTag" },
+      },
+    ];
+    (NwrPost as any)._associations = [
+      {
+        type: "hasMany",
+        name: "nwrTaggings",
+        options: { className: "NwrTagging", foreignKey: "nwr_post_id" },
+      },
+    ];
+    (NwrTagging as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "nwrTag",
+        options: { className: "NwrTag", foreignKey: "nwr_tag_id" },
+      },
+    ];
+    registerModel("NwrAuthor", NwrAuthor);
+    registerModel("NwrPost", NwrPost);
+    registerModel("NwrTagging", NwrTagging);
+    registerModel("NwrTag", NwrTag);
+
+    const author = await NwrAuthor.create({ name: "David" });
+    const tag = await NwrTag.create({ name: "general" });
+
+    const proxy = new CollectionProxy(author, "nwrTags", {
+      type: "hasMany",
+      name: "nwrTags",
+      options: { through: "nwrTaggings", source: "nwrTag", className: "NwrTag" },
+    });
+
+    await expect(proxy.push(tag)).rejects.toThrow(/nested through association/);
+  });
+
+  it("nested has one through writers should raise error", async () => {
+    const { CollectionProxy } = await import("../associations.js");
+
+    class NhoAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NhoPost extends Base {
+      static {
+        this.attribute("nho_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NhoComment extends Base {
+      static {
+        this.attribute("nho_post_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    (NhoAuthor as any)._associations = [
+      {
+        type: "hasOne",
+        name: "nhoPost",
+        options: { className: "NhoPost", foreignKey: "nho_author_id" },
+      },
+      {
+        type: "hasOneThrough",
+        name: "nhoComment",
+        options: { through: "nhoPost", source: "nhoComment", className: "NhoComment" },
+      },
+      {
+        type: "hasOneThrough",
+        name: "nhoNestedComment",
+        options: { through: "nhoComment", source: "nhoComment", className: "NhoComment" },
+      },
+    ];
+    (NhoPost as any)._associations = [
+      {
+        type: "hasOne",
+        name: "nhoComment",
+        options: { className: "NhoComment", foreignKey: "nho_post_id" },
+      },
+    ];
+    registerModel("NhoAuthor", NhoAuthor);
+    registerModel("NhoPost", NhoPost);
+    registerModel("NhoComment", NhoComment);
+
+    const author = await NhoAuthor.create({ name: "David" });
+    const comment = await NhoComment.create({ body: "C1" });
+
+    const proxy = new CollectionProxy(author, "nhoNestedComment", {
+      type: "hasOne",
+      name: "nhoNestedComment",
+      options: { through: "nhoComment", source: "nhoComment", className: "NhoComment" },
+    });
+
+    await expect(proxy.push(comment)).rejects.toThrow(/nested through association/);
+  });
 
   it.skip("nested has many through with conditions on through associations", () => {});
 

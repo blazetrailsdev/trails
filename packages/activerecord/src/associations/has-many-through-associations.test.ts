@@ -27,9 +27,99 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it.skip("marshal dump", () => {});
 
-  it.skip("through association with joins", () => {});
+  it("through association with joins", async () => {
+    class TajAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TajPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("taj_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class TajComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("taj_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(TajAuthor, "tajPosts", { foreignKey: "taj_author_id" });
+    Associations.hasMany.call(TajAuthor, "tajComments", {
+      through: "tajPosts",
+      source: "tajComments",
+      className: "TajComment",
+    });
+    Associations.hasMany.call(TajPost, "tajComments", { foreignKey: "taj_post_id" });
+    registerModel("TajAuthor", TajAuthor);
+    registerModel("TajPost", TajPost);
+    registerModel("TajComment", TajComment);
 
-  it.skip("through association with left joins", () => {});
+    const author = await TajAuthor.create({ name: "Mary" });
+    const post = await TajPost.create({ title: "P1", taj_author_id: author.id });
+    await TajComment.create({ body: "C1", taj_post_id: post.id });
+
+    // Through association with joins should generate SQL that includes the join
+    const sql = TajAuthor.joins("tajComments").toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("taj_posts");
+    expect(sql).toContain("taj_comments");
+
+    const results = await TajAuthor.joins("tajComments").where({ id: author.id }).toArray();
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  it("through association with left joins", async () => {
+    class TaljAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TaljPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("talj_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class TaljComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("talj_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(TaljAuthor, "taljPosts", { foreignKey: "talj_author_id" });
+    Associations.hasMany.call(TaljAuthor, "taljComments", {
+      through: "taljPosts",
+      source: "taljComments",
+      className: "TaljComment",
+    });
+    Associations.hasMany.call(TaljPost, "taljComments", { foreignKey: "talj_post_id" });
+    registerModel("TaljAuthor", TaljAuthor);
+    registerModel("TaljPost", TaljPost);
+    registerModel("TaljComment", TaljComment);
+
+    const author = await TaljAuthor.create({ name: "Mary" });
+    const post = await TaljPost.create({ title: "P1", talj_author_id: author.id });
+    await TaljComment.create({ body: "C1", talj_post_id: post.id });
+
+    // Through association with left joins
+    const sql = TaljAuthor.leftOuterJoins("taljComments").toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toContain("talj_posts");
+    expect(sql).toContain("talj_comments");
+
+    const results = await TaljAuthor.leftOuterJoins("taljComments")
+      .where({ id: author.id })
+      .toArray();
+    expect(results.length).toBeGreaterThan(0);
+  });
 
   it.skip("through association with through scope and nested where", () => {});
   it("preload with nested association", async () => {
@@ -2742,7 +2832,53 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it.skip("count with include should alias join table", () => {});
 
-  it.skip("inner join with quoted table name", () => {});
+  it("inner join with quoted table name", async () => {
+    class IjqPerson extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class IjqReference extends Base {
+      static {
+        this.attribute("ijq_person_id", "integer");
+        this.attribute("ijq_job_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class IjqJob extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(IjqPerson, "ijqReferences", { foreignKey: "ijq_person_id" });
+    Associations.hasMany.call(IjqPerson, "ijqJobs", {
+      through: "ijqReferences",
+      source: "ijqJob",
+      className: "IjqJob",
+    });
+    Associations.belongsTo.call(IjqReference, "ijqJob", {
+      foreignKey: "ijq_job_id",
+      className: "IjqJob",
+    });
+    registerModel("IjqPerson", IjqPerson);
+    registerModel("IjqReference", IjqReference);
+    registerModel("IjqJob", IjqJob);
+
+    const person = await IjqPerson.create({ first_name: "Michael" });
+    const job1 = await IjqJob.create({ title: "Engineer" });
+    const job2 = await IjqJob.create({ title: "Designer" });
+    await IjqReference.create({ ijq_person_id: person.id, ijq_job_id: job1.id });
+    await IjqReference.create({ ijq_person_id: person.id, ijq_job_id: job2.id });
+
+    const jobs = await loadHasManyThrough(person, "ijqJobs", {
+      through: "ijqReferences",
+      source: "ijqJob",
+      className: "IjqJob",
+    });
+    expect(jobs).toHaveLength(2);
+  });
   it("get ids for has many through with conditions should not preload", async () => {
     class HmtIdsCondOwner extends Base {
       static {
@@ -2930,7 +3066,53 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
   });
-  it.skip("merge join association with has many through association proxy", () => {});
+  it("merge join association with has many through association proxy", async () => {
+    class MjAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class MjPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("mj_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class MjComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("mj_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class MjRating extends Base {
+      static {
+        this.attribute("score", "integer");
+        this.attribute("mj_comment_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(MjAuthor, "mjPosts", { foreignKey: "mj_author_id" });
+    Associations.hasMany.call(MjAuthor, "mjComments", {
+      through: "mjPosts",
+      source: "mjComments",
+      className: "MjComment",
+    });
+    Associations.hasMany.call(MjPost, "mjComments", { foreignKey: "mj_post_id" });
+    Associations.hasMany.call(MjComment, "mjRatings", { foreignKey: "mj_comment_id" });
+    registerModel("MjAuthor", MjAuthor);
+    registerModel("MjPost", MjPost);
+    registerModel("MjComment", MjComment);
+    registerModel("MjRating", MjRating);
+
+    // The key test: chaining through association proxy with another relation should not raise
+    const sql = MjAuthor.joins("mjComments").toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("mj_posts");
+    expect(sql).toContain("mj_comments");
+  });
   it("has many association through a has many association with nonstandard primary keys", async () => {
     class NpkOwner extends Base {
       static {
@@ -3107,7 +3289,56 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(items).toHaveLength(1);
     expect(items[0].readAttribute("label")).toBe("I");
   });
-  it.skip("modifying has many through has one reflection should raise", () => {});
+  it("modifying has many through has one reflection should raise", async () => {
+    class MhrAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class MhrPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("mhr_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class MhrComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("mhr_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    // Through goes via has_one, so writes should be forbidden
+    Associations.hasOne.call(MhrAuthor, "mhrPost", { foreignKey: "mhr_author_id" });
+    (MhrAuthor as any)._associations.push({
+      type: "hasMany",
+      name: "mhrComments",
+      options: { through: "mhrPost", source: "mhrComments", className: "MhrComment" },
+    });
+    Associations.hasMany.call(MhrPost, "mhrComments", { foreignKey: "mhr_post_id" });
+    registerModel("MhrAuthor", MhrAuthor);
+    registerModel("MhrPost", MhrPost);
+    registerModel("MhrComment", MhrComment);
+
+    const author = await MhrAuthor.create({ name: "David" });
+    const post = await MhrPost.create({ title: "P1", mhr_author_id: author.id });
+    const comment = await MhrComment.create({ body: "C1", mhr_post_id: post.id });
+
+    const proxy = new CollectionProxy(author, "mhrComments", {
+      type: "hasMany",
+      name: "mhrComments",
+      options: { through: "mhrPost", source: "mhrComments", className: "MhrComment" },
+    });
+
+    // Replace should raise
+    await expect(proxy.replace([comment])).rejects.toThrow(/Cannot modify association/);
+    // Push should raise
+    await expect(proxy.push(comment)).rejects.toThrow(/Cannot modify association/);
+    // Delete should raise
+    await expect(proxy.delete(comment)).rejects.toThrow(/Cannot modify association/);
+  });
   it("associate existing with nonstandard primary key on belongs to", async () => {
     class NskPost extends Base {
       static {
@@ -4188,9 +4419,114 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(joins).toHaveLength(1);
   });
-  it.skip("joining has many through with distinct", () => {});
+  it("joining has many through with distinct", async () => {
+    class JdAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class JdCategorization extends Base {
+      static {
+        this.attribute("jd_author_id", "integer");
+        this.attribute("jd_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class JdPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(JdAuthor, "jdCategorizations", { foreignKey: "jd_author_id" });
+    Associations.hasMany.call(JdAuthor, "jdUniquePosts", {
+      through: "jdCategorizations",
+      source: "jdPost",
+      className: "JdPost",
+    });
+    Associations.belongsTo.call(JdCategorization, "jdPost", {
+      foreignKey: "jd_post_id",
+      className: "JdPost",
+    });
+    registerModel("JdAuthor", JdAuthor);
+    registerModel("JdCategorization", JdCategorization);
+    registerModel("JdPost", JdPost);
 
-  it.skip("joining has many through belongs to", () => {});
+    const author = await JdAuthor.create({ name: "Mary" });
+    const post = await JdPost.create({ title: "P1" });
+    // Two categorizations pointing to the same post
+    await JdCategorization.create({ jd_author_id: author.id, jd_post_id: post.id });
+    await JdCategorization.create({ jd_author_id: author.id, jd_post_id: post.id });
+
+    // Joining with distinct should produce valid SQL
+    const sql = JdAuthor.joins("jdUniquePosts").distinct().toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("DISTINCT");
+    expect(sql).toContain("jd_categorizations");
+    expect(sql).toContain("jd_posts");
+  });
+
+  it("joining has many through belongs to", async () => {
+    class JbtPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("jbt_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class JbtAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class JbtCategorization extends Base {
+      static {
+        this.attribute("jbt_author_id", "integer");
+        this.attribute("jbt_category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class JbtCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(JbtPost, "jbtAuthor", { foreignKey: "jbt_author_id" });
+    Associations.hasMany.call(JbtAuthor, "jbtCategorizations", { foreignKey: "jbt_author_id" });
+    Associations.belongsTo.call(JbtCategorization, "jbtCategory", {
+      foreignKey: "jbt_category_id",
+      className: "JbtCategory",
+    });
+    // Post -> author -> categorizations (through belongs_to then has_many)
+    Associations.hasMany.call(JbtPost, "jbtAuthorCategorizations", {
+      through: "jbtAuthor",
+      source: "jbtCategorizations",
+      className: "JbtCategorization",
+    });
+    registerModel("JbtPost", JbtPost);
+    registerModel("JbtAuthor", JbtAuthor);
+    registerModel("JbtCategorization", JbtCategorization);
+    registerModel("JbtCategory", JbtCategory);
+
+    const author = await JbtAuthor.create({ name: "Mary" });
+    const cat = await JbtCategory.create({ name: "General" });
+    const post = await JbtPost.create({ title: "P1", jbt_author_id: author.id });
+    await JbtCategorization.create({ jbt_author_id: author.id, jbt_category_id: cat.id });
+
+    // Joining has_many through a belongs_to should generate correct SQL
+    const sql = JbtPost.joins("jbtAuthorCategorizations").toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("jbt_authors");
+    expect(sql).toContain("jbt_categorizations");
+
+    const results = await JbtPost.joins("jbtAuthorCategorizations")
+      .where({ id: post.id })
+      .toArray();
+    expect(results.length).toBeGreaterThan(0);
+  });
   it("select chosen fields only", async () => {
     class HmtSelOwner extends Base {
       static {
@@ -4773,7 +5109,51 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
   });
-  it.skip("explicitly joining join table", () => {});
+  it("explicitly joining join table", async () => {
+    class EjjOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjjPet extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ejj_owner_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class EjjToy extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ejj_pet_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(EjjOwner, "ejjPets", { foreignKey: "ejj_owner_id" });
+    Associations.hasMany.call(EjjOwner, "ejjToys", {
+      through: "ejjPets",
+      source: "ejjToys",
+      className: "EjjToy",
+    });
+    Associations.hasMany.call(EjjPet, "ejjToys", { foreignKey: "ejj_pet_id" });
+    registerModel("EjjOwner", EjjOwner);
+    registerModel("EjjPet", EjjPet);
+    registerModel("EjjToy", EjjToy);
+
+    const owner = await EjjOwner.create({ name: "Blackbeard" });
+    const pet = await EjjPet.create({ name: "Parrot", ejj_owner_id: owner.id });
+    await EjjToy.create({ name: "Ball", ejj_pet_id: pet.id });
+
+    // Explicitly joining the join table should work
+    const sql = EjjOwner.joins("ejjToys").toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("ejj_pets");
+    expect(sql).toContain("ejj_toys");
+
+    const results = await EjjOwner.joins("ejjToys").where({ id: owner.id }).toArray();
+    expect(results.length).toBeGreaterThan(0);
+  });
   it("has many through with polymorphic source", async () => {
     class PsPost extends Base {
       static {
@@ -4954,7 +5334,84 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(posts).toHaveLength(2);
   });
-  it.skip("has many through associations sum on columns", () => {});
+  it("has many through associations sum on columns", async () => {
+    class SumPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SumPerson extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.attribute("followers_count", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class SumReader extends Base {
+      static {
+        this.attribute("sum_post_id", "integer");
+        this.attribute("sum_person_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(SumPost, "sumReaders", { foreignKey: "sum_post_id" });
+    Associations.hasMany.call(SumPost, "sumPeople", {
+      through: "sumReaders",
+      source: "sumPerson",
+      className: "SumPerson",
+    });
+    Associations.belongsTo.call(SumReader, "sumPerson", {
+      foreignKey: "sum_person_id",
+      className: "SumPerson",
+    });
+    Associations.hasMany.call(SumPerson, "sumReaders", { foreignKey: "sum_person_id" });
+    Associations.hasMany.call(SumPerson, "sumPosts", {
+      through: "sumReaders",
+      source: "sumPost",
+      className: "SumPost",
+    });
+    Associations.belongsTo.call(SumReader, "sumPost", {
+      foreignKey: "sum_post_id",
+      className: "SumPost",
+    });
+    registerModel("SumPost", SumPost);
+    registerModel("SumPerson", SumPerson);
+    registerModel("SumReader", SumReader);
+
+    const post1 = await SumPost.create({ title: "active" });
+    const post2 = await SumPost.create({ title: "inactive" });
+    const p1 = await SumPerson.create({ first_name: "aaron", followers_count: 1 });
+    const p2 = await SumPerson.create({ first_name: "schmit", followers_count: 2 });
+    const p3 = await SumPerson.create({ first_name: "bill", followers_count: 3 });
+    const p4 = await SumPerson.create({ first_name: "cal", followers_count: 4 });
+
+    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p1.id });
+    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p2.id });
+    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p3.id });
+    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p4.id });
+    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p1.id });
+    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p2.id });
+    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p3.id });
+    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p4.id });
+
+    // Sum followers_count for people who read "active" posts via joins + distinct
+    const activePersons = SumPerson.joins("sumPosts")
+      .where({ "sum_posts.title": "active" })
+      .distinct();
+
+    const sql = activePersons.toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain("DISTINCT");
+
+    // Map and reduce to verify the sum
+    const results = await activePersons.toArray();
+    let manualSum = 0;
+    for (const p of results) {
+      manualSum += p.readAttribute("followers_count") as number;
+    }
+    expect(manualSum).toBe(10);
+  });
 
   it.skip("has many through with default scope on the target", () => {});
 
