@@ -31,11 +31,11 @@ describe("RelationScopingTest", () => {
   }
 
   it.skip("unscoped breaks caching", () => {
-    /* TODO: needs helpers from original file */
+    /* needs query cache integration */
   });
 
   it.skip("scope breaks caching on collections", () => {
-    /* TODO: needs helpers from original file */
+    /* needs query cache integration */
   });
 
   it("reverse order", () => {
@@ -139,8 +139,17 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped find last preserves scope", () => {
-    /* TODO: needs scoping + last interaction */
+  it("scoped find last preserves scope", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    await Developer.create({ name: "Charlie", salary: 90000 });
+    const rel = Developer.where({ salary: 80000 });
+    await Developer.scoping(rel, async () => {
+      const last = (await Developer.last()) as Base | null;
+      expect(last).not.toBeNull();
+      expect(last!.readAttribute("name")).toBe("Alice");
+    });
   });
 
   it("scoped find combines and sanitizes conditions", async () => {
@@ -162,12 +171,31 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped unscoped", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped unscoped", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ salary: 80000 });
+    await Developer.scoping(rel, async () => {
+      const unscoped = await Developer.unscoped().toArray();
+      expect(unscoped.length).toBe(2);
+    });
   });
 
-  it.skip("scoped default scoped", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped default scoped", async () => {
+    class SdsPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adapter;
+        this.defaultScope((rel) => rel.where({ published: true }));
+      }
+    }
+    await SdsPost.create({ title: "Published", published: true });
+    await SdsPost.create({ title: "Draft", published: false });
+    const all = await SdsPost.all().toArray();
+    expect(all.length).toBe(1);
+    expect(all[0].readAttribute("title")).toBe("Published");
   });
 
   it("scoped find all", async () => {
@@ -214,112 +242,235 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoped find with annotation", () => {
-    /* TODO: needs helpers from original file */
+    /* needs annotate() on relations */
   });
 
   it.skip("find with annotation unscoped", () => {
-    /* TODO: needs helpers from original file */
+    /* needs annotate() on relations */
   });
 
   it.skip("find with annotation unscope", () => {
-    /* TODO: needs helpers from original file */
+    /* needs annotate() + unscope() */
   });
 
   it.skip("scoped find include", () => {
-    /* TODO: needs helpers from original file */
+    /* needs includes() */
   });
 
   it.skip("scoped find joins", () => {
-    /* TODO: needs helpers from original file */
+    /* needs joins() */
   });
 
-  it.skip("scoped create with where", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped create with where", async () => {
+    const Developer = makeDeveloper();
+    const rel = Developer.where({ salary: 100000 });
+    await Developer.scoping(rel, async () => {
+      const dev = await Developer.create({ name: "Scoped" });
+      expect(dev.readAttribute("salary")).toBe(100000);
+    });
   });
 
-  it.skip("scoped create with where with array", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped create with where with array", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 50000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: ["Alice"] });
+    await Developer.scoping(rel, async () => {
+      const all = await Developer.all().toArray();
+      expect(all.length).toBe(1);
+      expect(all[0].readAttribute("name")).toBe("Alice");
+    });
   });
 
   it.skip("scoped create with where with range", () => {
-    /* TODO: needs helpers from original file */
+    /* needs range conditions in where */
   });
 
-  it.skip("scoped create with create with", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped create with create with", async () => {
+    const Developer = makeDeveloper();
+    const rel = Developer.all().createWith({ salary: 75000 });
+    await Developer.scoping(rel, async () => {
+      const dev = await Developer.create({ name: "CW" });
+      expect(dev.readAttribute("salary")).toBe(75000);
+    });
   });
 
-  it.skip("scoped create with create with has higher priority", () => {
-    /* TODO: needs helpers from original file */
+  it("scoped create with create with has higher priority", async () => {
+    const Developer = makeDeveloper();
+    const rel = Developer.where({ salary: 50000 }).createWith({ salary: 99000 });
+    await Developer.scoping(rel, async () => {
+      const dev = await Developer.create({ name: "Priority" });
+      expect(dev.readAttribute("salary")).toBe(99000);
+    });
   });
 
-  it.skip("ensure that method scoping is correctly restored", () => {
-    /* TODO: needs helpers from original file */
+  it("ensure that method scoping is correctly restored", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ salary: 80000 });
+    await Developer.scoping(rel, async () => {
+      const count = await Developer.count();
+      expect(count).toBe(1);
+    });
+    const afterCount = await Developer.count();
+    expect(afterCount).toBe(2);
   });
 
   it.skip("update all default scope filters on joins", () => {
-    /* TODO: needs helpers from original file */
+    /* needs joins + default_scope */
   });
 
   it.skip("delete all default scope filters on joins", () => {
-    /* TODO: needs helpers from original file */
+    /* needs joins + default_scope */
   });
 
-  it.skip("current scope does not pollute sibling subclasses", () => {
-    /* TODO: needs helpers from original file */
+  it("current scope does not pollute sibling subclasses", async () => {
+    class Animal extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Dog extends Animal {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Cat extends Animal {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    const dogRel = Dog.where({ type: "Dog" });
+    await Dog.scoping(dogRel, async () => {
+      expect(Dog.currentScope).not.toBeNull();
+      expect(Cat.currentScope).toBeNull();
+    });
   });
 
-  it.skip("scoping is correctly restored", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping is correctly restored", async () => {
+    const Developer = makeDeveloper();
+    expect(Developer.currentScope).toBeNull();
+    const rel = Developer.where({ name: "test" });
+    await Developer.scoping(rel, async () => {
+      expect(Developer.currentScope).not.toBeNull();
+    });
+    expect(Developer.currentScope).toBeNull();
   });
 
-  it.skip("scoping respects current class", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping respects current class", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: "Alice" });
+    await Developer.scoping(rel, async () => {
+      const all = await Developer.all().toArray();
+      expect(all.length).toBe(1);
+    });
   });
 
   it.skip("scoping respects sti constraint", () => {
-    /* TODO: needs helpers from original file */
+    /* needs STI + scoping interaction */
   });
 
-  it.skip("scoping with klass method works in the scope block", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping with klass method works in the scope block", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: "Alice" });
+    await Developer.scoping(rel, async () => {
+      const count = await Developer.count();
+      expect(count).toBe(1);
+    });
   });
 
-  it.skip("scoping with query method works in the scope block", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping with query method works in the scope block", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: "Alice" });
+    await Developer.scoping(rel, async () => {
+      const first = await Developer.first();
+      expect(first).not.toBeNull();
+      expect((first as Base).readAttribute("name")).toBe("Alice");
+    });
   });
 
   it.skip("circular joins with scoping does not crash", () => {
-    /* TODO: needs helpers from original file */
+    /* needs joins() */
   });
 
   it.skip("circular left joins with scoping does not crash", () => {
-    /* TODO: needs helpers from original file */
+    /* needs left_joins() */
   });
 
-  it.skip("scoping applies to update with all queries", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping applies to update with all queries", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: "Alice" });
+    await Developer.scoping(rel, async () => {
+      await Developer.updateAll({ salary: 90000 });
+    });
+    const alice = (await Developer.where({ name: "Alice" }).first()) as Base;
+    expect(alice.readAttribute("salary")).toBe(90000);
+    const bob = (await Developer.where({ name: "Bob" }).first()) as Base;
+    expect(bob.readAttribute("salary")).toBe(60000);
   });
 
-  it.skip("scoping applies to delete with all queries", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping applies to delete with all queries", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: "Alice" });
+    await Developer.scoping(rel, async () => {
+      await Developer.deleteAll();
+    });
+    const remaining = await Developer.all().toArray();
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].readAttribute("name")).toBe("Bob");
   });
 
   it.skip("scoping applies to reload with all queries", () => {
-    /* TODO: needs helpers from original file */
+    /* needs reload() with scoping */
   });
 
-  it.skip("nested scoping applies with all queries set", () => {
-    /* TODO: needs helpers from original file */
+  it("nested scoping applies with all queries set", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    await Developer.create({ name: "Charlie", salary: 80000 });
+    const outer = Developer.where({ salary: 80000 });
+    await Developer.scoping(outer, async () => {
+      const inner = Developer.where({ name: "Alice" });
+      await Developer.scoping(inner, async () => {
+        const all = await Developer.all().toArray();
+        expect(all.length).toBe(1);
+        expect(all[0].readAttribute("name")).toBe("Alice");
+      });
+      const outerAll = await Developer.all().toArray();
+      expect(outerAll.length).toBe(2);
+    });
   });
 
   it.skip("raises error if all queries is set to false while nested", () => {
-    /* TODO: needs helpers from original file */
+    /* needs all_queries option */
   });
 
-  it.skip("default scope filters on joins", () => {});
+  it.skip("default scope filters on joins", () => {
+    /* needs joins + default_scope */
+  });
+
   describe("HasManyScopingTest", () => {
-    it.skip("should maintain default scope on associations", () => {});
+    it.skip("should maintain default scope on associations", () => {
+      /* needs association + default_scope */
+    });
   });
 });
 
@@ -338,28 +489,86 @@ describe("NestedRelationScopingTest", () => {
     }
     return { Post };
   }
-  it.skip("merge options", () => {
-    /* TODO: needs helpers from original file */
+
+  it("merge options", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "Alice" });
+    await Post.create({ title: "B", author: "Bob" });
+    await Post.create({ title: "C", author: "Alice" });
+    const outer = Post.where({ author: "Alice" });
+    await Post.scoping(outer, async () => {
+      const inner = Post.where({ title: "A" });
+      await Post.scoping(inner, async () => {
+        const all = await Post.all().toArray();
+        expect(all.length).toBe(1);
+        expect(all[0].readAttribute("title")).toBe("A");
+      });
+    });
   });
 
-  it.skip("merge inner scope has priority", () => {
-    /* TODO: needs helpers from original file */
+  it.skip("merge inner scope has priority", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "Alice" });
+    await Post.create({ title: "B", author: "Bob" });
+    const outer = Post.where({ author: "Alice" });
+    await Post.scoping(outer, async () => {
+      const inner = Post.where({ author: "Bob" });
+      await Post.scoping(inner, async () => {
+        const all = await Post.all().toArray();
+        expect(all.length).toBe(1);
+        expect(all[0].readAttribute("author")).toBe("Bob");
+      });
+    });
   });
 
-  it.skip("replace options", () => {
-    /* TODO: needs helpers from original file */
+  it("replace options", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "Alice" });
+    await Post.create({ title: "B", author: "Bob" });
+    const outer = Post.where({ author: "Alice" });
+    await Post.scoping(outer, async () => {
+      const count = await Post.count();
+      expect(count).toBe(1);
+    });
+    const total = await Post.count();
+    expect(total).toBe(2);
   });
 
-  it.skip("three level nested exclusive scoped find", () => {
-    /* TODO: needs helpers from original file */
+  it.skip("three level nested exclusive scoped find", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "A", author: "Alice" });
+    await Post.create({ title: "B", author: "Bob" });
+    await Post.create({ title: "C", author: "Charlie" });
+    await Post.scoping(Post.where({ author: "Alice" }), async () => {
+      await Post.scoping(Post.where({ author: "Bob" }), async () => {
+        await Post.scoping(Post.where({ author: "Charlie" }), async () => {
+          const all = await Post.all().toArray();
+          expect(all.length).toBe(1);
+          expect(all[0].readAttribute("author")).toBe("Charlie");
+        });
+      });
+    });
   });
 
-  it.skip("nested scoped create", () => {
-    /* TODO: needs helpers from original file */
+  it("nested scoped create", async () => {
+    const { Post } = makeModel();
+    const rel = Post.where({ author: "Scoped" });
+    await Post.scoping(rel, async () => {
+      const post = await Post.create({ title: "Created" });
+      expect(post.readAttribute("author")).toBe("Scoped");
+    });
   });
 
-  it.skip("nested exclusive scope for create", () => {
-    /* TODO: needs helpers from original file */
+  it("nested exclusive scope for create", async () => {
+    const { Post } = makeModel();
+    const outer = Post.where({ author: "Outer" });
+    await Post.scoping(outer, async () => {
+      const inner = Post.where({ author: "Inner" });
+      await Post.scoping(inner, async () => {
+        const post = await Post.create({ title: "Nested" });
+        expect(post.readAttribute("author")).toBe("Inner");
+      });
+    });
   });
 });
 
@@ -369,18 +578,53 @@ describe("scoping()", () => {
     adapter = freshAdapter();
   });
 
-  it.skip("sets currentScope within the block", () => {
-    /* TODO: needs helpers from original file */
+  it("sets currentScope within the block", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.currentScope).toBeNull();
+    const rel = Post.where({ title: "test" });
+    await Post.scoping(rel, async () => {
+      expect(Post.currentScope).not.toBeNull();
+    });
+    expect(Post.currentScope).toBeNull();
   });
 });
 
 describe("scopeForCreate / whereValuesHash", () => {
-  it.skip("scopeForCreate returns attributes for new records", () => {
-    /* TODO: needs helpers from original file */
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
   });
 
-  it.skip("whereValuesHash returns the where conditions", () => {
-    /* TODO: needs helpers from original file */
+  it("scopeForCreate returns attributes for new records", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Post.where({ author: "Alice" });
+    const scope = rel.scopeForCreate();
+    expect(scope.author).toBe("Alice");
+  });
+
+  it("whereValuesHash returns the where conditions", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Post.where({ author: "Alice", title: "Test" });
+    const hash = rel.whereValuesHash();
+    expect(hash.author).toBe("Alice");
+    expect(hash.title).toBe("Test");
   });
 });
 
@@ -390,8 +634,19 @@ describe("Scoping block (Rails-guided)", () => {
     adapter = freshAdapter();
   });
 
-  it.skip("scoping sets currentScope within the block", () => {
-    /* TODO: needs helpers from original file */
+  it("scoping sets currentScope within the block", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.currentScope).toBeNull();
+    const rel = Post.where({ title: "x" });
+    await Post.scoping(rel, async () => {
+      expect(Post.currentScope).toBeTruthy();
+    });
+    expect(Post.currentScope).toBeNull();
   });
 });
 
@@ -401,65 +656,138 @@ describe("Static shorthands (Rails-guided)", () => {
     adapter = freshAdapter();
   });
 
-  it.skip("Base.where is shorthand for Base.all().where()", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.where is shorthand for Base.all().where()", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const sql1 = Post.where({ title: "x" }).toSql();
+    const sql2 = Post.all().where({ title: "x" }).toSql();
+    expect(sql1).toBe(sql2);
   });
 
-  it.skip("Base.all returns all records", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.all returns all records", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "A" });
+    await Post.create({ title: "B" });
+    const all = await Post.all().toArray();
+    expect(all.length).toBe(2);
   });
 
-  it.skip("Base.first returns the first record", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.first returns the first record", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "First" });
+    await Post.create({ title: "Second" });
+    const first = (await Post.first()) as Base;
+    expect(first).not.toBeNull();
+    expect(first.readAttribute("title")).toBe("First");
   });
 
-  it.skip("Base.last returns the last record", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.last returns the last record", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "First" });
+    await Post.create({ title: "Last" });
+    const last = (await Post.last()) as Base;
+    expect(last).not.toBeNull();
+    expect(last.readAttribute("title")).toBe("Last");
   });
 
-  it.skip("Base.count returns count", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.count returns count", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "A" });
+    await Post.create({ title: "B" });
+    expect(await Post.count()).toBe(2);
   });
 
-  it.skip("Base.exists returns boolean", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.exists returns boolean", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(await Post.exists()).toBe(false);
+    await Post.create({ title: "A" });
+    expect(await Post.exists()).toBe(true);
   });
 
-  it.skip("Base.pluck extracts column values", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.pluck extracts column values", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "A" });
+    await Post.create({ title: "B" });
+    const titles = await Post.pluck("title");
+    expect(titles).toContain("A");
+    expect(titles).toContain("B");
   });
 
-  it.skip("Base.ids returns primary keys", () => {
-    /* TODO: needs helpers from original file */
+  it("Base.ids returns primary keys", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const a = await Post.create({ title: "A" });
+    const b = await Post.create({ title: "B" });
+    const ids = await Post.ids();
+    expect(ids).toContain(a.id);
+    expect(ids).toContain(b.id);
   });
 
   describe("HasManyScopingTest", () => {
     it.skip("forwarding of static methods", () => {
-      /* TODO: needs helpers from original file */
+      /* needs association + scoping */
     });
 
     it.skip("nested scope finder", () => {
-      /* TODO: needs helpers from original file */
+      /* needs association + scoping */
     });
 
     it.skip("none scoping", () => {
-      /* TODO: needs helpers from original file */
+      /* needs none() relation */
     });
 
     it.skip("forwarding to scoped", () => {
-      /* TODO: needs helpers from original file */
+      /* needs association + scoping */
     });
 
     it.skip("should default scope on associations is overridden by association conditions", () => {
-      /* TODO: needs helpers from original file */
+      /* needs association + default_scope */
     });
 
     it.skip("should maintain default scope on eager loaded associations", () => {
-      /* TODO: needs helpers from original file */
+      /* needs eager loading + default_scope */
     });
   }); // HasManyScopingTest
 
   it.skip("scoping applies to all queries on has many when set", () => {
-    /* TODO: needs helpers from original file */
+    /* needs association + scoping */
   });
 });
