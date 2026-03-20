@@ -50,6 +50,7 @@ export class Base extends Model {
   static _tableNamePrefix = "";
   static _tableNameSuffix = "";
   static _protectedEnvironments: string[] = ["production"];
+  static _lockingColumn: string = "lock_version";
 
   /**
    * List of environments where destructive actions are prohibited.
@@ -136,6 +137,26 @@ export class Base extends Model {
 
   static set primaryKey(key: string | string[]) {
     this._primaryKey = key;
+  }
+
+  /**
+   * The column used for optimistic locking. Defaults to "lock_version".
+   *
+   * Mirrors: ActiveRecord::Locking::Optimistic.locking_column
+   */
+  static get lockingColumn(): string {
+    return this._lockingColumn;
+  }
+
+  static set lockingColumn(col: string) {
+    this._lockingColumn = col;
+  }
+
+  /**
+   * Whether this model uses optimistic locking.
+   */
+  static get lockingEnabled(): boolean {
+    return this._attributeDefinitions.has(this._lockingColumn);
   }
 
   /**
@@ -2344,21 +2365,22 @@ export class Base extends Model {
 
     const pkWhere = ctor._buildPkWhere(this.id);
 
-    // Optimistic locking: include lock_version in WHERE and increment it
+    // Optimistic locking: include lock column in WHERE and increment it
     let lockClause = "";
-    if (ctor._attributeDefinitions.has("lock_version")) {
-      const rawVersion = this.readAttribute("lock_version");
+    const lockCol = ctor.lockingColumn;
+    if (ctor.lockingEnabled) {
+      const rawVersion = this.readAttribute(lockCol);
       const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
       if (rawVersion == null) {
-        lockClause = ` AND "lock_version" IS NULL`;
+        lockClause = ` AND "${lockCol}" IS NULL`;
       } else {
-        lockClause = ` AND "lock_version" = ${currentVersion}`;
+        lockClause = ` AND "${lockCol}" = ${currentVersion}`;
       }
-      this._attributes.set("lock_version", currentVersion + 1);
+      this._attributes.set(lockCol, currentVersion + 1);
     }
 
-    const finalSetClause = ctor._attributeDefinitions.has("lock_version")
-      ? `${setClause}, "lock_version" = ${this.readAttribute("lock_version")}`
+    const finalSetClause = ctor.lockingEnabled
+      ? `${setClause}, "${lockCol}" = ${this.readAttribute(lockCol)}`
       : setClause;
 
     const sql = `UPDATE "${table.name}" SET ${finalSetClause} WHERE ${pkWhere}${lockClause}`;
@@ -2376,8 +2398,9 @@ export class Base extends Model {
    */
   async update(attrs: Record<string, unknown>): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
-    if ("lock_version" in attrs && ctor._attributeDefinitions.has("lock_version")) {
-      throw new Error("lock_version cannot be updated explicitly");
+    const lockCol = ctor.lockingColumn;
+    if (lockCol in attrs && ctor.lockingEnabled) {
+      throw new Error(`${lockCol} cannot be updated explicitly`);
     }
     for (const [key, value] of Object.entries(attrs)) {
       this.writeAttribute(key, value);
@@ -2418,12 +2441,13 @@ export class Base extends Model {
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
         let lockClause = "";
-        if (ctor._attributeDefinitions.has("lock_version")) {
-          const currentVersion = this.readAttribute("lock_version");
+        const lockCol = ctor.lockingColumn;
+        if (ctor.lockingEnabled) {
+          const currentVersion = this.readAttribute(lockCol);
           if (currentVersion == null) {
-            lockClause = ` AND "lock_version" IS NULL`;
+            lockClause = ` AND "${lockCol}" IS NULL`;
           } else {
-            lockClause = ` AND "lock_version" = ${Number(currentVersion) || 0}`;
+            lockClause = ` AND "${lockCol}" = ${Number(currentVersion) || 0}`;
           }
         }
 
@@ -2544,6 +2568,12 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#lock!
    */
   async lockBang(lockClause: string = "FOR UPDATE"): Promise<this> {
+    if (this.changed) {
+      const dirtyAttrs = this.changedAttributes.map((a) => `"${a}"`).join(", ");
+      throw new Error(
+        `Locking a record with unpersisted changes is not supported. Changed attributes: ${dirtyAttrs}. Use save to persist the changes, or reload to discard them explicitly.`,
+      );
+    }
     const ctor = this.constructor as typeof Base;
     const sql = `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)} ${lockClause}`;
     const rows = await ctor.adapter.execute(sql);
@@ -2569,11 +2599,28 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#with_lock
    */
-  async withLock(fn?: (record: this) => Promise<void> | void): Promise<void> {
+  async withLock(
+    lockOrFnOrOpts?:
+      | string
+      | ((record: this) => Promise<void> | void)
+      | { lock?: string; requiresNew?: boolean; isolation?: string },
+    fn?: (record: this) => Promise<void> | void,
+  ): Promise<void> {
+    let lockClause = "FOR UPDATE";
+    let callback = fn;
+
+    if (typeof lockOrFnOrOpts === "function") {
+      callback = lockOrFnOrOpts;
+    } else if (typeof lockOrFnOrOpts === "string") {
+      lockClause = lockOrFnOrOpts;
+    } else if (lockOrFnOrOpts && typeof lockOrFnOrOpts === "object") {
+      if (lockOrFnOrOpts.lock) lockClause = lockOrFnOrOpts.lock;
+    }
+
     const { transaction } = await import("./transactions.js");
     await transaction(this.constructor as typeof Base, async () => {
-      await this.lockBang();
-      if (fn) await fn(this);
+      await this.lockBang(lockClause);
+      if (callback) await callback(this);
     });
   }
 
