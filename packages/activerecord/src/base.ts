@@ -2399,7 +2399,7 @@ export class Base extends Model {
   async update(attrs: Record<string, unknown>): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
     const lockCol = ctor.lockingColumn;
-    if (lockCol in attrs && ctor.lockingEnabled) {
+    if (Object.hasOwn(attrs, lockCol) && ctor.lockingEnabled) {
       throw new Error(`${lockCol} cannot be updated explicitly`);
     }
     for (const [key, value] of Object.entries(attrs)) {

@@ -737,10 +737,18 @@ describe("PessimisticLockingTest", () => {
       }
     }
     const p = await Person.create({ name: "Test" });
+    const executedSql: string[] = [];
+    const origExecute = adapter.execute.bind(adapter);
+    adapter.execute = async (sql: string, binds?: unknown[]) => {
+      executedSql.push(sql);
+      return origExecute(sql, binds);
+    };
     await transaction(Person, async () => {
-      await p.lockBang("FOR UPDATE");
+      await p.lockBang("FOR NO KEY UPDATE");
       expect(p.readAttribute("name")).toBe("Test");
     });
+    const lockSql = executedSql.find((s) => s.includes("FOR NO KEY UPDATE"));
+    expect(lockSql).toBeDefined();
   });
 
   it.skip("with lock sets isolation", () => {
