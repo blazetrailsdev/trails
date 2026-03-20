@@ -4,7 +4,7 @@ Current state: **57%** (4,777 / 8,385 tests). 3,367 skipped, 33 wrong describe, 
 
 ## How coverage is measured
 
-`npm run convention:compare --package activerecord` matches our test names against the Rails test suite. Coverage goes up as a side effect of implementing features.
+`npm run convention:compare -- --package activerecord` matches our test names against the Rails test suite. Coverage goes up as a side effect of implementing features.
 
 ## Two workstreams
 

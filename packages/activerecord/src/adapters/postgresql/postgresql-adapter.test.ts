@@ -629,14 +629,11 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
       await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
       const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
-      const d = rows[0].d;
-      if (d instanceof Date) {
-        expect(d.getUTCFullYear()).toBe(2023);
-        expect(d.getUTCMonth()).toBe(5);
-        expect(d.getUTCDate()).toBe(15);
-      } else {
-        expect(String(d)).toContain("2023-06-15");
-      }
+      const d = rows[0].d as Date;
+      expect(d).toBeInstanceOf(Date);
+      expect(d.getUTCFullYear()).toBe(2023);
+      expect(d.getUTCMonth()).toBe(5);
+      expect(d.getUTCDate()).toBe(15);
     });
 
     it.skip("date decoding disabled", async () => {
