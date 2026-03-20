@@ -369,14 +369,16 @@ export abstract class Migration {
    */
   async createTable(
     name: string,
-    optionsOrFn?: { id?: boolean } | ((t: TableDefinition) => void),
+    optionsOrFn?:
+      | { id?: boolean; force?: boolean; ifNotExists?: boolean }
+      | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "createTable", args: [name, optionsOrFn, fn] });
       return;
     }
-    let options: { id?: boolean } = {};
+    let options: { id?: boolean; force?: boolean; ifNotExists?: boolean } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 
     if (typeof optionsOrFn === "function") {
@@ -386,6 +388,24 @@ export abstract class Migration {
       definer = fn;
     }
 
+    if (name.length > 64) {
+      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+    }
+
+    if (options.force && options.ifNotExists) {
+      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
+    }
+
+    if (options.force) {
+      if (await this.tableExists(name)) {
+        await this.dropTable(name);
+      }
+    }
+
+    if (options.ifNotExists && (await this.tableExists(name))) {
+      return;
+    }
+
     const td = new TableDefinition(name, { ...options, adapterName: this._adapterName });
     if (definer) definer(td);
 
@@ -393,7 +413,7 @@ export abstract class Migration {
 
     // Create indexes
     for (const idx of td.indexes) {
-      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_")}`;
+      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
       const unique = idx.unique ? "UNIQUE " : "";
       const cols = idx.columns.map((c) => `"${c}"`).join(", ");
       await this.adapter.executeMutation(
@@ -424,10 +444,13 @@ export abstract class Migration {
     tableName: string,
     columnName: string,
     type: ColumnType,
-    options: ColumnOptions = {},
+    options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addColumn", args: [tableName, columnName, type, options] });
+      return;
+    }
+    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
       return;
     }
     const sqlType = this._sqlType(type, options);
@@ -444,9 +467,16 @@ export abstract class Migration {
    *
    * Mirrors: ActiveRecord::Migration#remove_column
    */
-  async removeColumn(tableName: string, columnName: string): Promise<void> {
+  async removeColumn(
+    tableName: string,
+    columnName: string,
+    options: { ifExists?: boolean } = {},
+  ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName] });
+      this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName, options] });
+      return;
+    }
+    if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
     }
     await this.adapter.executeMutation(`ALTER TABLE "${tableName}" DROP COLUMN "${columnName}"`);
@@ -482,7 +512,7 @@ export abstract class Migration {
       return;
     }
     const cols = Array.isArray(columns) ? columns : [columns];
-    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_")}`;
+    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_and_")}`;
     const unique = options.unique ? "UNIQUE " : "";
 
     await this.adapter.executeMutation(
@@ -508,7 +538,7 @@ export abstract class Migration {
       indexName = options.name;
     } else if (options.column) {
       const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${tableName}_on_${cols.join("_")}`;
+      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
     } else {
       throw new Error("Must specify either name or column for remove_index");
     }
@@ -842,7 +872,7 @@ export abstract class Migration {
    */
   indexName(tableName: string, options: { column?: string | string[] }): string {
     const cols = Array.isArray(options.column) ? options.column : [options.column ?? ""];
-    return `index_${tableName}_on_${cols.join("_")}`;
+    return `index_${tableName}_on_${cols.join("_and_")}`;
   }
 
   /**
@@ -1254,6 +1284,21 @@ export class Schema {
 export class MigrationContext {
   private _tables = new Set<string>();
   private _columns = new Map<string, Set<string>>();
+  private _columnMeta = new Map<
+    string,
+    Map<
+      string,
+      {
+        type: string;
+        primaryKey?: boolean;
+        null?: boolean;
+        default?: unknown;
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      }
+    >
+  >();
   private _indexes = new Map<string, { columns: string[]; unique: boolean; name?: string }[]>();
   tableNamePrefix = "";
   tableNameSuffix = "";
@@ -1266,11 +1311,20 @@ export class MigrationContext {
 
   async createTable(
     name: string,
-    options?: { primaryKey?: string | false; force?: boolean; id?: boolean },
+    options?: { primaryKey?: string | false; force?: boolean; ifNotExists?: boolean; id?: boolean },
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
+    if (name.length > 64) {
+      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+    }
+    if (options?.force && options?.ifNotExists) {
+      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
+    }
     if (options?.force) {
       await this.dropTable(name).catch(() => {});
+    }
+    if (options?.ifNotExists && this.tableExists(name)) {
+      return;
     }
     const td = new TableDefinition(name, { id: options?.id, adapterName: this._adapterName });
     if (fn) fn(td);
@@ -1281,12 +1335,55 @@ export class MigrationContext {
       cols.add(col.name);
     }
     this._columns.set(name, cols);
+
+    // Store column metadata
+    const meta = new Map<
+      string,
+      {
+        type: string;
+        primaryKey?: boolean;
+        null?: boolean;
+        default?: unknown;
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      }
+    >();
+    if (options?.id !== false) {
+      meta.set("id", { type: "integer", primaryKey: true });
+    }
+    for (const col of td.columns) {
+      if (col.name === "id" && meta.has("id")) continue;
+      meta.set(col.name, {
+        type: col.type,
+        primaryKey: col.options.primaryKey,
+        null: col.options.null,
+        default: col.options.default,
+        limit: col.options.limit,
+        precision: col.options.precision,
+        scale: col.options.scale,
+      });
+    }
+    this._columnMeta.set(name, meta);
+
+    // Create indexes from table definition
+    for (const idx of td.indexes) {
+      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
+      const unique = idx.unique ? "UNIQUE " : "";
+      const colsList = idx.columns.map((c) => `"${c}"`).join(", ");
+      await this.adapter.executeMutation(
+        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${colsList})`,
+      );
+      if (!this._indexes.has(name)) this._indexes.set(name, []);
+      this._indexes.get(name)!.push({ ...idx, name: indexName });
+    }
   }
 
   async dropTable(name: string): Promise<void> {
     await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
     this._tables.delete(name);
     this._columns.delete(name);
+    this._columnMeta.delete(name);
     this._indexes.delete(name);
   }
 
@@ -1339,13 +1436,42 @@ export class MigrationContext {
     );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
+    if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
+    this._columnMeta.get(table)!.set(column, {
+      type,
+      null: _options?.null,
+      default: _options?.default,
+      limit: _options?.limit,
+      precision: _options?.precision,
+      scale: _options?.scale,
+    });
   }
 
-  async removeColumn(table: string, ...columns: string[]): Promise<void> {
-    for (const column of columns) {
-      await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${column}"`);
-      this._columns.get(table)?.delete(column);
+  async removeColumn(
+    table: string,
+    columnOrColumns: string,
+    optionsOrColumn?: string | { ifExists?: boolean },
+    ...rest: string[]
+  ): Promise<void> {
+    // Support variadic: removeColumn("t", "a", "b", "c")
+    if (typeof optionsOrColumn === "string") {
+      if (rest.length > 0 && typeof rest[rest.length - 1] === "object") {
+        throw new Error("Cannot mix variadic column names with options object in removeColumn");
+      }
+      const allCols = [columnOrColumns, optionsOrColumn, ...rest];
+      for (const col of allCols) {
+        await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
+        this._columns.get(table)?.delete(col);
+        this._columnMeta.get(table)?.delete(col);
+      }
+      return;
     }
+    if (optionsOrColumn?.ifExists && !this.columnExists(table, columnOrColumns)) {
+      return;
+    }
+    await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${columnOrColumns}"`);
+    this._columns.get(table)?.delete(columnOrColumns);
+    this._columnMeta.get(table)?.delete(columnOrColumns);
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
@@ -1354,6 +1480,12 @@ export class MigrationContext {
     if (cols) {
       cols.delete(from);
       cols.add(to);
+    }
+    const meta = this._columnMeta.get(table);
+    if (meta && meta.has(from)) {
+      const entry = meta.get(from)!;
+      meta.delete(from);
+      meta.set(to, entry);
     }
   }
 
@@ -1371,6 +1503,19 @@ export class MigrationContext {
       await this.adapter.executeMutation(
         `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`,
       );
+    }
+    const meta = this._columnMeta.get(table);
+    if (meta && meta.has(column)) {
+      const entry = meta.get(column)!;
+      meta.set(column, {
+        ...entry,
+        type,
+        null: _options?.null ?? entry.null,
+        default: _options?.default ?? entry.default,
+        limit: _options?.limit ?? entry.limit,
+        precision: _options?.precision ?? entry.precision,
+        scale: _options?.scale ?? entry.scale,
+      });
     }
   }
 
@@ -1428,6 +1573,11 @@ export class MigrationContext {
       this._columns.delete(fullFrom);
       this._columns.set(fullTo, cols);
     }
+    const meta = this._columnMeta.get(fullFrom);
+    if (meta) {
+      this._columnMeta.delete(fullFrom);
+      this._columnMeta.set(fullTo, meta);
+    }
     const indexes = this._indexes.get(fullFrom);
     if (indexes) {
       this._indexes.delete(fullFrom);
@@ -1467,5 +1617,34 @@ export class MigrationContext {
 
   indexExists(table: string, column: string): boolean {
     return this._indexes.get(table)?.some((i) => i.columns.includes(column)) ?? false;
+  }
+
+  tables(): string[] {
+    return Array.from(this._tables).sort();
+  }
+
+  columns(tableName: string): Array<{
+    name: string;
+    type: string;
+    primaryKey?: boolean;
+    null?: boolean;
+    default?: unknown;
+    limit?: number;
+    precision?: number;
+    scale?: number;
+  }> {
+    const meta = this._columnMeta.get(tableName);
+    if (meta) {
+      return Array.from(meta.entries()).map(([name, info]) => ({ name, ...info }));
+    }
+    const cols = this._columns.get(tableName);
+    if (!cols) return [];
+    return Array.from(cols).map((name) => ({ name, type: "string" }));
+  }
+
+  indexes(tableName: string): Array<{ columns: string[]; unique: boolean; name?: string }> {
+    const idxs = this._indexes.get(tableName);
+    if (!idxs) return [];
+    return idxs.map((i) => ({ ...i, columns: [...i.columns] }));
   }
 }

@@ -141,6 +141,20 @@ describe("MigrationTest", () => {
     expect(ctx.indexExists("users", "email")).toBe(false);
   });
 
+  it("inline index from createTable block is tracked", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("posts", {}, (t) => {
+      t.string("slug");
+      t.index(["slug"], { unique: true });
+    });
+    expect(ctx.indexExists("posts", "slug")).toBe(true);
+    const indexes = ctx.indexes("posts");
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0].columns).toEqual(["slug"]);
+    expect(indexes[0].unique).toBe(true);
+    expect(indexes[0].name).toBe("index_posts_on_slug");
+  });
+
   it("rename table", async () => {
     const { ctx } = freshContext();
     await ctx.createTable("old_name", {}, (t) => {
@@ -934,36 +948,76 @@ describe("MigrationTest", () => {
     // Requires migration version tracking
   });
 
-  it.skip("create table with if not exists true", () => {
-    // Requires DDL migration runner
+  it("create table with if not exists true", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("things", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("things", { ifNotExists: true }, (t) => {
+      t.string("name");
+    });
+    expect(ctx.tableExists("things")).toBe(true);
   });
 
-  it.skip("create table raises for long table names", () => {
-    // Requires DDL migration runner
+  it("create table raises for long table names", async () => {
+    const { ctx } = freshContext();
+    const longName = "a".repeat(65);
+    await expect(ctx.createTable(longName, {})).rejects.toThrow(/too long/);
   });
 
-  it.skip("create table with force and if not exists", () => {
-    // Requires DDL migration runner
+  it("create table with force and if not exists", async () => {
+    const { ctx } = freshContext();
+    await expect(ctx.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
+      /cannot be used simultaneously/i,
+    );
   });
 
-  it.skip("create table with indexes and if not exists true", () => {
-    // Requires DDL migration runner
+  it("create table with indexes and if not exists true", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("things", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.addIndex("things", "name");
+    await ctx.createTable("things", { ifNotExists: true }, (t) => {
+      t.string("name");
+    });
+    expect(ctx.tableExists("things")).toBe(true);
   });
 
-  it.skip("create table with force true does not drop nonexisting table", () => {
-    // Requires DDL migration runner
+  it("create table with force true does not drop nonexisting table", async () => {
+    const { ctx } = freshContext();
+    expect(ctx.tableExists("nonexistent")).toBe(false);
+    await ctx.createTable("nonexistent", { force: true }, (t) => {
+      t.string("name");
+    });
+    expect(ctx.tableExists("nonexistent")).toBe(true);
   });
 
-  it.skip("remove column with if exists set", () => {
-    // Requires DDL migration runner
+  it("remove column with if exists set", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.removeColumn("users", "nonexistent", { ifExists: true });
+    expect(ctx.tableExists("users")).toBe(true);
   });
 
-  it.skip("add column with casted type if not exists set to true", () => {
-    // Requires DDL migration runner
+  it("add column with casted type if not exists set to true", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.addColumn("users", "name", "string", { ifNotExists: true });
+    expect(ctx.columnExists("users", "name")).toBe(true);
   });
 
-  it.skip("add column with if not exists set to true does not raise if type is different", () => {
-    // Requires DDL migration runner
+  it("add column with if not exists set to true does not raise if type is different", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.addColumn("users", "name", "integer", { ifNotExists: true });
+    expect(ctx.columnExists("users", "name")).toBe(true);
   });
 
   it.skip("method missing delegates to connection", () => {
