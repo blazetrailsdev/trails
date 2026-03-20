@@ -1060,12 +1060,12 @@ export class CollectionProxy {
   }
 
   private async _withoutStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
-    const wasStrict = (this._record as any)._strictLoading;
-    (this._record as any)._strictLoading = false;
+    const wasStrict = this._record._strictLoading;
+    this._record._strictLoading = false;
     try {
       return await fn();
     } finally {
-      (this._record as any)._strictLoading = wasStrict;
+      this._record._strictLoading = wasStrict;
     }
   }
 

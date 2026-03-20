@@ -579,10 +579,19 @@ describe("StrictLoadingTest", () => {
       foreignKey: "sl_thr_tag_id",
       className: "SlThrTag",
     });
+    Associations.hasMany.call(SlThrAuthor, "slThrTags", {
+      through: "slThrPosts",
+      source: "slThrTags",
+      className: "SlThrTag",
+    });
     const author = await SlThrAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
-      loadHasMany(author, "slThrPosts", { foreignKey: "sl_thr_author_id" }),
+      loadHasMany(author, "slThrTags", {
+        through: "slThrPosts",
+        source: "slThrTags",
+        className: "SlThrTag",
+      }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
 
@@ -593,20 +602,43 @@ describe("StrictLoadingTest", () => {
         this.adapter = adapter;
       }
     }
-    class SlHotProfile extends Base {
+    class SlHotAccount extends Base {
       static {
         this.attribute("sl_hot_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class SlHotProfile extends Base {
+      static {
+        this.attribute("sl_hot_account_id", "integer");
         this.attribute("bio", "string");
         this.adapter = adapter;
       }
     }
     registerModel("SlHotAuthor", SlHotAuthor);
+    registerModel("SlHotAccount", SlHotAccount);
     registerModel("SlHotProfile", SlHotProfile);
-    Associations.hasOne.call(SlHotAuthor, "slHotProfile", { foreignKey: "sl_hot_author_id" });
+    Associations.hasOne.call(SlHotAuthor, "slHotAccount", {
+      foreignKey: "sl_hot_author_id",
+      className: "SlHotAccount",
+    });
+    Associations.hasOne.call(SlHotAccount, "slHotProfile", {
+      foreignKey: "sl_hot_account_id",
+      className: "SlHotProfile",
+    });
+    Associations.hasOne.call(SlHotAuthor, "slHotProfile", {
+      through: "slHotAccount",
+      source: "slHotProfile",
+      className: "SlHotProfile",
+    });
     const author = await SlHotAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
-      loadHasOne(author, "slHotProfile", { foreignKey: "sl_hot_author_id" }),
+      loadHasOne(author, "slHotProfile", {
+        through: "slHotAccount",
+        source: "slHotProfile",
+        className: "SlHotProfile",
+      }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
   it.skip("strict loading with includes prevents lazy loading", () => {});
@@ -697,9 +729,8 @@ describe("StrictLoadingTest", () => {
         this.adapter = adapter;
       }
     }
-    const a = await SlcAuthor.create({ name: "Test" });
-    a.strictLoadingBang();
-    const count = await SlcAuthor.all().count();
+    await SlcAuthor.create({ name: "Test" });
+    const count = await SlcAuthor.all().strictLoading().count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
@@ -710,9 +741,8 @@ describe("StrictLoadingTest", () => {
         this.adapter = adapter;
       }
     }
-    const a = await SlpAuthor.create({ name: "Test" });
-    a.strictLoadingBang();
-    const names = await SlpAuthor.all().pluck("name");
+    await SlpAuthor.create({ name: "Test" });
+    const names = await SlpAuthor.all().strictLoading().pluck("name");
     expect(names).toContain("Test");
   });
 
@@ -725,9 +755,7 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SlsAuthor.create({ name: "Test", age: 30 });
-    const a = await SlsAuthor.first();
-    (a as any)._strictLoading = true;
-    const total = await SlsAuthor.all().sum("age");
+    const total = await SlsAuthor.all().strictLoading().sum("age");
     expect(total).toBe(30);
   });
 
@@ -739,10 +767,8 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SlszAuthor.create({ name: "Test" });
-    const a = await SlszAuthor.first();
-    (a as any)._strictLoading = true;
-    const count = await SlszAuthor.all().count();
-    expect(count).toBe(1);
+    const size = await SlszAuthor.all().strictLoading().size();
+    expect(size).toBe(1);
   });
 
   it("strict loading with empty does not raise", async () => {
@@ -752,10 +778,9 @@ describe("StrictLoadingTest", () => {
         this.adapter = adapter;
       }
     }
-    const a = await SleAuthor.create({ name: "Test" });
-    a.strictLoadingBang();
-    const empty = await SleAuthor.where({ name: "nonexistent" }).toArray();
-    expect(empty).toHaveLength(0);
+    await SleAuthor.create({ name: "Test" });
+    const empty = await SleAuthor.where({ name: "nonexistent" }).strictLoading().isEmpty();
+    expect(empty).toBe(true);
   });
 
   it("strict loading with any does not raise", async () => {
@@ -766,10 +791,8 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SlaAuthor.create({ name: "Test" });
-    const a = await SlaAuthor.first();
-    (a as any)._strictLoading = true;
-    const exists = await SlaAuthor.all().exists();
-    expect(exists).toBe(true);
+    const any = await SlaAuthor.all().strictLoading().isAny();
+    expect(any).toBe(true);
   });
 
   it("strict loading with none does not raise", async () => {
@@ -779,9 +802,8 @@ describe("StrictLoadingTest", () => {
         this.adapter = adapter;
       }
     }
-    const a = await SlnAuthor.create({ name: "Test" });
-    a.strictLoadingBang();
-    const none = await SlnAuthor.none().toArray();
+    await SlnAuthor.create({ name: "Test" });
+    const none = await SlnAuthor.none().strictLoading().toArray();
     expect(none).toHaveLength(0);
   });
 
@@ -793,9 +815,7 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SlexAuthor.create({ name: "Test" });
-    const a = await SlexAuthor.first();
-    (a as any)._strictLoading = true;
-    const exists = await SlexAuthor.all().exists();
+    const exists = await SlexAuthor.all().strictLoading().exists();
     expect(exists).toBe(true);
   });
 
@@ -807,8 +827,7 @@ describe("StrictLoadingTest", () => {
       }
     }
     const a = await SliAuthor.create({ name: "Test" });
-    a.strictLoadingBang();
-    const ids = await SliAuthor.all().ids();
+    const ids = await SliAuthor.all().strictLoading().ids();
     expect(ids).toContain(a.id);
   });
 
@@ -820,10 +839,8 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SllAuthor.create({ name: "Test" });
-    const a = await SllAuthor.first();
-    (a as any)._strictLoading = true;
-    const all = await SllAuthor.all().toArray();
-    expect(all.length).toBeGreaterThanOrEqual(1);
+    const len = await SllAuthor.all().strictLoading().length();
+    expect(len).toBeGreaterThanOrEqual(1);
   });
 
   it("strict loading with loaded does not raise", async () => {
@@ -834,10 +851,10 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SlldAuthor.create({ name: "Test" });
-    const a = await SlldAuthor.first();
-    (a as any)._strictLoading = true;
-    const all = await SlldAuthor.all().toArray();
-    expect(all.length).toBeGreaterThanOrEqual(1);
+    const rel = SlldAuthor.all().strictLoading();
+    expect(rel.isLoaded).toBe(false);
+    await rel.toArray();
+    expect(rel.isLoaded).toBe(true);
   });
 
   it("strict loading with presence does not raise", async () => {
@@ -848,10 +865,9 @@ describe("StrictLoadingTest", () => {
       }
     }
     await SlprAuthor.create({ name: "Test" });
-    const a = await SlprAuthor.first();
-    (a as any)._strictLoading = true;
-    const exists = await SlprAuthor.all().exists();
-    expect(exists).toBe(true);
+    const rel = SlprAuthor.all().strictLoading();
+    const presence = await rel.presence();
+    expect(presence).toBe(rel);
   });
   it("strict loading!", async () => {
     class SlBangAuthor extends Base {
@@ -962,7 +978,7 @@ describe("StrictLoadingTest", () => {
       options: { className: "SlcnBook", foreignKey: "sl_cn_author_id" },
     });
     const book = new SlcnBook({ title: "New Book" });
-    await expect(proxy.push(book)).resolves.not.toThrow();
+    await proxy.push(book);
   });
 
   it("strict loading on build is ignored", async () => {
@@ -1025,7 +1041,7 @@ describe("StrictLoadingTest", () => {
       options: { className: "SlwrBook", foreignKey: "sl_wr_author_id" },
     });
     const book = new SlwrBook({ title: "Written Book" });
-    await expect(proxy.replace([book])).resolves.not.toThrow();
+    await proxy.replace([book]);
   });
 
   it("strict loading with new record on concat is ignored", async () => {
@@ -1057,7 +1073,7 @@ describe("StrictLoadingTest", () => {
       options: { className: "SlnrBook", foreignKey: "sl_nr_author_id" },
     });
     const book = new SlnrBook({ title: "New Book" });
-    await expect(proxy.push(book)).resolves.not.toThrow();
+    await proxy.push(book);
   });
   it.skip("strict loading with new record on build is ignored", () => {});
   it.skip("strict loading with new record on writer is ignored", () => {});
