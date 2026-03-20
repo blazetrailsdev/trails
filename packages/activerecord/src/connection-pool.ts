@@ -7,12 +7,6 @@
 import type { DatabaseAdapter } from "./adapter.js";
 import type { DatabaseConfig } from "./database-configurations.js";
 
-export interface ConnectionPoolConfig {
-  size?: number;
-  checkoutTimeout?: number;
-  idleTimeout?: number;
-}
-
 export class ConnectionPool {
   readonly dbConfig: DatabaseConfig;
   readonly size: number;

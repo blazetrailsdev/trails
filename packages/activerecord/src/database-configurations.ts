@@ -16,6 +16,7 @@ export interface DatabaseConfigOptions {
   url?: string;
   replicaOf?: string;
   replica?: boolean;
+  _hidden?: boolean;
   [key: string]: unknown;
 }
 
@@ -120,7 +121,7 @@ export class DatabaseConfigurations {
       configs = configs.filter((c) => c.name === nameStr);
     }
     if (!options.includeHidden) {
-      configs = configs.filter((c) => !c.configuration._hidden);
+      configs = configs.filter((c) => c.configuration._hidden !== true);
     }
     return configs;
   }
@@ -156,8 +157,10 @@ export class DatabaseConfigurations {
   }
 
   private _isThreeLevelConfig(config: unknown): boolean {
-    if (typeof config !== "object" || config === null) return false;
-    const values = Object.values(config as Record<string, unknown>);
+    if (typeof config !== "object" || config === null || Array.isArray(config)) return false;
+    const obj = config as Record<string, unknown>;
+    if ("adapter" in obj || "url" in obj || "database" in obj) return false;
+    const values = Object.values(obj);
     if (values.length === 0) return false;
     return values.every((v) => typeof v === "object" && v !== null && !Array.isArray(v));
   }

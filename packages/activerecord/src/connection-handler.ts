@@ -30,15 +30,18 @@ export class ConnectionHandler {
           );
 
     if (!dbConfig.adapter) {
-      throw new Error(
-        `database configuration does not specify adapter: ${JSON.stringify(dbConfig.configuration)}`,
-      );
+      throw new Error("database configuration does not specify adapter");
     }
 
     const owner = options.owner ?? dbConfig.name;
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
     const poolKey = `${owner}:${role}:${shard}`;
+
+    const existing = this._pools.get(poolKey);
+    if (existing) {
+      existing.disconnect();
+    }
 
     const pool = new ConnectionPool(dbConfig, {
       role,
