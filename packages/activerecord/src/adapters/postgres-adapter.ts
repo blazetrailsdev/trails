@@ -341,9 +341,38 @@ export class PostgresAdapter implements DatabaseAdapter {
     await this.exec(`CREATE EXTENSION IF NOT EXISTS "${name}"`);
   }
 
-  async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
+  async disableExtension(
+    name: string,
+    options: { force?: "cascade"; schema?: string } = {},
+  ): Promise<void> {
     const cascade = options.force === "cascade" ? " CASCADE" : "";
-    await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+    if (options.schema) {
+      const client = await this.getClient();
+      try {
+        const { rows } = await client.query(`SHOW search_path`);
+        const originalSearchPath = rows[0]?.search_path as string;
+        await client.query(`SELECT set_config('search_path', $1, false)`, [options.schema]);
+        try {
+          await client.query(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+        } finally {
+          await client.query(`SELECT set_config('search_path', $1, false)`, [
+            originalSearchPath ?? "public",
+          ]);
+        }
+      } finally {
+        this.releaseClient(client);
+      }
+    } else {
+      await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+    }
+  }
+
+  async databaseExists(name: string): Promise<boolean> {
+    const rows = await this.execute(
+      `SELECT COUNT(*) AS count FROM pg_database WHERE datname = $1`,
+      [name],
+    );
+    return Number(rows[0].count) > 0;
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {

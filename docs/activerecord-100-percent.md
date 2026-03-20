@@ -1,251 +1,276 @@
-# ActiveRecord: Road to Feature Completeness
+# ActiveRecord: Road to 100%
 
-Current state: **52.2%** (4,374 OK / 8,385 Ruby tests). Additionally: 3,767 skipped stubs, 52 in wrong describe blocks, 244 with no TS equivalent.
+Current state: **57%** (4,777 / 8,385 tests). 3,367 skipped, 33 wrong describe, 2 missing files.
 
 ## How coverage is measured
 
-`npm run convention:compare` matches our test names against the Rails test suite. Test coverage is a trailing indicator — it goes up as a side effect of implementing features, not as a goal in itself.
+`npm run convention:compare -- --package activerecord` matches our test names against the Rails test suite. Coverage goes up as a side effect of implementing features.
 
 ## Two workstreams
 
-These can be worked on in parallel — they touch different files.
+These run in parallel — they touch different files and have minimal overlap.
 
 ---
 
-### Workstream A: Associations & Querying
+### Workstream A: Associations, Querying & Relations
 
-The goal is to make ActiveRecord associations work the way a Rails developer expects. Someone reading the Rails guides on associations should be able to write equivalent TypeScript.
+**~1,400 skipped tests.** The biggest chunk of remaining work. These features build on each other — order matters.
 
-#### A1: Through associations
+#### A1: Scoping & default_scope (~56 tests)
 
-Implement `has_many :through` so you can do things like:
+**Files:** scoping/relation-scoping.test.ts (53), plus scattered tests in relations.test.ts
 
-```ts
-// class Post extends Base { static { this.hasMany('tags', { through: 'taggings' }) } }
-const tags = await post.tags;
-Post.joins("tags").where({ tags: { name: "ruby" } });
-```
+Foundation for everything else — many association and querying tests depend on `default_scope`, `unscoped`, and `scoping`. Implement first.
 
-Partially implemented in #128: through-aware `build`/`create` on `CollectionProxy`,
-49 new passing tests covering basic through CRUD, polymorphic/STI through,
-nested through chains, and collection proxy operations (push/delete/replace/setIds).
+- `default_scope`, `unscoped`, `scoping` block
+- Scope merging/chaining on relations
+- `all` vs `unscoped` semantics
 
-Further progress in #130: 6 more tests unskipped covering callback ordering,
-scope filtering on targets, and error handling. Also adds error classes (`HasManyThroughCantAssociateThroughHasOneOrManyReflection`,
-`HasManyThroughNestedAssociationsAreReadonly`, `HasOneThroughNestedAssociationsAreReadonly`,
-`HasManyThroughOrderError`) — these aren't wired into CollectionProxy enforcement yet,
-that should be a separate PR when the write protection logic is implemented.
+#### A2: Where clause features (~67 tests)
 
-Remaining ~97 skipped tests need:
+**Files:** relation/where.test.ts (36), relation/where-chain.test.ts (31)
 
-- **SQL join generation** (~20): `joins`, `left_joins`, `inner_join`, `explicitly_joining_join_table`, `joining_has_many_through_*`
-- **Scope merging on through** (~15): `source_scope`, `through_scope_with_includes/joins`, `unscope`, `default_scope_on_target`
-- **Preload for nested through** (~25): all `*_preload` and `*_preload_via_joins` tests in nested-through
-- **Counter caches** (6): `update_counter_caches_on_*`
-- **Transactions** (2): `transaction_method_starts_transaction`, `through_model_to_create_transactions`
-- **Write protection enforcement** (~3): wire `HasManyThroughNestedAssociationsAreReadonly` etc. into CollectionProxy to raise on nested through writes
-- **Validation propagation** (3): `create_bang_should_raise`, `save_bang_should_raise`, `save_returns_falsy` when join record has errors
-- **Distinct on through** (~2): distinct through source/through reflection
-- **`_pushThrough` FK resolution**: currently uses convention-based `sourceFk`; should resolve the source association's configured `foreignKey` option to handle nonstandard FK columns correctly
-- **Order preservation**: through loader uses WHERE IN which returns by PK order; true order preservation needs ORDER BY support
+Depends on: A1 (scoping)
 
-This is the biggest missing feature — it unlocks join models, nested through chains, and through-source reflection. Also covers `has_one :through`.
+- `where.not`, `where.or`, `where.and`
+- Polymorphic `where` (type + id)
+- Range conditions, array conditions
+- `where.missing`, `where.associated`
 
-#### A2: Eager loading
+#### A3: Eager loading & preloading (~89 tests)
 
-Implement `includes`/`preload`/`eagerLoad` so N+1 queries can be avoided:
+**Files:** associations/eager.test.ts (69+20 missing), associations/nested-through-associations.test.ts (48)
 
-```ts
-const posts = await Post.includes("comments", "author").all();
-// comments and author are preloaded, no additional queries
-```
+Depends on: A1 (scoping), A2 (where)
 
-Partially started in #114. Needs: preloader, batch loading, nested eager loading, polymorphic eager loading.
+The preloader needs scoping and where support to generate correct subqueries. Nested through preloading is the hardest part.
 
-#### A3: Autosave associations
+- `includes`, `preload`, `eager_load`
+- Nested eager loading (`includes(comments: :author)`)
+- Polymorphic eager loading
+- Through + nested through preloading
 
-When you save a parent, its dirty children should be saved too:
+#### A4: Remaining association features (~250 tests)
 
-```ts
-const post = await Post.find(1);
-post.comments[0].body = "updated";
-await post.save(); // also saves the updated comment
-```
+**Files:** associations.test.ts (71), has-many-through (49), has-one-through (29), has-one (31), inverse (35), join-model (41), HABTM (43)
 
-Includes `markForDestruction`, validation propagation through nested models, and `accepts_nested_attributes_for`.
+Depends on: A3 (eager loading), A1 (scoping)
 
-#### A4: HABTM
+- Through association write protection (readonly enforcement)
+- Inverse association detection and setting
+- Has-one-through CRUD
+- HABTM bidirectional syncing, join table callbacks
+- Association scopes and conditions
+- `collection_singular_ids=` setter
+- Disable-joins through associations (28 tests)
 
-Implement `has_and_belongs_to_many` — the simpler many-to-many without an explicit join model:
+#### A5: Autosave & nested attributes (~81 tests)
 
-```ts
-// class Assembly extends Base { static { this.hasAndBelongsToMany('parts') } }
-await assembly.parts; // queries through assemblies_parts join table
-```
+**Files:** autosave-association.test.ts (62), nested-attributes.test.ts (19+18 wrong describe)
 
-Join table management, bidirectional syncing.
+Depends on: A4 (association features)
 
-#### A5: Scoping
+- `mark_for_destruction`, `_destroy` in nested attributes
+- Validation propagation through nested models
+- Autosave with through associations
+- `reject_if` / `limit` on nested attributes
+- Fix 18 wrong-describe tests (move to correct blocks)
 
-Make `default_scope`, `unscoped`, and `scoping` work so queries are composable:
+#### A6: Counter caches (~31 tests)
 
-```ts
-class PublishedPost extends Post {
-  static {
-    this.defaultScope((rel) => rel.where({ published: true }));
-  }
-}
-PublishedPost.all(); // automatically filtered
-PublishedPost.unscoped().all(); // bypasses default scope
-```
+**Files:** counter-cache.test.ts (31)
 
-#### A6: Where clause features
+Depends on: A4 (associations)
 
-`where.not`, `or`, `and`, polymorphic where, range conditions:
+- `counter_cache: true` on belongs_to
+- `increment_counter` / `decrement_counter` / `reset_counters`
+- Counter updates on create/destroy/reassignment
+- Polymorphic counter caches
 
-```ts
-Post.where.not({ status: "draft" });
-Post.where({ status: "published" }).or(Post.where({ featured: true }));
-Post.where({ created_at: [startDate, endDate] }); // BETWEEN
-```
+#### A7: Relation features (~80 tests)
+
+**Files:** relations.test.ts (16), batches.test.ts (13), load-async.test.ts (31), unsafe-raw-sql.test.ts (37)
+
+Depends on: A1 (scoping), A2 (where)
+
+- `find_each`, `find_in_batches`, `in_batches` with cursor
+- `load_async` / async relation loading
+- Unsafe raw SQL detection and sanitization
+- Remaining relation edge cases
 
 ---
 
-### Workstream B: Core ORM & Infrastructure
+### Workstream B: ORM Infrastructure & Adapters
 
-The goal is to make ActiveRecord work as a real ORM — connecting to databases, managing schemas, caching queries, and handling the lifecycle of records.
+**~1,200 skipped tests.** Database adapters, schema management, and ORM lifecycle features. Many are independent of each other.
 
-#### B1: Base class features
+#### B1: Base class & attributes (~55 tests)
 
-The core `Base` class needs attribute API completions, type casting, STI (single table inheritance), abstract classes, and configuration:
+**Files:** base.test.ts (53), attribute-methods.test.ts (2)
 
-```ts
-class Animal extends Base {}
-class Dog extends Animal {} // STI: stored in animals table with type='Dog'
-```
+No dependencies — can start immediately.
 
-#### B2: PostgreSQL types
+- Remaining base class edge cases (abstract class, table name customization)
+- Attribute method generation edge cases
+- `column_for_attribute`, `has_attribute?`
 
-Implement PG-specific types so you can store and query rich data:
+#### B2: Locking (~25 tests)
 
-```ts
-// Range columns
-Post.where({ published_during: new Range(startDate, endDate) });
-// Array columns
-Post.where("tags @> ARRAY[?]", ["ruby"]);
-// HStore columns
-Post.where("metadata -> 'color' = ?", "red");
-```
+**Files:** locking.test.ts (25)
 
-Requires `PG_TEST_URL` for integration tests.
+No dependencies.
 
-#### B3: PostgreSQL adapter & schema
+- Optimistic locking (`lock_version` column)
+- `StaleObjectError` on conflict
+- Pessimistic locking (`lock!`, `with_lock`)
 
-Schema introspection, DDL generation, and adapter-specific features so migrations and schema dumps work against real Postgres.
+#### B3: Strict loading (~34 tests)
 
-#### B4: Fixtures
+**Files:** strict-loading.test.ts (34)
 
-Implement fixture loading so tests can use declarative test data:
+No dependencies.
 
-```ts
-// test/fixtures/posts.yml equivalent
-const post = fixtures("posts", "first");
-```
+- `strict_loading!` on records and relations
+- `strict_loading_mode` (:all vs :n_plus_one_only)
+- `StrictLoadingViolationError`
 
-YAML parsing, caching, transactional fixtures for test isolation.
+#### B4: Reflection (~40 tests)
 
-#### B5: Query cache
+**Files:** reflection.test.ts (40)
 
-Cache repeated queries within a request/block so the same SELECT doesn't hit the DB twice:
+Depends on: A4 (association features) for through reflection tests
 
-```ts
-await QueryCache.run(async () => {
-  await Post.find(1); // hits DB
-  await Post.find(1); // served from cache
-});
-```
+- Through reflection, source reflection
+- Scope chain on reflections
+- `column_for_attribute`, `columns_for_attribute`
+- HABTM reflection
 
-#### B6: Schema & migrations
+#### B5: Fixtures (~111 tests)
 
-DDL generation so you can define schema changes in code:
+**Files:** fixtures.test.ts (111)
 
-```ts
-class CreatePosts extends Migration {
-  async change() {
-    await this.createTable("posts", (t) => {
-      t.string("title");
-      t.text("body");
-      t.timestamps();
-    });
-  }
-}
-```
+Depends on: B2 (locking) for some fixture tests
 
-Schema dumper, migrator, database tasks.
+- Transactional fixtures
+- Fixture caching and reloading
+- YAML fixture loading with ERB
+- Fixture associations and label references
 
-Implemented in #143: SchemaDumper foundation, `ifNotExists`/`ifExists` migration options,
-table name length validation, MigrationContext schema introspection (`tables`/`columns`/`indexes`).
-19 tests unskipped.
+#### B6: Schema, migrations & database tasks (~214 tests)
 
-Remaining follow-ups from review:
+**Files:** schema-dumper.test.ts (59), migration.test.ts (42), migrator.test.ts (35), tasks/database-tasks.test.ts (78)
 
-- **Adapter-specific existence checks**: `tableExists()` and `columnExists()` use SQLite-specific queries; need adapter-aware implementations for Postgres/MySQL
-- **Adapter-specific identifier length**: Hard-coded to 64 (Rails default); PostgreSQL limit is 63. Should use adapter-provided `maxIdentifierLength`
-- **SchemaDumper force:cascade**: Emit `force: :cascade` on `createTable` for idempotent schema loads
-- **SchemaDumper prefix/suffix**: `tableNamePrefix`/`tableNameSuffix` filtering for dump-to-file workflow
-- **SchemaDumper roundtrip**: Validate dumped schema can execute against MigrationContext and reproduce original structure
-- **Migration version tracking**: `schema_migrations` table, version ordering, `dump_schema_information`
-- **File-system migration discovery**: Loading migration files from a directory
-- **Advisory locking, multi-database, database task runners**
+Depends on: PostgreSQL adapter (B8) for PG-specific migration tests
 
-#### B7: Encryption
+- Schema dumper: force:cascade, prefix/suffix, timestamps, type-specific output
+- Migrator: file discovery, version tracking, advisory locking
+- Database tasks: create, drop, migrate, schema:dump, schema:load
+- Migration version tracking with `schema_migrations` table
 
-Encrypted attributes so sensitive data is encrypted at rest:
+#### B7: Encryption integration (~51 tests)
 
-```ts
-class User extends Base {
-  static {
-    this.encryptsAttribute("email", { deterministic: true });
-  }
-}
-await User.findBy({ email: "dean@example.com" }); // queries encrypted column
-```
+**Files:** encryption/encryptable-record.test.ts (51)
 
-#### B8: Connections
+Depends on: B1 (base class) — needs attribute hooks wired into Base
 
-Connection pooling, multi-database support, and adapter resolution:
+- `encrypts` attribute declaration on Base
+- Transparent encrypt/decrypt on read/write
+- Deterministic encryption for queryable columns
+- `with_encryption_context`, `without_encryption`
+- `ignore_case`, `downcase` options
 
-```ts
-Base.establishConnection({ adapter: 'postgresql', database: 'myapp' });
-Base.connectedTo({ role: 'reading' }, async () => { ... });
-```
+#### B8: PostgreSQL adapter & types (~300+ tests)
 
-#### B9: Reflection & insert-all
+**Files:** postgresql-adapter.test.ts (31), schema.test.ts (35), range.test.ts (36), hstore.test.ts (24), array.test.ts (22), connection.test.ts (22), uuid.test.ts (29), plus ~20 smaller files
 
-The reflection API lets you introspect associations and columns at runtime. Insert-all/upsert for bulk operations:
+No dependencies — can run in parallel with everything.
 
-```ts
-Post.reflectOnAssociation("comments"); // => HasManyReflection
-Post.insertAll([{ title: "A" }, { title: "B" }]); // single INSERT
-Post.upsertAll([{ id: 1, title: "Updated" }]); // INSERT ... ON CONFLICT
-```
+- Range type: contains, overlap, adjacent operators
+- HStore: key access, merge, contains
+- Array: push, remove, any/all operators
+- UUID primary keys
+- Schema introspection: columns, indexes, foreign keys
+- Connection: reconnection, prepared statements, session variables
+- Adapter-specific SQL: RETURNING, EXPLAIN, advisory locks
 
-#### B10: Locking, strict loading, and remaining features
+#### B9: Query cache & logs (~36+26 tests)
 
-Optimistic locking (`lock_version`), pessimistic locking (`lock!`), strict loading modes, counter caches, collection cache keys, instrumentation, and other smaller features.
+**Files:** query-cache.test.ts (36), query-logs.test.ts (remaining)
+
+No dependencies.
+
+- Cache invalidation on writes
+- Cache with different SQL variations
+- Query log tags and formatters
+
+#### B10: Insert-all (~45 tests)
+
+**Files:** insert-all.test.ts (45)
+
+Depends on: B8 (PG adapter) for RETURNING and adapter-specific ON CONFLICT
+
+- `insert_all!` with duplicate raising
+- `returning` option
+- `update_only` with real adapter-specific SET clauses
+- Timestamp auto-setting on upsert
+- Attribute alias support
+
+#### B11: Connections & config (~160 tests)
+
+**Files:** connection-pool.test.ts (41), connection-adapters/ (various, ~40), database-configurations/ (34), merge-and-resolve (40)
+
+Partially done (#146). Mostly threading/concurrency dependent.
+
+- Connection pool: async waiting, reaping, flushing
+- Hash config parsing, URL config resolution
+- Multi-database: `connected_to`, role switching, shard routing
+- Connection management middleware
+
+#### B12: Remaining features (~100 tests)
+
+**Files:** transactions.test.ts (17), serialized-attribute.test.ts (18+10), store.test.ts (4), multiparameter-attributes.test.ts (37), collection-cache-key.test.ts (30), integration.test.ts (33), enum.test.ts (8), dirty.test.ts (4)
+
+Various smaller features:
+
+- Transaction callbacks: `after_commit`, `after_rollback` ordering
+- Serialized attributes with JSON/YAML coders
+- Store accessors
+- Multiparameter attribute assignment (dates from form params)
+- Collection cache key generation
+- Enum edge cases
 
 ---
 
-### Wrong describes (52 remaining)
+### Wrong describes (33 remaining)
 
 Fix alongside whichever PR touches the relevant file:
 
-- nested-attributes.test.ts (18) — A3
-- PostgreSQL adapter files (26 across ~12 files) — B2/B3
-- scoping/relation-scoping.test.ts (1) — A5
-- associations/nested-error.test.ts (3) — A3
+- nested-attributes.test.ts (18) — A5
+- scoping/relation-scoping.test.ts (1) — A1
+- associations/nested-error.test.ts (3) — A5
+- PG adapter files (~11 across datatype, virtual-column, utils) — B8
 
 ---
+
+## Suggested execution order
+
+**Week 1 priority — parallel tracks:**
+
+- A1 (scoping, 56 tests) then A2 (where, 67) — unlocks everything in workstream A
+- B1 (base, 55) + B2 (locking, 25) + B3 (strict loading, 34) — independent, quick wins
+- B8 (PG adapter, 300+) — large but independent, chip away continuously
+
+**Week 2 priority:**
+
+- A3 (eager loading, 89) + A4 (associations, 250) — the biggest block
+- A6 (counter cache, 31) + A7 (relations, 80)
+- B5 (fixtures, 111) + B6 (schema/migrations, 214)
+
+**Final stretch:**
+
+- A5 (autosave/nested, 81)
+- B7 (encryption integration, 51) + B10 (insert-all, 45) + B12 (remaining, 100)
+- B9 (query cache, 62) + B11 (connections, 160)
 
 ## Tracking
 

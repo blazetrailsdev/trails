@@ -62,9 +62,24 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows[0].enable_seqscan).toBe("off");
     });
 
-    it.skip("set session variable nil", async () => {});
-    it.skip("set session variable default", async () => {});
-    it.skip("set session variable reset", async () => {});
+    it("set session variable nil", async () => {
+      await adapter.exec("SET enable_seqscan = DEFAULT");
+      const rows = await adapter.execute("SHOW enable_seqscan");
+      expect(rows[0].enable_seqscan).toBe("on");
+    });
+
+    it("set session variable default", async () => {
+      await adapter.exec("SET enable_seqscan = DEFAULT");
+      const rows = await adapter.execute("SHOW enable_seqscan");
+      expect(rows[0].enable_seqscan).toBe("on");
+    });
+
+    it("set session variable reset", async () => {
+      await adapter.exec("SET enable_seqscan = OFF");
+      await adapter.exec("RESET enable_seqscan");
+      const rows = await adapter.execute("SHOW enable_seqscan");
+      expect(rows[0].enable_seqscan).toBe("on");
+    });
 
     it("set session timezone", async () => {
       await adapter.exec("SET timezone = 'UTC'");
@@ -87,16 +102,37 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("advisory lock with xact", async () => {});
     it.skip("reconnection after actual disconnection", async () => {});
     it.skip("reconnection after simulated disconnection", async () => {});
-    it.skip("set client min messages", async () => {});
+    it("set client min messages", async () => {
+      await adapter.exec("SET client_min_messages = 'warning'");
+      const rows = await adapter.execute("SHOW client_min_messages");
+      expect(rows[0].client_min_messages).toBe("warning");
+    });
     it.skip("only warn on first encounter of unrecognized oid", async () => {});
     it.skip("only warn on first encounter of undefined column type", async () => {});
-    it.skip("default client min messages", async () => {});
+    it("default client min messages", async () => {
+      await adapter.exec("RESET client_min_messages");
+      const rows = await adapter.execute("SHOW client_min_messages");
+      expect(rows[0].client_min_messages).toBe("notice");
+    });
     it.skip("connection options", async () => {});
     it.skip("reset", async () => {});
     it.skip("reset with transaction", async () => {});
     it.skip("prepare false with binds", async () => {});
     it.skip("reconnection after actual disconnection with verify", async () => {});
-    it.skip("get and release advisory lock", () => {});
-    it.skip("release non existent advisory lock", () => {});
+    it("get and release advisory lock", async () => {
+      const lockRows = await adapter.execute("SELECT pg_try_advisory_lock(99999) AS locked");
+      try {
+        expect(lockRows[0].locked).toBe(true);
+        const unlockRows = await adapter.execute("SELECT pg_advisory_unlock(99999) AS unlocked");
+        expect(unlockRows[0].unlocked).toBe(true);
+      } finally {
+        await adapter.execute("SELECT pg_advisory_unlock(99999)");
+      }
+    });
+
+    it("release non existent advisory lock", async () => {
+      const rows = await adapter.execute("SELECT pg_advisory_unlock(88888) AS unlocked");
+      expect(rows[0].unlocked).toBe(false);
+    });
   });
 });

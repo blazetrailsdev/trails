@@ -625,10 +625,49 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("allowlist of warnings to ignore", async () => {});
     it.skip("allowlist of warning codes to ignore", async () => {});
     it.skip("does not raise notice level warnings", async () => {});
-    it.skip("date decoding enabled", async () => {});
-    it.skip("date decoding disabled", async () => {});
-    it.skip("disable extension with schema", async () => {});
-    it.skip("disable extension without schema", async () => {});
+    it("date decoding enabled", async () => {
+      await adapter.exec(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
+      await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
+      const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
+      const d = rows[0].d as Date;
+      expect(d).toBeInstanceOf(Date);
+      expect(d.getFullYear()).toBe(2023);
+      expect(d.getMonth()).toBe(5);
+      expect(d.getDate()).toBe(15);
+    });
+
+    it.skip("date decoding disabled", async () => {
+      /* needs adapter-level date decoding toggle */
+    });
+
+    it("disable extension with schema", async () => {
+      const wasEnabled = await adapter.extensionEnabled("hstore");
+      if (wasEnabled) await adapter.disableExtension("hstore");
+      await adapter.exec(`CREATE SCHEMA IF NOT EXISTS "ex_extensions"`);
+      try {
+        await adapter.exec(`CREATE EXTENSION "hstore" WITH SCHEMA "ex_extensions"`);
+        const before = await adapter.extensionEnabled("hstore");
+        expect(before).toBe(true);
+        await adapter.disableExtension("hstore", { schema: "ex_extensions" });
+        const after = await adapter.extensionEnabled("hstore");
+        expect(after).toBe(false);
+      } finally {
+        await adapter.exec(`DROP SCHEMA IF EXISTS "ex_extensions" CASCADE`);
+        if (wasEnabled) await adapter.enableExtension("hstore");
+      }
+    });
+
+    it("disable extension without schema", async () => {
+      const wasEnabled = await adapter.extensionEnabled("hstore");
+      if (!wasEnabled) await adapter.enableExtension("hstore");
+      try {
+        await adapter.disableExtension("hstore");
+        const enabled = await adapter.extensionEnabled("hstore");
+        expect(enabled).toBe(false);
+      } finally {
+        if (wasEnabled) await adapter.enableExtension("hstore");
+      }
+    });
     it("connection error", async () => {
       const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
@@ -639,8 +678,12 @@ describeIfPg("PostgresAdapter", () => {
       /* needs reconnection logic */
     });
 
-    it.skip("database exists returns true when the database exists", () => {
-      /* needs adapter.databaseExists() API */
+    it("database exists returns true when the database exists", async () => {
+      const [{ current_database }] = await adapter.execute(
+        `SELECT current_database() AS current_database`,
+      );
+      const exists = await adapter.databaseExists(current_database as string);
+      expect(exists).toBe(true);
     });
 
     it("columns for distinct zero orders", () => {
@@ -679,8 +722,9 @@ describeIfPg("PostgresAdapter", () => {
       await bad.close();
     });
 
-    it.skip("database exists returns false when the database does not exist", () => {
-      /* needs adapter.databaseExists() API */
+    it("database exists returns false when the database does not exist", async () => {
+      const exists = await adapter.databaseExists("nonexistent_db_xyz_12345");
+      expect(exists).toBe(false);
     });
     it.skip("exec insert with returning disabled", () => {
       /* needs RETURNING-disabled adapter mode */
