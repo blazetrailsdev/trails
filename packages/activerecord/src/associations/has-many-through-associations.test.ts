@@ -3107,11 +3107,15 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("MjComment", MjComment);
     registerModel("MjRating", MjRating);
 
-    // The key test: chaining through association proxy with another relation should not raise
-    const sql = MjAuthor.joins("mjComments").toSql();
+    // The key test: merging a joins relation into a through association query should not raise
+    const commentsRel = MjAuthor.joins("mjComments");
+    const ratingsRel = MjComment.joins("mjRatings");
+    const merged = commentsRel.merge(ratingsRel);
+    const sql = merged.toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("mj_posts");
     expect(sql).toContain("mj_comments");
+    expect(sql).toContain("mj_ratings");
   });
   it("has many association through a has many association with nonstandard primary keys", async () => {
     class NpkOwner extends Base {
@@ -5404,13 +5408,16 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("DISTINCT");
 
-    // Map and reduce to verify the sum
+    // Verify sum via both manual calculation and aggregate
     const results = await activePersons.toArray();
     let manualSum = 0;
     for (const p of results) {
       manualSum += p.readAttribute("followers_count") as number;
     }
     expect(manualSum).toBe(10);
+
+    const aggregateSum = await activePersons.sum("followers_count");
+    expect(aggregateSum).toBe(10);
   });
 
   it.skip("has many through with default scope on the target", () => {});

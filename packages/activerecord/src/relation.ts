@@ -2004,7 +2004,23 @@ export class Relation<T extends Base> {
 
   private async _aggregate(fn: string, column: string): Promise<number | null> {
     const table = this._modelClass.arelTable;
-    const manager = table.project(`${fn}("${table.name}"."${column}") AS val`);
+    const projection = this._isDistinct
+      ? `${fn}(DISTINCT "${table.name}"."${column}") AS val`
+      : `${fn}("${table.name}"."${column}") AS val`;
+    const manager = table.project(projection);
+
+    for (const join of this._joinClauses) {
+      const onNode = new Nodes.SqlLiteral(join.on);
+      if (join.type === "inner") {
+        manager.join(join.table, onNode);
+      } else {
+        manager.outerJoin(join.table, onNode);
+      }
+    }
+    for (const rawJoin of this._rawJoins) {
+      manager.join(rawJoin);
+    }
+
     this._applyWheresToManager(manager, table);
 
     const sql = manager.toSql();
@@ -2868,7 +2884,7 @@ export class Relation<T extends Base> {
   }
 
   private _resolveColumn(table: Table, key: string): Nodes.Attribute {
-    const dotIdx = key.indexOf(".");
+    const dotIdx = key.lastIndexOf(".");
     if (dotIdx !== -1) {
       const tableName = key.slice(0, dotIdx);
       const colName = key.slice(dotIdx + 1);
@@ -3020,7 +3036,7 @@ export class Relation<T extends Base> {
   private _castWhereValue(key: string, value: unknown): unknown {
     if (value === null || value === undefined || value instanceof Range) return value;
     let attrKey = key;
-    const dotIdx = key.indexOf(".");
+    const dotIdx = key.lastIndexOf(".");
     if (dotIdx !== -1) {
       const tablePrefix = key.slice(0, dotIdx);
       if (tablePrefix === this._modelClass.arelTable.name) {
@@ -3031,7 +3047,7 @@ export class Relation<T extends Base> {
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {
-    const dotIdx = key.indexOf(".");
+    const dotIdx = key.lastIndexOf(".");
     if (dotIdx !== -1) {
       return { tbl: key.slice(0, dotIdx), col: key.slice(dotIdx + 1) };
     }

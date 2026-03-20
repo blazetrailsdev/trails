@@ -1115,6 +1115,7 @@ export class CollectionProxy {
    * Build and save a new associated record.
    */
   async create(attrs: Record<string, unknown> = {}): Promise<Base> {
+    this._ensureThroughWritable();
     if (this._isThrough) {
       return this._createThrough(attrs);
     }
