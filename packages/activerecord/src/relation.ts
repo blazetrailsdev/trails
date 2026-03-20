@@ -3206,7 +3206,7 @@ export class Relation<T extends Base> {
           if (!targetModel) continue;
 
           const related = await (targetModel as any)
-            .unscoped()
+            ._allForPreload()
             .where({ [primaryKey]: fkValues })
             .toArray();
           const relatedMap = new Map<unknown, any>();
