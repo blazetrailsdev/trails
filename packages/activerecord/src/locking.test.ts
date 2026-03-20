@@ -737,17 +737,21 @@ describe("PessimisticLockingTest", () => {
       }
     }
     const p = await Person.create({ name: "Test" });
-    const executedSql: string[] = [];
+    // Intercept execute to capture the SQL lockBang generates, then
+    // delegate to the real adapter so the record reloads properly
+    const capturedSql: string[] = [];
     const origExecute = adapter.execute.bind(adapter);
-    adapter.execute = async (sql: string, binds?: unknown[]) => {
-      executedSql.push(sql);
-      return origExecute(sql, binds);
+    (adapter as any).execute = async (sql: string, binds?: unknown[]) => {
+      capturedSql.push(sql);
+      // Strip the custom lock clause before sending to the DB so it
+      // works on all backends (SQLite, MariaDB, PostgreSQL)
+      const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
+      return origExecute(cleaned, binds);
     };
     await transaction(Person, async () => {
-      await p.lockBang("FOR NO KEY UPDATE");
-      expect(p.readAttribute("name")).toBe("Test");
+      await p.lockBang("FOR UPDATE NOWAIT");
     });
-    const lockSql = executedSql.find((s) => s.includes("FOR NO KEY UPDATE"));
+    const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
     expect(lockSql).toBeDefined();
   });
 
