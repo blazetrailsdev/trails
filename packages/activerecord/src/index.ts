@@ -76,6 +76,14 @@ export { encrypts, defaultEncryptor, getEncryptor, isEncryptedAttribute } from "
 export type { Encryptor } from "./encryption.js";
 export { generatesTokenFor } from "./generates-token-for.js";
 export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
+export {
+  DatabaseConfigurations,
+  DatabaseConfig,
+  HashConfig,
+  UrlConfig,
+} from "./database-configurations.js";
+export { ConnectionPool } from "./connection-pool.js";
+export { ConnectionHandler } from "./connection-handler.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 
 export { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
