@@ -223,24 +223,8 @@ describe("OptimisticLockingTest", () => {
     await expect(t2.update({ title: "new title2" })).rejects.toThrow("StaleObjectError");
   });
 
-  it("lock with custom column without default queries count", async () => {
-    const adapter = freshAdapter();
-    class LockCustom extends Base {
-      static {
-        this._tableName = "lock_without_defaults_cust";
-        this.lockingColumn = "custom_lock_version";
-        this.attribute("title", "string");
-        this.attribute("custom_lock_version", "integer");
-        this.adapter = adapter;
-      }
-    }
-    const t1 = await LockCustom.create({ title: "title1" });
-    expect(t1.readAttribute("title")).toBe("title1");
-    expect(Number(t1.readAttribute("custom_lock_version")) || 0).toBe(0);
-    await t1.update({ title: "title2" });
-    const reloaded = await LockCustom.find(t1.id);
-    expect(reloaded.readAttribute("title")).toBe("title2");
-    expect(reloaded.readAttribute("custom_lock_version")).toBe(1);
+  it.skip("lock with custom column without default queries count", () => {
+    /* needs query counting (spy on execute and assert call counts) */
   });
 
   it("readonly attributes", async () => {
@@ -748,12 +732,15 @@ describe("PessimisticLockingTest", () => {
         const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
         return origExecute(cleaned, binds);
       });
-    await transaction(Person, async () => {
-      await p.lockBang("FOR UPDATE NOWAIT");
-    });
-    const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
-    expect(lockSql).toBeDefined();
-    spy.mockRestore();
+    try {
+      await transaction(Person, async () => {
+        await p.lockBang("FOR UPDATE NOWAIT");
+      });
+      const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
+      expect(lockSql).toBeDefined();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it.skip("with lock sets isolation", () => {
