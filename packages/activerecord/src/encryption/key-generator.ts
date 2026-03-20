@@ -25,14 +25,8 @@ export class KeyGenerator {
 
   deriveKey(password: string, length: number = DEFAULT_KEY_LENGTH, salt?: string): string {
     const effectiveSalt = salt ?? "";
-    const digest = this._hashDigestClass.toLowerCase().replace("-", "");
-    const derived = crypto.pbkdf2Sync(
-      password,
-      effectiveSalt,
-      2 ** 16,
-      length,
-      digest === "sha256" ? "sha256" : digest === "sha1" ? "sha1" : "sha256",
-    );
+    const digest = this._hashDigestClass.toLowerCase().replace(/-/g, "");
+    const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, length, digest);
     return derived.toString("base64");
   }
 }

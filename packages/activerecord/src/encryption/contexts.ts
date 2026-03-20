@@ -1,8 +1,10 @@
 /**
- * Encryption contexts — thread-local-like context stack.
+ * Encryption contexts — async-safe context stack using AsyncLocalStorage.
  *
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
+
+import { AsyncLocalStorage } from "async_hooks";
 
 export interface EncryptionContext {
   encryptionDisabled?: boolean;
@@ -11,20 +13,15 @@ export interface EncryptionContext {
   [key: string]: unknown;
 }
 
-const contextStack: EncryptionContext[] = [{}];
+const storage = new AsyncLocalStorage<EncryptionContext>();
 
 function currentContext(): EncryptionContext {
-  return contextStack[contextStack.length - 1];
+  return storage.getStore() ?? {};
 }
 
 export function withEncryptionContext(overrides: EncryptionContext, fn: () => void): void {
   const previous = currentContext();
-  contextStack.push({ ...previous, ...overrides });
-  try {
-    fn();
-  } finally {
-    contextStack.pop();
-  }
+  storage.run({ ...previous, ...overrides }, fn);
 }
 
 export function withoutEncryption(fn: () => void): void {

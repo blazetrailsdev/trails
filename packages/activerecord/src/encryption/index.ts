@@ -6,7 +6,7 @@ export { KeyGenerator } from "./key-generator.js";
 export { Cipher } from "./cipher.js";
 export { MessageSerializer } from "./message-serializer.js";
 export { Encryptor } from "./encryptor.js";
-export type { EncryptorOptions } from "./encryptor.js";
+export type { EncryptorOptions, KeyProviderLike } from "./encryptor.js";
 export { NullEncryptor } from "./null-encryptor.js";
 export { ReadOnlyNullEncryptor } from "./read-only-null-encryptor.js";
 export { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";

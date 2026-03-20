@@ -32,7 +32,11 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
   it("won't load classes from JSON", () => {
     const serializer = new MessageSerializer();
-    const malicious = JSON.stringify({ p: btoa("test"), h: {}, __proto__: { admin: true } });
+    const malicious = JSON.stringify({
+      p: Buffer.from("test").toString("base64"),
+      h: {},
+      __proto__: { admin: true },
+    });
     const loaded = serializer.load(malicious);
     expect(loaded.payload).toBe("test");
   });
@@ -49,8 +53,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
   it("detects JSON hashes with a 'p' key that is not encoded in base64", () => {
     const serializer = new MessageSerializer();
-    const loaded = serializer.load('{"p":"aGVsbG8=","h":{}}');
-    expect(loaded.payload).toBe("hello");
+    expect(() => serializer.load('{"p":"aGVsbG8$","h":{}}')).toThrow(DecryptionError);
   });
 
   it("raises a TypeError when trying to deserialize other data types", () => {
@@ -66,10 +69,10 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("raises Decryption when trying to parse message with more than one nested message", () => {
     const serializer = new MessageSerializer();
     const data = JSON.stringify({
-      p: btoa("payload"),
+      p: Buffer.from("payload").toString("base64"),
       h: {
-        nested1: { p: btoa("inner1"), h: {} },
-        nested2: { p: btoa("inner2"), h: {} },
+        nested1: { p: Buffer.from("inner1").toString("base64"), h: {} },
+        nested2: { p: Buffer.from("inner2").toString("base64"), h: {} },
       },
     });
     expect(() => serializer.load(data)).toThrow(DecryptionError);

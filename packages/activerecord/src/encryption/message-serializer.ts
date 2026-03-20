@@ -47,15 +47,22 @@ export class MessageSerializer {
       throw new DecryptionError("Invalid encrypted message format: missing payload");
     }
 
-    let payload: string;
-    try {
-      payload = Buffer.from(data.p, "base64").toString("utf-8");
-    } catch {
+    if (typeof data.p !== "string") {
       throw new DecryptionError("Invalid encrypted message format: payload not base64");
     }
+    const payloadBuffer = Buffer.from(data.p, "base64");
+    const reencoded = payloadBuffer.toString("base64").replace(/=+$/, "");
+    const normalizedOriginal = data.p.replace(/=+$/, "");
+    if (normalizedOriginal !== reencoded) {
+      throw new DecryptionError("Invalid encrypted message format: payload not base64");
+    }
+    const payload = payloadBuffer.toString("utf-8");
 
     const message = new Message(payload);
     const headers = data.h;
+    if (Array.isArray(headers)) {
+      throw new DecryptionError("Invalid encrypted message format: headers must be a JSON object");
+    }
     if (headers && typeof headers === "object") {
       const nestedMessages: string[] = [];
       for (const [key, value] of Object.entries(headers)) {

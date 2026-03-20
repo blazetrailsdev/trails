@@ -7,17 +7,16 @@
 import { Cipher } from "./cipher.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { ConfigError, DecryptionError, ForbiddenClass } from "./errors.js";
 import type { Compressor } from "./config.js";
 import { defaultCompressor } from "./config.js";
 
 export interface EncryptorOptions {
-  keyProvider?: KeyProviderLike;
   compress?: boolean;
   compressor?: Compressor;
 }
 
-interface KeyProviderLike {
+export interface KeyProviderLike {
   encryptionKey(): { secret: string; publicTags?: Record<string, unknown> };
   decryptionKeys(message: Message): Array<{ secret: string; publicTags?: Record<string, unknown> }>;
 }
@@ -44,7 +43,7 @@ export class Encryptor {
     const encKeyObj = options?.keyProvider?.encryptionKey();
     const key = options?.key ?? encKeyObj?.secret;
     if (!key) {
-      throw new Error("No encryption key provided");
+      throw new ConfigError("No encryption key provided");
     }
 
     let data = clearText;

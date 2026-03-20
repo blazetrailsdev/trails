@@ -5,6 +5,7 @@
  */
 
 import { Encryptor } from "./encryptor.js";
+import type { KeyProviderLike } from "./encryptor.js";
 
 export class EncryptingOnlyEncryptor {
   private _encryptor: Encryptor;
@@ -13,11 +14,14 @@ export class EncryptingOnlyEncryptor {
     this._encryptor = new Encryptor();
   }
 
-  encrypt(clearText: string, options?: Record<string, unknown>): string {
+  encrypt(
+    clearText: string,
+    options?: { keyProvider?: KeyProviderLike; key?: string; deterministic?: boolean },
+  ): string {
     return this._encryptor.encrypt(clearText, options);
   }
 
-  decrypt(encryptedText: string, _options?: Record<string, unknown>): string {
+  decrypt(encryptedText: string): string {
     return encryptedText;
   }
 }
