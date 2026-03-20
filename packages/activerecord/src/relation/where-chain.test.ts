@@ -373,8 +373,27 @@ describe("WhereChainTest", () => {
     // requires polymorphic association
   });
 
-  it.skip("rewhere with range", async () => {
-    // requires Range support in rewhere
+  it("rewhere with range", async () => {
+    class RrPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+        this.adapter = adapter;
+      }
+    }
+    await RrPost.create({ title: "Low", score: 5 });
+    await RrPost.create({ title: "At10", score: 10 });
+    await RrPost.create({ title: "Mid", score: 15 });
+    await RrPost.create({ title: "High", score: 25 });
+    await RrPost.create({ title: "At30", score: 30 });
+    const base = RrPost.where({ score: new Range(1, 10) });
+    const rewritten = base.rewhere({ score: new Range(10, 30) });
+    const baseResults = await base.toArray();
+    expect(baseResults.length).toBe(2);
+    const rewrittenResults = await rewritten.toArray();
+    expect(rewrittenResults.length).toBe(4);
+    const titles = rewrittenResults.map((r: any) => r.readAttribute("title")).sort();
+    expect(titles).toEqual(["At10", "At30", "High", "Mid"]);
   });
 });
 
