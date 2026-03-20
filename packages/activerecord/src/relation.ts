@@ -1915,6 +1915,7 @@ export class Relation<T extends Base> {
         : "COUNT(*) AS count";
     }
     const manager = table.project(countExpr);
+    this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
 
     const sql = manager.toSql();
@@ -1986,6 +1987,7 @@ export class Relation<T extends Base> {
     const aggExpr =
       column === "*" ? `${fn}(*) AS val` : `${fn}("${table.name}"."${column}") AS val`;
     const manager = table.project(`"${table.name}"."${groupCol}" AS group_key, ${aggExpr}`);
+    this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     manager.group(groupCol);
 
@@ -2002,13 +2004,7 @@ export class Relation<T extends Base> {
     return result;
   }
 
-  private async _aggregate(fn: string, column: string): Promise<number | null> {
-    const table = this._modelClass.arelTable;
-    const projection = this._isDistinct
-      ? `${fn}(DISTINCT "${table.name}"."${column}") AS val`
-      : `${fn}("${table.name}"."${column}") AS val`;
-    const manager = table.project(projection);
-
+  private _applyJoinsToManager(manager: SelectManager): void {
     for (const join of this._joinClauses) {
       const onNode = new Nodes.SqlLiteral(join.on);
       if (join.type === "inner") {
@@ -2018,9 +2014,17 @@ export class Relation<T extends Base> {
       }
     }
     for (const rawJoin of this._rawJoins) {
-      manager.join(rawJoin);
+      manager.join(new Nodes.StringJoin(new Nodes.SqlLiteral(rawJoin)));
     }
+  }
 
+  private async _aggregate(fn: string, column: string): Promise<number | null> {
+    const table = this._modelClass.arelTable;
+    const projection = this._isDistinct
+      ? `${fn}(DISTINCT "${table.name}"."${column}") AS val`
+      : `${fn}("${table.name}"."${column}") AS val`;
+    const manager = table.project(projection);
+    this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
 
     const sql = manager.toSql();
@@ -2822,17 +2826,7 @@ export class Relation<T extends Base> {
     const manager = table.project(...(projections as any));
 
     // Apply joins
-    for (const join of this._joinClauses) {
-      const onNode = new Nodes.SqlLiteral(join.on);
-      if (join.type === "inner") {
-        manager.join(join.table, onNode);
-      } else {
-        manager.outerJoin(join.table, onNode);
-      }
-    }
-    for (const rawJoin of this._rawJoins) {
-      manager.join(rawJoin);
-    }
+    this._applyJoinsToManager(manager);
 
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);

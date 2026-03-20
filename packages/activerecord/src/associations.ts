@@ -6,6 +6,7 @@ import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
+  HasManyThroughOrderError,
 } from "./errors.js";
 import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
 import { getInheritanceColumn, findStiClass } from "./sti.js";
@@ -1031,8 +1032,10 @@ export class CollectionProxy {
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
     if (!throughAssoc) {
-      throw new Error(
-        `Through association '${this._assocDef.options.through}' for '${ctor.name}.${this._assocName}' was not found`,
+      throw new HasManyThroughOrderError(
+        ctor.name,
+        this._assocName,
+        this._assocDef.options.through as string,
       );
     }
 

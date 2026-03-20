@@ -2872,6 +2872,11 @@ describe("HasManyThroughAssociationsTest", () => {
     await IjqReference.create({ ijq_person_id: person.id, ijq_job_id: job1.id });
     await IjqReference.create({ ijq_person_id: person.id, ijq_job_id: job2.id });
 
+    // Verify through join SQL properly quotes table names
+    const sql = IjqPerson.joins("ijqJobs").toSql();
+    expect(sql).toContain('"ijq_references"');
+    expect(sql).toContain('"ijq_jobs"');
+
     const jobs = await loadHasManyThrough(person, "ijqJobs", {
       through: "ijqReferences",
       source: "ijqJob",
