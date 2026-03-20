@@ -104,14 +104,19 @@ function extractColumnsFromModels(): void {
     // Detect composite or custom primary key
     const pk = modelClass.primaryKey;
     const isCpk = Array.isArray(pk);
-    const isCustomPk = !isCpk && typeof pk === "string" && pk !== "id";
+    const isCustomPk =
+      !isCpk && typeof pk === "string" && pk.length > 0 && pk !== "id" && !!attrs?.has(pk);
 
+    const pkCols = isCpk ? (pk as string[]) : isCustomPk ? [pk] : [];
     const columns = new Map<string, string>();
     if (attrs) {
       for (const [name, def] of attrs) {
-        // Skip "id" for standard models (auto-generated), but keep all CPK/custom PK columns
         if (name === "id" && !isCpk && !isCustomPk) continue;
-        columns.set(name, sqlType(def.type?.name || "string"));
+        let colType = sqlType(def.type?.name || "string");
+        if (isMysql() && pkCols.includes(name) && colType === "TEXT") {
+          colType = "VARCHAR(255)";
+        }
+        columns.set(name, colType);
       }
     }
 
