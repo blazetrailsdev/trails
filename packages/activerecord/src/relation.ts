@@ -140,7 +140,8 @@ export class Relation<T extends Base> {
         if (value instanceof Relation) {
           // Subquery: WHERE column IN (SELECT ...)
           const subSql = value.toSql();
-          rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${key}" IN (${subSql})`);
+          const { tbl, col } = this._qualifiedCol(this._modelClass.arelTable, key);
+          rel._whereRawClauses.push(`"${tbl}"."${col}" IN (${subSql})`);
         } else {
           normalConditions[key] = Array.isArray(value)
             ? value.map((v) => this._castWhereValue(key, v))
@@ -3018,7 +3019,15 @@ export class Relation<T extends Base> {
 
   private _castWhereValue(key: string, value: unknown): unknown {
     if (value === null || value === undefined || value instanceof Range) return value;
-    return this._modelClass._castAttributeValue(key, value);
+    let attrKey = key;
+    const dotIdx = key.indexOf(".");
+    if (dotIdx !== -1) {
+      const tablePrefix = key.slice(0, dotIdx);
+      if (tablePrefix === this._modelClass.arelTable.name) {
+        attrKey = key.slice(dotIdx + 1);
+      }
+    }
+    return this._modelClass._castAttributeValue(attrKey, value);
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {

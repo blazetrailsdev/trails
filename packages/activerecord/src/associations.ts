@@ -1030,7 +1030,11 @@ export class CollectionProxy {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) return;
+    if (!throughAssoc) {
+      throw new Error(
+        `Through association '${this._assocDef.options.through}' for '${ctor.name}.${this._assocName}' was not found`,
+      );
+    }
 
     if (throughAssoc.type === "hasOne") {
       throw new HasManyThroughCantAssociateThroughHasOneOrManyReflection(
