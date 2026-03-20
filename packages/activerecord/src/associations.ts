@@ -1562,10 +1562,10 @@ export class CollectionProxy {
    */
   async replace(records: Base[]): Promise<void> {
     this._ensureThroughWritable();
-    return this._withoutStrictLoading(async () => {
+    await this._withoutStrictLoading(async () => {
       await this.clear();
-      await this.push(...records);
     });
+    await this.push(...records);
   }
 
   /**

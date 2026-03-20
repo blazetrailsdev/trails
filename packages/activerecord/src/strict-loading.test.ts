@@ -1042,6 +1042,7 @@ describe("StrictLoadingTest", () => {
     });
     const book = new SlwrBook({ title: "Written Book" });
     await proxy.replace([book]);
+    expect(author.isStrictLoading()).toBe(true);
   });
 
   it("strict loading with new record on concat is ignored", async () => {
