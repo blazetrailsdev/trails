@@ -101,21 +101,29 @@ function extractColumnsFromModels(): void {
     const attrs: Map<string, { name: string; type: { name?: string } }> =
       modelClass._attributeDefinitions;
 
-    // Detect composite primary key
+    // Detect composite or custom primary key
     const pk = modelClass.primaryKey;
     const isCpk = Array.isArray(pk);
+    const isCustomPk =
+      !isCpk && typeof pk === "string" && pk.length > 0 && pk !== "id" && !!attrs?.has(pk);
 
+    const pkCols = isCpk ? (pk as string[]) : isCustomPk ? [pk] : [];
     const columns = new Map<string, string>();
     if (attrs) {
       for (const [name, def] of attrs) {
-        // Skip "id" for non-CPK models (auto-generated), but keep all CPK columns
-        if (name === "id" && !isCpk) continue;
-        columns.set(name, sqlType(def.type?.name || "string"));
+        if (name === "id" && !isCpk && !isCustomPk) continue;
+        let colType = sqlType(def.type?.name || "string");
+        if (isMysql() && pkCols.includes(name) && colType === "TEXT") {
+          colType = "VARCHAR(255)";
+        }
+        columns.set(name, colType);
       }
     }
 
     if (isCpk) {
       _pendingCpk.set(tableName, pk as string[]);
+    } else if (isCustomPk) {
+      _pendingCpk.set(tableName, [pk]);
     }
 
     const existing = _pendingModels.get(tableName);
