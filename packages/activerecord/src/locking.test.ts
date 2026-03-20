@@ -787,7 +787,7 @@ describe("PessimisticLockingTest", () => {
     }
     const p = await Person.create({ name: "Test" });
     await transaction(Person, async () => {
-      await p.lockBang("FOR SHARE NOWAIT");
+      await p.lockBang("FOR UPDATE");
       expect(p.readAttribute("name")).toBe("Test");
     });
   });
