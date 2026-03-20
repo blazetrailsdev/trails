@@ -273,7 +273,8 @@ describe("RelationScopingTest", () => {
   it("scoped create with where with array", async () => {
     const Developer = makeDeveloper();
     await Developer.create({ name: "Alice", salary: 50000 });
-    const rel = Developer.where({ name: "Alice" });
+    await Developer.create({ name: "Bob", salary: 60000 });
+    const rel = Developer.where({ name: ["Alice"] });
     await Developer.scoping(rel, async () => {
       const all = await Developer.all().toArray();
       expect(all.length).toBe(1);

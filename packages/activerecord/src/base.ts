@@ -1588,13 +1588,16 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.create
    */
-  static async create(attrs: Record<string, unknown> = {}): Promise<Base> {
-    let mergedAttrs = attrs;
+  private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
     if (this._currentScope) {
       const scopeAttrs = this._currentScope.scopeForCreate?.() ?? {};
-      mergedAttrs = { ...scopeAttrs, ...attrs };
+      return { ...scopeAttrs, ...attrs };
     }
-    const record = new this(mergedAttrs);
+    return attrs;
+  }
+
+  static async create(attrs: Record<string, unknown> = {}): Promise<Base> {
+    const record = new this(this._mergeCurrentScopeAttrs(attrs));
     await record.save();
     return record;
   }
@@ -1605,7 +1608,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.create!
    */
   static async createBang(attrs: Record<string, unknown> = {}): Promise<Base> {
-    const record = new this(attrs);
+    const record = new this(this._mergeCurrentScopeAttrs(attrs));
     await record.saveBang();
     return record;
   }
