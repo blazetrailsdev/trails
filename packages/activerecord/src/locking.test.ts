@@ -191,7 +191,7 @@ describe("OptimisticLockingTest", () => {
     class LockCustom extends Base {
       static {
         this._tableName = "lock_without_defaults_cust";
-        this._lockingColumn = "custom_lock_version";
+        this.lockingColumn = "custom_lock_version";
         this.attribute("title", "string");
         this.attribute("custom_lock_version", "integer");
         this.adapter = adapter;
@@ -210,7 +210,7 @@ describe("OptimisticLockingTest", () => {
     class LockCustom extends Base {
       static {
         this._tableName = "lock_without_defaults_cust";
-        this._lockingColumn = "custom_lock_version";
+        this.lockingColumn = "custom_lock_version";
         this.attribute("title", "string");
         this.attribute("custom_lock_version", "integer");
         this.adapter = adapter;
@@ -228,7 +228,7 @@ describe("OptimisticLockingTest", () => {
     class LockCustom extends Base {
       static {
         this._tableName = "lock_without_defaults_cust";
-        this._lockingColumn = "custom_lock_version";
+        this.lockingColumn = "custom_lock_version";
         this.attribute("title", "string");
         this.attribute("custom_lock_version", "integer");
         this.adapter = adapter;

@@ -2414,6 +2414,11 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#update!
    */
   async updateBang(attrs: Record<string, unknown>): Promise<true> {
+    const ctor = this.constructor as typeof Base;
+    const lockCol = ctor.lockingColumn;
+    if (Object.hasOwn(attrs, lockCol) && ctor.lockingEnabled) {
+      throw new Error(`${lockCol} cannot be updated explicitly`);
+    }
     for (const [key, value] of Object.entries(attrs)) {
       this.writeAttribute(key, value);
     }
@@ -2599,23 +2604,24 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#with_lock
    */
-  async withLock(
-    lockOrFn?: string | ((record: this) => Promise<void> | void),
-    fn?: (record: this) => Promise<void> | void,
-  ): Promise<void> {
+  async withLock<T = void>(
+    lockOrFn?: string | ((record: this) => Promise<T> | T),
+    fn?: (record: this) => Promise<T> | T,
+  ): Promise<T> {
     let lockClause = "FOR UPDATE";
     let callback = fn;
 
     if (typeof lockOrFn === "function") {
-      callback = lockOrFn;
+      callback = lockOrFn as (record: this) => Promise<T> | T;
     } else if (typeof lockOrFn === "string") {
       lockClause = lockOrFn;
     }
 
     const { transaction } = await import("./transactions.js");
-    await transaction(this.constructor as typeof Base, async () => {
+    return transaction(this.constructor as typeof Base, async () => {
       await this.lockBang(lockClause);
-      if (callback) await callback(this);
+      if (callback) return callback(this);
+      return undefined as T;
     });
   }
 
