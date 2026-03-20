@@ -42,7 +42,7 @@ export class SchemaDumper {
   private tables(lines: string[]): void {
     const tableNames = this._ctx.tables();
 
-    for (const tableName of tableNames.sort()) {
+    for (const tableName of tableNames) {
       if (this.shouldIgnore(tableName)) continue;
       this.table(lines, tableName);
     }
