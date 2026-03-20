@@ -341,9 +341,29 @@ export class PostgresAdapter implements DatabaseAdapter {
     await this.exec(`CREATE EXTENSION IF NOT EXISTS "${name}"`);
   }
 
-  async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
+  async disableExtension(
+    name: string,
+    options: { force?: "cascade"; schema?: string } = {},
+  ): Promise<void> {
     const cascade = options.force === "cascade" ? " CASCADE" : "";
-    await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+    if (options.schema) {
+      await this.exec(`SET search_path TO "${options.schema}"`);
+      try {
+        await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+      } finally {
+        await this.exec(`SET search_path TO public`);
+      }
+    } else {
+      await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
+    }
+  }
+
+  async databaseExists(name: string): Promise<boolean> {
+    const rows = await this.execute(
+      `SELECT COUNT(*) AS count FROM pg_database WHERE datname = $1`,
+      [name],
+    );
+    return Number(rows[0].count) > 0;
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
