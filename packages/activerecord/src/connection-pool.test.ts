@@ -26,7 +26,7 @@ it.skip("released connection moves between threads", () => {
   /* needs thread emulation */
 });
 
-it("with connection", () => {
+it("with connection", async () => {
   const pool = makePool();
   const result = pool.withConnection((conn) => {
     expect(conn).toBeTruthy();
@@ -35,6 +35,20 @@ it("with connection", () => {
   expect(result).toBe("ok");
   expect(pool.busyCount).toBe(0);
   expect(pool.idleCount).toBe(1);
+
+  const asyncResult = await pool.withConnection(async (conn) => {
+    expect(conn).toBeTruthy();
+    return "async-ok";
+  });
+  expect(asyncResult).toBe("async-ok");
+  expect(pool.busyCount).toBe(0);
+
+  await expect(
+    pool.withConnection(async () => {
+      throw new Error("boom");
+    }),
+  ).rejects.toThrow("boom");
+  expect(pool.busyCount).toBe(0);
 });
 
 it.skip("new connection no query", () => {

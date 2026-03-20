@@ -84,7 +84,15 @@ type RawConfigurations = Record<
 const customHandlers = new Map<string, new (...args: any[]) => DatabaseConfig>();
 
 export class DatabaseConfigurations {
-  static defaultEnv: string = "development";
+  private static _defaultEnv: string = "development";
+
+  static get defaultEnv(): string {
+    return this._defaultEnv || "default";
+  }
+
+  static set defaultEnv(value: string) {
+    this._defaultEnv = value;
+  }
 
   private _configurations: DatabaseConfig[];
 
@@ -136,6 +144,10 @@ export class DatabaseConfigurations {
 
   static registerDbConfig(key: string, klass: new (...args: any[]) => DatabaseConfig): void {
     customHandlers.set(key, klass);
+  }
+
+  static unregisterDbConfig(key: string): void {
+    customHandlers.delete(key);
   }
 
   private _buildConfigs(raw: RawConfigurations): DatabaseConfig[] {
