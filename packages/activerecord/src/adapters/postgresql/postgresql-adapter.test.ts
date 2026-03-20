@@ -631,9 +631,9 @@ describeIfPg("PostgresAdapter", () => {
       const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
       const d = rows[0].d as Date;
       expect(d).toBeInstanceOf(Date);
-      expect(d.getUTCFullYear()).toBe(2023);
-      expect(d.getUTCMonth()).toBe(5);
-      expect(d.getUTCDate()).toBe(15);
+      expect(d.getFullYear()).toBe(2023);
+      expect(d.getMonth()).toBe(5);
+      expect(d.getDate()).toBe(15);
     });
 
     it.skip("date decoding disabled", async () => {
@@ -641,22 +641,32 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("disable extension with schema", async () => {
+      const wasEnabled = await adapter.extensionEnabled("hstore");
+      if (wasEnabled) await adapter.disableExtension("hstore");
       await adapter.exec(`CREATE SCHEMA IF NOT EXISTS "ex_extensions"`);
-      await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "hstore" SCHEMA "ex_extensions"`);
-      const before = await adapter.extensionEnabled("hstore");
-      expect(before).toBe(true);
-      await adapter.disableExtension("hstore", { schema: "ex_extensions" });
-      const after = await adapter.extensionEnabled("hstore");
-      expect(after).toBe(false);
-      await adapter.exec(`DROP SCHEMA IF EXISTS "ex_extensions" CASCADE`);
+      try {
+        await adapter.exec(`CREATE EXTENSION "hstore" WITH SCHEMA "ex_extensions"`);
+        const before = await adapter.extensionEnabled("hstore");
+        expect(before).toBe(true);
+        await adapter.disableExtension("hstore", { schema: "ex_extensions" });
+        const after = await adapter.extensionEnabled("hstore");
+        expect(after).toBe(false);
+      } finally {
+        await adapter.exec(`DROP SCHEMA IF EXISTS "ex_extensions" CASCADE`);
+        if (wasEnabled) await adapter.enableExtension("hstore");
+      }
     });
 
     it("disable extension without schema", async () => {
-      await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "hstore"`);
-      await adapter.disableExtension("hstore");
-      const enabled = await adapter.extensionEnabled("hstore");
-      expect(enabled).toBe(false);
-      await adapter.enableExtension("hstore");
+      const wasEnabled = await adapter.extensionEnabled("hstore");
+      if (!wasEnabled) await adapter.enableExtension("hstore");
+      try {
+        await adapter.disableExtension("hstore");
+        const enabled = await adapter.extensionEnabled("hstore");
+        expect(enabled).toBe(false);
+      } finally {
+        if (wasEnabled) await adapter.enableExtension("hstore");
+      }
     });
     it("connection error", async () => {
       const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");

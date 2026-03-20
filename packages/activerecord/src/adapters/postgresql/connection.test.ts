@@ -121,9 +121,13 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("reconnection after actual disconnection with verify", async () => {});
     it("get and release advisory lock", async () => {
       const lockRows = await adapter.execute("SELECT pg_try_advisory_lock(99999) AS locked");
-      expect(lockRows[0].locked).toBe(true);
-      const unlockRows = await adapter.execute("SELECT pg_advisory_unlock(99999) AS unlocked");
-      expect(unlockRows[0].unlocked).toBe(true);
+      try {
+        expect(lockRows[0].locked).toBe(true);
+        const unlockRows = await adapter.execute("SELECT pg_advisory_unlock(99999) AS unlocked");
+        expect(unlockRows[0].unlocked).toBe(true);
+      } finally {
+        await adapter.execute("SELECT pg_advisory_unlock(99999)");
+      }
     });
 
     it("release non existent advisory lock", async () => {
