@@ -630,7 +630,13 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
       const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
       const d = rows[0].d;
-      expect(String(d)).toContain("2023-06-15");
+      if (d instanceof Date) {
+        expect(d.getUTCFullYear()).toBe(2023);
+        expect(d.getUTCMonth()).toBe(5);
+        expect(d.getUTCDate()).toBe(15);
+      } else {
+        expect(String(d)).toContain("2023-06-15");
+      }
     });
 
     it.skip("date decoding disabled", async () => {
@@ -641,7 +647,7 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "hstore"`);
       const before = await adapter.extensionEnabled("hstore");
       expect(before).toBe(true);
-      await adapter.disableExtension("hstore");
+      await adapter.disableExtension("hstore", { schema: "public" });
       const after = await adapter.extensionEnabled("hstore");
       expect(after).toBe(false);
       await adapter.enableExtension("hstore");
@@ -665,7 +671,10 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("database exists returns true when the database exists", async () => {
-      const exists = await adapter.databaseExists("rails_js_test");
+      const [{ current_database }] = await adapter.execute(
+        `SELECT current_database() AS current_database`,
+      );
+      const exists = await adapter.databaseExists(current_database as string);
       expect(exists).toBe(true);
     });
 

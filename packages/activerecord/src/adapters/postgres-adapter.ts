@@ -347,11 +347,15 @@ export class PostgresAdapter implements DatabaseAdapter {
   ): Promise<void> {
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     if (options.schema) {
-      await this.exec(`SET search_path TO "${options.schema}"`);
+      const rows = await this.execute(`SHOW search_path`);
+      const originalSearchPath = rows[0]?.search_path as string;
+      await this.execute(`SELECT set_config('search_path', $1, false)`, [options.schema]);
       try {
         await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
       } finally {
-        await this.exec(`SET search_path TO public`);
+        await this.execute(`SELECT set_config('search_path', $1, false)`, [
+          originalSearchPath ?? "public",
+        ]);
       }
     } else {
       await this.exec(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
