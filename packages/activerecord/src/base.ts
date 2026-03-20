@@ -2619,10 +2619,15 @@ export class Base extends Model {
       lockClause = lockOrFn;
     }
 
+    if (!callback) {
+      throw new Error("withLock requires a callback block");
+    }
+
+    const cb = callback;
     const { transaction } = await import("./transactions.js");
     await transaction(this.constructor as typeof Base, async () => {
       await this.lockBang(lockClause);
-      if (callback) await callback(this);
+      await cb(this);
     });
   }
 
