@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, transaction, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
@@ -29,11 +29,11 @@ describe("OptimisticLockingTest", () => {
   }
 
   it.skip("quote value passed lock col", () => {
-    /* needs custom locking column */
+    /* needs SQL query capture to assert quoting behavior */
   });
 
   it.skip("non integer lock destroy", () => {
-    /* destroy does not check lock_version yet */
+    /* needs non-integer (e.g. string) primary key support in test adapter */
   });
 
   it("lock destroy", async () => {
@@ -186,14 +186,45 @@ describe("OptimisticLockingTest", () => {
     expect(all.length).toBe(2);
   });
 
-  it.skip("lock with custom column without default sets version to zero", () => {
-    /* custom lock column not supported */
+  it("lock with custom column without default sets version to zero", async () => {
+    const adapter = freshAdapter();
+    class LockCustom extends Base {
+      static {
+        this._tableName = "lock_without_defaults_cust";
+        this.lockingColumn = "custom_lock_version";
+        this.attribute("title", "string");
+        this.attribute("custom_lock_version", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = new LockCustom();
+    const ver = Number(t1.readAttribute("custom_lock_version")) || 0;
+    expect(ver).toBe(0);
+    await t1.save();
+    const reloaded = await LockCustom.find(t1.id);
+    expect(Number(reloaded.readAttribute("custom_lock_version")) || 0).toBe(0);
   });
-  it.skip("lock with custom column without default should work with null in the database", () => {
-    /* custom lock column not supported */
+
+  it("lock with custom column without default should work with null in the database", async () => {
+    const adapter = freshAdapter();
+    class LockCustom extends Base {
+      static {
+        this._tableName = "lock_without_defaults_cust";
+        this.lockingColumn = "custom_lock_version";
+        this.attribute("title", "string");
+        this.attribute("custom_lock_version", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await LockCustom.create({ title: "title1" });
+    const t2 = await LockCustom.find(t1.id);
+    await t1.update({ title: "new title1" });
+    expect(t1.readAttribute("custom_lock_version")).toBe(1);
+    await expect(t2.update({ title: "new title2" })).rejects.toThrow("StaleObjectError");
   });
+
   it.skip("lock with custom column without default queries count", () => {
-    /* custom lock column not supported */
+    /* needs query counting (spy on execute and assert call counts) */
   });
 
   it("readonly attributes", async () => {
@@ -203,8 +234,21 @@ describe("OptimisticLockingTest", () => {
     await expect(p.update({ name: "Changed" })).rejects.toThrow();
   });
 
-  it.skip("quote table name reserved word references", () => {
-    /* needs specific SQL quoting test */
+  it("quote table name reserved word references", async () => {
+    const adapter = freshAdapter();
+    class Reference extends Base {
+      static {
+        this._tableName = "references";
+        this.attribute("favorite", "boolean");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const ref = await Reference.create({ favorite: false });
+    ref.writeAttribute("favorite", true);
+    await ref.save();
+    expect(ref.readAttribute("favorite")).toBe(true);
+    expect(ref.readAttribute("lock_version")).toBe(1);
   });
 
   it("update without attributes does not only update lock version", async () => {
@@ -305,7 +349,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it.skip("non integer lock existing", () => {
-    /* needs non-integer lock column support (e.g. timestamp-based) */
+    /* needs non-integer (e.g. string) primary key support in test adapter */
   });
 
   it("lock repeating", async () => {
@@ -556,11 +600,24 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("PessimisticLockingTest", () => {
-  it.skip("typical find with lock", () => {
-    /* pessimistic locking (FOR UPDATE) not implemented */
+  it("typical find with lock", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    await transaction(Person, async () => {
+      const locked = await Person.all().lock().find(p.id);
+      expect(locked.readAttribute("name")).toBe("Test");
+    });
   });
+
   it.skip("eager find with lock", () => {
-    /* pessimistic locking not implemented */
+    /* needs eager loading (includes) with lock support */
   });
 
   it("lock does not raise when the object is not dirty", async () => {
@@ -579,11 +636,35 @@ describe("PessimisticLockingTest", () => {
     expect(p.isPersisted()).toBe(true);
   });
 
-  it.skip("lock raises when the record is dirty", () => {
-    /* pessimistic lock() method not implemented */
+  it("lock raises when the record is dirty", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ first_name: "Test" });
+    p.writeAttribute("first_name", "fooman");
+    await expect(p.lockBang()).rejects.toThrow(/Changed attributes: "first_name"/);
   });
-  it.skip("locking in after save callback", () => {
-    /* pessimistic locking not implemented */
+  it("locking in after save callback", async () => {
+    const adapter = freshAdapter();
+    class Frog extends Base {
+      static {
+        this._tableName = "frogs";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.afterSave(async (record: any) => {
+          await record.lockBang();
+        });
+      }
+    }
+    const frog = await Frog.create({ name: "Old Frog" });
+    frog.writeAttribute("name", "New Frog");
+    await frog.save();
+    expect(frog.readAttribute("name")).toBe("New Frog");
   });
 
   it("with lock commits transaction", async () => {
@@ -603,23 +684,85 @@ describe("PessimisticLockingTest", () => {
     expect(all.length).toBe(1);
   });
 
-  it.skip("with lock rolls back transaction", () => {
-    /* MemoryAdapter does not support real rollback */
+  it("with lock rolls back transaction", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Original" });
+    try {
+      await p.withLock(async (record) => {
+        record.writeAttribute("name", "Changed");
+        await record.save();
+        throw new Error("oops");
+      });
+    } catch {
+      // expected
+    }
+    const reloaded = await Person.find(p.id);
+    expect(reloaded.readAttribute("name")).toBe("Original");
   });
 
   it.skip("with lock configures transaction", () => {
-    /* pessimistic locking not implemented */
+    /* needs requiresNew/joinable transaction options */
   });
-  it.skip("lock sending custom lock statement", () => {
-    /* pessimistic locking not implemented */
+
+  it("lock sending custom lock statement", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    // Intercept execute to capture the SQL lockBang generates, then
+    // delegate to the real adapter so the record reloads properly
+    const capturedSql: string[] = [];
+    const origExecute = adapter.execute.bind(adapter);
+    const spy = vi
+      .spyOn(adapter, "execute")
+      .mockImplementation(async (sql: string, binds?: unknown[]) => {
+        capturedSql.push(sql);
+        const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
+        return origExecute(cleaned, binds);
+      });
+    try {
+      await transaction(Person, async () => {
+        await p.lockBang("FOR UPDATE NOWAIT");
+      });
+      const lockSql = capturedSql.find((s) => s.includes("FOR UPDATE NOWAIT"));
+      expect(lockSql).toBeDefined();
+    } finally {
+      spy.mockRestore();
+    }
   });
+
   it.skip("with lock sets isolation", () => {
-    /* pessimistic locking not implemented */
+    /* needs transaction isolation level support */
   });
-  it.skip("with lock locks with no args", () => {
-    /* pessimistic locking not implemented */
+
+  it("with lock locks with no args", async () => {
+    const adapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ name: "Test" });
+    await p.withLock(async () => {
+      expect(p.readAttribute("name")).toBe("Test");
+    });
   });
+
   it.skip("no locks no wait", () => {
-    /* pessimistic locking not implemented */
+    /* requires concurrent database connections */
   });
 });

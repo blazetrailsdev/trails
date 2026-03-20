@@ -347,7 +347,10 @@ class SchemaAdapter implements DatabaseAdapter {
   private fixSqliteCompat(sql: string): string {
     if (isPg() || isMysql()) return sql;
     // SQLite doesn't support FOR UPDATE / FOR SHARE
-    sql = sql.replace(/\s+FOR\s+(UPDATE|SHARE)(\s+OF\s+\w+)?(\s+NOWAIT|\s+SKIP\s+LOCKED)?/gi, "");
+    sql = sql.replace(
+      /\s+FOR\s+(NO\s+KEY\s+)?(UPDATE|SHARE|KEY\s+SHARE)(\s+OF\s+\w+)?(\s+NOWAIT|\s+SKIP\s+LOCKED)?/gi,
+      "",
+    );
     // SQLite doesn't support OFFSET without LIMIT
     if (/OFFSET/i.test(sql) && !/LIMIT/i.test(sql)) {
       sql = sql.replace(/(OFFSET)/i, "LIMIT -1 $1");
