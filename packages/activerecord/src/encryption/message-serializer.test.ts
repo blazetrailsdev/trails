@@ -1,13 +1,77 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { MessageSerializer } from "./message-serializer.js";
+import { Message } from "./message.js";
+import { DecryptionError, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
-  it.skip("serializes messages", () => {});
-  it.skip("serializes messages with nested messages in their headers", () => {});
-  it.skip("won't load classes from JSON", () => {});
-  it.skip("detects random JSON data and raises a decryption error", () => {});
-  it.skip("detects random JSON hashes and raises a decryption error", () => {});
-  it.skip("detects JSON hashes with a 'p' key that is not encoded in base64", () => {});
-  it.skip("raises a TypeError when trying to deserialize other data types", () => {});
-  it.skip("raises ForbiddenClass when trying to serialize other data types", () => {});
-  it.skip("raises Decryption when trying to parse message with more than one nested message", () => {});
+  it("serializes messages", () => {
+    const serializer = new MessageSerializer();
+    const message = new Message("hello");
+    message.addHeader("iv", "test-iv");
+    const serialized = serializer.dump(message);
+    const loaded = serializer.load(serialized);
+    expect(loaded.payload).toBe("hello");
+    expect(loaded.headers.get("iv")).toBe("test-iv");
+  });
+
+  it("serializes messages with nested messages in their headers", () => {
+    const serializer = new MessageSerializer();
+    const inner = new Message("inner-payload");
+    inner.addHeader("iv", "inner-iv");
+
+    const outer = new Message("outer-payload");
+    outer.headers.set("nested", inner);
+
+    const serialized = serializer.dump(outer);
+    const loaded = serializer.load(serialized);
+    expect(loaded.payload).toBe("outer-payload");
+    const nested = loaded.headers.get("nested") as Message;
+    expect(nested).toBeInstanceOf(Message);
+    expect(nested.payload).toBe("inner-payload");
+  });
+
+  it("won't load classes from JSON", () => {
+    const serializer = new MessageSerializer();
+    const malicious = JSON.stringify({ p: btoa("test"), h: {}, __proto__: { admin: true } });
+    const loaded = serializer.load(malicious);
+    expect(loaded.payload).toBe("test");
+  });
+
+  it("detects random JSON data and raises a decryption error", () => {
+    const serializer = new MessageSerializer();
+    expect(() => serializer.load("[1,2,3]")).toThrow(DecryptionError);
+  });
+
+  it("detects random JSON hashes and raises a decryption error", () => {
+    const serializer = new MessageSerializer();
+    expect(() => serializer.load('{"foo":"bar"}')).toThrow(DecryptionError);
+  });
+
+  it("detects JSON hashes with a 'p' key that is not encoded in base64", () => {
+    const serializer = new MessageSerializer();
+    const loaded = serializer.load('{"p":"aGVsbG8=","h":{}}');
+    expect(loaded.payload).toBe("hello");
+  });
+
+  it("raises a TypeError when trying to deserialize other data types", () => {
+    const serializer = new MessageSerializer();
+    expect(() => serializer.load(42 as any)).toThrow(TypeError);
+  });
+
+  it("raises ForbiddenClass when trying to serialize other data types", () => {
+    const serializer = new MessageSerializer();
+    expect(() => serializer.dump("not a message" as any)).toThrow(ForbiddenClass);
+  });
+
+  it("raises Decryption when trying to parse message with more than one nested message", () => {
+    const serializer = new MessageSerializer();
+    const data = JSON.stringify({
+      p: btoa("payload"),
+      h: {
+        nested1: { p: btoa("inner1"), h: {} },
+        nested2: { p: btoa("inner2"), h: {} },
+      },
+    });
+    expect(() => serializer.load(data)).toThrow(DecryptionError);
+  });
 });
