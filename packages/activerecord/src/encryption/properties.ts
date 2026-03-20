@@ -6,7 +6,7 @@
 
 import { EncryptedContentIntegrity } from "./errors.js";
 
-const ALLOWED_TYPES = new Set(["string", "number", "boolean", "undefined"]);
+const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
 
 export class Properties {
   private _data = new Map<string, unknown>();
@@ -43,7 +43,7 @@ export class Properties {
   }
 
   toJSON(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [key, value] of this._data) {
       result[key] = value;
     }

@@ -12,11 +12,11 @@ export class MessageSerializer {
     if (!(message instanceof Message)) {
       throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
     }
+    const headers: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     const data: Record<string, unknown> = {
       p: Buffer.from(message.payload, "utf-8").toString("base64"),
-      h: {} as Record<string, unknown>,
+      h: headers,
     };
-    const headers = data.h as Record<string, unknown>;
     for (const [key, value] of message.headers.entries()) {
       if (value instanceof Message) {
         headers[key] = JSON.parse(this.dump(value));

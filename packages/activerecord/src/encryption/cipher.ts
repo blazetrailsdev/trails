@@ -5,7 +5,7 @@
  */
 
 import * as crypto from "crypto";
-import { DecryptionError } from "./errors.js";
+import { ConfigError, DecryptionError } from "./errors.js";
 
 const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
@@ -66,7 +66,7 @@ export class Cipher {
   private _validateKeyLength(key: string): void {
     const keyBuf = Buffer.from(key, "base64");
     if (keyBuf.length < KEY_LENGTH) {
-      throw new Error(
+      throw new ConfigError(
         `The provided key has length ${keyBuf.length} but must be at least ${KEY_LENGTH} bytes`,
       );
     }

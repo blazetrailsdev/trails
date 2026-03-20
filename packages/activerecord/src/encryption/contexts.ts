@@ -19,17 +19,17 @@ function currentContext(): EncryptionContext {
   return storage.getStore() ?? {};
 }
 
-export function withEncryptionContext(overrides: EncryptionContext, fn: () => void): void {
+export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () => T): T {
   const previous = currentContext();
-  storage.run({ ...previous, ...overrides }, fn);
+  return storage.run({ ...previous, ...overrides }, fn);
 }
 
-export function withoutEncryption(fn: () => void): void {
-  withEncryptionContext({ encryptionDisabled: true }, fn);
+export function withoutEncryption<T>(fn: () => T): T {
+  return withEncryptionContext({ encryptionDisabled: true }, fn);
 }
 
-export function protectingEncryptedData(fn: () => void): void {
-  withEncryptionContext({ protectedMode: true }, fn);
+export function protectingEncryptedData<T>(fn: () => T): T {
+  return withEncryptionContext({ protectedMode: true }, fn);
 }
 
 export function getEncryptionContext(): EncryptionContext {

@@ -49,9 +49,11 @@ export class Encryptor {
     let data = clearText;
     let compressed = false;
     if (this._compress) {
+      const originalByteLength = Buffer.byteLength(data, "utf-8");
       const compressedBuf = this._compressor.deflate(data);
-      if (compressedBuf.length < Buffer.byteLength(data, "utf-8")) {
-        data = Buffer.from(compressedBuf).toString("base64");
+      const compressedBase64 = Buffer.from(compressedBuf).toString("base64");
+      if (Buffer.byteLength(compressedBase64, "utf-8") < originalByteLength) {
+        data = compressedBase64;
         compressed = true;
       }
     }
