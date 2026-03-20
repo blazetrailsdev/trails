@@ -781,6 +781,30 @@ export class Base extends Model {
     return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
   }
 
+  /** @internal Like all() but skips currentScope — used by the preloader. */
+  static _allForPreload(): any {
+    return this._buildDefaultRelation();
+  }
+
+  private static _buildDefaultRelation(): any {
+    if (!_RelationCtor) {
+      throw new Error("Relation not loaded. Import relation.ts first.");
+    }
+    let rel = new _RelationCtor(this);
+    rel = _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
+    if (this._defaultScope) {
+      rel = this._defaultScope(rel);
+    }
+    if (isStiSubclass(this)) {
+      const col = getInheritanceColumn(getStiBase(this));
+      if (col) {
+        const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
+        rel = rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
+      }
+    }
+    return rel;
+  }
+
   // Scope extension methods: scope name -> Record of extra methods
   static _scopeExtensions: Map<string, Record<string, Function>> = new Map();
 
@@ -1047,28 +1071,10 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.all
    */
   static all(): any {
-    if (!_RelationCtor) {
-      throw new Error("Relation not loaded. Import relation.ts first.");
-    }
-    // If a current scope is set (via scoping()), return a clone to avoid stale caches
     if (this._currentScope) {
       return this._currentScope._clone();
     }
-    let rel = new _RelationCtor(this);
-    rel = _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
-    // Apply default scope if defined
-    if (this._defaultScope) {
-      rel = this._defaultScope(rel);
-    }
-    // STI subclasses auto-filter by type column (includes descendants)
-    if (isStiSubclass(this)) {
-      const col = getInheritanceColumn(getStiBase(this));
-      if (col) {
-        const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
-        rel = rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
-      }
-    }
-    return rel;
+    return this._buildDefaultRelation();
   }
 
   /**

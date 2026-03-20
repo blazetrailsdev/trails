@@ -3172,7 +3172,7 @@ export class Relation<T extends Base> {
             ];
             if (fkValues.length === 0) continue;
             const related = await (targetModel as any)
-              .all()
+              ._allForPreload()
               .where({ [primaryKey]: fkValues })
               .toArray();
             const relatedMap = new Map<unknown, any>();
@@ -3206,7 +3206,7 @@ export class Relation<T extends Base> {
           if (!targetModel) continue;
 
           const related = await (targetModel as any)
-            .all()
+            ._allForPreload()
             .where({ [primaryKey]: fkValues })
             .toArray();
           const relatedMap = new Map<unknown, any>();
@@ -3311,7 +3311,7 @@ export class Relation<T extends Base> {
           }
 
           const throughRecords = await (throughModel as any)
-            .all()
+            ._allForPreload()
             .where(throughWhereConditions)
             .toArray();
 
@@ -3335,7 +3335,7 @@ export class Relation<T extends Base> {
                   .filter((v: any) => v != null),
               ),
             ];
-            let targetRel = (targetModel as any).all().where({ [targetPk]: targetIds });
+            let targetRel = (targetModel as any)._allForPreload().where({ [targetPk]: targetIds });
             if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
             targetRecords = targetIds.length > 0 ? await targetRel.toArray() : [];
             targetMap = new Map<unknown, any>();
@@ -3358,7 +3358,7 @@ export class Relation<T extends Base> {
             const sourceWhereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
             if (sourceAsName)
               sourceWhereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
-            let sourceRel = (targetModel as any).all().where(sourceWhereConditions);
+            let sourceRel = (targetModel as any)._allForPreload().where(sourceWhereConditions);
             if (assocDef.options.scope) sourceRel = assocDef.options.scope(sourceRel);
             targetRecords = throughIds.length > 0 ? await sourceRel.toArray() : [];
             getTargetsForThrough = (tr: any) => {
@@ -3390,7 +3390,7 @@ export class Relation<T extends Base> {
 
         const whereConditions: Record<string, unknown> = { [foreignKey]: pkValues };
         if (typeCol) whereConditions[typeCol] = modelClass.name;
-        let hasManyRel = (targetModel as any).all().where(whereConditions);
+        let hasManyRel = (targetModel as any)._allForPreload().where(whereConditions);
         if (assocDef.options.scope) hasManyRel = assocDef.options.scope(hasManyRel);
         const related = await hasManyRel.toArray();
         const relatedMap = new Map<unknown, any[]>();
@@ -3465,7 +3465,7 @@ export class Relation<T extends Base> {
           if (throughAsName)
             throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
           const throughRecords = await (throughModel as any)
-            .all()
+            ._allForPreload()
             .where(throughWhereConditions)
             .toArray();
 
@@ -3499,7 +3499,7 @@ export class Relation<T extends Base> {
                 .filter((v: any) => v != null),
             ),
           ];
-          let hotTargetRel = (targetModel as any).all().where({ id: targetIds });
+          let hotTargetRel = (targetModel as any)._allForPreload().where({ id: targetIds });
           if (assocDef.options.scope) hotTargetRel = assocDef.options.scope(hotTargetRel);
           const targetRecords = targetIds.length > 0 ? await hotTargetRel.toArray() : [];
           const targetMap = new Map<unknown, any>();
@@ -3535,7 +3535,7 @@ export class Relation<T extends Base> {
 
         const hasOneWhere: Record<string, unknown> = { [foreignKey]: pkValues };
         if (hasOneTypeCol) hasOneWhere[hasOneTypeCol] = modelClass.name;
-        let hasOneRel = (targetModel as any).all().where(hasOneWhere);
+        let hasOneRel = (targetModel as any)._allForPreload().where(hasOneWhere);
         if (assocDef.options.scope) hasOneRel = assocDef.options.scope(hasOneRel);
         const related = await hasOneRel.toArray();
         const relatedMap = new Map<unknown, any>();
@@ -3603,7 +3603,7 @@ export class Relation<T extends Base> {
         const targetIds = [...allTargetIds];
         let targetRecords: any[] = [];
         if (targetIds.length > 0) {
-          let targetRel = (targetModel as any).all().where({ [targetPk]: targetIds });
+          let targetRel = (targetModel as any)._allForPreload().where({ [targetPk]: targetIds });
           if (assocDef.options.scope) targetRel = assocDef.options.scope(targetRel);
           targetRecords = await targetRel.toArray();
         }
