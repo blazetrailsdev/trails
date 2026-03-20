@@ -4,7 +4,13 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, StrictLoadingViolationError, registerModel } from "./index.js";
-import { Associations, loadBelongsTo, loadHasOne, loadHasMany } from "./associations.js";
+import {
+  Associations,
+  association,
+  loadBelongsTo,
+  loadHasOne,
+  loadHasMany,
+} from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -950,7 +956,6 @@ describe("StrictLoadingTest", () => {
   });
 
   it("strict loading on concat is ignored", async () => {
-    const { CollectionProxy } = await import("./associations.js");
     class SlcnAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -972,17 +977,13 @@ describe("StrictLoadingTest", () => {
     });
     const author = await SlcnAuthor.create({ name: "Test" });
     author.strictLoadingBang();
-    const proxy = new CollectionProxy(author, "slCnBooks", {
-      type: "hasMany",
-      name: "slCnBooks",
-      options: { className: "SlcnBook", foreignKey: "sl_cn_author_id" },
-    });
+    const proxy = association(author, "slCnBooks");
     const book = new SlcnBook({ title: "New Book" });
     await proxy.push(book);
+    expect(author.isStrictLoading()).toBe(true);
   });
 
   it("strict loading on build is ignored", async () => {
-    const { CollectionProxy } = await import("./associations.js");
     class SlbdAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -1004,16 +1005,12 @@ describe("StrictLoadingTest", () => {
     });
     const author = await SlbdAuthor.create({ name: "Test" });
     author.strictLoadingBang();
-    const proxy = new CollectionProxy(author, "slBdBooks", {
-      type: "hasMany",
-      name: "slBdBooks",
-      options: { className: "SlbdBook", foreignKey: "sl_bd_author_id" },
-    });
+    const proxy = association(author, "slBdBooks");
     expect(() => proxy.build({ title: "Built Book" })).not.toThrow();
+    expect(author.isStrictLoading()).toBe(true);
   });
 
   it("strict loading on writer is ignored", async () => {
-    const { CollectionProxy } = await import("./associations.js");
     class SlwrAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -1035,18 +1032,13 @@ describe("StrictLoadingTest", () => {
     });
     const author = await SlwrAuthor.create({ name: "Test" });
     author.strictLoadingBang();
-    const proxy = new CollectionProxy(author, "slWrBooks", {
-      type: "hasMany",
-      name: "slWrBooks",
-      options: { className: "SlwrBook", foreignKey: "sl_wr_author_id" },
-    });
+    const proxy = association(author, "slWrBooks");
     const book = new SlwrBook({ title: "Written Book" });
     await proxy.replace([book]);
     expect(author.isStrictLoading()).toBe(true);
   });
 
   it("strict loading with new record on concat is ignored", async () => {
-    const { CollectionProxy } = await import("./associations.js");
     class SlnrAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -1068,13 +1060,10 @@ describe("StrictLoadingTest", () => {
     });
     const author = new SlnrAuthor({ name: "Test" });
     author.strictLoadingBang();
-    const proxy = new CollectionProxy(author, "slNrBooks", {
-      type: "hasMany",
-      name: "slNrBooks",
-      options: { className: "SlnrBook", foreignKey: "sl_nr_author_id" },
-    });
+    const proxy = association(author, "slNrBooks");
     const book = new SlnrBook({ title: "New Book" });
     await proxy.push(book);
+    expect(author.isStrictLoading()).toBe(true);
   });
   it.skip("strict loading with new record on build is ignored", () => {});
   it.skip("strict loading with new record on writer is ignored", () => {});
