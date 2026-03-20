@@ -2014,7 +2014,7 @@ export class Relation<T extends Base> {
       }
     }
     for (const rawJoin of this._rawJoins) {
-      manager.join(new Nodes.StringJoin(new Nodes.SqlLiteral(rawJoin)));
+      (manager as any).core.source.right.push(new Nodes.StringJoin(new Nodes.SqlLiteral(rawJoin)));
     }
   }
 
@@ -2878,13 +2878,12 @@ export class Relation<T extends Base> {
   }
 
   private _resolveColumn(table: Table, key: string): Nodes.Attribute {
-    const dotIdx = key.lastIndexOf(".");
-    if (dotIdx !== -1) {
-      const tableName = key.slice(0, dotIdx);
-      const colName = key.slice(dotIdx + 1);
-      return new Table(tableName).get(colName);
-    }
-    return table.get(key);
+    if (key.includes('"')) return table.get(key);
+    const firstDot = key.indexOf(".");
+    if (firstDot === -1) return table.get(key);
+    const secondDot = key.indexOf(".", firstDot + 1);
+    if (secondDot !== -1) return table.get(key);
+    return new Table(key.slice(0, firstDot)).get(key.slice(firstDot + 1));
   }
 
   private _buildWhereNodes(
@@ -3030,22 +3029,22 @@ export class Relation<T extends Base> {
   private _castWhereValue(key: string, value: unknown): unknown {
     if (value === null || value === undefined || value instanceof Range) return value;
     let attrKey = key;
-    const dotIdx = key.lastIndexOf(".");
-    if (dotIdx !== -1) {
-      const tablePrefix = key.slice(0, dotIdx);
+    const firstDot = key.indexOf(".");
+    if (firstDot !== -1 && key.indexOf(".", firstDot + 1) === -1 && !key.includes('"')) {
+      const tablePrefix = key.slice(0, firstDot);
       if (tablePrefix === this._modelClass.arelTable.name) {
-        attrKey = key.slice(dotIdx + 1);
+        attrKey = key.slice(firstDot + 1);
       }
     }
     return this._modelClass._castAttributeValue(attrKey, value);
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {
-    const dotIdx = key.lastIndexOf(".");
-    if (dotIdx !== -1) {
-      return { tbl: key.slice(0, dotIdx), col: key.slice(dotIdx + 1) };
-    }
-    return { tbl: table.name, col: key };
+    if (key.includes('"')) return { tbl: table.name, col: key };
+    const firstDot = key.indexOf(".");
+    if (firstDot === -1) return { tbl: table.name, col: key };
+    if (key.indexOf(".", firstDot + 1) !== -1) return { tbl: table.name, col: key };
+    return { tbl: key.slice(0, firstDot), col: key.slice(firstDot + 1) };
   }
 
   private _buildWhereStrings(table: Table): string[] {
