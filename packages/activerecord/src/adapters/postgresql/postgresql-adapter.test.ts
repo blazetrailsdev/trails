@@ -644,13 +644,14 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("disable extension with schema", async () => {
-      await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "hstore"`);
+      await adapter.exec(`CREATE SCHEMA IF NOT EXISTS "ex_extensions"`);
+      await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "hstore" SCHEMA "ex_extensions"`);
       const before = await adapter.extensionEnabled("hstore");
       expect(before).toBe(true);
-      await adapter.disableExtension("hstore", { schema: "public" });
+      await adapter.disableExtension("hstore", { schema: "ex_extensions" });
       const after = await adapter.extensionEnabled("hstore");
       expect(after).toBe(false);
-      await adapter.enableExtension("hstore");
+      await adapter.exec(`DROP SCHEMA IF EXISTS "ex_extensions" CASCADE`);
     });
 
     it("disable extension without schema", async () => {
