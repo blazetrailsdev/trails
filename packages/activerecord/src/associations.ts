@@ -1059,6 +1059,16 @@ export class CollectionProxy {
     }
   }
 
+  private async _withoutStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
+    const wasStrict = (this._record as any)._strictLoading;
+    (this._record as any)._strictLoading = false;
+    try {
+      return await fn();
+    } finally {
+      (this._record as any)._strictLoading = wasStrict;
+    }
+  }
+
   /**
    * Build a new associated record (unsaved).
    * For direct has_many, sets the FK on the target.
@@ -1552,8 +1562,10 @@ export class CollectionProxy {
    */
   async replace(records: Base[]): Promise<void> {
     this._ensureThroughWritable();
-    await this.clear();
-    await this.push(...records);
+    return this._withoutStrictLoading(async () => {
+      await this.clear();
+      await this.push(...records);
+    });
   }
 
   /**
