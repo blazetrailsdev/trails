@@ -249,10 +249,11 @@ describe("RelationScopingTest", () => {
       }
     }
     await AnnPost.create({ title: "Annotated" });
-    const sql = AnnPost.all().annotate("finding posts").toSql();
-    expect(sql).toContain("/* finding posts */");
-    const results = await AnnPost.all().annotate("finding posts").toArray();
-    expect(results).toHaveLength(1);
+    const rel = AnnPost.all().annotate("finding posts");
+    await AnnPost.scoping(rel, async () => {
+      const sql = AnnPost.all().toSql();
+      expect(sql).toContain("/* finding posts */");
+    });
   });
 
   it("find with annotation unscoped", async () => {
@@ -263,9 +264,12 @@ describe("RelationScopingTest", () => {
       }
     }
     await AnnuPost.create({ title: "Test" });
-    const sql = AnnuPost.unscoped().toSql();
-    expect(sql).not.toContain("/* test */");
-    expect(sql).toContain("SELECT");
+    const annotated = AnnuPost.all().annotate("test");
+    const annotatedSql = annotated.toSql();
+    expect(annotatedSql).toContain("/* test */");
+    const unscopedSql = AnnuPost.unscoped().toSql();
+    expect(unscopedSql).not.toContain("/* test */");
+    expect(unscopedSql).toContain("SELECT");
   });
 
   it.skip("find with annotation unscope", () => {
@@ -284,8 +288,11 @@ describe("RelationScopingTest", () => {
       }
     }
     await SjPost.create({ title: "Joined" });
-    const sql = SjPost.joins("INNER JOIN comments ON comments.post_id = sj_posts.id").toSql();
-    expect(sql).toContain("INNER JOIN comments");
+    const rel = SjPost.joins("INNER JOIN comments ON comments.post_id = sj_posts.id");
+    await SjPost.scoping(rel, async () => {
+      const sql = SjPost.all().toSql();
+      expect(sql).toContain("INNER JOIN comments");
+    });
   });
 
   it("scoped create with where", async () => {
