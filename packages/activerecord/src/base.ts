@@ -1785,7 +1785,7 @@ export class Base extends Model {
   private _frozen = false;
   private _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
-  _transactionAction: string | undefined = undefined;
+  _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
   _strictLoading = false;
   _strictLoadingBypassCount = 0;
   _preloadedAssociations: Map<string, unknown> = new Map();
