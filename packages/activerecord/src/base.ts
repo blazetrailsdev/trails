@@ -1662,9 +1662,24 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.increment_counter
    */
-  static async incrementCounter(attribute: string, id: unknown, by: number = 1): Promise<number> {
+  static async incrementCounter(
+    attribute: string,
+    id: unknown,
+    by: number = 1,
+    options?: { touch?: boolean | string | string[] },
+  ): Promise<number> {
     const table = this.arelTable;
-    const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by} WHERE ${this._buildPkWhere(id)}`;
+    let touchClause = "";
+    if (options?.touch) {
+      const now = new Date().toISOString();
+      if (options.touch === true) {
+        touchClause = `, "updated_at" = '${now}'`;
+      } else {
+        const cols = Array.isArray(options.touch) ? options.touch : [options.touch];
+        touchClause = cols.map((c) => `, "${c}" = '${now}'`).join("");
+      }
+    }
+    const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by}${touchClause} WHERE ${this._buildPkWhere(id)}`;
     return this.adapter.executeMutation(sql);
   }
 
@@ -1673,8 +1688,13 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.decrement_counter
    */
-  static async decrementCounter(attribute: string, id: unknown, by: number = 1): Promise<number> {
-    return this.incrementCounter(attribute, id, -by);
+  static async decrementCounter(
+    attribute: string,
+    id: unknown,
+    by: number = 1,
+    options?: { touch?: boolean | string | string[] },
+  ): Promise<number> {
+    return this.incrementCounter(attribute, id, -by, options);
   }
 
   /**
@@ -1685,11 +1705,25 @@ export class Base extends Model {
   static async updateCounters(
     id: unknown | unknown[],
     counters: Record<string, number>,
+    options?: { touch?: boolean | string | string[] },
   ): Promise<number> {
     const table = this.arelTable;
-    const setClause = Object.entries(counters)
-      .map(([attr, amount]) => `"${attr}" = COALESCE("${attr}", 0) + ${amount}`)
-      .join(", ");
+    let touchClause = "";
+    if (options?.touch) {
+      const now = new Date().toISOString();
+      if (options.touch === true) {
+        touchClause = `, "updated_at" = '${now}'`;
+      } else if (Array.isArray(options.touch) && options.touch.length === 0) {
+        touchClause = "";
+      } else {
+        const cols = Array.isArray(options.touch) ? options.touch : [options.touch];
+        touchClause = cols.map((c) => `, "${c}" = '${now}'`).join("");
+      }
+    }
+    const setClause =
+      Object.entries(counters)
+        .map(([attr, amount]) => `"${attr}" = COALESCE("${attr}", 0) + ${amount}`)
+        .join(", ") + touchClause;
     if (Array.isArray(this.primaryKey)) {
       // For CPK: id can be a single tuple [1,2] or array of tuples [[1,2],[3,4]]
       const tuples =
