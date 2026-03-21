@@ -126,7 +126,7 @@ describe("Base#clone", () => {
     expect(c.isPersisted()).toBe(true);
   });
 
-  it("clone shares attributes with original (shallow)", async () => {
+  it("clone is independent from original", async () => {
     const adapter = freshAdapter();
     class User extends Base {
       static {

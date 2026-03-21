@@ -2923,6 +2923,7 @@ export class Base extends Model {
     Object.assign(copy, this);
     copy._attributes = this._attributes;
     copy._previouslyNewRecord = false;
+    copy.errors = new (this.errors.constructor as new (base: unknown) => typeof this.errors)(copy);
     return copy;
   }
 
