@@ -1223,10 +1223,21 @@ export class CollectionProxy {
       : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey as string);
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
-      record.writeAttribute(foreignKey as string, pkValue);
+      if (Array.isArray(foreignKey)) {
+        if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
+          throw new Error(
+            `Composite foreignKey on "${this._assocName}" requires primaryKey to be an array of the same length`,
+          );
+        }
+        for (let i = 0; i < foreignKey.length; i++) {
+          record.writeAttribute(foreignKey[i], this._record.readAttribute(primaryKey[i] as string));
+        }
+      } else {
+        const pkValue = this._record.readAttribute(primaryKey as string);
+        record.writeAttribute(foreignKey as string, pkValue);
+      }
       if (typeCol) record.writeAttribute(typeCol, ctor.name);
       await record.save();
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
@@ -1343,7 +1354,13 @@ export class CollectionProxy {
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
-      record.writeAttribute(foreignKey as string, null);
+      if (Array.isArray(foreignKey)) {
+        for (const fk of foreignKey) {
+          record.writeAttribute(fk, null);
+        }
+      } else {
+        record.writeAttribute(foreignKey as string, null);
+      }
       if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
@@ -1711,17 +1728,30 @@ export function setBelongsTo(
   options: AssociationOptions = {},
 ): void {
   const foreignKey = options.foreignKey ?? `${underscore(assocName)}_id`;
-  const primaryKey = options.primaryKey ?? "id";
+  const targetCtor = target ? (target.constructor as typeof Base) : null;
+  const primaryKey = options.primaryKey ?? targetCtor?.primaryKey ?? "id";
 
   if (target) {
-    record.writeAttribute(foreignKey as string, target.readAttribute(primaryKey as string));
-    // Polymorphic: set the _type column
+    if (Array.isArray(foreignKey)) {
+      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      for (let i = 0; i < foreignKey.length; i++) {
+        record.writeAttribute(foreignKey[i], target.readAttribute(pkCols[i] as string));
+      }
+    } else {
+      record.writeAttribute(foreignKey as string, target.readAttribute(primaryKey as string));
+    }
     if (options.polymorphic) {
       const typeCol = `${underscore(assocName)}_type`;
-      record.writeAttribute(typeCol, (target.constructor as typeof Base).name);
+      record.writeAttribute(typeCol, targetCtor!.name);
     }
   } else {
-    record.writeAttribute(foreignKey as string, null);
+    if (Array.isArray(foreignKey)) {
+      for (const fk of foreignKey) {
+        record.writeAttribute(fk, null);
+      }
+    } else {
+      record.writeAttribute(foreignKey as string, null);
+    }
     if (options.polymorphic) {
       const typeCol = `${underscore(assocName)}_type`;
       record.writeAttribute(typeCol, null);
