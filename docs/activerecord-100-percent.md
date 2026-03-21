@@ -55,15 +55,18 @@ and LEFT OUTER JOINs. Supported features:
 
 - Table aliases on all joined tables (`t1`, `t2`, etc.) to handle same-table joins
 - Association scopes applied as additional ON conditions
-- Nested association paths via dot notation (`eagerLoad("comments.author")`)
+- LIMIT/OFFSET uses a parent-ID subquery to avoid JOIN fan-out
 - Composite PK models fall back to the preload path
 - Unsupported associations (polymorphic belongsTo, missing models) fall back to preload
 
 Known limitations:
 
+- **Nested paths**: `eagerLoad("comments.author")` generates correct JOINs but
+  attaches children to the base record, not intermediate records. Needs per-level
+  grouping in `instantiateFromRows` to properly reconstruct the tree.
 - **Composite PK joins**: Composite FK/PK join predicates not yet supported
 - **CTE/hints/annotations**: These relation features aren't carried into the eager
-  load query yet (WHERE/ORDER/LIMIT/OFFSET/GROUP/HAVING are supported)
+  load query yet (WHERE/ORDER/GROUP/HAVING are supported)
 
 #### A4: Remaining association features (~250 tests)
 

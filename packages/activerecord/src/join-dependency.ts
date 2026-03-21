@@ -27,7 +27,10 @@ export interface JoinNode {
   assocName: string;
   assocType: "hasMany" | "hasOne" | "belongsTo";
   joinSql: string;
-  parentAssocName?: string;
+  /** The immediate association name (without parent prefix) */
+  immediateAssocName: string;
+  /** Dotted parent path, or null if directly on the base model */
+  parentPath: string | null;
 }
 
 export interface AliasMap {
@@ -151,6 +154,8 @@ export class JoinDependency {
       modelClass: targetModel!,
       columns,
       assocName: options?.parentAssocName ? `${options.parentAssocName}.${assocName}` : assocName,
+      immediateAssocName: assocName,
+      parentPath: options?.parentAssocName ?? null,
       assocType,
       joinSql: `LEFT OUTER JOIN "${targetTable!}" "${tableAlias}" ON ${joinOn}`,
     };
@@ -197,12 +202,13 @@ export class JoinDependency {
   }
 
   buildSelectSql(): string {
+    const aliasByIndex = new Map<number, string>();
+    aliasByIndex.set(this._baseTableIndex, this._baseAlias);
+    for (const node of this._nodes) aliasByIndex.set(node.tableIndex, node.tableAlias);
+
     return this._aliases
       .map((a) => {
-        const tableAlias =
-          a.tableIndex === this._baseTableIndex
-            ? this._baseAlias
-            : this._nodes.find((n) => n.tableIndex === a.tableIndex)!.tableAlias;
+        const tableAlias = aliasByIndex.get(a.tableIndex)!;
         return `"${tableAlias}"."${a.column}" AS "${a.alias}"`;
       })
       .join(", ");
@@ -376,6 +382,8 @@ export class JoinDependency {
       modelClass: targetModel,
       columns: targetColumns,
       assocName: fullAssocName,
+      immediateAssocName: assocDef.name,
+      parentPath: parentAssocName ?? null,
       assocType: assocDef.type,
       joinSql: `${throughJoinSql} LEFT OUTER JOIN "${targetTable}" "${targetAlias}" ON ${targetJoinOn}`,
     };

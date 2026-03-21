@@ -1682,11 +1682,26 @@ export class Relation<T extends Base> {
     this._applyOrderToManager(manager, table);
 
     if (this._isDistinct) manager.distinct();
-    if (this._limitValue !== null) manager.take(this._limitValue);
-    if (this._offsetValue !== null) manager.skip(this._offsetValue);
     for (const col of this._groupColumns) manager.group(col);
     for (const clause of this._havingClauses) manager.having(new Nodes.SqlLiteral(clause));
     if (this._lockValue) manager.lock(this._lockValue);
+
+    // When LIMIT/OFFSET is present, use a subquery for parent IDs to avoid
+    // JOIN fan-out changing the number of parent records returned.
+    if (this._limitValue !== null || this._offsetValue !== null) {
+      const tableName = (this._modelClass as any).tableName;
+      const idSubquery = table.project(`"${tableName}"."${basePk}"`);
+      this._applyWheresToManager(idSubquery as any, table);
+      this._applyOrderToManager(idSubquery as any, table);
+      if (this._limitValue !== null) (idSubquery as any).take(this._limitValue);
+      if (this._offsetValue !== null) (idSubquery as any).skip(this._offsetValue);
+      manager.where(
+        new Nodes.SqlLiteral(`"${tableName}"."${basePk}" IN (${(idSubquery as any).toSql()})`),
+      );
+    } else {
+      if (this._limitValue !== null) manager.take(this._limitValue);
+      if (this._offsetValue !== null) manager.skip(this._offsetValue);
+    }
 
     let sql = manager.toSql();
     if (this._fromClause) {
@@ -1706,9 +1721,9 @@ export class Relation<T extends Base> {
       for (const node of jd.nodes) {
         const children = assocs?.get(node.assocName) ?? [];
         if (node.assocType === "hasOne" || node.assocType === "belongsTo") {
-          (parent as any)._preloadedAssociations.set(node.assocName, children[0] ?? null);
+          (parent as any)._preloadedAssociations.set(node.immediateAssocName, children[0] ?? null);
         } else {
-          (parent as any)._preloadedAssociations.set(node.assocName, children);
+          (parent as any)._preloadedAssociations.set(node.immediateAssocName, children);
         }
       }
     }
