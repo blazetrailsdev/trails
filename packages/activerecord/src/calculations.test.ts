@@ -6422,7 +6422,7 @@ describe("CalculationsTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(User.i18nScope).toBe("activemodel");
+    expect(User.i18nScope).toBe("activerecord");
   });
 
   // Rails guide: attribute_previously_changed?
