@@ -181,6 +181,11 @@ export class JoinDependency {
     const parts = path.split(".");
     if (parts.length === 1) return this.addAssociation(parts[0]);
 
+    // Snapshot state so we can roll back on failure
+    const snapshotNodes = this._nodes.length;
+    const snapshotAliases = this._aliases.length;
+    const snapshotNextIndex = this._nextTableIndex;
+
     let currentModel = this._baseModel as any;
     let currentAlias = this._baseAlias;
     let lastNode: JoinNode | null = null;
@@ -192,7 +197,13 @@ export class JoinDependency {
         fromAlias: currentAlias,
         parentAssocName: parentPath || undefined,
       });
-      if (!node) return null;
+      if (!node) {
+        // Roll back partial additions
+        this._nodes.length = snapshotNodes;
+        this._aliases.length = snapshotAliases;
+        this._nextTableIndex = snapshotNextIndex;
+        return null;
+      }
       lastNode = node;
       currentModel = node.modelClass;
       currentAlias = node.tableAlias;
@@ -226,6 +237,8 @@ export class JoinDependency {
     const parentMap = new Map<unknown, any>();
     const assocMap = new Map<unknown, Map<string, any[]>>();
     const seenChildren = new Map<unknown, Map<string, Set<unknown>>>();
+    const seenRawPks = new Set<unknown>();
+    const rawToKey = new Map<unknown, unknown>();
 
     const baseColumns = getModelColumns(this._baseModel);
 
@@ -235,12 +248,18 @@ export class JoinDependency {
         parentAttrs[baseColumns[i]] = row[`t${this._baseTableIndex}_r${i}`];
       }
 
-      const parent = (this._baseModel as any)._instantiate(parentAttrs);
-      const parentKey = parent.readAttribute(basePk);
-      if (!parentMap.has(parentKey)) {
+      const rawPk = parentAttrs[basePk];
+      let parentKey: unknown;
+      if (!seenRawPks.has(rawPk)) {
+        seenRawPks.add(rawPk);
+        const parent = (this._baseModel as any)._instantiate(parentAttrs);
+        parentKey = parent.readAttribute(basePk);
+        rawToKey.set(rawPk, parentKey);
         parentMap.set(parentKey, parent);
         assocMap.set(parentKey, new Map());
         seenChildren.set(parentKey, new Map());
+      } else {
+        parentKey = rawToKey.get(rawPk)!;
       }
 
       for (const node of this._nodes) {
