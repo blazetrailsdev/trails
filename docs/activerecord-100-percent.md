@@ -50,6 +50,24 @@ The preloader needs scoping and where support to generate correct subqueries. Ne
 - Polymorphic eager loading
 - Through + nested through preloading
 
+JoinDependency (#156) implements Rails-style `eager_load` with `t0_r0` column aliasing
+and LEFT OUTER JOINs. Supported features:
+
+- Table aliases on all joined tables (`t1`, `t2`, etc.) to handle same-table joins
+- Association scopes applied as additional ON conditions
+- LIMIT/OFFSET uses a parent-ID subquery to avoid JOIN fan-out
+- Composite PK models fall back to the preload path
+- Unsupported associations (polymorphic belongsTo, missing models) fall back to preload
+
+Known limitations:
+
+- **Nested paths**: `eagerLoad("comments.author")` falls back to the preload path.
+  Supporting nested JOINs needs per-level grouping in `instantiateFromRows`.
+- **Composite PK joins**: Composite FK/PK join predicates not yet supported
+  (falls back to preload)
+- **CTEs**: Common table expressions aren't carried into the eager load query yet
+  (WHERE/ORDER/GROUP/HAVING, optimizer hints, and annotations are supported)
+
 #### A4: Remaining association features (~250 tests)
 
 **Files:** associations.test.ts (71), has-many-through (49), has-one-through (29), has-one (31), inverse (35), join-model (41), HABTM (43)

@@ -1614,9 +1614,14 @@ export class Relation<T extends Base> {
     if (this._isNone) return [];
     if (this._loaded) return [...this._records];
 
-    const sql = this._toSql();
-    const rows = await this._modelClass.adapter.execute(sql);
-    this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+    // Eager load via single JOIN query when eager_load associations are specified
+    if (this._eagerLoadAssociations.length > 0) {
+      await this._executeEagerLoad();
+    } else {
+      const sql = this._toSql();
+      const rows = await this._modelClass.adapter.execute(sql);
+      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+    }
     this._loaded = true;
 
     // Apply readonly and strict_loading flags to loaded records
@@ -1631,17 +1636,147 @@ export class Relation<T extends Base> {
       }
     }
 
-    // Preload associations if requested
-    const allAssocs = [
-      ...this._includesAssociations,
-      ...this._preloadAssociations,
-      ...this._eagerLoadAssociations,
-    ];
-    if (allAssocs.length > 0 && this._records.length > 0) {
-      await this._preloadAssociationsForRecords(this._records, allAssocs);
+    // Preload associations via separate queries (includes + preload)
+    const preloadAssocs = [...this._includesAssociations, ...this._preloadAssociations];
+    if (preloadAssocs.length > 0 && this._records.length > 0) {
+      await this._preloadAssociationsForRecords(this._records, preloadAssocs);
     }
 
     return [...this._records];
+  }
+
+  private async _executeEagerLoad(): Promise<void> {
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    if (Array.isArray(basePk) || this._ctes.length > 0 || this._setOperation || this._fromClause) {
+      const sql = this._toSql();
+      const rows = await this._modelClass.adapter.execute(sql);
+      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+      await this._preloadAssociationsForRecords(this._records, this._eagerLoadAssociations);
+      return;
+    }
+
+    const { JoinDependency } = await import("./join-dependency.js");
+    const jd = new JoinDependency(this._modelClass);
+
+    const fallbackAssocs: string[] = [];
+    for (const assocName of this._eagerLoadAssociations) {
+      if (assocName.includes(".")) {
+        // Nested paths fall back to preload until per-level grouping is implemented
+        fallbackAssocs.push(assocName);
+        continue;
+      }
+      const node = jd.addAssociation(assocName);
+      if (!node) fallbackAssocs.push(assocName);
+    }
+
+    // If no associations could be JOINed, fall back entirely to preload
+    if (jd.nodes.length === 0) {
+      const sql = this._toSql();
+      const rows = await this._modelClass.adapter.execute(sql);
+      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+      if (fallbackAssocs.length > 0) {
+        await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+      }
+      return;
+    }
+
+    const table = this._modelClass.arelTable;
+    const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
+
+    // Apply JoinDependency's LEFT OUTER JOINs
+    for (const node of jd.nodes) {
+      (manager as any).core.source.right.push(
+        new Nodes.StringJoin(new Nodes.SqlLiteral(node.joinSql)),
+      );
+    }
+
+    // Apply relation's existing joins, WHERE, ORDER, LIMIT, OFFSET, etc.
+    this._applyJoinsToManager(manager);
+    this._applyWheresToManager(manager, table);
+    this._applyOrderToManager(manager, table);
+
+    if (this._isDistinct) manager.distinct();
+    for (const col of this._groupColumns) manager.group(col);
+    for (const clause of this._havingClauses) manager.having(new Nodes.SqlLiteral(clause));
+    if (this._lockValue) manager.lock(this._lockValue);
+
+    // When LIMIT/OFFSET is present, use a subquery for parent IDs to avoid
+    // JOIN fan-out changing the number of parent records returned.
+    if (this._limitValue !== null || this._offsetValue !== null) {
+      const tableName = (this._modelClass as any).tableName;
+      const idSubquery = table.project(`"${tableName}"."${basePk}"`);
+      (idSubquery as any).distinct();
+      for (const node of jd.nodes) {
+        (idSubquery as any).core.source.right.push(
+          new Nodes.StringJoin(new Nodes.SqlLiteral(node.joinSql)),
+        );
+      }
+      this._applyJoinsToManager(idSubquery as any);
+      this._applyWheresToManager(idSubquery as any, table);
+      this._applyOrderToManager(idSubquery as any, table);
+      if (this._limitValue !== null) (idSubquery as any).take(this._limitValue);
+      if (this._offsetValue !== null) (idSubquery as any).skip(this._offsetValue);
+      manager.where(
+        new Nodes.SqlLiteral(`"${tableName}"."${basePk}" IN (${(idSubquery as any).toSql()})`),
+      );
+    } else {
+      if (this._limitValue !== null) manager.take(this._limitValue);
+      if (this._offsetValue !== null) manager.skip(this._offsetValue);
+    }
+
+    let sql = manager.toSql();
+    if (this._optimizerHints.length > 0) {
+      const hints = `/*+ ${this._optimizerHints.join(" ")} */`;
+      sql = sql.replace(/^SELECT/, `SELECT ${hints}`);
+    }
+    if (this._annotations.length > 0) {
+      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      sql = `${sql} ${comments}`;
+    }
+
+    const rows = await this._modelClass.adapter.execute(sql);
+
+    const { parents, associations } = jd.instantiateFromRows(rows);
+
+    const inverseMap = new Map<string, string | undefined>();
+    const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
+    for (const assoc of modelAssocs) {
+      inverseMap.set(assoc.name, assoc.options?.inverseOf);
+    }
+
+    for (const parent of parents) {
+      if (!(parent as any)._preloadedAssociations) {
+        (parent as any)._preloadedAssociations = new Map();
+      }
+      const pk = parent.readAttribute(basePk);
+      const assocs = associations.get(pk);
+      for (const node of jd.nodes) {
+        const children = assocs?.get(node.assocName) ?? [];
+        const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
+        if (isSingular) {
+          (parent as any)._preloadedAssociations.set(node.immediateAssocName, children[0] ?? null);
+        } else {
+          (parent as any)._preloadedAssociations.set(node.immediateAssocName, children);
+        }
+
+        const inverseName = inverseMap.get(node.immediateAssocName);
+        if (inverseName) {
+          const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
+          for (const child of targets) {
+            if (!(child as any)._cachedAssociations) {
+              (child as any)._cachedAssociations = new Map();
+            }
+            (child as any)._cachedAssociations.set(inverseName, parent);
+          }
+        }
+      }
+    }
+
+    this._records = parents as T[];
+
+    if (fallbackAssocs.length > 0 && this._records.length > 0) {
+      await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+    }
   }
 
   /**

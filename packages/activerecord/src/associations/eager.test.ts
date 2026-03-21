@@ -1686,7 +1686,98 @@ describe("EagerAssociationTest", () => {
     const preloaded = (children[0] as any)._preloadedAssociations.get("eagerStrBtParent");
     expect(preloaded?.readAttribute("name")).toBe("P");
   });
-  it.skip("eager association loading with explicit join", () => {});
+  it("eager association loading with explicit join", async () => {
+    class EjAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ej_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(EjAuthor, "ejPosts", {
+      className: "EjPost",
+      foreignKey: "ej_author_id",
+    });
+    registerModel(EjAuthor);
+    registerModel(EjPost);
+
+    const alice = await EjAuthor.create({ name: "Alice" });
+    await EjPost.create({ title: "P1", ej_author_id: alice.id });
+    await EjPost.create({ title: "P2", ej_author_id: alice.id });
+
+    const authors = await EjAuthor.all().eagerLoad("ejPosts").toArray();
+    expect(authors).toHaveLength(1);
+    const posts = (authors[0] as any)._preloadedAssociations?.get("ejPosts");
+    expect(posts).toHaveLength(2);
+    const titles = posts.map((p: any) => p.readAttribute("title")).sort();
+    expect(titles).toEqual(["P1", "P2"]);
+  });
+  it("eager association loading with explicit join belongs to", async () => {
+    class EjBtAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjBtPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ej_bt_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(EjBtPost, "ejBtAuthor", {
+      className: "EjBtAuthor",
+      foreignKey: "ej_bt_author_id",
+    });
+    registerModel(EjBtAuthor);
+    registerModel(EjBtPost);
+
+    const author = await EjBtAuthor.create({ name: "BtAuthor" });
+    await EjBtPost.create({ title: "BtPost", ej_bt_author_id: author.id });
+
+    const posts2 = await EjBtPost.all().eagerLoad("ejBtAuthor").toArray();
+    expect(posts2).toHaveLength(1);
+    const loaded = (posts2[0] as any)._preloadedAssociations?.get("ejBtAuthor");
+    expect(loaded).not.toBeNull();
+    expect(loaded.readAttribute("name")).toBe("BtAuthor");
+  });
+  it("eager association loading with explicit join has one", async () => {
+    class EjHoUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjHoProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("ej_ho_user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(EjHoUser, "ejHoProfile", {
+      className: "EjHoProfile",
+      foreignKey: "ej_ho_user_id",
+    });
+    registerModel(EjHoUser);
+    registerModel(EjHoProfile);
+
+    const user = await EjHoUser.create({ name: "HoUser" });
+    await EjHoProfile.create({ bio: "HoBio", ej_ho_user_id: user.id });
+
+    const users = await EjHoUser.all().eagerLoad("ejHoProfile").toArray();
+    expect(users).toHaveLength(1);
+    const profile = (users[0] as any)._preloadedAssociations?.get("ejHoProfile");
+    expect(profile).not.toBeNull();
+    expect(profile.readAttribute("bio")).toBe("HoBio");
+  });
   it("eager with has many through", async () => {
     class EagerHmtReader extends Base {
       static {
