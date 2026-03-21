@@ -1706,6 +1706,11 @@ export class Relation<T extends Base> {
       const tableName = (this._modelClass as any).tableName;
       const idSubquery = table.project(`"${tableName}"."${basePk}"`);
       (idSubquery as any).distinct();
+      for (const node of jd.nodes) {
+        (idSubquery as any).core.source.right.push(
+          new Nodes.StringJoin(new Nodes.SqlLiteral(node.joinSql)),
+        );
+      }
       this._applyJoinsToManager(idSubquery as any);
       this._applyWheresToManager(idSubquery as any, table);
       this._applyOrderToManager(idSubquery as any, table);
