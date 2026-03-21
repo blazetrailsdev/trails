@@ -120,16 +120,46 @@ describe("DirtyTest", () => {
     /* needs aliasAttribute to propagate dirty tracking */
   });
 
-  it.skip("saved_change_to_attribute? returns whether a change occurred in the last save", () => {
-    /* needs constructor to snapshot defaults before applying attrs */
+  it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
+    class Person extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ first_name: "Sean" });
+    p.writeAttribute("first_name", "Bob");
+    await p.save();
+    expect(p.savedChangeToAttribute("first_name")).toBe(true);
+    expect(p.savedChangeToAttribute("first_name", { from: "Sean", to: "Bob" })).toBe(true);
+    expect(p.savedChangeToAttribute("first_name", { from: "Bob" })).toBe(false);
   });
 
-  it.skip("saved_change_to_attribute returns the change that occurred in the last save", () => {
-    /* needs constructor to snapshot defaults before applying attrs */
+  it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
+    class Person extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ first_name: "Sean" });
+    p.writeAttribute("first_name", "Bob");
+    await p.save();
+    const change = p.savedChangeToAttributeValues("first_name");
+    expect(change).toEqual(["Sean", "Bob"]);
   });
 
-  it.skip("attribute_before_last_save returns the original value before saving", () => {
-    /* needs constructor to snapshot defaults before applying attrs */
+  it("attribute_before_last_save returns the original value before saving", async () => {
+    class Person extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const p = await Person.create({ first_name: "Sean" });
+    p.writeAttribute("first_name", "Bob");
+    await p.save();
+    expect(p.attributeBeforeLastSave("first_name")).toBe("Sean");
   });
 
   it("changed? in after callbacks returns false", async () => {
