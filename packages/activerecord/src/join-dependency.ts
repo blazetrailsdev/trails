@@ -96,6 +96,7 @@ export class JoinDependency {
     if (assocDef.type === "belongsTo") {
       if (assocDef.options.polymorphic) return null;
       const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
+      if (Array.isArray(foreignKey)) return null;
       const className = assocDef.options.className ?? _camelize(assocName);
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
@@ -350,6 +351,7 @@ export class JoinDependency {
     const throughFk = throughAssocDef.options.as
       ? (throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughAssocDef.options.as)}_id`)
       : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+    if (Array.isArray(throughFk)) return null;
 
     let throughJoinOn = `"${throughAlias}"."${throughFk}" = "${sourceAlias}"."${sourcePk}"`;
     if (throughAssocDef.options.as) {
@@ -370,11 +372,13 @@ export class JoinDependency {
 
     if (sourceAssocDef?.type === "belongsTo") {
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
+      if (Array.isArray(targetFk)) return null;
       const className = sourceAssocDef.options.className ?? _camelize(sourceName);
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
+      if (Array.isArray(targetPk)) return null;
       targetJoinOn = `"${targetAlias}"."${targetPk}" = "${throughAlias}"."${targetFk}"`;
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
@@ -383,6 +387,7 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const targetFk =
         sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`;
+      if (Array.isArray(targetFk)) return null;
       const throughPk = (throughModel as any).primaryKey ?? "id";
       if (Array.isArray(throughPk)) return null;
       targetJoinOn = `"${targetAlias}"."${targetFk}" = "${throughAlias}"."${throughPk}"`;
