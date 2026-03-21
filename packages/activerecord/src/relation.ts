@@ -1660,9 +1660,12 @@ export class Relation<T extends Base> {
 
     const fallbackAssocs: string[] = [];
     for (const assocName of this._eagerLoadAssociations) {
-      const node = assocName.includes(".")
-        ? jd.addNestedAssociation(assocName)
-        : jd.addAssociation(assocName);
+      if (assocName.includes(".")) {
+        // Nested paths fall back to preload until per-level grouping is implemented
+        fallbackAssocs.push(assocName);
+        continue;
+      }
+      const node = jd.addAssociation(assocName);
       if (!node) fallbackAssocs.push(assocName);
     }
 
@@ -1718,10 +1721,24 @@ export class Relation<T extends Base> {
     if (this._fromClause) {
       sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause}`);
     }
+    if (this._optimizerHints.length > 0) {
+      const hints = `/*+ ${this._optimizerHints.join(" ")} */`;
+      sql = sql.replace(/^SELECT/, `SELECT ${hints}`);
+    }
+    if (this._annotations.length > 0) {
+      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      sql = `${sql} ${comments}`;
+    }
 
     const rows = await this._modelClass.adapter.execute(sql);
 
     const { parents, associations } = jd.instantiateFromRows(rows);
+
+    const inverseMap = new Map<string, string | undefined>();
+    const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
+    for (const assoc of modelAssocs) {
+      inverseMap.set(assoc.name, assoc.options?.inverseOf);
+    }
 
     for (const parent of parents) {
       if (!(parent as any)._preloadedAssociations) {
@@ -1729,7 +1746,6 @@ export class Relation<T extends Base> {
       }
       const pk = parent.readAttribute(basePk);
       const assocs = associations.get(pk);
-      const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
       for (const node of jd.nodes) {
         const children = assocs?.get(node.assocName) ?? [];
         const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
@@ -1739,9 +1755,7 @@ export class Relation<T extends Base> {
           (parent as any)._preloadedAssociations.set(node.immediateAssocName, children);
         }
 
-        // Populate inverse caches on children
-        const assocDef = modelAssocs.find((a: any) => a.name === node.immediateAssocName);
-        const inverseName = assocDef?.options?.inverseOf;
+        const inverseName = inverseMap.get(node.immediateAssocName);
         if (inverseName) {
           const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
           for (const child of targets) {
