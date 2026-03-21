@@ -663,7 +663,7 @@ describe("CounterCacheTest", () => {
     const t = await Topic.create({ title: "test" });
     const r = await Reply.create({ content: "reply", topic_id: t.id });
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(1);
-    await updateCounterCaches(r, "decrement");
+    await r.destroy();
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(0);
   });
   it.skip("counter cache on association with touch true also updates the timestamps", () => {
@@ -1274,10 +1274,17 @@ describe("CounterCacheTest", () => {
         this.adapter = adapter;
       }
     }
-    const t = await Topic.create({ title: "test", updated_at: new Date("2020-01-01") });
+    const originalTime = new Date("2020-01-01");
+    const t = await Topic.create({ title: "test", updated_at: originalTime });
     await Topic.updateCounters(t.id, { replies_count: 1 }, { touch: [] as string[] });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.readAttribute("replies_count")).toBe(1);
+    const updatedAt = reloaded.readAttribute("updated_at");
+    if (updatedAt instanceof Date) {
+      expect(updatedAt.getTime()).toBe(originalTime.getTime());
+    } else {
+      expect(String(updatedAt)).toContain("2020");
+    }
   });
 
   it("update counters with touch: true", async () => {

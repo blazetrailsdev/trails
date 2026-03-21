@@ -1671,12 +1671,13 @@ export class Base extends Model {
     const table = this.arelTable;
     let touchClause = "";
     if (options?.touch) {
-      const now = new Date().toISOString();
       if (options.touch === true) {
-        touchClause = `, "updated_at" = '${now}'`;
+        touchClause = `, "updated_at" = CURRENT_TIMESTAMP`;
       } else {
         const cols = Array.isArray(options.touch) ? options.touch : [options.touch];
-        touchClause = cols.map((c) => `, "${c}" = '${now}'`).join("");
+        if (cols.length > 0) {
+          touchClause = cols.map((c) => `, "${c}" = CURRENT_TIMESTAMP`).join("");
+        }
       }
     }
     const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by}${touchClause} WHERE ${this._buildPkWhere(id)}`;
@@ -1710,14 +1711,13 @@ export class Base extends Model {
     const table = this.arelTable;
     let touchClause = "";
     if (options?.touch) {
-      const now = new Date().toISOString();
       if (options.touch === true) {
-        touchClause = `, "updated_at" = '${now}'`;
+        touchClause = `, "updated_at" = CURRENT_TIMESTAMP`;
       } else if (Array.isArray(options.touch) && options.touch.length === 0) {
         touchClause = "";
       } else {
         const cols = Array.isArray(options.touch) ? options.touch : [options.touch];
-        touchClause = cols.map((c) => `, "${c}" = '${now}'`).join("");
+        touchClause = cols.map((c) => `, "${c}" = CURRENT_TIMESTAMP`).join("");
       }
     }
     const setClause =
