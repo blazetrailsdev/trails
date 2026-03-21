@@ -1653,12 +1653,33 @@ export class Relation<T extends Base> {
       jd.addAssociation(assocName);
     }
 
-    const baseSql = this._toSql();
-    const whereMatch = baseSql.match(
-      /\bWHERE\s+(.*?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+GROUP\s+BY|\s*$)/i,
-    );
-    const orderMatch = baseSql.match(/\bORDER\s+BY\s+(.*?)(?:\s+LIMIT|\s*$)/i);
-    const sql = jd.buildFullSql(whereMatch?.[1], orderMatch?.[1]);
+    const table = this._modelClass.arelTable;
+    const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
+
+    // Apply JoinDependency's LEFT OUTER JOINs
+    for (const node of jd.nodes) {
+      (manager as any).core.source.right.push(
+        new Nodes.StringJoin(new Nodes.SqlLiteral(node.joinSql)),
+      );
+    }
+
+    // Apply relation's existing joins, WHERE, ORDER, LIMIT, OFFSET, etc.
+    this._applyJoinsToManager(manager);
+    this._applyWheresToManager(manager, table);
+    this._applyOrderToManager(manager, table);
+
+    if (this._isDistinct) manager.distinct();
+    if (this._limitValue !== null) manager.take(this._limitValue);
+    if (this._offsetValue !== null) manager.skip(this._offsetValue);
+    for (const col of this._groupColumns) manager.group(col);
+    for (const clause of this._havingClauses) manager.having(new Nodes.SqlLiteral(clause));
+    if (this._lockValue) manager.lock(this._lockValue);
+
+    let sql = manager.toSql();
+    if (this._fromClause) {
+      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause}`);
+    }
+
     const rows = await this._modelClass.adapter.execute(sql);
 
     const { parents, associations } = jd.instantiateFromRows(rows);

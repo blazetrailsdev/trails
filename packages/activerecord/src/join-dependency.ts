@@ -151,14 +151,6 @@ export class JoinDependency {
     return this._nodes.map((n) => n.joinSql).join(" ");
   }
 
-  buildFullSql(whereSql?: string, orderSql?: string): string {
-    const baseTable = (this._baseModel as any).tableName;
-    let sql = `SELECT ${this.buildSelectSql()} FROM "${baseTable}" ${this.buildJoinSql()}`;
-    if (whereSql) sql += ` WHERE ${whereSql}`;
-    if (orderSql) sql += ` ORDER BY ${orderSql}`;
-    return sql;
-  }
-
   instantiateFromRows(rows: Record<string, unknown>[]): {
     parents: any[];
     associations: Map<unknown, Map<string, any[]>>;
