@@ -296,19 +296,18 @@ export class JoinDependency {
 
         if (!hasNonNull) continue;
 
-        const child = (node.modelClass as any)._instantiate(childAttrs);
-        const childPk = child.readAttribute((node.modelClass as any).primaryKey ?? "id");
-        const parentAssocs = assocMap.get(parentKey)!;
-        if (!parentAssocs.has(node.assocName)) {
-          parentAssocs.set(node.assocName, []);
-        }
-
+        const rawChildPk = childAttrs[(node.modelClass as any).primaryKey ?? "id"];
         const seen = seenChildren.get(parentKey)!;
         if (!seen.has(node.assocName)) seen.set(node.assocName, new Set());
         const seenPks = seen.get(node.assocName)!;
 
-        if (!seenPks.has(childPk)) {
-          seenPks.add(childPk);
+        if (!seenPks.has(rawChildPk)) {
+          seenPks.add(rawChildPk);
+          const child = (node.modelClass as any)._instantiate(childAttrs);
+          const parentAssocs = assocMap.get(parentKey)!;
+          if (!parentAssocs.has(node.assocName)) {
+            parentAssocs.set(node.assocName, []);
+          }
           parentAssocs.get(node.assocName)!.push(child);
         }
       }
@@ -370,7 +369,9 @@ export class JoinDependency {
     const targetTableIndex = this._nextTableIndex++;
     const targetAlias = `t${targetTableIndex}`;
 
-    if (sourceAssocDef?.type === "belongsTo") {
+    if (!sourceAssocDef) return null;
+
+    if (sourceAssocDef.type === "belongsTo") {
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) return null;
       const className = sourceAssocDef.options.className ?? _camelize(sourceName);
