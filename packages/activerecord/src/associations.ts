@@ -1420,8 +1420,10 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#clear
    */
   async clear(): Promise<void> {
-    const records = await this.toArray();
-    await this.delete(...records);
+    return this._withoutStrictLoading(async () => {
+      const records = await this.toArray();
+      await this.delete(...records);
+    });
   }
 
   /**
@@ -1562,9 +1564,7 @@ export class CollectionProxy {
    */
   async replace(records: Base[]): Promise<void> {
     this._ensureThroughWritable();
-    await this._withoutStrictLoading(async () => {
-      await this.clear();
-    });
+    await this.clear();
     await this.push(...records);
   }
 
