@@ -1705,6 +1705,7 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null || this._offsetValue !== null) {
       const tableName = (this._modelClass as any).tableName;
       const idSubquery = table.project(`"${tableName}"."${basePk}"`);
+      this._applyJoinsToManager(idSubquery as any);
       this._applyWheresToManager(idSubquery as any, table);
       this._applyOrderToManager(idSubquery as any, table);
       if (this._limitValue !== null) (idSubquery as any).take(this._limitValue);
