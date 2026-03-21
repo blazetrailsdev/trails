@@ -1,6 +1,19 @@
 import type { Base } from "./base.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+/**
+ * Throw inside a transaction block to trigger a rollback without
+ * re-raising the error to the caller.
+ *
+ * Mirrors: ActiveRecord::Rollback
+ */
+export class Rollback extends Error {
+  constructor() {
+    super("Rollback");
+    this.name = "Rollback";
+  }
+}
+
 // Track the currently-active transaction (if any) for after_commit/after_rollback callbacks
 let _currentTransaction: Transaction | null = null;
 
@@ -68,7 +81,7 @@ let _savepointCounter = 0;
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: Transaction) => Promise<T>,
-): Promise<T> {
+): Promise<T | undefined> {
   const adapter = modelClass.adapter;
   const tx = new Transaction(adapter);
   const previousTx = _currentTransaction;
@@ -100,6 +113,9 @@ export async function transaction<T>(
     }
     _currentTransaction = previousTx;
     await tx.runAfterRollbackCallbacks();
+    if (error instanceof Rollback) {
+      return undefined;
+    }
     throw error;
   }
   _currentTransaction = previousTx;

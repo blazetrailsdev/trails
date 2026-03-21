@@ -3218,7 +3218,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#transaction
    */
-  async transaction<R>(fn: (tx: any) => Promise<R>): Promise<R> {
+  async transaction<R>(fn: (tx: any) => Promise<R>): Promise<R | undefined> {
     const { transaction: txn } = await import("./transactions.js");
     return txn(this.constructor as typeof Base, fn);
   }
