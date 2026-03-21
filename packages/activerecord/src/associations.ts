@@ -1732,10 +1732,24 @@ export function setBelongsTo(
   const primaryKey = options.primaryKey ?? targetCtor?.primaryKey ?? "id";
 
   if (target) {
+    if (Array.isArray(foreignKey) && !Array.isArray(primaryKey)) {
+      throw new Error(
+        `Composite foreignKey for belongs_to "${assocName}" requires primaryKey to also be an array`,
+      );
+    }
+    if (
+      Array.isArray(foreignKey) &&
+      Array.isArray(primaryKey) &&
+      foreignKey.length !== primaryKey.length
+    ) {
+      throw new Error(
+        `Mismatched composite keys for belongs_to "${assocName}": foreignKey length (${foreignKey.length}) does not match primaryKey length (${primaryKey.length})`,
+      );
+    }
     if (Array.isArray(foreignKey)) {
-      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      const pkCols = primaryKey as string[];
       for (let i = 0; i < foreignKey.length; i++) {
-        record.writeAttribute(foreignKey[i], target.readAttribute(pkCols[i] as string));
+        record.writeAttribute(foreignKey[i], target.readAttribute(pkCols[i]));
       }
     } else {
       record.writeAttribute(foreignKey as string, target.readAttribute(primaryKey as string));

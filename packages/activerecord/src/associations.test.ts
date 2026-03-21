@@ -2463,7 +2463,7 @@ describe("AssociationsTest", () => {
     });
     const parent = await CpkParent.create({ region_id: 1, id: 20, name: "Parent" });
     const child = await CpkChild.create({ label: "Child" });
-    await setBelongsTo(child, "cpkParent", parent, {
+    setBelongsTo(child, "cpkParent", parent, {
       foreignKey: ["parent_region_id", "parent_id"],
       className: "CpkParent",
     });
@@ -2497,7 +2497,7 @@ describe("AssociationsTest", () => {
       className: "CpkParent2",
     });
     const child = await CpkChild2.create({ parent_region_id: 1, parent_id: 20, label: "Child" });
-    await setBelongsTo(child, "cpkParent2", null, {
+    setBelongsTo(child, "cpkParent2", null, {
       foreignKey: ["parent_region_id", "parent_id"],
       className: "CpkParent2",
     });
@@ -2532,7 +2532,7 @@ describe("AssociationsTest", () => {
     });
     const parent = await CpkParent3.create({ region_id: 2, id: 30, name: "Parent" });
     const child = new CpkChild3({ label: "Child" });
-    await setBelongsTo(child, "cpkParent3", parent, {
+    setBelongsTo(child, "cpkParent3", parent, {
       foreignKey: ["parent_region_id", "parent_id"],
       className: "CpkParent3",
     });
