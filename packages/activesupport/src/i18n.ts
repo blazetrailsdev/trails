@@ -1,26 +1,8 @@
+import { deepMergeInPlace } from "./hash-utils.js";
+
 type TranslationValue = string | (string | null)[] | null | TranslationHash;
 interface TranslationHash {
   [key: string]: TranslationValue;
-}
-
-function deepMerge(target: TranslationHash, source: TranslationHash): TranslationHash {
-  for (const key of Object.keys(source)) {
-    const sv = source[key];
-    const tv = target[key];
-    if (
-      sv !== null &&
-      typeof sv === "object" &&
-      !Array.isArray(sv) &&
-      tv !== null &&
-      typeof tv === "object" &&
-      !Array.isArray(tv)
-    ) {
-      target[key] = deepMerge(tv as TranslationHash, sv as TranslationHash);
-    } else {
-      target[key] = sv;
-    }
-  }
-  return target;
 }
 
 function dig(obj: TranslationHash, keys: string[]): TranslationValue | undefined {
@@ -42,7 +24,7 @@ class SimpleBackend {
     if (!this.translations[locale]) {
       this.translations[locale] = {};
     }
-    deepMerge(this.translations[locale], data);
+    deepMergeInPlace(this.translations[locale], data as Record<string, unknown>);
   }
 
   lookup(locale: string, key: string): TranslationValue | undefined {
@@ -105,7 +87,19 @@ function tzAbbreviation(date: Date): string {
   return `${tzSign}${pad(tzAbsHours)}${pad(tzAbsMins)}`;
 }
 
-function strftime(date: Date, format: string): string {
+interface StrftimeNames {
+  dayNames?: string[];
+  abbrDayNames?: string[];
+  monthNames?: (string | null)[];
+  abbrMonthNames?: (string | null)[];
+}
+
+function strftime(date: Date, format: string, names: StrftimeNames = {}): string {
+  const dayNames = names.dayNames ?? DAYNAMES;
+  const abbrDayNames = names.abbrDayNames ?? ABBR_DAYNAMES;
+  const monthNames = names.monthNames ?? MONTHNAMES;
+  const abbrMonthNames = names.abbrMonthNames ?? ABBR_MONTHNAMES;
+
   const day = date.getDay();
   const mday = date.getDate();
   const month = date.getMonth(); // 0-based
@@ -140,16 +134,16 @@ function strftime(date: Date, format: string): string {
         result += "%";
         break;
       case "a":
-        result += ABBR_DAYNAMES[day];
+        result += abbrDayNames[day];
         break;
       case "A":
-        result += DAYNAMES[day];
+        result += dayNames[day];
         break;
       case "b":
-        result += ABBR_MONTHNAMES[month + 1]!;
+        result += abbrMonthNames[month + 1] ?? "";
         break;
       case "B":
-        result += MONTHNAMES[month + 1] as string;
+        result += monthNames[month + 1] ?? "";
         break;
       case "d":
         result += pad(mday);
@@ -219,10 +213,10 @@ class I18nModule {
   backend = new SimpleBackend();
 
   constructor() {
-    this._loadDefaults();
+    this.loadDefaults();
   }
 
-  private _loadDefaults(): void {
+  loadDefaults(): void {
     this.backend.storeTranslations("en", {
       date: {
         formats: {
@@ -287,11 +281,30 @@ class I18nModule {
       }
     }
 
-    return strftime(object, pattern);
+    const names: StrftimeNames = {
+      dayNames: this._lookupArray(locale, "date.day_names") ?? DAYNAMES,
+      abbrDayNames: this._lookupArray(locale, "date.abbr_day_names") ?? ABBR_DAYNAMES,
+      monthNames: this._lookupNullableArray(locale, "date.month_names") ?? MONTHNAMES,
+      abbrMonthNames: this._lookupNullableArray(locale, "date.abbr_month_names") ?? ABBR_MONTHNAMES,
+    };
+
+    return strftime(object, pattern, names);
   }
 
   l(object: DateLike, options: LocalizeOptions = {}): string {
     return this.localize(object, options);
+  }
+
+  private _lookupArray(locale: string, key: string): string[] | null {
+    const val = this.backend.lookup(locale, key);
+    if (Array.isArray(val)) return val as string[];
+    return null;
+  }
+
+  private _lookupNullableArray(locale: string, key: string): (string | null)[] | null {
+    const val = this.backend.lookup(locale, key);
+    if (Array.isArray(val)) return val;
+    return null;
   }
 
   private _isDateOnly(d: Date): boolean {

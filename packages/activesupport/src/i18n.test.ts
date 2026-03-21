@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "./i18n.js";
 import { toSentence } from "./array-utils.js";
 
@@ -7,8 +7,13 @@ describe("I18nTest", () => {
   let time: Date;
 
   beforeEach(() => {
+    I18n.loadDefaults();
     date = new Date(2008, 6, 2); // July 2, 2008 local midnight
-    time = new Date(Date.UTC(2008, 6, 2, 16, 47, 1)); // UTC time
+    time = new Date(2008, 6, 2, 16, 47, 1); // July 2, 2008 16:47:01 local time
+  });
+
+  afterEach(() => {
+    I18n.loadDefaults();
   });
 
   it("time zone localization with default format", () => {
@@ -36,22 +41,20 @@ describe("I18nTest", () => {
 
   it("time localization should use default format", () => {
     const result = I18n.localize(time, { type: "time" });
-    expect(result).toMatch(/Wed, 02 Jul 2008 \d{2}:\d{2}:01/);
+    expect(result).toMatch(/Wed, 02 Jul 2008 16:47:01/);
   });
 
   it("time localization with default format", () => {
     const result = I18n.localize(time, { type: "time", format: "default" });
-    expect(result).toMatch(/Wed, 02 Jul 2008 \d{2}:\d{2}:01/);
+    expect(result).toMatch(/Wed, 02 Jul 2008 16:47:01/);
   });
 
   it("time localization with short format", () => {
-    const result = I18n.localize(time, { type: "time", format: "short" });
-    expect(result).toMatch(/02 Jul \d{2}:\d{2}/);
+    expect(I18n.localize(time, { type: "time", format: "short" })).toBe("02 Jul 16:47");
   });
 
   it("time localization with long format", () => {
-    const result = I18n.localize(time, { type: "time", format: "long" });
-    expect(result).toMatch(/July 02, 2008 \d{2}:\d{2}/);
+    expect(I18n.localize(time, { type: "time", format: "long" })).toBe("July 02, 2008 16:47");
   });
 
   it("day names", () => {
@@ -152,11 +155,6 @@ describe("I18nTest", () => {
     });
     const lastWord = I18n.translate("support.array.last_word_connector") as string;
     expect(toSentence(["a", "b", "c"], { lastWordConnector: lastWord })).toBe("a, b and c");
-
-    // Restore defaults
-    I18n.backend.storeTranslations("en", {
-      support: { array: { two_words_connector: " and ", last_word_connector: ", and " } },
-    });
   });
 
   it("to sentence with empty i18n store", () => {
