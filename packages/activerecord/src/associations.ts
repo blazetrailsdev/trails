@@ -243,7 +243,7 @@ export async function loadBelongsTo(
   }
 
   // Strict loading check: this is a lazy load
-  if ((record as any)._strictLoading) {
+  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
     throw new StrictLoadingViolationError(record, assocName);
   }
 
@@ -324,7 +324,7 @@ export async function loadHasOne(
   }
 
   // Strict loading check
-  if ((record as any)._strictLoading) {
+  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
     throw new StrictLoadingViolationError(record, assocName);
   }
 
@@ -478,7 +478,7 @@ export async function loadHasMany(
   }
 
   // Strict loading check
-  if ((record as any)._strictLoading) {
+  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
     throw new StrictLoadingViolationError(record, assocName);
   }
 
@@ -630,13 +630,12 @@ export async function countHasMany(
 ): Promise<number> {
   if (options.through) {
     // Temporarily disable strict loading so through-association loading works
-    const wasStrict = (record as any)._strictLoading;
-    (record as any)._strictLoading = false;
+    (record as any)._strictLoadingBypassCount++;
     try {
       const records = await loadHasManyThrough(record, assocName, options);
       return records.length;
     } finally {
-      (record as any)._strictLoading = wasStrict;
+      (record as any)._strictLoadingBypassCount--;
     }
   }
   const rel = buildHasManyRelation(record, assocName, options);
@@ -1059,6 +1058,15 @@ export class CollectionProxy {
     }
   }
 
+  private async _withoutStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
+    this._record._strictLoadingBypassCount++;
+    try {
+      return await fn();
+    } finally {
+      this._record._strictLoadingBypassCount--;
+    }
+  }
+
   /**
    * Build a new associated record (unsaved).
    * For direct has_many, sets the FK on the target.
@@ -1410,8 +1418,10 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#clear
    */
   async clear(): Promise<void> {
-    const records = await this.toArray();
-    await this.delete(...records);
+    return this._withoutStrictLoading(async () => {
+      const records = await this.toArray();
+      await this.delete(...records);
+    });
   }
 
   /**

@@ -1779,6 +1779,7 @@ export class Base extends Model {
   private _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _strictLoading = false;
+  _strictLoadingBypassCount = 0;
   _preloadedAssociations: Map<string, unknown> = new Map();
 
   /**
