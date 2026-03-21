@@ -32,9 +32,13 @@ export interface AssociationOptions {
   scope?: (rel: any) => any;
   required?: boolean;
   optional?: boolean;
-  beforeAdd?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  beforeAdd?:
+    | ((owner: Base, record: Base) => void | false)
+    | ((owner: Base, record: Base) => void | false)[];
   afterAdd?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
-  beforeRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  beforeRemove?:
+    | ((owner: Base, record: Base) => void | false)
+    | ((owner: Base, record: Base) => void | false)[];
   afterRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
@@ -1086,8 +1090,9 @@ export class CollectionProxy {
     }
 
     const record = this._buildRaw(attrs);
-    fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
-    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    if (fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    }
     return record;
   }
 
@@ -1144,7 +1149,9 @@ export class CollectionProxy {
       return this._createThrough(attrs);
     }
     const record = this._buildRaw(attrs);
-    fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+    if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+      return record;
+    }
     await record.save();
     fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     return record;

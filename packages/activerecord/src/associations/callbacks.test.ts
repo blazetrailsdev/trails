@@ -257,29 +257,28 @@ describe("AssociationCallbacksTest", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        (this as any)._associations = [
-          {
-            type: "hasOne",
-            name: "profile",
-            options: {
-              className: `HOProfile${idx}`,
-              foreignKey: "user_id",
-              afterAdd: (_owner: any, record: any) => {
-                log.push("added:" + (record.id ?? "<new>"));
-              },
-            },
-          },
-        ];
       }
     }
     registerModel(`HOProfile${idx}`, Profile);
     registerModel(`HOUser${idx}`, User);
+    (User as any)._associations = [
+      {
+        type: "hasMany",
+        name: "profiles",
+        options: {
+          className: `HOProfile${idx}`,
+          foreignKey: "user_id",
+          afterAdd: (_owner: any, record: any) => {
+            log.push("added:" + (record.id ?? "<new>"));
+          },
+        },
+      },
+    ];
     const user = await User.create({ name: "Alice" });
-    const profile = new Profile({ bio: "Hello", user_id: user.id });
-    await profile.save();
-    // hasOne add callbacks fire through build, not push
-    // For now, verify the association can be read back
-    expect(profile.readAttribute("user_id")).toBe(user.id);
+    const proxy = association(user, "profiles");
+    const profile = proxy.build({ bio: "Hello" });
+    expect(log.length).toBe(1);
+    expect(log[0]).toBe("added:<new>");
   });
 
   it("remove callback on has one", async () => {
@@ -297,26 +296,31 @@ describe("AssociationCallbacksTest", () => {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
-        (this as any)._associations = [
-          {
-            type: "hasOne",
-            name: "profile",
-            options: {
-              className: `HORProfile${idx}`,
-              foreignKey: "user_id",
-              beforeRemove: (_owner: any, record: any) => {
-                log.push("removing:" + record.id);
-              },
-            },
-          },
-        ];
       }
     }
     registerModel(`HORProfile${idx}`, Profile);
     registerModel(`HORUser${idx}`, User);
+    (User as any)._associations = [
+      {
+        type: "hasMany",
+        name: "profiles",
+        options: {
+          className: `HORProfile${idx}`,
+          foreignKey: "user_id",
+          beforeRemove: (_owner: any, record: any) => {
+            log.push("removing:" + record.id);
+          },
+          afterRemove: (_owner: any, record: any) => {
+            log.push("removed:" + record.id);
+          },
+        },
+      },
+    ];
     const user = await User.create({ name: "Bob" });
     const profile = await Profile.create({ bio: "Hi", user_id: user.id });
-    expect(profile.id).toBeDefined();
+    const proxy = association(user, "profiles");
+    await proxy.delete(profile);
+    expect(log).toEqual(["removing:" + profile.id, "removed:" + profile.id]);
   });
 
   it("add callback fires before save", async () => {
@@ -437,5 +441,53 @@ describe("AssociationCallbacksTest", () => {
     await proxy.delete(c2);
     expect(log).toContain("br:" + c2.id);
     expect(log).toContain("ar:" + c2.id);
+  });
+
+  it("has many callbacks with create", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    const { Post } = makePostWithCallbacks(adapter, {
+      beforeAdd: (_owner: any, record: any) => {
+        log.push("before:" + (record.id ?? "<new>"));
+      },
+      afterAdd: (_owner: any, record: any) => {
+        log.push("after:" + record.id);
+      },
+    });
+    const post = await Post.create({ title: "Post" });
+    const proxy = association(post, "comments");
+    const c = await proxy.create({ body: "Created" });
+    expect(log[0]).toBe("before:<new>");
+    expect(log[1]).toBe("after:" + c.id);
+  });
+
+  it("has many callbacks with build", async () => {
+    const adapter = freshAdapter();
+    const log: string[] = [];
+    const { Post } = makePostWithCallbacks(adapter, {
+      beforeAdd: (_owner: any, record: any) => {
+        log.push("before:" + (record.id ?? "<new>"));
+      },
+      afterAdd: (_owner: any, record: any) => {
+        log.push("after:" + (record.id ?? "<new>"));
+      },
+    });
+    const post = await Post.create({ title: "Post" });
+    const proxy = association(post, "comments");
+    proxy.build({ body: "Built" });
+    expect(log).toEqual(["before:<new>", "after:<new>"]);
+  });
+
+  it("before add abort prevents create from saving", async () => {
+    const adapter = freshAdapter();
+    const { Post, Comment } = makePostWithCallbacks(adapter, {
+      beforeAdd: () => false as const,
+    });
+    const post = await Post.create({ title: "Post" });
+    const proxy = association(post, "comments");
+    const c = await proxy.create({ body: "Blocked" });
+    expect(c.isNewRecord()).toBe(true);
+    const all = await (Comment as any).all().toArray();
+    expect(all.length).toBe(0);
   });
 });
