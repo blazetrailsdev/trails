@@ -1218,11 +1218,14 @@ export class CollectionProxy {
 
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
+    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const foreignKey = asName
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+      : (this._assocDef.options.foreignKey ??
+        (Array.isArray(primaryKey)
+          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+          : `${underscore(ctor.name)}_id`));
     const typeCol = asName ? `${underscore(asName)}_type` : null;
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
       if (Array.isArray(foreignKey)) {
@@ -1348,9 +1351,13 @@ export class CollectionProxy {
 
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
+    const ownerPk = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const foreignKey = asName
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+      : (this._assocDef.options.foreignKey ??
+        (Array.isArray(ownerPk)
+          ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
+          : `${underscore(ctor.name)}_id`));
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
@@ -1727,9 +1734,13 @@ export function setBelongsTo(
   target: Base | null,
   options: AssociationOptions = {},
 ): void {
-  const foreignKey = options.foreignKey ?? `${underscore(assocName)}_id`;
   const targetCtor = target ? (target.constructor as typeof Base) : null;
   const primaryKey = options.primaryKey ?? targetCtor?.primaryKey ?? "id";
+  const foreignKey =
+    options.foreignKey ??
+    (Array.isArray(primaryKey)
+      ? primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
+      : `${underscore(assocName)}_id`);
 
   if (target) {
     if (Array.isArray(foreignKey) && !Array.isArray(primaryKey)) {
