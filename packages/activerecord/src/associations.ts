@@ -1952,6 +1952,13 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;
 
-    await parent.touch();
+    const touchOpt = assoc.options.touch;
+    if (touchOpt === true) {
+      await parent.touch();
+    } else if (typeof touchOpt === "string") {
+      await parent.touch(touchOpt);
+    } else if (Array.isArray(touchOpt)) {
+      await parent.touch(...(touchOpt as string[]));
+    }
   }
 }
