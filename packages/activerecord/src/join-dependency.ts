@@ -163,7 +163,6 @@ export class JoinDependency {
     parents: any[];
     associations: Map<unknown, Map<string, any[]>>;
   } {
-    const baseTable = (this._baseModel as any).tableName;
     const basePk = (this._baseModel as any).primaryKey ?? "id";
     const parentMap = new Map<unknown, any>();
     const assocMap = new Map<unknown, Map<string, any[]>>();
@@ -252,8 +251,6 @@ export class JoinDependency {
       const typeCol = `${_toUnderscore(throughAssocDef.options.as)}_type`;
       throughJoinSql = `LEFT OUTER JOIN "${throughTable}" ON ${throughJoinOn} AND "${throughTable}"."${typeCol}" = '${modelClass.name}'`;
     }
-
-    const throughTableIndex = this._nextTableIndex++;
 
     const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
     const throughAssocs: any[] = (throughModel as any)._associations ?? [];
