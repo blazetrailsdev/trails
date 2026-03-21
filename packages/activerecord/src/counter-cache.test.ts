@@ -1303,7 +1303,9 @@ describe("CounterCacheTest", () => {
     expect(reloaded.readAttribute("replies_count")).toBe(1);
     const updatedAt = reloaded.readAttribute("updated_at");
     expect(updatedAt).not.toBeNull();
-    expect(String(updatedAt)).not.toContain("2020-01-01");
+    const updatedTime =
+      updatedAt instanceof Date ? updatedAt.getTime() : Number(new Date(String(updatedAt)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
   });
 
   it.skip("update counters of multiple records with touch: true", () => {});
@@ -1325,7 +1327,10 @@ describe("CounterCacheTest", () => {
     await Topic.incrementCounter("replies_count", t.id, 1, { touch: true });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.readAttribute("replies_count")).toBe(1);
-    expect(String(reloaded.readAttribute("updated_at"))).not.toContain("2020-01-01");
+    const reloadedAt = reloaded.readAttribute("updated_at");
+    const reloadedTime =
+      reloadedAt instanceof Date ? reloadedAt.getTime() : Number(new Date(String(reloadedAt)));
+    expect(reloadedTime).toBeGreaterThan(originalTime.getTime());
   });
 
   it("decrement counters with touch: true", async () => {
@@ -1346,7 +1351,10 @@ describe("CounterCacheTest", () => {
     await Topic.decrementCounter("replies_count", t.id, 1, { touch: true });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.readAttribute("replies_count")).toBe(4);
-    expect(String(reloaded.readAttribute("updated_at"))).not.toContain("2020-01-01");
+    const reloadedAt = reloaded.readAttribute("updated_at");
+    const reloadedTime =
+      reloadedAt instanceof Date ? reloadedAt.getTime() : Number(new Date(String(reloadedAt)));
+    expect(reloadedTime).toBeGreaterThan(originalTime.getTime());
   });
 
   it("update counters with touch: :written_on", async () => {
@@ -1382,6 +1390,7 @@ describe("CounterCacheTest", () => {
     await Topic.incrementCounter("replies_count", t.id, 1, { touch: "written_on" });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.readAttribute("replies_count")).toBe(1);
+    expect(reloaded.readAttribute("written_on")).not.toBeNull();
   });
 
   it("decrement counters with touch: :written_on", async () => {
@@ -1397,6 +1406,7 @@ describe("CounterCacheTest", () => {
     await Topic.decrementCounter("replies_count", t.id, 1, { touch: "written_on" });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.readAttribute("replies_count")).toBe(4);
+    expect(reloaded.readAttribute("written_on")).not.toBeNull();
   });
 
   it("update counters with touch: %i( updated_at written_on )", async () => {
