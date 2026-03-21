@@ -969,13 +969,19 @@ export async function processDependentAssociations(record: Base): Promise<void> 
  * Fire one or more association callbacks (before_add, after_add, etc.).
  */
 function fireAssocCallbacks(
-  cbs: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[] | undefined,
+  cbs:
+    | ((owner: Base, record: Base) => void | false)
+    | ((owner: Base, record: Base) => void | false)[]
+    | undefined,
   owner: Base,
   record: Base,
-): void {
-  if (!cbs) return;
+): boolean {
+  if (!cbs) return true;
   const arr = Array.isArray(cbs) ? cbs : [cbs];
-  for (const cb of arr) cb(owner, record);
+  for (const cb of arr) {
+    if (cb(owner, record) === false) return false;
+  }
+  return true;
 }
 
 /**
@@ -1079,6 +1085,13 @@ export class CollectionProxy {
       return this._buildThrough(attrs);
     }
 
+    const record = this._buildRaw(attrs);
+    fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    return record;
+  }
+
+  private _buildRaw(attrs: Record<string, unknown> = {}): Base {
     const ctor = this._record.constructor as typeof Base;
     const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
@@ -1130,8 +1143,10 @@ export class CollectionProxy {
     if (this._isThrough) {
       return this._createThrough(attrs);
     }
-    const record = this.build(attrs);
+    const record = this._buildRaw(attrs);
+    fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
     await record.save();
+    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     return record;
   }
 
@@ -1203,7 +1218,7 @@ export class CollectionProxy {
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const pkValue = this._record.readAttribute(primaryKey as string);
     for (const record of records) {
-      fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
       record.writeAttribute(foreignKey as string, pkValue);
       if (typeCol) record.writeAttribute(typeCol, ctor.name);
       await record.save();
@@ -1320,7 +1335,7 @@ export class CollectionProxy {
       : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     for (const record of records) {
-      fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       record.writeAttribute(foreignKey as string, null);
       if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
