@@ -358,7 +358,34 @@ describe("CounterCacheTest", () => {
     expect(after.readAttribute("replies_count")).toBe(1);
   });
 
-  it.skip("reset counters by id", () => {});
+  it("reset counters by id", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Reply.create({ content: "r2", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 99 });
+    await Topic.resetCounters(t.id, "replies");
+    const after = await Topic.find(t.id);
+    expect(after.readAttribute("replies_count")).toBe(2);
+  });
+
   it.skip("reset counters with string id", () => {});
   it.skip("reset counters with modular association", () => {});
   it("update counter caches on destroy", async () => {
@@ -584,11 +611,90 @@ describe("CounterCacheTest", () => {
     expect(reloaded.readAttribute("replies_count")).toBe(0);
   });
   it.skip("counter cache on unloaded association class works", () => {});
-  it.skip("update counter caches on update", () => {});
-  it.skip("update counter caches on delete", () => {});
+  it("update counter caches on update", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t1 = await Topic.create({ title: "first" });
+    const t2 = await Topic.create({ title: "second" });
+    const r = await Reply.create({ content: "reply", topic_id: t1.id });
+    expect((await Topic.find(t1.id)).readAttribute("replies_count")).toBe(1);
+    expect((await Topic.find(t2.id)).readAttribute("replies_count")).toBe(0);
+    await updateCounterCaches(r, "decrement");
+    r.writeAttribute("topic_id", t2.id);
+    await r.save();
+    await updateCounterCaches(r, "increment");
+    expect((await Topic.find(t1.id)).readAttribute("replies_count")).toBe(0);
+    expect((await Topic.find(t2.id)).readAttribute("replies_count")).toBe(1);
+  });
+
+  it("update counter caches on delete", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    const r = await Reply.create({ content: "reply", topic_id: t.id });
+    expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(1);
+    await updateCounterCaches(r, "decrement");
+    expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(0);
+  });
   it.skip("counter cache on association with touch true also updates the timestamps", () => {});
   it.skip("counter cache on association with touch option updates timestamps", () => {});
-  it.skip("counter cache with belongs to association with class name", () => {});
+  it("counter cache with belongs to association with class name", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("posts_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("writer_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Post, "writer", {
+      className: "Author",
+      foreignKey: "writer_id",
+      counterCache: "posts_count",
+    });
+    registerModel(Author);
+    registerModel(Post);
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ title: "P1", writer_id: author.id });
+    const reloaded = await Author.find(author.id);
+    expect(reloaded.readAttribute("posts_count")).toBe(1);
+  });
   it("counter cache with belongs to association", async () => {
     class Topic extends Base {
       static {
@@ -614,9 +720,61 @@ describe("CounterCacheTest", () => {
   });
   it.skip("counter cache on polymorphic association", () => {});
   it.skip("counter cache on self referential association", () => {});
-  it.skip("counter cache on double destroy does not count twice", () => {});
+  it.skip("counter cache on double destroy does not count twice", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    const r = await Reply.create({ content: "a", topic_id: t.id });
+    expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(1);
+    await r.destroy();
+    expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(0);
+    await r.destroy();
+    expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(0);
+  });
   it.skip("counter cache with inverse of", () => {});
-  it.skip("reset counters by id resets all counters", () => {});
+  it("reset counters by id resets all counters", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Reply.create({ content: "r2", topic_id: t.id });
+    await Reply.create({ content: "r3", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies");
+    const after = await Topic.find(t.id);
+    expect(after.readAttribute("replies_count")).toBe(3);
+  });
   it.skip("reset counters with touch true touches the counter cache association", () => {});
   it.skip("reset counters with touch option touches the counter cache association", () => {});
   it("counter gets decremented when associated record is destroyed", async () => {
