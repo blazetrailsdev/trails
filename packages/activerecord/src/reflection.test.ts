@@ -345,6 +345,9 @@ describe("ReflectionTest", () => {
     });
     const ref = reflectOnAssociation(Subscriber, "subBooks");
     expect(ref).toBeInstanceOf(ThroughReflection);
+    expect((ref as ThroughReflection).through).toBe("subscriptions");
+    expect((ref as ThroughReflection).source).toBe("subBook");
+    expect(ref!.isThrough()).toBe(true);
   });
 
   it("has one through reflection", () => {
@@ -384,6 +387,9 @@ describe("ReflectionTest", () => {
     });
     const ref = reflectOnAssociation(HotOwner, "hotProfile");
     expect(ref).toBeInstanceOf(ThroughReflection);
+    expect((ref as ThroughReflection).through).toBe("hotAccount");
+    expect((ref as ThroughReflection).source).toBe("hotProfile");
+    expect(ref!.isThrough()).toBe(true);
   });
   it.skip("column for attribute", () => {});
   it.skip("columns for attribute", () => {});

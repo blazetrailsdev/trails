@@ -192,6 +192,24 @@ export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
  *
  * Mirrors: ActiveRecord::Base.reflect_on_association
  */
+function buildReflection(assocDef: any, modelClass: typeof Base): AssociationReflection {
+  if (
+    assocDef.options.through ||
+    assocDef.type === "hasManyThrough" ||
+    assocDef.type === "hasOneThrough"
+  ) {
+    const macro: "hasOne" | "hasMany" =
+      assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
+    return new ThroughReflection(assocDef.name, macro, assocDef.options, modelClass);
+  }
+  return new AssociationReflection(
+    assocDef.name,
+    assocDef.type as any,
+    assocDef.options,
+    modelClass,
+  );
+}
+
 export function reflectOnAssociation(
   modelClass: typeof Base,
   name: string,
@@ -199,23 +217,7 @@ export function reflectOnAssociation(
   const associations: any[] = (modelClass as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === name);
   if (!assocDef) return null;
-
-  if (
-    assocDef.options.through ||
-    assocDef.type === "hasManyThrough" ||
-    assocDef.type === "hasOneThrough"
-  ) {
-    const macro =
-      assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
-    return new ThroughReflection(assocDef.name, macro, assocDef.options, modelClass);
-  }
-
-  return new AssociationReflection(
-    assocDef.name,
-    assocDef.type as any,
-    assocDef.options,
-    modelClass,
-  );
+  return buildReflection(assocDef, modelClass);
 }
 
 /**
@@ -239,21 +241,5 @@ export function reflectOnAllAssociations(
       })
     : associations;
 
-  return filtered.map((assocDef) => {
-    if (
-      assocDef.options.through ||
-      assocDef.type === "hasManyThrough" ||
-      assocDef.type === "hasOneThrough"
-    ) {
-      const macro =
-        assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
-      return new ThroughReflection(assocDef.name, macro, assocDef.options, modelClass);
-    }
-    return new AssociationReflection(
-      assocDef.name,
-      assocDef.type as any,
-      assocDef.options,
-      modelClass,
-    );
-  });
+  return filtered.map((assocDef) => buildReflection(assocDef, modelClass));
 }
