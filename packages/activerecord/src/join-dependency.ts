@@ -26,7 +26,6 @@ export interface JoinNode {
   assocName: string;
   assocType: "hasMany" | "hasOne" | "belongsTo";
   joinSql: string;
-  children: JoinNode[];
 }
 
 export interface AliasMap {
@@ -122,7 +121,6 @@ export class JoinDependency {
       assocName,
       assocType,
       joinSql: `LEFT OUTER JOIN "${targetTable!}" ON ${joinOn}`,
-      children: [],
     };
 
     for (let i = 0; i < columns.length; i++) {
@@ -296,7 +294,6 @@ export class JoinDependency {
       assocName: assocDef.name,
       assocType: assocDef.type,
       joinSql: `${throughJoinSql} LEFT OUTER JOIN "${targetTable}" ON ${targetJoinOn}`,
-      children: [],
     };
 
     this._nodes.push(node);

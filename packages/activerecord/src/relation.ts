@@ -1649,8 +1649,10 @@ export class Relation<T extends Base> {
     const { JoinDependency } = await import("./join-dependency.js");
     const jd = new JoinDependency(this._modelClass);
 
+    const fallbackAssocs: string[] = [];
     for (const assocName of this._eagerLoadAssociations) {
-      jd.addAssociation(assocName);
+      const node = jd.addAssociation(assocName);
+      if (!node) fallbackAssocs.push(assocName);
     }
 
     const table = this._modelClass.arelTable;
@@ -1702,6 +1704,10 @@ export class Relation<T extends Base> {
     }
 
     this._records = parents as T[];
+
+    if (fallbackAssocs.length > 0 && this._records.length > 0) {
+      await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+    }
   }
 
   /**
