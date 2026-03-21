@@ -1691,14 +1691,12 @@ export class Relation<T extends Base> {
       }
       const pk = parent.readAttribute(basePk);
       const assocs = associations.get(pk);
-      if (assocs) {
-        for (const node of jd.nodes) {
-          const children = assocs.get(node.assocName) ?? [];
-          if (node.assocType === "hasOne" || node.assocType === "belongsTo") {
-            (parent as any)._preloadedAssociations.set(node.assocName, children[0] ?? null);
-          } else {
-            (parent as any)._preloadedAssociations.set(node.assocName, children);
-          }
+      for (const node of jd.nodes) {
+        const children = assocs?.get(node.assocName) ?? [];
+        if (node.assocType === "hasOne" || node.assocType === "belongsTo") {
+          (parent as any)._preloadedAssociations.set(node.assocName, children[0] ?? null);
+        } else {
+          (parent as any)._preloadedAssociations.set(node.assocName, children);
         }
       }
     }

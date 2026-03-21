@@ -81,6 +81,9 @@ export class JoinDependency {
     const assocType: "hasMany" | "hasOne" | "belongsTo" = assocDef.type;
 
     if (assocDef.type === "belongsTo") {
+      if (assocDef.options.polymorphic) {
+        return null;
+      }
       const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
       const className = assocDef.options.className ?? _camelize(assocName);
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
@@ -158,6 +161,7 @@ export class JoinDependency {
     const basePk = (this._baseModel as any).primaryKey ?? "id";
     const parentMap = new Map<unknown, any>();
     const assocMap = new Map<unknown, Map<string, any[]>>();
+    const seenChildren = new Map<unknown, Map<string, Set<unknown>>>();
 
     const baseColumns = getModelColumns(this._baseModel);
 
@@ -171,6 +175,7 @@ export class JoinDependency {
       if (!parentMap.has(parentPk)) {
         parentMap.set(parentPk, (this._baseModel as any)._instantiate(parentAttrs));
         assocMap.set(parentPk, new Map());
+        seenChildren.set(parentPk, new Map());
       }
 
       for (const node of this._nodes) {
@@ -190,13 +195,13 @@ export class JoinDependency {
           parentAssocs.set(node.assocName, []);
         }
 
-        const existing = parentAssocs.get(node.assocName)!;
-        if (
-          !existing.some(
-            (c: any) => c.readAttribute((node.modelClass as any).primaryKey ?? "id") === childPk,
-          )
-        ) {
-          existing.push((node.modelClass as any)._instantiate(childAttrs));
+        const seen = seenChildren.get(parentPk)!;
+        if (!seen.has(node.assocName)) seen.set(node.assocName, new Set());
+        const seenPks = seen.get(node.assocName)!;
+
+        if (!seenPks.has(childPk)) {
+          seenPks.add(childPk);
+          parentAssocs.get(node.assocName)!.push((node.modelClass as any)._instantiate(childAttrs));
         }
       }
     }
@@ -267,7 +272,8 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const targetFk =
         sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`;
-      targetJoinOn = `"${targetTable}"."${targetFk}" = "${throughTable}"."id"`;
+      const throughPk = (throughModel as any).primaryKey ?? "id";
+      targetJoinOn = `"${targetTable}"."${targetFk}" = "${throughTable}"."${throughPk}"`;
     }
 
     const targetTableIndex = this._nextTableIndex++;
