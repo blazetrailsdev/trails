@@ -73,7 +73,6 @@ export class AssociationReflection {
    */
   get foreignType(): string | null {
     if (!this.options.polymorphic && !this.options.as) return null;
-    if (this.options.foreignType) return this.options.foreignType as string;
     if (this.macro === "belongsTo") {
       return `${underscore(this.name)}_type`;
     }
