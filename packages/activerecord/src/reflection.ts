@@ -73,6 +73,7 @@ export class AssociationReflection {
    */
   get foreignType(): string | null {
     if (!this.options.polymorphic && !this.options.as) return null;
+    if (this.options.foreignType) return this.options.foreignType as string;
     if (this.macro === "belongsTo") {
       return `${this.name}_type`;
     }
@@ -128,7 +129,7 @@ export class ThroughReflection extends AssociationReflection {
 
   constructor(
     name: string,
-    macro: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
+    macro: "hasOne" | "hasMany",
     options: Record<string, unknown>,
     ownerClass: typeof Base,
   ) {
@@ -210,7 +211,7 @@ export function reflectOnAssociation(
   ) {
     const macro =
       assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
-    return new ThroughReflection(assocDef.name, macro as any, assocDef.options, modelClass);
+    return new ThroughReflection(assocDef.name, macro, assocDef.options, modelClass);
   }
 
   return new AssociationReflection(
@@ -250,7 +251,7 @@ export function reflectOnAllAssociations(
     ) {
       const macro =
         assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
-      return new ThroughReflection(assocDef.name, macro as any, assocDef.options, modelClass);
+      return new ThroughReflection(assocDef.name, macro, assocDef.options, modelClass);
     }
     return new AssociationReflection(
       assocDef.name,

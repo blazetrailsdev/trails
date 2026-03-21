@@ -515,6 +515,7 @@ describe("ReflectionTest", () => {
   it("content columns", () => {
     class Topic extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_name", "string");
         this.attribute("body", "string");
