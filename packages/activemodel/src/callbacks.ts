@@ -17,6 +17,7 @@ export interface CallbackConditions {
   if?: (record: AnyRecord) => boolean;
   unless?: (record: AnyRecord) => boolean;
   prepend?: boolean;
+  on?: string | string[];
 }
 
 interface CallbackEntry {
@@ -56,6 +57,13 @@ export class CallbackChain {
   private _shouldRun(entry: CallbackEntry, record: AnyRecord): boolean {
     if (entry.conditions?.if && !entry.conditions.if(record)) return false;
     if (entry.conditions?.unless && entry.conditions.unless(record)) return false;
+    if (entry.conditions?.on) {
+      const allowed = Array.isArray(entry.conditions.on)
+        ? entry.conditions.on
+        : [entry.conditions.on];
+      const action: string | undefined = record._transactionAction;
+      if (!action || !allowed.includes(action)) return false;
+    }
     return true;
   }
 
