@@ -1,5 +1,5 @@
 import { Errors } from "./errors.js";
-import { humanize } from "@rails-ts/activesupport";
+import { humanize, underscore } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./types/registry.js";
 import { Type } from "./types/type.js";
@@ -642,23 +642,24 @@ export class Model {
    * Mirrors: ActiveModel::Translation.human_attribute_name
    */
   static humanAttributeName(attr: string): string {
-    const modelKey = this.name
-      ? this.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
-      : undefined;
     const fallback = humanize(attr);
+    const scope = this.i18nScope;
 
     const defaults: Array<{ key: string } | { message: string }> = [];
-    if (modelKey) {
-      defaults.push({ key: `${this.i18nScope}.attributes.${modelKey}.${attr}` });
+    const ancestors = typeof this.lookupAncestors === "function" ? this.lookupAncestors() : [this];
+    for (const klass of ancestors) {
+      const key = klass.name ? underscore(klass.name) : undefined;
+      if (key) {
+        defaults.push({ key: `${scope}.attributes.${key}.${attr}` });
+      }
     }
     defaults.push({ key: `attributes.${attr}` });
     defaults.push({ message: fallback });
 
-    const primaryKey = modelKey
-      ? `${this.i18nScope}.attributes.${modelKey}.${attr}`
-      : `attributes.${attr}`;
+    const [primary, ...rest] = defaults;
+    const primaryKey = "key" in primary ? primary.key : `attributes.${attr}`;
 
-    return I18n.t(primaryKey, { defaults: defaults.slice(1) });
+    return I18n.t(primaryKey, { defaults: rest });
   }
 
   /**
@@ -772,9 +773,14 @@ export class Model {
 
   // -- Naming (Phase 1300) --
 
+  static lookupAncestors(): Array<typeof Model> {
+    return [this];
+  }
+
   static get modelName(): ModelName {
     if (!this._modelName || this._modelName.name !== this.name) {
-      this._modelName = new ModelName(this.name);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Model satisfies ModelLike but TS can't prove it due to circular types
+      this._modelName = new ModelName(this.name, { klass: this as any });
     }
     return this._modelName;
   }

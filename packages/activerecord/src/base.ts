@@ -42,6 +42,22 @@ export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): 
  * Mirrors: ActiveRecord::Base
  */
 export class Base extends Model {
+  static get i18nScope(): string {
+    return "activerecord";
+  }
+
+  static lookupAncestors(): Array<typeof Base> {
+    const ancestors: Array<typeof Base> = [];
+    let klass: typeof Base | null = this;
+    while (klass && klass !== Base) {
+      ancestors.push(klass);
+      const parent = Object.getPrototypeOf(klass);
+      klass = parent && parent !== Model && parent.prototype ? parent : null;
+    }
+    if (ancestors.length === 0) ancestors.push(this);
+    return ancestors;
+  }
+
   // -- Class-level configuration --
   static _tableName: string | null = null;
   static _primaryKey: string | string[] = "id";
@@ -291,15 +307,6 @@ export class Base extends Model {
   static columnNames(): string[] {
     const ignored = new Set(this._ignoredColumns);
     return Array.from(this._attributeDefinitions.keys()).filter((name) => !ignored.has(name));
-  }
-
-  /**
-   * Convert an attribute name to a human-readable form.
-   *
-   * Mirrors: ActiveRecord::Base.human_attribute_name
-   */
-  static humanAttributeName(attr: string): string {
-    return attr.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
   }
 
   /**

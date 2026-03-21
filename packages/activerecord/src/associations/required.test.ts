@@ -148,9 +148,9 @@ describe("belongs_to required option", () => {
     const book = new RBook({ title: "No Author" });
     const saved = await book.save();
     expect(saved).toBe(false);
-    expect(
-      book.errors.fullMessages.some((m: string) => m.toLowerCase().includes("author id")),
-    ).toBe(true);
+    expect(book.errors.fullMessages.some((m: string) => m.toLowerCase().includes("author"))).toBe(
+      true,
+    );
   });
 
   it("passes validation when foreign key is present", async () => {

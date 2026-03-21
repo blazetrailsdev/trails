@@ -6413,7 +6413,7 @@ describe("CalculationsTest", () => {
 
   // Rails guide: i18nScope
   it("i18nScope returns 'activemodel' on Model", () => {
-    // Base extends Model, so should inherit
+    // Base overrides Model's i18nScope to return "activerecord"
     const adapter = createTestAdapter();
     class User extends Base {
       static {
@@ -6422,7 +6422,7 @@ describe("CalculationsTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(User.i18nScope).toBe("activemodel");
+    expect(User.i18nScope).toBe("activerecord");
   });
 
   // Rails guide: attribute_previously_changed?
