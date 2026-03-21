@@ -1,5 +1,5 @@
 import { Errors } from "./errors.js";
-import { humanize } from "@rails-ts/activesupport";
+import { humanize, underscore } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./types/registry.js";
 import { Type } from "./types/type.js";
@@ -648,9 +648,7 @@ export class Model {
     const defaults: Array<{ key: string } | { message: string }> = [];
     const ancestors = typeof this.lookupAncestors === "function" ? this.lookupAncestors() : [this];
     for (const klass of ancestors) {
-      const key = klass.name
-        ? klass.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
-        : undefined;
+      const key = klass.name ? underscore(klass.name) : undefined;
       if (key) {
         defaults.push({ key: `${scope}.attributes.${key}.${attr}` });
       }
