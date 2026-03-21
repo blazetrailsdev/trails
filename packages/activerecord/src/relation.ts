@@ -1646,6 +1646,15 @@ export class Relation<T extends Base> {
   }
 
   private async _executeEagerLoad(): Promise<void> {
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    if (Array.isArray(basePk)) {
+      const sql = this._toSql();
+      const rows = await this._modelClass.adapter.execute(sql);
+      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+      await this._preloadAssociationsForRecords(this._records, this._eagerLoadAssociations);
+      return;
+    }
+
     const { JoinDependency } = await import("./join-dependency.js");
     const jd = new JoinDependency(this._modelClass);
 
@@ -1685,7 +1694,6 @@ export class Relation<T extends Base> {
     const rows = await this._modelClass.adapter.execute(sql);
 
     const { parents, associations } = jd.instantiateFromRows(rows);
-    const basePk = (this._modelClass as any).primaryKey ?? "id";
 
     for (const parent of parents) {
       if (!(parent as any)._preloadedAssociations) {

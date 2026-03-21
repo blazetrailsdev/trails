@@ -54,7 +54,7 @@ JoinDependency (#156) implements Rails-style `eager_load` with `t0_r0` column al
 and LEFT OUTER JOINs. Known limitations that need follow-up:
 
 - **Composite PK**: JoinDependency assumes single-column PKs for join predicates and
-  row deduplication. Composite FKs/PKs fall back to the preload path.
+  row deduplication. Models with composite PKs fall back to the preload path.
 - **Table aliasing**: Joined tables use raw names, not aliases. Self-referential
   associations or multiple associations to the same table will fail.
 - **Nested association paths**: Only single-level `eagerLoad("assoc")` is supported.
