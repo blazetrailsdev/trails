@@ -1742,7 +1742,20 @@ export function setBelongsTo(
   options: AssociationOptions = {},
 ): void {
   const targetCtor = target ? (target.constructor as typeof Base) : null;
-  const primaryKey = options.primaryKey ?? targetCtor?.primaryKey ?? "id";
+  let resolvedPk: string | string[] = "id";
+  if (options.primaryKey) {
+    resolvedPk = options.primaryKey;
+  } else if (targetCtor) {
+    resolvedPk = targetCtor.primaryKey;
+  } else if (options.className) {
+    try {
+      const resolved = resolveModel(options.className);
+      resolvedPk = resolved.primaryKey;
+    } catch {
+      // model not registered, fall back to "id"
+    }
+  }
+  const primaryKey = resolvedPk;
   const foreignKey =
     options.foreignKey ??
     options.queryConstraints ??

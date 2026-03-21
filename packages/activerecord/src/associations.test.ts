@@ -2539,6 +2539,67 @@ describe("AssociationsTest", () => {
     expect(child.readAttribute("parent_region_id")).toBe(2);
     expect(child.readAttribute("parent_id")).toBe(30);
   });
+  it("setBelongsTo infers composite foreign key from target primary key", async () => {
+    const adapter = freshAdapter();
+    class InfParent extends Base {
+      static {
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class InfChild extends Base {
+      static {
+        this.attribute("inf_parent_region_id", "integer");
+        this.attribute("inf_parent_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("InfParent", InfParent);
+    registerModel("InfChild", InfChild);
+    Associations.belongsTo.call(InfChild, "infParent", { className: "InfParent" });
+    const parent = await InfParent.create({ region_id: 3, id: 7, name: "Inferred" });
+    const child = new InfChild({ label: "Child" });
+    setBelongsTo(child, "infParent", parent, { className: "InfParent" });
+    expect(child.readAttribute("inf_parent_region_id")).toBe(3);
+    expect(child.readAttribute("inf_parent_id")).toBe(7);
+  });
+
+  it("setBelongsTo nullifies inferred composite foreign key", async () => {
+    const adapter = freshAdapter();
+    class InfParent2 extends Base {
+      static {
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class InfChild2 extends Base {
+      static {
+        this.attribute("inf_parent2_region_id", "integer");
+        this.attribute("inf_parent2_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("InfParent2", InfParent2);
+    registerModel("InfChild2", InfChild2);
+    Associations.belongsTo.call(InfChild2, "infParent2", { className: "InfParent2" });
+    const child = await InfChild2.create({
+      inf_parent2_region_id: 1,
+      inf_parent2_id: 5,
+      label: "Child",
+    });
+    setBelongsTo(child, "infParent2", null, { className: "InfParent2" });
+    expect(child.readAttribute("inf_parent2_region_id")).toBeNull();
+    expect(child.readAttribute("inf_parent2_id")).toBeNull();
+  });
+
   it.skip("query constraints that dont include the primary key raise with a single column", () => {
     /* needs composite key / query constraints support */
   });
