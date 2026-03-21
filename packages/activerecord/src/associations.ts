@@ -1253,7 +1253,7 @@ export class CollectionProxy {
     const sourceFk = `${underscore(sourceName)}_id`;
 
     for (const record of records) {
-      fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
       // Save the target record if it's new
       if (record.isNewRecord()) await record.save();
       // Create the join record
@@ -1289,7 +1289,7 @@ export class CollectionProxy {
       typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
 
     for (const record of records) {
-      fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
       if (record.isNewRecord()) await record.save();
       const targetPkCol = (record.constructor as typeof Base).primaryKey;
       if (Array.isArray(targetPkCol)) {
@@ -1363,7 +1363,7 @@ export class CollectionProxy {
       typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
 
     for (const record of records) {
-      fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       const targetPkCol = (record.constructor as typeof Base).primaryKey;
       if (Array.isArray(targetPkCol)) {
         throw new Error(
@@ -1399,7 +1399,7 @@ export class CollectionProxy {
     const sourceFk = `${underscore(sourceName)}_id`;
 
     for (const record of records) {
-      fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       const targetPk = record.readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
