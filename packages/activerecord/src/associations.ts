@@ -1957,7 +1957,7 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
       await parent.touch();
     } else if (typeof touchOpt === "string") {
       await parent.touch(touchOpt);
-    } else if (Array.isArray(touchOpt)) {
+    } else if (Array.isArray(touchOpt) && touchOpt.length > 0) {
       await parent.touch(...(touchOpt as string[]));
     }
   }
