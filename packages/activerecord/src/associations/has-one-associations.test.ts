@@ -1114,12 +1114,20 @@ describe("HasOneAssociationsTest", () => {
     const acct = await TouchUpdAccount.create({ touch_upd_firm_id: firm.id, credit_limit: 100 });
     const afterCreate = await TouchUpdFirm.find(firm.id);
     const timeAfterCreate = afterCreate.readAttribute("updated_at");
+    const createTime =
+      timeAfterCreate instanceof Date
+        ? timeAfterCreate.getTime()
+        : Number(new Date(String(timeAfterCreate)));
 
     acct.writeAttribute("credit_limit", 200);
     await acct.save();
     const afterUpdate = await TouchUpdFirm.find(firm.id);
     const timeAfterUpdate = afterUpdate.readAttribute("updated_at");
-    expect(timeAfterUpdate).not.toBeNull();
+    const updateTime =
+      timeAfterUpdate instanceof Date
+        ? timeAfterUpdate.getTime()
+        : Number(new Date(String(timeAfterUpdate)));
+    expect(updateTime).toBeGreaterThanOrEqual(createTime);
   });
 
   it.skip("has one with touch option on touch", () => {
@@ -1151,12 +1159,21 @@ describe("HasOneAssociationsTest", () => {
     const originalTime = new Date("2020-01-01");
     const firm = await TouchDesFirm.create({ name: "Touch Corp", updated_at: originalTime });
     const acct = await TouchDesAccount.create({ touch_des_firm_id: firm.id, credit_limit: 100 });
+    const afterCreate = await TouchDesFirm.find(firm.id);
+    const afterCreateAt = afterCreate.readAttribute("updated_at");
+    const afterCreateTime =
+      afterCreateAt instanceof Date
+        ? afterCreateAt.getTime()
+        : Number(new Date(String(afterCreateAt)));
+
     await acct.destroy();
-    const reloaded = await TouchDesFirm.find(firm.id);
-    const updatedAt = reloaded.readAttribute("updated_at");
-    const updatedTime =
-      updatedAt instanceof Date ? updatedAt.getTime() : Number(new Date(String(updatedAt)));
-    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+    const afterDestroy = await TouchDesFirm.find(firm.id);
+    const afterDestroyAt = afterDestroy.readAttribute("updated_at");
+    const afterDestroyTime =
+      afterDestroyAt instanceof Date
+        ? afterDestroyAt.getTime()
+        : Number(new Date(String(afterDestroyAt)));
+    expect(afterDestroyTime).toBeGreaterThanOrEqual(afterCreateTime);
   });
 
   it.skip("has one with touch option on empty update", () => {

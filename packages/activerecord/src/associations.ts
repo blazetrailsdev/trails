@@ -27,7 +27,7 @@ export interface AssociationOptions {
   polymorphic?: boolean;
   as?: string;
   counterCache?: boolean | string;
-  touch?: boolean;
+  touch?: boolean | string | string[];
   autosave?: boolean;
   scope?: (rel: any) => any;
   required?: boolean;
