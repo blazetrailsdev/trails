@@ -241,24 +241,51 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped find with annotation", () => {
-    /* needs annotate() on relations */
+  it("scoped find with annotation", async () => {
+    class AnnPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await AnnPost.create({ title: "Annotated" });
+    const sql = AnnPost.all().annotate("finding posts").toSql();
+    expect(sql).toContain("/* finding posts */");
+    const results = await AnnPost.all().annotate("finding posts").toArray();
+    expect(results).toHaveLength(1);
   });
 
-  it.skip("find with annotation unscoped", () => {
-    /* needs annotate() on relations */
+  it("find with annotation unscoped", async () => {
+    class AnnuPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await AnnuPost.create({ title: "Test" });
+    const sql = AnnuPost.unscoped().toSql();
+    expect(sql).not.toContain("/* test */");
+    expect(sql).toContain("SELECT");
   });
 
   it.skip("find with annotation unscope", () => {
-    /* needs annotate() + unscope() */
+    /* needs unscope(:annotate) */
   });
 
   it.skip("scoped find include", () => {
     /* needs includes() */
   });
 
-  it.skip("scoped find joins", () => {
-    /* needs joins() */
+  it("scoped find joins", async () => {
+    class SjPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await SjPost.create({ title: "Joined" });
+    const sql = SjPost.joins("INNER JOIN comments ON comments.post_id = sj_posts.id").toSql();
+    expect(sql).toContain("INNER JOIN comments");
   });
 
   it("scoped create with where", async () => {
@@ -282,8 +309,18 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped create with where with range", () => {
-    /* needs range conditions in where */
+  it("scoped create with where with range", async () => {
+    const { Range } = await import("../index.js");
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 50000 });
+    await Developer.create({ name: "Bob", salary: 80000 });
+    await Developer.create({ name: "Charlie", salary: 120000 });
+    const rel = Developer.where({ salary: new Range(60000, 100000) });
+    await Developer.scoping(rel, async () => {
+      const all = await Developer.all().toArray();
+      expect(all.length).toBe(1);
+      expect(all[0].readAttribute("name")).toBe("Bob");
+    });
   });
 
   it("scoped create with create with", async () => {
