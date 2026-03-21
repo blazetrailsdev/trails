@@ -57,7 +57,10 @@ export class CallbackChain {
   private _shouldRun(entry: CallbackEntry, record: AnyRecord): boolean {
     if (entry.conditions?.if && !entry.conditions.if(record)) return false;
     if (entry.conditions?.unless && entry.conditions.unless(record)) return false;
-    if (entry.conditions?.on && (entry.event === "commit" || entry.event === "rollback")) {
+    if (
+      entry.conditions?.on !== undefined &&
+      (entry.event === "commit" || entry.event === "rollback")
+    ) {
       const allowed = Array.isArray(entry.conditions.on)
         ? entry.conditions.on
         : [entry.conditions.on];

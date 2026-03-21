@@ -563,7 +563,7 @@ export class Model {
   }
 
   static afterCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
-    if (conditions?.on) {
+    if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
     this._ensureOwnCallbacks();
@@ -587,7 +587,7 @@ export class Model {
   }
 
   static afterRollback(fn: CallbackFn, conditions?: CallbackConditions): void {
-    if (conditions?.on) {
+    if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
     this._ensureOwnCallbacks();
