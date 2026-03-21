@@ -198,17 +198,85 @@ describe("Sqlite3DefaultExpressionTest", () => {
 });
 
 describe("DefaultTest", () => {
+  const adapter = freshAdapter();
+
   it.skip("default attribute value overrides from database", () => {});
-  it.skip("default attribute value for integer", () => {});
-  it.skip("default attribute value for string", () => {});
-  it.skip("default attribute value for boolean", () => {});
+
+  it("default attribute value for integer", () => {
+    class M extends Base {
+      static {
+        this.attribute("count", "integer", { default: 42 });
+        this.adapter = adapter;
+      }
+    }
+    expect(new M().readAttribute("count")).toBe(42);
+  });
+
+  it("default attribute value for string", () => {
+    class M extends Base {
+      static {
+        this.attribute("name", "string", { default: "hello" });
+        this.adapter = adapter;
+      }
+    }
+    expect(new M().readAttribute("name")).toBe("hello");
+  });
+
+  it("default attribute value for boolean", () => {
+    class M extends Base {
+      static {
+        this.attribute("active", "boolean", { default: true });
+        this.adapter = adapter;
+      }
+    }
+    expect(new M().readAttribute("active")).toBe(true);
+  });
+
   it.skip("default attribute value for datetime", () => {});
   it.skip("default attribute value for date", () => {});
   it.skip("default attribute value for decimal", () => {});
-  it.skip("default value for float", () => {});
-  it.skip("default attribute value for text", () => {});
-  it.skip("default attribute value is available on new record", () => {});
-  it.skip("default attribute value accessible through class", () => {});
+
+  it("default value for float", () => {
+    class M extends Base {
+      static {
+        this.attribute("score", "float", { default: 3.14 });
+        this.adapter = adapter;
+      }
+    }
+    expect(new M().readAttribute("score")).toBeCloseTo(3.14);
+  });
+
+  it("default attribute value for text", () => {
+    class M extends Base {
+      static {
+        this.attribute("bio", "string", { default: "none" });
+        this.adapter = adapter;
+      }
+    }
+    expect(new M().readAttribute("bio")).toBe("none");
+  });
+
+  it("default attribute value is available on new record", () => {
+    class M extends Base {
+      static {
+        this.attribute("status", "string", { default: "draft" });
+        this.adapter = adapter;
+      }
+    }
+    const m = new M();
+    expect(m.readAttribute("status")).toBe("draft");
+  });
+
+  it("default attribute value accessible through class", () => {
+    class M extends Base {
+      static {
+        this.attribute("role", "string", { default: "user" });
+        this.adapter = adapter;
+      }
+    }
+    const defaults = M.columnDefaults;
+    expect(defaults.role).toBe("user");
+  });
 });
 
 describe("Base.columnDefaults", () => {
