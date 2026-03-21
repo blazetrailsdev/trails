@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { underscore, pluralize, singularize } from "@rails-ts/activesupport";
 import { modelRegistry } from "./associations.js";
 
 /**
@@ -22,18 +23,14 @@ export class AssociationReflection {
     this.name = name;
     this.macro = macro;
     this.options = options;
+    this._ownerClass = ownerClass;
 
     // Derive className
     if (options.className) {
       this.className = options.className as string;
     } else if (macro === "hasMany" || macro === "hasAndBelongsToMany") {
-      const singularize = (w: string) => {
-        if (w.endsWith("ies")) return w.slice(0, -3) + "y";
-        if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
-        if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
-        return w;
-      };
-      this.className = singularize(name).charAt(0).toUpperCase() + singularize(name).slice(1);
+      const singular = singularize(name);
+      this.className = singular.charAt(0).toUpperCase() + singular.slice(1);
     } else {
       this.className = name.charAt(0).toUpperCase() + name.slice(1);
     }
@@ -42,13 +39,10 @@ export class AssociationReflection {
     if (options.foreignKey) {
       this.foreignKey = options.foreignKey as string;
     } else if (macro === "belongsTo") {
-      this.foreignKey = `${name}_id`;
+      this.foreignKey = `${underscore(name)}_id`;
+    } else if (options.as) {
+      this.foreignKey = `${underscore(options.as as string)}_id`;
     } else {
-      const underscore = (n: string) =>
-        n
-          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-          .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-          .toLowerCase();
       this.foreignKey = `${underscore(ownerClass.name)}_id`;
     }
   }
@@ -70,6 +64,41 @@ export class AssociationReflection {
   }
 
   /**
+   * For polymorphic associations, returns the type column name.
+   *
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#foreign_type
+   */
+  get foreignType(): string | null {
+    if (!this.options.polymorphic && !this.options.as) return null;
+    if (this.macro === "belongsTo") {
+      return `${underscore(this.name)}_type`;
+    }
+    if (this.options.as) {
+      return `${underscore(this.options.as as string)}_type`;
+    }
+    return null;
+  }
+
+  /**
+   * For HABTM associations, returns the join table name.
+   *
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#join_table
+   */
+  get joinTable(): string | null {
+    if (this.macro !== "hasAndBelongsToMany") return null;
+    if (this.options.joinTable) return this.options.joinTable as string;
+    const ownerKey = pluralize(underscore(this._ownerClass.name));
+    const assocKey = underscore(this.name);
+    return [ownerKey, assocKey].sort().join("_");
+  }
+
+  isThrough(): boolean {
+    return false;
+  }
+
+  private _ownerClass: typeof Base;
+
+  /**
    * Returns the target class of the association, resolved via the model registry.
    *
    * Mirrors: ActiveRecord::Reflection::AssociationReflection#klass
@@ -82,6 +111,31 @@ export class AssociationReflection {
       );
     }
     return resolved;
+  }
+}
+
+/**
+ * Represents a through association reflection.
+ *
+ * Mirrors: ActiveRecord::Reflection::ThroughReflection
+ */
+export class ThroughReflection extends AssociationReflection {
+  readonly through: string;
+  readonly source: string;
+
+  constructor(
+    name: string,
+    macro: "hasOne" | "hasMany",
+    options: Record<string, unknown>,
+    ownerClass: typeof Base,
+  ) {
+    super(name, macro, options, ownerClass);
+    this.through = options.through as string;
+    this.source = (options.source as string) ?? (macro === "hasMany" ? singularize(name) : name);
+  }
+
+  isThrough(): boolean {
+    return true;
   }
 }
 
@@ -123,10 +177,39 @@ export function columnNames(modelClass: typeof Base): string[] {
 }
 
 /**
+ * Get content columns as ColumnReflection objects.
+ * Delegates to Base.contentColumns() which excludes PK, FK (_id suffix), and timestamps.
+ *
+ * Mirrors: ActiveRecord::Base.content_columns
+ */
+export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
+  const contentNames = new Set(modelClass.contentColumns());
+  return columns(modelClass).filter((col) => contentNames.has(col.name));
+}
+
+/**
  * Reflect on a specific association.
  *
  * Mirrors: ActiveRecord::Base.reflect_on_association
  */
+function buildReflection(assocDef: any, modelClass: typeof Base): AssociationReflection {
+  if (
+    assocDef.options.through ||
+    assocDef.type === "hasManyThrough" ||
+    assocDef.type === "hasOneThrough"
+  ) {
+    const macro: "hasOne" | "hasMany" =
+      assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
+    return new ThroughReflection(assocDef.name, macro, assocDef.options, modelClass);
+  }
+  return new AssociationReflection(
+    assocDef.name,
+    assocDef.type as any,
+    assocDef.options,
+    modelClass,
+  );
+}
+
 export function reflectOnAssociation(
   modelClass: typeof Base,
   name: string,
@@ -134,13 +217,7 @@ export function reflectOnAssociation(
   const associations: any[] = (modelClass as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === name);
   if (!assocDef) return null;
-
-  return new AssociationReflection(
-    assocDef.name,
-    assocDef.type as any,
-    assocDef.options,
-    modelClass,
-  );
+  return buildReflection(assocDef, modelClass);
 }
 
 /**
@@ -153,10 +230,16 @@ export function reflectOnAllAssociations(
   macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
 ): AssociationReflection[] {
   const associations: any[] = (modelClass as any)._associations ?? [];
-  const filtered = macro ? associations.filter((a) => a.type === macro) : associations;
+  const filtered = macro
+    ? associations.filter((a) => {
+        if (a.options?.through || a.type === "hasManyThrough" || a.type === "hasOneThrough") {
+          const normalized =
+            a.type === "hasOneThrough" || a.type === "hasOne" ? "hasOne" : "hasMany";
+          return normalized === macro;
+        }
+        return a.type === macro;
+      })
+    : associations;
 
-  return filtered.map(
-    (assocDef) =>
-      new AssociationReflection(assocDef.name, assocDef.type as any, assocDef.options, modelClass),
-  );
+  return filtered.map((assocDef) => buildReflection(assocDef, modelClass));
 }
