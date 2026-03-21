@@ -91,7 +91,8 @@ export class ModelName {
 
   private _i18nScope(): string[] {
     if (!this._klass) return [];
-    const scope = typeof this._klass.i18nScope === "string" ? this._klass.i18nScope : "activemodel";
+    const klassScope = this._klass.i18nScope;
+    const scope = typeof klassScope === "string" ? klassScope : "activemodel";
     return [scope, "models"];
   }
 }
