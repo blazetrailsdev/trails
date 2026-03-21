@@ -1647,7 +1647,7 @@ export class Relation<T extends Base> {
 
   private async _executeEagerLoad(): Promise<void> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    if (Array.isArray(basePk) || this._ctes.length > 0 || this._setOperation) {
+    if (Array.isArray(basePk) || this._ctes.length > 0 || this._setOperation || this._fromClause) {
       const sql = this._toSql();
       const rows = await this._modelClass.adapter.execute(sql);
       this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
@@ -1719,9 +1719,6 @@ export class Relation<T extends Base> {
     }
 
     let sql = manager.toSql();
-    if (this._fromClause) {
-      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause}`);
-    }
     if (this._optimizerHints.length > 0) {
       const hints = `/*+ ${this._optimizerHints.join(" ")} */`;
       sql = sql.replace(/^SELECT/, `SELECT ${hints}`);
