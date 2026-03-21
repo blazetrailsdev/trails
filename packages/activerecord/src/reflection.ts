@@ -40,6 +40,8 @@ export class AssociationReflection {
       this.foreignKey = options.foreignKey as string;
     } else if (macro === "belongsTo") {
       this.foreignKey = `${underscore(name)}_id`;
+    } else if (options.as) {
+      this.foreignKey = `${underscore(options.as as string)}_id`;
     } else {
       this.foreignKey = `${underscore(ownerClass.name)}_id`;
     }
