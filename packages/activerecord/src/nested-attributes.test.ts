@@ -63,135 +63,6 @@ describe("NestedAttributesTest", () => {
     expect(tags.length).toBe(0);
   });
 
-  it("should build a new record if reject all blank does not return false", async () => {
-    class NBird1 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("npirate1_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NPirate1 extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NPirate1, "nBird1s", {
-      className: "NBird1",
-      foreignKey: "npirate1_id",
-    });
-    acceptsNestedAttributesFor(NPirate1, "nBird1s", {
-      rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
-    });
-    registerModel(NBird1);
-    registerModel(NPirate1);
-
-    const pirate = await NPirate1.create({ catchphrase: "Savvy?" });
-    assignNestedAttributes(pirate, "nBird1s", [{ name: "Tweetie" }]);
-    await pirate.save();
-
-    const birds = await NBird1.where({ npirate1_id: pirate.id }).toArray();
-    expect(birds.length).toBe(1);
-    expect((birds[0] as any).name).toBe("Tweetie");
-  });
-
-  it("should disable allow destroy by default", async () => {
-    class NShip2 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("npirate2_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NPirate2 extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NPirate2, "nShip2s", {
-      className: "NShip2",
-      foreignKey: "npirate2_id",
-    });
-    acceptsNestedAttributesFor(NPirate2, "nShip2s");
-    registerModel(NShip2);
-    registerModel(NPirate2);
-
-    const pirate = await NPirate2.create({ catchphrase: "Savvy?" });
-    const ship = await NShip2.create({ name: "Night Lightning", npirate2_id: pirate.id });
-
-    assignNestedAttributes(pirate, "nShip2s", [{ id: ship.id, _destroy: true }]);
-    await pirate.save();
-
-    const found = await NShip2.findBy({ id: ship.id });
-    expect(found).not.toBeNull();
-  });
-
-  it("reject if is not short circuited if allow destroy is false", async () => {
-    class NPart3 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("nboat3_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NBoat3 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NBoat3, "nPart3s", { className: "NPart3", foreignKey: "nboat3_id" });
-    acceptsNestedAttributesFor(NBoat3, "nPart3s", {
-      rejectIf: () => true,
-      allowDestroy: false,
-    });
-    registerModel(NPart3);
-    registerModel(NBoat3);
-
-    const boat = await NBoat3.create({ name: "SS Test" });
-    const part = await NPart3.create({ name: "Mast", nboat3_id: boat.id });
-
-    assignNestedAttributes(boat, "nPart3s", [{ id: part.id, _destroy: true, name: "Mast" }]);
-    await boat.save();
-
-    const found = await NPart3.findBy({ id: part.id });
-    expect(found).not.toBeNull();
-  });
-
-  it("has many association updating a single record", async () => {
-    class NInterest4 extends Base {
-      static {
-        this.attribute("topic", "string");
-        this.attribute("nhuman4_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NHuman4 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NHuman4, "nInterest4s", {
-      className: "NInterest4",
-      foreignKey: "nhuman4_id",
-    });
-    acceptsNestedAttributesFor(NHuman4, "nInterest4s");
-    registerModel(NInterest4);
-    registerModel(NHuman4);
-
-    const human = await NHuman4.create({ name: "John" });
-    const interest = await NInterest4.create({ topic: "photography", nhuman4_id: human.id });
-
-    assignNestedAttributes(human, "nInterest4s", [{ id: interest.id, topic: "gardening" }]);
-    await human.save();
-
-    const updated = await NInterest4.find(interest.id);
-    expect((updated as any).topic).toBe("gardening");
-  });
-
   it("should define an attribute writer method for the association", async () => {
     class NComment5 extends Base {
       static {
@@ -510,41 +381,6 @@ describe("NestedAttributesTest", () => {
     expect(tags.length).toBe(0);
   });
 
-  it("destroy works independent of reject if", async () => {
-    class NTagF extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("narticleF_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class NArticleF extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(NArticleF, "nTagFs", {
-      className: "NTagF",
-      foreignKey: "narticleF_id",
-    });
-    acceptsNestedAttributesFor(NArticleF, "nTagFs", {
-      allowDestroy: true,
-      rejectIf: () => true,
-    });
-    registerModel(NTagF);
-    registerModel(NArticleF);
-
-    const article = await NArticleF.create({ title: "Test" });
-    const tag = await NTagF.create({ name: "ruby", narticleF_id: article.id });
-
-    assignNestedAttributes(article, "nTagFs", [{ id: tag.id, _destroy: true }]);
-    await article.save();
-
-    const found = await NTagF.findBy({ id: tag.id });
-    expect(found).toBeNull();
-  });
-
   it("should take a hash with string keys and assign the attributes to the associated models", async () => {
     class NTagH extends Base {
       static {
@@ -576,287 +412,6 @@ describe("NestedAttributesTest", () => {
     const names = tags.map((t: any) => t.name).sort();
     expect(names).toEqual(["rails", "ruby"]);
   });
-
-  it("when great-grandchild changed via attributes, saving parent should save great-grandchild", async () => {
-    class GGCReply extends Base {
-      static {
-        this.attribute("text", "string");
-        this.attribute("ggc_comment_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GGCComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("ggc_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GGCPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(GGCPost, "ggcComments", {
-      className: "GGCComment",
-      foreignKey: "ggc_post_id",
-    });
-    Associations.hasMany.call(GGCComment, "ggcReplies", {
-      className: "GGCReply",
-      foreignKey: "ggc_comment_id",
-    });
-    registerModel(GGCReply);
-    registerModel(GGCComment);
-    registerModel(GGCPost);
-    acceptsNestedAttributesFor(GGCPost, "ggcComments");
-    acceptsNestedAttributesFor(GGCComment, "ggcReplies");
-
-    const post = await GGCPost.create({ title: "Parent" });
-    const comment = await GGCComment.create({ body: "Hello", ggc_post_id: post.id });
-    const reply = await GGCReply.create({ text: "old", ggc_comment_id: comment.id });
-
-    // Update great-grandchild via nested attributes on comment, then save comment
-    assignNestedAttributes(comment, "ggcReplies", [{ id: reply.id, text: "updated" }]);
-    await comment.save();
-
-    const reloaded = await GGCReply.find(reply.id);
-    expect(reloaded.readAttribute("text")).toBe("updated");
-  });
-
-  it("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", async () => {
-    class GGDReply extends Base {
-      static {
-        this.attribute("text", "string");
-        this.attribute("ggd_comment_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GGDComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("ggd_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GGDPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(GGDPost, "ggdComments", {
-      className: "GGDComment",
-      foreignKey: "ggd_post_id",
-    });
-    Associations.hasMany.call(GGDComment, "ggdReplies", {
-      className: "GGDReply",
-      foreignKey: "ggd_comment_id",
-    });
-    registerModel(GGDReply);
-    registerModel(GGDComment);
-    registerModel(GGDPost);
-    acceptsNestedAttributesFor(GGDPost, "ggdComments");
-    acceptsNestedAttributesFor(GGDComment, "ggdReplies", { allowDestroy: true });
-
-    const post = await GGDPost.create({ title: "Parent" });
-    const comment = await GGDComment.create({ body: "Hello", ggd_post_id: post.id });
-    const reply = await GGDReply.create({ text: "doomed", ggd_comment_id: comment.id });
-
-    assignNestedAttributes(comment, "ggdReplies", [{ id: reply.id, _destroy: true }]);
-    await comment.save();
-
-    const remaining = await GGDReply.where({ ggd_comment_id: comment.id }).toArray();
-    expect(remaining.length).toBe(0);
-  });
-
-  it("when great-grandchild added via attributes, saving parent should create great-grandchild", async () => {
-    class GGAReply extends Base {
-      static {
-        this.attribute("text", "string");
-        this.attribute("gga_comment_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GGAComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("gga_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GGAPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(GGAPost, "ggaComments", {
-      className: "GGAComment",
-      foreignKey: "gga_post_id",
-    });
-    Associations.hasMany.call(GGAComment, "ggaReplies", {
-      className: "GGAReply",
-      foreignKey: "gga_comment_id",
-    });
-    registerModel(GGAReply);
-    registerModel(GGAComment);
-    registerModel(GGAPost);
-    acceptsNestedAttributesFor(GGAPost, "ggaComments");
-    acceptsNestedAttributesFor(GGAComment, "ggaReplies");
-
-    const post = await GGAPost.create({ title: "Parent" });
-    const comment = await GGAComment.create({ body: "Hello", gga_post_id: post.id });
-
-    assignNestedAttributes(comment, "ggaReplies", [{ text: "new-great-grandchild" }]);
-    await comment.save();
-
-    const replies = await GGAReply.where({ gga_comment_id: comment.id }).toArray();
-    expect(replies.length).toBe(1);
-    expect(replies[0].readAttribute("text")).toBe("new-great-grandchild");
-  });
-  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => {});
-  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {});
-  it("when grandchild changed via attributes, saving parent should save grandchild", async () => {
-    class GCTag extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("gc_comment_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GCComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("gc_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GCPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(GCPost, "gcComments", {
-      className: "GCComment",
-      foreignKey: "gc_post_id",
-    });
-    Associations.hasMany.call(GCComment, "gcTags", {
-      className: "GCTag",
-      foreignKey: "gc_comment_id",
-    });
-    registerModel(GCTag);
-    registerModel(GCComment);
-    registerModel(GCPost);
-    acceptsNestedAttributesFor(GCPost, "gcComments");
-    acceptsNestedAttributesFor(GCComment, "gcTags");
-
-    const post = await GCPost.create({ title: "Parent" });
-    const comment = await GCComment.create({ body: "Hello", gc_post_id: post.id });
-    const tag = await GCTag.create({ name: "old", gc_comment_id: comment.id });
-
-    // Update grandchild through nested attributes
-    assignNestedAttributes(comment, "gcTags", [{ id: tag.id, name: "updated" }]);
-    await comment.save();
-
-    const reloaded = await GCTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("updated");
-  });
-
-  it("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", async () => {
-    class GCDTag extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("gc_d_comment_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GCDComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("gc_d_post_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GCDPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(GCDPost, "gcdComments", {
-      className: "GCDComment",
-      foreignKey: "gc_d_post_id",
-    });
-    Associations.hasMany.call(GCDComment, "gcdTags", {
-      className: "GCDTag",
-      foreignKey: "gc_d_comment_id",
-    });
-    registerModel(GCDTag);
-    registerModel(GCDComment);
-    registerModel(GCDPost);
-    acceptsNestedAttributesFor(GCDPost, "gcdComments");
-    acceptsNestedAttributesFor(GCDComment, "gcdTags", { allowDestroy: true });
-
-    const post = await GCDPost.create({ title: "Parent" });
-    const comment = await GCDComment.create({ body: "Hello", gc_d_post_id: post.id });
-    const tag = await GCDTag.create({ name: "doomed", gc_d_comment_id: comment.id });
-
-    // Destroy grandchild through nested attributes on comment
-    assignNestedAttributes(comment, "gcdTags", [{ id: tag.id, _destroy: true }]);
-    await comment.save();
-
-    const remaining = await GCDTag.where({ gc_d_comment_id: comment.id }).toArray();
-    expect(remaining.length).toBe(0);
-  });
-
-  it("when grandchild added via attributes, saving parent should create grandchild", async () => {
-    class GCTag2 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("gc_comment2_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GCComment2 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("gc_post2_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class GCPost2 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasMany.call(GCPost2, "gcComment2s", {
-      className: "GCComment2",
-      foreignKey: "gc_post2_id",
-    });
-    Associations.hasMany.call(GCComment2, "gcTag2s", {
-      className: "GCTag2",
-      foreignKey: "gc_comment2_id",
-    });
-    registerModel(GCTag2);
-    registerModel(GCComment2);
-    registerModel(GCPost2);
-    acceptsNestedAttributesFor(GCPost2, "gcComment2s");
-    acceptsNestedAttributesFor(GCComment2, "gcTag2s");
-
-    const post = await GCPost2.create({ title: "Parent" });
-    const comment = await GCComment2.create({ body: "Hello", gc_post2_id: post.id });
-
-    assignNestedAttributes(comment, "gcTag2s", [{ name: "new-grandchild" }]);
-    await comment.save();
-
-    const tags = await GCTag2.where({ gc_comment2_id: comment.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("new-grandchild");
-  });
-  it.skip("circular references do not perform unnecessary queries", () => {});
 });
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
@@ -1762,6 +1317,170 @@ describe("TestNestedAttributesInGeneral", () => {
   });
   it.skip("updating models with cpk provided as strings", () => {
     /* composite keys not implemented */
+  });
+
+  it("should build a new record if reject all blank does not return false", async () => {
+    class NBird1 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("npirate1_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NPirate1 extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(NPirate1, "nBird1s", {
+      className: "NBird1",
+      foreignKey: "npirate1_id",
+    });
+    acceptsNestedAttributesFor(NPirate1, "nBird1s", {
+      rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
+    });
+    registerModel(NBird1);
+    registerModel(NPirate1);
+
+    const pirate = await NPirate1.create({ catchphrase: "Savvy?" });
+    assignNestedAttributes(pirate, "nBird1s", [{ name: "Tweetie" }]);
+    await pirate.save();
+
+    const birds = await NBird1.where({ npirate1_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect((birds[0] as any).name).toBe("Tweetie");
+  });
+
+  it("should disable allow destroy by default", async () => {
+    class NShip2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("npirate2_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NPirate2 extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(NPirate2, "nShip2s", {
+      className: "NShip2",
+      foreignKey: "npirate2_id",
+    });
+    acceptsNestedAttributesFor(NPirate2, "nShip2s");
+    registerModel(NShip2);
+    registerModel(NPirate2);
+
+    const pirate = await NPirate2.create({ catchphrase: "Savvy?" });
+    const ship = await NShip2.create({ name: "Night Lightning", npirate2_id: pirate.id });
+
+    assignNestedAttributes(pirate, "nShip2s", [{ id: ship.id, _destroy: true }]);
+    await pirate.save();
+
+    const found = await NShip2.findBy({ id: ship.id });
+    expect(found).not.toBeNull();
+  });
+
+  it("destroy works independent of reject if", async () => {
+    class NTagF extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("narticleF_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NArticleF extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(NArticleF, "nTagFs", {
+      className: "NTagF",
+      foreignKey: "narticleF_id",
+    });
+    acceptsNestedAttributesFor(NArticleF, "nTagFs", {
+      allowDestroy: true,
+      rejectIf: () => true,
+    });
+    registerModel(NTagF);
+    registerModel(NArticleF);
+
+    const article = await NArticleF.create({ title: "Test" });
+    const tag = await NTagF.create({ name: "ruby", narticleF_id: article.id });
+
+    assignNestedAttributes(article, "nTagFs", [{ id: tag.id, _destroy: true }]);
+    await article.save();
+
+    const found = await NTagF.findBy({ id: tag.id });
+    expect(found).toBeNull();
+  });
+
+  it("reject if is not short circuited if allow destroy is false", async () => {
+    class NPart3 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("nboat3_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NBoat3 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(NBoat3, "nPart3s", { className: "NPart3", foreignKey: "nboat3_id" });
+    acceptsNestedAttributesFor(NBoat3, "nPart3s", {
+      rejectIf: () => true,
+      allowDestroy: false,
+    });
+    registerModel(NPart3);
+    registerModel(NBoat3);
+
+    const boat = await NBoat3.create({ name: "SS Test" });
+    const part = await NPart3.create({ name: "Mast", nboat3_id: boat.id });
+
+    assignNestedAttributes(boat, "nPart3s", [{ id: part.id, _destroy: true, name: "Mast" }]);
+    await boat.save();
+
+    const found = await NPart3.findBy({ id: part.id });
+    expect(found).not.toBeNull();
+  });
+
+  it("has many association updating a single record", async () => {
+    class NInterest4 extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("nhuman4_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NHuman4 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(NHuman4, "nInterest4s", {
+      className: "NInterest4",
+      foreignKey: "nhuman4_id",
+    });
+    acceptsNestedAttributesFor(NHuman4, "nInterest4s");
+    registerModel(NInterest4);
+    registerModel(NHuman4);
+
+    const human = await NHuman4.create({ name: "John" });
+    const interest = await NInterest4.create({ topic: "photography", nhuman4_id: human.id });
+
+    assignNestedAttributes(human, "nInterest4s", [{ id: interest.id, topic: "gardening" }]);
+    await human.save();
+
+    const updated = await NInterest4.find(interest.id);
+    expect((updated as any).topic).toBe("gardening");
   });
 });
 
@@ -2806,52 +2525,6 @@ describe("Nested Attributes (Rails-guided)", () => {
     const comments = await Comment.all().toArray();
     expect(comments.length).toBe(2);
   });
-  it("when great-grandchild changed in memory, saving parent should save great-grandchild", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.writeAttribute("name", "Sail");
-    cacheAssoc(ship, "part", part);
-    ship.writeAttribute("name", "Pearl-touched");
-    cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    const reloaded = await Part.find(part.id!);
-    expect(reloaded.readAttribute("name")).toBe("Sail");
-  });
-
-  it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => {
-    /* requires lazy-loading tracking */
-  });
-
-  it("when grandchild changed in memory, saving parent should save grandchild", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.writeAttribute("name", "Sail");
-    cacheAssoc(ship, "parts", [part]);
-    // Mark ship as changed so autosave cascades to its children
-    ship.writeAttribute("name", "Pearl-touched");
-    cacheAssoc(pirate, "ships", [ship]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
-    const reloaded = await Part.find(part.id!);
-    expect(reloaded.readAttribute("name")).toBe("Sail");
-  });
-
-  it("nested singular associations are validated", async () => {
-    const { Pirate, Ship, Part } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    const invalidPart = new Part({ name: "" });
-    cacheAssoc(ship, "parts", [invalidPart]);
-    ship.writeAttribute("name", "Pearl-touched");
-    cacheAssoc(pirate, "ships", [ship]);
-    const saved = await pirate.save();
-    expect(saved).toBe(false);
-  });
   it("should automatically enable autosave on the association", () => {
     const adapter = freshAdapter();
     class AE1Tag extends Base {
@@ -2879,5 +2552,427 @@ describe("Nested Attributes (Rails-guided)", () => {
     const configs = (AE1Article as any)._nestedAttributeConfigs;
     expect(configs).toBeDefined();
     expect(configs.find((c: any) => c.associationName === "ae1Tags")).toBeDefined();
+  });
+});
+
+describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function cacheAssoc(record: Base, name: string, value: unknown) {
+    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+    (record as any)._cachedAssociations.set(name, value);
+  }
+
+  function makeModels() {
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+      }
+    }
+    class Part extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+        this.validates("name", { presence: true });
+      }
+    }
+    Pirate.adapter = adapter;
+    Ship.adapter = adapter;
+    Part.adapter = adapter;
+    registerModel("Pirate", Pirate);
+    registerModel("Ship", Ship);
+    registerModel("Part", Part);
+    (Pirate as any)._associations = [{ type: "hasOne", name: "ship", options: { autosave: true } }];
+    (Ship as any)._associations = [
+      { type: "belongsTo", name: "pirate", options: {} },
+      { type: "hasOne", name: "part", options: { autosave: true } },
+    ];
+    return { Pirate, Ship, Part };
+  }
+
+  it("when great-grandchild changed in memory, saving parent should save great-grandchild", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const part = await Part.create({ name: "Mast", ship_id: ship.id });
+    part.writeAttribute("name", "Sail");
+    cacheAssoc(ship, "part", part);
+    ship.writeAttribute("name", "Pearl-touched");
+    cacheAssoc(pirate, "ship", ship);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
+    const reloaded = await Part.find(part.id!);
+    expect(reloaded.readAttribute("name")).toBe("Sail");
+  });
+
+  it("when great-grandchild changed via attributes, saving parent should save great-grandchild", async () => {
+    class GGCReply extends Base {
+      static {
+        this.attribute("text", "string");
+        this.attribute("ggc_comment_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GGCComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("ggc_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GGCPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GGCPost, "ggcComments", {
+      className: "GGCComment",
+      foreignKey: "ggc_post_id",
+    });
+    Associations.hasMany.call(GGCComment, "ggcReplies", {
+      className: "GGCReply",
+      foreignKey: "ggc_comment_id",
+    });
+    registerModel(GGCReply);
+    registerModel(GGCComment);
+    registerModel(GGCPost);
+    acceptsNestedAttributesFor(GGCPost, "ggcComments");
+    acceptsNestedAttributesFor(GGCComment, "ggcReplies");
+
+    const post = await GGCPost.create({ title: "Parent" });
+    const comment = await GGCComment.create({ body: "Hello", ggc_post_id: post.id });
+    const reply = await GGCReply.create({ text: "old", ggc_comment_id: comment.id });
+
+    assignNestedAttributes(comment, "ggcReplies", [{ id: reply.id, text: "updated" }]);
+    await comment.save();
+
+    const reloaded = await GGCReply.find(reply.id);
+    expect(reloaded.readAttribute("text")).toBe("updated");
+  });
+
+  it("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", async () => {
+    class GGDReply extends Base {
+      static {
+        this.attribute("text", "string");
+        this.attribute("ggd_comment_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GGDComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("ggd_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GGDPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GGDPost, "ggdComments", {
+      className: "GGDComment",
+      foreignKey: "ggd_post_id",
+    });
+    Associations.hasMany.call(GGDComment, "ggdReplies", {
+      className: "GGDReply",
+      foreignKey: "ggd_comment_id",
+    });
+    registerModel(GGDReply);
+    registerModel(GGDComment);
+    registerModel(GGDPost);
+    acceptsNestedAttributesFor(GGDPost, "ggdComments");
+    acceptsNestedAttributesFor(GGDComment, "ggdReplies", { allowDestroy: true });
+
+    const post = await GGDPost.create({ title: "Parent" });
+    const comment = await GGDComment.create({ body: "Hello", ggd_post_id: post.id });
+    const reply = await GGDReply.create({ text: "doomed", ggd_comment_id: comment.id });
+
+    assignNestedAttributes(comment, "ggdReplies", [{ id: reply.id, _destroy: true }]);
+    await comment.save();
+
+    const remaining = await GGDReply.where({ ggd_comment_id: comment.id }).toArray();
+    expect(remaining.length).toBe(0);
+  });
+
+  it("when great-grandchild added via attributes, saving parent should create great-grandchild", async () => {
+    class GGAReply extends Base {
+      static {
+        this.attribute("text", "string");
+        this.attribute("gga_comment_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GGAComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("gga_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GGAPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GGAPost, "ggaComments", {
+      className: "GGAComment",
+      foreignKey: "gga_post_id",
+    });
+    Associations.hasMany.call(GGAComment, "ggaReplies", {
+      className: "GGAReply",
+      foreignKey: "gga_comment_id",
+    });
+    registerModel(GGAReply);
+    registerModel(GGAComment);
+    registerModel(GGAPost);
+    acceptsNestedAttributesFor(GGAPost, "ggaComments");
+    acceptsNestedAttributesFor(GGAComment, "ggaReplies");
+
+    const post = await GGAPost.create({ title: "Parent" });
+    const comment = await GGAComment.create({ body: "Hello", gga_post_id: post.id });
+
+    assignNestedAttributes(comment, "ggaReplies", [{ text: "new-great-grandchild" }]);
+    await comment.save();
+
+    const replies = await GGAReply.where({ gga_comment_id: comment.id }).toArray();
+    expect(replies.length).toBe(1);
+    expect(replies[0].readAttribute("text")).toBe("new-great-grandchild");
+  });
+
+  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => {});
+});
+
+describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function cacheAssoc(record: Base, name: string, value: unknown) {
+    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
+    (record as any)._cachedAssociations.set(name, value);
+  }
+
+  function makeModels() {
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+      }
+    }
+    class Part extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+        this.validates("name", { presence: true });
+      }
+    }
+    Pirate.adapter = adapter;
+    Ship.adapter = adapter;
+    Part.adapter = adapter;
+    registerModel("Pirate", Pirate);
+    registerModel("Ship", Ship);
+    registerModel("Part", Part);
+    (Pirate as any)._associations = [
+      { type: "hasMany", name: "ships", options: { autosave: true } },
+    ];
+    (Ship as any)._associations = [
+      { type: "belongsTo", name: "pirate", options: {} },
+      { type: "hasMany", name: "parts", options: { autosave: true } },
+    ];
+    return { Pirate, Ship, Part };
+  }
+
+  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {});
+
+  it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => {
+    /* requires lazy-loading tracking */
+  });
+
+  it("when grandchild changed in memory, saving parent should save grandchild", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const part = await Part.create({ name: "Mast", ship_id: ship.id });
+    part.writeAttribute("name", "Sail");
+    cacheAssoc(ship, "parts", [part]);
+    ship.writeAttribute("name", "Pearl-touched");
+    cacheAssoc(pirate, "ships", [ship]);
+    const saved = await pirate.save();
+    expect(saved).toBe(true);
+    const reloaded = await Part.find(part.id!);
+    expect(reloaded.readAttribute("name")).toBe("Sail");
+  });
+
+  it("when grandchild changed via attributes, saving parent should save grandchild", async () => {
+    class GCTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("gc_comment_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GCComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("gc_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GCPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GCPost, "gcComments", {
+      className: "GCComment",
+      foreignKey: "gc_post_id",
+    });
+    Associations.hasMany.call(GCComment, "gcTags", {
+      className: "GCTag",
+      foreignKey: "gc_comment_id",
+    });
+    registerModel(GCTag);
+    registerModel(GCComment);
+    registerModel(GCPost);
+    acceptsNestedAttributesFor(GCPost, "gcComments");
+    acceptsNestedAttributesFor(GCComment, "gcTags");
+
+    const post = await GCPost.create({ title: "Parent" });
+    const comment = await GCComment.create({ body: "Hello", gc_post_id: post.id });
+    const tag = await GCTag.create({ name: "old", gc_comment_id: comment.id });
+
+    assignNestedAttributes(comment, "gcTags", [{ id: tag.id, name: "updated" }]);
+    await comment.save();
+
+    const reloaded = await GCTag.find(tag.id);
+    expect(reloaded.readAttribute("name")).toBe("updated");
+  });
+
+  it("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", async () => {
+    class GCDTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("gc_d_comment_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GCDComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("gc_d_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GCDPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GCDPost, "gcdComments", {
+      className: "GCDComment",
+      foreignKey: "gc_d_post_id",
+    });
+    Associations.hasMany.call(GCDComment, "gcdTags", {
+      className: "GCDTag",
+      foreignKey: "gc_d_comment_id",
+    });
+    registerModel(GCDTag);
+    registerModel(GCDComment);
+    registerModel(GCDPost);
+    acceptsNestedAttributesFor(GCDPost, "gcdComments");
+    acceptsNestedAttributesFor(GCDComment, "gcdTags", { allowDestroy: true });
+
+    const post = await GCDPost.create({ title: "Parent" });
+    const comment = await GCDComment.create({ body: "Hello", gc_d_post_id: post.id });
+    const tag = await GCDTag.create({ name: "doomed", gc_d_comment_id: comment.id });
+
+    assignNestedAttributes(comment, "gcdTags", [{ id: tag.id, _destroy: true }]);
+    await comment.save();
+
+    const remaining = await GCDTag.where({ gc_d_comment_id: comment.id }).toArray();
+    expect(remaining.length).toBe(0);
+  });
+
+  it("when grandchild added via attributes, saving parent should create grandchild", async () => {
+    class GCTag2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("gc_comment2_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GCComment2 extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("gc_post2_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GCPost2 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GCPost2, "gcComment2s", {
+      className: "GCComment2",
+      foreignKey: "gc_post2_id",
+    });
+    Associations.hasMany.call(GCComment2, "gcTag2s", {
+      className: "GCTag2",
+      foreignKey: "gc_comment2_id",
+    });
+    registerModel(GCTag2);
+    registerModel(GCComment2);
+    registerModel(GCPost2);
+    acceptsNestedAttributesFor(GCPost2, "gcComment2s");
+    acceptsNestedAttributesFor(GCComment2, "gcTag2s");
+
+    const post = await GCPost2.create({ title: "Parent" });
+    const comment = await GCComment2.create({ body: "Hello", gc_post2_id: post.id });
+
+    assignNestedAttributes(comment, "gcTag2s", [{ name: "new-grandchild" }]);
+    await comment.save();
+
+    const tags = await GCTag2.where({ gc_comment2_id: comment.id }).toArray();
+    expect(tags.length).toBe(1);
+    expect(tags[0].readAttribute("name")).toBe("new-grandchild");
+  });
+
+  it.skip("circular references do not perform unnecessary queries", () => {});
+
+  it("nested singular associations are validated", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const invalidPart = new Part({ name: "" });
+    cacheAssoc(ship, "parts", [invalidPart]);
+    ship.writeAttribute("name", "Pearl-touched");
+    cacheAssoc(pirate, "ships", [ship]);
+    const saved = await pirate.save();
+    expect(saved).toBe(false);
   });
 });

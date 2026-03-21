@@ -16,7 +16,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgreSQLNameTest", () => {
+  describe("PostgreSQLUtilsTest", () => {
     it("reset pk sequence on empty table", async () => {
       await adapter.exec(`CREATE TABLE utils_reset_pk (id serial primary key, name text)`);
       await adapter.exec(`SELECT setval('utils_reset_pk_id_seq', 123)`);
@@ -60,7 +60,9 @@ describeIfPg("PostgresAdapter", () => {
         expect(result.identifier).toBe(expectedName);
       }
     });
+  });
 
+  describe("PostgreSQLNameTest", () => {
     it("represents itself as schema.name", () => {
       const obj = new PgName("public", "articles");
       expect(obj.toString()).toBe("public.articles");

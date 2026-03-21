@@ -785,9 +785,8 @@ describe("Static shorthands (Rails-guided)", () => {
     it.skip("should maintain default scope on eager loaded associations", () => {
       /* needs eager loading + default_scope */
     });
+    it.skip("scoping applies to all queries on has many when set", () => {
+      /* needs association + scoping */
+    });
   }); // HasManyScopingTest
-
-  it.skip("scoping applies to all queries on has many when set", () => {
-    /* needs association + scoping */
-  });
 });

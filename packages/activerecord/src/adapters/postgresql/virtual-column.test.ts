@@ -22,6 +22,9 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("virtual column migration", async () => {});
     it.skip("virtual column stored", async () => {});
     it.skip("non persisted column", async () => {});
+    it.skip("virtual column with full inserts", () => {});
+    it.skip("stored column", () => {});
+    it.skip("change table", () => {});
   });
 
   describe("PostgresqlXmlTest", () => {
@@ -32,12 +35,5 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("xml schema dump", async () => {});
     it.skip("null xml", async () => {});
     it.skip("round trip", async () => {});
-  });
-  it.skip("virtual column with full inserts", () => {
-    /* needs PostgreSQL GENERATED ALWAYS AS ... STORED syntax (no VIRTUAL in PG) */
-
-    it.skip("stored column", () => {});
-
-    it.skip("change table", () => {});
   });
 });
