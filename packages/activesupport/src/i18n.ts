@@ -1,4 +1,4 @@
-type TranslationValue = string | string[] | null | TranslationHash;
+type TranslationValue = string | (string | null)[] | null | TranslationHash;
 interface TranslationHash {
   [key: string]: TranslationValue;
 }
@@ -90,6 +90,21 @@ function pad(n: number, width = 2): string {
   return String(n).padStart(width, "0");
 }
 
+function tzAbbreviation(date: Date): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" }).formatToParts(date);
+    const tzPart = parts.find((p) => p.type === "timeZoneName");
+    if (tzPart) return tzPart.value;
+  } catch {
+    // fall through
+  }
+  const tzOffset = date.getTimezoneOffset();
+  const tzSign = tzOffset <= 0 ? "+" : "-";
+  const tzAbsHours = Math.floor(Math.abs(tzOffset) / 60);
+  const tzAbsMins = Math.abs(tzOffset) % 60;
+  return `${tzSign}${pad(tzAbsHours)}${pad(tzAbsMins)}`;
+}
+
 function strftime(date: Date, format: string): string {
   const day = date.getDay();
   const mday = date.getDate();
@@ -103,27 +118,89 @@ function strftime(date: Date, format: string): string {
   const tzSign = tzOffset <= 0 ? "+" : "-";
   const tzAbsHours = Math.floor(Math.abs(tzOffset) / 60);
   const tzAbsMins = Math.abs(tzOffset) % 60;
-  const tz = `${tzSign}${pad(tzAbsHours)}${pad(tzAbsMins)}`;
+  const tzNumeric = `${tzSign}${pad(tzAbsHours)}${pad(tzAbsMins)}`;
 
-  return format
-    .replace(/%a/g, ABBR_DAYNAMES[day])
-    .replace(/%A/g, DAYNAMES[day])
-    .replace(/%b/g, ABBR_MONTHNAMES[month + 1]!)
-    .replace(/%B/g, MONTHNAMES[month + 1] as string)
-    .replace(/%d/g, pad(mday))
-    .replace(/%e/g, String(mday).padStart(2, " "))
-    .replace(/%m/g, pad(month + 1))
-    .replace(/%Y/g, String(year))
-    .replace(/%H/g, pad(hours))
-    .replace(/%M/g, pad(minutes))
-    .replace(/%S/g, pad(seconds))
-    .replace(/%z/g, tz)
-    .replace(/%Z/g, tz)
-    .replace(/%p/g, hours < 12 ? "AM" : "PM")
-    .replace(/%P/g, hours < 12 ? "am" : "pm");
+  let result = "";
+  for (let i = 0; i < format.length; i++) {
+    if (format[i] !== "%") {
+      result += format[i];
+      continue;
+    }
+
+    if (i + 1 >= format.length) {
+      result += "%";
+      break;
+    }
+
+    const spec = format[i + 1];
+    i++;
+
+    switch (spec) {
+      case "%":
+        result += "%";
+        break;
+      case "a":
+        result += ABBR_DAYNAMES[day];
+        break;
+      case "A":
+        result += DAYNAMES[day];
+        break;
+      case "b":
+        result += ABBR_MONTHNAMES[month + 1]!;
+        break;
+      case "B":
+        result += MONTHNAMES[month + 1] as string;
+        break;
+      case "d":
+        result += pad(mday);
+        break;
+      case "e":
+        result += String(mday).padStart(2, " ");
+        break;
+      case "m":
+        result += pad(month + 1);
+        break;
+      case "Y":
+        result += String(year);
+        break;
+      case "H":
+        result += pad(hours);
+        break;
+      case "M":
+        result += pad(minutes);
+        break;
+      case "S":
+        result += pad(seconds);
+        break;
+      case "z":
+        result += tzNumeric;
+        break;
+      case "Z":
+        result += tzAbbreviation(date);
+        break;
+      case "p":
+        result += hours < 12 ? "AM" : "PM";
+        break;
+      case "P":
+        result += hours < 12 ? "am" : "pm";
+        break;
+      default:
+        result += "%" + spec;
+        break;
+    }
+  }
+
+  return result;
 }
 
 type DateLike = Date;
+
+function symbolToString(value: string | symbol): string {
+  if (typeof value === "symbol") {
+    return value.description ?? "";
+  }
+  return value;
+}
 
 interface LocalizeOptions {
   format?: string | symbol;
@@ -155,8 +232,8 @@ class I18nModule {
         },
         day_names: DAYNAMES,
         abbr_day_names: ABBR_DAYNAMES,
-        month_names: MONTHNAMES as any,
-        abbr_month_names: ABBR_MONTHNAMES as any,
+        month_names: MONTHNAMES,
+        abbr_month_names: ABBR_MONTHNAMES,
         order: ["year", "month", "day"],
       },
       time: {
@@ -180,7 +257,7 @@ class I18nModule {
 
   translate(key: string | symbol, options: TranslateOptions = {}): TranslationValue {
     const locale = options.locale ?? this.locale;
-    const keyStr = typeof key === "symbol" ? String(key) : key;
+    const keyStr = symbolToString(key);
     const result = this.backend.lookup(locale, keyStr);
     if (result !== undefined) return result;
     if (options.default !== undefined) return options.default;
@@ -194,7 +271,7 @@ class I18nModule {
   localize(object: DateLike, options: LocalizeOptions = {}): string {
     const locale = options.locale ?? this.locale;
     const format = options.format ?? "default";
-    const formatStr = typeof format === "symbol" ? String(format) : format;
+    const formatStr = symbolToString(format);
 
     const scope = options.type ?? (this._isDateOnly(object) ? "date" : "time");
 
