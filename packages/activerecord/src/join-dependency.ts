@@ -17,6 +17,7 @@ import {
   singularize as _singularize,
 } from "@rails-ts/activesupport";
 import { modelRegistry } from "./associations.js";
+import { getInheritanceColumn, isStiSubclass } from "./sti.js";
 
 export interface JoinNode {
   tableIndex: number;
@@ -146,6 +147,13 @@ export class JoinDependency {
       }
     }
 
+    // Add STI type constraint if target is an STI subclass
+    joinOn = this._addStiConstraint(joinOn, targetModel!, tableAlias);
+
+    // Guard against composite PK on target model
+    const targetModelPk = (targetModel as any).primaryKey ?? "id";
+    if (Array.isArray(targetModelPk)) return null;
+
     const columns = getModelColumns(targetModel);
     const node: JoinNode = {
       tableIndex,
@@ -227,6 +235,16 @@ export class JoinDependency {
 
   buildJoinSql(): string {
     return this._nodes.map((n) => n.joinSql).join(" ");
+  }
+
+  private _addStiConstraint(joinOn: string, model: typeof Base, alias: string): string {
+    const inheritanceCol = getInheritanceColumn(model);
+    if (inheritanceCol && isStiSubclass(model)) {
+      const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
+      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+      joinOn += ` AND "${alias}"."${inheritanceCol}" IN (${inList})`;
+    }
+    return joinOn;
   }
 
   instantiateFromRows(rows: Record<string, unknown>[]): {
@@ -380,6 +398,13 @@ export class JoinDependency {
         }
       }
     }
+
+    // Add STI type constraint on target
+    targetJoinOn = this._addStiConstraint(targetJoinOn, targetModel, targetAlias);
+
+    // Guard against composite PK on target
+    const targetModelPk = (targetModel as any).primaryKey ?? "id";
+    if (Array.isArray(targetModelPk)) return null;
 
     const targetColumns = getModelColumns(targetModel);
 
