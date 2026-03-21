@@ -503,61 +503,73 @@ export class Model {
   }
 
   static beforeSave(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "save", fn, conditions);
   }
 
   static afterSave(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "save", fn, conditions);
   }
 
   static beforeCreate(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "create", fn, conditions);
   }
 
   static afterCreate(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "create", fn, conditions);
   }
 
   static beforeUpdate(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "update", fn, conditions);
   }
 
   static afterUpdate(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "update", fn, conditions);
   }
 
   static beforeDestroy(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "destroy", fn, conditions);
   }
 
   static afterDestroy(fn: CallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "destroy", fn, conditions);
   }
 
   static aroundSave(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "save", fn, conditions);
   }
 
   static aroundCreate(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "create", fn, conditions);
   }
 
   static aroundUpdate(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "update", fn, conditions);
   }
 
   static aroundDestroy(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+    _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "destroy", fn, conditions);
   }
@@ -1472,6 +1484,12 @@ function _validateOnCondition(on: string | string[]): void {
         `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
       );
     }
+  }
+}
+
+function _rejectOnOption(conditions?: CallbackConditions): void {
+  if (conditions && "on" in conditions) {
+    throw new ArgumentError("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   }
 }
 

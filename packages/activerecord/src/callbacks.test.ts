@@ -147,14 +147,43 @@ describe("CallbacksTest", () => {
     expect(log).toContain("before_create");
   });
 
-  it.skip("before save doesnt allow on option", () => {
-    /* fixture-dependent */
+  it("before save doesnt allow on option", () => {
+    expect(() => {
+      class T extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adapter;
+          this.beforeSave(() => {}, { on: "create" } as any);
+        }
+      }
+      void T;
+    }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
-  it.skip("around save doesnt allow on option", () => {
-    /* fixture-dependent */
+
+  it("around save doesnt allow on option", () => {
+    expect(() => {
+      class T extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adapter;
+          this.aroundSave((_r, proceed) => proceed(), { on: "create" } as any);
+        }
+      }
+      void T;
+    }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
-  it.skip("after save doesnt allow on option", () => {
-    /* fixture-dependent */
+
+  it("after save doesnt allow on option", () => {
+    expect(() => {
+      class T extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adapter;
+          this.afterSave(() => {}, { on: "create" } as any);
+        }
+      }
+      void T;
+    }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
 
   it("before validation returns false", async () => {
