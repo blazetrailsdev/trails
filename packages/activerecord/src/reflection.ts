@@ -22,6 +22,7 @@ export class AssociationReflection {
     this.name = name;
     this.macro = macro;
     this.options = options;
+    this._ownerClass = ownerClass;
 
     // Derive className
     if (options.className) {
@@ -70,6 +71,42 @@ export class AssociationReflection {
   }
 
   /**
+   * For polymorphic associations, returns the type column name.
+   *
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#foreign_type
+   */
+  get foreignType(): string | null {
+    if (!this.options.polymorphic && !this.options.as) return null;
+    if (this.macro === "belongsTo") {
+      return `${this.name}_type`;
+    }
+    if (this.options.as) {
+      const underscore = (n: string) =>
+        n
+          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+          .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+          .toLowerCase();
+      return `${underscore(this.options.as as string)}_type`;
+    }
+    return null;
+  }
+
+  /**
+   * For HABTM associations, returns the join table name.
+   *
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#join_table
+   */
+  get joinTable(): string | null {
+    if (this.macro !== "hasAndBelongsToMany") return null;
+    if (this.options.joinTable) return this.options.joinTable as string;
+    const ownerTable = this._ownerClass.tableName;
+    const targetTable = this.klass.tableName;
+    return [ownerTable, targetTable].sort().join("_");
+  }
+
+  private _ownerClass: typeof Base;
+
+  /**
    * Returns the target class of the association, resolved via the model registry.
    *
    * Mirrors: ActiveRecord::Reflection::AssociationReflection#klass
@@ -82,6 +119,31 @@ export class AssociationReflection {
       );
     }
     return resolved;
+  }
+}
+
+/**
+ * Represents a through association reflection.
+ *
+ * Mirrors: ActiveRecord::Reflection::ThroughReflection
+ */
+export class ThroughReflection extends AssociationReflection {
+  readonly through: string;
+  readonly source: string;
+
+  constructor(
+    name: string,
+    macro: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
+    options: Record<string, unknown>,
+    ownerClass: typeof Base,
+  ) {
+    super(name, macro, options, ownerClass);
+    this.through = options.through as string;
+    this.source = (options.source as string) ?? name;
+  }
+
+  isThrough(): boolean {
+    return true;
   }
 }
 
@@ -123,6 +185,35 @@ export function columnNames(modelClass: typeof Base): string[] {
 }
 
 /**
+ * Get content columns (excludes primary key, foreign keys, and internal columns like type/lock_version).
+ *
+ * Mirrors: ActiveRecord::Base.content_columns
+ */
+export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
+  const pk = modelClass.primaryKey;
+  const pkCols = Array.isArray(pk) ? pk : [pk];
+  const excludeNames = new Set([
+    ...pkCols,
+    "type",
+    (modelClass as any).lockingColumn ?? "lock_version",
+  ]);
+
+  // Also exclude foreign keys from associations
+  const associations: any[] = (modelClass as any)._associations ?? [];
+  for (const assoc of associations) {
+    if (assoc.type === "belongsTo") {
+      const fk = assoc.options.foreignKey ?? `${assoc.name}_id`;
+      excludeNames.add(fk);
+      if (assoc.options.polymorphic) {
+        excludeNames.add(`${assoc.name}_type`);
+      }
+    }
+  }
+
+  return columns(modelClass).filter((col) => !excludeNames.has(col.name));
+}
+
+/**
  * Reflect on a specific association.
  *
  * Mirrors: ActiveRecord::Base.reflect_on_association
@@ -134,6 +225,16 @@ export function reflectOnAssociation(
   const associations: any[] = (modelClass as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === name);
   if (!assocDef) return null;
+
+  if (
+    assocDef.options.through ||
+    assocDef.type === "hasManyThrough" ||
+    assocDef.type === "hasOneThrough"
+  ) {
+    const macro =
+      assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
+    return new ThroughReflection(assocDef.name, macro as any, assocDef.options, modelClass);
+  }
 
   return new AssociationReflection(
     assocDef.name,

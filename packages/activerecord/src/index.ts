@@ -62,9 +62,11 @@ export {
 } from "./errors.js";
 export {
   AssociationReflection,
+  ThroughReflection,
   ColumnReflection,
   columns,
   columnNames,
+  contentColumns,
   reflectOnAssociation,
   reflectOnAllAssociations,
 } from "./reflection.js";

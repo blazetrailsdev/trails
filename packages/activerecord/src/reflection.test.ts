@@ -7,8 +7,10 @@ import {
   Base,
   columns,
   columnNames,
+  contentColumns,
   reflectOnAssociation,
   reflectOnAllAssociations,
+  ThroughReflection,
   registerModel,
   composedOf,
 } from "./index.js";
@@ -308,8 +310,81 @@ describe("ReflectionTest", () => {
     expect(ref).not.toBeNull();
     expect(ref!.macro).toBe("belongsTo");
   });
-  it.skip("has many through reflection", () => {});
-  it.skip("has one through reflection", () => {});
+  it("has many through reflection", () => {
+    class Subscriber extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Subscription extends Base {
+      static {
+        this.attribute("subscriber_id", "integer");
+        this.attribute("book_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class SubBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Subscriber", Subscriber);
+    registerModel("Subscription", Subscription);
+    registerModel("SubBook", SubBook);
+    Associations.hasMany.call(Subscriber, "subscriptions", {});
+    Associations.hasMany.call(Subscriber, "subBooks", {
+      through: "subscriptions",
+      source: "subBook",
+      className: "SubBook",
+    });
+    Associations.belongsTo.call(Subscription, "subBook", {
+      foreignKey: "book_id",
+      className: "SubBook",
+    });
+    const ref = reflectOnAssociation(Subscriber, "subBooks");
+    expect(ref).toBeInstanceOf(ThroughReflection);
+  });
+
+  it("has one through reflection", () => {
+    class HotOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HotAccount extends Base {
+      static {
+        this.attribute("hot_owner_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class HotProfile extends Base {
+      static {
+        this.attribute("hot_account_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("HotOwner", HotOwner);
+    registerModel("HotAccount", HotAccount);
+    registerModel("HotProfile", HotProfile);
+    Associations.hasOne.call(HotOwner, "hotAccount", {
+      foreignKey: "hot_owner_id",
+      className: "HotAccount",
+    });
+    Associations.hasOne.call(HotAccount, "hotProfile", {
+      foreignKey: "hot_account_id",
+      className: "HotProfile",
+    });
+    Associations.hasOne.call(HotOwner, "hotProfile", {
+      through: "hotAccount",
+      source: "hotProfile",
+      className: "HotProfile",
+    });
+    const ref = reflectOnAssociation(HotOwner, "hotProfile");
+    expect(ref).toBeInstanceOf(ThroughReflection);
+  });
   it.skip("column for attribute", () => {});
   it.skip("columns for attribute", () => {});
   it.skip("reflection class for", () => {});
@@ -321,10 +396,38 @@ describe("ReflectionTest", () => {
     expect(belongsToRef!.macro).toBe("belongsTo");
   });
   it.skip("aggregate mapping", () => {});
-  it.skip("has and belongs to many reflection", () => {});
+  it("has and belongs to many reflection", () => {
+    class Category extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HabtmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Category", Category);
+    registerModel("HabtmPost", HabtmPost);
+    Associations.hasAndBelongsToMany.call(Category, "habtmPosts", {
+      className: "HabtmPost",
+    });
+    const refs = reflectOnAllAssociations(Category, "hasAndBelongsToMany");
+    expect(refs.length).toBeGreaterThanOrEqual(1);
+    expect(refs[0].macro).toBe("hasAndBelongsToMany");
+    expect(refs[0].name).toBe("habtmPosts");
+  });
   it.skip("has many through source reflection", () => {});
   it.skip("has many through conditions when using a custom foreign key", () => {});
-  it.skip("collection based on associated model", () => {});
+  it("collection based on associated model", () => {
+    const { Author } = makeModels();
+    const ref = reflectOnAssociation(Author, "books");
+    expect(ref!.isCollection()).toBe(true);
+    const profileRef = reflectOnAssociation(Author, "profile");
+    expect(profileRef!.isCollection()).toBe(false);
+  });
   it("automated reflection", () => {
     const { Author } = makeModels();
     const refs = reflectOnAllAssociations(Author);
@@ -342,8 +445,31 @@ describe("ReflectionTest", () => {
     expect(ref).toBeNull();
   });
   it.skip("has many reflection for reloaded child", () => {});
-  it.skip("association target type", () => {});
-  it.skip("belongs to reflection with symbol foreign key", () => {});
+  it("association target type", () => {
+    class Tagging extends Base {
+      static {
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Tagging", Tagging);
+    Associations.belongsTo.call(Tagging, "taggable", { polymorphic: true });
+    const ref = reflectOnAssociation(Tagging, "taggable");
+    expect(ref!.foreignType).toBe("taggable_type");
+  });
+  it("belongs to reflection with symbol foreign key", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Comment", Comment);
+    Associations.belongsTo.call(Comment, "post", { foreignKey: "post_id" });
+    const ref = reflectOnAssociation(Comment, "post");
+    expect(ref!.foreignKey).toBe("post_id");
+  });
   it("has many reflection without foreign key", () => {
     const { Author } = makeModels();
     const ref = reflectOnAssociation(Author, "books");
@@ -351,7 +477,22 @@ describe("ReflectionTest", () => {
     expect(ref).not.toBeNull();
     expect(ref!.options.foreignKey ?? "author_id").toBe("author_id");
   });
-  it.skip("belongs to reflection with custom primary key", () => {});
+  it("belongs to reflection with custom primary key", () => {
+    class Bookmark extends Base {
+      static {
+        this.attribute("author_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Bookmark", Bookmark);
+    Associations.belongsTo.call(Bookmark, "author", {
+      primaryKey: "name",
+      foreignKey: "author_name",
+    });
+    const ref = reflectOnAssociation(Bookmark, "author");
+    expect(ref!.options.primaryKey).toBe("name");
+    expect(ref!.foreignKey).toBe("author_name");
+  });
   it.skip("has many reflection scope", () => {});
   it.skip("has many through reflection scope", () => {});
   it.skip("association primary key raises error when nil", () => {});
@@ -371,8 +512,27 @@ describe("ReflectionTest", () => {
     expect(names.indexOf("title")).toBeLessThan(names.indexOf("author_name"));
     expect(names.indexOf("author_name")).toBeLessThan(names.indexOf("body"));
   });
-  it.skip("content columns", () => {
-    /* needs Base.contentColumns() that excludes PK/FK/timestamps */
+  it("content columns", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.attribute("body", "string");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Topic", Topic);
+    Associations.belongsTo.call(Topic, "category", {});
+    const cols = contentColumns(Topic);
+    const colNames = cols.map((c) => c.name);
+    // Should exclude id (PK) and category_id (FK)
+    expect(colNames).not.toContain("id");
+    expect(colNames).not.toContain("category_id");
+    // Should include content columns
+    expect(colNames).toContain("title");
+    expect(colNames).toContain("author_name");
+    expect(colNames).toContain("body");
   });
   it.skip("non existent types are identity types", () => {
     /* needs unknown type fallback to identity type */
@@ -385,7 +545,25 @@ describe("ReflectionTest", () => {
   it.skip("association primary key", () => {});
   it.skip("association primary key raises when missing primary key", () => {});
   it.skip("active record primary key raises when missing primary key", () => {});
-  it.skip("foreign type", () => {});
+  it("foreign type", () => {
+    class Sponsor extends Base {
+      static {
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.attribute("sponsor_club_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Sponsor", Sponsor);
+    Associations.belongsTo.call(Sponsor, "sponsorable", { polymorphic: true });
+    Associations.belongsTo.call(Sponsor, "sponsorClub", {
+      foreignKey: "sponsor_club_id",
+    });
+    const polyRef = reflectOnAssociation(Sponsor, "sponsorable");
+    expect(polyRef!.foreignType).toBe("sponsorable_type");
+    const normalRef = reflectOnAssociation(Sponsor, "sponsorClub");
+    expect(normalRef!.foreignType).toBeNull();
+  });
   it.skip("default association validation", () => {});
   it.skip("always validate association if explicit", () => {});
   it.skip("validate association if autosave", () => {});
@@ -393,10 +571,111 @@ describe("ReflectionTest", () => {
   it.skip("symbol for class name", () => {});
   it.skip("class for class name", () => {});
   it.skip("class for source type", () => {});
-  it.skip("join table with common prefix", () => {});
-  it.skip("join table with different prefix", () => {});
-  it.skip("join table can be overridden", () => {});
-  it.skip("includes accepts strings", () => {});
+  it("join table with common prefix", () => {
+    class CatalogCategory extends Base {
+      static {
+        this._tableName = "catalog_categories";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class CatalogProduct extends Base {
+      static {
+        this._tableName = "catalog_products";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CatalogCategory", CatalogCategory);
+    registerModel("CatalogProduct", CatalogProduct);
+    Associations.hasAndBelongsToMany.call(CatalogProduct, "catalogCategories", {
+      className: "CatalogCategory",
+    });
+    const ref = reflectOnAssociation(CatalogProduct, "catalogCategories");
+    expect(ref!.joinTable).toBe("catalog_categories_catalog_products");
+  });
+
+  it("join table with different prefix", () => {
+    class CatCategory extends Base {
+      static {
+        this._tableName = "catalog_categories";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ContentPage extends Base {
+      static {
+        this._tableName = "content_pages";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CatCategory", CatCategory);
+    registerModel("ContentPage", ContentPage);
+    Associations.hasAndBelongsToMany.call(ContentPage, "catCategories", {
+      className: "CatCategory",
+    });
+    const ref = reflectOnAssociation(ContentPage, "catCategories");
+    expect(ref!.joinTable).toBe("catalog_categories_content_pages");
+  });
+
+  it("join table can be overridden", () => {
+    class JtCategory extends Base {
+      static {
+        this._tableName = "categories";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class JtProduct extends Base {
+      static {
+        this._tableName = "products";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("JtCategory", JtCategory);
+    registerModel("JtProduct", JtProduct);
+    Associations.hasAndBelongsToMany.call(JtProduct, "jtCategories", {
+      className: "JtCategory",
+      joinTable: "product_categories",
+    });
+    const ref = reflectOnAssociation(JtProduct, "jtCategories");
+    expect(ref!.joinTable).toBe("product_categories");
+  });
+  it("includes accepts strings", async () => {
+    class Hotel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Department extends Base {
+      static {
+        this.attribute("hotel_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Chef extends Base {
+      static {
+        this.attribute("department_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Hotel", Hotel);
+    registerModel("Department", Department);
+    registerModel("Chef", Chef);
+    Associations.hasMany.call(Hotel, "departments", { foreignKey: "hotel_id" });
+    Associations.hasMany.call(Department, "chefs", { foreignKey: "department_id" });
+    const hotel = await Hotel.create({ name: "Grand" });
+    const dept = await Department.create({ hotel_id: hotel.id, name: "Kitchen" });
+    await Chef.create({ department_id: dept.id, name: "Gordon" });
+    // includes should accept string association names
+    const hotels = await Hotel.all().includes("departments").toArray();
+    expect(hotels).toHaveLength(1);
+  });
   it("reflect on association accepts symbols", () => {
     const { Author } = makeModels();
     const ref = reflectOnAssociation(Author, "books");
