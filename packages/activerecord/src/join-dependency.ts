@@ -380,6 +380,7 @@ export class JoinDependency {
       const targetFk =
         sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`;
       const throughPk = (throughModel as any).primaryKey ?? "id";
+      if (Array.isArray(throughPk)) return null;
       targetJoinOn = `"${targetAlias}"."${targetFk}" = "${throughAlias}"."${throughPk}"`;
     }
 
