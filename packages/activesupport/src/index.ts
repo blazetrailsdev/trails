@@ -227,3 +227,5 @@ export {
   rangeEach,
 } from "./range-ext.js";
 export type { Range as RangeExt } from "./range-ext.js";
+
+export { I18n } from "./i18n.js";
