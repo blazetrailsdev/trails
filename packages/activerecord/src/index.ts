@@ -22,7 +22,13 @@ export {
   touchBelongsToParents,
 } from "./associations.js";
 export type { AssociationOptions } from "./associations.js";
-export { Transaction, transaction, savepoint, currentTransaction } from "./transactions.js";
+export {
+  Transaction,
+  Rollback,
+  transaction,
+  savepoint,
+  currentTransaction,
+} from "./transactions.js";
 export { delegate } from "./delegate.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, transaction, savepoint } from "./index.js";
+import { Base, transaction, savepoint, Rollback } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -525,14 +525,86 @@ describe("TransactionTest", () => {
     expect(log).toContain("committed");
   });
 
-  it.skip("after_rollback on create", () => {
-    /* needs real transaction rollback */
+  it("after_rollback on create", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterRollback(
+          (r: any) => {
+            history.push("rollback:" + r.readAttribute("title"));
+          },
+          { on: "create" },
+        );
+      }
+    }
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "rollback-me" });
+      throw new Rollback();
+    });
+    expect(history).toEqual(["rollback:rollback-me"]);
   });
-  it.skip("after_rollback on update", () => {
-    /* needs real transaction rollback */
+
+  it("after_rollback on update", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterRollback(
+          () => {
+            history.push("rollback_on_update");
+          },
+          { on: "update" },
+        );
+        this.afterRollback(
+          () => {
+            history.push("rollback_on_create");
+          },
+          { on: "create" },
+        );
+      }
+    }
+    const t = await Topic.create({ title: "original" });
+    history.length = 0;
+    await transaction(Topic, async () => {
+      await t.update({ title: "changed" });
+      throw new Rollback();
+    });
+    expect(history).toEqual(["rollback_on_update"]);
   });
-  it.skip("after_rollback on destroy", () => {
-    /* needs real transaction rollback */
+
+  it("after_rollback on destroy", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterRollback(
+          () => {
+            history.push("rollback_on_destroy");
+          },
+          { on: "destroy" },
+        );
+        this.afterRollback(
+          () => {
+            history.push("rollback_on_update");
+          },
+          { on: "update" },
+        );
+      }
+    }
+    const t = await Topic.create({ title: "doomed" });
+    history.length = 0;
+    await transaction(Topic, async () => {
+      await t.destroy();
+      throw new Rollback();
+    });
+    expect(history).toEqual(["rollback_on_destroy"]);
   });
 
   it("after commit callback ordering", async () => {
@@ -578,17 +650,66 @@ describe("TransactionTest", () => {
     /* destroy doesn't trigger afterCommit callbacks */
   });
 
-  it.skip("rollback triggers after_rollback", () => {
-    /* needs real transaction rollback */
+  it("rollback triggers after_rollback", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterRollback(() => {
+          history.push("rolled_back");
+        });
+      }
+    }
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "test" });
+      throw new Rollback();
+    });
+    expect(history).toContain("rolled_back");
   });
-  it.skip("after_commit_on_destroy_in_transaction", () => {
-    /* needs destroy within transaction + afterCommit */
+
+  it("after_commit_on_destroy_in_transaction", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterDestroyCommit(() => {
+          history.push("commit_on_destroy");
+        });
+      }
+    }
+    const t = await Topic.create({ title: "test" });
+    await transaction(Topic, async () => {
+      await t.destroy();
+    });
+    expect(history).toEqual(["commit_on_destroy"]);
   });
   it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {
     /* needs nested transaction / savepoint support */
   });
-  it.skip("after_commit_not_called_on_rollback", () => {
-    /* needs real transaction rollback */
+  it("after_commit_not_called_on_rollback", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCommit(() => {
+          history.push("committed");
+        });
+        this.afterRollback(() => {
+          history.push("rolled_back");
+        });
+      }
+    }
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "test" });
+      throw new Rollback();
+    });
+    expect(history).toEqual(["rolled_back"]);
   });
   it.skip("after_commit callback doesnt fire for readonly", () => {
     /* needs readonly check in commit callbacks */
@@ -628,7 +749,29 @@ describe("TransactionTest", () => {
        after INSERT so rollback requires DB-level transaction support */
   });
   it.skip("update should rollback on failure!", () => {});
-  it.skip("manually rolling back a transaction", () => {});
+  it("manually rolling back a transaction", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adp;
+      }
+    }
+    const t1 = await Topic.create({ title: "First", approved: false });
+    const t2 = await Topic.create({ title: "Second", approved: true });
+
+    await transaction(Topic, async () => {
+      await t1.update({ approved: true });
+      await t2.update({ approved: false });
+      throw new Rollback();
+    });
+
+    const r1 = await Topic.find(t1.id);
+    const r2 = await Topic.find(t2.id);
+    expect(r1.readAttribute("approved")).toBe(false);
+    expect(r2.readAttribute("approved")).toBe(true);
+  });
   it.skip("force savepoint on instance", () => {});
   it.skip("rollback when commit raises", () => {});
   it.skip("rollback when saving a frozen record", () => {
