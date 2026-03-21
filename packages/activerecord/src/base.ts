@@ -1785,6 +1785,7 @@ export class Base extends Model {
   private _frozen = false;
   private _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
+  _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
   _strictLoading = false;
   _strictLoadingBypassCount = 0;
   _preloadedAssociations: Map<string, unknown> = new Map();
@@ -2242,6 +2243,9 @@ export class Base extends Model {
       const { touchBelongsToParents } = await import("./associations.js");
       await touchBelongsToParents(this);
 
+      // Track the transaction action for on: filters in commit/rollback callbacks
+      this._transactionAction = wasNewRecord ? "create" : "update";
+
       // Fire after_commit callbacks
       const { currentTransaction } = await import("./transactions.js");
       const tx = currentTransaction();
@@ -2496,6 +2500,7 @@ export class Base extends Model {
     await updateCounterCaches(this, "decrement");
 
     if (didDelete) {
+      this._transactionAction = "destroy";
       const { currentTransaction } = await import("./transactions.js");
       const tx = currentTransaction();
       if (tx) {

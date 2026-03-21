@@ -563,11 +563,33 @@ export class Model {
   }
 
   static afterCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+    if (conditions?.on !== undefined) {
+      _validateOnCondition(conditions.on);
+    }
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "commit", fn, conditions);
   }
 
+  static afterSaveCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+    this.afterCommit(fn, { ...conditions, on: ["create", "update"] });
+  }
+
+  static afterCreateCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+    this.afterCommit(fn, { ...conditions, on: "create" });
+  }
+
+  static afterUpdateCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+    this.afterCommit(fn, { ...conditions, on: "update" });
+  }
+
+  static afterDestroyCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+    this.afterCommit(fn, { ...conditions, on: "destroy" });
+  }
+
   static afterRollback(fn: CallbackFn, conditions?: CallbackConditions): void {
+    if (conditions?.on !== undefined) {
+      _validateOnCondition(conditions.on);
+    }
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "rollback", fn, conditions);
   }
@@ -1437,5 +1459,25 @@ export class Model {
 
   runCallbacks(event: string, block: () => void): boolean {
     return (this.constructor as typeof Model)._callbackChain.runSync(event, this, block);
+  }
+}
+
+const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
+
+function _validateOnCondition(on: string | string[]): void {
+  const values = Array.isArray(on) ? on : [on];
+  for (const v of values) {
+    if (!VALID_ON_CONDITIONS.has(v)) {
+      throw new ArgumentError(
+        `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
+      );
+    }
+  }
+}
+
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
   }
 }

@@ -403,11 +403,30 @@ describe("TransactionCallbacksTest", () => {
   it.skip("after rollback callback when raise should restore state", () => {
     /* fixture-dependent */
   });
-  it.skip("after rollback callbacks should validate on condition", () => {
-    /* fixture-dependent */
+  it("after rollback callbacks should validate on condition", () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    expect(() => Topic.afterRollback(() => {}, { on: "save" })).toThrow(
+      /:on conditions for after_commit and after_rollback callbacks have to be one of \[:create, :destroy, :update\]/,
+    );
   });
-  it.skip("after commit callbacks should validate on condition", () => {
-    /* fixture-dependent */
+
+  it("after commit callbacks should validate on condition", () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    expect(() => Topic.afterCommit(() => {}, { on: "save" })).toThrow(
+      /:on conditions for after_commit and after_rollback callbacks have to be one of \[:create, :destroy, :update\]/,
+    );
   });
 
   it("after commit chain not called on errors", async () => {
@@ -495,10 +514,56 @@ describe("TransactionCallbacksTest", () => {
     expect(opts).toEqual(original);
   });
 
-  it.skip("only call after commit on create after transaction commits for new record", () => {});
-  it.skip("save in after create commit wont invoke extra after create commit", () => {});
+  it("only call after commit on create after transaction commits for new record", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterCreateCommit(() => {
+          history.push("commit_on_create");
+        });
+        this.afterUpdateCommit(() => {
+          history.push("commit_on_update");
+        });
+        this.afterDestroyCommit(() => {
+          history.push("commit_on_destroy");
+        });
+      }
+    }
+    const t = new Topic({ title: "New topic" });
+    await t.save();
+    expect(history).toEqual(["commit_on_create"]);
+  });
+
+  it.skip("save in after create commit wont invoke extra after create commit", () => {
+    /* needs transactional callback deduplication */
+  });
+
   describe("CallbackOrderTest", () => {
-    it.skip("callbacks run in order defined in model if not using run after transaction callbacks in order defined", () => {});
+    it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
+      const adp = freshAdapter();
+      const history: number[] = [];
+      class Topic extends Base {
+        static {
+          this.attribute("title", "string");
+          this.adapter = adp;
+          this.afterCommit(() => {
+            history.push(1);
+          });
+          this.afterCommit(() => {
+            history.push(2);
+          });
+          this.afterCommit(() => {
+            history.push(3);
+          });
+        }
+      }
+      const t = new Topic({ title: "Order test" });
+      await t.save();
+      expect(history).toEqual([1, 2, 3]);
+    });
   });
 });
 
