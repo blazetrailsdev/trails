@@ -616,7 +616,7 @@ describe("ReflectionTest", () => {
       className: "CatCategory",
     });
     const ref = reflectOnAssociation(ContentPage, "catCategories");
-    expect(ref!.joinTable).toBe("cat_categories_content_pages");
+    expect(ref!.joinTable).toBe("catalog_categories_content_pages");
   });
 
   it("join table can be overridden", () => {

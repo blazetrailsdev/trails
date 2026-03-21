@@ -90,9 +90,15 @@ export class AssociationReflection {
   get joinTable(): string | null {
     if (this.macro !== "hasAndBelongsToMany") return null;
     if (this.options.joinTable) return this.options.joinTable as string;
-    const ownerKey = pluralize(underscore(this._ownerClass.name));
-    const assocKey = underscore(this.name);
-    return [ownerKey, assocKey].sort().join("_");
+    try {
+      const ownerTable = this._ownerClass.tableName;
+      const targetTable = this.klass.tableName;
+      return [ownerTable, targetTable].sort().join("_");
+    } catch {
+      const ownerKey = pluralize(underscore(this._ownerClass.name));
+      const assocKey = underscore(this.name);
+      return [ownerKey, assocKey].sort().join("_");
+    }
   }
 
   private _ownerClass: typeof Base;
@@ -181,32 +187,8 @@ export function columnNames(modelClass: typeof Base): string[] {
  * Mirrors: ActiveRecord::Base.content_columns
  */
 export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
-  const pk = modelClass.primaryKey;
-  const pkCols = Array.isArray(pk) ? pk : [pk];
-  const inheritanceColumn = (modelClass as any).inheritanceColumn;
-  const lockingColumn = (modelClass as any).lockingColumn ?? "lock_version";
-  const excludeNames = new Set<string>([
-    ...pkCols,
-    lockingColumn,
-    ...(inheritanceColumn ? [inheritanceColumn] : []),
-  ]);
-
-  // Also exclude foreign keys from associations
-  const associations: any[] = (modelClass as any)._associations ?? [];
-  for (const assoc of associations) {
-    if (assoc.type === "belongsTo") {
-      const fkOption = assoc.options.foreignKey;
-      const fks = Array.isArray(fkOption) ? fkOption : [fkOption ?? `${assoc.name}_id`];
-      for (const fk of fks) {
-        excludeNames.add(fk);
-      }
-      if (assoc.options.polymorphic) {
-        excludeNames.add(`${assoc.name}_type`);
-      }
-    }
-  }
-
-  return columns(modelClass).filter((col) => !excludeNames.has(col.name));
+  const contentNames = new Set(modelClass.contentColumns());
+  return columns(modelClass).filter((col) => contentNames.has(col.name));
 }
 
 /**
@@ -250,7 +232,16 @@ export function reflectOnAllAssociations(
   macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
 ): AssociationReflection[] {
   const associations: any[] = (modelClass as any)._associations ?? [];
-  const filtered = macro ? associations.filter((a) => a.type === macro) : associations;
+  const filtered = macro
+    ? associations.filter((a) => {
+        if (a.options?.through || a.type === "hasManyThrough" || a.type === "hasOneThrough") {
+          const normalized =
+            a.type === "hasOneThrough" || a.type === "hasOne" ? "hasOne" : "hasMany";
+          return normalized === macro;
+        }
+        return a.type === macro;
+      })
+    : associations;
 
   return filtered.map((assocDef) => {
     if (
