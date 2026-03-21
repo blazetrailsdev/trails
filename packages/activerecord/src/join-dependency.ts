@@ -169,11 +169,12 @@ export class JoinDependency {
         parentAttrs[baseColumns[i]] = row[`t${this._baseTableIndex}_r${i}`];
       }
 
-      const parentPk = parentAttrs[basePk];
-      if (!parentMap.has(parentPk)) {
-        parentMap.set(parentPk, (this._baseModel as any)._instantiate(parentAttrs));
-        assocMap.set(parentPk, new Map());
-        seenChildren.set(parentPk, new Map());
+      const parent = (this._baseModel as any)._instantiate(parentAttrs);
+      const parentKey = parent.readAttribute(basePk);
+      if (!parentMap.has(parentKey)) {
+        parentMap.set(parentKey, parent);
+        assocMap.set(parentKey, new Map());
+        seenChildren.set(parentKey, new Map());
       }
 
       for (const node of this._nodes) {
@@ -187,19 +188,20 @@ export class JoinDependency {
 
         if (!hasNonNull) continue;
 
-        const childPk = childAttrs[(node.modelClass as any).primaryKey ?? "id"];
-        const parentAssocs = assocMap.get(parentPk)!;
+        const child = (node.modelClass as any)._instantiate(childAttrs);
+        const childPk = child.readAttribute((node.modelClass as any).primaryKey ?? "id");
+        const parentAssocs = assocMap.get(parentKey)!;
         if (!parentAssocs.has(node.assocName)) {
           parentAssocs.set(node.assocName, []);
         }
 
-        const seen = seenChildren.get(parentPk)!;
+        const seen = seenChildren.get(parentKey)!;
         if (!seen.has(node.assocName)) seen.set(node.assocName, new Set());
         const seenPks = seen.get(node.assocName)!;
 
         if (!seenPks.has(childPk)) {
           seenPks.add(childPk);
-          parentAssocs.get(node.assocName)!.push((node.modelClass as any)._instantiate(childAttrs));
+          parentAssocs.get(node.assocName)!.push(child);
         }
       }
     }
