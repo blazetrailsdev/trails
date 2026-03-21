@@ -90,15 +90,13 @@ export class AssociationReflection {
   get joinTable(): string | null {
     if (this.macro !== "hasAndBelongsToMany") return null;
     if (this.options.joinTable) return this.options.joinTable as string;
-    try {
-      const ownerTable = this._ownerClass.tableName;
-      const targetTable = this.klass.tableName;
-      return [ownerTable, targetTable].sort().join("_");
-    } catch {
-      const ownerKey = pluralize(underscore(this._ownerClass.name));
-      const assocKey = underscore(this.name);
-      return [ownerKey, assocKey].sort().join("_");
-    }
+    const ownerKey = pluralize(underscore(this._ownerClass.name));
+    const assocKey = underscore(this.name);
+    return [ownerKey, assocKey].sort().join("_");
+  }
+
+  isThrough(): boolean {
+    return false;
   }
 
   private _ownerClass: typeof Base;
@@ -182,7 +180,8 @@ export function columnNames(modelClass: typeof Base): string[] {
 }
 
 /**
- * Get content columns (excludes primary key, foreign keys, and internal columns like type/lock_version).
+ * Get content columns as ColumnReflection objects.
+ * Delegates to Base.contentColumns() which excludes PK, FK (_id suffix), and timestamps.
  *
  * Mirrors: ActiveRecord::Base.content_columns
  */
