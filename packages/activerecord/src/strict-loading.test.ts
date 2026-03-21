@@ -979,7 +979,7 @@ describe("StrictLoadingTest", () => {
     author.strictLoadingBang();
     const proxy = association(author, "slCnBooks");
     const book = new SlcnBook({ title: "New Book" });
-    await proxy.push(book);
+    await proxy.concat(book);
     expect(author.isStrictLoading()).toBe(true);
   });
 
@@ -1062,7 +1062,7 @@ describe("StrictLoadingTest", () => {
     author.strictLoadingBang();
     const proxy = association(author, "slNrBooks");
     const book = new SlnrBook({ title: "New Book" });
-    await proxy.push(book);
+    await proxy.concat(book);
     expect(author.isStrictLoading()).toBe(true);
   });
   it.skip("strict loading with new record on build is ignored", () => {});

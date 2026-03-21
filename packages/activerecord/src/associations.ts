@@ -243,7 +243,7 @@ export async function loadBelongsTo(
   }
 
   // Strict loading check: this is a lazy load
-  if ((record as any)._strictLoading) {
+  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
     throw new StrictLoadingViolationError(record, assocName);
   }
 
@@ -324,7 +324,7 @@ export async function loadHasOne(
   }
 
   // Strict loading check
-  if ((record as any)._strictLoading) {
+  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
     throw new StrictLoadingViolationError(record, assocName);
   }
 
@@ -478,7 +478,7 @@ export async function loadHasMany(
   }
 
   // Strict loading check
-  if ((record as any)._strictLoading) {
+  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
     throw new StrictLoadingViolationError(record, assocName);
   }
 
@@ -630,13 +630,12 @@ export async function countHasMany(
 ): Promise<number> {
   if (options.through) {
     // Temporarily disable strict loading so through-association loading works
-    const wasStrict = (record as any)._strictLoading;
-    (record as any)._strictLoading = false;
+    (record as any)._strictLoadingBypassCount++;
     try {
       const records = await loadHasManyThrough(record, assocName, options);
       return records.length;
     } finally {
-      (record as any)._strictLoading = wasStrict;
+      (record as any)._strictLoadingBypassCount--;
     }
   }
   const rel = buildHasManyRelation(record, assocName, options);
@@ -1060,12 +1059,11 @@ export class CollectionProxy {
   }
 
   private async _withoutStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
-    const wasStrict = this._record._strictLoading;
-    this._record._strictLoading = false;
+    this._record._strictLoadingBypassCount++;
     try {
       return await fn();
     } finally {
-      this._record._strictLoading = wasStrict;
+      this._record._strictLoadingBypassCount--;
     }
   }
 
