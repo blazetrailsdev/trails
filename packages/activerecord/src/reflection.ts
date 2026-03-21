@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { underscore, pluralize } from "@rails-ts/activesupport";
+import { underscore, pluralize, singularize } from "@rails-ts/activesupport";
 import { modelRegistry } from "./associations.js";
 
 /**
@@ -134,7 +134,7 @@ export class ThroughReflection extends AssociationReflection {
   ) {
     super(name, macro, options, ownerClass);
     this.through = options.through as string;
-    this.source = (options.source as string) ?? name;
+    this.source = (options.source as string) ?? (macro === "hasMany" ? singularize(name) : name);
   }
 
   isThrough(): boolean {
