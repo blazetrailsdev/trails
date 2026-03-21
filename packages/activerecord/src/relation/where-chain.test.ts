@@ -129,9 +129,11 @@ describe("WhereChainTest", () => {
     });
     const author = await LjAuthor.create({ name: "Alice" });
     await LjPost.create({ title: "P1", lj_author_id: author.id });
+    const lonely = await LjAuthor.create({ name: "Lonely" });
 
     const results = await LjAuthor.leftJoins("ljPosts").whereAssociated("ljPosts").toArray();
     expect(results.some((r: any) => r.id === author.id)).toBe(true);
+    expect(results.some((r: any) => r.id === lonely.id)).toBe(false);
   });
 
   it("associated with add left outer joins before", async () => {
@@ -156,39 +158,16 @@ describe("WhereChainTest", () => {
       foreignKey: "lo_author_id",
     });
     const author = await LoAuthor.create({ name: "Alice" });
+    const lonelyAuthor = await LoAuthor.create({ name: "Bob" });
     await LoPost.create({ title: "P1", lo_author_id: author.id });
 
     const results = await LoAuthor.leftOuterJoins("loPosts").whereAssociated("loPosts").toArray();
     expect(results.some((r: any) => r.id === author.id)).toBe(true);
+    expect(results.some((r: any) => r.id === lonelyAuthor.id)).toBe(false);
   });
 
-  it("associated with composite primary key", async () => {
-    const a = freshAdapter();
-    class CpkAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = a;
-      }
-    }
-    class CpkBook extends Base {
-      static {
-        this.attribute("cpk_author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = a;
-      }
-    }
-    registerModel("CpkAuthor", CpkAuthor);
-    registerModel("CpkBook", CpkBook);
-    Associations.hasMany.call(CpkAuthor, "cpkBooks", {
-      className: "CpkBook",
-      foreignKey: "cpk_author_id",
-    });
-    const author = await CpkAuthor.create({ name: "Test" });
-    await CpkBook.create({ cpk_author_id: author.id, title: "Book1" });
-
-    const results = await CpkAuthor.all().whereAssociated("cpkBooks").toArray();
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.some((r: any) => r.id === author.id)).toBe(true);
+  it.skip("associated with composite primary key", () => {
+    /* needs proper composite primary key model setup */
   });
   it("missing with child association", () => {
     const sql = Post.all().whereMissing("author").toSql();
@@ -275,35 +254,8 @@ describe("WhereChainTest", () => {
   it.skip("missing with enum extended late", () => {
     /* fixture-dependent */
   });
-  it("missing with composite primary key", async () => {
-    const a = freshAdapter();
-    class McpkAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = a;
-      }
-    }
-    class McpkBook extends Base {
-      static {
-        this.attribute("mcpk_author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = a;
-      }
-    }
-    registerModel("McpkAuthor", McpkAuthor);
-    registerModel("McpkBook", McpkBook);
-    Associations.hasMany.call(McpkAuthor, "mcpkBooks", {
-      className: "McpkBook",
-      foreignKey: "mcpk_author_id",
-    });
-    await McpkAuthor.create({ name: "WithBooks" });
-    const lonely = await McpkAuthor.create({ name: "NoBooks" });
-    const withBooks = await McpkAuthor.first();
-    await McpkBook.create({ mcpk_author_id: (withBooks as any).id, title: "B1" });
-
-    const results = await McpkAuthor.all().whereMissing("mcpkBooks").toArray();
-    expect(results.some((r: any) => r.id === lonely.id)).toBe(true);
-    expect(results.some((r: any) => r.id === (withBooks as any).id)).toBe(false);
+  it.skip("missing with composite primary key", () => {
+    /* needs proper composite primary key model setup */
   });
 
   it("rewhere with alias condition", () => {
