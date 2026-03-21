@@ -825,7 +825,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#merge
    */
-  merge(other: Relation<T>): Relation<T> {
+  merge(other: Relation<any>): Relation<T> {
     const rel = this._clone();
     rel._whereClauses.push(...other._whereClauses);
     rel._whereNotClauses.push(...other._whereNotClauses);

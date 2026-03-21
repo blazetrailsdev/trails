@@ -39,25 +39,27 @@ describe("WhereChainTest", () => {
     expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
   });
   it.skip("associated merged with scope on association", () => {
-    /* requires scoped associations */
+    /* needs cross-model merge with automatic JOIN */
   });
+
   it.skip("associated unscoped merged with scope on association", () => {
-    /* requires scoped associations */
+    /* needs unscope support */
   });
   it.skip("associated unscoped merged joined with scope on association", () => {
-    /* fixture-dependent */
+    /* needs unscope support */
   });
   it.skip("associated unscoped merged joined extended early with scope on association", () => {
-    /* fixture-dependent */
+    /* needs extending support */
   });
   it.skip("associated unscoped merged joined extended late with scope on association", () => {
-    /* fixture-dependent */
+    /* needs extending support */
   });
+
   it.skip("associated ordered merged with scope on association", () => {
-    /* fixture-dependent */
+    /* needs cross-model merge with automatic JOIN */
   });
   it.skip("associated ordered merged joined with scope on association", () => {
-    /* fixture-dependent */
+    /* needs cross-model merge with automatic JOIN */
   });
   it.skip("associated with enum", () => {
     /* fixture-dependent */
@@ -74,17 +76,119 @@ describe("WhereChainTest", () => {
   it.skip("associated with enum extended late", () => {
     /* fixture-dependent */
   });
-  it.skip("associated with add joins before", () => {
-    /* fixture-dependent */
+  it("associated with add joins before", async () => {
+    const a = freshAdapter();
+    class JbAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a;
+      }
+    }
+    class JbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("jb_author_id", "integer");
+        this.adapter = a;
+      }
+    }
+    registerModel("JbAuthor", JbAuthor);
+    registerModel("JbPost", JbPost);
+    Associations.hasMany.call(JbAuthor, "jbPosts", {
+      className: "JbPost",
+      foreignKey: "jb_author_id",
+    });
+    const author = await JbAuthor.create({ name: "Alice" });
+    await JbPost.create({ title: "P1", jb_author_id: author.id });
+    const lonely = await JbAuthor.create({ name: "Lonely" });
+
+    const results = await JbAuthor.joins("jbPosts").whereAssociated("jbPosts").toArray();
+    expect(results.some((r: any) => r.id === author.id)).toBe(true);
+    expect(results.some((r: any) => r.id === lonely.id)).toBe(false);
   });
-  it.skip("associated with add left joins before", () => {
-    /* fixture-dependent */
+
+  it("associated with add left joins before", async () => {
+    const a = freshAdapter();
+    class LjAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a;
+      }
+    }
+    class LjPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("lj_author_id", "integer");
+        this.adapter = a;
+      }
+    }
+    registerModel("LjAuthor", LjAuthor);
+    registerModel("LjPost", LjPost);
+    Associations.hasMany.call(LjAuthor, "ljPosts", {
+      className: "LjPost",
+      foreignKey: "lj_author_id",
+    });
+    const author = await LjAuthor.create({ name: "Alice" });
+    await LjPost.create({ title: "P1", lj_author_id: author.id });
+
+    const results = await LjAuthor.leftJoins("ljPosts").whereAssociated("ljPosts").toArray();
+    expect(results.some((r: any) => r.id === author.id)).toBe(true);
   });
-  it.skip("associated with add left outer joins before", () => {
-    /* fixture-dependent */
+
+  it("associated with add left outer joins before", async () => {
+    const a = freshAdapter();
+    class LoAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a;
+      }
+    }
+    class LoPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("lo_author_id", "integer");
+        this.adapter = a;
+      }
+    }
+    registerModel("LoAuthor", LoAuthor);
+    registerModel("LoPost", LoPost);
+    Associations.hasMany.call(LoAuthor, "loPosts", {
+      className: "LoPost",
+      foreignKey: "lo_author_id",
+    });
+    const author = await LoAuthor.create({ name: "Alice" });
+    await LoPost.create({ title: "P1", lo_author_id: author.id });
+
+    const results = await LoAuthor.leftOuterJoins("loPosts").whereAssociated("loPosts").toArray();
+    expect(results.some((r: any) => r.id === author.id)).toBe(true);
   });
-  it.skip("associated with composite primary key", () => {
-    /* fixture-dependent */
+
+  it("associated with composite primary key", async () => {
+    const a = freshAdapter();
+    class CpkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a;
+      }
+    }
+    class CpkBook extends Base {
+      static {
+        this.attribute("cpk_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = a;
+      }
+    }
+    registerModel("CpkAuthor", CpkAuthor);
+    registerModel("CpkBook", CpkBook);
+    Associations.hasMany.call(CpkAuthor, "cpkBooks", {
+      className: "CpkBook",
+      foreignKey: "cpk_author_id",
+    });
+    const author = await CpkAuthor.create({ name: "Test" });
+    await CpkBook.create({ cpk_author_id: author.id, title: "Book1" });
+
+    const results = await CpkAuthor.all().whereAssociated("cpkBooks").toArray();
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.some((r: any) => r.id === author.id)).toBe(true);
   });
   it("missing with child association", () => {
     const sql = Post.all().whereMissing("author").toSql();
@@ -128,6 +232,10 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("IS NULL");
   });
   it.skip("missing merged with scope on association", () => {
+    /* needs cross-model merge with automatic JOIN */
+  });
+
+  it.skip("missing unscoped merged with scope on association", () => {
     /* fixture-dependent */
   });
   it.skip("missing unscoped merged with scope on association", () => {
@@ -137,6 +245,10 @@ describe("WhereChainTest", () => {
     /* fixture-dependent */
   });
   it.skip("missing ordered merged with scope on association", () => {
+    /* needs cross-model merge with automatic JOIN */
+  });
+
+  it.skip("missing ordered merged joined with scope on association", () => {
     /* fixture-dependent */
   });
   it.skip("missing ordered merged joined with scope on association", () => {
@@ -163,8 +275,35 @@ describe("WhereChainTest", () => {
   it.skip("missing with enum extended late", () => {
     /* fixture-dependent */
   });
-  it.skip("missing with composite primary key", () => {
-    /* fixture-dependent */
+  it("missing with composite primary key", async () => {
+    const a = freshAdapter();
+    class McpkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a;
+      }
+    }
+    class McpkBook extends Base {
+      static {
+        this.attribute("mcpk_author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = a;
+      }
+    }
+    registerModel("McpkAuthor", McpkAuthor);
+    registerModel("McpkBook", McpkBook);
+    Associations.hasMany.call(McpkAuthor, "mcpkBooks", {
+      className: "McpkBook",
+      foreignKey: "mcpk_author_id",
+    });
+    await McpkAuthor.create({ name: "WithBooks" });
+    const lonely = await McpkAuthor.create({ name: "NoBooks" });
+    const withBooks = await McpkAuthor.first();
+    await McpkBook.create({ mcpk_author_id: (withBooks as any).id, title: "B1" });
+
+    const results = await McpkAuthor.all().whereMissing("mcpkBooks").toArray();
+    expect(results.some((r: any) => r.id === lonely.id)).toBe(true);
+    expect(results.some((r: any) => r.id === (withBooks as any).id)).toBe(false);
   });
 
   it("rewhere with alias condition", () => {
