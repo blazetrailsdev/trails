@@ -1660,7 +1660,9 @@ export class Relation<T extends Base> {
 
     const fallbackAssocs: string[] = [];
     for (const assocName of this._eagerLoadAssociations) {
-      const node = jd.addAssociation(assocName);
+      const node = assocName.includes(".")
+        ? jd.addNestedAssociation(assocName)
+        : jd.addAssociation(assocName);
       if (!node) fallbackAssocs.push(assocName);
     }
 

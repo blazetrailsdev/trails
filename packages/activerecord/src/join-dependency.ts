@@ -4,7 +4,7 @@
  *
  * Mirrors: ActiveRecord::Associations::JoinDependency
  *
- * Rails assigns each joined table a sequential index (t0, t1, t2...)
+ * Rails assigns each joined table a sequential alias (t0, t1, t2...)
  * and aliases every column as t{table}_r{col} to avoid name collisions.
  * After executing the query, each row is split back into per-table
  * attribute hashes and instantiated into the correct model.
@@ -20,12 +20,14 @@ import { modelRegistry } from "./associations.js";
 
 export interface JoinNode {
   tableIndex: number;
+  tableAlias: string;
   tableName: string;
   modelClass: typeof Base;
   columns: string[];
   assocName: string;
   assocType: "hasMany" | "hasOne" | "belongsTo";
   joinSql: string;
+  parentAssocName?: string;
 }
 
 export interface AliasMap {
@@ -36,7 +38,7 @@ export interface AliasMap {
 }
 
 function getModelColumns(modelClass: any): string[] {
-  const cols = modelClass.columnNames?.() ?? [];
+  const cols: string[] = modelClass.columnNames?.() ?? [];
   const pk = modelClass.primaryKey ?? "id";
   if (Array.isArray(pk)) {
     for (const k of pk) {
@@ -50,6 +52,7 @@ function getModelColumns(modelClass: any): string[] {
 
 export class JoinDependency {
   private _baseModel: typeof Base;
+  private _baseAlias: string;
   private _baseTableIndex = 0;
   private _nextTableIndex = 1;
   private _nodes: JoinNode[] = [];
@@ -57,6 +60,7 @@ export class JoinDependency {
 
   constructor(baseModel: typeof Base) {
     this._baseModel = baseModel;
+    this._baseAlias = (baseModel as any).tableName;
     this._buildBaseAliases();
   }
 
@@ -64,15 +68,21 @@ export class JoinDependency {
     return this._nodes;
   }
 
-  addAssociation(assocName: string): JoinNode | null {
-    const modelClass = this._baseModel as any;
+  addAssociation(
+    assocName: string,
+    options?: { fromModel?: any; fromAlias?: string; parentAssocName?: string },
+  ): JoinNode | null {
+    const modelClass = (options?.fromModel ?? this._baseModel) as any;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === assocName);
     if (!assocDef) return null;
 
-    const sourceTable = modelClass.tableName;
+    const sourceAlias = options?.fromAlias ?? this._baseAlias;
     const sourcePk = modelClass.primaryKey ?? "id";
+    if (Array.isArray(sourcePk)) return null;
+
     const tableIndex = this._nextTableIndex++;
+    const tableAlias = `t${tableIndex}`;
 
     let targetModel: typeof Base | undefined;
     let targetTable: string;
@@ -80,19 +90,24 @@ export class JoinDependency {
     const assocType: "hasMany" | "hasOne" | "belongsTo" = assocDef.type;
 
     if (assocDef.type === "belongsTo") {
-      if (assocDef.options.polymorphic) {
-        return null;
-      }
+      if (assocDef.options.polymorphic) return null;
       const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
       const className = assocDef.options.className ?? _camelize(assocName);
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       const targetPk = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
-      joinOn = `"${targetTable}"."${targetPk}" = "${sourceTable}"."${foreignKey}"`;
+      if (Array.isArray(targetPk)) return null;
+      joinOn = `"${tableAlias}"."${targetPk}" = "${sourceAlias}"."${foreignKey}"`;
     } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
       if (assocDef.options.through) {
-        return this._addThroughAssociation(assocDef, sourceTable, sourcePk);
+        return this._addThroughAssociation(
+          assocDef,
+          modelClass,
+          sourceAlias,
+          sourcePk,
+          options?.parentAssocName,
+        );
       }
       const className =
         assocDef.options.className ??
@@ -102,25 +117,42 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
       const primaryKey = assocDef.options.primaryKey ?? sourcePk;
-      joinOn = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${primaryKey}"`;
+      joinOn = `"${tableAlias}"."${foreignKey}" = "${sourceAlias}"."${primaryKey}"`;
 
       if (assocDef.options.as) {
         const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        joinOn += ` AND "${targetTable}"."${typeCol}" = '${modelClass.name}'`;
+        joinOn += ` AND "${tableAlias}"."${typeCol}" = '${modelClass.name}'`;
       }
     } else {
       return null;
     }
 
+    // Apply association scope as additional ON conditions
+    if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
+      const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
+      const scopeSql = scopeRel?.toSql?.();
+      if (scopeSql) {
+        const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
+        if (whereMatch) {
+          const scopeWhere = whereMatch[1].replace(
+            new RegExp(`"${targetTable}"`, "g"),
+            `"${tableAlias}"`,
+          );
+          joinOn += ` AND ${scopeWhere}`;
+        }
+      }
+    }
+
     const columns = getModelColumns(targetModel);
     const node: JoinNode = {
       tableIndex,
+      tableAlias,
       tableName: targetTable!,
       modelClass: targetModel!,
       columns,
-      assocName,
+      assocName: options?.parentAssocName ? `${options.parentAssocName}.${assocName}` : assocName,
       assocType,
-      joinSql: `LEFT OUTER JOIN "${targetTable!}" ON ${joinOn}`,
+      joinSql: `LEFT OUTER JOIN "${targetTable!}" "${tableAlias}" ON ${joinOn}`,
     };
 
     for (let i = 0; i < columns.length; i++) {
@@ -136,14 +168,42 @@ export class JoinDependency {
     return node;
   }
 
+  /**
+   * Add a nested association path like "comments.author".
+   * Walks the chain, adding JOINs for each segment.
+   */
+  addNestedAssociation(path: string): JoinNode | null {
+    const parts = path.split(".");
+    if (parts.length === 1) return this.addAssociation(parts[0]);
+
+    let currentModel = this._baseModel as any;
+    let currentAlias = this._baseAlias;
+    let lastNode: JoinNode | null = null;
+    let parentPath = "";
+
+    for (const part of parts) {
+      const node = this.addAssociation(part, {
+        fromModel: currentModel,
+        fromAlias: currentAlias,
+        parentAssocName: parentPath || undefined,
+      });
+      if (!node) return null;
+      lastNode = node;
+      currentModel = node.modelClass;
+      currentAlias = node.tableAlias;
+      parentPath = parentPath ? `${parentPath}.${part}` : part;
+    }
+    return lastNode;
+  }
+
   buildSelectSql(): string {
     return this._aliases
       .map((a) => {
-        const tableName =
+        const tableAlias =
           a.tableIndex === this._baseTableIndex
-            ? (this._baseModel as any).tableName
-            : this._nodes.find((n) => n.tableIndex === a.tableIndex)!.tableName;
-        return `"${tableName}"."${a.column}" AS "${a.alias}"`;
+            ? this._baseAlias
+            : this._nodes.find((n) => n.tableIndex === a.tableIndex)!.tableAlias;
+        return `"${tableAlias}"."${a.column}" AS "${a.alias}"`;
       })
       .join(", ");
   }
@@ -223,10 +283,11 @@ export class JoinDependency {
 
   private _addThroughAssociation(
     assocDef: any,
-    sourceTable: string,
+    modelClass: any,
+    sourceAlias: string,
     sourcePk: string,
+    parentAssocName?: string,
   ): JoinNode | null {
-    const modelClass = this._baseModel as any;
     const associations: any[] = modelClass._associations ?? [];
     const throughAssocDef = associations.find((a: any) => a.name === assocDef.options.through);
     if (!throughAssocDef) return null;
@@ -236,18 +297,19 @@ export class JoinDependency {
     const throughModel = modelRegistry.get(throughClassName) as typeof Base | undefined;
     if (!throughModel) return null;
     const throughTable = (throughModel as any).tableName;
+    const throughTableIndex = this._nextTableIndex++;
+    const throughAlias = `t${throughTableIndex}`;
 
     const throughFk = throughAssocDef.options.as
       ? (throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughAssocDef.options.as)}_id`)
       : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
 
-    const throughJoinOn = `"${throughTable}"."${throughFk}" = "${sourceTable}"."${sourcePk}"`;
-    let throughJoinSql = `LEFT OUTER JOIN "${throughTable}" ON ${throughJoinOn}`;
-
+    let throughJoinOn = `"${throughAlias}"."${throughFk}" = "${sourceAlias}"."${sourcePk}"`;
     if (throughAssocDef.options.as) {
       const typeCol = `${_toUnderscore(throughAssocDef.options.as)}_type`;
-      throughJoinSql = `LEFT OUTER JOIN "${throughTable}" ON ${throughJoinOn} AND "${throughTable}"."${typeCol}" = '${modelClass.name}'`;
+      throughJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${modelClass.name}'`;
     }
+    const throughJoinSql = `LEFT OUTER JOIN "${throughTable}" "${throughAlias}" ON ${throughJoinOn}`;
 
     const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
     const throughAssocs: any[] = (throughModel as any)._associations ?? [];
@@ -256,6 +318,8 @@ export class JoinDependency {
     let targetModel: typeof Base | undefined;
     let targetTable: string;
     let targetJoinOn: string;
+    const targetTableIndex = this._nextTableIndex++;
+    const targetAlias = `t${targetTableIndex}`;
 
     if (sourceAssocDef?.type === "belongsTo") {
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
@@ -264,7 +328,7 @@ export class JoinDependency {
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
-      targetJoinOn = `"${targetTable}"."${targetPk}" = "${throughTable}"."${targetFk}"`;
+      targetJoinOn = `"${targetAlias}"."${targetPk}" = "${throughAlias}"."${targetFk}"`;
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
@@ -273,10 +337,25 @@ export class JoinDependency {
       const targetFk =
         sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`;
       const throughPk = (throughModel as any).primaryKey ?? "id";
-      targetJoinOn = `"${targetTable}"."${targetFk}" = "${throughTable}"."${throughPk}"`;
+      targetJoinOn = `"${targetAlias}"."${targetFk}" = "${throughAlias}"."${throughPk}"`;
     }
 
-    const targetTableIndex = this._nextTableIndex++;
+    // Apply association scope
+    if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
+      const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
+      const scopeSql = scopeRel?.toSql?.();
+      if (scopeSql) {
+        const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
+        if (whereMatch) {
+          const scopeWhere = whereMatch[1].replace(
+            new RegExp(`"${targetTable}"`, "g"),
+            `"${targetAlias}"`,
+          );
+          targetJoinOn += ` AND ${scopeWhere}`;
+        }
+      }
+    }
+
     const targetColumns = getModelColumns(targetModel);
 
     for (let i = 0; i < targetColumns.length; i++) {
@@ -288,14 +367,17 @@ export class JoinDependency {
       });
     }
 
+    const fullAssocName = parentAssocName ? `${parentAssocName}.${assocDef.name}` : assocDef.name;
+
     const node: JoinNode = {
       tableIndex: targetTableIndex,
+      tableAlias: targetAlias,
       tableName: targetTable,
       modelClass: targetModel,
       columns: targetColumns,
-      assocName: assocDef.name,
+      assocName: fullAssocName,
       assocType: assocDef.type,
-      joinSql: `${throughJoinSql} LEFT OUTER JOIN "${targetTable}" ON ${targetJoinOn}`,
+      joinSql: `${throughJoinSql} LEFT OUTER JOIN "${targetTable}" "${targetAlias}" ON ${targetJoinOn}`,
     };
 
     this._nodes.push(node);
