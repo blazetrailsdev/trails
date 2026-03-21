@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { underscore, pluralize } from "@rails-ts/activesupport";
 import { modelRegistry } from "./associations.js";
 
 /**
@@ -45,11 +46,6 @@ export class AssociationReflection {
     } else if (macro === "belongsTo") {
       this.foreignKey = `${name}_id`;
     } else {
-      const underscore = (n: string) =>
-        n
-          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-          .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-          .toLowerCase();
       this.foreignKey = `${underscore(ownerClass.name)}_id`;
     }
   }
@@ -81,11 +77,6 @@ export class AssociationReflection {
       return `${this.name}_type`;
     }
     if (this.options.as) {
-      const underscore = (n: string) =>
-        n
-          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-          .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-          .toLowerCase();
       return `${underscore(this.options.as as string)}_type`;
     }
     return null;
@@ -99,9 +90,9 @@ export class AssociationReflection {
   get joinTable(): string | null {
     if (this.macro !== "hasAndBelongsToMany") return null;
     if (this.options.joinTable) return this.options.joinTable as string;
-    const ownerTable = this._ownerClass.tableName;
-    const targetTable = this.klass.tableName;
-    return [ownerTable, targetTable].sort().join("_");
+    const ownerKey = pluralize(underscore(this._ownerClass.name));
+    const assocKey = underscore(this.name);
+    return [ownerKey, assocKey].sort().join("_");
   }
 
   private _ownerClass: typeof Base;
@@ -192,18 +183,23 @@ export function columnNames(modelClass: typeof Base): string[] {
 export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
   const pk = modelClass.primaryKey;
   const pkCols = Array.isArray(pk) ? pk : [pk];
-  const excludeNames = new Set([
+  const inheritanceColumn = (modelClass as any).inheritanceColumn;
+  const lockingColumn = (modelClass as any).lockingColumn ?? "lock_version";
+  const excludeNames = new Set<string>([
     ...pkCols,
-    "type",
-    (modelClass as any).lockingColumn ?? "lock_version",
+    lockingColumn,
+    ...(inheritanceColumn ? [inheritanceColumn] : []),
   ]);
 
   // Also exclude foreign keys from associations
   const associations: any[] = (modelClass as any)._associations ?? [];
   for (const assoc of associations) {
     if (assoc.type === "belongsTo") {
-      const fk = assoc.options.foreignKey ?? `${assoc.name}_id`;
-      excludeNames.add(fk);
+      const fkOption = assoc.options.foreignKey;
+      const fks = Array.isArray(fkOption) ? fkOption : [fkOption ?? `${assoc.name}_id`];
+      for (const fk of fks) {
+        excludeNames.add(fk);
+      }
       if (assoc.options.polymorphic) {
         excludeNames.add(`${assoc.name}_type`);
       }
@@ -256,8 +252,21 @@ export function reflectOnAllAssociations(
   const associations: any[] = (modelClass as any)._associations ?? [];
   const filtered = macro ? associations.filter((a) => a.type === macro) : associations;
 
-  return filtered.map(
-    (assocDef) =>
-      new AssociationReflection(assocDef.name, assocDef.type as any, assocDef.options, modelClass),
-  );
+  return filtered.map((assocDef) => {
+    if (
+      assocDef.options.through ||
+      assocDef.type === "hasManyThrough" ||
+      assocDef.type === "hasOneThrough"
+    ) {
+      const macro =
+        assocDef.type === "hasOneThrough" || assocDef.type === "hasOne" ? "hasOne" : "hasMany";
+      return new ThroughReflection(assocDef.name, macro as any, assocDef.options, modelClass);
+    }
+    return new AssociationReflection(
+      assocDef.name,
+      assocDef.type as any,
+      assocDef.options,
+      modelClass,
+    );
+  });
 }
