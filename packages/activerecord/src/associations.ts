@@ -1222,6 +1222,7 @@ export class CollectionProxy {
     const foreignKey = asName
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
       : (this._assocDef.options.foreignKey ??
+        this._assocDef.options.queryConstraints ??
         (Array.isArray(primaryKey)
           ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
@@ -1238,6 +1239,11 @@ export class CollectionProxy {
           record.writeAttribute(foreignKey[i], this._record.readAttribute(primaryKey[i] as string));
         }
       } else {
+        if (Array.isArray(primaryKey)) {
+          throw new Error(
+            `Association "${this._assocName}" with composite primaryKey requires a composite foreignKey array`,
+          );
+        }
         const pkValue = this._record.readAttribute(primaryKey as string);
         record.writeAttribute(foreignKey as string, pkValue);
       }
@@ -1355,6 +1361,7 @@ export class CollectionProxy {
     const foreignKey = asName
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
       : (this._assocDef.options.foreignKey ??
+        this._assocDef.options.queryConstraints ??
         (Array.isArray(ownerPk)
           ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
@@ -1738,6 +1745,7 @@ export function setBelongsTo(
   const primaryKey = options.primaryKey ?? targetCtor?.primaryKey ?? "id";
   const foreignKey =
     options.foreignKey ??
+    options.queryConstraints ??
     (Array.isArray(primaryKey)
       ? primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
       : `${underscore(assocName)}_id`);
