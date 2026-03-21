@@ -119,8 +119,12 @@ export class JoinDependency {
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
-      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+      const foreignKey = assocDef.options.as
+        ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
+        : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+      if (Array.isArray(foreignKey)) return null;
       const primaryKey = assocDef.options.primaryKey ?? sourcePk;
+      if (Array.isArray(primaryKey)) return null;
       joinOn = `"${tableAlias}"."${foreignKey}" = "${sourceAlias}"."${primaryKey}"`;
 
       if (assocDef.options.as) {
