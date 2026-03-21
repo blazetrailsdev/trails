@@ -1,10 +1,12 @@
 import { describe, it } from "vitest";
 
-describe("NestedErrorTest", () => {
+describe("AssociationsNestedErrorInAssociationOrderTest", () => {
   it.skip("index in association order", () => {
     /* needs NestedError class and index_errors support */
   });
+});
 
+describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
   it.skip("index in nested attributes order", () => {
     /* needs NestedError class and index_errors support */
   });

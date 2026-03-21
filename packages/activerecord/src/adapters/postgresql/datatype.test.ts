@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgreSQLInternalDatatypeTest", () => {
+  describe("PostgreSQLDatatypeTest", () => {
     it.skip("money column", async () => {});
     it.skip("number column", async () => {});
     it.skip("time column", async () => {});
@@ -30,6 +30,9 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("oid values", async () => {});
     it.skip("update oid", async () => {});
     it.skip("text columns are limitless the upper limit is one GB", async () => {});
+  });
+
+  describe("PostgreSQLInternalDatatypeTest", () => {
     it.skip("name column type", async () => {});
     it.skip("char column type", async () => {});
   });
