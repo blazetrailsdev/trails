@@ -575,14 +575,12 @@ describe("ReflectionTest", () => {
   it("join table with common prefix", () => {
     class CatalogCategory extends Base {
       static {
-        this._tableName = "catalog_categories";
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
     class CatalogProduct extends Base {
       static {
-        this._tableName = "catalog_products";
         this.attribute("name", "string");
         this.adapter = adapter;
       }
@@ -599,14 +597,12 @@ describe("ReflectionTest", () => {
   it("join table with different prefix", () => {
     class CatCategory extends Base {
       static {
-        this._tableName = "catalog_categories";
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
     class ContentPage extends Base {
       static {
-        this._tableName = "content_pages";
         this.attribute("name", "string");
         this.adapter = adapter;
       }
@@ -617,20 +613,19 @@ describe("ReflectionTest", () => {
       className: "CatCategory",
     });
     const ref = reflectOnAssociation(ContentPage, "catCategories");
+    // Join table derived from model names: pluralize(underscore("ContentPage")) + underscore("catCategories")
     expect(ref!.joinTable).toBe("cat_categories_content_pages");
   });
 
   it("join table can be overridden", () => {
     class JtCategory extends Base {
       static {
-        this._tableName = "categories";
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
     class JtProduct extends Base {
       static {
-        this._tableName = "products";
         this.attribute("name", "string");
         this.adapter = adapter;
       }

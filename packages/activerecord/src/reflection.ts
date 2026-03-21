@@ -29,13 +29,8 @@ export class AssociationReflection {
     if (options.className) {
       this.className = options.className as string;
     } else if (macro === "hasMany" || macro === "hasAndBelongsToMany") {
-      const singularize = (w: string) => {
-        if (w.endsWith("ies")) return w.slice(0, -3) + "y";
-        if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
-        if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
-        return w;
-      };
-      this.className = singularize(name).charAt(0).toUpperCase() + singularize(name).slice(1);
+      const singular = singularize(name);
+      this.className = singular.charAt(0).toUpperCase() + singular.slice(1);
     } else {
       this.className = name.charAt(0).toUpperCase() + name.slice(1);
     }
