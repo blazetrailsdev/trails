@@ -1666,6 +1666,17 @@ export class Relation<T extends Base> {
       if (!node) fallbackAssocs.push(assocName);
     }
 
+    // If no associations could be JOINed, fall back entirely to preload
+    if (jd.nodes.length === 0) {
+      const sql = this._toSql();
+      const rows = await this._modelClass.adapter.execute(sql);
+      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+      if (fallbackAssocs.length > 0) {
+        await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+      }
+      return;
+    }
+
     const table = this._modelClass.arelTable;
     const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
 
@@ -1718,12 +1729,27 @@ export class Relation<T extends Base> {
       }
       const pk = parent.readAttribute(basePk);
       const assocs = associations.get(pk);
+      const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
       for (const node of jd.nodes) {
         const children = assocs?.get(node.assocName) ?? [];
-        if (node.assocType === "hasOne" || node.assocType === "belongsTo") {
+        const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
+        if (isSingular) {
           (parent as any)._preloadedAssociations.set(node.immediateAssocName, children[0] ?? null);
         } else {
           (parent as any)._preloadedAssociations.set(node.immediateAssocName, children);
+        }
+
+        // Populate inverse caches on children
+        const assocDef = modelAssocs.find((a: any) => a.name === node.immediateAssocName);
+        const inverseName = assocDef?.options?.inverseOf;
+        if (inverseName) {
+          const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
+          for (const child of targets) {
+            if (!(child as any)._cachedAssociations) {
+              (child as any)._cachedAssociations = new Map();
+            }
+            (child as any)._cachedAssociations.set(inverseName, parent);
+          }
         }
       }
     }
