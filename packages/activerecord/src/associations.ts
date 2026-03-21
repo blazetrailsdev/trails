@@ -1752,6 +1752,11 @@ export function setBelongsTo(
         record.writeAttribute(foreignKey[i], target.readAttribute(pkCols[i]));
       }
     } else {
+      if (Array.isArray(primaryKey)) {
+        throw new Error(
+          `belongs_to "${assocName}" has a single foreignKey but the target model has a composite primaryKey. Provide an explicit foreignKey array or primaryKey option.`,
+        );
+      }
       record.writeAttribute(foreignKey as string, target.readAttribute(primaryKey as string));
     }
     if (options.polymorphic) {
