@@ -9,8 +9,8 @@ import type { DatabaseAdapter } from "./adapter.js";
  */
 export class Rollback extends Error {
   constructor() {
-    super("ActiveRecord::Rollback");
-    this.name = "ActiveRecord::Rollback";
+    super("Rollback");
+    this.name = "Rollback";
   }
 }
 
@@ -81,7 +81,7 @@ let _savepointCounter = 0;
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: Transaction) => Promise<T>,
-): Promise<T> {
+): Promise<T | undefined> {
   const adapter = modelClass.adapter;
   const tx = new Transaction(adapter);
   const previousTx = _currentTransaction;
@@ -114,7 +114,7 @@ export async function transaction<T>(
     _currentTransaction = previousTx;
     await tx.runAfterRollbackCallbacks();
     if (error instanceof Rollback) {
-      return undefined as T;
+      return undefined;
     }
     throw error;
   }
