@@ -44,7 +44,7 @@ export class AssociationReflection {
     if (options.foreignKey) {
       this.foreignKey = options.foreignKey as string;
     } else if (macro === "belongsTo") {
-      this.foreignKey = `${name}_id`;
+      this.foreignKey = `${underscore(name)}_id`;
     } else {
       this.foreignKey = `${underscore(ownerClass.name)}_id`;
     }
@@ -75,7 +75,7 @@ export class AssociationReflection {
     if (!this.options.polymorphic && !this.options.as) return null;
     if (this.options.foreignType) return this.options.foreignType as string;
     if (this.macro === "belongsTo") {
-      return `${this.name}_type`;
+      return `${underscore(this.name)}_type`;
     }
     if (this.options.as) {
       return `${underscore(this.options.as as string)}_type`;
