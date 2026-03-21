@@ -1686,7 +1686,38 @@ describe("EagerAssociationTest", () => {
     const preloaded = (children[0] as any)._preloadedAssociations.get("eagerStrBtParent");
     expect(preloaded?.readAttribute("name")).toBe("P");
   });
-  it.skip("eager association loading with explicit join", () => {});
+  it("eager association loading with explicit join", async () => {
+    class EjAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ej_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(EjAuthor, "ejPosts", {
+      className: "EjPost",
+      foreignKey: "ej_author_id",
+    });
+    registerModel(EjAuthor);
+    registerModel(EjPost);
+
+    const alice = await EjAuthor.create({ name: "Alice" });
+    await EjPost.create({ title: "P1", ej_author_id: alice.id });
+    await EjPost.create({ title: "P2", ej_author_id: alice.id });
+
+    const authors = await EjAuthor.all().eagerLoad("ejPosts").toArray();
+    expect(authors).toHaveLength(1);
+    const posts = (authors[0] as any)._preloadedAssociations?.get("ejPosts");
+    expect(posts).toHaveLength(2);
+    const titles = posts.map((p: any) => p.readAttribute("title")).sort();
+    expect(titles).toEqual(["P1", "P2"]);
+  });
   it("eager with has many through", async () => {
     class EagerHmtReader extends Base {
       static {

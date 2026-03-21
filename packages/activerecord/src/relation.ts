@@ -1614,9 +1614,14 @@ export class Relation<T extends Base> {
     if (this._isNone) return [];
     if (this._loaded) return [...this._records];
 
-    const sql = this._toSql();
-    const rows = await this._modelClass.adapter.execute(sql);
-    this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+    // Eager load via single JOIN query when eager_load associations are specified
+    if (this._eagerLoadAssociations.length > 0) {
+      await this._executeEagerLoad();
+    } else {
+      const sql = this._toSql();
+      const rows = await this._modelClass.adapter.execute(sql);
+      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+    }
     this._loaded = true;
 
     // Apply readonly and strict_loading flags to loaded records
@@ -1631,17 +1636,53 @@ export class Relation<T extends Base> {
       }
     }
 
-    // Preload associations if requested
-    const allAssocs = [
-      ...this._includesAssociations,
-      ...this._preloadAssociations,
-      ...this._eagerLoadAssociations,
-    ];
-    if (allAssocs.length > 0 && this._records.length > 0) {
-      await this._preloadAssociationsForRecords(this._records, allAssocs);
+    // Preload associations via separate queries (includes + preload)
+    const preloadAssocs = [...this._includesAssociations, ...this._preloadAssociations];
+    if (preloadAssocs.length > 0 && this._records.length > 0) {
+      await this._preloadAssociationsForRecords(this._records, preloadAssocs);
     }
 
     return [...this._records];
+  }
+
+  private async _executeEagerLoad(): Promise<void> {
+    const { JoinDependency } = await import("./join-dependency.js");
+    const jd = new JoinDependency(this._modelClass);
+
+    for (const assocName of this._eagerLoadAssociations) {
+      jd.addAssociation(assocName);
+    }
+
+    const baseSql = this._toSql();
+    const whereMatch = baseSql.match(
+      /\bWHERE\s+(.*?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+GROUP\s+BY|\s*$)/i,
+    );
+    const orderMatch = baseSql.match(/\bORDER\s+BY\s+(.*?)(?:\s+LIMIT|\s*$)/i);
+    const sql = jd.buildFullSql(whereMatch?.[1], orderMatch?.[1]);
+    const rows = await this._modelClass.adapter.execute(sql);
+
+    const { parents, associations } = jd.instantiateFromRows(rows);
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+
+    for (const parent of parents) {
+      if (!(parent as any)._preloadedAssociations) {
+        (parent as any)._preloadedAssociations = new Map();
+      }
+      const pk = parent.readAttribute(basePk);
+      const assocs = associations.get(pk);
+      if (assocs) {
+        for (const node of jd.nodes) {
+          const children = assocs.get(node.assocName) ?? [];
+          if (node.assocType === "hasOne" || node.assocType === "belongsTo") {
+            (parent as any)._preloadedAssociations.set(node.assocName, children[0] ?? null);
+          } else {
+            (parent as any)._preloadedAssociations.set(node.assocName, children);
+          }
+        }
+      }
+    }
+
+    this._records = parents as T[];
   }
 
   /**
