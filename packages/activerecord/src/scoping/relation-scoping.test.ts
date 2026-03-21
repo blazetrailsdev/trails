@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound } from "../index.js";
+import { Base, Range, RecordNotFound } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -317,7 +317,6 @@ describe("RelationScopingTest", () => {
   });
 
   it("scoped create with where with range", async () => {
-    const { Range } = await import("../index.js");
     const Developer = makeDeveloper();
     await Developer.create({ name: "Alice", salary: 50000 });
     await Developer.create({ name: "Bob", salary: 80000 });
