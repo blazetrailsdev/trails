@@ -6412,7 +6412,7 @@ describe("CalculationsTest", () => {
   });
 
   // Rails guide: i18nScope
-  it("i18nScope returns 'activerecord' on Base", () => {
+  it("i18nScope returns 'activemodel' on Model", () => {
     // Base overrides Model's i18nScope to return "activerecord"
     const adapter = createTestAdapter();
     class User extends Base {
