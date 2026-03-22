@@ -43,7 +43,7 @@ describeIfPg("PostgresAdapter", () => {
       const rows = await adapter.execute(
         `SELECT "inet_address" FROM "postgresql_network_addresses" ORDER BY "id" DESC LIMIT 1`,
       );
-      expect(rows[0].inet_address).toBe("172.16.1.254/32");
+      expect(rows[0].inet_address).toBe("172.16.1.254");
     });
 
     it("inet where", async () => {
@@ -93,7 +93,7 @@ describeIfPg("PostgresAdapter", () => {
         `SELECT * FROM "postgresql_network_addresses" ORDER BY "id" DESC LIMIT 1`,
       );
       expect(rows[0].cidr_address).toBe("192.168.0.0/24");
-      expect(rows[0].inet_address).toBe("172.16.1.254/32");
+      expect(rows[0].inet_address).toBe("172.16.1.254");
       expect(rows[0].mac_address).toBe("01:23:45:67:89:0a");
 
       await adapter.executeMutation(
