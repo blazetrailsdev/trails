@@ -230,10 +230,14 @@ export class Migrator {
     }
   }
 
+  private _schemaTableEnsured = false;
+
   private async _ensureSchemaTable(): Promise<void> {
+    if (this._schemaTableEnsured) return;
     await this._adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS "${this._schemaTableName}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
     );
+    this._schemaTableEnsured = true;
   }
 
   private async _appliedVersions(): Promise<Set<string>> {
