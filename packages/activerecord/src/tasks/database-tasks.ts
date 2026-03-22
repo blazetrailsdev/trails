@@ -121,6 +121,8 @@ export class DatabaseTasks {
 
   static async migrate(version?: number | string): Promise<void> {
     this.checkTargetVersion(version);
+    // Migration execution is not yet implemented — needs MigrationRunner
+    // integration with file discovery and version tracking.
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {
