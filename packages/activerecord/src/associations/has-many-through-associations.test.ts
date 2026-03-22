@@ -2110,19 +2110,35 @@ describe("HasManyThroughAssociationsTest", () => {
     class CcDTagging extends Base {
       static {
         this.attribute("cc_d_owner_id", "integer");
+        this.attribute("cc_d_tag_id", "integer");
         this.adapter = adapter;
       }
     }
+    class CcDTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CcDOwner, "ccDTaggings", {
+      className: "CcDTagging",
+      foreignKey: "cc_d_owner_id",
+    });
+    Associations.hasMany.call(CcDOwner, "ccDTags", { through: "ccDTaggings", source: "ccDTag" });
     Associations.belongsTo.call(CcDTagging, "ccDOwner", {
       foreignKey: "cc_d_owner_id",
       counterCache: "taggings_count",
     });
+    Associations.belongsTo.call(CcDTagging, "ccDTag", { foreignKey: "cc_d_tag_id" });
     registerModel(CcDOwner);
     registerModel(CcDTagging);
+    registerModel(CcDTag);
 
     const owner = await CcDOwner.create({ name: "Owner" });
-    const tagging = await CcDTagging.create({ cc_d_owner_id: owner.id });
+    const tag = await CcDTag.create({ name: "Tag1" });
+    const tagging = await CcDTagging.create({ cc_d_owner_id: owner.id, cc_d_tag_id: tag.id });
     expect((await CcDOwner.find(owner.id)).readAttribute("taggings_count")).toBe(1);
+    // Destroy the through record (join model), which should decrement the counter
     await tagging.destroy();
     expect((await CcDOwner.find(owner.id)).readAttribute("taggings_count")).toBe(0);
   });

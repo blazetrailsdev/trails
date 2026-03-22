@@ -1119,6 +1119,9 @@ describe("HasOneAssociationsTest", () => {
         ? timeAfterCreate.getTime()
         : Number(new Date(String(timeAfterCreate)));
 
+    // Ensure time advances so we can detect the touch
+    await new Promise((r) => setTimeout(r, 10));
+
     acct.writeAttribute("credit_limit", 200);
     await acct.save();
     const afterUpdate = await TouchUpdFirm.find(firm.id);
@@ -1127,7 +1130,7 @@ describe("HasOneAssociationsTest", () => {
       timeAfterUpdate instanceof Date
         ? timeAfterUpdate.getTime()
         : Number(new Date(String(timeAfterUpdate)));
-    expect(updateTime).toBeGreaterThanOrEqual(createTime);
+    expect(updateTime).toBeGreaterThan(createTime);
   });
 
   it.skip("has one with touch option on touch", () => {
