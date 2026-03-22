@@ -37,11 +37,11 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("inet write", async () => {
-      await adapter.executeMutation(
+      const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_network_addresses" ("inet_address") VALUES ('172.16.1.254/32')`,
       );
       const rows = await adapter.execute(
-        `SELECT "inet_address" FROM "postgresql_network_addresses" ORDER BY "id" DESC LIMIT 1`,
+        `SELECT "inet_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
       );
       expect(rows[0].inet_address).toBe("172.16.1.254");
     });
@@ -85,12 +85,12 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("network types", async () => {
-      await adapter.executeMutation(
+      const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_network_addresses" ("cidr_address", "inet_address", "mac_address")
          VALUES ('192.168.0.0/24', '172.16.1.254/32', '01:23:45:67:89:0a')`,
       );
       const rows = await adapter.execute(
-        `SELECT * FROM "postgresql_network_addresses" ORDER BY "id" DESC LIMIT 1`,
+        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
       );
       expect(rows[0].cidr_address).toBe("192.168.0.0/24");
       expect(rows[0].inet_address).toBe("172.16.1.254");
@@ -118,29 +118,29 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("cidr change prefix", async () => {
-      await adapter.executeMutation(
+      const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_network_addresses" ("cidr_address") VALUES ('192.168.1.0/24')`,
       );
       const rows = await adapter.execute(
-        `SELECT * FROM "postgresql_network_addresses" ORDER BY "id" DESC LIMIT 1`,
+        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
       );
       expect(rows[0].cidr_address).toBe("192.168.1.0/24");
 
       await adapter.executeMutation(
-        `UPDATE "postgresql_network_addresses" SET "cidr_address" = '192.168.1.0/25' WHERE "id" = ${rows[0].id}`,
+        `UPDATE "postgresql_network_addresses" SET "cidr_address" = '192.168.1.0/25' WHERE "id" = ${id}`,
       );
       const updated = await adapter.execute(
-        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ${rows[0].id}`,
+        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
       );
       expect(updated[0].cidr_address).toBe("192.168.1.0/25");
     });
 
     it("mac address change case does not mark dirty", async () => {
-      await adapter.executeMutation(
+      const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_network_addresses" ("mac_address") VALUES ('Ab:Cd:Ef:01:02:03')`,
       );
       const rows = await adapter.execute(
-        `SELECT "mac_address" FROM "postgresql_network_addresses" ORDER BY "id" DESC LIMIT 1`,
+        `SELECT "mac_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
       );
       // PG normalizes macaddr to lowercase
       expect(rows[0].mac_address).toBe("ab:cd:ef:01:02:03");
