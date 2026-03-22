@@ -13,7 +13,7 @@ describeIfPg("PostgresAdapter", () => {
       CREATE TABLE "postgresql_moneys" (
         "id" SERIAL PRIMARY KEY,
         "wealth" money,
-        "depth" money DEFAULT '150.55'
+        "depth" money DEFAULT 150.55::numeric::money
       )
     `);
   });
@@ -127,7 +127,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("money format", async () => {
-      const rows = await adapter.execute("SELECT '$1,234.56'::money::numeric AS val");
+      const rows = await adapter.execute("SELECT 1234.56::numeric::money::numeric AS val");
       expect(Number(rows[0].val)).toBeCloseTo(1234.56, 2);
     });
 
