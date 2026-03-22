@@ -49,15 +49,16 @@ export class Migrator {
    *
    * Mirrors: ActiveRecord::Migrator#migrate
    */
-  async migrate(targetVersion?: number | null): Promise<void> {
+  async migrate(targetVersion?: number | string | null): Promise<void> {
     await this._ensureSchemaTable();
 
     if (targetVersion !== undefined && targetVersion !== null) {
       this._validateTargetVersion(targetVersion);
-      const current = await this.currentVersion();
-      if (targetVersion > current) {
+      const target = BigInt(targetVersion);
+      const current = BigInt(await this.currentVersion());
+      if (target > current) {
         await this._migrateUp(targetVersion);
-      } else if (targetVersion < current) {
+      } else if (target < current) {
         await this._migrateDown(targetVersion);
       }
     } else {
@@ -70,7 +71,7 @@ export class Migrator {
    *
    * Mirrors: ActiveRecord::Migrator.up
    */
-  async up(targetVersion?: number | null): Promise<void> {
+  async up(targetVersion?: number | string | null): Promise<void> {
     await this._ensureSchemaTable();
     await this._migrateUp(targetVersion ?? null);
   }
@@ -80,7 +81,7 @@ export class Migrator {
    *
    * Mirrors: ActiveRecord::Migrator.down
    */
-  async down(targetVersion?: number | null): Promise<void> {
+  async down(targetVersion?: number | string | null): Promise<void> {
     await this._ensureSchemaTable();
     await this._migrateDown(targetVersion ?? 0);
   }
@@ -135,11 +136,6 @@ export class Migrator {
     for (const v of versions) {
       const bv = BigInt(v);
       if (bv > max) max = bv;
-    }
-    if (max > BigInt(Number.MAX_SAFE_INTEGER)) {
-      throw new Error(
-        `Current migration version ${max} exceeds Number.MAX_SAFE_INTEGER. Use string-based version APIs.`,
-      );
     }
     return Number(max);
   }
@@ -252,13 +248,19 @@ export class Migrator {
     return new Set(rows.map((r) => String(r.version)));
   }
 
-  private _validateTargetVersion(v: number): void {
-    if (!Number.isInteger(v) || v < 0 || v > Number.MAX_SAFE_INTEGER) {
-      throw new Error(`Invalid target version: ${v}. Must be a non-negative safe integer.`);
+  private _validateTargetVersion(v: number | string): void {
+    if (typeof v === "string") {
+      if (!/^\d+$/.test(v)) {
+        throw new Error(`Invalid target version: ${v}. Must be a non-negative numeric value.`);
+      }
+    } else {
+      if (!Number.isInteger(v) || v < 0) {
+        throw new Error(`Invalid target version: ${v}. Must be a non-negative integer.`);
+      }
     }
   }
 
-  private async _migrateUp(targetVersion: number | null): Promise<void> {
+  private async _migrateUp(targetVersion: number | string | null): Promise<void> {
     if (targetVersion !== null) this._validateTargetVersion(targetVersion);
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
@@ -270,7 +272,7 @@ export class Migrator {
     }
   }
 
-  private async _migrateDown(targetVersion: number): Promise<void> {
+  private async _migrateDown(targetVersion: number | string): Promise<void> {
     this._validateTargetVersion(targetVersion);
     const target = BigInt(targetVersion);
     const applied = await this._appliedVersions();
