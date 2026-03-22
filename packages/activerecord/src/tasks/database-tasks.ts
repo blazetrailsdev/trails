@@ -211,7 +211,8 @@ export class DatabaseTasks {
 
   static async checkProtectedEnvironments(environment?: string): Promise<void> {
     const env = environment ?? this.env;
-    const protectedEnvs = ["production"];
+    const { Base } = await import("../base.js");
+    const protectedEnvs = (Base as any).protectedEnvironments ?? ["production"];
     if (protectedEnvs.includes(env)) {
       throw new Error(
         `You are attempting to run a destructive action against your '${env}' database. Aborting.`,
@@ -235,7 +236,7 @@ export class DatabaseTasks {
 
   private static _environmentsToCreate(environment?: string): string[] {
     const env = environment ?? this.env;
-    if (!environment && (env === "development" || env === "")) {
+    if (!environment && env === "development") {
       return ["development", "test"];
     }
     return [env];
@@ -243,7 +244,7 @@ export class DatabaseTasks {
 
   private static _environmentsToDrop(environment?: string): string[] {
     const env = environment ?? this.env;
-    if (!environment && (env === "development" || env === "")) {
+    if (!environment && env === "development") {
       return ["development", "test"];
     }
     return [env];
