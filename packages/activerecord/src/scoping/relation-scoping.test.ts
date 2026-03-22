@@ -255,7 +255,7 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it("find with annotation unscoped", async () => {
+  it("find with annotation unscoped", () => {
     class AnnUnscopedPost extends Base {
       static {
         this.attribute("title", "string");
