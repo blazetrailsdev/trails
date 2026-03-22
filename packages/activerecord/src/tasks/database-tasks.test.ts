@@ -26,7 +26,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
 
 describe("DatabaseTasksRegisterTask", () => {
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
   });
 
   it("register task", () => {
@@ -49,6 +49,20 @@ describe("DatabaseTasksRegisterTask", () => {
 });
 
 describe("DatabaseTasksDumpSchemaCacheTest", () => {
+  let originalSchema: string | undefined;
+  let originalDbDir: string;
+
+  beforeEach(() => {
+    originalSchema = process.env.SCHEMA;
+    originalDbDir = DatabaseTasks.dbDir;
+    delete process.env.SCHEMA;
+  });
+  afterEach(() => {
+    if (originalSchema === undefined) delete process.env.SCHEMA;
+    else process.env.SCHEMA = originalSchema;
+    DatabaseTasks.dbDir = originalDbDir;
+  });
+
   it.skip("dump schema cache", () => {
     /* needs schema cache implementation */
   });
@@ -59,17 +73,12 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.rb");
   });
   it("cache dump default filename with custom db dir", () => {
-    const original = DatabaseTasks.dbDir;
     DatabaseTasks.dbDir = "custom_db";
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom_db/schema.rb");
-    DatabaseTasks.dbDir = original;
   });
   it("cache dump alternate filename", () => {
-    const original = process.env.SCHEMA;
     process.env.SCHEMA = "alt_schema.rb";
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("alt_schema.rb");
-    if (original === undefined) delete process.env.SCHEMA;
-    else process.env.SCHEMA = original;
   });
   it("cache dump filename with path from db config", () => {
     const config = new HashConfig("test", "animals", {
@@ -79,12 +88,9 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.rb");
   });
   it("cache dump filename with path from the argument has precedence", () => {
-    const original = process.env.SCHEMA;
     process.env.SCHEMA = "override.rb";
     const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
-    if (original === undefined) delete process.env.SCHEMA;
-    else process.env.SCHEMA = original;
   });
 });
 
@@ -108,7 +114,7 @@ describe("DatabaseTasksCreateAllTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 
@@ -167,7 +173,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
   });
@@ -223,7 +229,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
   });
@@ -264,7 +270,7 @@ describe("DatabaseTasksDropAllTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 
@@ -319,7 +325,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
   });
@@ -366,7 +372,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
   });
@@ -416,7 +422,7 @@ describe("DatabaseTasksMigrateStatusTest", () => {
 
 describe("DatabaseTasksMigrateErrorTest", () => {
   it("migrate raise error on invalid version format", async () => {
-    await expect(DatabaseTasks.migrate("abc" as any)).rejects.toThrow(/Invalid format/);
+    await expect(DatabaseTasks.migrate("abc")).rejects.toThrow(/Invalid format/);
   });
 
   it.skip("migrate raise error on failed check target version", () => {});
@@ -440,7 +446,7 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.purgeCurrent("test");
     expect(purged).toBe(true);
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 });
@@ -459,7 +465,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
     });
     await DatabaseTasks.purgeAll();
     expect(purged.length).toBe(2);
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 });
@@ -478,7 +484,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.truncateAll("test");
     expect(truncated).toBe(true);
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 });
@@ -494,7 +500,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
     });
   });
   afterEach(() => {
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
   });
@@ -542,7 +548,7 @@ describe("DatabaseTasksCharsetTest", () => {
     DatabaseTasks.env = "test";
     const result = await DatabaseTasks.charsetCurrent("test");
     expect(result).toBe("utf8");
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 });
@@ -558,7 +564,7 @@ describe("DatabaseTasksCollationTest", () => {
     DatabaseTasks.env = "test";
     const result = await DatabaseTasks.collationCurrent("test");
     expect(result).toBe("utf8_general_ci");
-    (DatabaseTasks as any)._registeredTasks = new Map();
+    DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
   });
 });

@@ -13,18 +13,24 @@ export class DatabaseTasks {
   static migrationsPath: string[] = ["db/migrate"];
   static schemaFormat: "ruby" | "sql" = "ruby";
 
-  private static _registeredTasks = new Map<string, DatabaseTaskHandler>();
+  private static _registeredTasks: Array<{ pattern: RegExp; handler: DatabaseTaskHandler }> = [];
 
   static registerTask(pattern: RegExp | string, handler: DatabaseTaskHandler): void {
-    const key = typeof pattern === "string" ? pattern : pattern.source;
-    this._registeredTasks.set(key, handler);
+    const regex = typeof pattern === "string" ? new RegExp(pattern) : pattern;
+    this._registeredTasks.push({ pattern: regex, handler });
   }
 
   static resolveTask(adapter: string): DatabaseTaskHandler | undefined {
-    for (const [pattern, handler] of this._registeredTasks) {
-      if (new RegExp(pattern).test(adapter)) return handler;
+    for (let i = this._registeredTasks.length - 1; i >= 0; i--) {
+      if (this._registeredTasks[i].pattern.test(adapter)) {
+        return this._registeredTasks[i].handler;
+      }
     }
     return undefined;
+  }
+
+  static clearRegisteredTasks(): void {
+    this._registeredTasks = [];
   }
 
   static async create(config: DatabaseConfig): Promise<void> {
@@ -77,7 +83,7 @@ export class DatabaseTasks {
     }
   }
 
-  static async migrate(version?: number): Promise<void> {
+  static async migrate(version?: number | string): Promise<void> {
     if (version !== undefined) {
       this.checkTargetVersion(version);
     }
