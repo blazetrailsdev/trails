@@ -90,6 +90,9 @@ export class Migrator {
    * Mirrors: ActiveRecord::Migrator#rollback
    */
   async rollback(steps: number = 1): Promise<void> {
+    if (!Number.isInteger(steps) || steps < 0) {
+      throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
+    }
     await this._ensureSchemaTable();
     const applied = await this._appliedVersions();
     const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
@@ -106,6 +109,9 @@ export class Migrator {
    * Mirrors: ActiveRecord::Migrator#forward
    */
   async forward(steps: number = 1): Promise<void> {
+    if (!Number.isInteger(steps) || steps < 0) {
+      throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
+    }
     await this._ensureSchemaTable();
     const pending = await this.pendingMigrations();
     const toRun = pending.slice(0, steps);
@@ -235,20 +241,29 @@ export class Migrator {
     return new Set(rows.map((r) => String(r.version)));
   }
 
+  private _validateTargetVersion(v: number): bigint {
+    if (!Number.isInteger(v) || v < 0) {
+      throw new Error(`Invalid target version: ${v}. Must be a non-negative integer.`);
+    }
+    return BigInt(v);
+  }
+
   private async _migrateUp(targetVersion: number | null): Promise<void> {
+    const target = targetVersion !== null ? this._validateTargetVersion(targetVersion) : null;
     const applied = await this._appliedVersions();
 
     for (const proxy of this._migrations) {
       if (applied.has(proxy.version)) continue;
-      if (targetVersion !== null && BigInt(proxy.version) > BigInt(targetVersion)) break;
+      if (target !== null && BigInt(proxy.version) > target) break;
       await this._runMigration(proxy, "up");
     }
   }
 
   private async _migrateDown(targetVersion: number): Promise<void> {
+    const target = this._validateTargetVersion(targetVersion);
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
-      .filter((m) => applied.has(m.version) && BigInt(m.version) > BigInt(targetVersion))
+      .filter((m) => applied.has(m.version) && BigInt(m.version) > target)
       .reverse();
 
     for (const proxy of toRevert) {
