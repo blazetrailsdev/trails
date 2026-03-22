@@ -32,164 +32,95 @@ export interface SchemaSource {
   indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
 }
 
-/**
- * Map SQL type strings (as returned by pg_catalog.format_type) to DSL method names.
- */
-function sqlTypeToDsl(sqlType: string): { dslType: string; extraOpts?: Record<string, unknown> } {
-  const normalized = sqlType.toLowerCase().trim();
+interface DslMapping {
+  dslType: string;
+  extraOpts?: Record<string, unknown>;
+}
 
+/** Map SQL type strings (as returned by pg_catalog.format_type) to DSL method names. */
+const SQL_TYPE_MAP: Record<string, DslMapping> = {
+  "character varying": { dslType: "string" },
+  varchar: { dslType: "string" },
+  text: { dslType: "text" },
+  integer: { dslType: "integer" },
+  int: { dslType: "integer" },
+  int4: { dslType: "integer" },
+  bigint: { dslType: "bigint" },
+  int8: { dslType: "bigint" },
+  smallint: { dslType: "integer", extraOpts: { limit: 2 } },
+  int2: { dslType: "integer", extraOpts: { limit: 2 } },
+  "double precision": { dslType: "float" },
+  float8: { dslType: "float" },
+  real: { dslType: "float" },
+  float4: { dslType: "float" },
+  numeric: { dslType: "decimal" },
+  decimal: { dslType: "decimal" },
+  boolean: { dslType: "boolean" },
+  bool: { dslType: "boolean" },
+  date: { dslType: "date" },
+  "timestamp without time zone": { dslType: "datetime" },
+  timestamp: { dslType: "datetime" },
+  "timestamp with time zone": { dslType: "timestamptz" },
+  timestamptz: { dslType: "timestamptz" },
+  "time without time zone": { dslType: "time" },
+  time: { dslType: "time" },
+  "time with time zone": { dslType: "time" },
+  timetz: { dslType: "time" },
+  bytea: { dslType: "binary" },
+  json: { dslType: "json" },
+  jsonb: { dslType: "jsonb" },
+  uuid: { dslType: "uuid" },
+  money: { dslType: "money", extraOpts: { scale: 2 } },
+  inet: { dslType: "inet" },
+  cidr: { dslType: "cidr" },
+  macaddr: { dslType: "macaddr" },
+  hstore: { dslType: "hstore" },
+  xml: { dslType: "xml" },
+  point: { dslType: "point" },
+  line: { dslType: "line" },
+  lseg: { dslType: "lseg" },
+  box: { dslType: "box" },
+  path: { dslType: "path" },
+  polygon: { dslType: "polygon" },
+  circle: { dslType: "circle" },
+  interval: { dslType: "interval" },
+  bit: { dslType: "bit" },
+  "bit varying": { dslType: "bit" },
+  citext: { dslType: "citext" },
+  ltree: { dslType: "ltree" },
+  oid: { dslType: "oid" },
+  serial: { dslType: "serial" },
+  bigserial: { dslType: "bigserial" },
+};
+
+function sqlTypeToDsl(sqlType: string): DslMapping {
+  const normalized = sqlType.toLowerCase().trim();
   const isArray = normalized.endsWith("[]");
   const baseType = isArray ? normalized.slice(0, -2) : normalized;
 
-  let result: { dslType: string; extraOpts?: Record<string, unknown> };
+  let result = SQL_TYPE_MAP[baseType];
 
-  switch (baseType) {
-    case "character varying":
-    case "varchar":
-      result = { dslType: "string" };
-      break;
-    case "text":
-      result = { dslType: "text" };
-      break;
-    case "integer":
-    case "int":
-    case "int4":
-      result = { dslType: "integer" };
-      break;
-    case "bigint":
-    case "int8":
-      result = { dslType: "bigint" };
-      break;
-    case "smallint":
-    case "int2":
-      result = { dslType: "integer", extraOpts: { limit: 2 } };
-      break;
-    case "double precision":
-    case "float8":
-    case "real":
-    case "float4":
-      result = { dslType: "float" };
-      break;
-    case "numeric":
-    case "decimal":
-      result = { dslType: "decimal" };
-      break;
-    case "boolean":
-    case "bool":
-      result = { dslType: "boolean" };
-      break;
-    case "date":
-      result = { dslType: "date" };
-      break;
-    case "timestamp without time zone":
-    case "timestamp":
-      result = { dslType: "datetime" };
-      break;
-    case "timestamp with time zone":
-    case "timestamptz":
-      result = { dslType: "timestamptz" };
-      break;
-    case "time without time zone":
-    case "time":
-    case "time with time zone":
-    case "timetz":
-      result = { dslType: "time" };
-      break;
-    case "bytea":
-      result = { dslType: "binary" };
-      break;
-    case "json":
-      result = { dslType: "json" };
-      break;
-    case "jsonb":
-      result = { dslType: "jsonb" };
-      break;
-    case "uuid":
-      result = { dslType: "uuid" };
-      break;
-    case "money":
-      result = { dslType: "money", extraOpts: { scale: 2 } };
-      break;
-    case "inet":
-      result = { dslType: "inet" };
-      break;
-    case "cidr":
-      result = { dslType: "cidr" };
-      break;
-    case "macaddr":
-      result = { dslType: "macaddr" };
-      break;
-    case "hstore":
-      result = { dslType: "hstore" };
-      break;
-    case "xml":
-      result = { dslType: "xml" };
-      break;
-    case "point":
-      result = { dslType: "point" };
-      break;
-    case "line":
-      result = { dslType: "line" };
-      break;
-    case "lseg":
-      result = { dslType: "lseg" };
-      break;
-    case "box":
-      result = { dslType: "box" };
-      break;
-    case "path":
-      result = { dslType: "path" };
-      break;
-    case "polygon":
-      result = { dslType: "polygon" };
-      break;
-    case "circle":
-      result = { dslType: "circle" };
-      break;
-    case "interval":
-      result = { dslType: "interval" };
-      break;
-    case "bit":
-    case "bit varying":
-      result = { dslType: "bit" };
-      break;
-    case "citext":
-      result = { dslType: "citext" };
-      break;
-    case "ltree":
-      result = { dslType: "ltree" };
-      break;
-    case "oid":
-      result = { dslType: "oid" };
-      break;
-    case "serial":
-      result = { dslType: "serial" };
-      break;
-    case "bigserial":
-      result = { dslType: "bigserial" };
-      break;
-    default: {
-      const varcharMatch = baseType.match(/^character varying\((\d+)\)$/);
-      if (varcharMatch) {
-        result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
-        break;
-      }
+  if (!result) {
+    // Handle parameterized types: character varying(N), numeric(P,S)
+    const varcharMatch = baseType.match(/^character varying\((\d+)\)$/);
+    if (varcharMatch) {
+      result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
+    } else {
       const numericMatch = baseType.match(/^numeric\((\d+),(\d+)\)$/);
       if (numericMatch) {
         result = {
           dslType: "decimal",
           extraOpts: { precision: Number(numericMatch[1]), scale: Number(numericMatch[2]) },
         };
-        break;
+      } else {
+        // Unknown types (enums, domains, etc.)
+        result = { dslType: "enum", extraOpts: { enum_type: baseType } };
       }
-      // Unknown types (enums, domains, etc.) — emit as t.enum with enum_type option
-      result = { dslType: "enum", extraOpts: { enum_type: baseType } };
-      break;
     }
   }
 
   if (isArray) {
-    result.extraOpts = { ...result.extraOpts, array: true };
+    return { ...result, extraOpts: { ...result.extraOpts, array: true } };
   }
 
   return result;
