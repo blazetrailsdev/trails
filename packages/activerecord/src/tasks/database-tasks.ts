@@ -53,12 +53,20 @@ export class DatabaseTasks {
     return handler;
   }
 
+  private static _adapterFor(config: DatabaseConfig): string {
+    const adapter = config.adapter;
+    if (!adapter) {
+      throw new Error("database configuration does not specify adapter");
+    }
+    return adapter;
+  }
+
   static clearRegisteredTasks(): void {
     this._registeredTasks = [];
   }
 
   static async create(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     if (handler.create) {
       await handler.create(config);
     }
@@ -83,7 +91,7 @@ export class DatabaseTasks {
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     if (handler.drop) {
       await handler.drop(config);
     }
@@ -99,9 +107,9 @@ export class DatabaseTasks {
   }
 
   static async dropCurrent(environment?: string): Promise<void> {
-    await this.checkProtectedEnvironments(environment);
     const envs = this._environmentsToDrop(environment);
     for (const env of envs) {
+      await this.checkProtectedEnvironments(env);
       const configs = this.configsFor(env);
       for (const config of configs) {
         await this.drop(config);
@@ -114,7 +122,7 @@ export class DatabaseTasks {
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     if (handler.purge) {
       await handler.purge(config);
     }
@@ -143,7 +151,7 @@ export class DatabaseTasks {
     const env = environment ?? this.env;
     const configs = this.configsFor(env);
     for (const config of configs) {
-      const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+      const handler = this._resolveTaskOrThrow(this._adapterFor(config));
       if (handler.truncateAll) {
         await handler.truncateAll(config);
       }
@@ -151,7 +159,7 @@ export class DatabaseTasks {
   }
 
   static async charset(config: DatabaseConfig): Promise<string | null> {
-    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     return handler.charset ? handler.charset(config) : null;
   }
 
@@ -163,7 +171,7 @@ export class DatabaseTasks {
   }
 
   static async collation(config: DatabaseConfig): Promise<string | null> {
-    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     if (handler.collation) {
       return handler.collation(config);
     }
@@ -212,7 +220,7 @@ export class DatabaseTasks {
   static async checkProtectedEnvironments(environment?: string): Promise<void> {
     const env = environment ?? this.env;
     const { Base } = await import("../base.js");
-    const protectedEnvs = (Base as any).protectedEnvironments ?? ["production"];
+    const protectedEnvs = Base.protectedEnvironments ?? ["production"];
     if (protectedEnvs.includes(env)) {
       throw new Error(
         `You are attempting to run a destructive action against your '${env}' database. Aborting.`,
