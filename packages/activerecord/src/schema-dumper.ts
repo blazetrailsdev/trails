@@ -212,7 +212,7 @@ function cleanDefault(raw: unknown): unknown {
   // Numeric defaults: 150.55::type or (150.55)::type
   const numericCastMatch = str.match(/^\(?([\d.]+)\)?::[\w\s]+$/);
   if (numericCastMatch) {
-    return numericCastMatch[1];
+    return Number(numericCastMatch[1]);
   }
 
   // Expression defaults like nextval(...) — keep as-is
@@ -220,8 +220,9 @@ function cleanDefault(raw: unknown): unknown {
     return str;
   }
 
-  if (str === "true" || str === "false") return str;
-  if (/^-?\d+(\.\d+)?$/.test(str)) return str;
+  if (str === "true") return true;
+  if (str === "false") return false;
+  if (/^-?\d+(\.\d+)?$/.test(str)) return Number(str);
 
   return raw;
 }
