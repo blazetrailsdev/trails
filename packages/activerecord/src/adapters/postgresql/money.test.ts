@@ -127,8 +127,10 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("money format", async () => {
-      const rows = await adapter.execute("SELECT 1234.56::numeric::money::numeric AS val");
-      expect(Number(rows[0].val)).toBeCloseTo(1234.56, 2);
+      const rows = await adapter.execute("SELECT 1234.56::numeric::money::text AS val");
+      // Formatted text includes thousands separator (locale-dependent, but value is preserved)
+      const numeric = parseFloat(String(rows[0].val).replace(/[^0-9.-]/g, ""));
+      expect(numeric).toBeCloseTo(1234.56, 2);
     });
 
     it("money values", async () => {
