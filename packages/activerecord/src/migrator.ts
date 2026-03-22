@@ -32,16 +32,16 @@ export class Migrator {
 
   constructor(adapter: DatabaseAdapter, migrations: MigrationProxy[]) {
     this._adapter = adapter;
+    this._validateMigrations(migrations);
     this._migrations = this._sortMigrations(migrations);
-    this._validateMigrations();
   }
 
   get migrations(): MigrationProxy[] {
     return [...this._migrations];
   }
 
-  get output(): string[] {
-    return this._output;
+  get output(): readonly string[] {
+    return [...this._output];
   }
 
   /**
@@ -65,7 +65,7 @@ export class Migrator {
   }
 
   /**
-   * Run a single migration up.
+   * Run all pending migrations up to the target version (or all if no target).
    *
    * Mirrors: ActiveRecord::Migrator.up
    */
@@ -75,7 +75,7 @@ export class Migrator {
   }
 
   /**
-   * Run a single migration down.
+   * Revert all applied migrations down to the target version.
    *
    * Mirrors: ActiveRecord::Migrator.down
    */
@@ -124,7 +124,12 @@ export class Migrator {
     await this._ensureSchemaTable();
     const versions = await this.getAllVersions();
     if (versions.length === 0) return 0;
-    return Math.max(...versions.map(Number));
+    let max = BigInt(0);
+    for (const v of versions) {
+      const bv = BigInt(v);
+      if (bv > max) max = bv;
+    }
+    return Number(max);
   }
 
   /**
@@ -135,7 +140,13 @@ export class Migrator {
   async getAllVersions(): Promise<string[]> {
     await this._ensureSchemaTable();
     const applied = await this._appliedVersions();
-    return [...applied].sort();
+    return [...applied].sort((a, b) => {
+      const ba = BigInt(a);
+      const bb = BigInt(b);
+      if (ba < bb) return -1;
+      if (ba > bb) return 1;
+      return 0;
+    });
   }
 
   /**
@@ -192,11 +203,11 @@ export class Migrator {
     });
   }
 
-  private _validateMigrations(): void {
+  private _validateMigrations(migrations: MigrationProxy[]): void {
     const versions = new Set<string>();
     const names = new Set<string>();
 
-    for (const m of this._migrations) {
+    for (const m of migrations) {
       if (versions.has(m.version)) {
         throw new Error(`Duplicate migration version: ${m.version}`);
       }
@@ -229,7 +240,7 @@ export class Migrator {
 
     for (const proxy of this._migrations) {
       if (applied.has(proxy.version)) continue;
-      if (targetVersion !== null && Number(proxy.version) > targetVersion) break;
+      if (targetVersion !== null && BigInt(proxy.version) > BigInt(targetVersion)) break;
       await this._runMigration(proxy, "up");
     }
   }
@@ -237,7 +248,7 @@ export class Migrator {
   private async _migrateDown(targetVersion: number): Promise<void> {
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
-      .filter((m) => applied.has(m.version) && Number(m.version) > targetVersion)
+      .filter((m) => applied.has(m.version) && BigInt(m.version) > BigInt(targetVersion))
       .reverse();
 
     for (const proxy of toRevert) {
