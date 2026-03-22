@@ -33,7 +33,11 @@ export class Migrator {
   constructor(adapter: DatabaseAdapter, migrations: MigrationProxy[]) {
     this._adapter = adapter;
     this._validateMigrations(migrations);
-    this._migrations = this._sortMigrations(migrations);
+    const normalized = migrations.map((m) => ({
+      ...m,
+      version: String(BigInt(m.version)),
+    }));
+    this._migrations = this._sortMigrations(normalized);
   }
 
   get migrations(): MigrationProxy[] {
@@ -245,7 +249,16 @@ export class Migrator {
 
   private async _appliedVersions(): Promise<Set<string>> {
     const rows = await this._adapter.execute(`SELECT "version" FROM "${this._schemaTableName}"`);
-    return new Set(rows.map((r) => String(r.version)));
+    return new Set(
+      rows.map((r) => {
+        const v = String(r.version).trim();
+        try {
+          return String(BigInt(v));
+        } catch {
+          return v;
+        }
+      }),
+    );
   }
 
   private _validateTargetVersion(v: number | string): void {
