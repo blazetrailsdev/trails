@@ -228,7 +228,7 @@ export class DatabaseTasks {
   }
 
   static async checkProtectedEnvironments(environment?: string): Promise<void> {
-    const env = environment ?? this.env;
+    const env = (environment && environment.trim()) || this.env;
     const { Base } = await import("../base.js");
     const protectedEnvs = Base.protectedEnvironments;
     if (protectedEnvs.includes(env)) {
@@ -253,8 +253,9 @@ export class DatabaseTasks {
   }
 
   private static _environmentsFor(environment?: string): string[] {
-    const env = environment ?? this.env;
-    if (!environment && env === "development") {
+    const normalized = environment?.trim() || undefined;
+    const env = normalized ?? this.env;
+    if (!normalized && env === "development") {
       return ["development", "test"];
     }
     return [env];
