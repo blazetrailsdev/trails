@@ -53,6 +53,7 @@ export class Migrator {
     await this._ensureSchemaTable();
 
     if (targetVersion !== undefined && targetVersion !== null) {
+      this._validateTargetVersion(targetVersion);
       const current = await this.currentVersion();
       if (targetVersion > current) {
         await this._migrateUp(targetVersion);
@@ -282,16 +283,23 @@ export class Migrator {
     }
 
     const migration = proxy.migration();
-    if (direction === "up") {
-      await migration.up(this._adapter);
-      await this._adapter.executeMutation(
-        `INSERT INTO "${this._schemaTableName}" ("version") VALUES ('${proxy.version}')`,
-      );
-    } else {
-      await migration.down(this._adapter);
-      await this._adapter.executeMutation(
-        `DELETE FROM "${this._schemaTableName}" WHERE "version" = '${proxy.version}'`,
-      );
+    await this._adapter.beginTransaction();
+    try {
+      if (direction === "up") {
+        await migration.up(this._adapter);
+        await this._adapter.executeMutation(
+          `INSERT INTO "${this._schemaTableName}" ("version") VALUES ('${proxy.version}')`,
+        );
+      } else {
+        await migration.down(this._adapter);
+        await this._adapter.executeMutation(
+          `DELETE FROM "${this._schemaTableName}" WHERE "version" = '${proxy.version}'`,
+        );
+      }
+      await this._adapter.commit();
+    } catch (error) {
+      await this._adapter.rollback();
+      throw error;
     }
 
     if (this.verbose) {
