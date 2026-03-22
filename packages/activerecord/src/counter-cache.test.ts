@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { Associations, updateCounterCaches } from "./associations.js";
+import { Associations, association, updateCounterCaches } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -942,12 +942,14 @@ describe("CounterCacheTest", () => {
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
     registerModel(Topic);
     registerModel(Reply);
     const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "pushed", topic_id: t.id });
+    const proxy = association(t, "replies");
+    await proxy.push(new Reply({ content: "pushed" }));
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(1);
-    await Reply.create({ content: "pushed2", topic_id: t.id });
+    await proxy.push(new Reply({ content: "pushed2" }));
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(2);
   });
 
@@ -967,10 +969,12 @@ describe("CounterCacheTest", () => {
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
     registerModel(Topic);
     registerModel(Reply);
     const t = await Topic.create({ title: "test" });
-    const r = new Reply({ content: "built", topic_id: t.id });
+    const proxy = association(t, "replies");
+    const r = proxy.build({ content: "built" });
     await r.save();
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(1);
   });
