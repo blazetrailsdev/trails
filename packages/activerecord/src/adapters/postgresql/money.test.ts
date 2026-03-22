@@ -47,10 +47,10 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('567.89'::money)`,
       );
       const rows = await adapter.execute(
-        `SELECT "wealth"::numeric FROM "postgresql_moneys" WHERE "id" = ?`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
         [id],
       );
-      expect(Number(rows[0].numeric)).toBeCloseTo(567.89, 2);
+      expect(Number(rows[0].wealth)).toBeCloseTo(567.89, 2);
     });
 
     it("money select", async () => {
