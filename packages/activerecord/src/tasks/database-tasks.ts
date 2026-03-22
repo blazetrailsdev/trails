@@ -26,7 +26,7 @@ export class DatabaseTasks {
     for (let i = this._registeredTasks.length - 1; i >= 0; i--) {
       const { pattern, handler } = this._registeredTasks[i];
       if (typeof pattern === "string") {
-        if (adapter.includes(pattern)) return handler;
+        if (adapter.startsWith(pattern)) return handler;
       } else {
         pattern.lastIndex = 0;
         if (pattern.test(adapter)) return handler;
@@ -164,10 +164,10 @@ export class DatabaseTasks {
 
   static targetVersion(): number | null {
     const version = process.env.VERSION;
-    if (!version || version.trim() === "") return null;
-    const parsed = parseInt(version, 10);
-    if (isNaN(parsed)) return null;
-    return parsed;
+    if (!version) return null;
+    const str = version.trim();
+    if (str === "" || !/^\d+$/.test(str)) return null;
+    return parseInt(str, 10);
   }
 
   static checkTargetVersion(version?: number | string): void {
@@ -180,7 +180,7 @@ export class DatabaseTasks {
   }
 
   static dumpSchemaFilename(config?: DatabaseConfig): string {
-    const envSchema = process.env.SCHEMA;
+    const envSchema = process.env.SCHEMA?.trim();
     if (envSchema) return envSchema;
     if (config && config.name !== "primary") {
       return `${this.dbDir}/${config.name}_schema.rb`;
