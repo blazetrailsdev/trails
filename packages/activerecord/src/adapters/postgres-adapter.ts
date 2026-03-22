@@ -958,12 +958,12 @@ export class PostgresAdapter implements DatabaseAdapter {
     const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
     let sql = `SELECT e.enumlabel AS value
        FROM pg_enum e
-       JOIN pg_type t ON t.oid = e.enumtypid`;
+       JOIN pg_type t ON t.oid = e.enumtypid
+       JOIN pg_namespace n ON n.oid = t.typnamespace`;
     const params: unknown[] = [];
 
     if (schema) {
       sql += `
-       JOIN pg_namespace n ON n.oid = t.typnamespace
        WHERE t.typname = $1 AND n.nspname = $2
        ORDER BY e.enumsortorder`;
       params.push(enumName, schema);
