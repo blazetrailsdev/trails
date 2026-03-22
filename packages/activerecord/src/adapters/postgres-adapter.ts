@@ -580,9 +580,15 @@ export class PostgresAdapter implements DatabaseAdapter {
     await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
   }
 
-  async columns(
-    tableName: string,
-  ): Promise<{ name: string; type: string; default: string | null }[]> {
+  async columns(tableName: string): Promise<
+    {
+      name: string;
+      type: string;
+      default: string | null;
+      null?: boolean;
+      primaryKey?: boolean;
+    }[]
+  > {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
@@ -599,11 +605,17 @@ export class PostgresAdapter implements DatabaseAdapter {
     const rows = await this.execute(
       `SELECT a.attname AS name,
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
-              pg_get_expr(d.adbin, d.adrelid) AS "default"
+              pg_get_expr(d.adbin, d.adrelid) AS "default",
+              a.attnotnull AS notnull,
+              (i.indisprimary IS TRUE) AS is_primary
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       LEFT JOIN pg_index i
+         ON i.indrelid = a.attrelid
+        AND i.indisprimary
+        AND a.attnum = ANY(i.indkey)
        WHERE ${tableCondition}
          AND a.attnum > 0
          AND NOT a.attisdropped
@@ -615,6 +627,8 @@ export class PostgresAdapter implements DatabaseAdapter {
       name: r.name as string,
       type: r.type as string,
       default: (r.default as string | null) ?? null,
+      null: !(r.notnull as boolean),
+      primaryKey: r.is_primary as boolean,
     }));
   }
 
@@ -873,6 +887,102 @@ export class PostgresAdapter implements DatabaseAdapter {
     if (options.collation) sql += ` LC_COLLATE = ${this.quoteLiteral(options.collation)}`;
     if (options.ctype) sql += ` LC_CTYPE = ${this.quoteLiteral(options.ctype)}`;
     return sql;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Enum types
+  // ---------------------------------------------------------------------------
+
+  async createEnum(name: string, values: string[]): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    const valueList = values.map((v) => this.quoteLiteral(v)).join(", ");
+    await this.exec(`CREATE TYPE ${qualifiedName} AS ENUM (${valueList})`);
+  }
+
+  async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+  }
+
+  async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
+    const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
+    const { schema: newSchema } = this.parseSchemaQualifiedName(newName);
+    if (newSchema) {
+      throw new Error(
+        "PostgresAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
+      );
+    }
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    await this.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.quoteIdentifier(newName)}`);
+  }
+
+  async addEnumValue(
+    name: string,
+    value: string,
+    options: { before?: string; after?: string; ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
+    if (options.before && options.after) {
+      throw new Error("Cannot specify both `before` and `after` for addEnumValue");
+    }
+    let position = "";
+    if (options.before) {
+      position = ` BEFORE ${this.quoteLiteral(options.before)}`;
+    } else if (options.after) {
+      position = ` AFTER ${this.quoteLiteral(options.after)}`;
+    }
+    await this.exec(
+      `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.quoteLiteral(value)}${position}`,
+    );
+  }
+
+  async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    await this.exec(
+      `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.quoteLiteral(options.from)} TO ${this.quoteLiteral(options.to)}`,
+    );
+  }
+
+  async enumValues(name: string): Promise<string[]> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    let sql = `SELECT e.enumlabel AS value
+       FROM pg_enum e
+       JOIN pg_type t ON t.oid = e.enumtypid
+       JOIN pg_namespace n ON n.oid = t.typnamespace`;
+    const params: unknown[] = [];
+
+    if (schema) {
+      sql += `
+       WHERE t.typname = $1 AND n.nspname = $2
+       ORDER BY e.enumsortorder`;
+      params.push(enumName, schema);
+    } else {
+      sql += `
+       WHERE t.typname = $1
+         AND n.nspname = ANY(current_schemas(false))
+       ORDER BY e.enumsortorder`;
+      params.push(enumName);
+    }
+
+    const rows = await this.execute(sql, params);
+    return rows.map((r) => r.value as string);
   }
 
   // ---------------------------------------------------------------------------

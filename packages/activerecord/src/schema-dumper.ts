@@ -5,25 +5,64 @@
  * Mirrors: ActiveRecord::SchemaDumper
  */
 
-import type { MigrationContext } from "./migration.js";
+export interface ColumnInfo {
+  name: string;
+  type: string;
+  primaryKey?: boolean;
+  null?: boolean;
+  default?: unknown;
+  limit?: number;
+  precision?: number;
+  scale?: number;
+}
+
+export interface IndexInfo {
+  columns: string[];
+  unique: boolean;
+  name?: string;
+}
+
+/**
+ * Interface for sources that can provide schema information.
+ * Both MigrationContext (sync/in-memory) and database adapters (async) can implement this.
+ */
+export interface SchemaSource {
+  tables(): string[] | Promise<string[]>;
+  columns(tableName: string): ColumnInfo[] | Promise<ColumnInfo[]>;
+  indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
+}
 
 export class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
 
-  private _ctx: MigrationContext;
+  private _source: SchemaSource;
 
-  constructor(ctx: MigrationContext) {
-    this._ctx = ctx;
+  constructor(source: SchemaSource) {
+    this._source = source;
   }
 
-  static dump(ctx: MigrationContext): string {
-    return new SchemaDumper(ctx).dump();
+  static dump(source: SchemaSource): string | Promise<string> {
+    const dumper = new SchemaDumper(source);
+    return dumper.dump();
   }
 
-  dump(): string {
+  static async dumpTableSchema(source: SchemaSource, tableName: string): Promise<string> {
+    const dumper = new SchemaDumper(source);
+    const lines: string[] = [];
+    await dumper.dumpTable(lines, tableName);
+    return lines.join("\n");
+  }
+
+  dump(): string | Promise<string> {
     const lines: string[] = [];
     this.header(lines);
-    this.tables(lines);
+    const result = this.dumpTables(lines);
+    if (result instanceof Promise) {
+      return result.then(() => {
+        this.trailer(lines);
+        return lines.join("\n");
+      });
+    }
     this.trailer(lines);
     return lines.join("\n");
   }
@@ -39,12 +78,28 @@ export class SchemaDumper {
     lines.push("}");
   }
 
-  private tables(lines: string[]): void {
-    const tableNames = this._ctx.tables();
-
+  private dumpTables(lines: string[]): void | Promise<void> {
+    const tableNames = this._source.tables();
+    if (tableNames instanceof Promise) {
+      return tableNames.then(async (names) => {
+        for (const tableName of names) {
+          if (this.shouldIgnore(tableName)) continue;
+          await this.dumpTable(lines, tableName);
+        }
+      });
+    }
     for (const tableName of tableNames) {
       if (this.shouldIgnore(tableName)) continue;
-      this.table(lines, tableName);
+      // Sync path — columns/indexes must also be sync
+      const columns = this._source.columns(tableName);
+      const indexes = this._source.indexes(tableName);
+      if (columns instanceof Promise || indexes instanceof Promise) {
+        throw new TypeError(
+          "SchemaSource.columns()/indexes() returned a Promise while tables() was synchronous. " +
+            "Use the async schema dumper path (make tables() return a Promise) or ensure all schema methods are synchronous.",
+        );
+      }
+      this.emitTable(lines, tableName, columns as ColumnInfo[], indexes as IndexInfo[]);
     }
   }
 
@@ -63,9 +118,18 @@ export class SchemaDumper {
     return false;
   }
 
-  private table(lines: string[], tableName: string): void {
-    const columns = this._ctx.columns(tableName);
-    const indexes = this._ctx.indexes(tableName);
+  async dumpTable(lines: string[], tableName: string): Promise<void> {
+    const columns = await this._source.columns(tableName);
+    const indexes = await this._source.indexes(tableName);
+    this.emitTable(lines, tableName, columns, indexes);
+  }
+
+  private emitTable(
+    lines: string[],
+    tableName: string,
+    columns: ColumnInfo[],
+    indexes: IndexInfo[],
+  ): void {
     const pkColumn = columns.find((c) => c.primaryKey);
     const hasId = pkColumn?.name === "id";
 
