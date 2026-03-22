@@ -615,6 +615,15 @@ describe("DatabaseTaskTargetVersionTest", () => {
 });
 
 describe("DatabaseTaskCheckTargetVersionTest", () => {
+  let originalVersion: string | undefined;
+  beforeEach(() => {
+    originalVersion = process.env.VERSION;
+  });
+  afterEach(() => {
+    if (originalVersion === undefined) delete process.env.VERSION;
+    else process.env.VERSION = originalVersion;
+  });
+
   it("check target version does not raise error on empty version", () => {
     expect(() => DatabaseTasks.checkTargetVersion("")).not.toThrow();
   });

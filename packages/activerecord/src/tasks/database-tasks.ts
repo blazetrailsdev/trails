@@ -66,10 +66,10 @@ export class DatabaseTasks {
   }
 
   static async dropAll(): Promise<void> {
-    await this.checkProtectedEnvironments();
     if (!this.databaseConfiguration) return;
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
+      await this.checkProtectedEnvironments(config.envName);
       await this.drop(config);
     }
   }
@@ -106,10 +106,10 @@ export class DatabaseTasks {
   }
 
   static async purgeAll(): Promise<void> {
-    await this.checkProtectedEnvironments();
     if (!this.databaseConfiguration) return;
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
+      await this.checkProtectedEnvironments(config.envName);
       await this.purge(config);
     }
   }
