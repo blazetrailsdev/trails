@@ -913,6 +913,12 @@ export class PostgresAdapter implements DatabaseAdapter {
 
   async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
     const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
+    const { schema: newSchema } = this.parseSchemaQualifiedName(newName);
+    if (newSchema) {
+      throw new Error(
+        "PostgresAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
+      );
+    }
     const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
