@@ -81,7 +81,7 @@ export class DatabaseTasks {
   }
 
   static async createCurrent(environment?: string): Promise<void> {
-    const envs = this._environmentsToCreate(environment);
+    const envs = this._environmentsFor(environment);
     for (const env of envs) {
       const configs = this.configsFor(env);
       for (const config of configs) {
@@ -107,7 +107,7 @@ export class DatabaseTasks {
   }
 
   static async dropCurrent(environment?: string): Promise<void> {
-    const envs = this._environmentsToDrop(environment);
+    const envs = this._environmentsFor(environment);
     for (const env of envs) {
       await this.checkProtectedEnvironments(env);
       const configs = this.configsFor(env);
@@ -205,10 +205,12 @@ export class DatabaseTasks {
   static dumpSchemaFilename(config?: DatabaseConfig): string {
     const envSchema = process.env.SCHEMA?.trim();
     if (envSchema) return envSchema;
+    const ext = this.schemaFormat === "sql" ? "structure.sql" : "schema.rb";
     if (config && config.name !== "primary") {
-      return `${this.dbDir}/${config.name}_schema.rb`;
+      const base = this.schemaFormat === "sql" ? "structure" : "schema";
+      return `${this.dbDir}/${config.name}_${base}.${this.schemaFormat === "sql" ? "sql" : "rb"}`;
     }
-    return `${this.dbDir}/schema.rb`;
+    return `${this.dbDir}/${ext}`;
   }
 
   static checkSchemaFile(filename: string): void {
@@ -220,7 +222,7 @@ export class DatabaseTasks {
   static async checkProtectedEnvironments(environment?: string): Promise<void> {
     const env = environment ?? this.env;
     const { Base } = await import("../base.js");
-    const protectedEnvs = Base.protectedEnvironments ?? ["production"];
+    const protectedEnvs = Base.protectedEnvironments;
     if (protectedEnvs.includes(env)) {
       throw new Error(
         `You are attempting to run a destructive action against your '${env}' database. Aborting.`,
@@ -242,15 +244,7 @@ export class DatabaseTasks {
     });
   }
 
-  private static _environmentsToCreate(environment?: string): string[] {
-    const env = environment ?? this.env;
-    if (!environment && env === "development") {
-      return ["development", "test"];
-    }
-    return [env];
-  }
-
-  private static _environmentsToDrop(environment?: string): string[] {
+  private static _environmentsFor(environment?: string): string[] {
     const env = environment ?? this.env;
     if (!environment && env === "development") {
       return ["development", "test"];
