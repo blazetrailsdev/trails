@@ -607,16 +607,15 @@ export class PostgresAdapter implements DatabaseAdapter {
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
               pg_get_expr(d.adbin, d.adrelid) AS "default",
               a.attnotnull AS notnull,
-              (EXISTS (
-                SELECT 1 FROM pg_index i
-                WHERE i.indrelid = a.attrelid
-                  AND a.attnum = ANY(i.indkey)
-                  AND i.indisprimary
-              )) AS is_primary
+              (i.indisprimary IS TRUE) AS is_primary
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       LEFT JOIN pg_index i
+         ON i.indrelid = a.attrelid
+        AND i.indisprimary
+        AND a.attnum = ANY(i.indkey)
        WHERE ${tableCondition}
          AND a.attnum > 0
          AND NOT a.attisdropped
@@ -971,6 +970,7 @@ export class PostgresAdapter implements DatabaseAdapter {
     } else {
       sql += `
        WHERE t.typname = $1
+         AND n.nspname = ANY(current_schemas(false))
        ORDER BY e.enumsortorder`;
       params.push(enumName);
     }

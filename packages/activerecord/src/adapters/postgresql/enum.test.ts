@@ -94,7 +94,14 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.renameEnum("mood", "feeling");
       const values = await adapter.enumValues("feeling");
       expect(values).toEqual(["sad", "ok", "happy"]);
+
+      // Also verify renameEnumValue
+      await adapter.renameEnumValue("feeling", { from: "ok", to: "okay" });
+      const updated = await adapter.enumValues("feeling");
+      expect(updated).toEqual(["sad", "okay", "happy"]);
+
       // Clean up — rename back so afterEach can drop "mood"
+      await adapter.renameEnumValue("feeling", { from: "okay", to: "ok" });
       await adapter.renameEnum("feeling", "mood");
     });
 
