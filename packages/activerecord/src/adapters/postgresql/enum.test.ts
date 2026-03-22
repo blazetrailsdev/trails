@@ -206,7 +206,13 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_enums" ("current_mood", "past_moods") VALUES ('happy', '{sad,ok}')`,
       );
       const rows = await adapter.execute(`SELECT "past_moods" FROM "postgresql_enums"`);
-      expect(rows[0].past_moods).toEqual(["sad", "ok"]);
+      // pg driver may return enum arrays as raw strings since it doesn't know the enum OID
+      const pastMoods = rows[0].past_moods;
+      const values =
+        typeof pastMoods === "string"
+          ? pastMoods.replace(/[{}]/g, "").split(",")
+          : (pastMoods as string[]);
+      expect(values).toEqual(["sad", "ok"]);
     });
 
     it("enum defaults", async () => {
