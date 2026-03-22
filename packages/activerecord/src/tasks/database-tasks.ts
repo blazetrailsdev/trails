@@ -102,6 +102,8 @@ export class DatabaseTasks {
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
       await this.checkProtectedEnvironments(config.envName);
+    }
+    for (const config of configs) {
       await this.drop(config);
     }
   }
@@ -142,6 +144,8 @@ export class DatabaseTasks {
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
       await this.checkProtectedEnvironments(config.envName);
+    }
+    for (const config of configs) {
       await this.purge(config);
     }
   }
@@ -167,7 +171,8 @@ export class DatabaseTasks {
     const env = environment ?? this.env;
     const configs = this.configsFor(env);
     if (configs.length === 0) return null;
-    return this.charset(configs[0]);
+    const primary = configs.find((c) => c.name === "primary") ?? configs[0];
+    return this.charset(primary);
   }
 
   static async collation(config: DatabaseConfig): Promise<string | null> {
@@ -182,7 +187,8 @@ export class DatabaseTasks {
     const env = environment ?? this.env;
     const configs = this.configsFor(env);
     if (configs.length === 0) return null;
-    return this.collation(configs[0]);
+    const primary = configs.find((c) => c.name === "primary") ?? configs[0];
+    return this.collation(primary);
   }
 
   static targetVersion(): number | null {
