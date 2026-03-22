@@ -620,6 +620,7 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
   });
 
   it("check target version does not raise error if version is not set", () => {
+    delete process.env.VERSION;
     expect(() => DatabaseTasks.checkTargetVersion(undefined)).not.toThrow();
   });
 
@@ -640,9 +641,17 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
 });
 
 describe("DatabaseTasksCheckSchemaFileMethods", () => {
-  afterEach(() => {
+  let originalSchema: string | undefined;
+  let originalDbDir: string;
+  beforeEach(() => {
+    originalSchema = process.env.SCHEMA;
+    originalDbDir = DatabaseTasks.dbDir;
     delete process.env.SCHEMA;
-    DatabaseTasks.dbDir = "db";
+  });
+  afterEach(() => {
+    if (originalSchema === undefined) delete process.env.SCHEMA;
+    else process.env.SCHEMA = originalSchema;
+    DatabaseTasks.dbDir = originalDbDir;
   });
 
   it("check dump filename defaults", () => {

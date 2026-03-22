@@ -66,6 +66,7 @@ export class DatabaseTasks {
   }
 
   static async dropAll(): Promise<void> {
+    await this.checkProtectedEnvironments();
     if (!this.databaseConfiguration) return;
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
@@ -74,6 +75,7 @@ export class DatabaseTasks {
   }
 
   static async dropCurrent(environment?: string): Promise<void> {
+    await this.checkProtectedEnvironments(environment);
     const envs = this._environmentsToDrop(environment);
     for (const env of envs) {
       const configs = this.configsFor(env);
@@ -84,9 +86,7 @@ export class DatabaseTasks {
   }
 
   static async migrate(version?: number | string): Promise<void> {
-    if (version !== undefined) {
-      this.checkTargetVersion(version);
-    }
+    this.checkTargetVersion(version);
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {
@@ -97,6 +97,7 @@ export class DatabaseTasks {
   }
 
   static async purgeCurrent(environment?: string): Promise<void> {
+    await this.checkProtectedEnvironments(environment);
     const env = environment ?? this.env;
     const configs = this.configsFor(env);
     for (const config of configs) {
@@ -105,6 +106,7 @@ export class DatabaseTasks {
   }
 
   static async purgeAll(): Promise<void> {
+    await this.checkProtectedEnvironments();
     if (!this.databaseConfiguration) return;
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
@@ -113,6 +115,7 @@ export class DatabaseTasks {
   }
 
   static async truncateAll(environment?: string): Promise<void> {
+    await this.checkProtectedEnvironments(environment);
     const env = environment ?? this.env;
     const configs = this.configsFor(env);
     for (const config of configs) {
