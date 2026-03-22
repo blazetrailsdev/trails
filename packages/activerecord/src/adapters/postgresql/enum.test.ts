@@ -52,13 +52,15 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("enum mapping", async () => {
-      await adapter.executeMutation(
+      const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
       );
-      const rows = await adapter.execute(`SELECT "current_mood" FROM "postgresql_enums"`);
+      const rows = await adapter.execute(
+        `SELECT "current_mood" FROM "postgresql_enums" WHERE "id" = ?`,
+        [id],
+      );
       expect(rows[0].current_mood).toBe("sad");
 
-      const id = rows[0].id ?? 1;
       await adapter.executeMutation(
         `UPDATE "postgresql_enums" SET "current_mood" = 'happy' WHERE "id" = ?`,
         [id],
@@ -82,7 +84,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("drop enum", async () => {
-      await adapter.createEnum("unused", []);
+      await adapter.createEnum("unused", ["dummy"]);
       await adapter.dropEnum("unused");
       await expect(adapter.dropEnum("unused")).rejects.toThrow();
       await expect(adapter.dropEnum("unused", { ifExists: true })).resolves.toBeUndefined();
@@ -242,20 +244,24 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("works with activerecord enum", () => {});
 
     it("enum type scoped to schemas", async () => {
-      await adapter.createSchema("test_schema");
-      await adapter.exec(`SET search_path TO test_schema, public`);
-      await adapter.createEnum("mood_in_other_schema", ["sad", "ok", "happy"]);
-      await adapter.exec(`
-        CREATE TABLE "postgresql_enums_in_other_schema" (
-          "id" SERIAL PRIMARY KEY,
-          "current_mood" mood_in_other_schema DEFAULT 'happy' NOT NULL
-        )
-      `);
-      const exists = await adapter.dataSourceExists("postgresql_enums_in_other_schema");
-      expect(exists).toBe(true);
-      await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums_in_other_schema"`);
-      await adapter.exec(`DROP TYPE IF EXISTS "mood_in_other_schema"`);
-      await adapter.exec(`SET search_path TO public`);
+      await adapter.beginTransaction();
+      try {
+        await adapter.createSchema("test_schema");
+        await adapter.exec(`SET LOCAL search_path TO test_schema, public`);
+        await adapter.createEnum("mood_in_other_schema", ["sad", "ok", "happy"]);
+        await adapter.exec(`
+          CREATE TABLE "postgresql_enums_in_other_schema" (
+            "id" SERIAL PRIMARY KEY,
+            "current_mood" mood_in_other_schema DEFAULT 'happy' NOT NULL
+          )
+        `);
+        const exists = await adapter.dataSourceExists("postgresql_enums_in_other_schema");
+        expect(exists).toBe(true);
+        await adapter.commit();
+      } catch (error) {
+        await adapter.rollback();
+        throw error;
+      }
     });
 
     it("enum type explicit schema", async () => {

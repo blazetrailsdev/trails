@@ -931,6 +931,9 @@ export class PostgresAdapter implements DatabaseAdapter {
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
       : this.quoteIdentifier(enumName);
     const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
+    if (options.before && options.after) {
+      throw new Error("Cannot specify both `before` and `after` for addEnumValue");
+    }
     let position = "";
     if (options.before) {
       position = ` BEFORE ${this.quoteLiteral(options.before)}`;
@@ -953,14 +956,26 @@ export class PostgresAdapter implements DatabaseAdapter {
   }
 
   async enumValues(name: string): Promise<string[]> {
-    const rows = await this.execute(
-      `SELECT e.enumlabel AS value
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    let sql = `SELECT e.enumlabel AS value
        FROM pg_enum e
-       JOIN pg_type t ON t.oid = e.enumtypid
+       JOIN pg_type t ON t.oid = e.enumtypid`;
+    const params: unknown[] = [];
+
+    if (schema) {
+      sql += `
+       JOIN pg_namespace n ON n.oid = t.typnamespace
+       WHERE t.typname = $1 AND n.nspname = $2
+       ORDER BY e.enumsortorder`;
+      params.push(enumName, schema);
+    } else {
+      sql += `
        WHERE t.typname = $1
-       ORDER BY e.enumsortorder`,
-      [name],
-    );
+       ORDER BY e.enumsortorder`;
+      params.push(enumName);
+    }
+
+    const rows = await this.execute(sql, params);
     return rows.map((r) => r.value as string);
   }
 

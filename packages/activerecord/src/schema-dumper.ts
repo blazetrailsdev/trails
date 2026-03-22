@@ -91,9 +91,15 @@ export class SchemaDumper {
     for (const tableName of tableNames) {
       if (this.shouldIgnore(tableName)) continue;
       // Sync path — columns/indexes must also be sync
-      const columns = this._source.columns(tableName) as ColumnInfo[];
-      const indexes = this._source.indexes(tableName) as IndexInfo[];
-      this.emitTable(lines, tableName, columns, indexes);
+      const columns = this._source.columns(tableName);
+      const indexes = this._source.indexes(tableName);
+      if (columns instanceof Promise || indexes instanceof Promise) {
+        throw new TypeError(
+          "SchemaSource.columns()/indexes() returned a Promise while tables() was synchronous. " +
+            "Use the async schema dumper path (make tables() return a Promise) or ensure all schema methods are synchronous.",
+        );
+      }
+      this.emitTable(lines, tableName, columns as ColumnInfo[], indexes as IndexInfo[]);
     }
   }
 
