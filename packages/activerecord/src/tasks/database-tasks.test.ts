@@ -32,7 +32,7 @@ describe("DatabaseTasksRegisterTask", () => {
   it("register task", () => {
     const handler = { create: async () => {} };
     DatabaseTasks.registerTask("sqlite", handler);
-    expect(DatabaseTasks.resolveTask("sqlite3")).toBeTruthy();
+    expect(DatabaseTasks.resolveTask("sqlite3")).toBe(handler);
   });
 
   it("register task precedence", () => {

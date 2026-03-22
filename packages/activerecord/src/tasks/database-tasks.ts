@@ -4,10 +4,17 @@
  * Mirrors: ActiveRecord::Tasks::DatabaseTasks
  */
 
-import { DatabaseConfigurations, DatabaseConfig } from "../database-configurations.js";
+import type { DatabaseConfig } from "../database-configurations.js";
+import { DatabaseConfigurations } from "../database-configurations.js";
 
 export class DatabaseTasks {
-  static env: string = process.env.RAILS_ENV ?? process.env.NODE_ENV ?? "development";
+  static get env(): string {
+    return DatabaseConfigurations.defaultEnv;
+  }
+
+  static set env(value: string) {
+    DatabaseConfigurations.defaultEnv = value;
+  }
   static databaseConfiguration: DatabaseConfigurations | null = null;
   static dbDir: string = "db";
   static migrationsPath: string[] = ["db/migrate"];
