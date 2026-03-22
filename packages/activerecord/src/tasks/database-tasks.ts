@@ -134,7 +134,7 @@ export class DatabaseTasks {
 
   static async purgeCurrent(environment?: string): Promise<void> {
     await this.checkProtectedEnvironments(environment);
-    const env = environment ?? this.env;
+    const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     for (const config of configs) {
       await this.purge(config);
@@ -154,7 +154,7 @@ export class DatabaseTasks {
 
   static async truncateAll(environment?: string): Promise<void> {
     await this.checkProtectedEnvironments(environment);
-    const env = environment ?? this.env;
+    const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     for (const config of configs) {
       const handler = this._resolveTaskOrThrow(this._adapterFor(config));
@@ -170,7 +170,7 @@ export class DatabaseTasks {
   }
 
   static async charsetCurrent(environment?: string): Promise<string | null> {
-    const env = environment ?? this.env;
+    const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     if (configs.length === 0) return null;
     const primary = configs.find((c) => c.name === "primary") ?? configs[0];
@@ -186,7 +186,7 @@ export class DatabaseTasks {
   }
 
   static async collationCurrent(environment?: string): Promise<string | null> {
-    const env = environment ?? this.env;
+    const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     if (configs.length === 0) return null;
     const primary = configs.find((c) => c.name === "primary") ?? configs[0];
@@ -228,7 +228,7 @@ export class DatabaseTasks {
   }
 
   static async checkProtectedEnvironments(environment?: string): Promise<void> {
-    const env = (environment && environment.trim()) || this.env;
+    const env = this._normalizeEnv(environment);
     const { Base } = await import("../base.js");
     const protectedEnvs = Base.protectedEnvironments;
     if (protectedEnvs.includes(env)) {
@@ -243,6 +243,11 @@ export class DatabaseTasks {
     return this.databaseConfiguration.configsFor({ envName: environment });
   }
 
+  private static _normalizeEnv(environment?: string): string {
+    const trimmed = environment?.trim();
+    return trimmed || this.env;
+  }
+
   static eachLocalConfiguration(): DatabaseConfig[] {
     if (!this.databaseConfiguration) return [];
     return this.databaseConfiguration.configurations.filter((c) => {
@@ -253,9 +258,8 @@ export class DatabaseTasks {
   }
 
   private static _environmentsFor(environment?: string): string[] {
-    const normalized = environment?.trim() || undefined;
-    const env = normalized ?? this.env;
-    if (!normalized && env === "development") {
+    const env = this._normalizeEnv(environment);
+    if (!environment?.trim() && env === "development") {
       return ["development", "test"];
     }
     return [env];
