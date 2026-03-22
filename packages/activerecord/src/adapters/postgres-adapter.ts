@@ -580,9 +580,15 @@ export class PostgresAdapter implements DatabaseAdapter {
     await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
   }
 
-  async columns(
-    tableName: string,
-  ): Promise<{ name: string; type: string; default: string | null }[]> {
+  async columns(tableName: string): Promise<
+    {
+      name: string;
+      type: string;
+      default: string | null;
+      null?: boolean;
+      primaryKey?: boolean;
+    }[]
+  > {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
@@ -599,7 +605,14 @@ export class PostgresAdapter implements DatabaseAdapter {
     const rows = await this.execute(
       `SELECT a.attname AS name,
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
-              pg_get_expr(d.adbin, d.adrelid) AS "default"
+              pg_get_expr(d.adbin, d.adrelid) AS "default",
+              a.attnotnull AS notnull,
+              (EXISTS (
+                SELECT 1 FROM pg_index i
+                WHERE i.indrelid = a.attrelid
+                  AND a.attnum = ANY(i.indkey)
+                  AND i.indisprimary
+              )) AS is_primary
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -615,6 +628,8 @@ export class PostgresAdapter implements DatabaseAdapter {
       name: r.name as string,
       type: r.type as string,
       default: (r.default as string | null) ?? null,
+      null: !(r.notnull as boolean),
+      primaryKey: r.is_primary as boolean,
     }));
   }
 
@@ -873,6 +888,80 @@ export class PostgresAdapter implements DatabaseAdapter {
     if (options.collation) sql += ` LC_COLLATE = ${this.quoteLiteral(options.collation)}`;
     if (options.ctype) sql += ` LC_CTYPE = ${this.quoteLiteral(options.ctype)}`;
     return sql;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Enum types
+  // ---------------------------------------------------------------------------
+
+  async createEnum(name: string, values: string[]): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    const valueList = values.map((v) => this.quoteLiteral(v)).join(", ");
+    await this.exec(`CREATE TYPE ${qualifiedName} AS ENUM (${valueList})`);
+  }
+
+  async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+  }
+
+  async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
+    const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    await this.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.quoteIdentifier(newName)}`);
+  }
+
+  async addEnumValue(
+    name: string,
+    value: string,
+    options: { before?: string; after?: string; ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
+    let position = "";
+    if (options.before) {
+      position = ` BEFORE ${this.quoteLiteral(options.before)}`;
+    } else if (options.after) {
+      position = ` AFTER ${this.quoteLiteral(options.after)}`;
+    }
+    await this.exec(
+      `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.quoteLiteral(value)}${position}`,
+    );
+  }
+
+  async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
+    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
+      : this.quoteIdentifier(enumName);
+    await this.exec(
+      `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.quoteLiteral(options.from)} TO ${this.quoteLiteral(options.to)}`,
+    );
+  }
+
+  async enumValues(name: string): Promise<string[]> {
+    const rows = await this.execute(
+      `SELECT e.enumlabel AS value
+       FROM pg_enum e
+       JOIN pg_type t ON t.oid = e.enumtypid
+       WHERE t.typname = $1
+       ORDER BY e.enumsortorder`,
+      [name],
+    );
+    return rows.map((r) => r.value as string);
   }
 
   // ---------------------------------------------------------------------------
