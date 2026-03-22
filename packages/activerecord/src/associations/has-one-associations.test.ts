@@ -1169,6 +1169,8 @@ describe("HasOneAssociationsTest", () => {
         ? afterCreateAt.getTime()
         : Number(new Date(String(afterCreateAt)));
 
+    await new Promise((r) => setTimeout(r, 10));
+
     await acct.destroy();
     const afterDestroy = await TouchDesFirm.find(firm.id);
     const afterDestroyAt = afterDestroy.readAttribute("updated_at");
@@ -1176,7 +1178,7 @@ describe("HasOneAssociationsTest", () => {
       afterDestroyAt instanceof Date
         ? afterDestroyAt.getTime()
         : Number(new Date(String(afterDestroyAt)));
-    expect(afterDestroyTime).toBeGreaterThanOrEqual(afterCreateTime);
+    expect(afterDestroyTime).toBeGreaterThan(afterCreateTime);
   });
 
   it.skip("has one with touch option on empty update", () => {
