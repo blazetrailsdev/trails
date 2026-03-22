@@ -35,13 +35,24 @@ export class DatabaseTasks {
     return undefined;
   }
 
+  private static _resolveTaskOrThrow(adapter: string): DatabaseTaskHandler {
+    const handler = this.resolveTask(adapter);
+    if (!handler) {
+      throw new Error(
+        `No database task handler registered for adapter '${adapter}'. ` +
+          `Register one with DatabaseTasks.registerTask().`,
+      );
+    }
+    return handler;
+  }
+
   static clearRegisteredTasks(): void {
     this._registeredTasks = [];
   }
 
   static async create(config: DatabaseConfig): Promise<void> {
-    const handler = this.resolveTask(config.adapter ?? "");
-    if (handler?.create) {
+    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    if (handler.create) {
       await handler.create(config);
     }
   }
@@ -65,8 +76,8 @@ export class DatabaseTasks {
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {
-    const handler = this.resolveTask(config.adapter ?? "");
-    if (handler?.drop) {
+    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    if (handler.drop) {
       await handler.drop(config);
     }
   }
@@ -96,8 +107,8 @@ export class DatabaseTasks {
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {
-    const handler = this.resolveTask(config.adapter ?? "");
-    if (handler?.purge) {
+    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    if (handler.purge) {
       await handler.purge(config);
     }
   }
@@ -125,19 +136,16 @@ export class DatabaseTasks {
     const env = environment ?? this.env;
     const configs = this.configsFor(env);
     for (const config of configs) {
-      const handler = this.resolveTask(config.adapter ?? "");
-      if (handler?.truncateAll) {
+      const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+      if (handler.truncateAll) {
         await handler.truncateAll(config);
       }
     }
   }
 
   static async charset(config: DatabaseConfig): Promise<string | null> {
-    const handler = this.resolveTask(config.adapter ?? "");
-    if (handler?.charset) {
-      return handler.charset(config);
-    }
-    return null;
+    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    return handler.charset ? handler.charset(config) : null;
   }
 
   static async charsetCurrent(environment?: string): Promise<string | null> {
@@ -148,8 +156,8 @@ export class DatabaseTasks {
   }
 
   static async collation(config: DatabaseConfig): Promise<string | null> {
-    const handler = this.resolveTask(config.adapter ?? "");
-    if (handler?.collation) {
+    const handler = this._resolveTaskOrThrow(config.adapter ?? "");
+    if (handler.collation) {
       return handler.collation(config);
     }
     return null;
