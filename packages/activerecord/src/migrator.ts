@@ -287,12 +287,14 @@ export class Migrator {
     if (direction === "up") {
       await migration.up(this._adapter);
       await this._adapter.executeMutation(
-        `INSERT INTO "${this._schemaTableName}" ("version") VALUES ('${proxy.version}')`,
+        `INSERT INTO "${this._schemaTableName}" ("version") VALUES (?)`,
+        [proxy.version],
       );
     } else {
       await migration.down(this._adapter);
       await this._adapter.executeMutation(
-        `DELETE FROM "${this._schemaTableName}" WHERE "version" = '${proxy.version}'`,
+        `DELETE FROM "${this._schemaTableName}" WHERE "version" = ?`,
+        [proxy.version],
       );
     }
 
