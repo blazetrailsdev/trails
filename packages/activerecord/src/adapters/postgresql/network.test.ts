@@ -41,7 +41,8 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_network_addresses" ("inet_address") VALUES ('172.16.1.254/32')`,
       );
       const rows = await adapter.execute(
-        `SELECT "inet_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
+        `SELECT "inet_address" FROM "postgresql_network_addresses" WHERE "id" = ?`,
+        [id],
       );
       expect(rows[0].inet_address).toBe("172.16.1.254");
     });
@@ -54,7 +55,8 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_network_addresses" ("inet_address") VALUES ('10.0.0.2')`,
       );
       const rows = await adapter.execute(
-        `SELECT * FROM "postgresql_network_addresses" WHERE "inet_address" = '10.0.0.1'`,
+        `SELECT * FROM "postgresql_network_addresses" WHERE "inet_address" = ?`,
+        ["10.0.0.1"],
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].inet_address).toBe("10.0.0.1");
@@ -87,22 +89,25 @@ describeIfPg("PostgresAdapter", () => {
     it("network types", async () => {
       const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_network_addresses" ("cidr_address", "inet_address", "mac_address")
-         VALUES ('192.168.0.0/24', '172.16.1.254/32', '01:23:45:67:89:0a')`,
+         VALUES ('192.168.0.0/24', '172.16.1.254/32', 'Ab:Cd:Ef:01:02:03')`,
       );
       const rows = await adapter.execute(
-        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
+        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ?`,
+        [id],
       );
       expect(rows[0].cidr_address).toBe("192.168.0.0/24");
       expect(rows[0].inet_address).toBe("172.16.1.254");
-      expect(rows[0].mac_address).toBe("01:23:45:67:89:0a");
+      expect(rows[0].mac_address).toBe("ab:cd:ef:01:02:03");
 
       await adapter.executeMutation(
         `UPDATE "postgresql_network_addresses"
          SET "cidr_address" = '10.1.2.3/32', "inet_address" = '10.0.0.0/8', "mac_address" = 'bc:de:f0:12:34:56'
-         WHERE "id" = ${id}`,
+         WHERE "id" = ?`,
+        [id],
       );
       const updated = await adapter.execute(
-        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
+        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ?`,
+        [id],
       );
       expect(updated[0].cidr_address).toBe("10.1.2.3/32");
       expect(updated[0].inet_address).toBe("10.0.0.0/8");
@@ -122,15 +127,18 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_network_addresses" ("cidr_address") VALUES ('192.168.1.0/24')`,
       );
       const rows = await adapter.execute(
-        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
+        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ?`,
+        [id],
       );
       expect(rows[0].cidr_address).toBe("192.168.1.0/24");
 
       await adapter.executeMutation(
-        `UPDATE "postgresql_network_addresses" SET "cidr_address" = '192.168.1.0/25' WHERE "id" = ${id}`,
+        `UPDATE "postgresql_network_addresses" SET "cidr_address" = '192.168.1.0/25' WHERE "id" = ?`,
+        [id],
       );
       const updated = await adapter.execute(
-        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
+        `SELECT "cidr_address" FROM "postgresql_network_addresses" WHERE "id" = ?`,
+        [id],
       );
       expect(updated[0].cidr_address).toBe("192.168.1.0/25");
     });
