@@ -246,15 +246,15 @@ export class Migrator {
     return new Set(rows.map((r) => String(r.version)));
   }
 
-  private _validateTargetVersion(v: number): bigint {
-    if (!Number.isInteger(v) || v < 0) {
-      throw new Error(`Invalid target version: ${v}. Must be a non-negative integer.`);
+  private _validateTargetVersion(v: number): void {
+    if (!Number.isInteger(v) || v < 0 || v > Number.MAX_SAFE_INTEGER) {
+      throw new Error(`Invalid target version: ${v}. Must be a non-negative safe integer.`);
     }
-    return BigInt(v);
   }
 
   private async _migrateUp(targetVersion: number | null): Promise<void> {
-    const target = targetVersion !== null ? this._validateTargetVersion(targetVersion) : null;
+    if (targetVersion !== null) this._validateTargetVersion(targetVersion);
+    const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
 
     for (const proxy of this._migrations) {
@@ -265,7 +265,8 @@ export class Migrator {
   }
 
   private async _migrateDown(targetVersion: number): Promise<void> {
-    const target = this._validateTargetVersion(targetVersion);
+    this._validateTargetVersion(targetVersion);
+    const target = BigInt(targetVersion);
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
       .filter((m) => applied.has(m.version) && BigInt(m.version) > target)
