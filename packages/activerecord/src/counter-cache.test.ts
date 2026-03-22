@@ -916,12 +916,13 @@ describe("CounterCacheTest", () => {
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
     registerModel(Topic);
     registerModel(Reply);
     const t = await Topic.create({ title: "test" });
     const r = await Reply.create({ content: "r1", topic_id: t.id });
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(1);
-    await updateCounterCaches(r, "decrement");
+    await r.destroy();
     expect((await Topic.find(t.id)).readAttribute("replies_count")).toBe(0);
   });
 
@@ -1369,7 +1370,7 @@ describe("CounterCacheTest", () => {
     Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
     registerModel(Topic);
     const t = await Topic.create({ title: "test" });
-    await expect(Topic.resetCounters(t.id, "nonexistent")).rejects.toThrow();
+    await expect(Topic.resetCounters(t.id, "nonexistent")).rejects.toThrow(/nonexistent/);
   });
   it.skip("reset counter works with select declared on association", () => {});
   it("update counters doesn't touch timestamps with touch: []", async () => {
