@@ -2530,10 +2530,11 @@ export class Base extends Model {
 
     if (halted) return false;
 
-    const { updateCounterCaches } = await import("./associations.js");
-    await updateCounterCaches(this, "decrement");
-
     if (didDelete) {
+      const { updateCounterCaches, touchBelongsToParents } = await import("./associations.js");
+      await updateCounterCaches(this, "decrement");
+      await touchBelongsToParents(this);
+
       this._transactionAction = "destroy";
       const { currentTransaction } = await import("./transactions.js");
       const tx = currentTransaction();

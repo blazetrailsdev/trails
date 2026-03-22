@@ -27,7 +27,7 @@ export interface AssociationOptions {
   polymorphic?: boolean;
   as?: string;
   counterCache?: boolean | string;
-  touch?: boolean;
+  touch?: boolean | string | string[];
   autosave?: boolean;
   scope?: (rel: any) => any;
   required?: boolean;
@@ -1952,6 +1952,13 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;
 
-    await parent.touch();
+    const touchOpt = assoc.options.touch;
+    if (touchOpt === true) {
+      await parent.touch();
+    } else if (typeof touchOpt === "string") {
+      await parent.touch(touchOpt);
+    } else if (Array.isArray(touchOpt) && touchOpt.length > 0) {
+      await parent.touch(...(touchOpt as string[]));
+    }
   }
 }

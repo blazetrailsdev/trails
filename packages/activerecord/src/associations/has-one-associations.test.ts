@@ -1045,32 +1045,144 @@ describe("HasOneAssociationsTest", () => {
     // Requires reserved name validation
   });
 
-  it.skip("has one with touch option on create", () => {
-    // Requires touch: true option
+  it("has one with touch option on create", async () => {
+    class TouchFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class TouchAccount extends Base {
+      static {
+        this.attribute("touch_firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(TouchAccount, "touchFirm", {
+      foreignKey: "touch_firm_id",
+      touch: true,
+    });
+    registerModel(TouchFirm);
+    registerModel(TouchAccount);
+
+    const originalTime = new Date("2020-01-01");
+    const firm = await TouchFirm.create({ name: "Touch Corp", updated_at: originalTime });
+    await TouchAccount.create({ touch_firm_id: firm.id, credit_limit: 100 });
+    const reloaded = await TouchFirm.find(firm.id);
+    const updatedAt = reloaded.readAttribute("updated_at");
+    const updatedTime =
+      updatedAt instanceof Date ? updatedAt.getTime() : Number(new Date(String(updatedAt)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
   });
 
   it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
-    // Requires polymorphic + touch + transaction
+    /* needs polymorphic + touch + transaction commit */
   });
 
   it.skip("polymorphic has one with touch option on update will touch record by fetching from database if needed", () => {
-    // Requires polymorphic + touch on update
+    /* needs polymorphic + touch on update */
   });
 
-  it.skip("has one with touch option on update", () => {
-    // Requires touch: true on update
+  it("has one with touch option on update", async () => {
+    class TouchUpdFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class TouchUpdAccount extends Base {
+      static {
+        this.attribute("touch_upd_firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(TouchUpdAccount, "touchUpdFirm", {
+      foreignKey: "touch_upd_firm_id",
+      touch: true,
+    });
+    registerModel(TouchUpdFirm);
+    registerModel(TouchUpdAccount);
+
+    const firm = await TouchUpdFirm.create({
+      name: "Touch Corp",
+      updated_at: new Date("2020-01-01"),
+    });
+    const acct = await TouchUpdAccount.create({ touch_upd_firm_id: firm.id, credit_limit: 100 });
+    const afterCreate = await TouchUpdFirm.find(firm.id);
+    const timeAfterCreate = afterCreate.readAttribute("updated_at");
+    const createTime =
+      timeAfterCreate instanceof Date
+        ? timeAfterCreate.getTime()
+        : Number(new Date(String(timeAfterCreate)));
+
+    // Ensure time advances so we can detect the touch
+    await new Promise((r) => setTimeout(r, 10));
+
+    acct.writeAttribute("credit_limit", 200);
+    await acct.save();
+    const afterUpdate = await TouchUpdFirm.find(firm.id);
+    const timeAfterUpdate = afterUpdate.readAttribute("updated_at");
+    const updateTime =
+      timeAfterUpdate instanceof Date
+        ? timeAfterUpdate.getTime()
+        : Number(new Date(String(timeAfterUpdate)));
+    expect(updateTime).toBeGreaterThan(createTime);
   });
 
   it.skip("has one with touch option on touch", () => {
-    // Requires touch propagation
+    /* needs touch propagation chain */
   });
 
-  it.skip("has one with touch option on destroy", () => {
-    // Requires touch on destroy
+  it("has one with touch option on destroy", async () => {
+    class TouchDesFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class TouchDesAccount extends Base {
+      static {
+        this.attribute("touch_des_firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(TouchDesAccount, "touchDesFirm", {
+      foreignKey: "touch_des_firm_id",
+      touch: true,
+    });
+    registerModel(TouchDesFirm);
+    registerModel(TouchDesAccount);
+
+    const originalTime = new Date("2020-01-01");
+    const firm = await TouchDesFirm.create({ name: "Touch Corp", updated_at: originalTime });
+    const acct = await TouchDesAccount.create({ touch_des_firm_id: firm.id, credit_limit: 100 });
+    const afterCreate = await TouchDesFirm.find(firm.id);
+    const afterCreateAt = afterCreate.readAttribute("updated_at");
+    const afterCreateTime =
+      afterCreateAt instanceof Date
+        ? afterCreateAt.getTime()
+        : Number(new Date(String(afterCreateAt)));
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    await acct.destroy();
+    const afterDestroy = await TouchDesFirm.find(firm.id);
+    const afterDestroyAt = afterDestroy.readAttribute("updated_at");
+    const afterDestroyTime =
+      afterDestroyAt instanceof Date
+        ? afterDestroyAt.getTime()
+        : Number(new Date(String(afterDestroyAt)));
+    expect(afterDestroyTime).toBeGreaterThan(afterCreateTime);
   });
 
   it.skip("has one with touch option on empty update", () => {
-    // Requires touch on no-op save
+    /* needs no-op save detection */
   });
 
   it("has one double belongs to destroys both from either end", async () => {

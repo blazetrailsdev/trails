@@ -2045,12 +2045,107 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(children.length).toBe(1);
     expect(children[0].readAttribute("bt_null_parent_id")).toBeNull();
   });
-  it.skip("update counter caches on delete", () => {});
-  it.skip("update counter caches on delete with dependent destroy", () => {});
-  it.skip("update counter caches on delete with dependent nullify", () => {});
-  it.skip("update counter caches on replace association", () => {});
-  it.skip("update counter caches on destroy", () => {});
-  it.skip("update counter caches on destroy with indestructible through record", () => {});
+  it("update counter caches on delete", async () => {
+    class CcOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("tags_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class CcTagging extends Base {
+      static {
+        this.attribute("cc_owner_id", "integer");
+        this.attribute("cc_tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CcTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CcOwner, "ccTaggings", {
+      className: "CcTagging",
+      foreignKey: "cc_owner_id",
+    });
+    Associations.hasMany.call(CcOwner, "ccTags", { through: "ccTaggings", source: "ccTag" });
+    Associations.belongsTo.call(CcTagging, "ccOwner", {
+      foreignKey: "cc_owner_id",
+      counterCache: "tags_count",
+    });
+    Associations.belongsTo.call(CcTagging, "ccTag", { foreignKey: "cc_tag_id" });
+    registerModel(CcOwner);
+    registerModel(CcTagging);
+    registerModel(CcTag);
+
+    const owner = await CcOwner.create({ name: "Owner" });
+    const tag = await CcTag.create({ name: "Tag1" });
+    await CcTagging.create({ cc_owner_id: owner.id, cc_tag_id: tag.id });
+    expect((await CcOwner.find(owner.id)).readAttribute("tags_count")).toBe(1);
+    const tagging = (await CcTagging.where({ cc_owner_id: owner.id }).first()) as Base;
+    await tagging.destroy();
+    expect((await CcOwner.find(owner.id)).readAttribute("tags_count")).toBe(0);
+  });
+
+  it.skip("update counter caches on delete with dependent destroy", () => {
+    /* needs dependent: :destroy on through */
+  });
+  it.skip("update counter caches on delete with dependent nullify", () => {
+    /* needs dependent: :nullify on through */
+  });
+  it.skip("update counter caches on replace association", () => {
+    /* needs collection replacement with counter update */
+  });
+
+  it("update counter caches on destroy", async () => {
+    class CcDOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("taggings_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class CcDTagging extends Base {
+      static {
+        this.attribute("cc_d_owner_id", "integer");
+        this.attribute("cc_d_tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CcDTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CcDOwner, "ccDTaggings", {
+      className: "CcDTagging",
+      foreignKey: "cc_d_owner_id",
+    });
+    Associations.hasMany.call(CcDOwner, "ccDTags", { through: "ccDTaggings", source: "ccDTag" });
+    Associations.belongsTo.call(CcDTagging, "ccDOwner", {
+      foreignKey: "cc_d_owner_id",
+      counterCache: "taggings_count",
+    });
+    Associations.belongsTo.call(CcDTagging, "ccDTag", { foreignKey: "cc_d_tag_id" });
+    registerModel(CcDOwner);
+    registerModel(CcDTagging);
+    registerModel(CcDTag);
+
+    const owner = await CcDOwner.create({ name: "Owner" });
+    const tag = await CcDTag.create({ name: "Tag1" });
+    const tagging = await CcDTagging.create({ cc_d_owner_id: owner.id, cc_d_tag_id: tag.id });
+    expect((await CcDOwner.find(owner.id)).readAttribute("taggings_count")).toBe(1);
+    // Destroy the through record (join model), which should decrement the counter
+    await tagging.destroy();
+    expect((await CcDOwner.find(owner.id)).readAttribute("taggings_count")).toBe(0);
+  });
+
+  it.skip("update counter caches on destroy with indestructible through record", () => {
+    /* needs before_destroy callback preventing destruction */
+  });
   it("replace association", async () => {
     class HmtReplOwner extends Base {
       static {
