@@ -119,10 +119,46 @@ export class DatabaseTasks {
     }
   }
 
+  private static _migrations: Array<import("../migrator.js").MigrationProxy> = [];
+
+  static registerMigrations(migrations: Array<import("../migrator.js").MigrationProxy>): void {
+    this._migrations = migrations;
+  }
+
   static async migrate(version?: number | string): Promise<void> {
     this.checkTargetVersion(version);
-    // Migration execution is not yet implemented — needs MigrationRunner
-    // integration with file discovery and version tracking.
+    if (!this.databaseConfiguration) return;
+    const configs = this.configsFor(this._normalizeEnv());
+    if (configs.length === 0) return;
+
+    const config = configs.find((c) => c.name === "primary") ?? configs[0];
+    const handler = this.resolveTask(config.adapter ?? "");
+    if (!handler) return;
+
+    const { Migrator } = await import("../migrator.js");
+    const adapter = await this._resolveAdapter(config);
+    if (!adapter) return;
+
+    const migrator = new Migrator(adapter, this._migrations);
+    const target =
+      version !== undefined && version !== null
+        ? typeof version === "string"
+          ? parseInt(version, 10)
+          : version
+        : undefined;
+    await migrator.migrate(target ?? null);
+  }
+
+  private static _adapterInstance: import("../adapter.js").DatabaseAdapter | null = null;
+
+  static setAdapter(adapter: import("../adapter.js").DatabaseAdapter): void {
+    this._adapterInstance = adapter;
+  }
+
+  private static async _resolveAdapter(
+    _config: DatabaseConfig,
+  ): Promise<import("../adapter.js").DatabaseAdapter | null> {
+    return this._adapterInstance;
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {

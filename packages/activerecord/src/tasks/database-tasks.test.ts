@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations, HashConfig } from "../database-configurations.js";
+import { createTestAdapter } from "../test-adapter.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error when called with protected environment", async () => {
@@ -400,11 +401,47 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
 });
 
 describe("DatabaseTasksMigrateTest", () => {
-  it.skip("migrate set and unset empty values for verbose and version env vars", () => {
-    /* needs migration runner */
+  let originalVersion: string | undefined;
+  beforeEach(() => {
+    originalVersion = process.env.VERSION;
   });
-  it.skip("migrate set and unset nonsense values for verbose and version env vars", () => {
-    /* needs migration runner */
+  afterEach(() => {
+    if (originalVersion === undefined) delete process.env.VERSION;
+    else process.env.VERSION = originalVersion;
+    DatabaseTasks.registerMigrations([]);
+    DatabaseTasks.setAdapter(null as any);
+    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.clearRegisteredTasks();
+  });
+
+  it("migrate set and unset empty values for verbose and version env vars", async () => {
+    const adapter = createTestAdapter();
+    DatabaseTasks.setAdapter(adapter);
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "dev.db" },
+    });
+    let migrated = false;
+    DatabaseTasks.registerMigrations([
+      {
+        version: "1",
+        name: "M1",
+        migration: () => ({
+          up: async () => {
+            migrated = true;
+          },
+          down: async () => {},
+        }),
+      },
+    ]);
+    process.env.VERSION = "";
+    await DatabaseTasks.migrate();
+    expect(migrated).toBe(true);
+  });
+
+  it("migrate set and unset nonsense values for verbose and version env vars", async () => {
+    process.env.VERSION = "nonsense";
+    await expect(DatabaseTasks.migrate()).rejects.toThrow(/Invalid format/);
   });
 });
 
