@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound } from "../index.js";
+import { Base, Range, RecordNotFound } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -241,24 +241,55 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped find with annotation", () => {
-    /* needs annotate() on relations */
+  it("scoped find with annotation", async () => {
+    class AnnPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = AnnPost.all().annotate("finding posts");
+    await AnnPost.scoping(rel, async () => {
+      const sql = AnnPost.all().toSql();
+      expect(sql).toContain("/* finding posts */");
+    });
   });
 
-  it.skip("find with annotation unscoped", () => {
-    /* needs annotate() on relations */
+  it("find with annotation unscoped", () => {
+    class AnnUnscopedPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const annotated = AnnUnscopedPost.all().annotate("test");
+    const annotatedSql = annotated.toSql();
+    expect(annotatedSql).toContain("/* test */");
+    const unscopedSql = AnnUnscopedPost.unscoped().toSql();
+    expect(unscopedSql).not.toContain("/* test */");
+    expect(unscopedSql).toContain("SELECT");
   });
 
   it.skip("find with annotation unscope", () => {
-    /* needs annotate() + unscope() */
+    /* needs unscope(:annotate) */
   });
 
   it.skip("scoped find include", () => {
     /* needs includes() */
   });
 
-  it.skip("scoped find joins", () => {
-    /* needs joins() */
+  it("scoped find joins", async () => {
+    class SjPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = SjPost.joins(`INNER JOIN comments ON comments.post_id = ${SjPost.tableName}.id`);
+    await SjPost.scoping(rel, async () => {
+      const sql = SjPost.all().toSql();
+      expect(sql).toContain("INNER JOIN comments");
+    });
   });
 
   it("scoped create with where", async () => {
@@ -282,8 +313,17 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped create with where with range", () => {
-    /* needs range conditions in where */
+  it("scoped create with where with range", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 50000 });
+    await Developer.create({ name: "Bob", salary: 80000 });
+    await Developer.create({ name: "Charlie", salary: 120000 });
+    const rel = Developer.where({ salary: new Range(60000, 100000) });
+    await Developer.scoping(rel, async () => {
+      const all = await Developer.all().toArray();
+      expect(all.length).toBe(1);
+      expect(all[0].readAttribute("name")).toBe("Bob");
+    });
   });
 
   it("scoped create with create with", async () => {
