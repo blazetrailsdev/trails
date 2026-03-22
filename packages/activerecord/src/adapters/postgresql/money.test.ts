@@ -80,8 +80,13 @@ describeIfPg("PostgresAdapter", () => {
       expect(rows[0].val).toBe(true);
     });
 
-    // Needs schema dumper support
-    it.skip("money schema dump", async () => {});
+    it("money schema dump", async () => {
+      const { SchemaDumper } = await import("../../schema-dumper.js");
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
+      expect(output).toMatch(/t\.money\s*\("wealth"/);
+      expect(output).toMatch(/t\.money\s*\("depth"/);
+      expect(output).toContain("scale: 2");
+    });
 
     it("money where", async () => {
       await adapter.executeMutation(

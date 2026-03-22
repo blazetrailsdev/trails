@@ -32,6 +32,200 @@ export interface SchemaSource {
   indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
 }
 
+/**
+ * Map SQL type strings (as returned by pg_catalog.format_type) to DSL method names.
+ */
+function sqlTypeToDsl(sqlType: string): { dslType: string; extraOpts?: Record<string, unknown> } {
+  const normalized = sqlType.toLowerCase().trim();
+
+  const isArray = normalized.endsWith("[]");
+  const baseType = isArray ? normalized.slice(0, -2) : normalized;
+
+  let result: { dslType: string; extraOpts?: Record<string, unknown> };
+
+  switch (baseType) {
+    case "character varying":
+    case "varchar":
+      result = { dslType: "string" };
+      break;
+    case "text":
+      result = { dslType: "text" };
+      break;
+    case "integer":
+    case "int":
+    case "int4":
+      result = { dslType: "integer" };
+      break;
+    case "bigint":
+    case "int8":
+      result = { dslType: "bigint" };
+      break;
+    case "smallint":
+    case "int2":
+      result = { dslType: "integer", extraOpts: { limit: 2 } };
+      break;
+    case "double precision":
+    case "float8":
+    case "real":
+    case "float4":
+      result = { dslType: "float" };
+      break;
+    case "numeric":
+    case "decimal":
+      result = { dslType: "decimal" };
+      break;
+    case "boolean":
+    case "bool":
+      result = { dslType: "boolean" };
+      break;
+    case "date":
+      result = { dslType: "date" };
+      break;
+    case "timestamp without time zone":
+    case "timestamp":
+      result = { dslType: "datetime" };
+      break;
+    case "timestamp with time zone":
+    case "timestamptz":
+      result = { dslType: "timestamptz" };
+      break;
+    case "time without time zone":
+    case "time":
+    case "time with time zone":
+    case "timetz":
+      result = { dslType: "time" };
+      break;
+    case "bytea":
+      result = { dslType: "binary" };
+      break;
+    case "json":
+      result = { dslType: "json" };
+      break;
+    case "jsonb":
+      result = { dslType: "jsonb" };
+      break;
+    case "uuid":
+      result = { dslType: "uuid" };
+      break;
+    case "money":
+      result = { dslType: "money", extraOpts: { scale: 2 } };
+      break;
+    case "inet":
+      result = { dslType: "inet" };
+      break;
+    case "cidr":
+      result = { dslType: "cidr" };
+      break;
+    case "macaddr":
+      result = { dslType: "macaddr" };
+      break;
+    case "hstore":
+      result = { dslType: "hstore" };
+      break;
+    case "xml":
+      result = { dslType: "xml" };
+      break;
+    case "point":
+      result = { dslType: "point" };
+      break;
+    case "line":
+      result = { dslType: "line" };
+      break;
+    case "lseg":
+      result = { dslType: "lseg" };
+      break;
+    case "box":
+      result = { dslType: "box" };
+      break;
+    case "path":
+      result = { dslType: "path" };
+      break;
+    case "polygon":
+      result = { dslType: "polygon" };
+      break;
+    case "circle":
+      result = { dslType: "circle" };
+      break;
+    case "interval":
+      result = { dslType: "interval" };
+      break;
+    case "bit":
+    case "bit varying":
+      result = { dslType: "bit" };
+      break;
+    case "citext":
+      result = { dslType: "citext" };
+      break;
+    case "ltree":
+      result = { dslType: "ltree" };
+      break;
+    case "oid":
+      result = { dslType: "oid" };
+      break;
+    case "serial":
+      result = { dslType: "serial" };
+      break;
+    case "bigserial":
+      result = { dslType: "bigserial" };
+      break;
+    default: {
+      const varcharMatch = baseType.match(/^character varying\((\d+)\)$/);
+      if (varcharMatch) {
+        result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
+        break;
+      }
+      const numericMatch = baseType.match(/^numeric\((\d+),(\d+)\)$/);
+      if (numericMatch) {
+        result = {
+          dslType: "decimal",
+          extraOpts: { precision: Number(numericMatch[1]), scale: Number(numericMatch[2]) },
+        };
+        break;
+      }
+      // Unknown types (enums, domains, etc.) — emit as t.enum with enum_type option
+      result = { dslType: "enum", extraOpts: { enum_type: baseType } };
+      break;
+    }
+  }
+
+  if (isArray) {
+    result.extraOpts = { ...result.extraOpts, array: true };
+  }
+
+  return result;
+}
+
+/**
+ * Clean up a PG default expression to a human-readable literal value.
+ * E.g. "'happy'::mood" -> "happy", "'192.168.1.1'::inet" -> "192.168.1.1"
+ */
+function cleanDefault(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return raw;
+  const str = String(raw);
+
+  // Strip type casts: 'value'::type -> value
+  const castMatch = str.match(/^'((?:[^']|'')*)'::[\w\s."[\]]+$/);
+  if (castMatch) {
+    return castMatch[1].replace(/''/g, "'");
+  }
+
+  // Numeric defaults: 150.55::type or (150.55)::type
+  const numericCastMatch = str.match(/^\(?([\d.]+)\)?::[\w\s]+$/);
+  if (numericCastMatch) {
+    return numericCastMatch[1];
+  }
+
+  // Expression defaults like nextval(...) — keep as-is
+  if (str.includes("(") && !str.startsWith("'")) {
+    return str;
+  }
+
+  if (str === "true" || str === "false") return str;
+  if (/^-?\d+(\.\d+)?$/.test(str)) return str;
+
+  return raw;
+}
+
 export class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
 
@@ -90,7 +284,6 @@ export class SchemaDumper {
     }
     for (const tableName of tableNames) {
       if (this.shouldIgnore(tableName)) continue;
-      // Sync path — columns/indexes must also be sync
       const columns = this._source.columns(tableName);
       const indexes = this._source.indexes(tableName);
       if (columns instanceof Promise || indexes instanceof Promise) {
@@ -143,17 +336,36 @@ export class SchemaDumper {
 
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
+
+      const { dslType, extraOpts } = sqlTypeToDsl(col.type);
       const opts: string[] = [];
+
       if (col.null === false) opts.push("null: false");
-      if (col.default !== undefined && col.default !== null) {
-        opts.push(`default: ${JSON.stringify(col.default)}`);
+
+      const cleanedDefault = cleanDefault(col.default);
+      if (cleanedDefault !== undefined && cleanedDefault !== null) {
+        opts.push(`default: ${JSON.stringify(cleanedDefault)}`);
       }
-      if (col.limit !== undefined && col.limit !== null) opts.push(`limit: ${col.limit}`);
-      if (col.precision !== undefined && col.precision !== null)
+
+      if (extraOpts) {
+        for (const [key, value] of Object.entries(extraOpts)) {
+          opts.push(`${key}: ${JSON.stringify(value)}`);
+        }
+      }
+
+      if (col.limit !== undefined && col.limit !== null && !extraOpts?.limit)
+        opts.push(`limit: ${col.limit}`);
+      if (col.precision !== undefined && col.precision !== null && !extraOpts?.precision)
         opts.push(`precision: ${col.precision}`);
-      if (col.scale !== undefined) opts.push(`scale: ${col.scale}`);
+      if (col.scale !== undefined && !extraOpts?.scale) opts.push(`scale: ${col.scale}`);
+
       const optionsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      lines.push(`    t.${col.type}(${JSON.stringify(col.name)}${optionsStr});`);
+
+      if (dslType === "enum" && extraOpts?.enum_type) {
+        lines.push(`    t.enum(${JSON.stringify(col.name)}${optionsStr});`);
+      } else {
+        lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
+      }
     }
 
     lines.push("  });");
