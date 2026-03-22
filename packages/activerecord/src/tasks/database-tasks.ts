@@ -13,18 +13,24 @@ export class DatabaseTasks {
   static migrationsPath: string[] = ["db/migrate"];
   static schemaFormat: "ruby" | "sql" = "ruby";
 
-  private static _registeredTasks: Array<{ pattern: RegExp; handler: DatabaseTaskHandler }> = [];
+  private static _registeredTasks: Array<{
+    pattern: RegExp | string;
+    handler: DatabaseTaskHandler;
+  }> = [];
 
   static registerTask(pattern: RegExp | string, handler: DatabaseTaskHandler): void {
-    const regex = typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    this._registeredTasks.push({ pattern: regex, handler });
+    this._registeredTasks.push({ pattern, handler });
   }
 
   static resolveTask(adapter: string): DatabaseTaskHandler | undefined {
     for (let i = this._registeredTasks.length - 1; i >= 0; i--) {
       const { pattern, handler } = this._registeredTasks[i];
-      pattern.lastIndex = 0;
-      if (pattern.test(adapter)) return handler;
+      if (typeof pattern === "string") {
+        if (adapter.includes(pattern)) return handler;
+      } else {
+        pattern.lastIndex = 0;
+        if (pattern.test(adapter)) return handler;
+      }
     }
     return undefined;
   }
@@ -208,7 +214,7 @@ export class DatabaseTasks {
     return this.databaseConfiguration.configurations.filter((c) => {
       if (!c.database) return false;
       const host = c.host;
-      return !host || host === "localhost" || host === "127.0.0.1" || host === "" || host === "::1";
+      return !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
     });
   }
 
