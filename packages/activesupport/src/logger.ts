@@ -363,7 +363,9 @@ interface TaggedFormatter {
 }
 
 export interface TaggedLogger extends Logger {
-  tagged(...tags: (string | string[] | null | undefined | (() => void))[]): TaggedLogger;
+  tagged(
+    ...tags: (string | string[] | null | undefined | ((logger: TaggedLogger) => void))[]
+  ): TaggedLogger;
   pushTags(...tags: (string | string[] | null | undefined)[]): string[];
   popTags(count?: number): string[];
   clearTags(): string[];
@@ -493,10 +495,15 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
     },
 
     /**
-     * Returns a NEW independent proxy that includes the current tags plus the
-     * new ones. The current proxy's tagStack is NOT modified.
+     * Without a block: returns a NEW independent proxy that includes the
+     * current tags plus the new ones (tagStack is NOT modified).
+     *
+     * With a block (last arg is a function): pushes tags, calls the block
+     * with the tagged logger, then pops tags.
      */
-    tagged(...rawTags: (string | string[] | null | undefined | (() => void))[]): TaggedLogger {
+    tagged(
+      ...rawTags: (string | string[] | null | undefined | ((logger: TaggedLogger) => void))[]
+    ): TaggedLogger {
       const lastArg = rawTags[rawTags.length - 1];
       const hasBlock = typeof lastArg === "function";
       const tagArgs = (hasBlock ? rawTags.slice(0, -1) : rawTags) as (
@@ -510,7 +517,7 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
       if (hasBlock) {
         tagStack.push(...flat);
         try {
-          (lastArg as () => void)();
+          (lastArg as (logger: TaggedLogger) => void)(proxy as TaggedLogger);
         } finally {
           tagStack.splice(tagStack.length - flat.length, flat.length);
         }

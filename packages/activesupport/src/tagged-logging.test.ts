@@ -226,6 +226,35 @@ describe("TaggedLoggingTest", () => {
     expect(output.string).toContain("[BCX] [Jason] Funky time");
     expect(output.string).toContain("[BCX] Junky time!");
   });
+
+  it("block form pushes and pops tags", () => {
+    logger.tagged("BCX", (l) => {
+      l.info("inside");
+    });
+    expect(output.string).toBe("[BCX] inside\n");
+    expect(logger.currentTags).toEqual([]);
+  });
+
+  it("block form restores tags on error", () => {
+    try {
+      logger.tagged("ERR", () => {
+        throw new Error("boom");
+      });
+    } catch {
+      // expected
+    }
+    expect(logger.currentTags).toEqual([]);
+  });
+
+  it("block form nested", () => {
+    logger.tagged("A", (l) => {
+      l.tagged("B", (l2) => {
+        l2.info("deep");
+      });
+      l.info("shallow");
+    });
+    expect(output.string).toBe("[A] [B] deep\n[A] shallow\n");
+  });
 });
 
 describe("TaggedLoggingWithoutBlockTest", () => {
