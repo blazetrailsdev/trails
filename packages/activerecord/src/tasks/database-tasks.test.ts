@@ -433,6 +433,12 @@ describe("DatabaseTasksMigrateErrorTest", () => {
 });
 
 describe("DatabaseTasksPurgeCurrentTest", () => {
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.env = "development";
+  });
+
   it("purges current environment database", async () => {
     let purged = false;
     DatabaseTasks.registerTask("sqlite", {
@@ -446,12 +452,15 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.purgeCurrent("test");
     expect(purged).toBe(true);
-    DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
   });
 });
 
 describe("DatabaseTasksPurgeAllTest", () => {
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.databaseConfiguration = null;
+  });
+
   it("purge all local configurations", async () => {
     const purged: string[] = [];
     DatabaseTasks.registerTask("sqlite", {
@@ -465,12 +474,16 @@ describe("DatabaseTasksPurgeAllTest", () => {
     });
     await DatabaseTasks.purgeAll();
     expect(purged.length).toBe(2);
-    DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
   });
 });
 
 describe("DatabaseTasksTruncateAllTest", () => {
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.env = "development";
+  });
+
   it("truncate tables", async () => {
     let truncated = false;
     DatabaseTasks.registerTask("sqlite", {
@@ -484,8 +497,6 @@ describe("DatabaseTasksTruncateAllTest", () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.truncateAll("test");
     expect(truncated).toBe(true);
-    DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
   });
 });
 
@@ -538,6 +549,12 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 });
 
 describe("DatabaseTasksCharsetTest", () => {
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.env = "development";
+  });
+
   it("charset current", async () => {
     DatabaseTasks.registerTask("sqlite", {
       charset: async () => "utf8",
@@ -548,12 +565,16 @@ describe("DatabaseTasksCharsetTest", () => {
     DatabaseTasks.env = "test";
     const result = await DatabaseTasks.charsetCurrent("test");
     expect(result).toBe("utf8");
-    DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
   });
 });
 
 describe("DatabaseTasksCollationTest", () => {
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.env = "development";
+  });
+
   it("collation current", async () => {
     DatabaseTasks.registerTask("sqlite", {
       collation: async () => "utf8_general_ci",
@@ -564,14 +585,17 @@ describe("DatabaseTasksCollationTest", () => {
     DatabaseTasks.env = "test";
     const result = await DatabaseTasks.collationCurrent("test");
     expect(result).toBe("utf8_general_ci");
-    DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
   });
 });
 
 describe("DatabaseTaskTargetVersionTest", () => {
+  let originalVersion: string | undefined;
+  beforeEach(() => {
+    originalVersion = process.env.VERSION;
+  });
   afterEach(() => {
-    delete process.env.VERSION;
+    if (originalVersion === undefined) delete process.env.VERSION;
+    else process.env.VERSION = originalVersion;
   });
 
   it("target version returns nil if version does not exist", () => {

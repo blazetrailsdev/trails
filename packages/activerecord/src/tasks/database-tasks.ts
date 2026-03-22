@@ -22,9 +22,9 @@ export class DatabaseTasks {
 
   static resolveTask(adapter: string): DatabaseTaskHandler | undefined {
     for (let i = this._registeredTasks.length - 1; i >= 0; i--) {
-      if (this._registeredTasks[i].pattern.test(adapter)) {
-        return this._registeredTasks[i].handler;
-      }
+      const { pattern, handler } = this._registeredTasks[i];
+      pattern.lastIndex = 0;
+      if (pattern.test(adapter)) return handler;
     }
     return undefined;
   }
