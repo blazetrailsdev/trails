@@ -15,6 +15,46 @@ function makeBuffer() {
 }
 
 describe("TaggedLoggingWithoutBlockTest", () => {
+  let output: ReturnType<typeof makeBuffer>;
+  let logger: ReturnType<typeof taggedLogging>;
+  beforeEach(() => {
+    output = makeBuffer();
+    const base = new Logger(output);
+    logger = taggedLogging(base);
+  });
+
+  it("tagged once", () => {
+    logger.tagged("BCX").info("Funky time");
+    expect(output.string).toBe("[BCX] Funky time\n");
+  });
+
+  it("tagged twice", () => {
+    logger.tagged("BCX").tagged("Jason").info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] Funky time\n");
+  });
+
+  it("tagged thrice at once", () => {
+    logger.tagged("BCX", "Jason", "New").info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
+  });
+
+  it("tagged are flattened", () => {
+    logger.tagged("BCX", ["Jason", "New"]).info("Funky time");
+    expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
+  });
+
+  it("tagged once with blank and nil", () => {
+    logger.tagged(null, "", "New").info("Funky time");
+    expect(output.string).toBe("[New] Funky time\n");
+  });
+
+  it("mixed levels of tagging", () => {
+    const bcx = logger.tagged("BCX");
+    bcx.tagged("Jason").info("Funky time");
+    bcx.info("Junky time!");
+    expect(output.string).toBe("[BCX] [Jason] Funky time\n[BCX] Junky time!\n");
+  });
+
   it.skip("shares tags across threads");
   it.skip("keeps formatter singleton class methods");
   it.skip("accepts non-String objects");
@@ -185,6 +225,35 @@ describe("TaggedLoggingTest", () => {
     outer.info("Junky time!");
     expect(output.string).toContain("[BCX] [Jason] Funky time");
     expect(output.string).toContain("[BCX] Junky time!");
+  });
+
+  it("block form pushes and pops tags", () => {
+    logger.tagged("BCX", (l) => {
+      l.info("inside");
+    });
+    expect(output.string).toBe("[BCX] inside\n");
+    expect(logger.currentTags).toEqual([]);
+  });
+
+  it("block form restores tags on error", () => {
+    try {
+      logger.tagged("ERR", () => {
+        throw new Error("boom");
+      });
+    } catch {
+      // expected
+    }
+    expect(logger.currentTags).toEqual([]);
+  });
+
+  it("block form nested", () => {
+    logger.tagged("A", (l) => {
+      l.tagged("B", (l2) => {
+        l2.info("deep");
+      });
+      l.info("shallow");
+    });
+    expect(output.string).toBe("[A] [B] deep\n[A] shallow\n");
   });
 });
 
