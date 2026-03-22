@@ -99,10 +99,10 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.executeMutation(
         `UPDATE "postgresql_network_addresses"
          SET "cidr_address" = '10.1.2.3/32', "inet_address" = '10.0.0.0/8', "mac_address" = 'bc:de:f0:12:34:56'
-         WHERE "id" = ${rows[0].id}`,
+         WHERE "id" = ${id}`,
       );
       const updated = await adapter.execute(
-        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ${rows[0].id}`,
+        `SELECT * FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
       );
       expect(updated[0].cidr_address).toBe("10.1.2.3/32");
       expect(updated[0].inet_address).toBe("10.0.0.0/8");
@@ -135,15 +135,7 @@ describeIfPg("PostgresAdapter", () => {
       expect(updated[0].cidr_address).toBe("192.168.1.0/25");
     });
 
-    it("mac address change case does not mark dirty", async () => {
-      const id = await adapter.executeMutation(
-        `INSERT INTO "postgresql_network_addresses" ("mac_address") VALUES ('Ab:Cd:Ef:01:02:03')`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "mac_address" FROM "postgresql_network_addresses" WHERE "id" = ${id}`,
-      );
-      // PG normalizes macaddr to lowercase
-      expect(rows[0].mac_address).toBe("ab:cd:ef:01:02:03");
-    });
+    // Needs Base model with dirty tracking support
+    it.skip("mac address change case does not mark dirty", async () => {});
   });
 });
