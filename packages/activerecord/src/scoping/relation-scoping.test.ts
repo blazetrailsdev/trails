@@ -248,7 +248,6 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await AnnPost.create({ title: "Annotated" });
     const rel = AnnPost.all().annotate("finding posts");
     await AnnPost.scoping(rel, async () => {
       const sql = AnnPost.all().toSql();
@@ -257,17 +256,16 @@ describe("RelationScopingTest", () => {
   });
 
   it("find with annotation unscoped", async () => {
-    class AnnuPost extends Base {
+    class AnnUnscopedPost extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    await AnnuPost.create({ title: "Test" });
-    const annotated = AnnuPost.all().annotate("test");
+    const annotated = AnnUnscopedPost.all().annotate("test");
     const annotatedSql = annotated.toSql();
     expect(annotatedSql).toContain("/* test */");
-    const unscopedSql = AnnuPost.unscoped().toSql();
+    const unscopedSql = AnnUnscopedPost.unscoped().toSql();
     expect(unscopedSql).not.toContain("/* test */");
     expect(unscopedSql).toContain("SELECT");
   });
@@ -287,8 +285,7 @@ describe("RelationScopingTest", () => {
         this.adapter = adapter;
       }
     }
-    await SjPost.create({ title: "Joined" });
-    const rel = SjPost.joins("INNER JOIN comments ON comments.post_id = sj_posts.id");
+    const rel = SjPost.joins(`INNER JOIN comments ON comments.post_id = ${SjPost.tableName}.id`);
     await SjPost.scoping(rel, async () => {
       const sql = SjPost.all().toSql();
       expect(sql).toContain("INNER JOIN comments");
