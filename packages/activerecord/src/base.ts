@@ -2919,16 +2919,11 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Core#clone
    */
   clone(): Base {
-    const ctor = this.constructor as typeof Base;
-    const copy = new ctor(this.attributes);
-    copy._newRecord = this._newRecord;
-    copy._destroyed = this._destroyed;
-    copy._readonly = this._readonly;
-    copy._frozen = this._frozen;
-    if (!this._newRecord) {
-      (copy as any)._dirty.snapshot(copy._attributes);
-      copy.changesApplied();
-    }
+    const copy = Object.create(Object.getPrototypeOf(this)) as Base;
+    Object.assign(copy, this);
+    copy._attributes = this._attributes;
+    copy._previouslyNewRecord = false;
+    copy.errors = new (this.errors.constructor as new (base: unknown) => typeof this.errors)(copy);
     return copy;
   }
 

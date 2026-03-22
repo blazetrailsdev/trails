@@ -14,6 +14,38 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("CloneTest", () => {
+  it("persisted", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const topic = await Topic.create({ title: "test", author_name: "David" });
+    const cloned = topic.clone();
+    expect(topic.isPersisted()).toBe(true);
+    expect(cloned.isPersisted()).toBe(true);
+    expect(cloned.isNewRecord()).toBe(false);
+    expect(cloned.previouslyNewRecord()).toBe(false);
+  });
+
+  it("shallow", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const topic = await Topic.create({ title: "test", author_name: "David" });
+    const cloned = topic.clone();
+    topic.writeAttribute("author_name", "Aaron");
+    expect(cloned.readAttribute("author_name")).toBe("Aaron");
+  });
+
   it("stays frozen", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
@@ -106,7 +138,7 @@ describe("Base#clone", () => {
     const u = await User.create({ name: "Alice" });
     const c = u.clone();
     c.writeAttribute("name", "Bob");
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.readAttribute("name")).toBe("Bob");
     expect(c.readAttribute("name")).toBe("Bob");
   });
 });
