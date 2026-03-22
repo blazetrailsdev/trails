@@ -136,6 +136,11 @@ export class Migrator {
       const bv = BigInt(v);
       if (bv > max) max = bv;
     }
+    if (max > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(
+        `Current migration version ${max} exceeds Number.MAX_SAFE_INTEGER. Use string-based version APIs.`,
+      );
+    }
     return Number(max);
   }
 
@@ -215,18 +220,19 @@ export class Migrator {
     const names = new Set<string>();
 
     for (const m of migrations) {
-      if (versions.has(m.version)) {
-        throw new Error(`Duplicate migration version: ${m.version}`);
-      }
-      if (names.has(m.name)) {
-        throw new Error(`Duplicate migration name: ${m.name}`);
-      }
       if (!m.version || !/^\d+$/.test(m.version)) {
         throw new Error(
           `Invalid migration version: ${m.version}. Version must be a numeric string.`,
         );
       }
-      versions.add(m.version);
+      const normalized = String(BigInt(m.version));
+      if (versions.has(normalized)) {
+        throw new Error(`Duplicate migration version: ${m.version}`);
+      }
+      if (names.has(m.name)) {
+        throw new Error(`Duplicate migration name: ${m.name}`);
+      }
+      versions.add(normalized);
       names.add(m.name);
     }
   }
