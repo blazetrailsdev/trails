@@ -363,7 +363,7 @@ interface TaggedFormatter {
 }
 
 export interface TaggedLogger extends Logger {
-  tagged(...tags: (string | string[] | null | undefined)[]): TaggedLogger;
+  tagged(...tags: (string | string[] | null | undefined | (() => void))[]): TaggedLogger;
   pushTags(...tags: (string | string[] | null | undefined)[]): string[];
   popTags(count?: number): string[];
   clearTags(): string[];
@@ -496,8 +496,27 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
      * Returns a NEW independent proxy that includes the current tags plus the
      * new ones. The current proxy's tagStack is NOT modified.
      */
-    tagged(...rawTags: (string | string[] | null | undefined)[]): TaggedLogger {
-      const flat = flattenTags(rawTags);
+    tagged(...rawTags: (string | string[] | null | undefined | (() => void))[]): TaggedLogger {
+      const lastArg = rawTags[rawTags.length - 1];
+      const hasBlock = typeof lastArg === "function";
+      const tagArgs = (hasBlock ? rawTags.slice(0, -1) : rawTags) as (
+        | string
+        | string[]
+        | null
+        | undefined
+      )[];
+      const flat = flattenTags(tagArgs);
+
+      if (hasBlock) {
+        tagStack.push(...flat);
+        try {
+          (lastArg as () => void)();
+        } finally {
+          tagStack.splice(tagStack.length - flat.length, flat.length);
+        }
+        return proxy as TaggedLogger;
+      }
+
       return makeTaggedProxy(logger, [...tagStack, ...flat]);
     },
   };
