@@ -22,12 +22,6 @@ describeIfPg("PostgresAdapter", () => {
     await adapter.close();
   });
 
-  /** Parse money value returned by pg (could be string or number depending on driver config). */
-  function moneyNum(val: unknown): number {
-    if (typeof val === "number") return val;
-    return parseFloat(String(val).replace(/[^0-9.-]/g, ""));
-  }
-
   describe("PostgresqlMoneyTest", () => {
     it("column", async () => {
       const cols = await adapter.columns("postgresql_moneys");
@@ -44,8 +38,8 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("money type cast", async () => {
-      const rows = await adapter.execute("SELECT '567.89'::money AS val");
-      expect(moneyNum(rows[0].val)).toBeCloseTo(567.89, 2);
+      const rows = await adapter.execute("SELECT '567.89'::money::numeric AS val");
+      expect(Number(rows[0].val)).toBeCloseTo(567.89, 2);
     });
 
     it("money write", async () => {
@@ -53,10 +47,10 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('567.89'::money)`,
       );
       const rows = await adapter.execute(
-        `SELECT "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
+        `SELECT "wealth"::numeric FROM "postgresql_moneys" WHERE "id" = ?`,
         [id],
       );
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(567.89, 2);
+      expect(Number(rows[0].numeric)).toBeCloseTo(567.89, 2);
     });
 
     it("money select", async () => {
@@ -66,15 +60,19 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.executeMutation(
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('678.90'::money)`,
       );
-      const rows = await adapter.execute(`SELECT "wealth" FROM "postgresql_moneys" ORDER BY "id"`);
+      const rows = await adapter.execute(
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" ORDER BY "id"`,
+      );
       expect(rows).toHaveLength(2);
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(123.45, 2);
-      expect(moneyNum(rows[1].wealth)).toBeCloseTo(678.9, 2);
+      expect(Number(rows[0].wealth)).toBeCloseTo(123.45, 2);
+      expect(Number(rows[1].wealth)).toBeCloseTo(678.9, 2);
     });
 
     it("money arithmetic", async () => {
-      const rows = await adapter.execute("SELECT ('100.00'::money + '50.25'::money) AS val");
-      expect(moneyNum(rows[0].val)).toBeCloseTo(150.25, 2);
+      const rows = await adapter.execute(
+        "SELECT ('100.00'::money + '50.25'::money)::numeric AS val",
+      );
+      expect(Number(rows[0].val)).toBeCloseTo(150.25, 2);
     });
 
     it("money comparison", async () => {
@@ -93,10 +91,10 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('200.00'::money)`,
       );
       const rows = await adapter.execute(
-        `SELECT * FROM "postgresql_moneys" WHERE "wealth" = '100.00'::money`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "wealth" = '100.00'::money`,
       );
       expect(rows).toHaveLength(1);
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(100, 2);
+      expect(Number(rows[0].wealth)).toBeCloseTo(100, 2);
     });
 
     it("money order", async () => {
@@ -110,11 +108,9 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('200.00'::money)`,
       );
       const rows = await adapter.execute(
-        `SELECT "wealth" FROM "postgresql_moneys" ORDER BY "wealth" ASC`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" ORDER BY "wealth" ASC`,
       );
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(100, 2);
-      expect(moneyNum(rows[1].wealth)).toBeCloseTo(200, 2);
-      expect(moneyNum(rows[2].wealth)).toBeCloseTo(300, 2);
+      expect(rows.map((r) => Number(r.wealth))).toEqual([100, 200, 300]);
     });
 
     it("money sum", async () => {
@@ -124,13 +120,15 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.executeMutation(
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('200.75'::money)`,
       );
-      const rows = await adapter.execute(`SELECT SUM("wealth") AS total FROM "postgresql_moneys"`);
-      expect(moneyNum(rows[0].total)).toBeCloseTo(301.25, 2);
+      const rows = await adapter.execute(
+        `SELECT SUM("wealth")::numeric AS total FROM "postgresql_moneys"`,
+      );
+      expect(Number(rows[0].total)).toBeCloseTo(301.25, 2);
     });
 
     it("money format", async () => {
-      const rows = await adapter.execute("SELECT '$1,234.56'::money AS val");
-      expect(moneyNum(rows[0].val)).toBeCloseTo(1234.56, 2);
+      const rows = await adapter.execute("SELECT '$1,234.56'::money::numeric AS val");
+      expect(Number(rows[0].val)).toBeCloseTo(1234.56, 2);
     });
 
     it("money values", async () => {
@@ -141,15 +139,15 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (2, '-567.89'::money)`,
       );
       const positive = await adapter.execute(
-        `SELECT "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
         [1],
       );
       const negative = await adapter.execute(
-        `SELECT "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
         [2],
       );
-      expect(moneyNum(positive[0].wealth)).toBeCloseTo(567.89, 2);
-      expect(moneyNum(negative[0].wealth)).toBeCloseTo(-567.89, 2);
+      expect(Number(positive[0].wealth)).toBeCloseTo(567.89, 2);
+      expect(Number(negative[0].wealth)).toBeCloseTo(-567.89, 2);
     });
 
     // Needs ActiveRecord type system
@@ -166,20 +164,20 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('987.65'::money)`,
       );
       const rows = await adapter.execute(
-        `SELECT "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
         [id],
       );
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(987.65, 2);
+      expect(Number(rows[0].wealth)).toBeCloseTo(987.65, 2);
 
       await adapter.executeMutation(
         `UPDATE "postgresql_moneys" SET "wealth" = '123.45'::money WHERE "id" = ?`,
         [id],
       );
       const updated = await adapter.execute(
-        `SELECT "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
         [id],
       );
-      expect(moneyNum(updated[0].wealth)).toBeCloseTo(123.45, 2);
+      expect(Number(updated[0].wealth)).toBeCloseTo(123.45, 2);
     });
 
     it("update all with money string", async () => {
@@ -187,8 +185,10 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('0.00'::money)`,
       );
       await adapter.executeMutation(`UPDATE "postgresql_moneys" SET "wealth" = '987.65'::money`);
-      const rows = await adapter.execute(`SELECT "wealth" FROM "postgresql_moneys"`);
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(987.65, 2);
+      const rows = await adapter.execute(
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys"`,
+      );
+      expect(Number(rows[0].wealth)).toBeCloseTo(987.65, 2);
     });
 
     // Needs ORM layer (BigDecimal handling)
@@ -199,8 +199,10 @@ describeIfPg("PostgresAdapter", () => {
         `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('0.00'::money)`,
       );
       await adapter.executeMutation(`UPDATE "postgresql_moneys" SET "wealth" = 123.45::money`);
-      const rows = await adapter.execute(`SELECT "wealth" FROM "postgresql_moneys"`);
-      expect(moneyNum(rows[0].wealth)).toBeCloseTo(123.45, 2);
+      const rows = await adapter.execute(
+        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys"`,
+      );
+      expect(Number(rows[0].wealth)).toBeCloseTo(123.45, 2);
     });
   });
 });
