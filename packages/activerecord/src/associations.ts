@@ -1010,7 +1010,9 @@ export class CollectionProxy {
 
   /** @internal Initialize from preloaded association data. */
   _hydrateFromPreload(records: Base[]): void {
-    this._target = records;
+    // Preserve any unsaved in-memory records (from build/push before preload ran)
+    const unsaved = this._target.filter((r) => r.isNewRecord());
+    this._target = unsaved.length > 0 ? [...records, ...unsaved] : records;
     this._loaded = true;
   }
 
