@@ -93,6 +93,20 @@ const SQL_TYPE_MAP: Record<string, DslMapping> = {
   bigserial: { dslType: "bigserial" },
 };
 
+const KNOWN_DSL_TYPES = new Set([
+  "string",
+  "text",
+  "integer",
+  "bigint",
+  "float",
+  "decimal",
+  "boolean",
+  "date",
+  "datetime",
+  "timestamp",
+  "binary",
+]);
+
 function sqlTypeToDsl(sqlType: string): DslMapping {
   const normalized = sqlType.toLowerCase().trim();
   const isArray = normalized.endsWith("[]");
@@ -124,20 +138,7 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
           result = { dslType: "time" };
         } else {
           // If it's already a known DSL type name, pass it through
-          const knownDslTypes = new Set([
-            "string",
-            "text",
-            "integer",
-            "bigint",
-            "float",
-            "decimal",
-            "boolean",
-            "date",
-            "datetime",
-            "timestamp",
-            "binary",
-          ]);
-          if (knownDslTypes.has(baseType)) {
+          if (KNOWN_DSL_TYPES.has(baseType)) {
             result = { dslType: baseType };
           } else {
             // Unknown types (enums, domains, etc.)
@@ -170,7 +171,7 @@ function cleanDefault(raw: unknown): unknown {
   }
 
   // Numeric defaults: 150.55::type, (150.55)::type, with chained casts
-  const numericCastMatch = str.match(/^\(?([\d.]+)\)?(::[\w\s."[\](),]+)+$/);
+  const numericCastMatch = str.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
   if (numericCastMatch) {
     return Number(numericCastMatch[1]);
   }
