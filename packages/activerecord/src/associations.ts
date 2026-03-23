@@ -1031,7 +1031,6 @@ export class CollectionProxy {
    * Load and return all associated records.
    */
   async toArray(): Promise<Base[]> {
-    if (this._loaded) return this._target;
     let results: Base[];
     if (this._isHabtm) {
       results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
@@ -1420,15 +1419,32 @@ export class CollectionProxy {
   }
 
   private _removeFromTarget(records: Base[]): void {
-    const pks = new Set(
-      records.map((r) => {
-        const pk = (r.constructor as typeof Base).primaryKey;
-        return r.readAttribute(pk as string);
-      }),
-    );
-    this._target = this._target.filter((r) => {
+    const identityFor = (r: Base): string | null => {
       const pk = (r.constructor as typeof Base).primaryKey;
-      return !pks.has(r.readAttribute(pk as string));
+      if (Array.isArray(pk)) {
+        const vals = pk.map((col) => r.readAttribute(col));
+        if (vals.some((v) => v == null)) return null;
+        return JSON.stringify(vals);
+      }
+      const val = r.readAttribute(pk as string);
+      return val == null ? null : String(val);
+    };
+
+    const pkIdentities = new Set<string>();
+    const nullPkRecords = new Set<Base>();
+    for (const r of records) {
+      const id = identityFor(r);
+      if (id == null) {
+        nullPkRecords.add(r);
+      } else {
+        pkIdentities.add(id);
+      }
+    }
+
+    this._target = this._target.filter((r) => {
+      const id = identityFor(r);
+      if (id != null) return !pkIdentities.has(id);
+      return !nullPkRecords.has(r);
     });
   }
 
@@ -1525,9 +1541,9 @@ export class CollectionProxy {
   async clear(): Promise<void> {
     return this._withoutStrictLoading(async () => {
       const records = await this.toArray();
-      await this.delete(...records);
-      this._target = [];
-      this._loaded = true;
+      if (records.length > 0) {
+        await this.delete(...records);
+      }
     });
   }
 
@@ -1716,7 +1732,7 @@ export class CollectionProxy {
   }
 
   async pluck(...columns: string[]): Promise<unknown[]> {
-    const records = await this.toArray();
+    const records = this._loaded ? this._target : await this.toArray();
     if (columns.length === 1) {
       return records.map((r) => r.readAttribute(columns[0]));
     }
@@ -1724,7 +1740,7 @@ export class CollectionProxy {
   }
 
   async pick(...columns: string[]): Promise<unknown> {
-    const records = await this.toArray();
+    const records = this._loaded ? this._target : await this.toArray();
     if (records.length === 0) return null;
     if (columns.length === 1) {
       return records[0].readAttribute(columns[0]);
@@ -1744,10 +1760,23 @@ export class CollectionProxy {
   }
 
   scope(): any {
+    if (this._isThrough || this._isHabtm) {
+      throw new Error(
+        `CollectionProxy#scope is not yet implemented for through/HABTM associations on "${this._assocName}".`,
+      );
+    }
+
     const ctor = this._record.constructor as typeof Base;
+    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
+
+    if (Array.isArray(primaryKey) || Array.isArray(this._assocDef.options.foreignKey)) {
+      throw new Error(
+        `CollectionProxy#scope is not yet implemented for composite primary/foreign keys on "${this._assocName}".`,
+      );
+    }
+
     const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const targetModel = resolveModel(className);
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const asName = this._assocDef.options.as;
     const foreignKey = asName
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)

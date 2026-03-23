@@ -6554,16 +6554,25 @@ describe("AssociationProxyTest", () => {
   it("pluck uses loaded target", async () => {
     const { APPost, APComment } = setupProxyModels();
     const post = await APPost.create({ title: "pluck test" });
-    await APComment.create({ body: "plucked", ap_post_id: post.id });
+    const comment = await APComment.create({ body: "plucked", ap_post_id: post.id });
     const proxy = association(post, "apComments");
+    await proxy.load();
+    // Mutate DB after loading — pluck should still see loaded data
+    const reloaded = await APComment.find(comment.id);
+    reloaded.body = "changed";
+    await reloaded.save();
     const bodies = await proxy.pluck("body");
     expect(bodies).toEqual(["plucked"]);
   });
   it("pick uses loaded target", async () => {
     const { APPost, APComment } = setupProxyModels();
     const post = await APPost.create({ title: "pick test" });
-    await APComment.create({ body: "picked", ap_post_id: post.id });
+    const comment = await APComment.create({ body: "picked", ap_post_id: post.id });
     const proxy = association(post, "apComments");
+    await proxy.load();
+    const reloaded = await APComment.find(comment.id);
+    reloaded.body = "changed";
+    await reloaded.save();
     const body = await proxy.pick("body");
     expect(body).toBe("picked");
   });
