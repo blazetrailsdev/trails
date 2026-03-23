@@ -1851,8 +1851,18 @@ export class CollectionProxy {
  * Returns a cached proxy if one exists on the record.
  */
 export function association(record: Base, assocName: string): CollectionProxy {
-  const existing = record._collectionProxies.get(assocName);
-  if (existing) return existing as CollectionProxy;
+  const existing = record._collectionProxies.get(assocName) as CollectionProxy | undefined;
+  if (existing) {
+    // Hydrate from preloaded data if proxy was cached before preloading ran
+    if (!existing.loaded) {
+      const preloaded = record._preloadedAssociations?.get(assocName);
+      if (preloaded != null) {
+        const records = Array.isArray(preloaded) ? preloaded : [preloaded];
+        existing._hydrateFromPreload(records as Base[]);
+      }
+    }
+    return existing;
+  }
 
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
