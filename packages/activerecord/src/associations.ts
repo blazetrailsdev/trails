@@ -1064,10 +1064,31 @@ export class CollectionProxy {
     } else {
       results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
     }
+    // Merge: prefer existing in-memory instances (from push/build) over fresh DB records
+    const existingByPk = new Map<string, Base>();
+    for (const r of this._target) {
+      const id = this._identityFor(r);
+      if (id != null) existingByPk.set(id, r);
+    }
+    const merged: Base[] = results.map((r) => {
+      const id = this._identityFor(r);
+      return id != null && existingByPk.has(id) ? existingByPk.get(id)! : r;
+    });
     const unsaved = this._target.filter((r) => r.isNewRecord());
-    this._target = [...results, ...unsaved];
+    this._target = unsaved.length > 0 ? [...merged, ...unsaved] : merged;
     this._loaded = true;
     return this._target;
+  }
+
+  private _identityFor(r: Base): string | null {
+    const pk = (r.constructor as typeof Base).primaryKey;
+    if (Array.isArray(pk)) {
+      const vals = pk.map((col) => r.readAttribute(col));
+      if (vals.some((v) => v == null)) return null;
+      return JSON.stringify(vals);
+    }
+    const val = r.readAttribute(pk as string);
+    return val == null ? null : String(val);
   }
 
   private get _isThrough(): boolean {
@@ -1453,21 +1474,10 @@ export class CollectionProxy {
   }
 
   private _removeFromTarget(records: Base[]): void {
-    const identityFor = (r: Base): string | null => {
-      const pk = (r.constructor as typeof Base).primaryKey;
-      if (Array.isArray(pk)) {
-        const vals = pk.map((col) => r.readAttribute(col));
-        if (vals.some((v) => v == null)) return null;
-        return JSON.stringify(vals);
-      }
-      const val = r.readAttribute(pk as string);
-      return val == null ? null : String(val);
-    };
-
     const pkIdentities = new Set<string>();
     const nullPkRecords = new Set<Base>();
     for (const r of records) {
-      const id = identityFor(r);
+      const id = this._identityFor(r);
       if (id == null) {
         nullPkRecords.add(r);
       } else {
@@ -1476,7 +1486,7 @@ export class CollectionProxy {
     }
 
     this._target = this._target.filter((r) => {
-      const id = identityFor(r);
+      const id = this._identityFor(r);
       if (id != null) return !pkIdentities.has(id);
       return !nullPkRecords.has(r);
     });
@@ -1781,7 +1791,18 @@ export class CollectionProxy {
   }
 
   async pluck(...columns: string[]): Promise<unknown[]> {
-    const records = this._loaded ? this._target : await this.toArray();
+    if (this._loaded) {
+      if (columns.length === 1) {
+        return this._target.map((r) => r.readAttribute(columns[0]));
+      }
+      return this._target.map((r) => columns.map((c) => r.readAttribute(c)));
+    }
+    // Delegate to scope().pluck() for DB-level column selection when possible
+    if (!this._isThrough && !this._isHabtm) {
+      const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
+      if (rel) return rel.pluck(...columns);
+    }
+    const records = await this.toArray();
     if (columns.length === 1) {
       return records.map((r) => r.readAttribute(columns[0]));
     }
@@ -1789,11 +1810,18 @@ export class CollectionProxy {
   }
 
   async pick(...columns: string[]): Promise<unknown> {
-    const records = this._loaded ? this._target : await this.toArray();
-    if (records.length === 0) return null;
-    if (columns.length === 1) {
-      return records[0].readAttribute(columns[0]);
+    if (this._loaded) {
+      if (this._target.length === 0) return null;
+      if (columns.length === 1) return this._target[0].readAttribute(columns[0]);
+      return columns.map((c) => this._target[0].readAttribute(c));
     }
+    if (!this._isThrough && !this._isHabtm) {
+      const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
+      if (rel) return rel.pick(...columns);
+    }
+    const records = await this.toArray();
+    if (records.length === 0) return null;
+    if (columns.length === 1) return records[0].readAttribute(columns[0]);
     return columns.map((c) => records[0].readAttribute(c));
   }
 
@@ -1816,38 +1844,11 @@ export class CollectionProxy {
       );
     }
 
-    const ctor = this._record.constructor as typeof Base;
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-
-    if (Array.isArray(primaryKey) || Array.isArray(this._assocDef.options.foreignKey)) {
-      throw new Error(
-        `CollectionProxy#scope is not yet implemented for composite primary/foreign keys on "${this._assocName}".`,
-      );
-    }
-
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-    const targetModel = resolveModel(className);
-    const asName = this._assocDef.options.as;
-    const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
-    const pkValue = this._record.readAttribute(primaryKey as string);
-    let rel = (targetModel as any).all();
-
-    if (pkValue === null || pkValue === undefined) {
-      if (this._assocDef.options.scope) {
-        rel = this._assocDef.options.scope(rel);
-      }
-      return rel.none();
-    }
-
-    const conditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
-    if (asName) {
-      conditions[`${underscore(asName)}_type`] = ctor.name;
-    }
-    rel = rel.where(conditions);
-    if (this._assocDef.options.scope) {
-      rel = this._assocDef.options.scope(rel);
+    const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
+    if (rel === null) {
+      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+      const targetModel = resolveModel(className);
+      return (targetModel as any).all().none();
     }
     return rel;
   }
