@@ -3461,6 +3461,34 @@ export class Relation<T extends Base> {
           const targetModel = _mr.get(className);
           if (!targetModel) continue;
 
+          // If the source association on the through model is itself a through
+          // association, recursively preload it on the through records first,
+          // then collect results from _preloadedAssociations.
+          if (sourceAssocDef?.options?.through) {
+            const resolvedSourceName = sourceAssocDef.name;
+            // Build a temporary Relation for the through model to trigger recursive preload
+            const throughRel = (throughModel as any)._allForPreload();
+            await (throughRel as any)._preloadAssociationsForRecords(throughRecords, [
+              resolvedSourceName,
+            ]);
+
+            for (const record of records) {
+              if (!(record as any)._preloadedAssociations)
+                (record as any)._preloadedAssociations = new Map();
+              const pkVal = record.readAttribute(primaryKey);
+              const myThroughRecords = throughRecords.filter(
+                (tr: any) => tr.readAttribute(throughFk) == pkVal,
+              );
+              const myTargets = myThroughRecords.flatMap((tr: any) => {
+                const preloaded = (tr as any)._preloadedAssociations?.get(resolvedSourceName);
+                if (!preloaded) return [];
+                return Array.isArray(preloaded) ? preloaded : [preloaded];
+              });
+              (record as any)._preloadedAssociations.set(assocName, myTargets);
+            }
+            continue;
+          }
+
           let targetRecords: any[];
           let targetMap: Map<unknown, any>;
           let getTargetsForThrough: (throughRec: any) => any[];
@@ -3633,6 +3661,31 @@ export class Relation<T extends Base> {
           const sourceAssocDef =
             throughModelAssociations.find((a: any) => a.name === sourceName) ??
             throughModelAssociations.find((a: any) => a.name === pluralizeHot(sourceName));
+
+          // Recursive through: if source association is itself a through, preload recursively
+          if (sourceAssocDef?.options?.through) {
+            const resolvedSourceName = sourceAssocDef.name;
+            const throughRel = (throughModel as any)._allForPreload();
+            await (throughRel as any)._preloadAssociationsForRecords(throughRecords, [
+              resolvedSourceName,
+            ]);
+
+            for (const record of records) {
+              if (!(record as any)._preloadedAssociations)
+                (record as any)._preloadedAssociations = new Map();
+              const pkVal = record.readAttribute(primaryKey);
+              const myThroughRecord = throughRecords.find(
+                (tr: any) => tr.readAttribute(throughFk) == pkVal,
+              );
+              const preloaded = myThroughRecord
+                ? ((myThroughRecord as any)._preloadedAssociations?.get(resolvedSourceName) ?? null)
+                : null;
+              // hasOne through: unwrap array to single value
+              const target = Array.isArray(preloaded) ? (preloaded[0] ?? null) : preloaded;
+              (record as any)._preloadedAssociations.set(assocName, target);
+            }
+            continue;
+          }
 
           const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
           const targetIds = [

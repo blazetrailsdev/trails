@@ -108,7 +108,42 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.name).toBe("nested-tag");
   });
 
-  it.skip("has many through has many with has many through source reflection preload", () => {});
+  it("has many through has many with has many through source reflection preload", async () => {
+    // Author -> posts -> taggings -> tags (nested through, preload strategy)
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "DHH" });
+    const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
+    const tag = await Tag.create({ name: "ruby" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("ruby");
+  });
 
   it.skip("has many through has many with has many through source reflection preload via joins", () => {});
 
@@ -141,7 +176,36 @@ describe("NestedThroughAssociationsTest", () => {
     expect(allTaggings.length).toBe(2);
   });
 
-  it.skip("has many through has many through with has many source reflection preload", () => {});
+  it("has many through has many through with has many source reflection preload", async () => {
+    // Author -> posts -> taggings (nested through, source is hasMany not through)
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", through: "posts", source: "taggings" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+    ];
+    const author = await Author.create({ name: "Nested" });
+    const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
+    const tag1 = await Tag.create({ name: "t1" });
+    const tag2 = await Tag.create({ name: "t2" });
+    await Tagging.create({ tag_id: tag1.id, taggable_id: post1.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag2.id, taggable_id: post2.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("taggings").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTaggings = (authors[0] as any)._preloadedAssociations?.get("taggings") ?? [];
+    expect(preloadedTaggings).toHaveLength(2);
+  });
 
   it.skip("has many through has many through with has many source reflection preload via joins", () => {});
 
@@ -167,7 +231,44 @@ describe("NestedThroughAssociationsTest", () => {
     expect(tagging!.tag_id).toBe(tag.id);
   });
 
-  it.skip("has many through has one with has one through source reflection preload", () => {});
+  it("has many through has one with has one through source reflection preload", async () => {
+    // Author -> posts (hasMany) -> tagging (hasOne per post) -> tag (belongsTo)
+    // Author has_many :tags, through: :posts, source: :tag
+    // Post has_one :tag, through: :tagging
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tag" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasOne",
+        name: "tagging",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasOne",
+        name: "tag",
+        options: { className: "Tag", through: "tagging", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "HasOneThrough" });
+    const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
+    const tag = await Tag.create({ name: "ruby" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("ruby");
+  });
 
   it.skip("has many through has one with has one through source reflection preload via joins", () => {});
 
@@ -197,7 +298,44 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.name).toBe("nested");
   });
 
-  it.skip("has many through has one through with has one source reflection preload", () => {});
+  it("has many through has one through with has one source reflection preload", async () => {
+    // Author -> posts (hasMany) -> each post has_one tagging -> tag (belongsTo on tagging)
+    // Post has_one :tag, through: :tagging (source is belongsTo, a hasOne through)
+    // Author has_many :tags, through: :posts, source: :tag
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tag" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasOne",
+        name: "tagging",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasOne",
+        name: "tag",
+        options: { className: "Tag", through: "tagging", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "NestedHasOne" });
+    const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
+    const tag = await Tag.create({ name: "nested" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("nested");
+  });
 
   it.skip("has many through has one through with has one source reflection preload via joins", () => {});
 
@@ -222,7 +360,44 @@ describe("NestedThroughAssociationsTest", () => {
     expect(taggings.length).toBe(2);
   });
 
-  it.skip("has many through has one with has many through source reflection preload", () => {});
+  it("has many through has one with has many through source reflection preload", async () => {
+    // Author -> posts -> taggings (where Post has_many :tags, through: :taggings)
+    // Author has_many :tags through posts, source is a through association
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "MixedThrough" });
+    const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
+    const t1 = await Tag.create({ name: "mix1" });
+    const t2 = await Tag.create({ name: "mix2" });
+    await Tagging.create({ tag_id: t1.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: t2.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(2);
+  });
 
   it.skip("has many through has one with has many through source reflection preload via joins", () => {});
 
@@ -249,7 +424,38 @@ describe("NestedThroughAssociationsTest", () => {
     expect(taggings.length).toBe(3);
   });
 
-  it.skip("has many through has one through with has many source reflection preload", () => {});
+  it("has many through has one through with has many source reflection preload", async () => {
+    // Author -> posts -> taggings (Post has_many :taggings directly)
+    // Author has_many :taggings, through: :posts
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", through: "posts", source: "taggings" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+    ];
+    const author = await Author.create({ name: "HasOneHasMany" });
+    const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
+    const t1 = await Tag.create({ name: "s1" });
+    const t2 = await Tag.create({ name: "s2" });
+    const t3 = await Tag.create({ name: "s3" });
+    await Tagging.create({ tag_id: t1.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: t2.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: t3.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("taggings").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTaggings = (authors[0] as any)._preloadedAssociations?.get("taggings") ?? [];
+    expect(preloadedTaggings).toHaveLength(3);
+  });
 
   it.skip("has many through has one through with has many source reflection preload via joins", () => {});
 
@@ -287,7 +493,45 @@ describe("NestedThroughAssociationsTest", () => {
     expect(names).toContain("hs_tag2");
   });
 
-  it.skip("has many through has many with has and belongs to many source reflection preload", () => {});
+  it("has many through has many with has and belongs to many source reflection preload", async () => {
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "HABTMSource" });
+    const post = await Post.create({ author_id: author.id, title: "HS", body: "B" });
+    const t1 = await Tag.create({ name: "hs_tag1" });
+    const t2 = await Tag.create({ name: "hs_tag2" });
+    await Tagging.create({ tag_id: t1.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: t2.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(2);
+    const names = preloadedTags.map((t: any) => t.name);
+    expect(names).toContain("hs_tag1");
+    expect(names).toContain("hs_tag2");
+  });
 
   it.skip("has many through has many with has and belongs to many source reflection preload via joins", () => {});
 
@@ -319,7 +563,40 @@ describe("NestedThroughAssociationsTest", () => {
     expect(titles).toContain("HM2");
   });
 
-  it.skip("has many through has and belongs to many with has many source reflection preload", () => {});
+  it("has many through has and belongs to many with has many source reflection preload", async () => {
+    (Tag as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "tag_id" },
+      },
+      {
+        type: "hasMany",
+        name: "posts",
+        options: { className: "Post", through: "taggings", source: "post" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "post",
+        options: { className: "Post", foreignKey: "taggable_id" },
+      },
+    ];
+    const tag = await Tag.create({ name: "habtm_hm_tag" });
+    const post1 = await Post.create({ title: "HM1", body: "B" });
+    const post2 = await Post.create({ title: "HM2", body: "B" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post1.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post2.id, taggable_type: "Post" });
+
+    const tags = await Tag.all().preload("posts").toArray();
+    expect(tags).toHaveLength(1);
+    const preloadedPosts = (tags[0] as any)._preloadedAssociations?.get("posts") ?? [];
+    expect(preloadedPosts).toHaveLength(2);
+    const titles = preloadedPosts.map((p: any) => p.title);
+    expect(titles).toContain("HM1");
+    expect(titles).toContain("HM2");
+  });
 
   it.skip("has many through has and belongs to many with has many source reflection preload via joins", () => {});
 
@@ -359,7 +636,44 @@ describe("NestedThroughAssociationsTest", () => {
     expect(names).toEqual(["hc1", "hc2"]);
   });
 
-  it.skip("has many through has many with has many through habtm source reflection preload", () => {});
+  it("has many through has many with has many through habtm source reflection preload", async () => {
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "HABTMChain" });
+    const post = await Post.create({ author_id: author.id, title: "HC", body: "B" });
+    const tag1 = await Tag.create({ name: "hc1" });
+    const tag2 = await Tag.create({ name: "hc2" });
+    await Tagging.create({ tag_id: tag1.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag2.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(2);
+    const names = preloadedTags.map((t: any) => t.name).sort();
+    expect(names).toEqual(["hc1", "hc2"]);
+  });
 
   it.skip("has many through has many with has many through habtm source reflection preload via joins", () => {});
 
@@ -392,7 +706,41 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.name).toBe("bt_tag");
   });
 
-  it.skip("has many through has many through with belongs to source reflection preload", () => {});
+  it("has many through has many through with belongs to source reflection preload", async () => {
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "BelongsToSource" });
+    const post = await Post.create({ author_id: author.id, title: "T1", body: "B" });
+    const tag = await Tag.create({ name: "bt_tag" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("bt_tag");
+  });
 
   it.skip("has many through has many through with belongs to source reflection preload via joins", () => {});
 
@@ -422,7 +770,40 @@ describe("NestedThroughAssociationsTest", () => {
     expect(allPosts.length).toBe(2);
   });
 
-  it.skip("has many through belongs to with has many through source reflection preload", () => {});
+  it("has many through belongs to with has many through source reflection preload", async () => {
+    // Post belongs_to Author -> Author has_many tags through posts -> taggings -> tags
+    (Post as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "author",
+        options: { className: "Author", foreignKey: "author_id" },
+      },
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "BtThrough" });
+    const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
+    const tag1 = await Tag.create({ name: "bt1" });
+    const tag2 = await Tag.create({ name: "bt2" });
+    await Tagging.create({ tag_id: tag1.id, taggable_id: post1.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag2.id, taggable_id: post2.id, taggable_type: "Post" });
+
+    const posts = await Post.all().preload("tags").toArray();
+    const allTags = posts.flatMap((p: any) => (p as any)._preloadedAssociations?.get("tags") ?? []);
+    expect(allTags).toHaveLength(2);
+  });
 
   it.skip("has many through belongs to with has many through source reflection preload via joins", () => {});
 
@@ -454,7 +835,44 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedTag!.name).toBe("hoc_tag");
   });
 
-  it.skip("has one through has one with has one through source reflection preload", () => {});
+  it("has one through has one with has one through source reflection preload", async () => {
+    // Author has_one :post -> Post has_one :tagging -> Tagging belongs_to :tag
+    // Post has_one :tag, through: :tagging
+    // Author has_one :tag, through: :post, source: :tag
+    (Author as any)._associations = [
+      { type: "hasOne", name: "post", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasOne",
+        name: "tag",
+        options: { className: "Tag", through: "post", source: "tag" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasOne",
+        name: "tagging",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasOne",
+        name: "tag",
+        options: { className: "Tag", through: "tagging", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "HasOneChain" });
+    const post = await Post.create({ author_id: author.id, title: "HOC", body: "B" });
+    const tag = await Tag.create({ name: "hoc_tag" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tag").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTag = (authors[0] as any)._preloadedAssociations?.get("tag");
+    expect(preloadedTag).not.toBeNull();
+    expect(preloadedTag.name).toBe("hoc_tag");
+  });
 
   it.skip("has one through has one with has one through source reflection preload via joins", () => {});
 
@@ -482,7 +900,35 @@ describe("NestedThroughAssociationsTest", () => {
 
   it.skip("joins and includes from through models not included in association", () => {});
 
-  it.skip("has one through has one through with belongs to source reflection preload", () => {});
+  it("has one through has one through with belongs to source reflection preload", async () => {
+    // Tag has_one :tagging -> Tagging belongs_to :post
+    // Tag has_one :post, through: :tagging
+    (Tag as any)._associations = [
+      { type: "hasOne", name: "tagging", options: { className: "Tagging", foreignKey: "tag_id" } },
+      {
+        type: "hasOne",
+        name: "post",
+        options: { className: "Post", through: "tagging", source: "post" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "post",
+        options: { className: "Post", foreignKey: "taggable_id" },
+      },
+    ];
+    const author = await Author.create({ name: "BelongsChain" });
+    const post = await Post.create({ author_id: author.id, title: "BC", body: "B" });
+    const tag = await Tag.create({ name: "bc_tag" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const tags = await Tag.all().preload("post").toArray();
+    expect(tags).toHaveLength(1);
+    const preloadedPost = (tags[0] as any)._preloadedAssociations?.get("post");
+    expect(preloadedPost).not.toBeNull();
+    expect(preloadedPost.title).toBe("BC");
+  });
 
   it.skip("has one through has one through with belongs to source reflection preload via joins", () => {});
 
