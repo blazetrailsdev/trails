@@ -315,11 +315,16 @@ export class SchemaDumper {
         }
       }
 
-      if (col.limit !== undefined && col.limit !== null && !extraOpts?.limit)
+      if (col.limit !== undefined && col.limit !== null && extraOpts?.limit === undefined)
         opts.push(`limit: ${col.limit}`);
-      if (col.precision !== undefined && col.precision !== null && !extraOpts?.precision)
+      if (
+        col.precision !== undefined &&
+        col.precision !== null &&
+        extraOpts?.precision === undefined
+      )
         opts.push(`precision: ${col.precision}`);
-      if (col.scale !== undefined && !extraOpts?.scale) opts.push(`scale: ${col.scale}`);
+      if (col.scale !== undefined && extraOpts?.scale === undefined)
+        opts.push(`scale: ${col.scale}`);
 
       const optionsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
 
