@@ -42,8 +42,8 @@ describe("CloneTest", () => {
     }
     const topic = await Topic.create({ title: "test", author_name: "David" });
     const cloned = topic.clone();
-    topic.writeAttribute("author_name", "Aaron");
-    expect(cloned.readAttribute("author_name")).toBe("Aaron");
+    topic.author_name = "Aaron";
+    expect(cloned.author_name).toBe("Aaron");
   });
 
   it("stays frozen", async () => {
@@ -122,7 +122,7 @@ describe("Base#clone", () => {
     const u = await User.create({ name: "Alice" });
     const c = u.clone();
     expect(c.id).toBe(u.id);
-    expect(c.readAttribute("name")).toBe("Alice");
+    expect(c.name).toBe("Alice");
     expect(c.isPersisted()).toBe(true);
   });
 
@@ -137,8 +137,8 @@ describe("Base#clone", () => {
     }
     const u = await User.create({ name: "Alice" });
     const c = u.clone();
-    c.writeAttribute("name", "Bob");
-    expect(u.readAttribute("name")).toBe("Bob");
-    expect(c.readAttribute("name")).toBe("Bob");
+    c.name = "Bob";
+    expect(u.name).toBe("Bob");
+    expect(c.name).toBe("Bob");
   });
 });

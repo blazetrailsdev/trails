@@ -59,7 +59,7 @@ describe("has_and_belongs_to_many", () => {
 
     const tags = await loadHabtm(post, "tags", { joinTable: "posts_tags" });
     expect(tags).toHaveLength(2);
-    const names = tags.map((t: any) => t.readAttribute("name")).sort();
+    const names = tags.map((t: any) => t.name).sort();
     expect(names).toEqual(["rails", "ruby"]);
   });
 
@@ -97,6 +97,6 @@ describe("has_and_belongs_to_many", () => {
 
     const projects = await loadHabtm(dev, "projects", {});
     expect(projects).toHaveLength(1);
-    expect(projects[0].readAttribute("name")).toBe("Rails");
+    expect(projects[0].name).toBe("Rails");
   });
 });

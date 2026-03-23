@@ -271,7 +271,7 @@ describe("RelationTest", () => {
     }
     const rel = Post.all().createWith({ body: "default" });
     const post = await rel.findOrCreateBy({ title: "new" });
-    expect(post.readAttribute("body")).toBe("default");
+    expect(post.body).toBe("default");
   });
 
   it("no queries on empty condition exists?", async () => {

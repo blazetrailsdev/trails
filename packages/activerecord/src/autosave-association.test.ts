@@ -103,7 +103,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Ship, Part } = makePirateShip();
     const ship = await Ship.create({ name: "Titanic" });
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.writeAttribute("name", "");
+    part.name = "";
     markForDestruction(part);
     cacheAssoc(ship, "parts", [part]);
     const saved = await ship.save();
@@ -132,7 +132,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    ship.writeAttribute("name", "Black Pearl");
+    ship.name = "Black Pearl";
     cacheAssoc(pirate, "ship", ship);
     const saved = await pirate.save();
     expect(saved).toBe(true);
@@ -200,12 +200,12 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Bird } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    bird.writeAttribute("name", "Squawk");
+    bird.name = "Squawk";
     cacheAssoc(pirate, "birds", [bird]);
     const saved = await pirate.save();
     expect(saved).toBe(true);
     const reloaded = await Bird.find(bird.id!);
-    expect(reloaded.readAttribute("name")).toBe("Squawk");
+    expect(reloaded.name).toBe("Squawk");
   });
 
   it("should destroy has many as part of the save transaction if they were marked for destruction", async () => {
@@ -234,7 +234,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Bird } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    bird.writeAttribute("name", "");
+    bird.name = "";
     markForDestruction(bird);
     cacheAssoc(pirate, "birds", [bird]);
     const saved = await pirate.save();
@@ -339,7 +339,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.push(parrot);
 
     markForDestruction(parrot);
-    parrot.writeAttribute("name", "");
+    parrot.name = "";
     cacheAssoc(pirate, "parrots", [parrot]);
     const saved = await pirate.save();
     expect(saved).toBe(true);
@@ -503,7 +503,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(true);
-    expect(client.readAttribute("company_id")).toBe(company.id);
+    expect(client.company_id).toBe(company.id);
   });
 
   it("parent should not get saved with duplicate children records", async () => {
@@ -535,7 +535,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const saved = await company.save();
     expect(saved).toBe(true);
     expect(client.isNewRecord()).toBe(false);
-    expect(client.readAttribute("company_id")).toBe(company.id);
+    expect(client.company_id).toBe(company.id);
   });
 
   it("assign ids", async () => {
@@ -618,7 +618,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       className: "AidDeveloper",
     });
     expect(devs).toHaveLength(2);
-    expect(devs.map((d) => d.readAttribute("name")).sort()).toEqual(["David", "Jamis"]);
+    expect(devs.map((d) => d.name).sort()).toEqual(["David", "Jamis"]);
   });
 
   it("build before save", async () => {
@@ -761,7 +761,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(firm, "account", account);
     await firm.save();
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("build before either saved", async () => {
@@ -772,7 +772,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     await firm.save();
     expect(firm.isNewRecord()).toBe(false);
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("assignment before parent saved", async () => {
@@ -781,7 +781,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = new Account({ credit_limit: 300 });
     cacheAssoc(firm, "account", account);
     await firm.save();
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("assignment before either saved", async () => {
@@ -845,7 +845,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = await Account.create({ credit_limit: 600, firm_id: firm.id });
     cacheAssoc(firm, "account", account);
     await firm.save();
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 });
 
@@ -894,7 +894,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(ship.isNewRecord()).toBe(false);
-    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("changed for autosave should handle cycles", async () => {
@@ -1087,7 +1087,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     cacheAssoc(post, "author", author);
     await post.save();
     expect(author.isNewRecord()).toBe(false);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 
   it("assignment before either saved", async () => {
@@ -1108,7 +1108,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     await post.save();
     expect(post.isNewRecord()).toBe(false);
     expect(author.isNewRecord()).toBe(false);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 
   it.skip("store association in two relations with one save", () => {
@@ -1143,8 +1143,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     setBelongsTo(sponsor, "sponsorable", member, { polymorphic: true });
     await sponsor.save();
     const reloaded = await PolySponsor.find(sponsor.id!);
-    expect(reloaded.readAttribute("sponsorable_id")).toBe(member.id);
-    expect(reloaded.readAttribute("sponsorable_type")).toBe("PolyMember");
+    expect(reloaded.sponsorable_id).toBe(member.id);
+    expect(reloaded.sponsorable_type).toBe("PolyMember");
   });
 
   it("build and then save parent should not reload target", async () => {
@@ -1233,7 +1233,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
     expect(pirate.isNewRecord()).toBe(false);
-    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("should automatically save bang the associated model", async () => {
@@ -1314,19 +1314,19 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     const ship = new Ship({ name: "FK", pirate_id: pirate.id });
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
-    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("should save if previously saved", async () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Saved", pirate_id: pirate.id });
-    pirate.writeAttribute("catchphrase", "Ahoy");
+    pirate.catchphrase = "Ahoy";
     cacheAssoc(ship, "pirate", pirate);
     const saved = await ship.save();
     expect(saved).toBe(true);
     const reloaded = await Pirate.find(pirate.id!);
-    expect(reloaded.readAttribute("catchphrase")).toBe("Ahoy");
+    expect(reloaded.catchphrase).toBe("Ahoy");
   });
 });
 
@@ -1371,7 +1371,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     await pirate.save();
     const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
     expect(birds.length).toBe(1);
-    expect(birds[0].readAttribute("name")).toBe("Polly");
+    expect(birds[0].name).toBe("Polly");
   });
 
   it("invalid adding with nested attributes", async () => {
@@ -1398,7 +1398,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     assignNestedAttributes(pirate, "birds", [{ name: "Valid" }, { name: "" }]);
     await pirate.save();
     const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.some((b: any) => b.readAttribute("name") === "Valid")).toBe(true);
+    expect(birds.some((b: any) => b.name === "Valid")).toBe(true);
   });
 
   it.skip("errors should be indexed when global flag is set", () => {
@@ -1436,7 +1436,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("catchphrase", "string");
         this.adapter = adapter;
         this.beforeSave(function (record: any) {
-          record.writeAttribute("catchphrase", "Ahoy!");
+          record.catchphrase = "Ahoy!";
         });
       }
     }
@@ -1453,11 +1453,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = new Ship({ name: "Pearl" });
     cacheAssoc(pirate, "ship", ship);
-    pirate.writeAttribute("catchphrase", "trigger save");
+    pirate.catchphrase = "trigger save";
     await pirate.save();
-    expect(pirate.readAttribute("catchphrase")).toBe("Ahoy!");
+    expect(pirate.catchphrase).toBe("Ahoy!");
     expect(ship.isNewRecord()).toBe(false);
-    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it.skip("autosave does not pass through non custom validation contexts", () => {
@@ -1496,11 +1496,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const author = await Author.create({ name: "Test" });
     const book = new Book({ title: "My Book" });
     cacheAssoc(author, "books", [book]);
-    author.writeAttribute("name", "trigger save");
+    author.name = "trigger save";
     await author.save();
     expect(book.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
-    expect(book.readAttribute("author_id")).toBe(author.id);
+    expect(book.author_id).toBe(author.id);
   });
 
   it("autosave has one association callbacks get called once", async () => {
@@ -1535,11 +1535,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const user = await User.create({ name: "Test" });
     const profile = new Profile({ bio: "Hello" });
     cacheAssoc(user, "profile", profile);
-    user.writeAttribute("name", "trigger save");
+    user.name = "trigger save";
     await user.save();
     expect(profile.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
-    expect(profile.readAttribute("user_id")).toBe(user.id);
+    expect(profile.user_id).toBe(user.id);
   });
 
   it("autosave belongs to association callbacks get called once", async () => {
@@ -1574,11 +1574,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const author = new Author({ name: "New Author" });
     const post = await Post.create({ title: "Test" });
     cacheAssoc(post, "author", author);
-    post.writeAttribute("title", "trigger save");
+    post.title = "trigger save";
     await post.save();
     expect(author.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 
   it.skip("should not add the same callbacks multiple times for has one", () => {
@@ -1650,7 +1650,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
     markForDestruction(part);
     cacheAssoc(ship, "parts", [part]);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ships", [ship]);
     await pirate.save();
     expect(part.isDestroyed()).toBe(true);
@@ -1662,7 +1662,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const newPart = new Part({ name: "Rudder" });
     cacheAssoc(ship, "parts", [newPart]);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ships", [ship]);
     await pirate.save();
     expect(newPart.isNewRecord()).toBe(false);
@@ -1690,11 +1690,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    ship.writeAttribute("name", "Updated Pearl");
+    ship.name = "Updated Pearl";
     cacheAssoc(pirate, "ships", [ship]);
     await pirate.save();
     const reloaded = await Ship.find(ship.id!);
-    expect(reloaded.readAttribute("name")).toBe("Updated Pearl");
+    expect(reloaded.name).toBe("Updated Pearl");
   });
 
   it.skip("when extra records exist for associations, validate should not load them up", () => {
@@ -1770,7 +1770,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
     markForDestruction(part);
     cacheAssoc(ship, "part", part);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(part.isDestroyed()).toBe(true);
@@ -1782,7 +1782,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const newPart = new Part({ name: "Rudder" });
     cacheAssoc(ship, "part", newPart);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(newPart.isNewRecord()).toBe(false);
@@ -1822,10 +1822,10 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     const author = new Author({ name: "Unsaved" });
     const post = await Post.create({ title: "test" });
     cacheAssoc(post, "author", author);
-    post.writeAttribute("title", "trigger save");
+    post.title = "trigger save";
     await post.save();
     expect(author.isNewRecord()).toBe(true);
-    expect(post.readAttribute("author_id")).toBeNull();
+    expect(post.author_id).toBeNull();
   });
 
   it("autosave new record on has one can be disabled per relationship", async () => {
@@ -1856,10 +1856,10 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     const user = await User.create({ name: "test" });
     const profile = new Profile({ bio: "Unsaved" });
     cacheAssoc(user, "profile", profile);
-    user.writeAttribute("name", "trigger save");
+    user.name = "trigger save";
     await user.save();
     expect(profile.isNewRecord()).toBe(true);
-    expect(profile.readAttribute("user_id")).toBeNull();
+    expect(profile.user_id).toBeNull();
   });
 
   it("autosave new record on has many can be disabled per relationship", async () => {
@@ -1890,10 +1890,10 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     const author = await Author.create({ name: "test" });
     const book = new Book({ title: "Unsaved" });
     cacheAssoc(author, "books", [book]);
-    author.writeAttribute("name", "trigger save");
+    author.name = "trigger save";
     await author.save();
     expect(book.isNewRecord()).toBe(true);
-    expect(book.readAttribute("author_id")).toBeNull();
+    expect(book.author_id).toBeNull();
   });
 
   it("autosave new record with after create callback", async () => {
@@ -1931,7 +1931,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     await pirate.save();
     expect(log).toContain("pirate_created");
     expect(pirate.isNewRecord()).toBe(false);
-    expect(ship.readAttribute("pirate_id")).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
     expect(ship.isNewRecord()).toBe(false);
   });
 
@@ -2191,7 +2191,7 @@ describe("should update children when autosave is true and parent is new but chi
     await article.save();
     const tags = await NAutoTag.where({ nauto_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("saved");
+    expect(tags[0].name).toBe("saved");
     expect(tags[0].isPersisted()).toBe(true);
   });
 
@@ -2256,7 +2256,7 @@ describe("should update children when autosave is true and parent is new but chi
     // Save parent again without changes - child should not be modified
     await article.save();
     const reloaded = await NUCTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("child");
+    expect(reloaded.name).toBe("child");
   });
 
   it("should automatically validate the associated models", async () => {
@@ -2385,7 +2385,7 @@ describe("should update children when autosave is true and parent is new but chi
     assignNestedAttributes(article, "bvuTags", [{ id: tag.id, name: "updated" }]);
     await article.save();
     const reloaded = await BVUTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("updated");
+    expect(reloaded.name).toBe("updated");
   });
 
   it("should validation the associated models on create", async () => {
@@ -2460,7 +2460,7 @@ describe("should update children when autosave is true and parent is new but chi
         this.attribute("cb_article_id", "integer");
         this.adapter = adapter;
         this.beforeSave(function (record: any) {
-          if (record.readAttribute("name") === "cancel") return false;
+          if (record.name === "cancel") return false;
         });
       }
     }

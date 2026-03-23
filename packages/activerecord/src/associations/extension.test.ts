@@ -63,7 +63,7 @@ describe("AssociationsExtensionsTest", () => {
     const proxy = association(post, "extComments");
     const filtered = await proxy.where({ body: "a" });
     expect(filtered.length).toBe(1);
-    expect(filtered[0].readAttribute("body")).toBe("a");
+    expect(filtered[0].body).toBe("a");
   });
 
   it("association with default scope", async () => {
@@ -124,7 +124,7 @@ describe("AssociationsExtensionsTest", () => {
       proxy as CollectionProxy & { findMostRecent: () => Promise<Base | null> }
     ).findMostRecent();
     expect(most).not.toBeNull();
-    expect(most!.readAttribute("name")).toBe("Second");
+    expect(most!.name).toBe("Second");
   });
 
   it("named extension on habtm", async () => {
@@ -166,7 +166,7 @@ describe("AssociationsExtensionsTest", () => {
       proxy as CollectionProxy & { findMostRecent: () => Promise<Base | null> }
     ).findMostRecent();
     expect(most).not.toBeNull();
-    expect(most!.readAttribute("name")).toBe("New");
+    expect(most!.name).toBe("New");
   });
 
   it("named two extensions on habtm", async () => {
@@ -215,8 +215,8 @@ describe("AssociationsExtensionsTest", () => {
     await proxy.push(p1, p2);
     const most = await proxy.findMostRecent();
     const least = await proxy.findLeastRecent();
-    expect(most!.readAttribute("name")).toBe("Beta");
-    expect(least!.readAttribute("name")).toBe("Alpha");
+    expect(most!.name).toBe("Beta");
+    expect(least!.name).toBe("Alpha");
   });
 
   it("named extension and block on habtm", async () => {
@@ -263,8 +263,8 @@ describe("AssociationsExtensionsTest", () => {
       findLeastRecent: () => Promise<Base | null>;
     };
     await proxy.push(p1, p2);
-    expect((await proxy.findMostRecent())!.readAttribute("name")).toBe("Last");
-    expect((await proxy.findLeastRecent())!.readAttribute("name")).toBe("First");
+    expect((await proxy.findMostRecent())!.name).toBe("Last");
+    expect((await proxy.findLeastRecent())!.name).toBe("First");
   });
   it.skip("extension with dirty target", () => {
     /* dirty tracking on proxy not implemented */

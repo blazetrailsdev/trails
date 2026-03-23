@@ -416,7 +416,7 @@ describe("EachTest", () => {
       await batchRel.updateAll({ updated: true });
     }
     const allUpdated = await Post.all().toArray();
-    expect(allUpdated.every((r: any) => r.readAttribute("updated") === true)).toBe(true);
+    expect(allUpdated.every((r: any) => r.updated === true)).toBe(true);
   });
 
   it("in batches delete all should not delete records in other batches", async () => {
@@ -733,7 +733,7 @@ describe("EachTest", () => {
     for await (const batch of Post.where({ active: true }).findInBatches({ batchSize: 2 })) {
       collected.push(...batch);
     }
-    expect(collected.every((r: any) => r.readAttribute("active") === true)).toBe(true);
+    expect(collected.every((r: any) => r.active === true)).toBe(true);
   });
 
   it("in batches should end at the finish option", async () => {
@@ -806,7 +806,7 @@ describe("EachTest", () => {
       await batchRel.updateAll({ processed: true });
     }
     const all = await Post.all().toArray();
-    expect(all.every((r: any) => r.readAttribute("processed") === true)).toBe(true);
+    expect(all.every((r: any) => r.processed === true)).toBe(true);
   });
 
   it("in batches when loaded can return an enum", async () => {
@@ -1475,7 +1475,7 @@ describe("EachTest", () => {
 
     const names: string[] = [];
     for await (const record of User.all().findEach({ batchSize: 3 })) {
-      names.push(record.readAttribute("name") as string);
+      names.push(record.name as string);
       if (names.length >= 5) break;
     }
 
@@ -1501,7 +1501,7 @@ describe("EachTest", () => {
 
     const names: string[] = [];
     for await (const item of Item.all().findEach({ batchSize: 2 })) {
-      names.push(item.readAttribute("name") as string);
+      names.push(item.name as string);
     }
     expect(names).toHaveLength(5);
   });
@@ -1563,7 +1563,7 @@ describe("EachTest", () => {
 
     const names: string[] = [];
     for await (const user of User.all().findEach({ start: 3, finish: 7 })) {
-      names.push(user.readAttribute("name") as string);
+      names.push(user.name as string);
     }
     expect(names.length).toBe(5);
   });
@@ -1586,7 +1586,7 @@ describe("EachTest", () => {
     const names: string[] = [];
     const rel = User.where({});
     for await (const u of rel.findEach({ order: "desc" })) {
-      names.push(u.readAttribute("name") as string);
+      names.push(u.name as string);
     }
     expect(names[0]).toBe("Charlie");
     expect(names[2]).toBe("Alice");
@@ -1626,7 +1626,7 @@ describe("EachTest", () => {
 
     const names: string[] = [];
     for await (const record of User.all().findEach({ batchSize: 2 })) {
-      names.push(record.readAttribute("name") as string);
+      names.push(record.name as string);
     }
     expect(names).toHaveLength(5);
   });
@@ -1706,7 +1706,7 @@ describe("EachTest", () => {
 
     const values: number[] = [];
     for await (const r of Record.all().findEach({ batchSize: 3 })) {
-      values.push(r.readAttribute("value") as number);
+      values.push(r.value as number);
     }
 
     expect(values).toHaveLength(7);
@@ -1727,7 +1727,7 @@ describe("EachTest", () => {
 
     const values: number[] = [];
     for await (const r of Record.where({ value: 5 }).findEach()) {
-      values.push(r.readAttribute("value") as number);
+      values.push(r.value as number);
     }
 
     expect(values).toEqual([5]);
@@ -1771,7 +1771,7 @@ describe("EachTest", () => {
 
     const values: number[] = [];
     for await (const record of Record.all().findEach({ batchSize: 3 })) {
-      values.push(record.readAttribute("value") as number);
+      values.push(record.value as number);
     }
     expect(values).toHaveLength(10);
   });
@@ -1798,7 +1798,7 @@ describe("EachTest", () => {
 
     const values: number[] = [];
     for await (const record of Record.where({ value: [1, 3, 5] }).findEach({ batchSize: 2 })) {
-      values.push(record.readAttribute("value") as number);
+      values.push(record.value as number);
     }
     expect(values).toHaveLength(3);
   });
@@ -1811,7 +1811,7 @@ describe("EachTest", () => {
 
     const values: number[] = [];
     for await (const record of Record.all().findEach({ batchSize: 2 })) {
-      values.push(record.readAttribute("value") as number);
+      values.push(record.value as number);
       if (values.length >= 3) break;
     }
     expect(values).toHaveLength(3);

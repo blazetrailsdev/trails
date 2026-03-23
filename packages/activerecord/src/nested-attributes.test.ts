@@ -485,7 +485,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(1);
-    expect(ships[0].readAttribute("name")).toBe("Black Pearl");
+    expect(ships[0].name).toBe("Black Pearl");
   });
 
   it("should not build a new record if there is no id and destroy is truthy", async () => {
@@ -513,7 +513,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ name: "New Ship" }]);
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
-    expect(ships.some((s: any) => s.readAttribute("name") === "New Ship")).toBe(true);
+    expect(ships.some((s: any) => s.name === "New Ship")).toBe(true);
   });
 
   it("should not replace an existing record if there is no id and destroy is truthy", async () => {
@@ -524,7 +524,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(1);
-    expect(ships[0].readAttribute("name")).toBe("Old Ship");
+    expect(ships[0].name).toBe("Old Ship");
   });
 
   it("should modify an existing record if there is a matching id", async () => {
@@ -534,7 +534,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ id: ship.id, name: "New Name" }]);
     await pirate.save();
     const updated = await Ship.find(ship.id!);
-    expect(updated.readAttribute("name")).toBe("New Name");
+    expect(updated.name).toBe("New Name");
   });
 
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
@@ -551,7 +551,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", { "0": { id: ship.id, name: "Updated" } });
     await pirate.save();
     const updated = await Ship.find(ship.id!);
-    expect(updated.readAttribute("name")).toBe("Updated");
+    expect(updated.name).toBe("Updated");
   });
 
   it.skip("should modify an existing record if there is a matching composite id", () => {
@@ -575,7 +575,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: false }]);
     await pirate.save();
     const found = await Ship.find(ship.id!);
-    expect(found.readAttribute("name")).toBe("Safe");
+    expect(found.name).toBe("Safe");
   });
 
   it("should not destroy an existing record if allow destroy is false", async () => {
@@ -585,7 +585,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: true }]);
     await pirate.save();
     const found = await Ship.find(ship.id!);
-    expect(found.readAttribute("name")).toBe("Protected");
+    expect(found.name).toBe("Protected");
   });
 
   it("should also work with a HashWithIndifferentAccess", async () => {
@@ -595,7 +595,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(1);
-    expect(ships[0].readAttribute("name")).toBe("IndifferentShip");
+    expect(ships[0].name).toBe("IndifferentShip");
   });
 
   it("should work with update as well", async () => {
@@ -605,16 +605,16 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ id: ship.id, name: "After" }]);
     await pirate.save();
     const updated = await Ship.find(ship.id!);
-    expect(updated.readAttribute("name")).toBe("After");
+    expect(updated.name).toBe("After");
   });
 
   it("should defer updating nested associations until after base attributes are set", async () => {
     const { Ship, Pirate } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    pirate.writeAttribute("catchphrase", "Yarr");
+    pirate.catchphrase = "Yarr";
     assignNestedAttributes(pirate, "ship", [{ name: "Deferred" }]);
     await pirate.save();
-    expect(pirate.readAttribute("catchphrase")).toBe("Yarr");
+    expect(pirate.catchphrase).toBe("Yarr");
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(1);
   });
@@ -673,7 +673,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ id: ship.id, name: "UpdatedWithId" }]);
     await pirate.save();
     const updated = await Ship.find(ship.id!);
-    expect(updated.readAttribute("name")).toBe("UpdatedWithId");
+    expect(updated.name).toBe("UpdatedWithId");
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
@@ -741,7 +741,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     await ship.save();
     const pirates = await Pirate.all().toArray();
     expect(pirates.length).toBe(1);
-    expect(pirates[0].readAttribute("catchphrase")).toBe("Arrr");
+    expect(pirates[0].catchphrase).toBe("Arrr");
   });
 
   it("should not build a new record if there is no id and destroy is truthy", async () => {
@@ -769,7 +769,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "New" }]);
     await ship.save();
     const pirates = await Pirate.all().toArray();
-    expect(pirates.some((p: any) => p.readAttribute("catchphrase") === "New")).toBe(true);
+    expect(pirates.some((p: any) => p.catchphrase === "New")).toBe(true);
   });
 
   it("should not replace an existing record if there is no id and destroy is truthy", async () => {
@@ -779,7 +779,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "Ghost", _destroy: true }]);
     await ship.save();
     const found = await Pirate.find(pirate.id!);
-    expect(found.readAttribute("catchphrase")).toBe("Old");
+    expect(found.catchphrase).toBe("Old");
   });
 
   it("should modify an existing record if there is a matching id", async () => {
@@ -789,7 +789,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, catchphrase: "Updated" }]);
     await ship.save();
     const updated = await Pirate.find(pirate.id!);
-    expect(updated.readAttribute("catchphrase")).toBe("Updated");
+    expect(updated.catchphrase).toBe("Updated");
   });
 
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
@@ -806,7 +806,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", { "0": { id: pirate.id, catchphrase: "StringKey" } });
     await ship.save();
     const updated = await Pirate.find(pirate.id!);
-    expect(updated.readAttribute("catchphrase")).toBe("StringKey");
+    expect(updated.catchphrase).toBe("StringKey");
   });
 
   it.skip("should modify an existing record if there is a matching composite id", () => {
@@ -840,7 +840,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: false }]);
     await ship.save();
     const found = await Pirate.find(pirate.id!);
-    expect(found.readAttribute("catchphrase")).toBe("Safe");
+    expect(found.catchphrase).toBe("Safe");
   });
 
   it("should not destroy an existing record if allow destroy is false", async () => {
@@ -850,7 +850,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
     await ship.save();
     const found = await Pirate.find(pirate.id!);
-    expect(found.readAttribute("catchphrase")).toBe("Protected");
+    expect(found.catchphrase).toBe("Protected");
   });
 
   it("should work with update as well", async () => {
@@ -860,7 +860,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, catchphrase: "After" }]);
     await ship.save();
     const updated = await Pirate.find(pirate.id!);
-    expect(updated.readAttribute("catchphrase")).toBe("After");
+    expect(updated.catchphrase).toBe("After");
   });
 
   it("should not destroy the associated model until the parent is saved", async () => {
@@ -907,7 +907,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, catchphrase: "WithIdUpdate" }]);
     await ship.save();
     const updated = await Pirate.find(pirate.id!);
-    expect(updated.readAttribute("catchphrase")).toBe("WithIdUpdate");
+    expect(updated.catchphrase).toBe("WithIdUpdate");
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
@@ -1117,7 +1117,7 @@ describe("TestNestedAttributesInGeneral", () => {
     await post.save();
     const comments = await Comment.where({ post_id: post.id }).toArray();
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("legit");
+    expect(comments[0].body).toBe("legit");
   });
 
   it("reject if with indifferent keys", async () => {
@@ -1143,7 +1143,7 @@ describe("TestNestedAttributesInGeneral", () => {
     await post.save();
     const comments = await Comment.where({ post_id: post.id }).toArray();
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("keep");
+    expect(comments[0].body).toBe("keep");
   });
 
   it("reject if with a proc which returns true always for has one", async () => {
@@ -1260,7 +1260,7 @@ describe("TestNestedAttributesInGeneral", () => {
     await pirate.save();
     const ships = await OvShip.where({ ov_pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(1);
-    expect(ships[0].readAttribute("name")).toBe("Overridden Ship");
+    expect(ships[0].name).toBe("Overridden Ship");
   });
   it("accepts nested attributes for can be overridden in subclasses", async () => {
     class SubBird extends Base {
@@ -1583,7 +1583,7 @@ describe("TestNestedAttributesWithExtend", () => {
     await article.save();
     const tags = await ExtTag.where({ ext_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("extended-tag");
+    expect(tags[0].name).toBe("extended-tag");
   });
 });
 
@@ -1641,7 +1641,7 @@ describe("TestNestedAttributesForDelegatedType", () => {
     await entry.save();
     const comments = await DTComment2.where({ dt_entry2_id: entry.id }).toArray();
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("via delegated type");
+    expect(comments[0].body).toBe("via delegated type");
   });
 });
 
@@ -1675,7 +1675,7 @@ describe("assigning nested attributes target", () => {
     await article.save();
     const tags = await ANTTag.where({ ant_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("assigned");
+    expect(tags[0].name).toBe("assigned");
   });
 });
 
@@ -1711,7 +1711,7 @@ describe("assigning nested attributes target with nil placeholder for rejected i
     await article.save();
     const tags = await NilTag.where({ nil_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("keep");
+    expect(tags[0].name).toBe("keep");
   });
 });
 
@@ -1762,10 +1762,10 @@ describe("numeric column changes from zero to no empty string", () => {
       }
     }
     const post = await NumPost.create({ title: "test", score: 0 });
-    expect(post.readAttribute("score")).toBe(0);
+    expect(post.score).toBe(0);
     // Setting to empty string should not be treated as 0
-    post.writeAttribute("score", "");
-    const val = post.readAttribute("score");
+    post.score = "";
+    const val = post.score;
     // Type casting empty string to integer typically yields null or 0
     expect(val === null || val === 0 || val === "").toBe(true);
   });
@@ -1802,7 +1802,7 @@ describe("should also work with a HashWithIndifferentAccess", () => {
     await article.save();
     const tags = await HITag.where({ hi_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("tag1");
+    expect(tags[0].name).toBe("tag1");
   });
 });
 
@@ -1837,7 +1837,7 @@ describe("should automatically build new associated models for each entry in a h
     await article.save();
     const tags = await NBuildTag.where({ nbuild_article_id: article.id }).toArray();
     expect(tags.length).toBe(2);
-    const names = tags.map((t: any) => t.readAttribute("name")).sort();
+    const names = tags.map((t: any) => t.name).sort();
     expect(names).toEqual(["new1", "new2"]);
   });
 });
@@ -1945,7 +1945,7 @@ describe("should not load association when updating existing records", () => {
     assignNestedAttributes(article, "nluTags", [{ id: tag.id, name: "updated" }]);
     await article.save();
     const reloaded = await NLUTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("updated");
+    expect(reloaded.name).toBe("updated");
   });
 });
 
@@ -2098,7 +2098,7 @@ describe("should save only one association on create", () => {
     await article.save();
     const tags = await NSaveTag.where({ nsave_article_id: article.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("only-one");
+    expect(tags[0].name).toBe("only-one");
   });
 });
 
@@ -2136,9 +2136,9 @@ describe("should sort the hash by the keys before building new associated models
     await article.save();
     const tags = await NSHTag.where({ nsh_article_id: article.id }).toArray();
     expect(tags.length).toBe(3);
-    expect(tags[0].readAttribute("name")).toBe("first");
-    expect(tags[1].readAttribute("name")).toBe("second");
-    expect(tags[2].readAttribute("name")).toBe("third");
+    expect(tags[0].name).toBe("first");
+    expect(tags[1].name).toBe("second");
+    expect(tags[2].name).toBe("third");
   });
 });
 
@@ -2172,7 +2172,7 @@ describe("should take a hash and assign the attributes to the associated models"
     assignNestedAttributes(article, "nhTags", [{ id: tag.id, name: "rails" }]);
     await article.save();
     const reloaded = await NHTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("rails");
+    expect(reloaded.name).toBe("rails");
   });
 });
 
@@ -2246,7 +2246,7 @@ describe("should work with update as well", () => {
     assignNestedAttributes(article, "nupdTags", [{ id: tag.id, name: "updated" }]);
     await article.save();
     const reloaded = await NUpdTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("updated");
+    expect(reloaded.name).toBe("updated");
   });
 });
 
@@ -2291,7 +2291,7 @@ describe("acceptsNestedAttributesFor", () => {
 
     const comments = await Comment.all().toArray();
     expect(comments.length).toBe(2);
-    expect(comments[0].readAttribute("post_id")).toBe(post.id);
+    expect(comments[0].post_id).toBe(post.id);
   });
 
   it("destroys child records with _destroy flag", async () => {
@@ -2411,8 +2411,8 @@ describe("Nested Attributes (Rails-guided)", () => {
 
     const comments = await Comment.all().toArray();
     expect(comments.length).toBe(2);
-    expect(comments[0].readAttribute("post_id")).toBe(post.id);
-    expect(comments[1].readAttribute("post_id")).toBe(post.id);
+    expect(comments[0].post_id).toBe(post.id);
+    expect(comments[1].post_id).toBe(post.id);
   });
 
   // Rails: test "update with nested attributes"
@@ -2447,7 +2447,7 @@ describe("Nested Attributes (Rails-guided)", () => {
     await post.save();
 
     await comment.reload();
-    expect(comment.readAttribute("body")).toBe("Updated body");
+    expect(comment.body).toBe("Updated body");
   });
 
   // Rails: test "destroy with nested attributes"
@@ -2484,7 +2484,7 @@ describe("Nested Attributes (Rails-guided)", () => {
 
     const remaining = await Comment.all().toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("body")).toBe("Keep me");
+    expect(remaining[0].body).toBe("Keep me");
   });
 
   // Rails: test "reject_if"
@@ -2605,14 +2605,14 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.writeAttribute("name", "Sail");
+    part.name = "Sail";
     cacheAssoc(ship, "part", part);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ship", ship);
     const saved = await pirate.save();
     expect(saved).toBe(true);
     const reloaded = await Part.find(part.id!);
-    expect(reloaded.readAttribute("name")).toBe("Sail");
+    expect(reloaded.name).toBe("Sail");
   });
 
   it("when great-grandchild changed via attributes, saving parent should save great-grandchild", async () => {
@@ -2658,7 +2658,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     await comment.save();
 
     const reloaded = await GGCReply.find(reply.id);
-    expect(reloaded.readAttribute("text")).toBe("updated");
+    expect(reloaded.text).toBe("updated");
   });
 
   it("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", async () => {
@@ -2750,7 +2750,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 
     const replies = await GGAReply.where({ gga_comment_id: comment.id }).toArray();
     expect(replies.length).toBe(1);
-    expect(replies[0].readAttribute("text")).toBe("new-great-grandchild");
+    expect(replies[0].text).toBe("new-great-grandchild");
   });
 
   it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => {});
@@ -2814,14 +2814,14 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    part.writeAttribute("name", "Sail");
+    part.name = "Sail";
     cacheAssoc(ship, "parts", [part]);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ships", [ship]);
     const saved = await pirate.save();
     expect(saved).toBe(true);
     const reloaded = await Part.find(part.id!);
-    expect(reloaded.readAttribute("name")).toBe("Sail");
+    expect(reloaded.name).toBe("Sail");
   });
 
   it("when grandchild changed via attributes, saving parent should save grandchild", async () => {
@@ -2867,7 +2867,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     await comment.save();
 
     const reloaded = await GCTag.find(tag.id);
-    expect(reloaded.readAttribute("name")).toBe("updated");
+    expect(reloaded.name).toBe("updated");
   });
 
   it("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", async () => {
@@ -2959,7 +2959,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 
     const tags = await GCTag2.where({ gc_comment2_id: comment.id }).toArray();
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("new-grandchild");
+    expect(tags[0].name).toBe("new-grandchild");
   });
 
   it.skip("circular references do not perform unnecessary queries", () => {});
@@ -2970,7 +2970,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const invalidPart = new Part({ name: "" });
     cacheAssoc(ship, "parts", [invalidPart]);
-    ship.writeAttribute("name", "Pearl-touched");
+    ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ships", [ship]);
     const saved = await pirate.save();
     expect(saved).toBe(false);

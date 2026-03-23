@@ -49,7 +49,7 @@ describe("StoreTest", () => {
     expect((u as any).theme).toBe("dark");
     expect((u as any).language).toBe("en");
     // extra is not exposed, but settings JSON string contains it
-    const settingsStr = u.readAttribute("settings") as string;
+    const settingsStr = u.settings as string;
     const settings = JSON.parse(settingsStr);
     expect(settings.extra).toBe("value");
   });
@@ -267,10 +267,10 @@ describe("StoreTest", () => {
     // Override the write accessor on a subclass
     class SpecialUser extends (User as any) {
       set theme(v: unknown) {
-        (this as any).writeAttribute("settings", JSON.stringify({ theme: `custom:${v}` }));
+        (this as any).settings = JSON.stringify({ theme: `custom:${v}` });
       }
       get theme() {
-        const raw = this.readAttribute("settings") as string;
+        const raw = this.settings as string;
         if (!raw) return null;
         return JSON.parse(raw).theme ?? null;
       }
@@ -291,7 +291,7 @@ describe("StoreTest", () => {
       settings: JSON.stringify({ theme: "dark", extra: "data" }),
     });
     expect((u as any).theme).toBe("dark");
-    const parsed = JSON.parse(u.readAttribute("settings") as string);
+    const parsed = JSON.parse(u.settings as string);
     expect(parsed.extra).toBe("data");
   });
 
@@ -299,7 +299,7 @@ describe("StoreTest", () => {
     const { User } = makeModel();
     const nested = { theme: "dark", nested: { key: "val" } };
     const u = new User({ name: "Jack", settings: JSON.stringify(nested) });
-    const parsed = JSON.parse(u.readAttribute("settings") as string);
+    const parsed = JSON.parse(u.settings as string);
     expect(parsed.nested.key).toBe("val");
   });
 
@@ -320,7 +320,7 @@ describe("StoreTest", () => {
       settings: JSON.stringify({ theme: "dark", secret: "hidden" }),
     });
     // secret is not exposed as an accessor, but lives in the JSON
-    const parsed = JSON.parse(u.readAttribute("settings") as string);
+    const parsed = JSON.parse(u.settings as string);
     expect(parsed.secret).toBe("hidden");
   });
 
@@ -430,12 +430,12 @@ describe("StoreTest", () => {
     const u = await User.create({ name: "Olga", settings: JSON.stringify({ theme: "dark" }) });
     expect((u as any).theme).toBe("dark");
     // Reload from "database"
-    const loaded = await User.find(u.readAttribute("id"));
+    const loaded = await User.find(u.id);
     expect((loaded as any).theme).toBe("dark");
     // Modify and save again
     (loaded as any).theme = "light";
     await loaded.save();
-    const reloaded = await User.find(u.readAttribute("id"));
+    const reloaded = await User.find(u.id);
     expect((reloaded as any).theme).toBe("light");
   });
 
@@ -623,7 +623,7 @@ describe("StoreTest", () => {
     expect((user as any).language).toBe("en");
 
     // Underlying attribute is an object
-    const settings = user.readAttribute("settings");
+    const settings = user.settings;
     expect(settings).toEqual({ theme: "dark", language: "en" });
   });
 
@@ -690,7 +690,7 @@ describe("StoreTest", () => {
     }
     const user = new User({ settings: { theme: "light" } });
     (user as any).theme = "dark";
-    const settings = user.readAttribute("settings") as Record<string, unknown>;
+    const settings = user.settings as Record<string, unknown>;
     expect(settings.theme).toBe("dark");
   });
 
@@ -750,7 +750,7 @@ describe("StoreTest", () => {
     (user as any).color = "red";
     (user as any).homepage = "example.com";
 
-    const settings = user.readAttribute("settings") as any;
+    const settings = user.settings as any;
     expect(settings.color).toBe("red");
     expect(settings.homepage).toBe("example.com");
   });

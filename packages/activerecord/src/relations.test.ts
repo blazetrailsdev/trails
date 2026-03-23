@@ -96,7 +96,7 @@ describe("RelationTest", () => {
     it("chains multiple where calls (AND)", async () => {
       const posts = await Post.where({ author: "alice" }).where({ category: "tech" }).toArray();
       expect(posts).toHaveLength(1);
-      expect(posts[0].readAttribute("title")).toBe("First");
+      expect(posts[0].title).toBe("First");
     });
 
     it("where with array value (IN)", async () => {
@@ -116,7 +116,7 @@ describe("RelationTest", () => {
       });
       const posts = await Post.where({ author: null }).toArray();
       expect(posts).toHaveLength(1);
-      expect(posts[0].readAttribute("title")).toBe("NoAuthor");
+      expect(posts[0].title).toBe("NoAuthor");
     });
 
     it("where with raw SQL string", async () => {
@@ -152,7 +152,7 @@ describe("RelationTest", () => {
     it("chains with where", async () => {
       const posts = await Post.where({ category: "tech" }).whereNot({ author: "alice" }).toArray();
       expect(posts).toHaveLength(1);
-      expect(posts[0].readAttribute("author")).toBe("bob");
+      expect(posts[0].author).toBe("bob");
     });
   });
 
@@ -191,28 +191,28 @@ describe("RelationTest", () => {
   describe("order", () => {
     it("orders ascending by string", async () => {
       const posts = await Post.all().order("title").toArray();
-      expect(posts[0].readAttribute("title")).toBe("Fifth");
-      expect(posts[4].readAttribute("title")).toBe("Third");
+      expect(posts[0].title).toBe("Fifth");
+      expect(posts[4].title).toBe("Third");
     });
 
     it("orders descending by hash", async () => {
       const posts = await Post.all().order({ views: "desc" }).toArray();
-      expect(posts[0].readAttribute("title")).toBe("Third");
+      expect(posts[0].title).toBe("Third");
     });
 
     it("orders by multiple columns", async () => {
       const posts = await Post.all().order({ category: "asc" }, { views: "desc" }).toArray();
-      expect(posts[0].readAttribute("category")).toBe("art");
+      expect(posts[0].category).toBe("art");
     });
 
     it("reorder replaces existing order", async () => {
       const posts = await Post.all().order("title").reorder({ views: "asc" }).toArray();
-      expect(posts[0].readAttribute("views")).toBe(10);
+      expect(posts[0].views).toBe(10);
     });
 
     it("reverseOrder flips the sort", async () => {
       const posts = await Post.all().order({ views: "asc" }).reverseOrder().toArray();
-      expect(posts[0].readAttribute("views")).toBe(200);
+      expect(posts[0].views).toBe(200);
     });
   });
 
@@ -235,7 +235,7 @@ describe("RelationTest", () => {
       const page2 = await Post.all().order("title").limit(2).offset(2).toArray();
       expect(page1).toHaveLength(2);
       expect(page2).toHaveLength(2);
-      expect(page1[0].readAttribute("title")).not.toBe(page2[0].readAttribute("title"));
+      expect(page1[0].title).not.toBe(page2[0].title);
     });
   });
 
@@ -254,7 +254,7 @@ describe("RelationTest", () => {
     });
 
     it("select with block filters loaded records", async () => {
-      const posts = await Post.all().select((p: any) => p.readAttribute("views") > 50);
+      const posts = await Post.all().select((p: any) => p.views > 50);
       expect(posts).toHaveLength(3);
     });
   });
@@ -330,7 +330,7 @@ describe("RelationTest", () => {
   describe("rewhere", () => {
     it("replaces existing where conditions for the same key", async () => {
       const posts = await Post.where({ author: "alice" }).rewhere({ author: "bob" }).toArray();
-      expect(posts.every((p: any) => p.readAttribute("author") === "bob")).toBe(true);
+      expect(posts.every((p: any) => p.author === "bob")).toBe(true);
     });
   });
 
@@ -640,7 +640,7 @@ describe("RelationTest", () => {
         published: false,
       });
       const post = await rel.create({ title: "New", body: "new body" });
-      expect(post.readAttribute("author")).toBe("dave");
+      expect(post.author).toBe("dave");
     });
   });
 
@@ -649,8 +649,8 @@ describe("RelationTest", () => {
   describe("build", () => {
     it("creates an unsaved record with scoped attributes", () => {
       const post = Post.where({ author: "dave" }).build({ title: "Built" });
-      expect(post.readAttribute("author")).toBe("dave");
-      expect(post.readAttribute("title")).toBe("Built");
+      expect(post.author).toBe("dave");
+      expect(post.title).toBe("Built");
       expect(post.isNewRecord()).toBe(true);
     });
   });
@@ -754,7 +754,7 @@ describe("RelationTest", () => {
 
   describe("reject", () => {
     it("removes matching records from results", async () => {
-      const posts = await Post.all().reject((p: any) => p.readAttribute("views") < 50);
+      const posts = await Post.all().reject((p: any) => p.views < 50);
       expect(posts).toHaveLength(4);
     });
   });
@@ -774,7 +774,7 @@ describe("RelationTest", () => {
     it("supports for-await-of", async () => {
       const titles: string[] = [];
       for await (const post of Post.all()) {
-        titles.push(post.readAttribute("title") as string);
+        titles.push(post.title as string);
       }
       expect(titles).toHaveLength(5);
     });
@@ -791,7 +791,7 @@ describe("RelationTest", () => {
   describe("find", () => {
     it("finds a single record by id", async () => {
       const post = await Post.find(1);
-      expect(post.readAttribute("title")).toBe("First");
+      expect(post.title).toBe("First");
     });
 
     it("finds multiple records by array of ids", async () => {
@@ -821,7 +821,7 @@ describe("RelationTest", () => {
     it("returns the first matching record", async () => {
       const post = await Post.findBy({ author: "alice" });
       expect(post).not.toBeNull();
-      expect(post!.readAttribute("author")).toBe("alice");
+      expect(post!.author).toBe("alice");
     });
 
     it("returns null when no match", async () => {
@@ -832,7 +832,7 @@ describe("RelationTest", () => {
     it("finds by multiple conditions", async () => {
       const post = await Post.findBy({ author: "alice", category: "science" });
       expect(post).not.toBeNull();
-      expect(post!.readAttribute("title")).toBe("Third");
+      expect(post!.title).toBe("Third");
     });
 
     it("finds by null value", async () => {
@@ -853,7 +853,7 @@ describe("RelationTest", () => {
   describe("findByBang", () => {
     it("returns the record when found", async () => {
       const post = await Post.findByBang({ author: "carol" });
-      expect(post.readAttribute("author")).toBe("carol");
+      expect(post.author).toBe("carol");
     });
 
     it("throws RecordNotFound when not found", async () => {
@@ -864,7 +864,7 @@ describe("RelationTest", () => {
   describe("findSoleBy", () => {
     it("returns the sole matching record", async () => {
       const post = await Post.findSoleBy({ author: "carol" });
-      expect(post.readAttribute("author")).toBe("carol");
+      expect(post.author).toBe("carol");
     });
 
     it("throws when no records match", async () => {
@@ -880,7 +880,7 @@ describe("RelationTest", () => {
     it("finds by a dynamic attribute", async () => {
       const post = await Post.findByAttribute("author", "carol");
       expect(post).not.toBeNull();
-      expect(post!.readAttribute("author")).toBe("carol");
+      expect(post!.author).toBe("carol");
     });
   });
 
@@ -986,7 +986,7 @@ describe("RelationTest", () => {
   describe("sole", () => {
     it("returns the only matching record", async () => {
       const post = await Post.where({ author: "carol" }).sole();
-      expect(post.readAttribute("author")).toBe("carol");
+      expect(post.author).toBe("carol");
     });
 
     it("throws RecordNotFound when none match", async () => {
@@ -1222,13 +1222,13 @@ describe("RelationTest", () => {
   it("where is chainable", async () => {
     const items = await Item.all().where({ category: "fruit" }).where({ name: "Apple" }).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Apple");
+    expect(items[0].name).toBe("Apple");
   });
 
   it("order sorts results", async () => {
     const items = await Item.all().order({ price: "desc" }).toArray();
-    expect(items[0].readAttribute("name")).toBe("Carrot");
-    expect(items[2].readAttribute("name")).toBe("Apple");
+    expect(items[0].name).toBe("Carrot");
+    expect(items[2].name).toBe("Apple");
   });
 
   it("limit restricts result count", async () => {
@@ -1244,7 +1244,7 @@ describe("RelationTest", () => {
   it("first returns the first record", async () => {
     const item = await Item.all().first();
     expect(item).not.toBeNull();
-    expect(item!.readAttribute("name")).toBe("Apple");
+    expect(item!.name).toBe("Apple");
   });
 
   it("count returns the number of records", async () => {
@@ -1278,14 +1278,14 @@ describe("RelationTest", () => {
   it("update all", async () => {
     await Item.all().where({ category: "fruit" }).updateAll({ price: 10 });
     const apple = await Item.find(1);
-    expect(apple.readAttribute("price")).toBe(10);
+    expect(apple.price).toBe(10);
   });
 
   it("delete all", async () => {
     await Item.all().where({ category: "fruit" }).deleteAll();
     const remaining = await Item.all().toArray();
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].readAttribute("name")).toBe("Carrot");
+    expect(remaining[0].name).toBe("Carrot");
   });
 
   it("toSql generates SQL", () => {
@@ -1315,10 +1315,10 @@ describe("RelationTest", () => {
 
   it("excluding array of records returns records not in array", async () => {
     const all = await Item.all().toArray();
-    const apple = all.find((r: any) => r.readAttribute("name") === "Apple")!;
+    const apple = all.find((r: any) => r.name === "Apple")!;
     const remaining = await Item.all().excluding(apple).toArray();
     expect(remaining).toHaveLength(2);
-    expect(remaining.every((r: any) => r.readAttribute("name") !== "Apple")).toBe(true);
+    expect(remaining.every((r: any) => r.name !== "Apple")).toBe(true);
   });
 
   it("respond to delegate methods", () => {
@@ -1345,15 +1345,15 @@ describe("RelationTest", () => {
   it("first with count and order", async () => {
     const items = (await Item.order("name").first(2)) as any[];
     expect(items).toHaveLength(2);
-    expect(items[0].readAttribute("name")).toBe("Apple");
-    expect(items[1].readAttribute("name")).toBe("Banana");
+    expect(items[0].name).toBe("Apple");
+    expect(items[1].name).toBe("Banana");
   });
 
   it("last with count and order", async () => {
     const items = (await Item.order("name").last(2)) as any[];
     expect(items).toHaveLength(2);
-    expect(items[0].readAttribute("name")).toBe("Banana");
-    expect(items[1].readAttribute("name")).toBe("Carrot");
+    expect(items[0].name).toBe("Banana");
+    expect(items[1].name).toBe("Carrot");
   });
 
   it("offset with count returns correct values", async () => {
@@ -1369,7 +1369,7 @@ describe("RelationTest", () => {
   it("where with hash conditions on numeric field", async () => {
     const items = await Item.where({ price: 1 }).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Apple");
+    expect(items[0].name).toBe("Apple");
   });
 
   it("loading with one record", async () => {
@@ -1382,7 +1382,7 @@ describe("RelationTest", () => {
 
   it("order should return unique records", async () => {
     const items = await Item.order("name").toArray();
-    const names = items.map((r: any) => r.readAttribute("name"));
+    const names = items.map((r: any) => r.name);
     expect(new Set(names).size).toBe(names.length);
   });
 
@@ -1404,7 +1404,7 @@ describe("RelationTest", () => {
     expect(apple).not.toBeNull();
     const banana = await Item.findBy({ name: "Banana" });
     expect(banana).not.toBeNull();
-    expect(banana!.readAttribute("name")).toBe("Banana");
+    expect(banana!.name).toBe("Banana");
   });
 
   it.skip("dynamic find by after find by id", () => {});
@@ -1442,16 +1442,16 @@ describe("RelationTest", () => {
 
   it("detect preserves order", async () => {
     const items = await Item.order("name").toArray();
-    const found = items.find((r: any) => r.readAttribute("name") === "Banana");
+    const found = items.find((r: any) => r.name === "Banana");
     expect(found).toBeDefined();
-    expect(found!.readAttribute("name")).toBe("Banana");
+    expect(found!.name).toBe("Banana");
   });
 
   it("each preserves order", async () => {
     const items = await Item.order("name").toArray();
     const names: string[] = [];
     for (const item of items) {
-      names.push(item.readAttribute("name") as string);
+      names.push(item.name as string);
     }
     expect(names).toEqual(["Apple", "Banana", "Carrot"]);
   });
@@ -1478,7 +1478,7 @@ describe("RelationTest", () => {
     const apple = await Item.findBy({ name: "Apple" });
     const items = await Item.where({ id: apple!.id }).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Apple");
+    expect(items[0].name).toBe("Apple");
   });
 
   it("pluck with serialized attributes", async () => {
@@ -1489,13 +1489,13 @@ describe("RelationTest", () => {
   it("relation responds to last", async () => {
     const last = await Item.order("name").last();
     expect(last).not.toBeNull();
-    expect((last as any).readAttribute("name")).toBe("Carrot");
+    expect((last as any).name).toBe("Carrot");
   });
 
   it("relation responds to first", async () => {
     const first = await Item.order("name").first();
     expect(first).not.toBeNull();
-    expect((first as any).readAttribute("name")).toBe("Apple");
+    expect((first as any).name).toBe("Apple");
   });
 
   it("sum doesnt error on no records", async () => {
@@ -1522,7 +1522,7 @@ describe("RelationTest", () => {
     const names: string[] = [];
     const items = await Item.all().toArray();
     for (const item of items) {
-      names.push(item.readAttribute("name") as string);
+      names.push(item.name as string);
     }
     expect(names).toHaveLength(3);
   });
@@ -1549,7 +1549,7 @@ describe("RelationTest", () => {
 
   it("find_or_create negotiates a race condition", async () => {
     const item = await Item.all().findOrCreateBy({ name: "Apple" });
-    expect(item.readAttribute("name")).toBe("Apple");
+    expect(item.name).toBe("Apple");
     // Should find existing, not create duplicate
     expect(await Item.where({ name: "Apple" }).count()).toBe(1);
   });
@@ -1558,9 +1558,9 @@ describe("RelationTest", () => {
     const item = await Item.all()
       .createWith({ price: 99, category: "new" })
       .findOrCreateBy({ name: "Dragonfruit" });
-    expect(item.readAttribute("name")).toBe("Dragonfruit");
-    expect(item.readAttribute("price")).toBe(99);
-    expect(item.readAttribute("category")).toBe("new");
+    expect(item.name).toBe("Dragonfruit");
+    expect(item.price).toBe(99);
+    expect(item.category).toBe("new");
   });
 
   it("exists returns false when no match exists", async () => {
@@ -1591,7 +1591,7 @@ describe("RelationTest", () => {
   it("find all using limit and offset", async () => {
     const items = await Item.order("name").limit(2).offset(1).toArray();
     expect(items).toHaveLength(2);
-    expect(items[0].readAttribute("name")).toBe("Banana");
+    expect(items[0].name).toBe("Banana");
   });
 
   it.skip("dynamic finder", () => {});
@@ -1599,7 +1599,7 @@ describe("RelationTest", () => {
   it("scoped first", async () => {
     const first = await Item.where({ category: "fruit" }).order("name").first();
     expect(first).not.toBeNull();
-    expect((first as any).readAttribute("name")).toBe("Apple");
+    expect((first as any).name).toBe("Apple");
   });
 
   it("finding with subquery with binds", () => {
@@ -1656,7 +1656,7 @@ describe("RelationTest", () => {
   it("finding last with arel order", async () => {
     const last = await Item.order("name ASC").last();
     expect(last).not.toBeNull();
-    expect((last as any).readAttribute("name")).toBe("Carrot");
+    expect((last as any).name).toBe("Carrot");
   });
 
   it("finding with order by aliased attributes", () => {
@@ -1686,14 +1686,14 @@ describe("RelationTest", () => {
   it("finding with order limit and offset", async () => {
     const items = await Item.order("name").limit(1).offset(1).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Banana");
+    expect(items[0].name).toBe("Banana");
   });
 
   it.skip("to sql on eager join", () => {});
 
   it("find id", async () => {
     const item = await Item.find(1);
-    expect(item.readAttribute("name")).toBe("Apple");
+    expect(item.name).toBe("Apple");
   });
 
   it("find in empty array", async () => {
@@ -1721,7 +1721,7 @@ describe("RelationTest", () => {
 
   it("create with array", async () => {
     const item = await Item.all().create({ name: "Durian", price: 8, category: "fruit" });
-    expect(item.readAttribute("name")).toBe("Durian");
+    expect(item.name).toBe("Durian");
     expect(item.id).toBeDefined();
   });
 
@@ -1730,8 +1730,8 @@ describe("RelationTest", () => {
       price: 5,
       category: "fruit",
     });
-    expect(item.readAttribute("name")).toBe("Dragonfruit");
-    expect(item.readAttribute("price")).toBe(5);
+    expect(item.name).toBe("Dragonfruit");
+    expect(item.price).toBe(5);
   });
 
   it("first or create bang with invalid options", async () => {
@@ -1740,21 +1740,21 @@ describe("RelationTest", () => {
       price: 3,
       category: "fruit",
     });
-    expect(item.readAttribute("name")).toBe("Honeydew");
+    expect(item.name).toBe("Honeydew");
   });
 
   it("first or create bang with no parameters", async () => {
     // Should find existing Apple
     const item = await Item.where({ name: "Apple" }).firstOrCreateBang();
-    expect(item.readAttribute("name")).toBe("Apple");
+    expect(item.name).toBe("Apple");
   });
 
   it("first or create bang with invalid block", async () => {
     // When record exists, returns it
     const item = await Item.where({ name: "Apple" }).firstOrCreateBang({ price: 99 });
-    expect(item.readAttribute("name")).toBe("Apple");
+    expect(item.name).toBe("Apple");
     // price should remain original since it was found, not created
-    expect(item.readAttribute("price")).toBe(1);
+    expect(item.price).toBe(1);
   });
 
   it("first or initialize with block", async () => {
@@ -1762,8 +1762,8 @@ describe("RelationTest", () => {
       price: 7,
       category: "fruit",
     });
-    expect(item.readAttribute("name")).toBe("Elderberry");
-    expect(item.readAttribute("price")).toBe(7);
+    expect(item.name).toBe("Elderberry");
+    expect(item.price).toBe(7);
     // Should not be persisted
     expect(item.isNewRecord()).toBe(true);
   });
@@ -1772,13 +1772,13 @@ describe("RelationTest", () => {
 
   it("find or create by with block", async () => {
     const item = await Item.all().findOrCreateBy({ name: "Fig" }, { price: 4, category: "fruit" });
-    expect(item.readAttribute("name")).toBe("Fig");
-    expect(item.readAttribute("price")).toBe(4);
+    expect(item.name).toBe("Fig");
+    expect(item.price).toBe(4);
   });
 
   it("create or find by within transaction", async () => {
     const item = await Item.all().createOrFindBy({ name: "Apple" });
-    expect(item.readAttribute("name")).toBe("Apple");
+    expect(item.name).toBe("Apple");
   });
 
   it("create or find by with bang", async () => {
@@ -1786,7 +1786,7 @@ describe("RelationTest", () => {
       { name: "Guava" },
       { price: 6, category: "fruit" },
     );
-    expect(item.readAttribute("name")).toBe("Guava");
+    expect(item.name).toBe("Guava");
   });
 
   it("order by relation attribute", () => {
@@ -1886,33 +1886,33 @@ describe("RelationTest", () => {
   // -- reorder replaces existing order --
   it("reorder replaces existing order", async () => {
     const items = await Widget.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
-    expect(items[0].readAttribute("name")).toBe("D");
+    expect(items[0].name).toBe("D");
   });
 
   // -- reverseOrder --
   it("reverseOrder reverses asc to desc", async () => {
     const items = await Widget.all().order({ weight: "asc" }).reverseOrder().toArray();
-    expect(items[0].readAttribute("weight")).toBe(30);
+    expect(items[0].weight).toBe(30);
   });
 
   // -- last with no order defaults to PK desc --
   it("last returns the last record by PK", async () => {
     const item = await Widget.all().last();
     expect(item).not.toBeNull();
-    expect(item!.readAttribute("name")).toBe("D");
+    expect(item!.name).toBe("D");
   });
 
   // -- last with explicit order reverses it --
   it("last with order reverses the order", async () => {
     const item = await Widget.all().order({ name: "asc" }).last();
     expect(item).not.toBeNull();
-    expect(item!.readAttribute("name")).toBe("D");
+    expect(item!.name).toBe("D");
   });
 
   // -- firstBang and lastBang --
   it("firstBang returns first or throws", async () => {
     const item = await Widget.all().firstBang();
-    expect(item.readAttribute("name")).toBe("A");
+    expect(item.name).toBe("A");
   });
 
   it("firstBang throws when empty", async () => {
@@ -1921,7 +1921,7 @@ describe("RelationTest", () => {
 
   it("lastBang returns last or throws", async () => {
     const item = await Widget.all().lastBang();
-    expect(item.readAttribute("name")).toBe("D");
+    expect(item.name).toBe("D");
   });
 
   it("lastBang throws when empty", async () => {
@@ -1932,7 +1932,7 @@ describe("RelationTest", () => {
   it("whereNot excludes matching records", async () => {
     const items = await Widget.all().whereNot({ color: "red" }).toArray();
     expect(items).toHaveLength(2);
-    expect(items.every((i: any) => i.readAttribute("color") !== "red")).toBe(true);
+    expect(items.every((i: any) => i.color !== "red")).toBe(true);
   });
 
   it("whereNot with null uses IS NOT NULL", async () => {
@@ -2025,8 +2025,8 @@ describe("RelationTest", () => {
     const allFirst = await all.first();
     const orderedFirst = await ordered.first();
     // ordering shouldn't change the unordered relation
-    expect(allFirst!.readAttribute("name")).toBe("A");
-    expect(orderedFirst!.readAttribute("name")).toBe("D");
+    expect(allFirst!.name).toBe("A");
+    expect(orderedFirst!.name).toBe("D");
   });
 });
 
@@ -2068,7 +2068,7 @@ describe("RelationTest", () => {
 
     const result = await User.where({ name: "Bob", email: null }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 
   it("whereNot with array generates NOT IN", async () => {
@@ -2089,7 +2089,7 @@ describe("RelationTest", () => {
       .whereNot({ name: ["Alice", "Charlie"] })
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 
   it("chaining multiple whereNot calls", async () => {
@@ -2112,7 +2112,7 @@ describe("RelationTest", () => {
       .whereNot({ name: "Charlie" })
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 
   it("limit overrides previous limit", async () => {
@@ -2161,9 +2161,9 @@ describe("RelationTest", () => {
     await User.create({ name: "Alice", email: "a@b.com" });
 
     const result = await User.all().select("name").toArray();
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
     // email should not be in the selected columns
-    expect(result[0].readAttribute("email")).toBeNull();
+    expect(result[0].email).toBeNull();
   });
 
   it("pluck with multiple columns returns arrays", async () => {
@@ -2252,7 +2252,7 @@ describe("RelationTest", () => {
     await User.create({ name: "Alice" });
 
     const first = await User.all().first();
-    expect((first as any)!.readAttribute("name")).toBe("Bob"); // ID 1
+    expect((first as any)!.name).toBe("Bob"); // ID 1
   });
 
   it("last on unordered relation returns last by PK", async () => {
@@ -2269,7 +2269,7 @@ describe("RelationTest", () => {
     await User.create({ name: "Alice" });
 
     const last = await User.all().last();
-    expect((last as any)!.readAttribute("name")).toBe("Alice"); // ID 2
+    expect((last as any)!.name).toBe("Alice"); // ID 2
   });
 
   it("count on empty table returns 0", async () => {
@@ -2333,7 +2333,7 @@ describe("RelationTest", () => {
     await User.create({ name: "Alice", age: 25 });
 
     const result = await User.all().order({ age: "desc" }).reorder("name").toArray();
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 });
 
@@ -2485,7 +2485,7 @@ describe("RelationTest", () => {
       .intersect(User.where({ active: true }))
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 
   it("except removes common records", async () => {
@@ -2504,7 +2504,7 @@ describe("RelationTest", () => {
       .except(User.where({ active: true }))
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 
   it("toSql generates UNION SQL", () => {
@@ -2630,7 +2630,7 @@ describe("RelationTest", () => {
     const item = await Item.all()
       .createWith({ status: "active" })
       .findOrCreateBy({ name: "Widget" });
-    expect(item.readAttribute("status")).toBe("active");
+    expect(item.status).toBe("active");
   });
 });
 
@@ -2659,7 +2659,7 @@ describe("RelationTest", () => {
 
     const items = await Item.all().extending(mod).onlyWidgets().toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Widget");
+    expect(items[0].name).toBe("Widget");
   });
 });
 
@@ -2874,7 +2874,7 @@ describe("RelationTest", () => {
     await adapter.executeMutation(`UPDATE "users" SET "name" = 'Updated' WHERE "id" = ${user.id}`);
 
     await user.lockBang();
-    expect(user.readAttribute("name")).toBe("Updated");
+    expect(user.name).toBe("Updated");
   });
 });
 
@@ -2892,9 +2892,9 @@ describe("RelationTest", () => {
     await User.create({ name: "Bob" });
     await User.create({ name: "Charlie" });
 
-    const results = await User.all().reject((u: any) => u.readAttribute("name") === "Bob");
+    const results = await User.all().reject((u: any) => u.name === "Bob");
     expect(results.length).toBe(2);
-    expect(results.map((u: any) => u.readAttribute("name")).sort()).toEqual(["Alice", "Charlie"]);
+    expect(results.map((u: any) => u.name).sort()).toEqual(["Alice", "Charlie"]);
   });
 });
 
@@ -2914,7 +2914,7 @@ describe("RelationTest", () => {
 
     const results = await User.all().compactBlank("email").toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 });
 
@@ -3035,7 +3035,7 @@ describe("RelationTest", () => {
     // invertWhere() should return Bob (non-admins)
     const nonAdmins = await InvertWhereUser.where({ role: "admin" }).invertWhere().toArray();
     expect(nonAdmins.length).toBe(1);
-    expect(nonAdmins[0].readAttribute("name")).toBe("Bob");
+    expect(nonAdmins[0].name).toBe("Bob");
   });
 });
 
@@ -3102,8 +3102,8 @@ describe("RelationTest", () => {
     const rel = User.where({ role: "admin" });
     const u = rel.build({ name: "Alice" });
     expect(u).toBeInstanceOf(User);
-    expect(u.readAttribute("role")).toBe("admin");
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.role).toBe("admin");
+    expect(u.name).toBe("Alice");
     expect(u.isPersisted()).toBe(false);
   });
 
@@ -3120,8 +3120,8 @@ describe("RelationTest", () => {
     const rel = User.where({ role: "admin" });
     const u = await rel.create({ name: "Bob" });
     expect(u.isPersisted()).toBe(true);
-    expect(u.readAttribute("role")).toBe("admin");
-    expect(u.readAttribute("name")).toBe("Bob");
+    expect(u.role).toBe("admin");
+    expect(u.name).toBe("Bob");
   });
 
   it("createBang raises on validation failure", async () => {
@@ -3250,9 +3250,7 @@ describe("RelationTest", () => {
     await User.create({ name: "Alice" });
     await User.create({ name: "Adam" });
     await User.create({ name: "Bob" });
-    const groups = await User.where({}).groupByColumn((u: any) =>
-      String(u.readAttribute("name")).charAt(0),
-    );
+    const groups = await User.where({}).groupByColumn((u: any) => String(u.name).charAt(0));
     expect(groups["A"].length).toBe(2);
     expect(groups["B"].length).toBe(1);
   });
@@ -3269,8 +3267,8 @@ describe("RelationTest", () => {
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
     const indexed = await User.where({}).indexBy("name");
-    expect(indexed["Alice"].readAttribute("name")).toBe("Alice");
-    expect(indexed["Bob"].readAttribute("name")).toBe("Bob");
+    expect(indexed["Alice"].name).toBe("Alice");
+    expect(indexed["Bob"].name).toBe("Bob");
   });
 
   it("indexBy accepts a function", async () => {
@@ -3284,9 +3282,7 @@ describe("RelationTest", () => {
     }
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
-    const indexed = await User.where({}).indexBy((u: any) =>
-      String(u.readAttribute("name")).toLowerCase(),
-    );
+    const indexed = await User.where({}).indexBy((u: any) => String(u.name).toLowerCase());
     expect(indexed["alice"]).toBeDefined();
     expect(indexed["bob"]).toBeDefined();
   });
@@ -3466,7 +3462,7 @@ describe("RelationTest", () => {
 
     const names: string[] = [];
     for await (const user of User.where({})) {
-      names.push(user.readAttribute("name") as string);
+      names.push(user.name as string);
     }
     expect(names.sort()).toEqual(["Alice", "Bob"]);
   });
@@ -3668,8 +3664,8 @@ describe("RelationTest", () => {
     const ordered = all.order({ name: "desc" });
     const allFirst = await all.first();
     const orderedFirst = await ordered.first();
-    expect(allFirst!.readAttribute("name")).toBe("Bob");
-    expect(orderedFirst!.readAttribute("name")).toBe("Bob");
+    expect(allFirst!.name).toBe("Bob");
+    expect(orderedFirst!.name).toBe("Bob");
   });
 
   it("limit returns a new relation", async () => {
@@ -3745,7 +3741,7 @@ describe("RelationTest", () => {
 
     const items = await Item.where({ category: null }).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Orphan");
+    expect(items[0].name).toBe("Orphan");
   });
 
   it("where with array produces IN", async () => {
@@ -3766,7 +3762,7 @@ describe("RelationTest", () => {
   it("whereNot excludes matching records", async () => {
     const items = await Product.all().whereNot({ category: "fruit" }).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Carrot");
+    expect(items[0].name).toBe("Carrot");
   });
 
   it("whereNot with null produces IS NOT NULL", async () => {
@@ -3782,7 +3778,7 @@ describe("RelationTest", () => {
 
     const items = await Item.all().whereNot({ category: null }).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("Categorized");
+    expect(items[0].name).toBe("Categorized");
   });
 
   // -- select --
@@ -3846,14 +3842,14 @@ describe("RelationTest", () => {
   it("last returns the last record by primary key", async () => {
     const product = await Product.all().last();
     expect(product).not.toBeNull();
-    expect(product!.readAttribute("name")).toBe("Expired");
+    expect(product!.name).toBe("Expired");
   });
 
   it("last with ordering returns the last in that order", async () => {
     const product = await Product.all().order({ price: "asc" }).last();
     // Price desc (reversed), so highest price = Carrot (3)
     expect(product).not.toBeNull();
-    expect(product!.readAttribute("name")).toBe("Carrot");
+    expect(product!.name).toBe("Carrot");
   });
 
   it("last returns null on empty result", async () => {
@@ -3915,7 +3911,7 @@ describe("RelationTest", () => {
         this.attribute("name", "string");
         this.adapter = adapter;
         this.beforeDestroy((record: any) => {
-          log.push(`destroy:${record.readAttribute("name")}`);
+          log.push(`destroy:${record.name}`);
         });
       }
     }
@@ -3936,7 +3932,7 @@ describe("RelationTest", () => {
   it("destroyAll returns destroyed records", async () => {
     const destroyed = await Product.where({ category: "vegetable" }).destroyAll();
     expect(destroyed).toHaveLength(1);
-    expect(destroyed[0].readAttribute("name")).toBe("Carrot");
+    expect(destroyed[0].name).toBe("Carrot");
   });
 
   // -- updateAll returns count --
@@ -3983,7 +3979,7 @@ describe("RelationTest", () => {
 
     const results = await Post.where({ body: null }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("No Body");
+    expect(results[0].title).toBe("No Body");
   });
 
   // Rails: test_where_not
@@ -3993,7 +3989,7 @@ describe("RelationTest", () => {
 
     const results = await Post.all().whereNot({ status: "draft" }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("Published");
+    expect(results[0].title).toBe("Published");
   });
 
   // Rails: test_where_not_with_nil
@@ -4003,7 +3999,7 @@ describe("RelationTest", () => {
 
     const results = await Post.all().whereNot({ body: null }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("Has Body");
+    expect(results[0].title).toBe("Has Body");
   });
 
   // Rails: test_where_not_in
@@ -4016,7 +4012,7 @@ describe("RelationTest", () => {
       .whereNot({ status: ["draft", "archived"] })
       .toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("Published");
+    expect(results[0].title).toBe("Published");
   });
 
   // Rails: test_chaining_where
@@ -4027,7 +4023,7 @@ describe("RelationTest", () => {
 
     const results = await Post.where({ status: "published" }).where({ views: 100 }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("A");
+    expect(results[0].title).toBe("A");
   });
 
   // Rails: test_limit_and_offset
@@ -4038,8 +4034,8 @@ describe("RelationTest", () => {
 
     const page2 = await Post.all().order("views").limit(2).offset(2).toArray();
     expect(page2).toHaveLength(2);
-    expect(page2[0].readAttribute("title")).toBe("Post 3");
-    expect(page2[1].readAttribute("title")).toBe("Post 4");
+    expect(page2[0].title).toBe("Post 3");
+    expect(page2[1].title).toBe("Post 4");
   });
 
   // Rails: test_order_asc_desc
@@ -4077,8 +4073,8 @@ describe("RelationTest", () => {
     await Post.create({ title: "Hello", body: "world", views: 5 });
 
     const results = await Post.all().select("title", "views").toArray();
-    expect(results[0].readAttribute("title")).toBe("Hello");
-    expect(results[0].readAttribute("views")).toBe(5);
+    expect(results[0].title).toBe("Hello");
+    expect(results[0].views).toBe(5);
   });
 
   // Rails: test_distinct
@@ -4121,8 +4117,8 @@ describe("RelationTest", () => {
     const b = await Post.create({ title: "B" });
 
     const ids = await Post.all().ids();
-    expect(ids).toContain(a.readAttribute("id"));
-    expect(ids).toContain(b.readAttribute("id"));
+    expect(ids).toContain(a.id);
+    expect(ids).toContain(b.id);
   });
 });
 
@@ -4179,7 +4175,7 @@ describe("RelationTest", () => {
       .intersect(Product.where({ featured: true }))
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("A");
+    expect(result[0].name).toBe("A");
   });
 
   it("except removes records from left relation", async () => {
@@ -4197,7 +4193,7 @@ describe("RelationTest", () => {
       .except(Product.where({ discontinued: true }))
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("A");
+    expect(result[0].name).toBe("A");
   });
 
   it("lock generates FOR UPDATE in SQL", async () => {
@@ -4753,7 +4749,7 @@ describe("RelationTest", () => {
     }
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
-    const results = await (Post.all() as any).select((r: any) => r.readAttribute("title") === "a");
+    const results = await (Post.all() as any).select((r: any) => r.title === "a");
     expect(results.length).toBe(1);
   });
 
@@ -5506,7 +5502,7 @@ describe("RelationTest", () => {
       }
     }
     const p = await Post.all().findOrInitializeBy({ title: "hello" });
-    expect(p.readAttribute("title")).toBe("hello");
+    expect(p.title).toBe("hello");
   });
 
   it("first or initialize with no parameters", async () => {
@@ -5517,7 +5513,7 @@ describe("RelationTest", () => {
       }
     }
     const p = await Post.all().findOrInitializeBy({ title: "auto" });
-    expect(p.readAttribute("title")).toBe("auto");
+    expect(p.title).toBe("auto");
   });
 
   it("find or create by", async () => {
@@ -5543,7 +5539,7 @@ describe("RelationTest", () => {
     }
     const rel = Post.all().createWith({ body: "default" });
     const post = await rel.findOrCreateBy({ title: "unique" });
-    expect(post.readAttribute("body")).toBe("default");
+    expect(post.body).toBe("default");
   });
 
   it("find or create by!", async () => {
@@ -5649,7 +5645,7 @@ describe("RelationTest", () => {
     }
     const p = await Post.all().findOrInitializeBy({ title: "new" });
     expect(p.isNewRecord()).toBe(true);
-    expect(p.readAttribute("title")).toBe("new");
+    expect(p.title).toBe("new");
   });
 
   it("find or initialize by with block", async () => {
@@ -5660,7 +5656,7 @@ describe("RelationTest", () => {
       }
     }
     const p = await Post.all().findOrInitializeBy({ title: "new" });
-    expect(p.readAttribute("title")).toBe("new");
+    expect(p.title).toBe("new");
   });
 
   it("find or initialize by with cpk association", () => {
@@ -6523,9 +6519,9 @@ describe("RelationTest", () => {
       }
     }
     const u = await User.create({ name: "original" });
-    u.writeAttribute("name", "modified");
+    u.name = "modified";
     await u.reload();
-    expect(u.readAttribute("name")).toBe("original");
+    expect(u.name).toBe("original");
   });
 
   it("last", async () => {
@@ -6553,7 +6549,7 @@ describe("RelationTest", () => {
     await Topic.create({ title: "other" });
     const found = await Topic.findBy({ title: "match" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("title")).toBe("match");
+    expect(found!.title).toBe("match");
     expect(found!.id).toBe(first.id);
   });
 
@@ -6670,7 +6666,7 @@ describe("RelationTest", () => {
     }
     const t = Topic.all().build({ title: "built" });
     expect(t.isNewRecord()).toBe(true);
-    expect(t.readAttribute("title")).toBe("built");
+    expect(t.title).toBe("built");
   });
 
   it("create", async () => {
@@ -6682,7 +6678,7 @@ describe("RelationTest", () => {
     }
     const t = await Topic.create({ title: "created" });
     expect(t.isPersisted()).toBe(true);
-    expect(t.readAttribute("title")).toBe("created");
+    expect(t.title).toBe("created");
   });
 
   it("count", async () => {

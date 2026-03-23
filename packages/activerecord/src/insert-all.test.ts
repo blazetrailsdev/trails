@@ -68,7 +68,7 @@ describe("InsertAllTest", () => {
     const b = await Book.create({ title: "Original", author: "Smith" });
     await Book.upsertAll([{ id: b.id, title: "Updated", author: "Smith" }]);
     const found = await Book.find(b.id);
-    expect(found.readAttribute("title")).toBe("Updated");
+    expect(found.title).toBe("Updated");
   });
 
   it("upsert all passing both on duplicate and update only will raise an error", async () => {
@@ -88,7 +88,7 @@ describe("InsertAllTest", () => {
     } as any);
     const found = await Book.find(b.id);
     // author gets updated but title stays (updateOnly restricts to author)
-    expect(found.readAttribute("author")).toBe("Kept");
+    expect(found.author).toBe("Kept");
   });
 
   it("upsert all only updates the list of columns provided via update only", async () => {
@@ -99,8 +99,8 @@ describe("InsertAllTest", () => {
       updateOnly: ["title", "author"],
     } as any);
     const found = await Book.find(b.id);
-    expect(found.readAttribute("title")).toBe("New Title");
-    expect(found.readAttribute("author")).toBe("New Author");
+    expect(found.title).toBe("New Title");
+    expect(found.author).toBe("New Author");
   });
 
   it.skip("insert all raises on unknown attribute", async () => {
@@ -121,9 +121,7 @@ describe("InsertAllTest", () => {
     ]);
     const all = await Book.all().toArray();
     expect(all).toHaveLength(2);
-    expect(
-      all.find((b: any) => b.readAttribute("title") === "Draft Book")!.readAttribute("status"),
-    ).toBe(0);
+    expect(all.find((b: any) => b.title === "Draft Book")!.status).toBe(0);
   });
 
   it("insert all on relation", async () => {
@@ -187,7 +185,7 @@ describe("InsertAllTest", () => {
     const b = await Book.create({ title: "Existing", author: "Author" });
     await Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" });
     const found = await Book.find(b.id);
-    expect(found.readAttribute("title")).toBe("Updated");
+    expect(found.title).toBe("Updated");
   });
 
   it.skip("insert all raises on unknown attribute", async () => {
@@ -219,8 +217,8 @@ describe("InsertAllTest", () => {
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Book.all().toArray();
     expect(all.length).toBe(2);
-    expect(all.some((b: any) => b.readAttribute("title") === "Existing")).toBe(true);
-    expect(all.some((b: any) => b.readAttribute("title") === "New")).toBe(true);
+    expect(all.some((b: any) => b.title === "Existing")).toBe(true);
+    expect(all.some((b: any) => b.title === "New")).toBe(true);
   });
   it("upsert all updates records", async () => {
     const adapter = freshAdapter();
@@ -228,7 +226,7 @@ describe("InsertAllTest", () => {
     const b = await Book.create({ title: "Original", author: "Auth" });
     await Book.upsertAll([{ id: b.id, title: "Updated", author: "Auth" }]);
     const reloaded = await Book.find(b.id);
-    expect(reloaded.readAttribute("title")).toBe("Updated");
+    expect(reloaded.title).toBe("Updated");
   });
   it("upsert all with unique by", async () => {
     const adapter = freshAdapter();
@@ -239,7 +237,7 @@ describe("InsertAllTest", () => {
       uniqueBy: "id",
     });
     const reloaded = await Book.find((existing as any).id);
-    expect(reloaded.readAttribute("title")).toBe("Upserted");
+    expect(reloaded.title).toBe("Upserted");
   });
 
   it.skip("upsert all does not update readonly attributes", () => {
@@ -257,7 +255,7 @@ describe("InsertAllTest", () => {
     const count = await Book.insertAll([{ title: "EnumBook", author: "Auth", status: 0 }]);
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Book.all().toArray();
-    expect(all.some((b: any) => b.readAttribute("title") === "EnumBook")).toBe(true);
+    expect(all.some((b: any) => b.title === "EnumBook")).toBe(true);
   });
 
   it.skip("insert_all has a clear error message when a column does not exist", () => {
@@ -324,7 +322,7 @@ describe("InsertAllTest", () => {
     const count = await Book.insertAll([{ title: "NoCallback", author: "Test" }]);
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Book.all().toArray();
-    expect(all.some((b: any) => b.readAttribute("title") === "NoCallback")).toBe(true);
+    expect(all.some((b: any) => b.title === "NoCallback")).toBe(true);
   });
   it.skip("upsert_all works with custom primary key", async () => {
     const adapter = freshAdapter();
@@ -340,7 +338,7 @@ describe("InsertAllTest", () => {
     await Item.upsertAll([{ code: "A1", name: "Updated" }]);
     const all = await Item.all().toArray();
     expect(all.length).toBe(1);
-    expect(all[0].readAttribute("name")).toBe("Updated");
+    expect(all[0].name).toBe("Updated");
   });
 
   it("insert_all can skip callbacks", async () => {
@@ -366,7 +364,7 @@ describe("InsertAllTest", () => {
     const count = await Book.insertAll([{ title: "NoTs", author: "Auth" }]);
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Book.all().toArray();
-    expect(all.some((b: any) => b.readAttribute("title") === "NoTs")).toBe(true);
+    expect(all.some((b: any) => b.title === "NoTs")).toBe(true);
   });
 
   it.skip("insert_all respects attribute aliases", () => {
@@ -412,7 +410,7 @@ describe("InsertAllTest", () => {
     await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "original" }]);
     await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "updated" }]);
     const record = await CpkOrder.find([1, 1]);
-    expect(record.readAttribute("name")).toBe("updated");
+    expect(record.name).toBe("updated");
   });
   it.skip("insert_all can insert rows with all defaults", () => {
     /* needs default value insertion without explicit columns */
@@ -475,7 +473,7 @@ describe("InsertAllTest", () => {
     const count = await CpkOrder.count();
     expect(count).toBe(1);
     const record = await CpkOrder.find([1, 1]);
-    expect(record.readAttribute("name")).toBe("second");
+    expect(record.name).toBe("second");
   });
   it("insert all and upsert all works with composite primary keys when unique by is not provided", async () => {
     const adapter = freshAdapter();
@@ -598,7 +596,7 @@ describe("InsertAllTest", () => {
     expect(result).toBeDefined();
     // Original should still have old title
     const existing = await Book.find(b.id);
-    expect(existing.readAttribute("title")).toBe("Existing");
+    expect(existing.title).toBe("Existing");
   });
 
   it("upsert all updates existing records", async () => {
@@ -606,7 +604,7 @@ describe("InsertAllTest", () => {
     const b = await Book.create({ title: "Old", author: "Smith" });
     await Book.upsertAll([{ id: b.id, title: "Updated", author: "Smith" }]);
     const found = await Book.find(b.id);
-    expect(found.readAttribute("title")).toBe("Updated");
+    expect(found.title).toBe("Updated");
   });
 
   it("insert all raises on unknown attribute", async () => {
@@ -623,7 +621,7 @@ describe("InsertAllTest", () => {
       onDuplicate: "skip",
     } as any);
     const found = await Book.find(b.id);
-    expect(found.readAttribute("title")).toBe("Original");
+    expect(found.title).toBe("Original");
   });
 
   it.skip("insert all generates correct sql", async () => {

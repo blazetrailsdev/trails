@@ -29,7 +29,7 @@ describe("TokenForTest", () => {
     }
     generatesTokenFor(User, "password_reset", {
       expiresIn: 15 * 60 * 1000,
-      generator: (r: any) => r.readAttribute("password_digest") ?? "",
+      generator: (r: any) => r.password_digest ?? "",
     });
     generatesTokenFor(User, "email_confirmation");
     return { User };
@@ -61,7 +61,7 @@ describe("TokenForTest", () => {
     const token = (u as any).generateTokenFor("password_reset");
     const found = await (User as any).findByTokenFor("password_reset", token);
     expect(found).not.toBeNull();
-    expect(found.readAttribute("name")).toBe("Alice");
+    expect(found.name).toBe("Alice");
   });
 
   it("does not find record when token has expired", async () => {
@@ -93,7 +93,7 @@ describe("TokenForTest", () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Dan", password_digest: "before" });
     const token = (u as any).generateTokenFor("password_reset");
-    u.writeAttribute("password_digest", "after");
+    u.password_digest = "after";
     await u.save();
     const result = await (User as any).findByTokenFor("password_reset", token);
     expect(result).toBeNull();
@@ -119,7 +119,7 @@ describe("TokenForTest", () => {
     const token = (u as any).generateTokenFor("confirm");
     const found = await (User2 as any).findByTokenFor("confirm", token);
     expect(found).not.toBeNull();
-    expect(found.readAttribute("name")).toBe("Frank");
+    expect(found.name).toBe("Frank");
   });
 
   it("raises on bang when record is not found", async () => {
@@ -151,7 +151,7 @@ describe("TokenForTest", () => {
     const token = (u as any).generateTokenFor("password_reset");
     const found = await (User as any).findByTokenFor("password_reset", token);
     expect(found).not.toBeNull();
-    expect(found.readAttribute("name")).toBe("Grace");
+    expect(found.name).toBe("Grace");
   });
 
   it("subclasses can redefine tokens", async () => {
@@ -164,7 +164,7 @@ describe("TokenForTest", () => {
       }
     }
     generatesTokenFor(Parent, "confirm", {
-      generator: (r: any) => r.readAttribute("digest") ?? "",
+      generator: (r: any) => r.digest ?? "",
     });
 
     // Child class redefines "confirm" with a different generator (no digest check)
@@ -192,11 +192,11 @@ describe("TokenForTest", () => {
       expiresIn: 60_000,
     });
     const item = await CustomPkItem.create({ uuid: "abc-123", name: "test" });
-    expect(item.readAttribute("uuid")).toBe("abc-123");
+    expect(item.uuid).toBe("abc-123");
     const token = item.signedId();
     const found = await CustomPkItem.findSigned(token);
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("test");
+    expect(found!.name).toBe("test");
   });
   it("finds record with a composite primary key", async () => {
     const adapter = freshAdapter();
@@ -213,7 +213,7 @@ describe("TokenForTest", () => {
     const token = item.signedId();
     const found = await CpkItem.findSigned(token);
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("cpk-test");
+    expect(found!.name).toBe("cpk-test");
     expect(found!.id).toEqual([1, 42]);
   });
   it("raises when no primary key has been declared", () => {
@@ -243,7 +243,7 @@ describe("TokenForTest", () => {
       }
     }
     generatesTokenFor(User, "password_reset", {
-      generator: (record: any) => String(record.readAttribute("password_digest")),
+      generator: (record: any) => String(record.password_digest),
     });
 
     const user = await User.create({ name: "Alice", password_digest: "abc123" });
@@ -254,7 +254,7 @@ describe("TokenForTest", () => {
     // Resolve the token
     const found = await (User as any).findByTokenFor("password_reset", token);
     expect(found).not.toBeNull();
-    expect(found.readAttribute("name")).toBe("Alice");
+    expect(found.name).toBe("Alice");
   });
 
   it("returns null for invalid token", async () => {
@@ -286,7 +286,7 @@ describe("TokenForTest", () => {
     const token = (user as any).generateTokenFor("lookup");
     const found = await (User as any).findByTokenFor("lookup", token);
     expect(found).not.toBeNull();
-    expect(found.readAttribute("name")).toBe("Alice");
+    expect(found.name).toBe("Alice");
   });
 
   it("does not find record when token is invalid", async () => {

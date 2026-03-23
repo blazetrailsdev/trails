@@ -125,7 +125,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const saved = await author.save();
     expect(saved).toBe(true);
     expect(book.isNewRecord()).toBe(false);
-    expect(book.readAttribute("author_id")).toBe(author.id);
+    expect(book.author_id).toBe(author.id);
   });
 });
 
@@ -173,7 +173,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const saved = await company.save();
     expect(saved).toBe(true);
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("company_id")).toBe(company.id);
+    expect(account.company_id).toBe(company.id);
   });
 
   it("test_save_fails_for_invalid_has_one when child has validation errors", async () => {
@@ -270,7 +270,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     expect(saved).toBe(true);
     // author should have been saved and FK set
     expect(author.isNewRecord()).toBe(false);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 
   it("test_assignment_before_parent_saved", async () => {
@@ -283,7 +283,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     await post.save();
 
     expect(author.isNewRecord()).toBe(false);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 
   it("test_store_two_association_with_one_save", async () => {
@@ -297,7 +297,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
     expect(post.isNewRecord()).toBe(false);
     expect(author.isNewRecord()).toBe(false);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 });
 
@@ -355,7 +355,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const saved = await company.save();
     expect(saved).toBe(true);
     expect(employee.isNewRecord()).toBe(false);
-    expect(employee.readAttribute("company_id")).toBe(company.id);
+    expect(employee.company_id).toBe(company.id);
   });
 
   it("children marked for destruction are destroyed when parent saves", async () => {

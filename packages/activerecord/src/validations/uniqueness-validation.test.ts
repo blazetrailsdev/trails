@@ -570,12 +570,12 @@ describe("UniquenessValidationTest", () => {
         this.adapter = adp;
         this.validatesUniqueness("title");
         this.afterCreate(async function (record: any) {
-          record.writeAttribute("saved_count", 1);
+          record.saved_count = 1;
         });
       }
     }
     const p = await Post.create({ title: "after_create" });
-    expect(p.readAttribute("saved_count")).toBe(1);
+    expect(p.saved_count).toBe(1);
   });
 
   it("validate uniqueness uuid", async () => {
@@ -648,7 +648,7 @@ describe("UniquenessValidationWithIndexTest", () => {
       }
     }
     const p = await Post.create({ title: "unique", body: "old" });
-    p.writeAttribute("body", "new");
+    p.body = "new";
     expect(await p.save()).toBe(true);
   });
 
@@ -663,7 +663,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     }
     await Post.create({ title: "taken" });
     const p = await Post.create({ title: "original" });
-    p.writeAttribute("title", "taken");
+    p.title = "taken";
     expect(await p.save()).toBe(false);
   });
 
@@ -678,7 +678,7 @@ describe("UniquenessValidationWithIndexTest", () => {
       }
     }
     const p = await Post.create({ title: null, body: "old" });
-    p.writeAttribute("body", "new");
+    p.body = "new";
     expect(await p.save()).toBe(true);
   });
 
@@ -891,7 +891,7 @@ describe("UniquenessWithCompositeKey", () => {
       }
     }
     const o = await Order.create({ shop_id: 1, order_num: 1, status: "pending" });
-    o.writeAttribute("status", "shipped");
+    o.status = "shipped";
     expect(await o.save()).toBe(true);
   });
 
@@ -907,7 +907,7 @@ describe("UniquenessWithCompositeKey", () => {
     }
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = await Order.create({ shop_id: 1, order_num: 2 });
-    o2.writeAttribute("order_num", 1);
+    o2.order_num = 1;
     expect(await o2.save()).toBe(false);
   });
 
@@ -1260,7 +1260,7 @@ describe("UniquenessWithCompositeKey", () => {
       }
     }
     const o = await Order.create({ shop_id: 1, order_num: 1, note: "old" });
-    o.writeAttribute("note", "new");
+    o.note = "new";
     expect(await o.save()).toBe(true);
   });
 
@@ -1380,7 +1380,7 @@ describe("UniquenessWithCompositeKey", () => {
     await o2.save();
     expect(o2.errors.on("order_num")).toBeTruthy();
     // Change to unique value
-    o2.writeAttribute("order_num", 2);
+    o2.order_num = 2;
     expect(await o2.save()).toBe(true);
   });
 
@@ -1444,7 +1444,7 @@ describe("UniquenessWithCompositeKey", () => {
     await Order.create({ shop_id: 1, order_num: 1 });
     const o2 = new Order({ shop_id: 1, order_num: 1 });
     expect(await o2.save()).toBe(false);
-    o2.writeAttribute("order_num", 2);
+    o2.order_num = 2;
     expect(await o2.save()).toBe(true);
   });
 

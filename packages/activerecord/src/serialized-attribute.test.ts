@@ -46,8 +46,8 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", JSON.stringify({ theme: "dark" }));
-    const val = u.readAttribute("preferences") as Record<string, unknown>;
+    u.preferences = JSON.stringify({ theme: "dark" });
+    const val = u.preferences as Record<string, unknown>;
     expect(val).toEqual({ theme: "dark" });
   });
 
@@ -63,12 +63,12 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(AliasUser, "preferences");
     const u = new AliasUser();
-    u.writeAttribute("preferences", JSON.stringify({ theme: "dark" }));
+    u.preferences = JSON.stringify({ theme: "dark" });
     // Reading via the original attribute name should deserialize
-    const val = u.readAttribute("preferences") as Record<string, unknown>;
+    const val = u.preferences as Record<string, unknown>;
     expect(val).toEqual({ theme: "dark" });
     // The alias should also resolve to the same underlying attribute
-    const aliasVal = u.readAttribute("prefs");
+    const aliasVal = u.prefs;
     // alias may or may not pass through serialization depending on implementation
     expect(aliasVal !== undefined).toBe(true);
   });
@@ -84,7 +84,7 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "settings");
     const p = new Post();
-    const val = p.readAttribute("settings");
+    const val = p.settings;
     expect(val).toEqual({});
   });
 
@@ -99,7 +99,7 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "metadata");
     const p = new Post();
-    const val = p.readAttribute("metadata");
+    const val = p.metadata;
     expect(val).toEqual({ version: 1 });
   });
 
@@ -115,8 +115,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Parent, "data");
     class Child extends Parent {}
     const c = new Child();
-    c.writeAttribute("data", JSON.stringify({ key: "val" }));
-    expect(c.readAttribute("data")).toEqual({ key: "val" });
+    c.data = JSON.stringify({ key: "val" });
+    expect(c.data).toEqual({ key: "val" });
   });
 
   it("serialized attributes from database on subclass", async () => {
@@ -135,16 +135,16 @@ describe("SerializedAttributeTest", () => {
       name: "test",
       data: JSON.stringify({ key: "val" }) as any,
     });
-    const found = await Child.find(created.readAttribute("id"));
-    expect(found.readAttribute("data")).toEqual({ key: "val" });
+    const found = await Child.find(created.id);
+    expect(found.data).toEqual({ key: "val" });
   });
 
   it("serialized attribute calling dup method", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", JSON.stringify({ theme: "dark" }));
-    const val1 = u.readAttribute("preferences") as Record<string, unknown>;
-    const val2 = u.readAttribute("preferences") as Record<string, unknown>;
+    u.preferences = JSON.stringify({ theme: "dark" });
+    const val1 = u.preferences as Record<string, unknown>;
+    const val2 = u.preferences as Record<string, unknown>;
     // Each read should return the same deserialized value
     expect(val1).toEqual(val2);
   });
@@ -152,8 +152,8 @@ describe("SerializedAttributeTest", () => {
   it("serialized json attribute returns unserialized value", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", JSON.stringify([1, 2, 3]));
-    const val = u.readAttribute("preferences");
+    u.preferences = JSON.stringify([1, 2, 3]);
+    const val = u.preferences;
     expect(Array.isArray(val)).toBe(true);
     expect(val).toEqual([1, 2, 3]);
   });
@@ -161,8 +161,8 @@ describe("SerializedAttributeTest", () => {
   it("json read db null", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", null);
-    const val = u.readAttribute("preferences");
+    u.preferences = null;
+    const val = u.preferences;
     expect(val).toBeNull();
   });
 
@@ -178,24 +178,24 @@ describe("SerializedAttributeTest", () => {
     class Child extends Parent {}
     serialize(Child, "data");
     const c = new Child();
-    c.writeAttribute("data", JSON.stringify({ key: "val" }));
-    expect(c.readAttribute("data")).toEqual({ key: "val" });
+    c.data = JSON.stringify({ key: "val" });
+    expect(c.data).toEqual({ key: "val" });
   });
 
   it("serialized time attribute", () => {
     const { User } = makeModel();
     const u = new User();
     const now = new Date().toISOString();
-    u.writeAttribute("preferences", JSON.stringify({ timestamp: now }));
-    const val = u.readAttribute("preferences") as Record<string, unknown>;
+    u.preferences = JSON.stringify({ timestamp: now });
+    const val = u.preferences as Record<string, unknown>;
     expect(val.timestamp).toBe(now);
   });
 
   it("serialized string attribute", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", JSON.stringify("just a string"));
-    expect(u.readAttribute("preferences")).toBe("just a string");
+    u.preferences = JSON.stringify("just a string");
+    expect(u.preferences).toBe("just a string");
   });
 
   it.skip("serialized class attribute", () => {
@@ -208,20 +208,20 @@ describe("SerializedAttributeTest", () => {
   it("nil serialized attribute without class constraint", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", null);
-    expect(u.readAttribute("preferences")).toBeNull();
+    u.preferences = null;
+    expect(u.preferences).toBeNull();
   });
 
   it("nil not serialized without class constraint", () => {
     const { User } = makeModel();
     const u = new User();
-    expect(u.readAttribute("preferences")).toBeNull();
+    expect(u.preferences).toBeNull();
   });
 
   it("nil not serialized with class constraint", () => {
     const { User } = makeModel();
     const u = new User();
-    expect(u.readAttribute("preferences")).toBeNull();
+    expect(u.preferences).toBeNull();
   });
 
   it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
@@ -254,27 +254,27 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "tags");
     const p = new Post();
-    expect(p.readAttribute("tags")).toEqual([]);
+    expect(p.tags).toEqual([]);
   });
   it("serialized no default class for object", () => {
     const { User } = makeModel();
     const u = new User();
     // Without class constraint, default is null
-    expect(u.readAttribute("preferences")).toBeNull();
+    expect(u.preferences).toBeNull();
   });
 
   it("serialized boolean value true", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", JSON.stringify(true));
-    expect(u.readAttribute("preferences")).toBe(true);
+    u.preferences = JSON.stringify(true);
+    expect(u.preferences).toBe(true);
   });
 
   it("serialized boolean value false", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", JSON.stringify(false));
-    expect(u.readAttribute("preferences")).toBe(false);
+    u.preferences = JSON.stringify(false);
+    expect(u.preferences).toBe(false);
   });
 
   it("serialize with coder", () => {
@@ -288,8 +288,8 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "tags", { coder: "array" });
     const p = new Post();
-    p.writeAttribute("tags", JSON.stringify(["a", "b"]));
-    expect(p.readAttribute("tags")).toEqual(["a", "b"]);
+    p.tags = JSON.stringify(["a", "b"]);
+    expect(p.tags).toEqual(["a", "b"]);
   });
 
   it.skip("serialize attribute via select method when time zone available", () => {
@@ -310,7 +310,7 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "data");
     const p = new Post({ title: "test" });
-    expect(p.readAttribute("data")).toEqual({});
+    expect(p.data).toEqual({});
   });
 
   it.skip("unexpected serialized type", () => {
@@ -322,14 +322,14 @@ describe("SerializedAttributeTest", () => {
     const u = await User.create({ name: "test", preferences: JSON.stringify({ a: 1 }) as any });
     // Update and verify unserialization
     await u.update({ preferences: JSON.stringify({ b: 2 }) as any });
-    expect(u.readAttribute("preferences")).toEqual({ b: 2 });
+    expect(u.preferences).toEqual({ b: 2 });
   });
 
   it("serialized column should unserialize after update attribute", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "test", preferences: JSON.stringify({ a: 1 }) as any });
-    u.writeAttribute("preferences", JSON.stringify({ c: 3 }));
-    expect(u.readAttribute("preferences")).toEqual({ c: 3 });
+    u.preferences = JSON.stringify({ c: 3 });
+    expect(u.preferences).toEqual({ c: 3 });
   });
 
   it("nil is not changed when serialized with a class", () => {
@@ -337,7 +337,7 @@ describe("SerializedAttributeTest", () => {
     const u = new User();
     (u as any)._dirty.snapshot(u._attributes);
     // preferences is nil, set it to nil again - no change
-    u.writeAttribute("preferences", null);
+    u.preferences = null;
     // Should not be marked as changed
     expect(u.changedAttributes).not.toContain("preferences");
   });
@@ -350,7 +350,7 @@ describe("SerializedAttributeTest", () => {
     const { User } = makeModel();
     const u = new User({ preferences: JSON.stringify({ theme: "dark" }) as any });
     (u as any)._dirty.snapshot(u._attributes);
-    u.writeAttribute("preferences", JSON.stringify({}));
+    u.preferences = JSON.stringify({});
     expect(u.changed).toBe(true);
   });
 
@@ -364,9 +364,9 @@ describe("SerializedAttributeTest", () => {
   it("values cast from nil are persisted as nil", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "test" });
-    expect(u.readAttribute("preferences")).toBeNull();
-    const found = await User.find(u.readAttribute("id"));
-    expect(found.readAttribute("preferences")).toBeNull();
+    expect(u.preferences).toBeNull();
+    const found = await User.find(u.id);
+    expect(found.preferences).toBeNull();
   });
 
   it("serialized attribute can be defined in abstract classes", () => {
@@ -381,15 +381,15 @@ describe("SerializedAttributeTest", () => {
     serialize(AbstractBase, "data");
     class Concrete extends AbstractBase {}
     const c = new Concrete();
-    c.writeAttribute("data", JSON.stringify({ key: "val" }));
-    expect(c.readAttribute("data")).toEqual({ key: "val" });
+    c.data = JSON.stringify({ key: "val" });
+    expect(c.data).toEqual({ key: "val" });
   });
 
   it("nil is always persisted as null", () => {
     const { User } = makeModel();
     const u = new User();
-    u.writeAttribute("preferences", null);
-    expect(u.readAttribute("preferences")).toBeNull();
+    u.preferences = null;
+    expect(u.preferences).toBeNull();
   });
 
   it("hash coder returns empty hash for null", () => {
@@ -403,8 +403,8 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "meta", { coder: "hash" });
     const p = new Post();
-    p.writeAttribute("meta", null);
-    expect(p.readAttribute("meta")).toEqual({});
+    p.meta = null;
+    expect(p.meta).toEqual({});
   });
 
   it("array coder returns empty array for null", () => {
@@ -418,8 +418,8 @@ describe("SerializedAttributeTest", () => {
     }
     serialize(Post, "tags", { coder: "array" });
     const p = new Post();
-    p.writeAttribute("tags", null);
-    expect(p.readAttribute("tags")).toEqual([]);
+    p.tags = null;
+    expect(p.tags).toEqual([]);
   });
 
   it.skip("decorated type with type for attribute", () => {
@@ -433,13 +433,13 @@ describe("SerializedAttributeTest", () => {
     const { User } = makeModel();
     const u = await User.create({ name: "test", preferences: JSON.stringify({ a: 1 }) as any });
     // Read, mutate the returned object, save
-    const prefs = u.readAttribute("preferences") as any;
+    const prefs = u.preferences as any;
     expect(prefs.a).toBe(1);
     prefs.b = 2;
-    u.writeAttribute("preferences", JSON.stringify(prefs));
+    u.preferences = JSON.stringify(prefs);
     await u.save();
     // Verify current instance has correct value
-    const currentPrefs = u.readAttribute("preferences") as any;
+    const currentPrefs = u.preferences as any;
     expect(currentPrefs.a).toBe(1);
     expect(currentPrefs.b).toBe(2);
   });
@@ -452,7 +452,7 @@ describe("SerializedAttributeTest", () => {
     const { User } = makeModel();
     const u = await User.create({ name: "test", preferences: null });
     const reloaded = await User.find(u.id);
-    expect(reloaded.readAttribute("preferences")).toBeNull();
+    expect(reloaded.preferences).toBeNull();
   });
 });
 
@@ -490,7 +490,7 @@ describe("serialize", () => {
 
     const s = await Setting.create({ data: JSON.stringify({ theme: "dark", fontSize: 14 }) });
     const loaded = await Setting.find(s.id);
-    const data = loaded.readAttribute("data") as Record<string, unknown>;
+    const data = loaded.data as Record<string, unknown>;
     expect(data.theme).toBe("dark");
     expect(data.fontSize).toBe(14);
   });
@@ -506,7 +506,7 @@ describe("serialize", () => {
 
     const p = await Pref.create({ tags: JSON.stringify(["ruby", "rails"]) });
     const loaded = await Pref.find(p.id);
-    expect(loaded.readAttribute("tags")).toEqual(["ruby", "rails"]);
+    expect(loaded.tags).toEqual(["ruby", "rails"]);
   });
 });
 
@@ -531,7 +531,7 @@ describe("serialize (Rails-guided)", () => {
 
     const user = await User.create({ preferences: JSON.stringify({ theme: "dark" }) });
     const loaded = await User.find(user.id);
-    const prefs = loaded.readAttribute("preferences") as Record<string, unknown>;
+    const prefs = loaded.preferences as Record<string, unknown>;
     expect(prefs.theme).toBe("dark");
   });
 
@@ -549,7 +549,7 @@ describe("serialize (Rails-guided)", () => {
 
     const user = await User.create({ roles: JSON.stringify(["admin", "editor"]) });
     const loaded = await User.find(user.id);
-    expect(loaded.readAttribute("roles")).toEqual(["admin", "editor"]);
+    expect(loaded.roles).toEqual(["admin", "editor"]);
   });
 
   // Rails: test "serialized hash"
@@ -566,7 +566,7 @@ describe("serialize (Rails-guided)", () => {
 
     const user = await User.create({ settings: JSON.stringify({ notify: true }) });
     const loaded = await User.find(user.id);
-    const settings = loaded.readAttribute("settings") as Record<string, unknown>;
+    const settings = loaded.settings as Record<string, unknown>;
     expect(settings.notify).toBe(true);
   });
 });
@@ -592,9 +592,9 @@ describe("SerializedAttributeTest", () => {
     serialize(Topic, "content", { coder: "json" });
 
     const topic = new Topic({});
-    topic.writeAttribute("content", JSON.stringify({ foo: "bar" }));
+    topic.content = JSON.stringify({ foo: "bar" });
     // readAttribute should deserialize the JSON string
-    expect(topic.readAttribute("content")).toEqual({ foo: "bar" });
+    expect(topic.content).toEqual({ foo: "bar" });
   });
 
   it("serialized attribute with custom coder", async () => {
@@ -619,8 +619,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Settings, "data", { coder: customCoder });
 
     const s = new Settings({});
-    s.writeAttribute("data", customCoder.dump({ key: "value" }));
-    expect(s.readAttribute("data")).toEqual({ key: "value" });
+    s.data = customCoder.dump({ key: "value" });
+    expect(s.data).toEqual({ key: "value" });
   });
 
   it("serialized attribute with array coder returns array", async () => {
@@ -633,8 +633,8 @@ describe("SerializedAttributeTest", () => {
     serialize(TagList, "tags", { coder: "array" });
 
     const t = new TagList({});
-    t.writeAttribute("tags", JSON.stringify(["a", "b", "c"]));
-    expect(t.readAttribute("tags")).toEqual(["a", "b", "c"]);
+    t.tags = JSON.stringify(["a", "b", "c"]);
+    expect(t.tags).toEqual(["a", "b", "c"]);
   });
 
   it("serialized attribute with array coder returns [] for null", async () => {
@@ -647,8 +647,8 @@ describe("SerializedAttributeTest", () => {
     serialize(TagList2, "tags", { coder: "array" });
 
     const t = new TagList2({});
-    t.writeAttribute("tags", null as any);
-    expect(t.readAttribute("tags")).toEqual([]);
+    t.tags = null as any;
+    expect(t.tags).toEqual([]);
   });
 
   it("serialized attribute with hash coder returns hash", async () => {
@@ -661,8 +661,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Prefs, "settings", { coder: "hash" });
 
     const p = new Prefs({});
-    p.writeAttribute("settings", JSON.stringify({ theme: "dark" }));
-    expect(p.readAttribute("settings")).toEqual({ theme: "dark" });
+    p.settings = JSON.stringify({ theme: "dark" });
+    expect(p.settings).toEqual({ theme: "dark" });
   });
 
   it("serialized attribute with hash coder returns {} for null", async () => {
@@ -675,8 +675,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Prefs2, "settings", { coder: "hash" });
 
     const p = new Prefs2({});
-    p.writeAttribute("settings", null as any);
-    expect(p.readAttribute("settings")).toEqual({});
+    p.settings = null as any;
+    expect(p.settings).toEqual({});
   });
 
   it("nil serialized attribute without coder constraint returns null", async () => {
@@ -689,8 +689,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Doc, "body");
 
     const d = new Doc({});
-    d.writeAttribute("body", null as any);
-    expect(d.readAttribute("body")).toBeNull();
+    d.body = null as any;
+    expect(d.body).toBeNull();
   });
 
   it("serialized attribute returns object when raw is already JSON string", async () => {
@@ -703,8 +703,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Config, "options", { coder: "json" });
 
     const c = new Config({});
-    c.writeAttribute("options", JSON.stringify({ already: "parsed" }));
-    expect(c.readAttribute("options")).toEqual({ already: "parsed" });
+    c.options = JSON.stringify({ already: "parsed" });
+    expect(c.options).toEqual({ already: "parsed" });
   });
 
   it("serialized attribute handles JSON parse errors gracefully", async () => {
@@ -717,9 +717,9 @@ describe("SerializedAttributeTest", () => {
     serialize(Blob, "data", { coder: "json" });
 
     const b = new Blob({});
-    b.writeAttribute("data", "not valid json" as any);
+    b.data = "not valid json" as any;
     // Should return the raw string (not throw)
-    expect(b.readAttribute("data")).toBe("not valid json");
+    expect(b.data).toBe("not valid json");
   });
 
   it("multiple serialized attributes on same class", async () => {
@@ -734,10 +734,10 @@ describe("SerializedAttributeTest", () => {
     serialize(Multi, "meta", { coder: "hash" });
 
     const m = new Multi({});
-    m.writeAttribute("tags", JSON.stringify(["x", "y"]));
-    m.writeAttribute("meta", JSON.stringify({ foo: 1 }));
-    expect(m.readAttribute("tags")).toEqual(["x", "y"]);
-    expect(m.readAttribute("meta")).toEqual({ foo: 1 });
+    m.tags = JSON.stringify(["x", "y"]);
+    m.meta = JSON.stringify({ foo: 1 });
+    expect(m.tags).toEqual(["x", "y"]);
+    expect(m.meta).toEqual({ foo: 1 });
   });
 
   it("non-serialized attributes are unaffected", async () => {
@@ -751,8 +751,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Mixed, "data", { coder: "json" });
 
     const m = new Mixed({ name: "Alice", data: JSON.stringify({ x: 1 }) });
-    expect(m.readAttribute("name")).toBe("Alice");
-    expect(m.readAttribute("data")).toEqual({ x: 1 });
+    expect(m.name).toBe("Alice");
+    expect(m.data).toEqual({ x: 1 });
   });
 
   it("serialize with no options defaults to JSON coder", async () => {
@@ -765,8 +765,8 @@ describe("SerializedAttributeTest", () => {
     serialize(JsonDefault, "payload");
 
     const j = new JsonDefault({});
-    j.writeAttribute("payload", JSON.stringify([1, 2, 3]));
-    expect(j.readAttribute("payload")).toEqual([1, 2, 3]);
+    j.payload = JSON.stringify([1, 2, 3]);
+    expect(j.payload).toEqual([1, 2, 3]);
   });
 
   it("serialized attribute with boolean true", async () => {
@@ -779,8 +779,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Flags, "active", { coder: "json" });
 
     const f = new Flags({});
-    f.writeAttribute("active", "true");
-    expect(f.readAttribute("active")).toBe(true);
+    f.active = "true";
+    expect(f.active).toBe(true);
   });
 
   it("serialized attribute with boolean false", async () => {
@@ -793,8 +793,8 @@ describe("SerializedAttributeTest", () => {
     serialize(Flags2, "active", { coder: "json" });
 
     const f = new Flags2({});
-    f.writeAttribute("active", "false");
-    expect(f.readAttribute("active")).toBe(false);
+    f.active = "false";
+    expect(f.active).toBe(false);
   });
 
   it("serialized attribute with numeric value", async () => {
@@ -807,7 +807,7 @@ describe("SerializedAttributeTest", () => {
     serialize(Counter, "count", { coder: "json" });
 
     const c = new Counter({});
-    c.writeAttribute("count", "42");
-    expect(c.readAttribute("count")).toBe(42);
+    c.count = "42";
+    expect(c.count).toBe(42);
   });
 });

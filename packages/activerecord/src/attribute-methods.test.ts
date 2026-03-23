@@ -90,7 +90,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = Post.new({ published: true }) as any;
-    expect(p.readAttribute("published")).toBe(true);
+    expect(p.published).toBe(true);
   });
 
   it("integers as nil", () => {
@@ -102,7 +102,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = Post.new({ count: null }) as any;
-    expect(p.readAttribute("count")).toBeNull();
+    expect(p.count).toBeNull();
   });
 
   it("attribute_present with booleans", () => {
@@ -115,7 +115,7 @@ describe("AttributeMethodsTest", () => {
     }
     const p = Post.new({ published: false }) as any;
     // false is a valid value, not "blank"
-    expect(p.readAttribute("published")).toBe(false);
+    expect(p.published).toBe(false);
   });
 
   it("array content", () => {
@@ -127,7 +127,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = Post.new({ title: "test" }) as any;
-    expect(p.readAttribute("title")).toBe("test");
+    expect(p.title).toBe("test");
   });
 
   it("hash content", () => {
@@ -177,7 +177,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = Post.new({ title: "test" }) as any;
-    expect(p.readAttribute("title")).toBe("test");
+    expect(p.title).toBe("test");
   });
 
   it("allocated objects can be inspected", () => {
@@ -225,7 +225,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Post({ Title: "test" } as any);
-    expect((p as any).readAttribute("Title")).toBe("test");
+    expect((p as any).Title).toBe("test");
   });
 
   it("write_attribute does not raise when the attribute isn't selected", async () => {
@@ -285,7 +285,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = await Post.create({ active: false });
-    expect((p as any).readAttribute("active")).toBe(false);
+    expect((p as any).active).toBe(false);
   });
 
   it("typecast attribute from select to true", async () => {
@@ -297,7 +297,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = await Post.create({ active: true });
-    expect((p as any).readAttribute("active")).toBe(true);
+    expect((p as any).active).toBe(true);
   });
 
   it("attribute_for_inspect with an array", async () => {
@@ -309,8 +309,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Post({ title: "test" });
-    const inspected =
-      (p as any).attributeForInspect?.("title") ?? (p as any).readAttribute("title");
+    const inspected = (p as any).attributeForInspect?.("title") ?? (p as any).title;
     expect(inspected).toBeTruthy();
   });
 
@@ -323,7 +322,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const e = new Event({ occurred_at: "2024-01-15" } as any);
-    const val = (e as any).readAttribute("occurred_at");
+    const val = (e as any).occurred_at;
     expect(val).toBeTruthy();
   });
 
@@ -378,7 +377,7 @@ describe("AttributeMethodsTest", () => {
   it("attribute_for_inspect with a long array", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "inspect_arr" });
-    expect(p.readAttribute("title")).toBe("inspect_arr");
+    expect(p.title).toBe("inspect_arr");
   });
   it("attribute_for_inspect with a non-primary key id attribute", async () => {
     const { Post } = makeModel();
@@ -394,37 +393,37 @@ describe("AttributeMethodsTest", () => {
   it("user-defined time attribute predicate", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "time_pred" });
-    expect(p.readAttribute("title")).toBe("time_pred");
+    expect(p.title).toBe("time_pred");
   });
   it("user-defined JSON attribute predicate", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "json_pred" });
-    expect(p.readAttribute("title")).toBe("json_pred");
+    expect(p.title).toBe("json_pred");
   });
   it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "undecl" });
-    expect(p.readAttribute("title")).toBe("undecl");
+    expect(p.title).toBe("undecl");
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "prefixed" });
-    expect(p.readAttribute("title")).toBe("prefixed");
+    expect(p.title).toBe("prefixed");
   });
   it("declared suffixed attribute method affects respond_to? and method_missing", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "suffixed" });
-    expect(p.readAttribute("title")).toBe("suffixed");
+    expect(p.title).toBe("suffixed");
   });
   it("declared affixed attribute method affects respond_to? and method_missing", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "affixed" });
-    expect(p.readAttribute("title")).toBe("affixed");
+    expect(p.title).toBe("affixed");
   });
   it("should unserialize attributes for frozen records", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "frozen" });
-    expect(p.readAttribute("title")).toBe("frozen");
+    expect(p.title).toBe("frozen");
   });
   it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", async () => {
     const { Post } = makeModel();
@@ -434,28 +433,28 @@ describe("AttributeMethodsTest", () => {
   it("setting time zone-aware read attribute", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "tz_read" });
-    expect(p.readAttribute("title")).toBe("tz_read");
+    expect(p.title).toBe("tz_read");
   });
   it("setting time zone-aware attribute with a string", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "tz_str" });
-    expect(p.readAttribute("title")).toBe("tz_str");
+    expect(p.title).toBe("tz_str");
   });
   it("time zone-aware attribute saved", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "tz_saved" });
     const found = await Post.find(p.id!);
-    expect(found.readAttribute("title")).toBe("tz_saved");
+    expect(found.title).toBe("tz_saved");
   });
   it("setting a time zone-aware attribute to a blank string returns nil", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "" });
-    expect(p.readAttribute("title")).toBe("");
+    expect(p.title).toBe("");
   });
   it("setting a time zone-aware attribute interprets time zone-unaware string in time zone", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "tz_interp" });
-    expect(p.readAttribute("title")).toBe("tz_interp");
+    expect(p.title).toBe("tz_interp");
   });
   it("setting a time zone-aware datetime in the current time zone", async () => {
     const { Post } = makeModel();
@@ -465,22 +464,22 @@ describe("AttributeMethodsTest", () => {
   it("YAML dumping a record with time zone-aware attribute", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "yaml_tz" });
-    expect(p.readAttribute("title")).toBe("yaml_tz");
+    expect(p.title).toBe("yaml_tz");
   });
   it("setting a time zone-aware time in the current time zone", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "tz_time" });
-    expect(p.readAttribute("title")).toBe("tz_time");
+    expect(p.title).toBe("tz_time");
   });
   it("setting a time zone-aware time with DST", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "dst_time" });
-    expect(p.readAttribute("title")).toBe("dst_time");
+    expect(p.title).toBe("dst_time");
   });
   it("setting invalid string to a zone-aware time attribute", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "invalid_tz" });
-    expect(p.readAttribute("title")).toBe("invalid_tz");
+    expect(p.title).toBe("invalid_tz");
   });
   it("removing time zone-aware types", async () => {
     const { Post } = makeModel();
@@ -490,12 +489,12 @@ describe("AttributeMethodsTest", () => {
   it("time zone-aware attributes do not recurse infinitely on invalid values", async () => {
     const { Post } = makeModel();
     const p = new Post({ title: "no_recurse" });
-    expect(p.readAttribute("title")).toBe("no_recurse");
+    expect(p.title).toBe("no_recurse");
   });
   it("time zone-aware custom attributes", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "custom_tz" });
-    expect(p.readAttribute("title")).toBe("custom_tz");
+    expect(p.title).toBe("custom_tz");
   });
   it("setting a time_zone_conversion_for_attributes should write the value on a class variable", async () => {
     const { Post } = makeModel();
@@ -505,34 +504,34 @@ describe("AttributeMethodsTest", () => {
   it("attribute predicates respect access control", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "pred_access" });
-    expect(p.readAttribute("title")).toBeDefined();
+    expect(p.title).toBeDefined();
   });
   it("bulk updates respect access control", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "bulk" });
     await Post.where({ title: "bulk" }).updateAll({ score: 5 });
     const updated = await Post.findBy({ title: "bulk" });
-    expect(updated?.readAttribute("score")).toBe(5);
+    expect(updated?.score).toBe(5);
   });
   it("#undefine_attribute_methods undefines alias attribute methods", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "undef_alias" });
-    expect(p.readAttribute("title")).toBe("undef_alias");
+    expect(p.title).toBe("undef_alias");
   });
   it("#define_attribute_methods brings back undefined aliases", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "redef_alias" });
-    expect(p.readAttribute("title")).toBe("redef_alias");
+    expect(p.title).toBe("redef_alias");
   });
   it("#method_missing define methods on the fly in a thread safe way", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "mm_safe" });
-    expect(p.readAttribute("title")).toBe("mm_safe");
+    expect(p.title).toBe("mm_safe");
   });
   it("#method_missing define methods on the fly in a thread safe way, even when decorated", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "mm_decorated" });
-    expect(p.readAttribute("title")).toBe("mm_decorated");
+    expect(p.title).toBe("mm_decorated");
   });
   it("inherited custom accessors with reserved names", async () => {
     const { Post } = makeModel();
@@ -542,12 +541,12 @@ describe("AttributeMethodsTest", () => {
   it("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "otf_super" });
-    expect(p.readAttribute("title")).toBe("otf_super");
+    expect(p.title).toBe("otf_super");
   });
   it("on-the-fly super-invokable generated attribute predicates via method_missing", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "otf_pred" });
-    expect(p.readAttribute("title")).toBe("otf_pred");
+    expect(p.title).toBe("otf_pred");
   });
   it("calling super when the parent does not define method raises NoMethodError", async () => {
     const { Post } = makeModel();
@@ -557,37 +556,37 @@ describe("AttributeMethodsTest", () => {
   it("generated attribute methods ancestors have correct module", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "ancestors" });
-    expect(p.readAttribute("title")).toBe("ancestors");
+    expect(p.title).toBe("ancestors");
   });
   it("#alias_attribute override methods defined in parent models", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_override" });
-    expect(p.readAttribute("title")).toBe("alias_override");
+    expect(p.title).toBe("alias_override");
   });
   it("aliases to the same attribute name do not conflict with each other", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_conflict" });
-    expect(p.readAttribute("title")).toBe("alias_conflict");
+    expect(p.title).toBe("alias_conflict");
   });
   it("#alias_attribute with an overridden original method does not use the overridden original method", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_orig" });
-    expect(p.readAttribute("title")).toBe("alias_orig");
+    expect(p.title).toBe("alias_orig");
   });
   it("#alias_attribute with an overridden original method from a module does not use the overridden original method", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_mod" });
-    expect(p.readAttribute("title")).toBe("alias_mod");
+    expect(p.title).toBe("alias_mod");
   });
   it("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_both" });
-    expect(p.readAttribute("title")).toBe("alias_both");
+    expect(p.title).toBe("alias_both");
   });
   it("#alias_attribute with an overridden original method along with an overridden alias method in a parent class uses the overridden alias method", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_parent" });
-    expect(p.readAttribute("title")).toBe("alias_parent");
+    expect(p.title).toBe("alias_parent");
   });
   it("#alias_attribute with the same alias as parent doesn't issue a deprecation", async () => {
     const { Post } = makeModel();
@@ -597,7 +596,7 @@ describe("AttributeMethodsTest", () => {
   it("#alias_attribute method on an abstract class is available on subclasses", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_abstract" });
-    expect(p.readAttribute("title")).toBe("alias_abstract");
+    expect(p.title).toBe("alias_abstract");
   });
   it("#alias_attribute with an _in_database method issues raises an error", async () => {
     const { Post } = makeModel();
@@ -617,7 +616,7 @@ describe("AttributeMethodsTest", () => {
   it("#alias_attribute method on a STI class is available on subclasses", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_sti" });
-    expect(p.readAttribute("title")).toBe("alias_sti");
+    expect(p.title).toBe("alias_sti");
   });
   it("#alias_attribute with a manually defined method raises an error", async () => {
     const { Post } = makeModel();
@@ -680,14 +679,14 @@ describe("AttributeMethodsTest", () => {
     }
     const p = new CustomPK({ custom_id: "42", name: "test" });
     expect(p.readAttributeBeforeTypeCast("custom_id")).toBe("42");
-    expect(p.readAttribute("custom_id")).toBe(42);
+    expect(p.custom_id).toBe(42);
   });
   it("read attributes_before_type_cast", () => {
     const { Post } = makeModel();
     const p = new Post({ title: "raw", score: "99" });
     const raw = p.attributesBeforeTypeCast;
     expect(raw.score).toBe("99");
-    expect(p.readAttribute("score")).toBe(99);
+    expect(p.score).toBe(99);
   });
   it("read attributes_before_type_cast on a boolean", () => {
     class PostBool extends Base {
@@ -699,13 +698,13 @@ describe("AttributeMethodsTest", () => {
     }
     const p = new PostBool({ title: "test", published: "true" });
     expect(p.readAttributeBeforeTypeCast("published")).toBe("true");
-    expect(p.readAttribute("published")).toBe(true);
+    expect(p.published).toBe(true);
   });
   it("read overridden attribute with predicate respects override", () => {
     const { Post } = makeModel();
     const p = new Post({ title: "overridden" });
     expect(p.attributePresent("title")).toBe(true);
-    expect(p.readAttribute("title")).toBe("overridden");
+    expect(p.title).toBe("overridden");
   });
   it("write time to date attribute", () => {
     class Event extends Base {
@@ -716,7 +715,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const e = new Event({ name: "party", starts_on: "2024-06-15" });
-    const val = e.readAttribute("starts_on");
+    const val = e.starts_on;
     expect(val).toBeDefined();
   });
   it("setting a time zone-aware attribute to UTC", () => {
@@ -729,7 +728,7 @@ describe("AttributeMethodsTest", () => {
     }
     const utcDate = new Date("2024-06-15T12:00:00Z");
     const e = new Event({ name: "utc", created_at: utcDate });
-    const val = e.readAttribute("created_at");
+    const val = e.created_at;
     expect(val).toBeInstanceOf(Date);
     expect((val as Date).toISOString()).toBe("2024-06-15T12:00:00.000Z");
   });
@@ -766,8 +765,8 @@ describe("AttributeMethodsTest", () => {
     const Topic = makeTopic();
     const t = new (Topic as any)({});
     t.assignAttributes({ title: "Set", author_name: "Alice" });
-    expect(t.readAttribute("title")).toBe("Set");
-    expect(t.readAttribute("author_name")).toBe("Alice");
+    expect(t.title).toBe("Set");
+    expect(t.author_name).toBe("Alice");
   });
 
   it("read attributes_before_type_cast on a datetime", async () => {
@@ -814,9 +813,9 @@ describe("AttributeMethodsTest", () => {
   it("boolean attribute predicate", async () => {
     const Topic = makeTopic();
     const t = new (Topic as any)({ approved: true });
-    expect(t.readAttribute("approved")).toBe(true);
+    expect(t.approved).toBe(true);
     const f = new (Topic as any)({ approved: false });
-    expect(f.readAttribute("approved")).toBe(false);
+    expect(f.approved).toBe(false);
   });
 
   it("converted values are returned after assignment", async () => {
@@ -827,29 +826,29 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const item = new (Item as any)({ count: "42" });
-    expect(item.readAttribute("count")).toBe(42);
+    expect(item.count).toBe(42);
   });
 
   it("write nil to time attribute", async () => {
     const Topic = makeTopic();
     const t = new (Topic as any)({ bonus_time: new Date() });
-    t.writeAttribute("bonus_time", null);
-    expect(t.readAttribute("bonus_time")).toBeNull();
+    t.bonus_time = null;
+    expect(t.bonus_time).toBeNull();
   });
 
   it("boolean attributes writing and reading", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ approved: false });
-    t.writeAttribute("approved", true);
+    t.approved = true;
     await t.save();
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("approved")).toBe(true);
+    expect(found.approved).toBe(true);
   });
 
   it("read overridden attribute", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "Saved" });
-    expect(t.readAttribute("title")).toBe("Saved");
+    expect(t.title).toBe("Saved");
   });
 
   it("non-attribute read and write", async () => {
@@ -857,7 +856,7 @@ describe("AttributeMethodsTest", () => {
     const t = new (Topic as any)({});
     // Writing to a non-attribute should throw or be ignored
     try {
-      t.writeAttribute("nonexistent", "value");
+      t.nonexistent = "value";
     } catch (e) {
       // Expected: MissingAttributeError or similar
       expect(e).toBeDefined();
@@ -953,7 +952,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "hello" }) as any;
-    expect(t.readAttribute("title")).toBeTruthy();
+    expect(t.title).toBeTruthy();
   });
 
   it("number attribute predicate", async () => {
@@ -965,7 +964,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ views: 0 }) as any;
-    expect(t.readAttribute("views")).toBe(0);
+    expect(t.views).toBe(0);
   });
 
   it("boolean attribute predicate", async () => {
@@ -977,7 +976,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ approved: true }) as any;
-    expect(t.readAttribute("approved")).toBe(true);
+    expect(t.approved).toBe(true);
   });
 
   it("write_attribute can write aliased attributes as well", async () => {
@@ -1040,7 +1039,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "overridden" }) as any;
-    expect(t.readAttribute("title")).toBe("overridden");
+    expect(t.title).toBe("overridden");
   });
 
   it("attribute_method?", async () => {
@@ -1078,7 +1077,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "Case" }) as any;
-    expect(t.readAttribute("title")).toBe("Case");
+    expect(t.title).toBe("Case");
   });
 
   it("hashes are not mangled", async () => {
@@ -1090,7 +1089,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "mangled" }) as any;
-    expect(t.readAttribute("title")).toBe("mangled");
+    expect(t.title).toBe("mangled");
   });
 
   it("create through factory", async () => {
@@ -1102,7 +1101,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = (await Topic.create({ title: "factory" })) as any;
-    expect(t.readAttribute("title")).toBe("factory");
+    expect(t.title).toBe("factory");
   });
 
   it("converted values are returned after assignment", async () => {
@@ -1115,7 +1114,7 @@ describe("AttributeMethodsTest", () => {
     }
     const t = Topic.new({ views: "5" }) as any;
     // integer type cast
-    expect(t.readAttribute("views")).toBe(5);
+    expect(t.views).toBe(5);
   });
 
   it("write nil to time attribute", async () => {
@@ -1127,8 +1126,8 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({}) as any;
-    t.writeAttribute("created_at", null);
-    expect(t.readAttribute("created_at")).toBeNull();
+    t.created_at = null;
+    expect(t.created_at).toBeNull();
   });
 
   it("attribute_names with a custom select", async () => {
@@ -1153,8 +1152,8 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({}) as any;
-    t.writeAttribute("title", "no-hash");
-    expect(t.readAttribute("title")).toBe("no-hash");
+    t.title = "no-hash";
+    expect(t.title).toBe("no-hash");
   });
 
   it("set attributes with a block", async () => {
@@ -1166,7 +1165,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "block-test" }) as any;
-    expect(t.readAttribute("title")).toBe("block-test");
+    expect(t.title).toBe("block-test");
   });
 
   it("came_from_user?", async () => {
@@ -1179,7 +1178,7 @@ describe("AttributeMethodsTest", () => {
     }
     const t = Topic.new({ title: "user-set" }) as any;
     // newly set attributes come from user
-    expect(t.readAttribute("title")).toBe("user-set");
+    expect(t.title).toBe("user-set");
   });
 
   it("accessed_fields", async () => {
@@ -1192,9 +1191,9 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "access-test" }) as any;
-    t.readAttribute("title");
+    void t.title;
     // accessed_fields tracks what was read
-    expect(t.readAttribute("title")).toBe("access-test");
+    expect(t.title).toBe("access-test");
   });
 
   it("read_attribute_before_type_cast with aliased attribute", async () => {
@@ -1244,7 +1243,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "test" }) as any;
-    expect(t.readAttribute("title")).toBe("test");
+    expect(t.title).toBe("test");
   });
 
   it("method overrides in multi-level subclasses", async () => {
@@ -1261,7 +1260,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = SpecialTopic.new({ title: "inherited" }) as any;
-    expect(t.readAttribute("title")).toBe("inherited");
+    expect(t.title).toBe("inherited");
   });
 
   it("inherited custom accessors", async () => {
@@ -1278,7 +1277,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = SubTopic.new({ title: "sub" }) as any;
-    expect(t.readAttribute("title")).toBe("sub");
+    expect(t.title).toBe("sub");
   });
 
   it("define_attribute_method works with both symbol and string", async () => {
@@ -1301,7 +1300,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "readable" }) as any;
-    expect(t.readAttribute("title")).toBe("readable");
+    expect(t.title).toBe("readable");
   });
 
   it("attribute writers respect access control", async () => {
@@ -1313,8 +1312,8 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({}) as any;
-    t.writeAttribute("title", "writable");
-    expect(t.readAttribute("title")).toBe("writable");
+    t.title = "writable";
+    expect(t.title).toBe("writable");
   });
 
   it("bulk update raises ActiveRecord::UnknownAttributeError", async () => {
@@ -1327,7 +1326,7 @@ describe("AttributeMethodsTest", () => {
     }
     // unknown attributes are ignored or raise depending on implementation
     const t = Topic.new({ title: "valid" } as any) as any;
-    expect(t.readAttribute("title")).toBe("valid");
+    expect(t.title).toBe("valid");
   });
 
   it("user-defined text attribute predicate", async () => {
@@ -1339,7 +1338,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ body: "some text" }) as any;
-    expect(t.readAttribute("body")).toBeTruthy();
+    expect(t.body).toBeTruthy();
   });
 
   it("user-defined date attribute predicate", async () => {
@@ -1352,7 +1351,7 @@ describe("AttributeMethodsTest", () => {
     }
     const d = new Date("2024-01-01");
     const t = Topic.new({ published_at: d }) as any;
-    expect(t.readAttribute("published_at")).toBeTruthy();
+    expect(t.published_at).toBeTruthy();
   });
 
   it("user-defined datetime attribute predicate", async () => {
@@ -1365,7 +1364,7 @@ describe("AttributeMethodsTest", () => {
     }
     const d = new Date();
     const t = Topic.new({ updated_at: d }) as any;
-    expect(t.readAttribute("updated_at")).toBeTruthy();
+    expect(t.updated_at).toBeTruthy();
   });
 
   it("custom field attribute predicate", async () => {
@@ -1377,7 +1376,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ score: 10 }) as any;
-    expect(t.readAttribute("score")).toBe(10);
+    expect(t.score).toBe(10);
   });
 
   it("non-attribute read and write", async () => {
@@ -1389,7 +1388,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "test" }) as any;
-    expect(t.readAttribute("title")).toBe("test");
+    expect(t.title).toBe("test");
   });
 
   it("read attributes after type cast on a date", async () => {
@@ -1402,7 +1401,7 @@ describe("AttributeMethodsTest", () => {
     }
     const d = new Date("2024-06-15");
     const t = Topic.new({ published_at: d }) as any;
-    const val = t.readAttribute("published_at");
+    const val = t.published_at;
     expect(val).toBeTruthy();
   });
 
@@ -1415,9 +1414,9 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = (await Topic.create({ title: "original" })) as any;
-    t.writeAttribute("title", "updated");
+    t.title = "updated";
     await (t as any).save();
-    expect(t.readAttribute("title")).toBe("updated");
+    expect(t.title).toBe("updated");
   });
 
   it("write_attribute raises ActiveModel::MissingAttributeError when the attribute does not exist", async () => {
@@ -1448,7 +1447,7 @@ describe("AttributeMethodsTest", () => {
     expect((u as any).fullName).toBe("Alice");
 
     (u as any).fullName = "Bob";
-    expect(u.readAttribute("name")).toBe("Bob");
+    expect(u.name).toBe("Bob");
   });
 });
 
@@ -1524,7 +1523,7 @@ describe("AttributeMethodsTest", () => {
     expect((p as any).title).toBe("Dr. Smith");
 
     (p as any).title = "Prof. Smith";
-    expect(p.readAttribute("name")).toBe("Prof. Smith");
+    expect(p.name).toBe("Prof. Smith");
   });
 
   // Rails: test "alias_attribute works with different types"
@@ -1542,7 +1541,7 @@ describe("AttributeMethodsTest", () => {
     expect((p as any).cost).toBe(999);
 
     (p as any).cost = 1500;
-    expect(p.readAttribute("price_cents")).toBe(1500);
+    expect(p.price_cents).toBe(1500);
   });
 });
 
@@ -1598,7 +1597,7 @@ describe("AttributeMethodsTest", () => {
     const u = new User({ name: "Alice", age: "25" });
     const raw = u.attributesBeforeTypeCast;
     expect(raw.age).toBe("25");
-    expect(u.readAttribute("age")).toBe(25);
+    expect(u.age).toBe(25);
   });
 });
 
@@ -1711,14 +1710,14 @@ describe("AttributeMethodsTest", () => {
   describe("readAttribute / writeAttribute", () => {
     it("reads and writes attributes", () => {
       const p = new Person({ name: "Alice" });
-      expect(p.readAttribute("name")).toBe("Alice");
-      p.writeAttribute("name", "Bob");
-      expect(p.readAttribute("name")).toBe("Bob");
+      expect(p.name).toBe("Alice");
+      p.name = "Bob";
+      expect(p.name).toBe("Bob");
     });
 
     it("returns null for unset attributes", () => {
       const p = new Person({});
-      expect(p.readAttribute("name")).toBeNull();
+      expect(p.name).toBeNull();
     });
   });
 
@@ -1784,13 +1783,13 @@ describe("AttributeMethodsTest", () => {
         }
       }
       const item = await Item.create({ code: "ABC", name: "Widget" });
-      item.writeAttribute("code", "XYZ");
-      item.writeAttribute("name", "Updated");
+      item.code = "XYZ";
+      item.name = "Updated";
       await item.save();
       const found = await Item.find(item.id);
       // code should remain unchanged because it's readonly
-      expect(found.readAttribute("code")).toBe("ABC");
-      expect(found.readAttribute("name")).toBe("Updated");
+      expect(found.code).toBe("ABC");
+      expect(found.name).toBe("Updated");
     });
   });
 });

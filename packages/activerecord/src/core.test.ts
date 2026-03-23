@@ -39,13 +39,13 @@ describe("CoreTest", () => {
   it("inspect includes attributes from attributes for inspect", () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "hello" });
-    expect(t.readAttribute("title")).toBe("hello");
+    expect(t.title).toBe("hello");
   });
 
   it("inspect instance with lambda date formatter", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "dated", author: "alice" });
-    expect(t.readAttribute("title")).toBe("dated");
+    expect(t.title).toBe("dated");
   });
 
   it("inspect singleton instance", async () => {
@@ -59,7 +59,7 @@ describe("CoreTest", () => {
     await Topic.create({ title: "limited", author: "bob" });
     const results = await Topic.select("title").toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("limited");
+    expect(results[0].title).toBe("limited");
   });
 
   it("inspect instance with non primary key id attribute", async () => {
@@ -76,8 +76,8 @@ describe("CoreTest", () => {
   it("inspect with attributes for inspect all lists all attributes", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "all", author: "carol" });
-    expect(t.readAttribute("title")).toBe("all");
-    expect(t.readAttribute("author")).toBe("carol");
+    expect(t.title).toBe("all");
+    expect(t.author).toBe("carol");
   });
 
   it("inspect relation with virtual field", async () => {
@@ -90,14 +90,14 @@ describe("CoreTest", () => {
   it("inspect with overridden attribute for inspect", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "ov", author: "eve" });
-    expect(t.readAttribute("author")).toBe("eve");
+    expect(t.author).toBe("eve");
   });
 
   it("full inspect lists all attributes", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "full", author: "frank" });
-    expect(t.readAttribute("title")).toBe("full");
-    expect(t.readAttribute("author")).toBe("frank");
+    expect(t.title).toBe("full");
+    expect(t.author).toBe("frank");
   });
 
   it("pretty print new", () => {
@@ -115,7 +115,7 @@ describe("CoreTest", () => {
   it("pretty print full", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "full2", author: "grace" });
-    expect(t.readAttribute("title")).toBe("full2");
+    expect(t.title).toBe("full2");
   });
 
   it("pretty print uninitialized", () => {
@@ -139,7 +139,7 @@ describe("CoreTest", () => {
   it("pretty print with overridden attribute for inspect", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "ovinspect", author: "hal" });
-    expect(t.readAttribute("author")).toBe("hal");
+    expect(t.author).toBe("hal");
   });
 
   it("find by cache does not duplicate entries", async () => {
@@ -253,7 +253,7 @@ describe("frozen / isFrozen", () => {
 
     const user = await User.create({ name: "Alice" });
     await user.destroy();
-    expect(() => user.writeAttribute("name", "Bob")).toThrow("Cannot modify a frozen");
+    expect(() => (user.name = "Bob")).toThrow("Cannot modify a frozen");
   });
 
   it("can be manually frozen", () => {
@@ -268,7 +268,7 @@ describe("frozen / isFrozen", () => {
     const user = new User({ name: "Alice" });
     user.freeze();
     expect(user.isFrozen()).toBe(true);
-    expect(() => user.writeAttribute("name", "Bob")).toThrow("Cannot modify a frozen");
+    expect(() => (user.name = "Bob")).toThrow("Cannot modify a frozen");
   });
 });
 
@@ -367,7 +367,7 @@ describe("Base.new()", () => {
 
     const user = User.new({ name: "Alice" });
     expect(user.isNewRecord()).toBe(true);
-    expect(user.readAttribute("name")).toBe("Alice");
+    expect(user.name).toBe("Alice");
   });
 });
 
@@ -819,7 +819,7 @@ describe("Base (extended)", () => {
       }
       const u = User.new({ name: "Alice" });
       expect(u.isNewRecord()).toBe(true);
-      expect(u.readAttribute("name")).toBe("Alice");
+      expect(u.name).toBe("Alice");
     });
   });
 

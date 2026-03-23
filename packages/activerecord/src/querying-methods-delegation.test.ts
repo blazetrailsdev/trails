@@ -32,7 +32,7 @@ describe("Base static query delegations", () => {
 
     const first = await User.first();
     expect(first).not.toBeNull();
-    expect((first as any).readAttribute("name")).toBe("Alice");
+    expect((first as any).name).toBe("Alice");
   });
 
   it("Base.last() returns the last record", async () => {
@@ -48,7 +48,7 @@ describe("Base static query delegations", () => {
 
     const last = await User.last();
     expect(last).not.toBeNull();
-    expect((last as any).readAttribute("name")).toBe("Bob");
+    expect((last as any).name).toBe("Bob");
   });
 
   it("Base.take() returns any record", async () => {
@@ -92,7 +92,7 @@ describe("Base static query delegations", () => {
     await User.create({ name: "Alice" });
 
     const results = await User.order("name").toArray();
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 
   it("Base.limit() limits results", async () => {
@@ -151,6 +151,6 @@ describe("Base static query delegations", () => {
     await User.create({ name: "Alice" });
 
     const record = await User.sole();
-    expect(record.readAttribute("name")).toBe("Alice");
+    expect(record.name).toBe("Alice");
   });
 });

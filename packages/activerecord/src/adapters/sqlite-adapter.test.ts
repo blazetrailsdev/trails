@@ -149,9 +149,9 @@ describe("SqliteAdapter", () => {
       expect(user.isPersisted()).toBe(true);
 
       const found = await User.find(1);
-      expect(found.readAttribute("name")).toBe("Alice");
-      expect(found.readAttribute("email")).toBe("alice@test.com");
-      expect(found.readAttribute("age")).toBe(30);
+      expect(found.name).toBe("Alice");
+      expect(found.email).toBe("alice@test.com");
+      expect(found.age).toBe(30);
     });
 
     it("updates records", async () => {
@@ -163,8 +163,8 @@ describe("SqliteAdapter", () => {
       await user.update({ name: "Alicia", age: 31 });
 
       const found = await User.find(user.id);
-      expect(found.readAttribute("name")).toBe("Alicia");
-      expect(found.readAttribute("age")).toBe(31);
+      expect(found.name).toBe("Alicia");
+      expect(found.age).toBe(31);
     });
 
     it("destroys records", async () => {
@@ -193,7 +193,7 @@ describe("SqliteAdapter", () => {
 
       const found = await User.findBy({ name: "Bob", age: 25 });
       expect(found).not.toBeNull();
-      expect(found!.readAttribute("email")).toBe("bob@test.com");
+      expect(found!.email).toBe("bob@test.com");
     });
 
     it("findBy returns null for no match", async () => {
@@ -209,8 +209,8 @@ describe("SqliteAdapter", () => {
       });
 
       const found = await User.find(user.id);
-      expect(found.readAttribute("email")).toBeNull();
-      expect(found.readAttribute("age")).toBeNull();
+      expect(found.email).toBeNull();
+      expect(found.age).toBeNull();
     });
 
     it("reloads from database", async () => {
@@ -223,9 +223,9 @@ describe("SqliteAdapter", () => {
       // Update via raw SQL
       adapter.exec(`UPDATE "users" SET "name" = 'Modified' WHERE "id" = ${user.id}`);
 
-      expect(user.readAttribute("name")).toBe("Original");
+      expect(user.name).toBe("Original");
       await user.reload();
-      expect(user.readAttribute("name")).toBe("Modified");
+      expect(user.name).toBe("Modified");
     });
   });
 
@@ -273,8 +273,8 @@ describe("SqliteAdapter", () => {
 
     it("order sorts correctly", async () => {
       const items = await Product.all().order({ price: "desc" }).toArray();
-      expect(items[0].readAttribute("name")).toBe("Eggplant");
-      expect(items[4].readAttribute("name")).toBe("Apple");
+      expect(items[0].name).toBe("Eggplant");
+      expect(items[4].name).toBe("Apple");
     });
 
     it("limit and offset", async () => {
@@ -311,10 +311,10 @@ describe("SqliteAdapter", () => {
     it("updateAll with where", async () => {
       await Product.where({ category: "fruit" }).updateAll({ price: 99 });
       const apple = await Product.find(1);
-      expect(apple.readAttribute("price")).toBe(99);
+      expect(apple.price).toBe(99);
       // Vegetable unchanged
       const carrot = await Product.find(3);
-      expect(carrot.readAttribute("price")).toBe(3);
+      expect(carrot.price).toBe(3);
     });
 
     it("none returns empty", async () => {
@@ -522,7 +522,7 @@ describe("SqliteAdapter", () => {
 
       const loaded = await loadBelongsTo(book, "author", {});
       expect(loaded).not.toBeNull();
-      expect(loaded!.readAttribute("name")).toBe("Tolkien");
+      expect(loaded!.name).toBe("Tolkien");
     });
 
     it("hasMany loads children from real DB", async () => {

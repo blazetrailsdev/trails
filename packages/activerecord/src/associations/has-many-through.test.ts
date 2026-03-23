@@ -125,7 +125,7 @@ describe("Associations: has_many through", () => {
       source: "tag",
     });
     expect(tags).toHaveLength(2);
-    const names = tags.map((t) => t.readAttribute("name"));
+    const names = tags.map((t) => t.name);
     expect(names).toContain("ruby");
     expect(names).toContain("rails");
   });

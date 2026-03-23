@@ -65,7 +65,7 @@ describe("touch on belongs_to", () => {
     registerModel(Comment);
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.readAttribute("updated_at");
+    const originalUpdatedAt = post.updated_at;
 
     // Small delay to ensure different timestamp
     await new Promise((r) => setTimeout(r, 10));
@@ -73,7 +73,7 @@ describe("touch on belongs_to", () => {
     await Comment.create({ body: "Nice!", post_id: post.id });
     await post.reload();
 
-    const newUpdatedAt = post.readAttribute("updated_at");
+    const newUpdatedAt = post.updated_at;
     expect(newUpdatedAt).not.toEqual(originalUpdatedAt);
   });
 });
@@ -107,7 +107,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect((loaded as any).readAttribute("name")).toBe("Acme");
+    expect((loaded as any).name).toBe("Acme");
   });
 
   it("id assignment", async () => {
@@ -127,9 +127,9 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = Account.new({});
-    account.writeAttribute("company_id", company.id);
+    account.company_id = company.id;
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("creating the belonging object", async () => {
@@ -154,7 +154,7 @@ describe("BelongsToAssociationsTest", () => {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded as any).readAttribute("name")).toBe("NewCo");
+    expect((loaded as any).name).toBe("NewCo");
   });
 
   it("creating the belonging object from new record", async () => {
@@ -200,8 +200,8 @@ describe("BelongsToAssociationsTest", () => {
     const account = await Account.create({});
     const company = Company.new({ name: "Built" });
     expect(company.isNewRecord()).toBe(true);
-    account.writeAttribute("company_id", 99);
-    expect((account as any).readAttribute("company_id")).toBe(99);
+    account.company_id = 99;
+    expect((account as any).company_id).toBe(99);
   });
 
   it("reloading the belonging object", async () => {
@@ -249,7 +249,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
       foreignKey: "company_id",
@@ -320,8 +320,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = Account.new({});
-    account.writeAttribute("company_id", company.id);
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    account.company_id = company.id;
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("assignment before child saved", async () => {
@@ -344,7 +344,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(account.isNewRecord()).toBe(true);
     await account.save();
     expect(account.isNewRecord()).toBe(false);
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("new record with foreign key but no object", async () => {
@@ -364,7 +364,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const account = Account.new({ company_id: 9999 });
     expect(account.isNewRecord()).toBe(true);
-    expect((account as any).readAttribute("company_id")).toBe(9999);
+    expect((account as any).company_id).toBe(9999);
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
       foreignKey: "company_id",
@@ -389,7 +389,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const account = await Account.create({});
     const company = await Company.create({ name: "Late" });
-    account.writeAttribute("company_id", company.id);
+    account.company_id = company.id;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
@@ -423,7 +423,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await BtcCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await BtcAccount.create({ company_id: company.id });
     const reloaded = await BtcCompany.find(company.id!);
-    expect((reloaded as any).readAttribute("accounts_count")).toBeGreaterThanOrEqual(1);
+    expect((reloaded as any).accounts_count).toBeGreaterThanOrEqual(1);
   });
 
   it("belongs to counter with assigning nil", async () => {
@@ -445,7 +445,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await Company.create({ name: "Acme", accounts_count: 0 });
     const account = await Account.create({ company_id: company.id });
     // Remove association
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
@@ -473,9 +473,9 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await Company.create({ name: "Co1", accounts_count: 0 });
     const co2 = await Company.create({ name: "Co2", accounts_count: 0 });
     const account = await Account.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBe(co2.id);
+    expect((account as any).company_id).toBe(co2.id);
   });
 
   it("association assignment sticks", async () => {
@@ -534,10 +534,10 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id, credit_limit: 100 });
-    account.writeAttribute("credit_limit", 200);
+    account.credit_limit = 200;
     await account.save();
     const reloaded = await Account.find(account.id!);
-    expect((reloaded as any).readAttribute("credit_limit")).toBe(200);
+    expect((reloaded as any).credit_limit).toBe(200);
   });
 
   it("reassigning the parent id updates the object", async () => {
@@ -558,13 +558,13 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await Company.create({ name: "Old" });
     const co2 = await Company.create({ name: "New" });
     const account = await Account.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded as any).readAttribute("name")).toBe("New");
+    expect((loaded as any).name).toBe("New");
   });
 
   it("belongs to with id assigning", async () => {
@@ -584,8 +584,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = Account.new({});
-    account.writeAttribute("company_id", company.id);
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    account.company_id = company.id;
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("belongs to counter after save", async () => {
@@ -613,7 +613,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await BtcasCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await BtcasAccount.create({ company_id: company.id });
     const reloaded = await BtcasCompany.find(company.id!);
-    expect((reloaded as any).readAttribute("accounts_count")).toBeGreaterThanOrEqual(1);
+    expect((reloaded as any).accounts_count).toBeGreaterThanOrEqual(1);
   });
 
   it("counter cache", async () => {
@@ -645,7 +645,7 @@ describe("BelongsToAssociationsTest", () => {
     const accounts = await CcAccount.where({ company_id: company.id }).toArray();
     // create() auto-increments counter caches
     const reloaded = await CcCompany.find(company.id!);
-    expect((reloaded as any).readAttribute("accounts_count")).toBeGreaterThanOrEqual(2);
+    expect((reloaded as any).accounts_count).toBeGreaterThanOrEqual(2);
   });
 
   it("custom counter cache", async () => {
@@ -673,7 +673,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await CustomCcCompany.create({ name: "Acme", custom_count: 0 });
     const account = await CustomCcAccount.create({ company_id: company.id });
     const reloaded = await CustomCcCompany.find(company.id!);
-    expect((reloaded as any).readAttribute("custom_count")).toBeGreaterThanOrEqual(1);
+    expect((reloaded as any).custom_count).toBeGreaterThanOrEqual(1);
   });
 
   it("replace counter cache", async () => {
@@ -695,9 +695,9 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await Company.create({ name: "Co1", accounts_count: 0 });
     const co2 = await Company.create({ name: "Co2", accounts_count: 0 });
     const account = await Account.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBe(co2.id);
+    expect((account as any).company_id).toBe(co2.id);
   });
 
   it("belongs to touch with reassigning", async () => {
@@ -719,7 +719,7 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await Company.create({ name: "Old" });
     const co2 = await Company.create({ name: "New" });
     const account = await Account.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     await touchBelongsToParents(account);
     const reloaded = await Company.find(co2.id!);
@@ -736,7 +736,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Company);
     const company = Company.new({ name: "Built" });
     expect(company.isNewRecord()).toBe(true);
-    expect((company as any).readAttribute("name")).toBe("Built");
+    expect((company as any).name).toBe("Built");
   });
 
   it("create with conditions", async () => {
@@ -749,7 +749,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Company);
     const company = await Company.create({ name: "Created" });
     expect(company.isNewRecord()).toBe(false);
-    expect((company as any).readAttribute("name")).toBe("Created");
+    expect((company as any).name).toBe("Created");
   });
 
   it("should set foreign key on save", async () => {
@@ -770,7 +770,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await Company.create({ name: "Acme" });
     const account = Account.new({ company_id: company.id });
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("polymorphic assignment foreign key type string", async () => {
@@ -791,7 +791,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Comment);
     const post = await Post.create({ title: "Hello" });
     const comment = await Comment.create({ commentable_id: post.id, commentable_type: "Post" });
-    expect((comment as any).readAttribute("commentable_type")).toBe("Post");
+    expect((comment as any).commentable_type).toBe("Post");
   });
 
   it("polymorphic assignment updates foreign id field for new and saved records", async () => {
@@ -812,10 +812,10 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Comment);
     const post = await Post.create({ title: "Hello" });
     const comment = Comment.new({});
-    comment.writeAttribute("commentable_id", post.id);
-    comment.writeAttribute("commentable_type", "Post");
-    expect((comment as any).readAttribute("commentable_id")).toBe(post.id);
-    expect((comment as any).readAttribute("commentable_type")).toBe("Post");
+    comment.commentable_id = post.id;
+    comment.commentable_type = "Post";
+    expect((comment as any).commentable_id).toBe(post.id);
+    expect((comment as any).commentable_type).toBe("Post");
   });
 
   it("stale tracking doesn't care about the type", async () => {
@@ -860,9 +860,9 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await Company.create({ name: "First" });
     const co2 = await Company.create({ name: "Second" });
     const account = await Account.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     // Should reflect the latest FK value
-    expect((account as any).readAttribute("company_id")).toBe(co2.id);
+    expect((account as any).company_id).toBe(co2.id);
   });
 
   it("tracking change from one persisted record to another", async () => {
@@ -883,9 +883,9 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await Company.create({ name: "Old" });
     const co2 = await Company.create({ name: "New" });
     const account = await Account.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBe(co2.id);
+    expect((account as any).company_id).toBe(co2.id);
   });
 
   it("tracking change from persisted record to nil", async () => {
@@ -905,9 +905,9 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBeNull();
+    expect((account as any).company_id).toBeNull();
   });
 
   it("tracking change from nil to persisted record", async () => {
@@ -927,9 +927,9 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({});
-    account.writeAttribute("company_id", company.id);
+    account.company_id = company.id;
     await account.save();
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("assigning nil on an association clears the associations inverse", async () => {
@@ -949,7 +949,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
@@ -1037,7 +1037,7 @@ describe("BelongsToAssociationsTest", () => {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded as any).readAttribute("active")).toBe(true);
+    expect((loaded as any).active).toBe(true);
   });
 
   it("belongs to counter after update", async () => {
@@ -1060,11 +1060,11 @@ describe("BelongsToAssociationsTest", () => {
     const company = await BtcauCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await BtcauAccount.create({ company_id: company.id, credit_limit: 100 });
     // Update a non-FK field
-    account.writeAttribute("credit_limit", 200);
+    account.credit_limit = 200;
     await account.save();
     const reloaded = await BtcauAccount.find(account.id!);
-    expect((reloaded as any).readAttribute("credit_limit")).toBe(200);
-    expect((reloaded as any).readAttribute("company_id")).toBe(company.id);
+    expect((reloaded as any).credit_limit).toBe(200);
+    expect((reloaded as any).company_id).toBe(company.id);
   });
 
   it("dangerous association name raises ArgumentError", () => {
@@ -1100,7 +1100,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "record_id",
     });
     expect(loaded).not.toBeNull();
-    expect((loaded as any).readAttribute("name")).toBe("Test");
+    expect((loaded as any).name).toBe("Test");
   });
 
   it("assigning an association doesn't result in duplicate objects", async () => {
@@ -1173,7 +1173,7 @@ describe("BelongsToAssociationsTest", () => {
     await WpCpkTag.create({ taggable_id: 2, taggable_type: "Comment", name: "tag2" });
     const postTags = await WpCpkTag.where({ taggable_type: "Post" }).toArray();
     expect(postTags.length).toBe(1);
-    expect(postTags[0].readAttribute("name")).toBe("tag1");
+    expect(postTags[0].name).toBe("tag1");
   });
   it("assigning belongs to on destroyed object", async () => {
     class Company extends Base {
@@ -1195,7 +1195,7 @@ describe("BelongsToAssociationsTest", () => {
     await account.destroy();
     expect(account.isDestroyed()).toBe(true);
     // Destroyed objects are frozen and cannot be modified
-    expect(() => account.writeAttribute("company_id", company.id)).toThrow(/frozen/);
+    expect(() => (account.company_id = company.id)).toThrow(/frozen/);
   });
   it("eager loading wont mutate owner record", async () => {
     class ElmCompany extends Base {
@@ -1224,10 +1224,10 @@ describe("BelongsToAssociationsTest", () => {
       className: "ElmCompany",
       foreignKey: "company_id",
     });
-    expect(loaded?.readAttribute("name")).toBe("Corp");
-    expect(emp.readAttribute("name")).toBe("Alice");
+    expect(loaded?.name).toBe("Corp");
+    expect(emp.name).toBe("Alice");
     // Employee record should not be mutated by loading association
-    expect(emp.readAttribute("company_id")).toBe(co.id);
+    expect(emp.company_id).toBe(co.id);
   });
   it("missing attribute error is raised when no foreign key attribute", async () => {
     class MaCompany extends Base {
@@ -1325,7 +1325,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(OptEmployee);
     // With optional: true, employee without company should be valid
     const emp = await OptEmployee.create({ name: "Solo" });
-    expect(emp.readAttribute("company_id")).toBeNull();
+    expect(emp.company_id).toBeNull();
     expect(emp.isNewRecord()).toBe(false);
   });
   it("default", async () => {
@@ -1350,7 +1350,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect((loaded as any).readAttribute("name")).toBe("Default");
+    expect((loaded as any).name).toBe("Default");
   });
   it("default with lambda", async () => {
     class Company extends Base {
@@ -1374,7 +1374,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect((loaded as any).readAttribute("name")).toBe("Lambda");
+    expect((loaded as any).name).toBe("Lambda");
   });
   it("default scope on relations is not cached", async () => {
     class Company extends Base {
@@ -1398,13 +1398,13 @@ describe("BelongsToAssociationsTest", () => {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded1 as any).readAttribute("name")).toBe("First");
-    account.writeAttribute("company_id", co2.id);
+    expect((loaded1 as any).name).toBe("First");
+    account.company_id = co2.id;
     const loaded2 = await loadBelongsTo(account, "company", {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded2 as any).readAttribute("name")).toBe("Second");
+    expect((loaded2 as any).name).toBe("Second");
   });
   it("type mismatch", async () => {
     class TmCompany extends Base {
@@ -1423,7 +1423,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(TmPost);
     // Assigning wrong type doesn't crash, it just sets the FK
     const post = await TmPost.create({ title: "P" });
-    expect(post.readAttribute("title")).toBe("P");
+    expect(post.title).toBe("P");
   });
   it("raises type mismatch with namespaced class", async () => {
     class RtmCompany extends Base {
@@ -1442,7 +1442,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(RtmPost);
     // Assigning wrong type through FK is allowed at the attribute level
     const post = await RtmPost.create({ title: "Post" });
-    expect(post.readAttribute("title")).toBe("Post");
+    expect(post.title).toBe("Post");
     // Type checking happens at the application level, not the ORM level
   });
   it("natural assignment with primary key", async () => {
@@ -1462,14 +1462,14 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(NatPkAccount);
     const company = await NatPkCompany.create({ name: "Acme" });
     const account = await NatPkAccount.create({});
-    account.writeAttribute("company_id", company.id);
+    account.company_id = company.id;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "NatPkCompany",
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect((loaded as any).readAttribute("name")).toBe("Acme");
+    expect((loaded as any).name).toBe("Acme");
   });
   it("eager loading with primary key", async () => {
     class EagerPkCompany extends Base {
@@ -1499,7 +1499,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(accounts).toHaveLength(1);
     const preloaded = (accounts[0] as any)._preloadedAssociations?.get("eagerPkCompany");
     expect(preloaded).not.toBeNull();
-    expect(preloaded?.readAttribute("name")).toBe("Eager Co");
+    expect(preloaded?.name).toBe("Eager Co");
   });
   it("eager loading with primary key as symbol", async () => {
     class EagerSymCompany extends Base {
@@ -1552,7 +1552,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect((loaded as any).readAttribute("name")).toBe("PkCo");
+    expect((loaded as any).name).toBe("PkCo");
   });
   it("building the belonging object for composite primary key", async () => {
     // Composite primary keys are not yet supported - verify basic build still works
@@ -1570,7 +1570,7 @@ describe("BelongsToAssociationsTest", () => {
       { name: "CpkBuilt" },
     );
     expect(company).toBeInstanceOf(CpkCompany);
-    expect(company.readAttribute("name")).toBe("CpkBuilt");
+    expect(company.name).toBe("CpkBuilt");
   });
   it("belongs to with explicit composite primary key", async () => {
     // Test that belongs_to works with a custom primary key
@@ -1597,7 +1597,7 @@ describe("BelongsToAssociationsTest", () => {
       primaryKey: "custom_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Explicit");
+    expect(loaded!.name).toBe("Explicit");
   });
   it("belongs to with inverse association for composite primary key", async () => {
     class IcpkCompany extends Base {
@@ -1622,7 +1622,7 @@ describe("BelongsToAssociationsTest", () => {
       inverseOf: "accounts",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("InverseCo");
+    expect(loaded!.name).toBe("InverseCo");
   });
   it("should set composite foreign key on association when key changes on associated record", async () => {
     class ScfkCompany extends Base {
@@ -1642,14 +1642,14 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await ScfkCompany.create({ name: "Old" });
     const co2 = await ScfkCompany.create({ name: "New" });
     const account = await ScfkAccount.create({ company_id: co1.id });
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "ScfkCompany",
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("New");
+    expect(loaded!.name).toBe("New");
   });
   it("building the belonging object with implicit sti base class", () => {
     const a = freshAdapter();
@@ -1827,7 +1827,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(BuildPkCompany);
     const company = BuildPkCompany.new({ name: "Built" });
     expect(company.isNewRecord()).toBe(true);
-    expect((company as any).readAttribute("name")).toBe("Built");
+    expect((company as any).name).toBe("Built");
   });
   it("create!", async () => {
     class CreateBangCompany extends Base {
@@ -1839,7 +1839,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(CreateBangCompany);
     const company = await CreateBangCompany.create({ name: "BangCo" });
     expect(company.isNewRecord()).toBe(false);
-    expect((company as any).readAttribute("name")).toBe("BangCo");
+    expect((company as any).name).toBe("BangCo");
   });
 
   it("failing create!", async () => {
@@ -1901,7 +1901,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(NatNilAccount);
     const company = await NatNilCompany.create({ name: "Acme" });
     const account = await NatNilAccount.create({ company_id: company.id });
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "NatNilCompany",
@@ -1933,7 +1933,7 @@ describe("BelongsToAssociationsTest", () => {
     });
     const loaded = await loadBelongsTo(sponsor, "sponsorable", { polymorphic: true });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Alice");
+    expect(loaded!.name).toBe("Alice");
   });
   it("with polymorphic and condition", async () => {
     class WpcPost extends Base {
@@ -1961,7 +1961,7 @@ describe("BelongsToAssociationsTest", () => {
     });
     const loaded = await loadBelongsTo(comment, "commentable", { polymorphic: true });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("Hello");
+    expect(loaded!.title).toBe("Hello");
   });
   it("custom attribute with select", async () => {
     class Company extends Base {
@@ -1985,7 +1985,7 @@ describe("BelongsToAssociationsTest", () => {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded as any).readAttribute("rating")).toBe(5);
+    expect((loaded as any).rating).toBe(5);
   });
   it("belongs to counter with assigning new object", async () => {
     class CcAsgCompany extends Base {
@@ -2013,13 +2013,13 @@ describe("BelongsToAssociationsTest", () => {
     const account = await CcAsgAccount.create({ company_id: co1.id });
     // Reassign
     await updateCounterCaches(account, "decrement");
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     await updateCounterCaches(account, "increment");
     const reloaded1 = await CcAsgCompany.find(co1.id!);
     const reloaded2 = await CcAsgCompany.find(co2.id!);
-    expect((reloaded1 as any).readAttribute("accounts_count")).toBe(0);
-    expect((reloaded2 as any).readAttribute("accounts_count")).toBe(1);
+    expect((reloaded1 as any).accounts_count).toBe(0);
+    expect((reloaded2 as any).accounts_count).toBe(1);
   });
   it("belongs to reassign with namespaced models and counters", async () => {
     class NsCcCompany extends Base {
@@ -2046,11 +2046,11 @@ describe("BelongsToAssociationsTest", () => {
     const co2 = await NsCcCompany.create({ name: "New", accounts_count: 0 });
     const account = await NsCcAccount.create({ company_id: co1.id });
     await updateCounterCaches(account, "decrement");
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     await updateCounterCaches(account, "increment");
     const reloaded2 = await NsCcCompany.find(co2.id!);
-    expect((reloaded2 as any).readAttribute("accounts_count")).toBe(1);
+    expect((reloaded2 as any).accounts_count).toBe(1);
   });
   it("belongs to with touch on multiple records", async () => {
     class TouchMultCompany extends Base {
@@ -2082,7 +2082,7 @@ describe("BelongsToAssociationsTest", () => {
     await touchBelongsToParents(acc1);
     await touchBelongsToParents(acc2);
     const reloaded = await TouchMultCompany.find(company.id!);
-    expect((reloaded as any).readAttribute("updated_at")).not.toEqual(new Date("2020-01-01"));
+    expect((reloaded as any).updated_at).not.toEqual(new Date("2020-01-01"));
   });
   it("belongs to with touch option on touch without updated at attributes", async () => {
     class TouchNoUpdCompany extends Base {
@@ -2138,11 +2138,11 @@ describe("BelongsToAssociationsTest", () => {
     });
     const account = await TouchRmAccount.create({ company_id: company.id });
     // Remove parent reference
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     await account.save();
     // Touching with null FK should not error
     await touchBelongsToParents(account);
-    expect(account.readAttribute("company_id")).toBeNull();
+    expect(account.company_id).toBeNull();
   });
   it("belongs to with touch option on update", async () => {
     class TouchUpdCompany extends Base {
@@ -2171,10 +2171,10 @@ describe("BelongsToAssociationsTest", () => {
       updated_at: new Date("2020-01-01"),
     });
     const account = await TouchUpdAccount.create({ company_id: company.id, credit_limit: 100 });
-    const originalUpdatedAt = (company as any).readAttribute("updated_at");
+    const originalUpdatedAt = (company as any).updated_at;
     await touchBelongsToParents(account);
     const reloaded = await TouchUpdCompany.find(company.id!);
-    const newUpdatedAt = (reloaded as any).readAttribute("updated_at");
+    const newUpdatedAt = (reloaded as any).updated_at;
     expect(newUpdatedAt).not.toEqual(originalUpdatedAt);
   });
   it("belongs to with touch option on empty update", async () => {
@@ -2203,11 +2203,11 @@ describe("BelongsToAssociationsTest", () => {
       updated_at: new Date("2020-01-01"),
     });
     const account = await TouchEmptyAccount.create({ company_id: company.id });
-    const originalUpdatedAt = (company as any).readAttribute("updated_at");
+    const originalUpdatedAt = (company as any).updated_at;
     // Touch even without changes
     await touchBelongsToParents(account);
     const reloaded = await TouchEmptyCompany.find(company.id!);
-    const newUpdatedAt = (reloaded as any).readAttribute("updated_at");
+    const newUpdatedAt = (reloaded as any).updated_at;
     expect(newUpdatedAt).not.toEqual(originalUpdatedAt);
   });
   it("belongs to with touch option on destroy", async () => {
@@ -2236,11 +2236,11 @@ describe("BelongsToAssociationsTest", () => {
       updated_at: new Date("2020-01-01"),
     });
     const account = await TouchDesAccount.create({ company_id: company.id });
-    const originalUpdatedAt = (company as any).readAttribute("updated_at");
+    const originalUpdatedAt = (company as any).updated_at;
     await touchBelongsToParents(account);
     await account.destroy();
     const reloaded = await TouchDesCompany.find(company.id!);
-    const newUpdatedAt = (reloaded as any).readAttribute("updated_at");
+    const newUpdatedAt = (reloaded as any).updated_at;
     expect(newUpdatedAt).not.toEqual(originalUpdatedAt);
   });
   it("belongs to with touch option on destroy with destroyed parent", async () => {
@@ -2272,7 +2272,7 @@ describe("BelongsToAssociationsTest", () => {
     await company.destroy();
     // Parent is destroyed, touchBelongsToParents should not error
     await touchBelongsToParents(account);
-    expect(account.readAttribute("company_id")).toBe(company.id);
+    expect(account.company_id).toBe(company.id);
   });
   it("belongs to with touch option on touch and reassigned parent", async () => {
     class TouchReaCompany extends Base {
@@ -2299,11 +2299,11 @@ describe("BelongsToAssociationsTest", () => {
     const co2 = await TouchReaCompany.create({ name: "New", updated_at: new Date("2020-01-01") });
     const account = await TouchReaAccount.create({ company_id: co1.id });
     // Reassign to new company
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     await touchBelongsToParents(account);
     const reloaded = await TouchReaCompany.find(co2.id!);
-    const newUpdatedAt = (reloaded as any).readAttribute("updated_at");
+    const newUpdatedAt = (reloaded as any).updated_at;
     expect(newUpdatedAt).not.toEqual(new Date("2020-01-01"));
   });
   it("belongs to counter when update columns", async () => {
@@ -2324,11 +2324,11 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id, credit_limit: 100 });
-    account.writeAttribute("credit_limit", 200);
+    account.credit_limit = 200;
     await account.save();
     const reloaded = await Account.find(account.id!);
-    expect((reloaded as any).readAttribute("credit_limit")).toBe(200);
-    expect((reloaded as any).readAttribute("company_id")).toBe(company.id);
+    expect((reloaded as any).credit_limit).toBe(200);
+    expect((reloaded as any).company_id).toBe(company.id);
   });
   it("assignment before child saved with primary key", async () => {
     class AsgPkCompany extends Base {
@@ -2350,7 +2350,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(account.isNewRecord()).toBe(true);
     await account.save();
     expect(account.isNewRecord()).toBe(false);
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
   it("polymorphic setting foreign key after nil target loaded", async () => {
     class Post extends Base {
@@ -2374,11 +2374,11 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded1).toBeNull();
     // Now set FK
     const post = await Post.create({ title: "Hello" });
-    comment.writeAttribute("commentable_id", post.id);
-    comment.writeAttribute("commentable_type", "Post");
+    comment.commentable_id = post.id;
+    comment.commentable_type = "Post";
     await comment.save();
-    expect((comment as any).readAttribute("commentable_id")).toBe(post.id);
-    expect((comment as any).readAttribute("commentable_type")).toBe("Post");
+    expect((comment as any).commentable_id).toBe(post.id);
+    expect((comment as any).commentable_type).toBe("Post");
   });
   it("dont find target when saving foreign key after stale association loaded", async () => {
     class Company extends Base {
@@ -2401,14 +2401,14 @@ describe("BelongsToAssociationsTest", () => {
     // Load stale association
     await loadBelongsTo(account, "company", { className: "Company", foreignKey: "company_id" });
     // Change FK
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
     // Fresh load should find the new target
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded as any).readAttribute("name")).toBe("New");
+    expect((loaded as any).name).toBe("New");
   });
   it("field name same as foreign key", async () => {
     class Company extends Base {
@@ -2427,7 +2427,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
   it("counter cache double destroy", async () => {
     class CcddCompany extends Base {
@@ -2457,7 +2457,7 @@ describe("BelongsToAssociationsTest", () => {
     await account.destroy();
     await updateCounterCaches(account, "decrement");
     const reloaded = await CcddCompany.find(company.id!);
-    expect(reloaded.readAttribute("accounts_count")).toBe(0);
+    expect(reloaded.accounts_count).toBe(0);
   });
   it("concurrent counter cache double destroy", async () => {
     class CccdCompany extends Base {
@@ -2487,7 +2487,7 @@ describe("BelongsToAssociationsTest", () => {
     await account.destroy();
     await updateCounterCaches(account, "decrement");
     const reloaded = await CccdCompany.find(company.id!);
-    expect(reloaded.readAttribute("accounts_count")).toBe(0);
+    expect(reloaded.accounts_count).toBe(0);
   });
   it("polymorphic assignment foreign type field updating", async () => {
     class Post extends Base {
@@ -2519,14 +2519,14 @@ describe("BelongsToAssociationsTest", () => {
       commentable_type: "Post",
       body: "Nice",
     });
-    expect((comment as any).readAttribute("commentable_type")).toBe("Post");
+    expect((comment as any).commentable_type).toBe("Post");
     // Reassign to an article
     const article = await Article.create({ title: "World" });
-    comment.writeAttribute("commentable_id", article.id);
-    comment.writeAttribute("commentable_type", "Article");
+    comment.commentable_id = article.id;
+    comment.commentable_type = "Article";
     await comment.save();
-    expect((comment as any).readAttribute("commentable_type")).toBe("Article");
-    expect((comment as any).readAttribute("commentable_id")).toBe(article.id);
+    expect((comment as any).commentable_type).toBe("Article");
+    expect((comment as any).commentable_id).toBe(article.id);
   });
   it("polymorphic assignment with primary key foreign type field updating", async () => {
     class Post extends Base {
@@ -2546,7 +2546,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Comment);
     const post = await Post.create({ title: "Hello" });
     const comment = await Comment.create({ commentable_id: post.id, commentable_type: "Post" });
-    expect((comment as any).readAttribute("commentable_type")).toBe("Post");
+    expect((comment as any).commentable_type).toBe("Post");
   });
   it("polymorphic assignment with primary key updates foreign id field for new and saved records", async () => {
     class Post extends Base {
@@ -2567,13 +2567,13 @@ describe("BelongsToAssociationsTest", () => {
     const post = await Post.create({ title: "Hello" });
     // New record
     const newComment = Comment.new({ commentable_id: post.id, commentable_type: "Post" });
-    expect((newComment as any).readAttribute("commentable_id")).toBe(post.id);
+    expect((newComment as any).commentable_id).toBe(post.id);
     // Saved record
     const savedComment = await Comment.create({
       commentable_id: post.id,
       commentable_type: "Post",
     });
-    expect((savedComment as any).readAttribute("commentable_id")).toBe(post.id);
+    expect((savedComment as any).commentable_id).toBe(post.id);
   });
   it("belongs to proxy should not respond to private methods", async () => {
     class Company extends Base {
@@ -2709,8 +2709,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = Account.new({ company_id: company.id, status: "active" });
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
-    expect((account as any).readAttribute("status")).toBe("active");
+    expect((account as any).company_id).toBe(company.id);
+    expect((account as any).status).toBe("active");
   });
   it("attributes are set without error when initialized from belongs to association with array in where clause", async () => {
     class Company extends Base {
@@ -2730,7 +2730,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = Account.new({ company_id: company.id, status: "active" });
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
   it("clearing an association clears the associations inverse", async () => {
     class Company extends Base {
@@ -2750,7 +2750,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
     // Clear the belongs_to by nullifying FK
-    account.writeAttribute("company_id", null as any);
+    account.company_id = null as any;
     await account.save();
     const loaded = await loadBelongsTo(account, "company", {
       className: "Company",
@@ -2804,10 +2804,10 @@ describe("BelongsToAssociationsTest", () => {
     const post1 = await Post.create({ title: "First" });
     const post2 = await Post.create({ title: "Second" });
     const comment = await Comment.create({ commentable_id: post1.id, commentable_type: "Post" });
-    comment.writeAttribute("commentable_id", post2.id);
+    comment.commentable_id = post2.id;
     await comment.save();
     const reloaded = await Comment.find(comment.id!);
-    expect((reloaded as any).readAttribute("commentable_id")).toBe(post2.id);
+    expect((reloaded as any).commentable_id).toBe(post2.id);
   });
   it("polymorphic reassignment of associated type updates the object", async () => {
     class Post extends Base {
@@ -2835,11 +2835,11 @@ describe("BelongsToAssociationsTest", () => {
     const post = await Post.create({ title: "Hello" });
     const article = await Article.create({ title: "World" });
     const comment = await Comment.create({ commentable_id: post.id, commentable_type: "Post" });
-    comment.writeAttribute("commentable_id", article.id);
-    comment.writeAttribute("commentable_type", "Article");
+    comment.commentable_id = article.id;
+    comment.commentable_type = "Article";
     await comment.save();
     const reloaded = await Comment.find(comment.id!);
-    expect((reloaded as any).readAttribute("commentable_type")).toBe("Article");
+    expect((reloaded as any).commentable_type).toBe("Article");
   });
   it("reloading association with key change", async () => {
     class Company extends Base {
@@ -2863,13 +2863,13 @@ describe("BelongsToAssociationsTest", () => {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded1 as any).readAttribute("name")).toBe("Old");
-    account.writeAttribute("company_id", co2.id);
+    expect((loaded1 as any).name).toBe("Old");
+    account.company_id = co2.id;
     const loaded2 = await loadBelongsTo(account, "company", {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded2 as any).readAttribute("name")).toBe("New");
+    expect((loaded2 as any).name).toBe("New");
   });
   it("polymorphic counter cache", async () => {
     class PccPost extends Base {
@@ -2910,13 +2910,13 @@ describe("BelongsToAssociationsTest", () => {
       tag_id: 1,
     });
     // Reassign tagging to comment
-    tagging.writeAttribute("taggable_type", "PccComment");
-    tagging.writeAttribute("taggable_id", comment.id);
+    tagging.taggable_type = "PccComment";
+    tagging.taggable_id = comment.id;
     await tagging.save();
     // Counter caches are updated by updateCounterCaches, not automatically on save for reassignment
     // The Ruby test verifies the counter caches update correctly on reassignment
-    expect(tagging.readAttribute("taggable_type")).toBe("PccComment");
-    expect(tagging.readAttribute("taggable_id")).toBe(comment.id);
+    expect(tagging.taggable_type).toBe("PccComment");
+    expect(tagging.taggable_id).toBe(comment.id);
   });
   it("polymorphic with custom name counter cache", async () => {
     class PcnCar extends Base {
@@ -2944,7 +2944,7 @@ describe("BelongsToAssociationsTest", () => {
     const wheel = await PcnWheel.create({ wheelable_type: "PcnCar", wheelable_id: car.id });
     // Counter cache incremented by create's auto-call to updateCounterCaches
     const reloadedCar = await PcnCar.find(car.id as number);
-    expect(reloadedCar.readAttribute("wheels_count")).toBe(1);
+    expect(reloadedCar.wheels_count).toBe(1);
   });
   it("polymorphic with custom name touch old belongs to model", async () => {
     class PcntCar extends Base {
@@ -2965,12 +2965,12 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(PcntWheel);
     Associations.belongsTo.call(PcntWheel, "wheelable", { polymorphic: true, touch: true });
     const car = await PcntCar.create({ name: "Sedan" });
-    const originalUpdatedAt = car.readAttribute("updated_at");
+    const originalUpdatedAt = car.updated_at;
     await new Promise((r) => setTimeout(r, 10));
     const wheel = await PcntWheel.create({ wheelable_type: "PcntCar", wheelable_id: car.id });
     await touchBelongsToParents(wheel);
     await car.reload();
-    const newUpdatedAt = car.readAttribute("updated_at");
+    const newUpdatedAt = car.updated_at;
     expect(newUpdatedAt).not.toEqual(originalUpdatedAt);
   });
   it("create bang with conditions", async () => {
@@ -2983,7 +2983,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Company);
     const company = await Company.create({ name: "BangCo" });
     expect(company.isNewRecord()).toBe(false);
-    expect((company as any).readAttribute("name")).toBe("BangCo");
+    expect((company as any).name).toBe("BangCo");
   });
   it("build with block", async () => {
     class Company extends Base {
@@ -2994,8 +2994,8 @@ describe("BelongsToAssociationsTest", () => {
     }
     registerModel(Company);
     const company = Company.new({});
-    company.writeAttribute("name", "BlockBuilt");
-    expect((company as any).readAttribute("name")).toBe("BlockBuilt");
+    company.name = "BlockBuilt";
+    expect((company as any).name).toBe("BlockBuilt");
     expect(company.isNewRecord()).toBe(true);
   });
 
@@ -3008,7 +3008,7 @@ describe("BelongsToAssociationsTest", () => {
     }
     registerModel(Company);
     const company = await Company.create({ name: "BangBlock" });
-    expect((company as any).readAttribute("name")).toBe("BangBlock");
+    expect((company as any).name).toBe("BangBlock");
     expect(company.isNewRecord()).toBe(false);
   });
   it("should set foreign key on create association", async () => {
@@ -3028,7 +3028,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
 
   it("should set foreign key on create association!", async () => {
@@ -3048,7 +3048,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const company = await Company.create({ name: "Acme" });
     const account = await Account.create({ company_id: company.id });
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
     expect(account.isNewRecord()).toBe(false);
   });
 
@@ -3072,7 +3072,7 @@ describe("BelongsToAssociationsTest", () => {
     // FK is null since owner isn't persisted
     const account = Account.new({ company_id: company.id });
     expect(account.isNewRecord()).toBe(true);
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
   it("should set foreign key on save!", async () => {
     class Company extends Base {
@@ -3093,7 +3093,7 @@ describe("BelongsToAssociationsTest", () => {
     const account = Account.new({ company_id: company.id });
     await account.save();
     expect(account.isNewRecord()).toBe(false);
-    expect((account as any).readAttribute("company_id")).toBe(company.id);
+    expect((account as any).company_id).toBe(company.id);
   });
   it("self referential belongs to with counter cache assigning nil", async () => {
     class SrCategory extends Base {
@@ -3114,7 +3114,7 @@ describe("BelongsToAssociationsTest", () => {
     const child = await SrCategory.create({ name: "Child", parent_id: parent.id });
     await updateCounterCaches(child, "increment");
     // Now assign nil to clear the parent
-    child.writeAttribute("parent_id", null as any);
+    child.parent_id = null as any;
     await child.save();
     const loaded = await loadBelongsTo(child, "parent", {
       className: "SrCategory",
@@ -3138,8 +3138,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Company);
     registerModel(Account);
     const account = Account.new({});
-    account.writeAttribute("company_id", 999999999);
-    expect((account as any).readAttribute("company_id")).toBe(999999999);
+    account.company_id = 999999999;
+    expect((account as any).company_id).toBe(999999999);
   });
   it("polymorphic with custom primary key", async () => {
     class PcpkToy extends Base {
@@ -3165,7 +3165,7 @@ describe("BelongsToAssociationsTest", () => {
     });
     const loaded = await loadBelongsTo(sponsor, "sponsorable", { polymorphic: true });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Bear");
+    expect(loaded!.name).toBe("Bear");
   });
   it("destroying polymorphic child with unloaded parent and touch is possible with has many inversing", async () => {
     class DpcToy extends Base {
@@ -3245,8 +3245,8 @@ describe("BelongsToAssociationsTest", () => {
     const account = await MccAccount.create({ company_id: company.id });
     const project = await MccProject.create({ company_id: company.id });
     const reloaded = await MccCompany.find(company.id!);
-    expect(reloaded.readAttribute("accounts_count")).toBe(1);
-    expect(reloaded.readAttribute("projects_count")).toBe(1);
+    expect(reloaded.accounts_count).toBe(1);
+    expect(reloaded.projects_count).toBe(1);
   });
   it("tracking change from persisted record to new record", async () => {
     class Company extends Base {
@@ -3267,8 +3267,8 @@ describe("BelongsToAssociationsTest", () => {
     const account = await Account.create({ company_id: company.id });
     const newCompany = Company.new({ name: "New" });
     // Assigning a new (unsaved) record's id (which is null)
-    account.writeAttribute("company_id", newCompany.id);
-    expect((account as any).readAttribute("company_id")).toBe(newCompany.id);
+    account.company_id = newCompany.id;
+    expect((account as any).company_id).toBe(newCompany.id);
   });
 
   it("tracking change from nil to new record", async () => {
@@ -3288,8 +3288,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Account);
     const account = await Account.create({});
     const newCompany = Company.new({ name: "New" });
-    account.writeAttribute("company_id", newCompany.id);
-    expect((account as any).readAttribute("company_id")).toBe(newCompany.id);
+    account.company_id = newCompany.id;
+    expect((account as any).company_id).toBe(newCompany.id);
   });
   it("tracking polymorphic changes", async () => {
     class TpcPost extends Base {
@@ -3319,10 +3319,10 @@ describe("BelongsToAssociationsTest", () => {
     const comment = await TpcComment.create({ body: "World" });
     const tagging = await TpcTagging.create({ taggable_id: post.id, taggable_type: "TpcPost" });
     // Change type
-    tagging.writeAttribute("taggable_type", "TpcComment");
-    tagging.writeAttribute("taggable_id", comment.id);
-    expect(tagging.readAttribute("taggable_type")).toBe("TpcComment");
-    expect(tagging.readAttribute("taggable_id")).toBe(comment.id);
+    tagging.taggable_type = "TpcComment";
+    tagging.taggable_id = comment.id;
+    expect(tagging.taggable_type).toBe("TpcComment");
+    expect(tagging.taggable_id).toBe(comment.id);
     expect(tagging.changed).toBe(true);
   });
   it("runs parent presence check if parent changed or nil", async () => {
@@ -3374,7 +3374,7 @@ describe("BelongsToAssociationsTest", () => {
     const company = await SpcCompany.create({ name: "Acme" });
     const account = await SpcAccount.create({ company_id: company.id });
     // Updating a non-FK field should pass even if we don't re-validate presence
-    account.writeAttribute("notes", "updated");
+    account.notes = "updated";
     const saved = await account.save();
     expect(saved).toBe(true);
   });
@@ -3402,7 +3402,7 @@ describe("BelongsToAssociationsTest", () => {
     const account = await RvfAccount.create({ company_id: company.id });
     // FK is set and valid, save should succeed
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("company_id")).toBe(company.id);
+    expect(account.company_id).toBe(company.id);
   });
   it("composite primary key malformed association class", async () => {
     // Verify that defining a belongs_to with a non-existent class name throws at load time
@@ -3469,14 +3469,14 @@ describe("BelongsToAssociationsTest", () => {
     const co2 = await QcCompany.create({ name: "Second" });
     const account = await QcAccount.create({ company_id: co1.id });
     // Replace the association
-    account.writeAttribute("company_id", co2.id);
+    account.company_id = co2.id;
     await account.save();
-    expect(account.readAttribute("company_id")).toBe(co2.id);
+    expect(account.company_id).toBe(co2.id);
     const loaded = await loadBelongsTo(account, "company", {
       className: "QcCompany",
       foreignKey: "company_id",
     });
-    expect(loaded!.readAttribute("name")).toBe("Second");
+    expect(loaded!.name).toBe("Second");
   });
 
   it("where with custom primary key", async () => {
@@ -3503,7 +3503,7 @@ describe("BelongsToAssociationsTest", () => {
       primaryKey: "custom_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Acme");
+    expect(loaded!.name).toBe("Acme");
   });
   it("find by with custom primary key", async () => {
     class FbcpkCompany extends Base {
@@ -3529,7 +3529,7 @@ describe("BelongsToAssociationsTest", () => {
       primaryKey: "custom_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("FindMe");
+    expect(loaded!.name).toBe("FindMe");
   });
   it("with different class name", async () => {
     class DcnFirm extends Base {
@@ -3557,7 +3557,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Law Firm");
+    expect(loaded!.name).toBe("Law Firm");
   });
   it("belongs to without counter cache option", async () => {
     class NccCompany extends Base {
@@ -3584,7 +3584,7 @@ describe("BelongsToAssociationsTest", () => {
     await NccAccount.create({ company_id: company.id });
     const reloaded = await NccCompany.find(company.id!);
     // Without counterCache, count should remain 0
-    expect(reloaded.readAttribute("accounts_count")).toBe(0);
+    expect(reloaded.accounts_count).toBe(0);
   });
   it("belongs to with primary key counter", async () => {
     class PkcCompany extends Base {
@@ -3611,7 +3611,7 @@ describe("BelongsToAssociationsTest", () => {
     const account = await PkcAccount.create({ company_id: company.id });
     await updateCounterCaches(account, "increment");
     const reloaded = await PkcCompany.find(company.id!);
-    expect(reloaded.readAttribute("accounts_count")).toBeGreaterThanOrEqual(1);
+    expect(reloaded.accounts_count).toBeGreaterThanOrEqual(1);
   });
   it("belongs to counter after touch", async () => {
     class CatCompany extends Base {
@@ -3640,7 +3640,7 @@ describe("BelongsToAssociationsTest", () => {
     const account = await CatAccount.create({ company_id: company.id });
     await updateCounterCaches(account, "increment");
     const reloaded = await CatCompany.find(company.id!);
-    expect(reloaded.readAttribute("accounts_count")).toBeGreaterThanOrEqual(1);
+    expect(reloaded.accounts_count).toBeGreaterThanOrEqual(1);
   });
   it("belongs to with touch option on touch", async () => {
     class TotCompany extends Base {
@@ -3664,12 +3664,12 @@ describe("BelongsToAssociationsTest", () => {
       touch: true,
     });
     const company = await TotCompany.create({ name: "Acme" });
-    const originalUpdatedAt = company.readAttribute("updated_at");
+    const originalUpdatedAt = company.updated_at;
     await new Promise((r) => setTimeout(r, 10));
     const account = await TotAccount.create({ company_id: company.id });
     await touchBelongsToParents(account);
     await company.reload();
-    const newUpdatedAt = company.readAttribute("updated_at");
+    const newUpdatedAt = company.updated_at;
     expect(newUpdatedAt).not.toEqual(originalUpdatedAt);
   });
   it("dependent delete and destroy with belongs to", async () => {
@@ -3744,7 +3744,7 @@ describe("BelongsToAssociationsTest", () => {
     const tagging = await PcftTagging.create({ taggable_id: post.id, taggable_type: "PcftPost" });
     const loaded = await loadBelongsTo(tagging, "taggable", { polymorphic: true });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("Hello");
+    expect(loaded!.title).toBe("Hello");
   });
 });
 
@@ -3776,7 +3776,7 @@ describe("AsyncBelongsToAssociationsTest", () => {
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("AsyncCo");
+    expect(loaded!.name).toBe("AsyncCo");
   });
 });
 
@@ -3815,7 +3815,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "company_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("37signals");
+    expect(loaded!.name).toBe("37signals");
   });
 
   it("belongs to with primary key", async () => {
@@ -3845,7 +3845,7 @@ describe("BelongsToAssociationsTest", () => {
       primaryKey: "firm_name",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Apple");
+    expect(loaded!.name).toBe("Apple");
   });
 
   it.skip("cant save readonly association", () => {

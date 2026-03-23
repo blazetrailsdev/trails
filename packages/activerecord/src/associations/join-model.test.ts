@@ -150,7 +150,7 @@ describe("AssociationsJoinModelTest", () => {
       primaryKey: "tag_id",
     });
     expect(loadedTag).not.toBeNull();
-    expect(loadedTag!.readAttribute("name")).toBe("ruby");
+    expect(loadedTag!.name).toBe("ruby");
   });
 
   it("has many distinct through count", async () => {
@@ -178,7 +178,7 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "taggable_id",
       primaryKey: "id",
     });
-    const found = taggings.find((t: any) => t.readAttribute("tag_id") === tag.id);
+    const found = taggings.find((t: any) => t.tag_id === tag.id);
     expect(found).toBeDefined();
   });
 
@@ -287,10 +287,10 @@ describe("AssociationsJoinModelTest", () => {
     await setHasMany(post, "sphmTags", [tag1, tag2], { as: "taggable", className: "SphmTag" });
     const r1 = await SphmTag.find(tag1.id!);
     const r2 = await SphmTag.find(tag2.id!);
-    expect(r1.readAttribute("taggable_id")).toBe(post.id);
-    expect(r1.readAttribute("taggable_type")).toBe("SphmPost");
-    expect(r2.readAttribute("taggable_id")).toBe(post.id);
-    expect(r2.readAttribute("taggable_type")).toBe("SphmPost");
+    expect(r1.taggable_id).toBe(post.id);
+    expect(r1.taggable_type).toBe("SphmPost");
+    expect(r2.taggable_id).toBe(post.id);
+    expect(r2.taggable_type).toBe("SphmPost");
   });
 
   it("set polymorphic has one", async () => {
@@ -316,8 +316,8 @@ describe("AssociationsJoinModelTest", () => {
     const tag = await SphoTag.create({ name: "ruby" });
     await setHasOne(post, "sphoTag", tag, { as: "taggable", className: "SphoTag" });
     const reloaded = await SphoTag.find(tag.id!);
-    expect(reloaded.readAttribute("taggable_id")).toBe(post.id);
-    expect(reloaded.readAttribute("taggable_type")).toBe("SphoPost");
+    expect(reloaded.taggable_id).toBe(post.id);
+    expect(reloaded.taggable_type).toBe("SphoPost");
   });
 
   it("set polymorphic has one on new record", async () => {
@@ -343,8 +343,8 @@ describe("AssociationsJoinModelTest", () => {
     await post.save();
     const tag = new SphnTag({ name: "ruby" });
     await setHasOne(post, "sphnTag", tag, { as: "taggable", className: "SphnTag" });
-    expect(tag.readAttribute("taggable_id")).toBe(post.id);
-    expect(tag.readAttribute("taggable_type")).toBe("SphnPost");
+    expect(tag.taggable_id).toBe(post.id);
+    expect(tag.taggable_type).toBe("SphnPost");
   });
 
   it("create polymorphic has many with scope", async () => {
@@ -377,8 +377,8 @@ describe("AssociationsJoinModelTest", () => {
     const tag = await CpsTag.create({ name: "misc" });
     const proxy = association(post, "taggings");
     const tagging = await proxy.create({ tag_id: tag.id });
-    expect(tagging.readAttribute("taggable_type")).toBe("CpsPost");
-    expect(tagging.readAttribute("taggable_id")).toBe(post.id);
+    expect(tagging.taggable_type).toBe("CpsPost");
+    expect(tagging.taggable_id).toBe(post.id);
     expect(await proxy.count()).toBe(1);
   });
 
@@ -412,7 +412,7 @@ describe("AssociationsJoinModelTest", () => {
     const tag = await CbpsTag.create({ name: "misc" });
     const proxy = association(post, "taggings");
     const tagging = await proxy.create({ tag_id: tag.id });
-    expect(tagging.readAttribute("taggable_type")).toBe("CbpsPost");
+    expect(tagging.taggable_type).toBe("CbpsPost");
     expect(await proxy.count()).toBe(1);
   });
 
@@ -450,10 +450,10 @@ describe("AssociationsJoinModelTest", () => {
       taggable_id: post.id,
       taggable_type: "CphoPost",
     });
-    expect(tagging.readAttribute("taggable_type")).toBe("CphoPost");
+    expect(tagging.taggable_type).toBe("CphoPost");
     const loaded = await loadHasOne(post, "tagging", { className: "CphoTagging", as: "taggable" });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("tag_id")).toBe(tag.id);
+    expect(loaded!.tag_id).toBe(tag.id);
   });
 
   it("delete polymorphic has many with delete all", async () => {
@@ -545,8 +545,8 @@ describe("AssociationsJoinModelTest", () => {
       taggable_type: "DphmnPost",
     });
     // Nullify
-    tag.writeAttribute("taggable_id", null);
-    tag.writeAttribute("taggable_type", null);
+    tag.taggable_id = null;
+    tag.taggable_type = null;
     await tag.save();
     const remaining = await loadHasMany(post, "dphmnTags", {
       as: "taggable",
@@ -691,7 +691,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(posts.length).toBe(1);
     const preloaded = (posts[0] as any)._preloadedAssociations?.get("iphoTag");
     expect(preloaded).not.toBeNull();
-    expect(preloaded.readAttribute("name")).toBe("ruby");
+    expect(preloaded.name).toBe("ruby");
   });
 
   it.skip("include polymorphic has one defined in abstract parent", () => {
@@ -765,7 +765,7 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "author_id",
       primaryKey: "id",
     });
-    const filtered = posts.filter((p: any) => p.readAttribute("title") === "Match");
+    const filtered = posts.filter((p: any) => p.title === "Match");
     expect(filtered.length).toBe(1);
   });
 
@@ -779,9 +779,9 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "author_id",
       primaryKey: "id",
     });
-    const found = posts.find((p: any) => p.readAttribute("title") === "Beta");
+    const found = posts.find((p: any) => p.title === "Beta");
     expect(found).toBeDefined();
-    expect((found as any).readAttribute("body")).toBe("B");
+    expect((found as any).body).toBe("B");
   });
 
   it("has many array methods called by method missing", async () => {
@@ -795,11 +795,11 @@ describe("AssociationsJoinModelTest", () => {
       primaryKey: "id",
     });
     // Array methods: map, filter, find, some, every
-    const titles = posts.map((p: any) => p.readAttribute("title"));
+    const titles = posts.map((p: any) => p.title);
     expect(titles).toContain("P1");
     expect(titles).toContain("P2");
-    expect(posts.some((p: any) => p.readAttribute("title") === "P1")).toBe(true);
-    expect(posts.every((p: any) => p.readAttribute("body") === "B")).toBe(true);
+    expect(posts.some((p: any) => p.title === "P1")).toBe(true);
+    expect(posts.every((p: any) => p.body === "B")).toBe(true);
   });
 
   it("has many going through join model with custom foreign key", async () => {
@@ -830,7 +830,7 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "writer_id",
     });
     expect(posts.length).toBe(1);
-    expect(posts[0].readAttribute("title")).toBe("Custom FK");
+    expect(posts[0].title).toBe("Custom FK");
   });
 
   it("has many going through join model with custom primary key", async () => {
@@ -1036,7 +1036,7 @@ describe("AssociationsJoinModelTest", () => {
     });
     // Should only return the Post, not the Comment
     expect(taggedPosts).toHaveLength(1);
-    expect(taggedPosts[0].readAttribute("title")).toBe("Tagged Post");
+    expect(taggedPosts[0].title).toBe("Tagged Post");
   });
 
   it.skip("has many polymorphic associations merges through scope", () => {
@@ -1114,7 +1114,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(tags).toHaveLength(1);
     const taggedPosts = (tags[0] as any)._preloadedAssociations.get("taggedPosts");
     expect(taggedPosts).toHaveLength(1);
-    expect(taggedPosts[0].readAttribute("title")).toBe("Eager Post");
+    expect(taggedPosts[0].title).toBe("Eager Post");
   });
 
   it("has many through has many find all", async () => {
@@ -1214,7 +1214,7 @@ describe("AssociationsJoinModelTest", () => {
       primaryKey: "id",
     });
     expect(taggings[0]).toBeDefined();
-    expect((taggings[0] as any).readAttribute("tag_id")).toBe(tag.id);
+    expect((taggings[0] as any).tag_id).toBe(tag.id);
   });
 
   it("has many through has many find conditions", async () => {
@@ -1235,7 +1235,7 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "taggable_id",
       primaryKey: "id",
     });
-    const found = taggings.filter((t: any) => t.readAttribute("tag_id") === t2.id);
+    const found = taggings.filter((t: any) => t.tag_id === t2.id);
     expect(found.length).toBe(1);
   });
 
@@ -1507,7 +1507,7 @@ describe("AssociationsJoinModelTest", () => {
       source: "sr_friend",
     });
     expect(friends.length).toBe(2);
-    const names = friends.map((f: any) => f.readAttribute("name")).sort();
+    const names = friends.map((f: any) => f.name).sort();
     expect(names).toEqual(["Bob", "Carol"]);
   });
 
@@ -1565,7 +1565,7 @@ describe("AssociationsJoinModelTest", () => {
       source: "cond_hmt_tag",
     });
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("active_tag");
+    expect(tags[0].name).toBe("active_tag");
   });
 
   it("has many through uses correct attributes", async () => {
@@ -1584,16 +1584,16 @@ describe("AssociationsJoinModelTest", () => {
       primaryKey: "id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("title")).toBe("AttrPost");
-    expect((posts[0] as any).readAttribute("body")).toBe("AttrBody");
+    expect((posts[0] as any).title).toBe("AttrPost");
+    expect((posts[0] as any).body).toBe("AttrBody");
     const taggings = await loadHasMany(posts[0] as Post, "taggings", {
       className: "Tagging",
       foreignKey: "taggable_id",
       primaryKey: "id",
     });
     expect(taggings.length).toBe(1);
-    expect((taggings[0] as any).readAttribute("tag_id")).toBe(tag.id);
-    expect((taggings[0] as any).readAttribute("taggable_type")).toBe("Post");
+    expect((taggings[0] as any).tag_id).toBe(tag.id);
+    expect((taggings[0] as any).taggable_type).toBe("Post");
   });
 
   it.skip("associating unsaved records with has many through", () => {
@@ -1644,10 +1644,10 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "taggable_id",
     });
     expect(taggings).toHaveLength(1);
-    expect(taggings[0].readAttribute("tag_id")).toBe(tag.id);
+    expect(taggings[0].tag_id).toBe(tag.id);
     const tags = await proxy.toArray();
     expect(tags).toHaveLength(1);
-    expect(tags[0].readAttribute("name")).toBe("pushme");
+    expect(tags[0].name).toBe("pushme");
   });
 
   it.skip("add to join table with no id", () => {
@@ -1772,7 +1772,7 @@ describe("AssociationsJoinModelTest", () => {
     await proxy.delete(doomed, doomed2);
     expect(await proxy.count()).toBe(1);
     const remaining = await proxy.toArray();
-    expect(remaining[0].readAttribute("name")).toBe("keeper");
+    expect(remaining[0].name).toBe("keeper");
   });
 
   it.skip("deleting junk from has many through should raise type mismatch", () => {
@@ -1864,7 +1864,7 @@ describe("AssociationsJoinModelTest", () => {
       source: "stiComments",
     });
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("body")).toBe("on special");
+    expect(comments[0].body).toBe("on special");
   });
 
   it("distinct has many through should retain order", async () => {
@@ -1926,7 +1926,7 @@ describe("AssociationsJoinModelTest", () => {
     await Tagging.create({ tag_id: tag.id, taggable_id: 999, taggable_type: "OtherModel" });
     const taggings = await loadHasMany(post, "taggings", { as: "taggable", className: "Tagging" });
     expect(taggings.length).toBe(1);
-    expect(taggings[0].readAttribute("tag_id")).toBe(tag.id);
+    expect(taggings[0].tag_id).toBe(tag.id);
   });
 
   it("polymorphic has one", async () => {
@@ -1934,7 +1934,7 @@ describe("AssociationsJoinModelTest", () => {
     await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
     const tagging = await loadHasOne(post, "tagging", { as: "taggable", className: "Tagging" });
     expect(tagging).not.toBeNull();
-    expect(tagging!.readAttribute("taggable_type")).toBe("Post");
+    expect(tagging!.taggable_type).toBe("Post");
   });
 
   it("polymorphic belongs to", async () => {
@@ -1947,7 +1947,7 @@ describe("AssociationsJoinModelTest", () => {
     Associations.belongsTo.call(Tagging, "taggable", { polymorphic: true });
     const loaded = await loadBelongsTo(tagging, "taggable", { polymorphic: true });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("PolyBt");
+    expect(loaded!.title).toBe("PolyBt");
   });
 
   it.skip("preload polymorphic has many through", () => {
@@ -1962,14 +1962,14 @@ describe("AssociationsJoinModelTest", () => {
     await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
     await Tagging.create({ tag_id: 2, taggable_id: author.id, taggable_type: "Author" });
     const taggings = await Tagging.all().includes("taggable").toArray();
-    const t1 = taggings.find((r: any) => r.readAttribute("taggable_type") === "Post");
-    const t2 = taggings.find((r: any) => r.readAttribute("taggable_type") === "Author");
+    const t1 = taggings.find((r: any) => r.taggable_type === "Post");
+    const t2 = taggings.find((r: any) => r.taggable_type === "Author");
     const p1 = (t1 as any)._preloadedAssociations?.get("taggable");
     const p2 = (t2 as any)._preloadedAssociations?.get("taggable");
     expect(p1).not.toBeNull();
-    expect(p1.readAttribute("title")).toBe("TypeA");
+    expect(p1.title).toBe("TypeA");
     expect(p2).not.toBeNull();
-    expect(p2.readAttribute("name")).toBe("TypeB");
+    expect(p2.name).toBe("TypeB");
   });
 
   it("preload nil polymorphic belongs to", async () => {
@@ -2064,7 +2064,7 @@ describe("AssociationsJoinModelTest", () => {
       foreignKey: "taggable_id",
       primaryKey: "id",
     });
-    const included = taggings.some((t: any) => t.readAttribute("tag_id") === tag.id);
+    const included = taggings.some((t: any) => t.tag_id === tag.id);
     expect(included).toBe(true);
   });
 
@@ -2254,7 +2254,7 @@ describe("AssociationsJoinModelTest", () => {
       source: "phm_tag",
     });
     expect(tags.length).toBe(1);
-    expect(tags[0].readAttribute("name")).toBe("ruby");
+    expect(tags[0].name).toBe("ruby");
   });
 });
 

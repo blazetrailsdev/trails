@@ -152,7 +152,7 @@ describe("FinderTest", () => {
     }
     await Topic.create({ title: "only" });
     const record = await Topic.all().sole();
-    expect(record.readAttribute("title")).toBe("only");
+    expect(record.title).toBe("only");
   });
 
   it("sole failing none", async () => {
@@ -530,7 +530,7 @@ describe("FinderTest", () => {
     }
     await Topic.create({ title: "target" });
     const found = await Topic.findByBang({ title: "target" });
-    expect(found.readAttribute("title")).toBe("target");
+    expect(found.title).toBe("target");
   });
 
   it("find by two attributes", async () => {
@@ -1783,7 +1783,7 @@ describe("FinderTest", () => {
     await Post.create({ title: "attr_ret" });
     const found = await Post.findBy({ title: "attr_ret" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("title")).toBe("attr_ret");
+    expect(found!.title).toBe("attr_ret");
   });
 
   it("find by alias attribute", async () => {
@@ -1818,7 +1818,7 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "sole_bang" });
     const sole = await Post.all().sole();
-    expect(sole.readAttribute("title")).toBe("sole_bang");
+    expect(sole.title).toBe("sole_bang");
   });
 
   it("take 2", async () => {
@@ -2298,7 +2298,7 @@ describe("FinderTest", () => {
     await Post.create({ title: "range_first" });
     const found = await Post.findBy({ title: "range_first" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("title")).toBe("range_first");
+    expect(found!.title).toBe("range_first");
   });
 
   it("#find_by with composite primary key", async () => {
@@ -2333,7 +2333,7 @@ describe("FinderTest", () => {
     await Topic.create({ title: "World" });
     const found = await Topic.findBy({ title: "World" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("title")).toBe("World");
+    expect(found!.title).toBe("World");
   });
 
   it("find by id with hash", async () => {
@@ -2646,7 +2646,7 @@ describe("FinderTest", () => {
     const found = await User.findOrCreateBy({ name: "Alice" }, { email: "new@example.com" });
 
     expect(found.id).toBe(original.id);
-    expect(found.readAttribute("email")).toBe("old@example.com");
+    expect(found.email).toBe("old@example.com");
   });
 
   it("findOrCreateBy creates record if not found", async () => {
@@ -2663,8 +2663,8 @@ describe("FinderTest", () => {
     const created = await User.findOrCreateBy({ name: "Alice" }, { email: "new@example.com" });
 
     expect(created.isPersisted()).toBe(true);
-    expect(created.readAttribute("name")).toBe("Alice");
-    expect(created.readAttribute("email")).toBe("new@example.com");
+    expect(created.name).toBe("Alice");
+    expect(created.email).toBe("new@example.com");
   });
 
   it("findOrInitializeBy returns existing record if found", async () => {
@@ -2698,8 +2698,8 @@ describe("FinderTest", () => {
     const initialized = await User.findOrInitializeBy({ name: "Alice" }, { email: "a@b.com" });
 
     expect(initialized.isNewRecord()).toBe(true);
-    expect(initialized.readAttribute("name")).toBe("Alice");
-    expect(initialized.readAttribute("email")).toBe("a@b.com");
+    expect(initialized.name).toBe("Alice");
+    expect(initialized.email).toBe("a@b.com");
   });
 });
 
@@ -2719,7 +2719,7 @@ describe("FinderTest", () => {
 
     await Item.create({ name: "Widget" });
     const item = await Item.all().where({ name: "Widget" }).sole();
-    expect(item.readAttribute("name")).toBe("Widget");
+    expect(item.name).toBe("Widget");
   });
 
   it("sole() raises RecordNotFound when zero records", async () => {
@@ -2802,7 +2802,7 @@ describe("FinderTest", () => {
 
     await Item.create({ name: "Unique" });
     const item = await Item.findSoleBy({ name: "Unique" });
-    expect(item.readAttribute("name")).toBe("Unique");
+    expect(item.name).toBe("Unique");
   });
 
   it("raises SoleRecordExceeded when multiple match", async () => {
@@ -2871,7 +2871,7 @@ describe("FinderTest", () => {
     await Item.create({ name: "C" });
     const item = await Item.all().second();
     expect(item).not.toBeNull();
-    expect(item!.readAttribute("name")).toBe("B");
+    expect(item!.name).toBe("B");
   });
 
   it("third() returns the third record", async () => {
@@ -2886,7 +2886,7 @@ describe("FinderTest", () => {
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
     const item = await Item.all().third();
-    expect(item!.readAttribute("name")).toBe("C");
+    expect(item!.name).toBe("C");
   });
 
   it("fourth() and fifth() return correct records", async () => {
@@ -2901,9 +2901,9 @@ describe("FinderTest", () => {
       await Item.create({ name: n });
     }
     const fourth = await Item.all().fourth();
-    expect(fourth!.readAttribute("name")).toBe("D");
+    expect(fourth!.name).toBe("D");
     const fifth = await Item.all().fifth();
-    expect(fifth!.readAttribute("name")).toBe("E");
+    expect(fifth!.name).toBe("E");
   });
 
   it("secondToLast() returns the second-to-last record", async () => {
@@ -2918,7 +2918,7 @@ describe("FinderTest", () => {
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
     const item = await Item.all().secondToLast();
-    expect(item!.readAttribute("name")).toBe("B");
+    expect(item!.name).toBe("B");
   });
 
   it("thirdToLast() returns the third-to-last record", async () => {
@@ -2934,7 +2934,7 @@ describe("FinderTest", () => {
     await Item.create({ name: "C" });
     await Item.create({ name: "D" });
     const item = await Item.all().thirdToLast();
-    expect(item!.readAttribute("name")).toBe("B");
+    expect(item!.name).toBe("B");
   });
 
   it("returns null when not enough records", async () => {
@@ -2961,7 +2961,7 @@ describe("FinderTest", () => {
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     const item = await Item.second();
-    expect(item!.readAttribute("name")).toBe("B");
+    expect(item!.name).toBe("B");
   });
 });
 
@@ -2976,7 +2976,7 @@ describe("FinderTest", () => {
     User.adapter = adapter;
 
     const user = await User.createOrFindBy({ name: "Alice" });
-    expect(user.readAttribute("name")).toBe("Alice");
+    expect(user.name).toBe("Alice");
     expect(user.isPersisted()).toBe(true);
   });
 
@@ -3011,7 +3011,7 @@ describe("FinderTest", () => {
 
     const results = await User.findBySql('SELECT * FROM "users" WHERE "name" = \'Alice\'');
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
     expect(results[0].isPersisted()).toBe(true);
     expect(results[0].isNewRecord()).toBe(false);
   });
@@ -3048,7 +3048,7 @@ describe("FinderTest", () => {
     }
     await User.create({ name: "Alice", role: "admin" });
     const result = await User.where({ role: "admin" }).firstOrCreate({ name: "Bob" });
-    expect(result.readAttribute("name")).toBe("Alice");
+    expect(result.name).toBe("Alice");
   });
 
   it("firstOrCreate creates a new record when not found", async () => {
@@ -3063,8 +3063,8 @@ describe("FinderTest", () => {
     }
     const result = await User.where({ role: "admin" }).firstOrCreate({ name: "Charlie" });
     expect(result.isPersisted()).toBe(true);
-    expect(result.readAttribute("role")).toBe("admin");
-    expect(result.readAttribute("name")).toBe("Charlie");
+    expect(result.role).toBe("admin");
+    expect(result.name).toBe("Charlie");
   });
 
   it("firstOrCreateBang raises on validation failure", async () => {
@@ -3093,7 +3093,7 @@ describe("FinderTest", () => {
     }
     await User.create({ name: "Alice", role: "admin" });
     const result = await User.where({ role: "admin" }).firstOrInitialize({ name: "Bob" });
-    expect(result.readAttribute("name")).toBe("Alice");
+    expect(result.name).toBe("Alice");
     expect(result.isPersisted()).toBe(true);
   });
 
@@ -3109,8 +3109,8 @@ describe("FinderTest", () => {
     }
     const result = await User.where({ role: "admin" }).firstOrInitialize({ name: "Eve" });
     expect(result.isNewRecord()).toBe(true);
-    expect(result.readAttribute("role")).toBe("admin");
-    expect(result.readAttribute("name")).toBe("Eve");
+    expect(result.role).toBe("admin");
+    expect(result.name).toBe("Eve");
   });
 });
 
@@ -3135,14 +3135,14 @@ describe("FinderTest", () => {
 
   it("find by primary key", async () => {
     const found = await User.find(1);
-    expect(found.readAttribute("name")).toBe("Alice");
+    expect(found.name).toBe("Alice");
   });
 
   it("find with multiple IDs", async () => {
     const found = await User.find([1, 3]);
     expect(found).toHaveLength(2);
-    expect(found[0].readAttribute("name")).toBe("Alice");
-    expect(found[1].readAttribute("name")).toBe("Charlie");
+    expect(found[0].name).toBe("Alice");
+    expect(found[1].name).toBe("Charlie");
   });
 
   it("find with empty array raises RecordNotFound", async () => {
@@ -3160,7 +3160,7 @@ describe("FinderTest", () => {
   it("findBy returns matching record", async () => {
     const found = await User.findBy({ name: "Bob" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("email")).toBe("bob@test.com");
+    expect(found!.email).toBe("bob@test.com");
   });
 
   it("findBy returns null when no match", async () => {
@@ -3175,7 +3175,7 @@ describe("FinderTest", () => {
   it("findBy with multiple conditions", async () => {
     const found = await User.findBy({ name: "Alice", age: 25 });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("email")).toBe("alice@test.com");
+    expect(found!.email).toBe("alice@test.com");
   });
 
   it("findBy with no match on combined conditions", async () => {
@@ -3204,7 +3204,7 @@ describe("FinderTest", () => {
   it("first returns the first record", async () => {
     const user = await User.all().first();
     expect(user).not.toBeNull();
-    expect(user!.readAttribute("name")).toBe("Alice");
+    expect(user!.name).toBe("Alice");
   });
 
   it("first returns null on empty", async () => {
@@ -3219,7 +3219,7 @@ describe("FinderTest", () => {
   it("last returns the last record", async () => {
     const user = await User.all().last();
     expect(user).not.toBeNull();
-    expect(user!.readAttribute("name")).toBe("Charlie");
+    expect(user!.name).toBe("Charlie");
   });
 
   it("last returns null on empty", async () => {
@@ -3234,13 +3234,13 @@ describe("FinderTest", () => {
   it("second returns the second record", async () => {
     const user = await User.all().second();
     expect(user).not.toBeNull();
-    expect(user!.readAttribute("name")).toBe("Bob");
+    expect(user!.name).toBe("Bob");
   });
 
   it("third returns the third record", async () => {
     const user = await User.all().third();
     expect(user).not.toBeNull();
-    expect(user!.readAttribute("name")).toBe("Charlie");
+    expect(user!.name).toBe("Charlie");
   });
 
   it("second returns null when not enough records", async () => {
@@ -3256,8 +3256,8 @@ describe("FinderTest", () => {
   it("findOrCreateBy creates when not found", async () => {
     const created = await User.findOrCreateBy({ name: "NewUser" }, { email: "new@test.com" });
     expect(created.isPersisted()).toBe(true);
-    expect(created.readAttribute("name")).toBe("NewUser");
-    expect(created.readAttribute("email")).toBe("new@test.com");
+    expect(created.name).toBe("NewUser");
+    expect(created.email).toBe("new@test.com");
   });
 
   it("findOrInitializeBy returns existing record", async () => {
@@ -3272,12 +3272,12 @@ describe("FinderTest", () => {
       { email: "new@test.com" },
     );
     expect(initialized.isNewRecord()).toBe(true);
-    expect(initialized.readAttribute("name")).toBe("NewUser");
+    expect(initialized.name).toBe("NewUser");
   });
 
   it("sole returns the only record", async () => {
     const sole = await User.where({ name: "Alice" }).sole();
-    expect(sole.readAttribute("name")).toBe("Alice");
+    expect(sole.name).toBe("Alice");
   });
 
   it("sole raises when multiple records", async () => {
@@ -3311,8 +3311,8 @@ describe("FinderTest", () => {
   it("find with multiple IDs returns array", async () => {
     const users = await User.find([1, 2]);
     expect(users).toHaveLength(2);
-    expect(users[0].readAttribute("name")).toBeDefined();
-    expect(users[1].readAttribute("name")).toBeDefined();
+    expect(users[0].name).toBeDefined();
+    expect(users[1].name).toBeDefined();
   });
 
   it("findBy with null matches IS NULL", async () => {
@@ -3328,7 +3328,7 @@ describe("FinderTest", () => {
 
     const found = await Item.findBy({ category: null });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Orphan");
+    expect(found!.name).toBe("Orphan");
   });
 
   it("findBy with multiple conditions no match", async () => {
@@ -3355,15 +3355,15 @@ describe("FinderTest", () => {
   it("find_or_create_by finds existing", async () => {
     await Bird.create({ name: "Parrot", color: "green" });
     const found = await Bird.findOrCreateBy({ name: "Parrot" });
-    expect(found.readAttribute("color")).toBe("green");
+    expect(found.color).toBe("green");
     expect(await Bird.all().count()).toBe(1); // no new record
   });
 
   it("find_or_create_by creates when not found", async () => {
     const created = await Bird.findOrCreateBy({ name: "Eagle" }, { color: "brown" });
     expect(created.isPersisted()).toBe(true);
-    expect(created.readAttribute("name")).toBe("Eagle");
-    expect(created.readAttribute("color")).toBe("brown");
+    expect(created.name).toBe("Eagle");
+    expect(created.color).toBe("brown");
   });
 
   it("find_or_initialize_by finds existing", async () => {
@@ -3375,8 +3375,8 @@ describe("FinderTest", () => {
   it("find_or_initialize_by initializes when not found", async () => {
     const bird = await Bird.findOrInitializeBy({ name: "Falcon" }, { color: "grey" });
     expect(bird.isNewRecord()).toBe(true);
-    expect(bird.readAttribute("name")).toBe("Falcon");
-    expect(bird.readAttribute("color")).toBe("grey");
+    expect(bird.name).toBe("Falcon");
+    expect(bird.color).toBe("grey");
   });
 
   it("find_or_create_by is idempotent", async () => {
@@ -3384,7 +3384,7 @@ describe("FinderTest", () => {
     await Bird.findOrCreateBy({ name: "Robin" }, { color: "blue" });
     expect(await Bird.all().count()).toBe(1);
     const robin = await Bird.findBy({ name: "Robin" });
-    expect(robin!.readAttribute("color")).toBe("red"); // original color preserved
+    expect(robin!.color).toBe("red"); // original color preserved
   });
 });
 
@@ -3407,8 +3407,8 @@ describe("FinderTest", () => {
   // Rails: test_find_with_array_of_ids
   it("find with single id returns instance", async () => {
     const user = await User.create({ name: "Alice" });
-    const found = await User.find(user.readAttribute("id")!);
-    expect(found.readAttribute("name")).toBe("Alice");
+    const found = await User.find(user.id!);
+    expect(found.name).toBe("Alice");
   });
 
   // Rails: test_find_raises_record_not_found
@@ -3422,7 +3422,7 @@ describe("FinderTest", () => {
     await User.create({ name: "Alice", age: 25, active: false });
 
     const found = User.findBy({ name: "Alice", active: true });
-    expect((await found)!.readAttribute("age")).toBe(30);
+    expect((await found)!.age).toBe(30);
   });
 
   // Rails: test_find_by_returns_nil
@@ -3474,7 +3474,7 @@ describe("FinderTest", () => {
     await User.create({ name: "Bob" });
     const found = await User.findByAttribute("name", "Bob");
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Bob");
+    expect(found!.name).toBe("Bob");
   });
 
   it("returns null when not found", async () => {
@@ -3578,8 +3578,8 @@ describe("FinderTest", () => {
 
     const found = await User.find([1, 3]);
     expect(found).toHaveLength(2);
-    expect(found[0].readAttribute("name")).toBe("Alice");
-    expect(found[1].readAttribute("name")).toBe("Charlie");
+    expect(found[0].name).toBe("Alice");
+    expect(found[1].name).toBe("Charlie");
   });
 
   it("find with empty array raises RecordNotFound", async () => {
@@ -3625,7 +3625,7 @@ describe("FinderTest", () => {
   describe("find", () => {
     it("finds by single id", async () => {
       const u = await User.find(1);
-      expect(u.readAttribute("name")).toBe("Alice");
+      expect(u.name).toBe("Alice");
     });
 
     it("raises RecordNotFound for missing id", async () => {
@@ -3646,7 +3646,7 @@ describe("FinderTest", () => {
     it("finds first matching record", async () => {
       const u = await User.findBy({ name: "Bob" });
       expect(u).not.toBeNull();
-      expect(u!.readAttribute("email")).toBe("bob@test.com");
+      expect(u!.email).toBe("bob@test.com");
     });
 
     it("returns null when not found", async () => {
@@ -3683,14 +3683,14 @@ describe("FinderTest", () => {
     it("returns filtered relation", async () => {
       const users = await User.where({ age: 30 }).toArray();
       expect(users).toHaveLength(1);
-      expect(users[0].readAttribute("name")).toBe("Alice");
+      expect(users[0].name).toBe("Alice");
     });
   });
 
   describe("order / limit / offset (class methods)", () => {
     it("order delegates to relation", async () => {
       const users = await User.order({ age: "asc" }).toArray();
-      expect(users[0].readAttribute("name")).toBe("Bob");
+      expect(users[0].name).toBe("Bob");
     });
 
     it("limit delegates to relation", async () => {
@@ -3737,7 +3737,7 @@ describe("FinderTest", () => {
 
       const items = await Item.all().toArray();
       expect(items).toHaveLength(1);
-      expect(items[0].readAttribute("name")).toBe("A");
+      expect(items[0].name).toBe("A");
     });
   });
 
@@ -3763,7 +3763,7 @@ describe("FinderTest", () => {
     await Item.create({ name: "Apple" });
     const item = await Item.findBy({ name: "Apple" });
     expect(item).not.toBeNull();
-    expect(item!.readAttribute("name")).toBe("Apple");
+    expect(item!.name).toBe("Apple");
   });
 });
 

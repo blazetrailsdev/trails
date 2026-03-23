@@ -661,7 +661,7 @@ describe("TransactionCallbacksTest", () => {
       expect(log).toContain("created");
       await p.update({ title: "changed" });
       expect(log).toContain("updated");
-      expect(p.readAttribute("lock_version")).toBe(1);
+      expect(p.lock_version).toBe(1);
     });
   }); // TransactionAfterCommitCallbacksWithOptimisticLockingTest
 
@@ -686,7 +686,7 @@ describe("TransactionCallbacksTest", () => {
       }
       const p = await Post.create({ title: "a" });
       expect(log).toContain("created");
-      p.writeAttribute("title", "b");
+      p.title = "b";
       await p.save();
       expect(log).toContain("updated");
       await p.destroy();
@@ -737,7 +737,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("title", "string");
           this.adapter = adp;
           this.afterDestroy((record: any) => {
-            log.push("destroyed:" + record.readAttribute("title"));
+            log.push("destroyed:" + record.title);
           });
         }
       }
@@ -756,7 +756,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("title", "string");
           this.adapter = adp;
           this.afterDestroy((record: any) => {
-            log.push("destroyed:" + record.readAttribute("title"));
+            log.push("destroyed:" + record.title);
           });
         }
       }
@@ -775,7 +775,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("title", "string");
           this.adapter = adp;
           this.afterDestroy((record: any) => {
-            log.push("destroyed:" + record.readAttribute("title"));
+            log.push("destroyed:" + record.title);
           });
         }
       }
@@ -837,7 +837,7 @@ describe("TransactionCallbacksTest", () => {
       await t1.destroy();
       expect(log).toContain("destroyed");
       // Attempting to modify a destroyed (frozen) record should throw, not trigger afterUpdate
-      expect(() => t1.writeAttribute("title", "b")).toThrow();
+      expect(() => (t1.title = "b")).toThrow();
       expect(log).not.toContain("updated");
     });
   }); // CallbacksOnDestroyUpdateActionRaceTest
@@ -852,7 +852,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("published", "boolean", { default: false });
           this.adapter = adapter;
           this.beforeSave(function (record: any) {
-            if (record.readAttribute("published")) {
+            if (record.published) {
               log.push("published_save");
             }
           });
@@ -874,7 +874,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("title", "string");
           this.adapter = adp;
           this.afterCreate((record: any) => {
-            log.push("created:" + record.readAttribute("title"));
+            log.push("created:" + record.title);
           });
         }
       }
@@ -895,7 +895,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("title", "string");
           this.adapter = adp;
           this.afterCreate((record: any) => {
-            log.push("created:" + record.readAttribute("title"));
+            log.push("created:" + record.title);
           });
         }
       }
@@ -918,7 +918,7 @@ describe("TransactionCallbacksTest", () => {
       const t2 = await Topic.create({ title: "b" });
       const log: string[] = [];
       Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.readAttribute("title"));
+        log.push("updated:" + record.title);
       });
       await transaction(Topic, async () => {
         await t1.update({ title: "a2" });
@@ -941,7 +941,7 @@ describe("TransactionCallbacksTest", () => {
       const t2 = await Topic.create({ title: "b" });
       const log: string[] = [];
       Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.readAttribute("title"));
+        log.push("updated:" + record.title);
       });
       await transaction(Topic, async () => {
         await t1.update({ title: "a2" });
@@ -962,10 +962,10 @@ describe("TransactionCallbacksTest", () => {
       const t2 = await Topic.create({ title: "b" });
       const log: string[] = [];
       Topic.afterDestroy((record: any) => {
-        log.push("destroyed:" + record.readAttribute("title"));
+        log.push("destroyed:" + record.title);
       });
       Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.readAttribute("title"));
+        log.push("updated:" + record.title);
       });
       await transaction(Topic, async () => {
         await t1.update({ title: "a2" });
@@ -991,10 +991,10 @@ describe("TransactionCallbacksTest", () => {
       const t2 = await Topic.create({ title: "b" });
       const log: string[] = [];
       Topic.afterDestroy((record: any) => {
-        log.push("destroyed:" + record.readAttribute("title"));
+        log.push("destroyed:" + record.title);
       });
       Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.readAttribute("title"));
+        log.push("updated:" + record.title);
       });
       await transaction(Topic, async () => {
         await t1.destroy();

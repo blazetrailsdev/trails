@@ -105,7 +105,7 @@ describe("NestedThroughAssociationsTest", () => {
       foreignKey: "tag_id",
     });
     expect(loadedTag).not.toBeNull();
-    expect(loadedTag!.readAttribute("name")).toBe("nested-tag");
+    expect(loadedTag!.name).toBe("nested-tag");
   });
 
   it.skip("has many through has many with has many through source reflection preload", () => {});
@@ -164,7 +164,7 @@ describe("NestedThroughAssociationsTest", () => {
       foreignKey: "taggable_id",
     });
     expect(tagging).not.toBeNull();
-    expect(tagging!.readAttribute("tag_id")).toBe(tag.id);
+    expect(tagging!.tag_id).toBe(tag.id);
   });
 
   it.skip("has many through has one with has one through source reflection preload", () => {});
@@ -194,7 +194,7 @@ describe("NestedThroughAssociationsTest", () => {
       primaryKey: "tag_id",
     });
     expect(loadedTag).not.toBeNull();
-    expect(loadedTag!.readAttribute("name")).toBe("nested");
+    expect(loadedTag!.name).toBe("nested");
   });
 
   it.skip("has many through has one through with has one source reflection preload", () => {});
@@ -282,7 +282,7 @@ describe("NestedThroughAssociationsTest", () => {
       if (tag) tags.push(tag);
     }
     expect(tags.length).toBe(2);
-    const names = tags.map((t: any) => t.readAttribute("name"));
+    const names = tags.map((t: any) => t.name);
     expect(names).toContain("hs_tag1");
     expect(names).toContain("hs_tag2");
   });
@@ -314,7 +314,7 @@ describe("NestedThroughAssociationsTest", () => {
       if (post) posts.push(post);
     }
     expect(posts.length).toBe(2);
-    const titles = posts.map((p: any) => p.readAttribute("title"));
+    const titles = posts.map((p: any) => p.title);
     expect(titles).toContain("HM1");
     expect(titles).toContain("HM2");
   });
@@ -355,7 +355,7 @@ describe("NestedThroughAssociationsTest", () => {
       if (tag) tags.push(tag);
     }
     expect(tags.length).toBe(2);
-    const names = tags.map((t: any) => t.readAttribute("name")).sort();
+    const names = tags.map((t: any) => t.name).sort();
     expect(names).toEqual(["hc1", "hc2"]);
   });
 
@@ -389,7 +389,7 @@ describe("NestedThroughAssociationsTest", () => {
       foreignKey: "tag_id",
     });
     expect(loadedTag).not.toBeNull();
-    expect(loadedTag!.readAttribute("name")).toBe("bt_tag");
+    expect(loadedTag!.name).toBe("bt_tag");
   });
 
   it.skip("has many through has many through with belongs to source reflection preload", () => {});
@@ -451,7 +451,7 @@ describe("NestedThroughAssociationsTest", () => {
       primaryKey: "tag_id",
     });
     expect(loadedTag).not.toBeNull();
-    expect(loadedTag!.readAttribute("name")).toBe("hoc_tag");
+    expect(loadedTag!.name).toBe("hoc_tag");
   });
 
   it.skip("has one through has one with has one through source reflection preload", () => {});
@@ -477,7 +477,7 @@ describe("NestedThroughAssociationsTest", () => {
       primaryKey: "taggable_id",
     });
     expect(loadedPost).not.toBeNull();
-    expect(loadedPost!.readAttribute("title")).toBe("BC");
+    expect(loadedPost!.title).toBe("BC");
   });
 
   it.skip("joins and includes from through models not included in association", () => {});
@@ -548,7 +548,7 @@ describe("NestedThroughAssociationsTest", () => {
       className: "FkThrComment",
     });
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("body")).toBe("Great!");
+    expect(comments[0].body).toBe("Great!");
   });
 
   it("has many through with foreign key option on source reflection", async () => {
@@ -605,7 +605,7 @@ describe("NestedThroughAssociationsTest", () => {
       className: "FkSrcComment",
     });
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("body")).toBe("Nice!");
+    expect(comments[0].body).toBe("Nice!");
   });
 
   it("has many through with sti on through reflection", async () => {
@@ -678,7 +678,7 @@ describe("NestedThroughAssociationsTest", () => {
       className: "StiThrMember",
     });
     expect(members).toHaveLength(1);
-    expect(members[0].readAttribute("name")).toBe("Alice");
+    expect(members[0].name).toBe("Alice");
   });
 
   it.skip("has many through with sti on nested through reflection", () => {});

@@ -70,33 +70,33 @@ describe("DupTest", () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "orig", body: "content" });
     const d = t.dup();
-    expect(d.readAttribute("title")).toBe("orig");
-    expect(d.readAttribute("body")).toBe("content");
+    expect(d.title).toBe("orig");
+    expect(d.body).toBe("content");
   });
 
   it("dup with changes", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "orig" });
-    t.writeAttribute("title", "changed");
+    t.title = "changed";
     const d = t.dup();
-    expect(d.readAttribute("title")).toBe("changed");
+    expect(d.title).toBe("changed");
   });
 
   it("dup topics are independent", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "orig" });
     const d = t.dup();
-    d.writeAttribute("title", "copy");
-    expect(t.readAttribute("title")).toBe("orig");
-    expect(d.readAttribute("title")).toBe("copy");
+    d.title = "copy";
+    expect(t.title).toBe("orig");
+    expect(d.title).toBe("copy");
   });
 
   it("dup attributes are independent", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "a", body: "b" });
     const d = t.dup();
-    d.writeAttribute("body", "different");
-    expect(t.readAttribute("body")).toBe("b");
+    d.body = "different";
+    expect(t.body).toBe("b");
   });
 
   it("dup timestamps are cleared", async () => {
@@ -124,7 +124,7 @@ describe("DupTest", () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "cb" });
     const d = t.dup();
-    expect(d.readAttribute("title")).toBe("cb");
+    expect(d.title).toBe("cb");
   });
 
   it("dup validity is independent", async () => {
@@ -138,7 +138,7 @@ describe("DupTest", () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "scoped" });
     const d = t.dup();
-    expect(d.readAttribute("title")).toBe("scoped");
+    expect(d.title).toBe("scoped");
   });
 
   it("dup without primary key", () => {
@@ -183,7 +183,7 @@ describe("DupTest", () => {
     const copy = original.dup();
     expect(copy.isNewRecord()).toBe(true);
     expect(copy.id).toBeNull();
-    expect(copy.readAttribute("name")).toBe("Original");
+    expect(copy.name).toBe("Original");
   });
 });
 
@@ -211,7 +211,7 @@ describe("DupTest", () => {
     const animal = await Animal.create({ name: "Rex" });
     const dog = animal.becomes(Dog);
     expect(dog).toBeInstanceOf(Dog);
-    expect(dog.readAttribute("name")).toBe("Rex");
+    expect(dog.name).toBe("Rex");
     expect(dog.isPersisted()).toBe(true);
   });
   it("dup", async () => {
@@ -224,7 +224,7 @@ describe("DupTest", () => {
     const u = await User.create({ name: "original" });
     const d = u.dup();
     expect(d.isNewRecord()).toBe(true);
-    expect(d.readAttribute("name")).toBe("original");
+    expect(d.name).toBe("original");
     expect(d.id).toBeNull();
   });
 });

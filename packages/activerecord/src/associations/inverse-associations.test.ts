@@ -257,7 +257,7 @@ describe("InverseBelongsToTests", () => {
     const a = await Author.create({ name: "Alice" });
     const proxy = association(a, "books");
     const b = proxy.build({ title: "New Book" });
-    expect(b.readAttribute("author_id")).toBe(a.id);
+    expect(b.author_id).toBe(a.id);
   });
 });
 
@@ -324,7 +324,7 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const child = proxy.build({ topic: "reading" });
-    expect(child.readAttribute("man_id")).toBe(m.id);
+    expect(child.man_id).toBe(m.id);
   });
 
   it("parent instance should be shared with newly created via bang method child", async () => {
@@ -332,7 +332,7 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const child = await proxy.create({ topic: "music" });
-    expect(child.readAttribute("man_id")).toBe(m.id);
+    expect(child.man_id).toBe(m.id);
     expect(child.isPersisted()).toBe(true);
   });
 
@@ -341,7 +341,7 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const child = await proxy.create({ topic: "art" });
-    expect(child.readAttribute("man_id")).toBe(m.id);
+    expect(child.man_id).toBe(m.id);
   });
 
   it.skip("parent instance should be shared within create block of new child", () => {
@@ -358,7 +358,7 @@ describe("InverseHasManyTests", () => {
     const child = new Interest({ topic: "trains" });
     const proxy = association(m, "interests");
     await proxy.push(child);
-    expect(child.readAttribute("man_id")).toBe(m.id);
+    expect(child.man_id).toBe(m.id);
   });
 
   it("parent instance should be shared with replaced via accessor children", async () => {
@@ -406,7 +406,7 @@ describe("InverseHasManyTests", () => {
     const child = await Interest.create({ topic: "trains", man_id: m.id });
     const proxy = association(m, "interests");
     const found = await proxy.find(child.id as number);
-    expect((found as Base).readAttribute("topic")).toBe("trains");
+    expect((found as Base).topic).toBe("trains");
   });
 
   it("parent instance should find child instance using child instance id when created", async () => {
@@ -415,7 +415,7 @@ describe("InverseHasManyTests", () => {
     const proxy = association(m, "interests");
     const child = await proxy.create({ topic: "boats" });
     const found = await proxy.find(child.id as number);
-    expect((found as Base).readAttribute("topic")).toBe("boats");
+    expect((found as Base).topic).toBe("boats");
   });
 
   it.skip("find on child instance with id should not load all child records", () => {
@@ -530,7 +530,7 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const child = proxy.build({ topic: "unsaved" });
-    expect(child.readAttribute("man_id")).toBe(m.id);
+    expect(child.man_id).toBe(m.id);
     expect(child.isNewRecord()).toBe(true);
   });
 
@@ -637,7 +637,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const child = await proxy.create({ topic: "music" });
-    expect(child.readAttribute("man_id")).toBe(m.id);
+    expect(child.man_id).toBe(m.id);
   });
 });
 
@@ -1186,7 +1186,7 @@ describe("InverseHasOneTests", () => {
     const m = new Man({ name: "Gordon" });
     const f = new Face({ description: "pretty" });
     // Simulate building: set FK and inverse cache
-    f.writeAttribute("man_id", 1);
+    f.man_id = 1;
     (f as any)._cachedAssociations = new Map();
     (f as any)._cachedAssociations.set("man", m);
     expect((f as any)._cachedAssociations.get("man")).toBe(m);
@@ -1207,7 +1207,7 @@ describe("InverseHasOneTests", () => {
     await Face.create({ description: "pretty", man_id: m.id });
     const face = await loadHasOne(m, "face", { inverseOf: "man" });
     expect(face).not.toBeNull();
-    expect(face!.readAttribute("description")).toBe("pretty");
+    expect(face!.description).toBe("pretty");
     expect((face as any)._cachedAssociations?.get("man")).toBe(m);
   });
 

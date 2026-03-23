@@ -204,15 +204,13 @@ describe("DeleteAllTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.readAttribute("updated_at") as Date;
+    const originalUpdatedAt = post.updated_at as Date;
 
     await Post.all().updateAll({ title: "Changed" });
 
     const reloaded = await Post.find(post.id);
     // updateAll should NOT auto-bump updated_at
-    expect((reloaded.readAttribute("updated_at") as Date).getTime()).toBe(
-      originalUpdatedAt.getTime(),
-    );
+    expect((reloaded.updated_at as Date).getTime()).toBe(originalUpdatedAt.getTime());
   });
 
   it("deleteAll does not run callbacks", async () => {
@@ -245,7 +243,7 @@ describe("DeleteAllTest", () => {
         this.attribute("name", "string");
         this.adapter = adapter;
         this.afterDestroy((r: any) => {
-          log.push(r.readAttribute("name"));
+          log.push(r.name);
         });
       }
     }
@@ -320,7 +318,7 @@ describe("DeleteAllTest", () => {
         this.attribute("name", "string");
         this.adapter = adapter;
         this.afterDestroy((r: any) => {
-          log.push(r.readAttribute("name"));
+          log.push(r.name);
         });
       }
     }
@@ -427,7 +425,7 @@ describe("DeleteAllTest", () => {
     await Item.create({ status: "old" });
     await Item.updateAll({ status: "new" });
     const items = await Item.all().toArray();
-    expect(items.every((i: any) => i.readAttribute("status") === "new")).toBe(true);
+    expect(items.every((i: any) => i.status === "new")).toBe(true);
   });
   it("destroy all", async () => {
     class Item extends Base {

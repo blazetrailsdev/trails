@@ -84,8 +84,8 @@ describe("AggregationsTest", () => {
 
     const c = await Customer.create({ name: "Bob", address_street: "Old St", address_city: "LA" });
     (c as any).address = new Address("New Ave", "SF");
-    expect(c.readAttribute("address_street")).toBe("New Ave");
-    expect(c.readAttribute("address_city")).toBe("SF");
+    expect(c.address_street).toBe("New Ave");
+    expect(c.address_city).toBe("SF");
   });
 
   // Rails: test_nil_assignment_results_in_nil
@@ -118,8 +118,8 @@ describe("AggregationsTest", () => {
       address_city: "PDX",
     });
     (c as any).address = null;
-    expect(c.readAttribute("address_street")).toBeNull();
-    expect(c.readAttribute("address_city")).toBeNull();
+    expect(c.address_street).toBeNull();
+    expect(c.address_city).toBeNull();
     expect((c as any).address).toBeNull();
   });
 
@@ -149,8 +149,8 @@ describe("AggregationsTest", () => {
 
     const loc = await Location.create({ name: "HQ", lat: 37.7, lng: -122.4 });
     (loc as any).gps = null;
-    expect(loc.readAttribute("lat")).toBeNull();
-    expect(loc.readAttribute("lng")).toBeNull();
+    expect(loc.lat).toBeNull();
+    expect(loc.lng).toBeNull();
   });
 
   // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
@@ -217,8 +217,8 @@ describe("AggregationsTest", () => {
     expect(price.currency).toBe("USD");
 
     (o as any).price = 5.0;
-    expect(o.readAttribute("price_amount")).toBe(5.0);
-    expect(o.readAttribute("price_currency")).toBe("USD");
+    expect(o.price_amount).toBe(5.0);
+    expect(o.price_currency).toBe("USD");
   });
 
   // Rails: test_custom_constructor
@@ -303,8 +303,8 @@ describe("AggregationsTest", () => {
 
     const s = await Shape.create({ name: "Circle", coord_x: 0.0, coord_y: 0.0 });
     (s as any).origin = new Coord(5.5, 3.3);
-    expect(s.readAttribute("coord_x")).toBeCloseTo(5.5);
-    expect(s.readAttribute("coord_y")).toBeCloseTo(3.3);
+    expect(s.coord_x).toBeCloseTo(5.5);
+    expect(s.coord_y).toBeCloseTo(3.3);
   });
 
   // Rails: test_gps_equality
@@ -427,7 +427,7 @@ describe("AggregationsTest", () => {
     const addr1 = (c as any).address;
     expect(addr1.city).toBe("BOS");
 
-    c.writeAttribute("address_city", "CHI");
+    c.address_city = "CHI";
     const addr2 = (c as any).address;
     expect(addr2.city).toBe("CHI");
   });
@@ -734,8 +734,8 @@ describe("composed_of", () => {
     const c = await Customer.create({ address_street: "old", address_city: "old" });
     (c as any).address = new Address("456 Oak", "SF");
 
-    expect(c.readAttribute("address_street")).toBe("456 Oak");
-    expect(c.readAttribute("address_city")).toBe("SF");
+    expect(c.address_street).toBe("456 Oak");
+    expect(c.address_city).toBe("SF");
   });
 });
 
@@ -808,8 +808,8 @@ describe("composed_of (Rails-guided)", () => {
     const p = await Product.create({ price_amount: 0, price_currency: "EUR" });
     (p as any).price = new Money(2500, "GBP");
 
-    expect(p.readAttribute("price_amount")).toBe(2500);
-    expect(p.readAttribute("price_currency")).toBe("GBP");
+    expect(p.price_amount).toBe(2500);
+    expect(p.price_currency).toBe("GBP");
   });
 
   // Rails: test "composed_of returns null when all columns are null"

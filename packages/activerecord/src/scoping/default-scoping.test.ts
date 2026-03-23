@@ -99,7 +99,7 @@ describe("DefaultScopingTest", () => {
     await Post.create({ title: "pub", published: true });
     await Post.create({ title: "draft", published: false });
     const results = await Post.all().toArray();
-    expect(results.every((r: any) => r.readAttribute("published") === true)).toBe(true);
+    expect(results.every((r: any) => r.published === true)).toBe(true);
   });
 
   it("default scope runs on select", async () => {
@@ -323,7 +323,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const post = (await Post.create({ title: "pub", published: true })) as any;
-    expect(post.readAttribute("published")).toBe(true);
+    expect(post.published).toBe(true);
   });
 
   it("default scope can be removed", async () => {
@@ -374,7 +374,7 @@ describe("DefaultScopingTest", () => {
     await Post.create({ title: "specific", published: false });
     const results = await (Post as any).titled().toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("specific");
+    expect(results[0].title).toBe("specific");
   });
 
   it("default scope with scope conditions", async () => {
@@ -458,7 +458,7 @@ describe("DefaultScopingTest", () => {
     await Post.create({ title: "draft", published: false });
     const results = await Post.unscoped().where({ published: false }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("draft");
+    expect(results[0].title).toBe("draft");
   });
 
   it("scope overrides default scope", async () => {
@@ -476,7 +476,7 @@ describe("DefaultScopingTest", () => {
     await Post.create({ title: "draft", published: false });
     const results = await (Post as any).drafts().toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("draft");
+    expect(results[0].title).toBe("draft");
   });
 
   it("unscoped removes default scope for update", async () => {
@@ -491,7 +491,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "pub", published: true })) as any;
     await post.update({ title: "updated" });
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("unscoped removes default scope for delete", async () => {
@@ -629,7 +629,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const post = (await Post.create({ title: "override", published: false })) as any;
-    expect(post.readAttribute("published")).toBe(false);
+    expect(post.published).toBe(false);
   });
 
   it("scope without default scope", async () => {
@@ -662,7 +662,7 @@ describe("DefaultScopingTest", () => {
     await Post.create({ title: "draft", published: false });
     const results = await Post.all().rewhere({ published: false }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("draft");
+    expect(results[0].title).toBe("draft");
   });
 
   it("default scope as class method", async () => {
@@ -740,7 +740,7 @@ describe("DefaultScopingTest", () => {
     // find by id should bypass default scope (unscoped find)
     const found = await Post.unscoped().find(draft.id);
     expect(found).toBeTruthy();
-    expect((found as any).readAttribute("title")).toBe("draft");
+    expect((found as any).title).toBe("draft");
   });
 
   it("default scope is unscoped on create", async () => {
@@ -755,7 +755,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "created", published: false })) as any;
     expect(post.isPersisted()).toBe(true);
-    expect(post.readAttribute("published")).toBe(false);
+    expect(post.published).toBe(false);
   });
 
   it("default scope with module includes", async () => {
@@ -835,7 +835,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "original" })) as any;
     await post.update({ title: "updated" });
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("nilable default scope with all queries runs on update", async () => {
@@ -848,7 +848,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "original" })) as any;
     await post.update({ title: "updated" });
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("default scope doesnt run on update columns", async () => {
@@ -861,7 +861,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "original" })) as any;
     await post.update({ title: "updated" });
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("unscope with where attributes", () => {
@@ -921,7 +921,7 @@ describe("DefaultScopingTest", () => {
     }
     await Post.create({ title: "pub", published: true });
     const results = await Post.all().toArray();
-    expect(results[0].readAttribute("published")).toBe(true);
+    expect(results[0].published).toBe(true);
   });
 
   it("default scope with joins", () => {
@@ -1101,7 +1101,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const post = (await Post.create({ title: "test", status: "published" })) as any;
-    expect(post.readAttribute("status")).toBe("published");
+    expect(post.status).toBe("published");
   });
 
   it("create attribute overwrites default values", async () => {
@@ -1114,7 +1114,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const post = (await Post.create({ title: "test", views: 99 })) as any;
-    expect(post.readAttribute("views")).toBe(99);
+    expect(post.views).toBe(99);
   });
 
   it("where attribute", async () => {
@@ -1160,7 +1160,7 @@ describe("DefaultScopingTest", () => {
     }
     // createWith not available, test that where + create sets defaults
     const post = (await Post.where({ status: "draft" }).create({ title: "merged" })) as any;
-    expect(post.readAttribute("title")).toBe("merged");
+    expect(post.title).toBe("merged");
     expect(post.isPersisted()).toBe(true);
   });
 
@@ -1174,7 +1174,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const post = (await Post.where({ status: "published" }).create({ title: "reset" })) as any;
-    expect(post.readAttribute("status")).toBe("published");
+    expect(post.status).toBe("published");
   });
 
   it("create with takes precedence over where", async () => {
@@ -1190,7 +1190,7 @@ describe("DefaultScopingTest", () => {
       title: "test",
       status: "override",
     })) as any;
-    expect(post.readAttribute("status")).toBe("override");
+    expect(post.status).toBe("override");
   });
 
   it("create with empty hash will not reset", async () => {
@@ -1203,8 +1203,8 @@ describe("DefaultScopingTest", () => {
       }
     }
     const post = (await Post.where({ status: "draft" }).create({ title: "no reset" })) as any;
-    expect(post.readAttribute("title")).toBe("no reset");
-    expect(post.readAttribute("status")).toBe("draft");
+    expect(post.title).toBe("no reset");
+    expect(post.status).toBe("draft");
   });
 
   it("default scope find last", async () => {
@@ -1316,7 +1316,7 @@ describe("DefaultScopingTest", () => {
     }
     class Dog extends Animal {}
     const dog = (await Dog.create({ name: "Rex", active: true })) as any;
-    expect(dog.readAttribute("name")).toBe("Rex");
+    expect(dog.name).toBe("Rex");
   });
 
   it("test default scope with multiple calls", async () => {
@@ -1373,7 +1373,7 @@ describe("DefaultScopingTest", () => {
     await Post.create({ title: "a", status: "active" });
     await Post.create({ title: "b", status: "inactive" });
     const results = await Post.where({ status: "active" }).toArray();
-    expect(results.every((r: any) => r.readAttribute("status") === "active")).toBe(true);
+    expect(results.every((r: any) => r.status === "active")).toBe(true);
   });
 
   it("default scope runs on create", async () => {
@@ -1411,7 +1411,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "original" })) as any;
     await post.update({ title: "updated" });
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("default scope doesnt run on destroy", async () => {
@@ -1438,7 +1438,7 @@ describe("DefaultScopingTest", () => {
     }
     const post = (await Post.create({ title: "reloaded" })) as any;
     await post.reload();
-    expect(post.readAttribute("title")).toBe("reloaded");
+    expect(post.title).toBe("reloaded");
   });
 });
 
@@ -1668,7 +1668,7 @@ describe("DefaultScopingTest", () => {
 
     const result = await Post.all().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Published");
+    expect(result[0].title).toBe("Published");
   });
 
   it("unscoped bypasses default_scope", async () => {
@@ -1709,7 +1709,7 @@ describe("DefaultScopingTest", () => {
 
     const result = await Post.where({ category: "tech" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("P1");
+    expect(result[0].title).toBe("P1");
   });
 
   it("default_scope applies to exists?", async () => {
@@ -1786,7 +1786,7 @@ describe("DefaultScopingTest", () => {
 
     const result = await Post.unscoped().where({ title: "Draft" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Draft");
+    expect(result[0].title).toBe("Draft");
   });
 });
 
@@ -1812,7 +1812,7 @@ describe("DefaultScopingTest", () => {
 
     expect(await Article.all().count()).toBe(1);
     const articles = await Article.all().toArray();
-    expect(articles[0].readAttribute("title")).toBe("Visible");
+    expect(articles[0].title).toBe("Visible");
   });
 
   it("unscoped removes default_scope", async () => {
@@ -1849,7 +1849,7 @@ describe("DefaultScopingTest", () => {
 
     const result = await Article.where({ category: "tech" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("V-Tech");
+    expect(result[0].title).toBe("V-Tech");
   });
 
   it("default_scope applies to count", async () => {
@@ -1883,6 +1883,6 @@ describe("DefaultScopingTest", () => {
     await Article.create({ title: "A", order_val: 1 });
 
     const first = await Article.all().first();
-    expect(first!.readAttribute("title")).toBe("A");
+    expect(first!.title).toBe("A");
   });
 });

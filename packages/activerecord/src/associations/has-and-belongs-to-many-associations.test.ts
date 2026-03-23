@@ -97,7 +97,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("Rails");
+    expect((projects[0] as any).name).toBe("Rails");
   });
 
   it("adding single", async () => {
@@ -239,7 +239,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proj = new Project({ name: "BuiltProj" });
     (proj.constructor as any).adapter = adapter;
     expect(proj.isNewRecord()).toBe(true);
-    expect(proj.readAttribute("name")).toBe("BuiltProj");
+    expect(proj.name).toBe("BuiltProj");
   });
 
   it("new aliased to build", async () => {
@@ -248,7 +248,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proj = new Project({ name: "NewAliasProj" });
     (proj.constructor as any).adapter = adapter;
     expect(proj.isNewRecord()).toBe(true);
-    expect(proj.readAttribute("name")).toBe("NewAliasProj");
+    expect(proj.name).toBe("NewAliasProj");
   });
 
   it("build by new record", async () => {
@@ -272,7 +272,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("CreatedProj");
+    expect((projects[0] as any).name).toBe("CreatedProj");
   });
 
   it("creation respects hash condition", async () => {
@@ -286,7 +286,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("HashProj");
+    expect((projects[0] as any).name).toBe("HashProj");
   });
 
   it("distinct after the fact", async () => {
@@ -430,7 +430,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("Keep");
+    expect((projects[0] as any).name).toBe("Keep");
   });
 
   it("destroying many join records", async () => {
@@ -490,9 +490,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       joinTable: "developer_projects",
       foreignKey: "developer_id",
     });
-    const found = projects.find((p: any) => p.readAttribute("name") === "FindP2");
+    const found = projects.find((p: any) => p.name === "FindP2");
     expect(found).toBeDefined();
-    expect((found as any).readAttribute("name")).toBe("FindP2");
+    expect((found as any).name).toBe("FindP2");
   });
 
   it("include uses array include after loaded", async () => {
@@ -556,7 +556,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("NewProj");
+    expect((projects[0] as any).name).toBe("NewProj");
   });
 
   it.skip("find in association with options", () => {
@@ -584,7 +584,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(2);
-    const names = projects.map((p: any) => p.readAttribute("name"));
+    const names = projects.map((p: any) => p.name);
     expect(names).toContain("RL2");
     expect(names).toContain("RL3");
     expect(names).not.toContain("RL1");
@@ -608,7 +608,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("New1");
+    expect((projects[0] as any).name).toBe("New1");
   });
 
   it("replace on new object", async () => {
@@ -675,10 +675,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "developer_id",
     });
     const p = projects[0] as any;
-    p.writeAttribute("name", "UpdatedProj");
+    p.name = "UpdatedProj";
     await p.save();
     const reloaded = await Project.find(proj.id as number);
-    expect(reloaded.readAttribute("name")).toBe("UpdatedProj");
+    expect(reloaded.name).toBe("UpdatedProj");
   });
 
   it.skip("habtm respects select", () => {
@@ -697,7 +697,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     });
     expect(projects.length).toBe(1);
     const p = projects[0] as any;
-    expect(p.readAttribute("name")).toBe("AllCols");
+    expect(p.name).toBe("AllCols");
     expect(p.id).toBe(proj.id);
   });
 
@@ -906,7 +906,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "cj_developer_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("CJProj");
+    expect((projects[0] as any).name).toBe("CJProj");
   });
 
   it.skip("has and belongs to many in a namespaced model pointing to a namespaced model", () => {
@@ -979,7 +979,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       foreignKey: "same_dev_id",
     });
     expect(projects.length).toBe(1);
-    expect((projects[0] as any).readAttribute("name")).toBe("SameProj");
+    expect((projects[0] as any).name).toBe("SameProj");
   });
 
   it.skip("has and belongs to many while partial inserts false", () => {
@@ -999,8 +999,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     });
     expect(projects.length).toBe(1);
     // The join record "belongs to" the developer
-    expect(join.readAttribute("developer_id")).toBe(dev.id);
-    expect(join.readAttribute("project_id")).toBe(proj.id);
+    expect(join.developer_id).toBe(dev.id);
+    expect(join.project_id).toBe(proj.id);
   });
 
   it("habtm adding before save", async () => {
@@ -1013,7 +1013,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(proj.isNewRecord()).toBe(false);
     const projects = await proxy.toArray();
     expect(projects).toHaveLength(1);
-    expect(projects[0].readAttribute("name")).toBe("BSProj");
+    expect(projects[0].name).toBe("BSProj");
   });
 
   it("deleting all", async () => {
@@ -1046,7 +1046,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // Join rows for destroyed projects should also be gone
     const remaining = await proxy.toArray();
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].readAttribute("name")).toBe("DMP3");
+    expect(remaining[0].name).toBe("DMP3");
   });
 
   it("destroy associations destroys multiple associations", async () => {
@@ -1059,7 +1059,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     await proxy.destroyAll();
     const allProjects = await Project.all().toArray();
-    const names = allProjects.map((p: any) => p.readAttribute("name"));
+    const names = allProjects.map((p: any) => p.name);
     expect(names).not.toContain("DMAP1");
     expect(names).not.toContain("DMAP2");
     // Join rows should also be gone

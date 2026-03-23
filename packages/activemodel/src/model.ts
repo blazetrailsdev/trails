@@ -54,6 +54,10 @@ interface CustomValidationEntry {
  * Mirrors: ActiveModel::Model (with all the included modules)
  */
 export class Model {
+  // Allow dynamic attribute access (e.g., record.title) for properties
+  // defined at runtime via Model.attribute().
+  [key: string]: unknown;
+
   // -- Class-level registries --
   static includeRootInJson: boolean | string = false;
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();

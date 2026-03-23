@@ -67,19 +67,19 @@ describe("InheritanceTest", () => {
   it("should store demodulized class name with store full sti class option disabled", async () => {
     const { Car } = makeHierarchy();
     const car = await Car.create({ name: "Toyota" });
-    expect(car.readAttribute("type")).toBe("Car");
+    expect(car.type).toBe("Car");
   });
 
   it("should store full class name with store full sti class option enabled", async () => {
     const { Car } = makeHierarchy();
     const car = await Car.create({ name: "Ford" });
-    expect(car.readAttribute("type")).toBeDefined();
+    expect(car.type).toBeDefined();
   });
 
   it("different namespace subclass should load correctly with store full sti class option", async () => {
     const { Car } = makeHierarchy();
     const c = await Car.create({ name: "BMW" });
-    expect(c.readAttribute("type")).toBe("Car");
+    expect(c.type).toBe("Car");
   });
 
   it("base class activerecord error", () => {
@@ -90,13 +90,13 @@ describe("InheritanceTest", () => {
   it("becomes sets variables before initialization callbacks", async () => {
     const { Vehicle } = makeHierarchy();
     const v = await Vehicle.create({ name: "Generic", type: "Vehicle" });
-    expect(v.readAttribute("name")).toBe("Generic");
+    expect(v.name).toBe("Generic");
   });
 
   it("becomes and change tracking for inheritance columns", async () => {
     const { Car } = makeHierarchy();
     const c = await Car.create({ name: "Honda" });
-    expect(c.readAttribute("type")).toBe("Car");
+    expect(c.type).toBe("Car");
   });
 
   it("alt becomes bang resets inheritance type column", async () => {
@@ -108,7 +108,7 @@ describe("InheritanceTest", () => {
   it("where create bang with subclass", async () => {
     const { Car } = makeHierarchy();
     const c = await Car.create({ name: "Subaru" });
-    expect(c.readAttribute("type")).toBe("Car");
+    expect(c.type).toBe("Car");
   });
 
   it("new with ar base", () => {
@@ -120,7 +120,7 @@ describe("InheritanceTest", () => {
   it("new with invalid type", () => {
     const { Vehicle } = makeHierarchy();
     const v = new Vehicle({ name: "test", type: "Vehicle" });
-    expect(v.readAttribute("type")).toBe("Vehicle");
+    expect(v.type).toBe("Vehicle");
   });
 
   it("new with unrelated type", () => {
@@ -150,7 +150,7 @@ describe("InheritanceTest", () => {
   it("where create with unrelated type", async () => {
     const { Car } = makeHierarchy();
     const c = await Car.create({ name: "test" });
-    expect(c.readAttribute("type")).toBe("Car");
+    expect(c.type).toBe("Car");
   });
 
   it("where create bang with invalid type", async () => {
@@ -162,7 +162,7 @@ describe("InheritanceTest", () => {
   it("where create bang with unrelated type", async () => {
     const { Truck } = makeHierarchy();
     const t = await Truck.create({ name: "test" });
-    expect(t.readAttribute("type")).toBe("Truck");
+    expect(t.type).toBe("Truck");
   });
 
   it("new with unrelated namespaced type", () => {
@@ -175,14 +175,14 @@ describe("InheritanceTest", () => {
     const { Car, Truck } = makeHierarchy();
     const c = await Car.create({ name: "car" });
     const t = await Truck.create({ name: "truck" });
-    expect(c.readAttribute("type")).toBe("Car");
-    expect(t.readAttribute("type")).toBe("Truck");
+    expect(c.type).toBe("Car");
+    expect(t.type).toBe("Truck");
   });
 
   it("new without storing full sti class", async () => {
     const { Car } = makeHierarchy();
     const c = await Car.create({ name: "Mini" });
-    expect(c.readAttribute("type")).toBe("Car");
+    expect(c.type).toBe("Car");
   });
 
   it("new with autoload paths", async () => {
@@ -195,8 +195,8 @@ describe("InheritanceTest", () => {
     const { Car, Truck } = makeHierarchy();
     const c = await Car.create({ name: "a" });
     const t = await Truck.create({ name: "b" });
-    expect(c.readAttribute("type")).toBe("Car");
-    expect(t.readAttribute("type")).toBe("Truck");
+    expect(c.type).toBe("Car");
+    expect(t.type).toBe("Truck");
   });
 
   it("eager load belongs to something inherited", async () => {
@@ -1019,7 +1019,7 @@ describe("InheritanceTest", () => {
     const firm = new Company({ type: "Firm" });
     // In Rails, Company.new(type: "Firm") returns a Firm instance
     // We validate by checking the type attribute is set
-    expect(firm.readAttribute("type")).toBe("Firm");
+    expect(firm.type).toBe("Firm");
   });
 
   // -------------------------------------------------------------------------
@@ -1085,16 +1085,16 @@ describe("InheritanceTest", () => {
     registerModel(Vegetable);
 
     const vegetable = await Vegetable.create({ name: "Red Pepper" });
-    expect(vegetable.readAttribute("custom_type")).toBeNull();
+    expect(vegetable.custom_type).toBeNull();
 
     const cabbage = vegetable.becomesBang(Cabbage);
     expect(cabbage).toBeInstanceOf(Cabbage);
-    expect(cabbage.readAttribute("custom_type")).toBe("Cabbage");
+    expect(cabbage.custom_type).toBe("Cabbage");
 
     // becomes! back to Vegetable should clear the type
     cabbage.becomesBang(Vegetable);
     // Since becomes! shares attributes, cabbage's custom_type is also cleared
-    expect(cabbage.readAttribute("custom_type")).toBeNull();
+    expect(cabbage.custom_type).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -1140,11 +1140,11 @@ describe("InheritanceTest", () => {
     await Client.updateAll({ name: "I am a client" });
 
     const client = await Client.all().first();
-    expect(client!.readAttribute("name")).toBe("I am a client");
+    expect(client!.name).toBe("I am a client");
 
     // Firm should be unchanged
     const firm = await Firm.all().first();
-    expect(firm!.readAttribute("name")).toBe("37signals");
+    expect(firm!.name).toBe("37signals");
   });
 
   // -------------------------------------------------------------------------
@@ -1185,10 +1185,10 @@ describe("InheritanceTest", () => {
     await Cabbage.updateAll({ name: "the cabbage" });
 
     const cabbage = await Cabbage.all().first();
-    expect(cabbage!.readAttribute("name")).toBe("the cabbage");
+    expect(cabbage!.name).toBe("the cabbage");
 
     const cucumber = await Cucumber.all().first();
-    expect(cucumber!.readAttribute("name")).toBe("my cucumber");
+    expect(cucumber!.name).toBe("my cucumber");
   });
 
   // -------------------------------------------------------------------------
@@ -1339,7 +1339,7 @@ describe("InheritanceTest", () => {
     registerModel(Subscriber);
 
     const ss = new SpecialSubscriber({ name: "And breaaaaathe!" });
-    ss.writeAttribute("nick", "roger");
+    ss.nick = "roger";
     await ss.save();
 
     const found = await SpecialSubscriber.find("roger");
@@ -1386,7 +1386,7 @@ describe("InheritanceTest", () => {
       }
     }
     const p = new (Plain as any)({ name: "NoSTI" });
-    expect(p.readAttribute("name")).toBe("NoSTI");
+    expect(p.name).toBe("NoSTI");
   });
 
   it.skip("scope inherited properly", async () => {
@@ -1420,14 +1420,14 @@ describe("InheritanceTest", () => {
   it("where new with subclass", async () => {
     const { Company, Firm } = makeCompanyHierarchy();
     const f = Firm.where({ name: "Test" }).new();
-    expect(f.readAttribute("name")).toBe("Test");
+    expect(f.name).toBe("Test");
   });
 
   it("where create with subclass", async () => {
     const { Firm } = makeCompanyHierarchy();
     const f = await Firm.where({ name: "Created Firm" }).create();
     expect(f).toBeDefined();
-    expect(f.readAttribute("name")).toBe("Created Firm");
+    expect(f.name).toBe("Created Firm");
   });
 
   it("new with abstract class", async () => {
@@ -1440,7 +1440,7 @@ describe("InheritanceTest", () => {
     }
     class RealCompany extends AbstractCompany {}
     const rc = new (RealCompany as any)({ name: "Real" });
-    expect(rc.readAttribute("name")).toBe("Real");
+    expect(rc.name).toBe("Real");
   });
 });
 
@@ -1476,7 +1476,7 @@ describe("InheritanceComputeTypeTest", () => {
   it("inheritance new with subclass as default", async () => {
     const { Car } = makeHierarchy();
     const c = await Car.create({ name: "subcar" });
-    expect(c.readAttribute("type")).toBe("Car");
+    expect(c.type).toBe("Car");
   });
 });
 
@@ -1493,7 +1493,7 @@ describe("InheritanceAttributeMappingTest", () => {
     }
     class Car extends Vehicle {}
     const c = await Car.create({ name: "Sedan" });
-    expect(c.readAttribute("kind")).toBe("Car");
+    expect(c.kind).toBe("Car");
   });
 
   it("polymorphic associations custom type", async () => {
@@ -1506,7 +1506,7 @@ describe("InheritanceAttributeMappingTest", () => {
       }
     }
     const e = await Entry.create({ entryable_type: "Comment", entryable_id: 1 });
-    expect(e.readAttribute("entryable_type")).toBe("Comment");
+    expect(e.entryable_type).toBe("Comment");
   });
 });
 
@@ -1523,7 +1523,7 @@ describe("InheritanceAttributeTest", () => {
     }
     class Car extends Vehicle {}
     const car = await Car.create({ name: "MyCar" });
-    expect(car.readAttribute("type")).toBe("Car");
+    expect(car.type).toBe("Car");
   });
 });
 
@@ -1561,7 +1561,7 @@ describe("STI", () => {
     registerModel(Car);
 
     const car = await Car.create({ name: "Civic" });
-    expect(car.readAttribute("type")).toBe("Car");
+    expect(car.type).toBe("Car");
   });
 
   it("inheritance condition", async () => {
@@ -1588,7 +1588,7 @@ describe("STI", () => {
 
     const cars = await Car.all().toArray();
     expect(cars).toHaveLength(2);
-    expect(cars.every((c: any) => c.readAttribute("type") === "Car")).toBe(true);
+    expect(cars.every((c: any) => c.type === "Car")).toBe(true);
 
     const trucks = await Truck.all().toArray();
     expect(trucks).toHaveLength(1);
@@ -1665,7 +1665,7 @@ describe("STI (Rails-guided)", () => {
     registerModel(Firm);
 
     const firm = await Firm.create({ name: "Acme" });
-    expect(firm.readAttribute("type")).toBe("Firm");
+    expect(firm.type).toBe("Firm");
   });
 
   // Rails: test "find returns correct subclass"
