@@ -768,8 +768,14 @@ describe("WhereTest", () => {
   it.skip("where with relation on has one association", () => {});
   it.skip("where on association with select relation", () => {});
   it.skip("where on association with collection polymorphic relation", () => {});
-  it.skip("where with unsupported arguments", () => {
-    /* needs type validation in where() to reject non-string/non-object args */
+  it("where with unsupported arguments", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => Post.where(42 as any)).toThrow(/Unsupported argument type/);
   });
   it("invert where", async () => {
     class Post extends Base {

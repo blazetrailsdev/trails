@@ -91,6 +91,14 @@ export class Relation<T extends Base> {
   where(sql: string, ...binds: unknown[]): Relation<T>;
   where(conditionsOrSql?: Record<string, unknown> | string, ...binds: unknown[]): Relation<T> {
     if (conditionsOrSql === undefined) return this._clone();
+    if (
+      typeof conditionsOrSql !== "string" &&
+      (typeof conditionsOrSql !== "object" || conditionsOrSql === null)
+    ) {
+      throw new Error(
+        `Unsupported argument type: ${typeof conditionsOrSql} (${String(conditionsOrSql)})`,
+      );
+    }
     const rel = this._clone();
     if (typeof conditionsOrSql === "string") {
       let sql = conditionsOrSql;

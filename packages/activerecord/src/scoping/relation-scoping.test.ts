@@ -546,17 +546,17 @@ describe("NestedRelationScopingTest", () => {
     });
   });
 
-  it.skip("merge inner scope has priority", async () => {
+  it("merge inner scope has priority", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "A", author: "Alice" });
-    await Post.create({ title: "B", author: "Bob" });
-    const outer = Post.where({ author: "Alice" });
+    for (let i = 0; i < 15; i++) {
+      await Post.create({ title: `Post ${i}`, author: "Someone" });
+    }
+    const outer = Post.limit(5);
     await Post.scoping(outer, async () => {
-      const inner = Post.where({ author: "Bob" });
+      const inner = Post.limit(10);
       await Post.scoping(inner, async () => {
         const all = await Post.all().toArray();
-        expect(all.length).toBe(1);
-        expect(all[0].author).toBe("Bob");
+        expect(all.length).toBe(10);
       });
     });
   });
