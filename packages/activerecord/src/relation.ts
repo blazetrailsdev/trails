@@ -3485,16 +3485,50 @@ export class Relation<T extends Base> {
               else throughByFk.set(key, [tr]);
             }
 
+            // Apply outer association scope if present
+            let allowedIds: Set<unknown> | null = null;
+            if (assocDef.options.scope) {
+              const targetPk = (targetModel as any).primaryKey ?? "id";
+              const allTargets: any[] = [];
+              for (const trs of throughByFk.values()) {
+                for (const tr of trs) {
+                  const p = (tr as any)._preloadedAssociations?.get(resolvedSourceName);
+                  if (!p) continue;
+                  if (Array.isArray(p)) allTargets.push(...p);
+                  else allTargets.push(p);
+                }
+              }
+              if (allTargets.length > 0) {
+                const ids = [
+                  ...new Set(
+                    allTargets
+                      .map((t: any) => t.readAttribute(targetPk))
+                      .filter((v: any) => v != null),
+                  ),
+                ];
+                let scopedRel = (targetModel as any)._allForPreload().where({ [targetPk]: ids });
+                scopedRel = assocDef.options.scope(scopedRel);
+                const scopedRecords = await scopedRel.toArray();
+                allowedIds = new Set(scopedRecords.map((r: any) => r.readAttribute(targetPk)));
+              }
+            }
+
             for (const record of records) {
               if (!(record as any)._preloadedAssociations)
                 (record as any)._preloadedAssociations = new Map();
               const pkVal = record.readAttribute(primaryKey);
               const myThroughRecords = throughByFk.get(pkVal) ?? [];
-              const myTargets = myThroughRecords.flatMap((tr: any) => {
+              let myTargets = myThroughRecords.flatMap((tr: any) => {
                 const preloaded = (tr as any)._preloadedAssociations?.get(resolvedSourceName);
                 if (!preloaded) return [];
                 return Array.isArray(preloaded) ? preloaded : [preloaded];
               });
+              if (allowedIds) {
+                const targetPk = (targetModel as any).primaryKey ?? "id";
+                myTargets = myTargets.filter((t: any) =>
+                  allowedIds!.has(t.readAttribute(targetPk)),
+                );
+              }
               (record as any)._preloadedAssociations.set(assocName, myTargets);
             }
             continue;
@@ -3689,6 +3723,34 @@ export class Relation<T extends Base> {
               }
             }
 
+            // Apply outer association scope if present
+            let hasOneAllowedIds: Set<unknown> | null = null;
+            if (assocDef.options.scope) {
+              const targetPk = (targetModel as any).primaryKey ?? "id";
+              const allTargets: any[] = [];
+              for (const tr of throughRecords) {
+                const p = (tr as any)._preloadedAssociations?.get(resolvedSourceName);
+                if (!p) continue;
+                if (Array.isArray(p)) allTargets.push(...p);
+                else allTargets.push(p);
+              }
+              if (allTargets.length > 0) {
+                const ids = [
+                  ...new Set(
+                    allTargets
+                      .map((t: any) => t.readAttribute(targetPk))
+                      .filter((v: any) => v != null),
+                  ),
+                ];
+                let scopedRel = (targetModel as any)._allForPreload().where({ [targetPk]: ids });
+                scopedRel = assocDef.options.scope(scopedRel);
+                const scopedRecords = await scopedRel.toArray();
+                hasOneAllowedIds = new Set(
+                  scopedRecords.map((r: any) => r.readAttribute(targetPk)),
+                );
+              }
+            }
+
             for (const record of records) {
               if (!(record as any)._preloadedAssociations)
                 (record as any)._preloadedAssociations = new Map();
@@ -3698,7 +3760,11 @@ export class Relation<T extends Base> {
                 ? ((myThroughRecord as any)._preloadedAssociations?.get(resolvedSourceName) ?? null)
                 : null;
               // hasOne through: unwrap array to single value
-              const target = Array.isArray(preloaded) ? (preloaded[0] ?? null) : preloaded;
+              let target = Array.isArray(preloaded) ? (preloaded[0] ?? null) : preloaded;
+              if (target && hasOneAllowedIds) {
+                const targetPk = (targetModel as any).primaryKey ?? "id";
+                if (!hasOneAllowedIds.has(target.readAttribute(targetPk))) target = null;
+              }
               (record as any)._preloadedAssociations.set(assocName, target);
             }
             continue;
