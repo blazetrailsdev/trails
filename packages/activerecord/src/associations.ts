@@ -1187,9 +1187,11 @@ export class CollectionProxy {
     if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
       return record;
     }
-    await record.save();
-    this._target.push(record);
-    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    const saved = await record.save();
+    if (saved) {
+      this._target.push(record);
+      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    }
     return record;
   }
 
@@ -1290,9 +1292,11 @@ export class CollectionProxy {
         record.writeAttribute(foreignKey as string, pkValue);
       }
       if (typeCol) record.writeAttribute(typeCol, ctor.name);
-      await record.save();
-      this._target.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      const saved = await record.save();
+      if (saved) {
+        this._target.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      }
     }
   }
 
