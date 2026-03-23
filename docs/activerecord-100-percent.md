@@ -40,13 +40,11 @@ These are sequential — each builds on the previous.
 
 1. **`scope()` for through/HABTM/CPK** — Currently throws for these. Needs to delegate to the full relation builder logic used by `loadHasMany`/`loadHasManyThrough`. Also needs `queryConstraints` support.
 
-2. **Preload sync** — Calling `association()` on a record that was eager-loaded returns a proxy with `loaded === false` even though `_preloadedAssociations` has the data. The proxy should initialize from preloaded data when available.
+2. **`load()` target merging** — `load()` replaces `_target` with DB results + unsaved records, dropping any in-memory mutations to persisted records (e.g. records added via `push()` while `_loaded` is false). Should merge by PK, preferring existing instances.
 
-3. **`load()` target merging** — `load()` replaces `_target` with DB results + unsaved records, dropping any in-memory mutations to persisted records (e.g. records added via `push()` while `_loaded` is false). Should merge by PK, preferring existing instances.
+3. **`pluck`/`pick` DB delegation** — When not loaded, these instantiate full model objects. Could delegate to `scope().pluck()` / `scope().pick()` for DB-level column selection.
 
-4. **`pluck`/`pick` DB delegation** — When not loaded, these instantiate full model objects. Could delegate to `scope().pluck()` / `scope().pick()` for DB-level column selection.
-
-5. **`replace` for has_many** — Nullify FKs on removed records, set FKs on new ones. Needed for `association=` setter.
+4. **`replace` for has_many** — Nullify FKs on removed records, set FKs on new ones. Needed for `association=` setter.
 
    Rails source: `collection_association.rb#replace`
 

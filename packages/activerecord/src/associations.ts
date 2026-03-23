@@ -1436,9 +1436,11 @@ export class CollectionProxy {
         record.writeAttribute(foreignKey as string, null);
       }
       if (typeCol) record.writeAttribute(typeCol, null);
-      await record.save();
-      removed.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      const saved = await record.save();
+      if (saved) {
+        removed.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      }
     }
     this._removeFromTarget(removed);
   }
