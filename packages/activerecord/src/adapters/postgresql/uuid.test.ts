@@ -1,15 +1,21 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/uuid_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "./uuid.js";
 
 describeIfPg("PostgresAdapter", () => {
   let adapter: PostgresAdapter;
+
+  beforeAll(async () => {
+    const setup = new PostgresAdapter(PG_TEST_URL);
+    await setup.exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+    await setup.close();
+  });
+
   beforeEach(async () => {
     adapter = new PostgresAdapter(PG_TEST_URL);
-    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
     await adapter.exec(`DROP TABLE IF EXISTS uuid_data_type`);
     await adapter.exec(`
       CREATE TABLE uuid_data_type (

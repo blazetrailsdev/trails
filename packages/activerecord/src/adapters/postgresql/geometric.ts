@@ -23,15 +23,28 @@ export class PgPoint {
   }
 }
 
+function finitePointOrNull(x: number, y: number): PgPoint | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return new PgPoint(x, y);
+}
+
 /**
- * Parse a PG point string like "(1.5,2.3)" into a PgPoint.
+ * Parse a PG point value into a PgPoint.
+ * Accepts strings like "(1.5,2.3)" or objects like {x: 1.5, y: 2.3}
+ * (the pg driver returns point columns as objects).
  */
-export function parsePoint(value: string | null | undefined): PgPoint | null {
+export function parsePoint(value: unknown): PgPoint | null {
   if (value == null || value === "") return null;
+  if (value instanceof PgPoint) return value;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (obj.x != null && obj.y != null) return finitePointOrNull(Number(obj.x), Number(obj.y));
+  }
+  if (typeof value !== "string") return null;
   const s = value.trim();
   const match = s.match(/^\(?\s*([^,\s]+)\s*,\s*([^)\s]+)\s*\)?$/);
   if (!match) return null;
-  return new PgPoint(parseFloat(match[1]), parseFloat(match[2]));
+  return finitePointOrNull(parseFloat(match[1]), parseFloat(match[2]));
 }
 
 /**
@@ -42,13 +55,13 @@ export function castPoint(value: unknown): PgPoint | null {
   if (value instanceof PgPoint) return value;
   if (typeof value === "string") return parsePoint(value);
   if (Array.isArray(value) && value.length === 2) {
-    return new PgPoint(Number(value[0]), Number(value[1]));
+    return finitePointOrNull(Number(value[0]), Number(value[1]));
   }
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>;
     const x = obj.x ?? obj.X;
     const y = obj.y ?? obj.Y;
-    if (x != null && y != null) return new PgPoint(Number(x), Number(y));
+    if (x != null && y != null) return finitePointOrNull(Number(x), Number(y));
   }
   return null;
 }
@@ -62,7 +75,7 @@ export function serializePoint(point: PgPoint | null): string | null {
 }
 
 /**
- * Parse a PG line string like "{a,b,c}" into [a,b,c].
+ * Return the trimmed string representation of a PG line value.
  */
 export function parseLine(value: string | null | undefined): string | null {
   if (value == null || value === "") return null;
@@ -70,7 +83,7 @@ export function parseLine(value: string | null | undefined): string | null {
 }
 
 /**
- * Parse a PG lseg string like "[(x1,y1),(x2,y2)]".
+ * Return the trimmed string representation of a PG lseg value.
  */
 export function parseLseg(value: string | null | undefined): string | null {
   if (value == null || value === "") return null;
@@ -78,7 +91,7 @@ export function parseLseg(value: string | null | undefined): string | null {
 }
 
 /**
- * Parse a PG box string like "(x1,y1),(x2,y2)".
+ * Return the trimmed string representation of a PG box value.
  */
 export function parseBox(value: string | null | undefined): string | null {
   if (value == null || value === "") return null;
@@ -86,7 +99,7 @@ export function parseBox(value: string | null | undefined): string | null {
 }
 
 /**
- * Parse a PG path string like "[(x1,y1),(x2,y2),...]" or "((x1,y1),...)".
+ * Return the trimmed string representation of a PG path value.
  */
 export function parsePath(value: string | null | undefined): string | null {
   if (value == null || value === "") return null;
@@ -94,7 +107,7 @@ export function parsePath(value: string | null | undefined): string | null {
 }
 
 /**
- * Parse a PG polygon string like "((x1,y1),(x2,y2),...)".
+ * Return the trimmed string representation of a PG polygon value.
  */
 export function parsePolygon(value: string | null | undefined): string | null {
   if (value == null || value === "") return null;
@@ -102,7 +115,7 @@ export function parsePolygon(value: string | null | undefined): string | null {
 }
 
 /**
- * Parse a PG circle string like "<(x,y),r>".
+ * Return the trimmed string representation of a PG circle value.
  */
 export function parseCircle(value: string | null | undefined): string | null {
   if (value == null || value === "") return null;

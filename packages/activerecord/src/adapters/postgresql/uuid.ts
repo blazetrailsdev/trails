@@ -9,21 +9,15 @@
  * - Standard: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
  * - Braced:   {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
  * - Compact:  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
- * - URN:      urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
  */
 export const ACCEPTABLE_UUID_REGEX =
   /^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\}?$/i;
 
 /**
- * JS-compatible version (no \A/\z anchors).
- */
-const UUID_PATTERN = /^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\}?$/i;
-
-/**
  * Check if a string is a valid UUID in any accepted format.
  */
 export function isValidUuid(value: string): boolean {
-  return UUID_PATTERN.test(value.trim());
+  return ACCEPTABLE_UUID_REGEX.test(value.trim());
 }
 
 /**
@@ -36,7 +30,6 @@ export function normalizeUuid(value: string | null | undefined): string | null {
   if (trimmed === "") return null;
   if (!isValidUuid(trimmed)) return null;
 
-  // Strip braces and hyphens
   const hex = trimmed.replace(/[{}-]/g, "").toLowerCase();
   if (hex.length !== 32) return null;
 

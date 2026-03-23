@@ -60,7 +60,7 @@ describeIfPg("PostgresAdapter", () => {
     it("point write", async () => {
       await adapter.execute(`INSERT INTO postgresql_points (x) VALUES ($1)`, ["(10,25.2)"]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p = parsePoint(rows[0].x as string);
+      const p = parsePoint(rows[0].x);
       expect(p!.x).toBeCloseTo(10);
       expect(p!.y).toBeCloseTo(25.2);
     });
@@ -87,7 +87,7 @@ describeIfPg("PostgresAdapter", () => {
     it("roundtrip", async () => {
       await adapter.execute(`INSERT INTO postgresql_points (x) VALUES ($1)`, ["(10,25.2)"]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
-      const p = parsePoint(rows[0].x as string);
+      const p = parsePoint(rows[0].x);
       expect(p!.x).toBeCloseTo(10);
       expect(p!.y).toBeCloseTo(25.2);
 
@@ -162,7 +162,7 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.execute(`INSERT INTO postgresql_points (x) VALUES ($1)`, ["(5,10)"]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
       expect(rows[0].x).toBeTruthy();
-      const p = parsePoint(rows[0].x as string);
+      const p = parsePoint(rows[0].x);
       expect(p!.x).toBeCloseTo(5);
       expect(p!.y).toBeCloseTo(10);
     });
@@ -419,7 +419,9 @@ describeIfPg("PostgresAdapter", () => {
         "<(1,2),3>",
       ]);
       const rows = await adapter.execute(`SELECT a_circle FROM test_geometric_types`);
-      expect(rows[0].a_circle).toMatch(/1.*2.*3/);
+      const circle = rows[0].a_circle;
+      const str = typeof circle === "object" ? JSON.stringify(circle) : String(circle);
+      expect(str).toMatch(/1.*2.*3/);
     });
 
     it("circle write", async () => {
