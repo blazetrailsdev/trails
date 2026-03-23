@@ -371,6 +371,61 @@ export class JoinDependency {
 
     if (!sourceAssocDef) return null;
 
+    // If the source association is itself a through, recursively resolve
+    // the chain by first adding the through JOIN, then delegating to
+    // addAssociation on the through model for the source name.
+    if (sourceAssocDef.options?.through) {
+      // We already consumed a table index for the target, give it back
+      this._nextTableIndex--;
+
+      // Add the through table JOIN as a standalone node (no columns — it's intermediate)
+      const throughColumns = getModelColumns(throughModel);
+      for (let i = 0; i < throughColumns.length; i++) {
+        this._aliases.push({
+          alias: `t${throughTableIndex}_r${i}`,
+          tableIndex: throughTableIndex,
+          columnIndex: i,
+          column: throughColumns[i],
+        });
+      }
+
+      // Push through node (intermediate, won't be used for association attachment)
+      const throughNodeName = parentAssocName
+        ? `${parentAssocName}._through_${assocDef.options.through}`
+        : `_through_${assocDef.options.through}`;
+      this._nodes.push({
+        tableIndex: throughTableIndex,
+        tableAlias: throughAlias,
+        tableName: throughTable,
+        modelClass: throughModel as typeof Base,
+        columns: throughColumns,
+        assocName: throughNodeName,
+        immediateAssocName: assocDef.options.through,
+        parentPath: parentAssocName ?? null,
+        assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
+        joinSql: throughJoinSql,
+      });
+
+      // Now recursively add the source association from the through model
+      const recursiveNode = this.addAssociation(sourceName, {
+        fromModel: throughModel,
+        fromAlias: throughAlias,
+        parentAssocName: parentAssocName,
+      });
+
+      if (!recursiveNode) return null;
+
+      // Patch the recursive node to reflect the outer association
+      recursiveNode.assocName = parentAssocName
+        ? `${parentAssocName}.${assocDef.name}`
+        : assocDef.name;
+      recursiveNode.immediateAssocName = assocDef.name;
+      recursiveNode.parentPath = parentAssocName ?? null;
+      recursiveNode.assocType = assocDef.type;
+
+      return recursiveNode;
+    }
+
     if (sourceAssocDef.type === "belongsTo") {
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) return null;
