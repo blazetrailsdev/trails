@@ -3287,7 +3287,7 @@ export class Base extends Model {
       return {
         name,
         loaded: proxy.loaded,
-        target: proxy,
+        target: proxy.loaded ? proxy.target : null,
       };
     }
     const cached = this._preloadedAssociations?.get(name) ?? null;

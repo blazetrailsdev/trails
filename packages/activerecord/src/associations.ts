@@ -1004,6 +1004,16 @@ export class CollectionProxy {
     return this._loaded;
   }
 
+  get target(): Base[] {
+    return this._target;
+  }
+
+  /** @internal Initialize from preloaded association data. */
+  _hydrateFromPreload(records: Base[]): void {
+    this._target = records;
+    this._loaded = true;
+  }
+
   constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
     this._record = record;
     this._assocName = assocName;
@@ -1845,6 +1855,14 @@ export function association(record: Base, assocName: string): CollectionProxy {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
   const proxy = new CollectionProxy(record, assocName, assocDef);
+
+  // Hydrate from preloaded data if available
+  const preloaded = record._preloadedAssociations?.get(assocName);
+  if (preloaded != null) {
+    const records = Array.isArray(preloaded) ? preloaded : [preloaded];
+    proxy._hydrateFromPreload(records as Base[]);
+  }
+
   record._collectionProxies.set(assocName, proxy);
   return proxy;
 }
