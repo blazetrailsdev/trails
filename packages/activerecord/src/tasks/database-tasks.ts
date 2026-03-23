@@ -133,9 +133,12 @@ export class DatabaseTasks {
     const configs = this.configsFor(this._normalizeEnv());
     if (configs.length === 0) return;
 
+    const config = configs.find((c) => c.name === "primary") ?? configs[0];
     const { Migrator } = await import("../migrator.js");
-    const adapter = await this._resolveAdapter(configs[0]);
-    if (!adapter) return;
+    const adapter = await this._resolveAdapter(config);
+    if (!adapter) {
+      throw new Error("No database adapter configured. Call DatabaseTasks.setAdapter() first.");
+    }
 
     const migrator = new Migrator(adapter, this._migrations);
     await migrator.migrate(effectiveVersion ?? null);
