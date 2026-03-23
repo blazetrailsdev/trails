@@ -3282,6 +3282,14 @@ export class Base extends Model {
     if (!assocDef) {
       throw new Error(`Association '${name}' not found on ${ctor.name}`);
     }
+    const proxy = this._collectionProxies.get(name) as any;
+    if (proxy) {
+      return {
+        name,
+        loaded: proxy.loaded,
+        target: proxy,
+      };
+    }
     const cached = this._preloadedAssociations?.get(name) ?? null;
     return {
       name,

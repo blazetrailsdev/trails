@@ -1212,8 +1212,13 @@ export class CollectionProxy {
    * Count associated records.
    */
   async count(): Promise<number> {
-    const records = await this.toArray();
-    return records.length;
+    let results: Base[];
+    if (this._isHabtm) {
+      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
+    } else {
+      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
+    }
+    return results.length;
   }
 
   /**
@@ -1553,8 +1558,13 @@ export class CollectionProxy {
   async clear(): Promise<void> {
     return this._withoutStrictLoading(async () => {
       const records = await this.toArray();
-      if (records.length > 0) {
-        await this.delete(...records);
+      const persisted = records.filter((r) => !r.isNewRecord());
+      if (persisted.length > 0) {
+        await this.delete(...persisted);
+      }
+      const unsaved = this._target.filter((r) => r.isNewRecord());
+      if (unsaved.length > 0) {
+        this._removeFromTarget(unsaved);
       }
     });
   }
