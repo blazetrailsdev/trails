@@ -1534,9 +1534,10 @@ export class CollectionProxy {
         await this._deleteHabtm(destroyed);
       } else if (this._isThrough) {
         await this._deleteThrough(destroyed);
+      } else {
+        this._removeFromTarget(destroyed);
       }
     }
-    this._removeFromTarget(destroyed);
   }
 
   /**
