@@ -1797,16 +1797,9 @@ export class CollectionProxy {
       }
       return this._target.map((r) => columns.map((c) => r.readAttribute(c)));
     }
-    // Delegate to scope().pluck() for DB-level column selection when possible
-    if (!this._isThrough && !this._isHabtm) {
-      const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
-      if (rel) return rel.pluck(...columns);
-    }
-    const records = await this.toArray();
-    if (columns.length === 1) {
-      return records.map((r) => r.readAttribute(columns[0]));
-    }
-    return records.map((r) => columns.map((c) => r.readAttribute(c)));
+    // Delegate to scope() for DB-level column selection
+    const rel = this.scope();
+    return rel.pluck(...columns);
   }
 
   async pick(...columns: string[]): Promise<unknown> {
@@ -1815,14 +1808,8 @@ export class CollectionProxy {
       if (columns.length === 1) return this._target[0].readAttribute(columns[0]);
       return columns.map((c) => this._target[0].readAttribute(c));
     }
-    if (!this._isThrough && !this._isHabtm) {
-      const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
-      if (rel) return rel.pick(...columns);
-    }
-    const records = await this.toArray();
-    if (records.length === 0) return null;
-    if (columns.length === 1) return records[0].readAttribute(columns[0]);
-    return columns.map((c) => records[0].readAttribute(c));
+    const rel = this.scope();
+    return rel.pick(...columns);
   }
 
   async reload(): Promise<this> {
@@ -1838,10 +1825,11 @@ export class CollectionProxy {
   }
 
   scope(): any {
-    if (this._isThrough || this._isHabtm) {
-      throw new Error(
-        `CollectionProxy#scope is not yet implemented for through/HABTM associations on "${this._assocName}".`,
-      );
+    if (this._isHabtm) {
+      return this._buildHabtmScope();
+    }
+    if (this._isThrough) {
+      return this._buildThroughScope();
     }
 
     const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
@@ -1851,6 +1839,95 @@ export class CollectionProxy {
       return (targetModel as any).all().none();
     }
     return rel;
+  }
+
+  private _buildHabtmScope(): any {
+    const ctor = this._record.constructor as typeof Base;
+    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+    const targetModel = resolveModel(className);
+    const joinTable =
+      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
+    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
+    const targetFk = `${underscore(singularize(this._assocName))}_id`;
+    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
+    const pkValue = this._record.readAttribute(ownerPkCol);
+
+    if (pkValue == null) return (targetModel as any).all().none();
+
+    const targetPkCol = targetModel.primaryKey;
+    if (Array.isArray(targetPkCol)) {
+      throw new Error(
+        "HABTM associations do not support composite primary keys on the target model",
+      );
+    }
+
+    const pkQuoted =
+      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+    const subquery = `"${targetPkCol}" IN (SELECT "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted})`;
+    let rel = (targetModel as any).all().where(subquery);
+    if (this._assocDef.options.scope) {
+      rel = this._assocDef.options.scope(rel);
+    }
+    return rel;
+  }
+
+  private _buildThroughScope(): any {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) {
+      throw new Error(
+        `Through association "${this._assocDef.options.through}" not found on ${ctor.name}`,
+      );
+    }
+
+    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+    const targetModel = resolveModel(className);
+    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+
+    const throughClassName =
+      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    const throughModel = resolveModel(throughClassName);
+    const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
+    const sourceAssoc =
+      throughModelAssocs.find((a) => a.name === sourceName) ??
+      throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+
+    const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    const pkValue = this._record.readAttribute(ownerPk as string);
+
+    if (pkValue == null) return (targetModel as any).all().none();
+
+    const throughTable = throughModel.tableName;
+    const pkQuoted =
+      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
+
+    const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+
+    if (sourceAssocKind === "belongsTo") {
+      // Through record has FK to target (e.g., tagging.tag_id -> tags.id)
+      const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+      const targetPkCol = targetModel.primaryKey as string;
+      const subquery = `"${targetPkCol}" IN (SELECT "${targetFk}" FROM "${throughTable}" WHERE "${ownerFk}" = ${pkQuoted})`;
+      let rel = (targetModel as any).all().where(subquery);
+      if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
+      return rel;
+    } else {
+      // Source is has_many/has_one: target has FK pointing to through record
+      const sourceAsName = sourceAssoc?.options?.as;
+      const sourceFk = sourceAsName
+        ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+        : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+      const throughPkCol = throughModel.primaryKey as string;
+      const subquery = `"${sourceFk}" IN (SELECT "${throughPkCol}" FROM "${throughTable}" WHERE "${ownerFk}" = ${pkQuoted})`;
+      let rel = (targetModel as any).all().where(subquery);
+      if (sourceAsName) {
+        rel = rel.where({ [`${underscore(sourceAsName)}_type`]: throughClassName });
+      }
+      if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
+      return rel;
+    }
   }
 }
 

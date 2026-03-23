@@ -36,10 +36,6 @@ These are sequential — each builds on the previous.
 
 **Done:** Target tracking (`_target`/`_loaded`), proxy caching per record, `build`/`push` append without loading, `load`/`reload`/`reset`, `pluck`/`pick`, `scope()`, callback gating on `_target` mutations. 10 tests unskipped.
 
-**Remaining follow-ups:**
-
-1. **`scope()` for through/HABTM** — Currently throws for these. Needs to build a relation that joins through the intermediate table, or queries in two steps for HABTM.
-
 **Tests unblocked:** associations.test.ts (~30), counter-cache.test.ts (~15), HABTM (~10), HMT (~10)
 
 ---
