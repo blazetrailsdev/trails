@@ -181,6 +181,8 @@ Depends on: B2 (locking) for some fixture tests
 Depends on: PostgreSQL adapter (B8) for PG-specific migration tests
 
 - Schema dumper: force:cascade, prefix/suffix, timestamps, type-specific output
+- Schema dumper: extend TableDefinition to support PG-specific DSL methods (money, inet, uuid, jsonb, enum, bigint, timestamptz, etc.) so dumped schemas are executable
+- Schema dumper: cleanDefault bigint precision — large integers above MAX_SAFE_INTEGER lose precision when coerced to Number
 - Migrator: file discovery, version tracking, advisory locking
 - Database tasks: create, drop, migrate, schema:dump, schema:load
 - Migration version tracking with `schema_migrations` table
