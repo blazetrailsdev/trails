@@ -1,10 +1,10 @@
 # ActiveRecord: Road to 100%
 
-Current state: **57%** (4,777 / 8,385 tests). 3,367 skipped, 33 wrong describe, 2 missing files.
+Current state: **59.7%** (5,005 / 8,385 tests). 3,142 skipped, 0 missing files.
 
 ## How coverage is measured
 
-`npm run convention:compare -- --package activerecord` matches our test names against the Rails test suite. Coverage goes up as a side effect of implementing features.
+`pnpm run convention:compare -- --package activerecord` matches our test names against the Rails test suite. Coverage goes up as a side effect of implementing features.
 
 ## Two workstreams
 
@@ -92,18 +92,17 @@ Depends on: A4 (association features)
 - Validation propagation through nested models
 - Autosave with through associations
 - `reject_if` / `limit` on nested attributes
-- Fix 18 wrong-describe tests (move to correct blocks)
 
-#### A6: Counter caches (~31 tests)
+#### A6: Counter caches (~28 skipped tests remaining)
 
-**Files:** counter-cache.test.ts (31)
+**Files:** counter-cache.test.ts (28 skipped of 73 total)
 
-Depends on: A4 (associations)
+Partially done — basic counter cache create/destroy/reassignment works. Remaining:
 
-- `counter_cache: true` on belongs_to
-- `increment_counter` / `decrement_counter` / `reset_counters`
-- Counter updates on create/destroy/reassignment
-- Polymorphic counter caches
+- Counter cache with locking integration
+- Touch option wired into counter cache callbacks
+- Collection replacement with counter update
+- Through association counter cache support
 
 #### A7: Relation features (~80 tests)
 
@@ -174,18 +173,17 @@ Depends on: B2 (locking) for some fixture tests
 - YAML fixture loading with ERB
 - Fixture associations and label references
 
-#### B6: Schema, migrations & database tasks (~214 tests)
+#### B6: Schema, migrations & database tasks (~133 skipped tests remaining)
 
-**Files:** schema-dumper.test.ts (59), migration.test.ts (42), migrator.test.ts (35), tasks/database-tasks.test.ts (78)
+**Files:** schema-dumper.test.ts (59 skipped), migration.test.ts (43 skipped), migrator.test.ts (5 skipped), tasks/database-tasks.test.ts (26 skipped)
 
-Depends on: PostgreSQL adapter (B8) for PG-specific migration tests
+Partially done — Migrator with version tracking, DatabaseTasks.migrate(), and basic schema dumper all work. Remaining:
 
-- Schema dumper: force:cascade, prefix/suffix, timestamps, type-specific output
-- Schema dumper: extend TableDefinition to support PG-specific DSL methods (money, inet, uuid, jsonb, enum, bigint, timestamptz, etc.) so dumped schemas are executable
-- Schema dumper: cleanDefault bigint precision — large integers above MAX_SAFE_INTEGER lose precision when coerced to Number
-- Migrator: file discovery, version tracking, advisory locking
-- Database tasks: create, drop, migrate, schema:dump, schema:load
-- Migration version tracking with `schema_migrations` table
+- Schema dumper: force:cascade, prefix/suffix, type-specific output, foreign key dumping
+- Schema dumper: extend TableDefinition to support PG-specific DSL methods
+- Schema dumper: cleanDefault bigint precision
+- Migration: change_table API, column introspection, reversible operations
+- Database tasks: remaining create/drop/schema:load edge cases
 
 #### B7: Encryption integration (~51 tests)
 
@@ -203,15 +201,15 @@ Depends on: B1 (base class) — needs attribute hooks wired into Base
 
 **Files:** postgresql-adapter.test.ts (31), schema.test.ts (35), range.test.ts (36), hstore.test.ts (24), array.test.ts (22), connection.test.ts (22), uuid.test.ts (29), plus ~20 smaller files
 
-No dependencies — can run in parallel with everything.
+Partially done — network types, money types, enum DDL, and SQL type mapping implemented. Remaining:
 
-- Range type: contains, overlap, adjacent operators
-- HStore: key access, merge, contains
-- Array: push, remove, any/all operators
-- UUID primary keys
-- Schema introspection: columns, indexes, foreign keys
+- Range type: contains, overlap, adjacent operators; multirange (PG 14+)
+- HStore: key access (`->`, `?`, `@>`, `<@`, `||`, `-`), merge, contains, `akeys()`, `avals()`
+- Array: push, remove, any/all operators, array column introspection
+- UUID primary keys, `gen_random_uuid()` default
+- Schema introspection: columns, indexes, foreign keys, expression indexes
 - Connection: reconnection, prepared statements, session variables
-- Adapter-specific SQL: RETURNING, EXPLAIN, advisory locks
+- PG-specific collation syntax, extension dumping
 
 #### B9: Query cache & logs (~36+26 tests)
 
@@ -261,39 +259,62 @@ Various smaller features:
 
 ---
 
-### Wrong describes (33 remaining)
+## Blocked features by category
 
-Fix alongside whichever PR touches the relevant file:
+Grouped from skip-test comments across all activerecord test files (~3,142 skipped):
 
-- nested-attributes.test.ts (18) — A5
-- scoping/relation-scoping.test.ts (1) — A1
-- associations/nested-error.test.ts (3) — A5
-- PG adapter files (~11 across datatype, virtual-column, utils) — B8
+### Fixtures (~103 skipped tests)
+
+The single largest blocker. Needs YAML file loading, fixture caching, transactional fixtures, association resolution in fixtures, ERB template support, label replacement (`$LABEL`), and multi-database fixture support.
+
+### Autosave & nested attributes (~15 skipped)
+
+Needs autosave association integration, FK sync, validation propagation, and `mark_for_destruction`.
+
+### Base model integration (~23 skipped)
+
+Many tests need a wired-up Base model with features like `validates_uniqueness_of`, `attribute_for_inspect`, `dup`, dirty tracking, and range/hstore attributes.
+
+### Composite primary keys (~16 skipped)
+
+Needs composite key support in queries, associations, fixtures, and FK resolution.
+
+### Timezone infrastructure (~10 skipped)
+
+Needs timezone-aware datetime handling, `timestamptz`, and time-string parsing.
+
+### Lazy-loading tracking (~7 skipped)
+
+Needs strict loading violation tracking for n+1 detection.
+
+### Thread/concurrency (~7+ skipped)
+
+Needs thread tracking, pin connection, concurrent connections, fiber emulation.
+
+### Callbacks (~7 skipped)
+
+Callbacks not fully implemented — needs `reflectOnAllAssociations` to inspect callback count, `beforeDestroy` halting, and transactional callback deduplication.
+
+### HStore operators (~6+ skipped)
+
+Needs `->`, `?`, `@>`, `<@`, `||`, `-` operators, plus `akeys()`, `avals()`, `skeys()`, `svals()`.
+
+### PG multirange (~6 skipped)
+
+Needs PG 14+ multirange type support.
+
+### Serialize API (~4+ skipped)
+
+Needs `serialize` with JSON/YAML coders, class-based serialization, and `store_accessor`.
+
+### Schema/migration features (~3+ skipped)
+
+Needs schema cache, prefix/suffix filtering, force:cascade, column default tracking.
 
 ---
-
-## Suggested execution order
-
-**Week 1 priority — parallel tracks:**
-
-- A1 (scoping, 56 tests) then A2 (where, 67) — unlocks everything in workstream A
-- B1 (base, 55) + B2 (locking, 25) + B3 (strict loading, 34) — independent, quick wins
-- B8 (PG adapter, 300+) — large but independent, chip away continuously
-
-**Week 2 priority:**
-
-- A3 (eager loading, 89) + A4 (associations, 250) — the biggest block
-- A6 (counter cache, 31) + A7 (relations, 80)
-- B5 (fixtures, 111) + B6 (schema/migrations, 214)
-
-**Final stretch:**
-
-- A5 (autosave/nested, 81)
-- B7 (encryption integration, 51) + B10 (insert-all, 45) + B12 (remaining, 100)
-- B9 (query cache, 62) + B11 (connections, 160)
 
 ## Tracking
 
 ```bash
-npm run convention:compare -- --package activerecord
+pnpm run convention:compare -- --package activerecord
 ```
