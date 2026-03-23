@@ -78,46 +78,58 @@ export function serializePoint(point: PgPoint | null): string | null {
  * Return the trimmed string representation of a PG line value.
  */
 export function parseLine(value: string | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  return value.trim();
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  return trimmed;
 }
 
 /**
  * Return the trimmed string representation of a PG lseg value.
  */
 export function parseLseg(value: string | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  return value.trim();
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  return trimmed;
 }
 
 /**
  * Return the trimmed string representation of a PG box value.
  */
 export function parseBox(value: string | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  return value.trim();
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  return trimmed;
 }
 
 /**
  * Return the trimmed string representation of a PG path value.
  */
 export function parsePath(value: string | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  return value.trim();
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  return trimmed;
 }
 
 /**
  * Return the trimmed string representation of a PG polygon value.
  */
 export function parsePolygon(value: string | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  return value.trim();
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  return trimmed;
 }
 
 /**
  * Return the trimmed string representation of a PG circle value.
  */
 export function parseCircle(value: string | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  return value.trim();
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  return trimmed;
 }

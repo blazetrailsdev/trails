@@ -399,10 +399,23 @@ describeIfPg("PostgresAdapter", () => {
       }
     });
 
-    it("uuid column default", () => {
-      expect(normalizeUuid("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(
-        "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      );
+    it("uuid column default", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS uuid_column_default_test`);
+      await adapter.exec(`
+        CREATE TABLE uuid_column_default_test (
+          id serial primary key,
+          guid uuid DEFAULT gen_random_uuid()
+        )
+      `);
+      try {
+        const rows = await adapter.execute(`
+          INSERT INTO uuid_column_default_test DEFAULT VALUES
+          RETURNING guid
+        `);
+        expect(isValidUuid(rows[0].guid as string)).toBe(true);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS uuid_column_default_test`);
+      }
     });
 
     it("change column default", async () => {
