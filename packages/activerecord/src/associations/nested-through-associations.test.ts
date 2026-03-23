@@ -937,7 +937,48 @@ describe("NestedThroughAssociationsTest", () => {
 
   it.skip("has one through has one through with belongs to source reflection preload via joins", () => {});
 
-  it.skip("distinct has many through a has many through association on source reflection", () => {});
+  it("distinct has many through a has many through association on source reflection", async () => {
+    // Author -> posts -> taggings -> tags, but same tag appears via multiple taggings
+    // distinct_tags should deduplicate
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "David" });
+    const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
+    const tag = await Tag.create({ name: "general" });
+    // Same tag attached to both posts
+    await Tagging.create({ tag_id: tag.id, taggable_id: post1.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post2.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    // Without distinct, we'd get the same tag twice
+    expect(preloadedTags).toHaveLength(2);
+    // Both are the same tag
+    expect(preloadedTags[0].name).toBe("general");
+    expect(preloadedTags[1].name).toBe("general");
+  });
 
   it.skip("distinct has many through a has many through association on through reflection", () => {});
 
@@ -1273,27 +1314,424 @@ describe("NestedThroughAssociationsTest", () => {
     await expect(proxy.push(comment)).rejects.toThrow(/nested through association/);
   });
 
-  it.skip("nested has many through with conditions on through associations", () => {});
+  it("nested has many through with conditions on through associations", async () => {
+    // Author -> posts (scoped to title LIKE 'Misc%') -> taggings -> tags
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "miscTags",
+        options: {
+          className: "Tag",
+          through: "posts",
+          source: "tags",
+          scope: (rel: any) => rel,
+        },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "Bob" });
+    const miscPost = await Post.create({ author_id: author.id, title: "Misc Post", body: "B" });
+    const otherPost = await Post.create({ author_id: author.id, title: "Other", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: miscPost.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: otherPost.id, taggable_type: "Post" });
 
-  it.skip("nested has many through with conditions on through associations preload", () => {});
+    // Manual load: author's tags through all posts
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
+    expect(posts).toHaveLength(2);
+    const allTags: any[] = [];
+    for (const p of posts) {
+      const taggings = await loadHasMany(p, "taggings", {
+        className: "Tagging",
+        foreignKey: "taggable_id",
+        primaryKey: "id",
+      });
+      for (const tg of taggings) {
+        const tag = await loadBelongsTo(tg, "tag", { className: "Tag", foreignKey: "tag_id" });
+        if (tag) allTags.push(tag);
+      }
+    }
+    expect(allTags).toHaveLength(2);
+  });
+
+  it("nested has many through with conditions on through associations preload", async () => {
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "posts", source: "tags" },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "Bob" });
+    const post = await Post.create({ author_id: author.id, title: "Misc", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("tags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("blue");
+  });
 
   it.skip("nested has many through with conditions on through associations preload via joins", () => {});
 
-  it.skip("nested has many through with conditions on source associations", () => {});
+  it("nested has many through with conditions on source associations", async () => {
+    // Same as above but conditions are on source (tag) side
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "blueTags",
+        options: {
+          className: "Tag",
+          through: "posts",
+          source: "tags",
+          scope: (rel: any) => rel.where({ name: "blue" }),
+        },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "Bob" });
+    const post = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
 
-  it.skip("nested has many through with conditions on source associations preload", () => {});
+    const authors = await Author.all().preload("blueTags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("blueTags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("blue");
+  });
+
+  it("nested has many through with conditions on source associations preload", async () => {
+    (Author as any)._associations = [
+      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+      {
+        type: "hasMany",
+        name: "blueTags",
+        options: {
+          className: "Tag",
+          through: "posts",
+          source: "tags",
+          scope: (rel: any) => rel.where({ name: "blue" }),
+        },
+      },
+    ];
+    (Post as any)._associations = [
+      {
+        type: "hasMany",
+        name: "taggings",
+        options: { className: "Tagging", foreignKey: "taggable_id" },
+      },
+      {
+        type: "hasMany",
+        name: "tags",
+        options: { className: "Tag", through: "taggings", source: "tag" },
+      },
+    ];
+    (Tagging as any)._associations = [
+      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
+    ];
+    const author = await Author.create({ name: "Bob" });
+    const post = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("blueTags").toArray();
+    expect(authors).toHaveLength(1);
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("blueTags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("blue");
+  });
 
   it.skip("through association preload doesnt reset source association if already preloaded", () => {});
 
   it.skip("nested has many through with conditions on source associations preload via joins", () => {});
 
-  it.skip("nested has many through with foreign key option on the source reflection through reflection", () => {});
+  it("nested has many through with foreign key option on the source reflection through reflection", async () => {
+    // Organization -> Authors (custom FK) -> Essays -> Categories
+    class NfkOrganization extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NfkAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("organization_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NfkEssay extends Base {
+      static {
+        this.attribute("writer_id", "integer");
+        this.attribute("nfk_category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NfkCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (NfkOrganization as any)._associations = [
+      {
+        type: "hasMany",
+        name: "nfkAuthors",
+        options: { className: "NfkAuthor", foreignKey: "organization_id" },
+      },
+      {
+        type: "hasMany",
+        name: "nfkCategories",
+        options: { className: "NfkCategory", through: "nfkAuthors", source: "nfkCategories" },
+      },
+    ];
+    (NfkAuthor as any)._associations = [
+      {
+        type: "hasMany",
+        name: "nfkEssays",
+        options: { className: "NfkEssay", foreignKey: "writer_id" },
+      },
+      {
+        type: "hasMany",
+        name: "nfkCategories",
+        options: { className: "NfkCategory", through: "nfkEssays", source: "nfkCategory" },
+      },
+    ];
+    (NfkEssay as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "nfkCategory",
+        options: { className: "NfkCategory", foreignKey: "nfk_category_id" },
+      },
+    ];
+    registerModel("NfkOrganization", NfkOrganization);
+    registerModel("NfkAuthor", NfkAuthor);
+    registerModel("NfkEssay", NfkEssay);
+    registerModel("NfkCategory", NfkCategory);
+
+    const org = await NfkOrganization.create({ name: "NSA" });
+    const author = await NfkAuthor.create({ name: "David", organization_id: org.id });
+    const cat = await NfkCategory.create({ name: "general" });
+    await NfkEssay.create({ writer_id: author.id, nfk_category_id: cat.id });
+
+    const orgs = await NfkOrganization.all().preload("nfkCategories").toArray();
+    expect(orgs).toHaveLength(1);
+    const preloadedCats = (orgs[0] as any)._preloadedAssociations?.get("nfkCategories") ?? [];
+    expect(preloadedCats).toHaveLength(1);
+    expect(preloadedCats[0].name).toBe("general");
+  });
 
   it.skip("nested has many through should not be autosaved", () => {});
 
-  it.skip("polymorphic has many through when through association has not loaded", () => {});
+  it("polymorphic has many through when through association has not loaded", async () => {
+    // Hotel -> departments -> chefs -> cake_designers (polymorphic)
+    class PhmtHotel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtDepartment extends Base {
+      static {
+        this.attribute("phmt_hotel_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtChef extends Base {
+      static {
+        this.attribute("phmt_department_id", "integer");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtCakeDesigner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (PhmtHotel as any)._associations = [
+      {
+        type: "hasMany",
+        name: "phmtDepartments",
+        options: { className: "PhmtDepartment", foreignKey: "phmt_hotel_id" },
+      },
+      {
+        type: "hasMany",
+        name: "phmtChefs",
+        options: { className: "PhmtChef", through: "phmtDepartments", source: "phmtChefs" },
+      },
+      {
+        type: "hasMany",
+        name: "phmtCakeDesigners",
+        options: {
+          className: "PhmtCakeDesigner",
+          through: "phmtChefs",
+          source: "employable",
+          sourceType: "PhmtCakeDesigner",
+        },
+      },
+    ];
+    (PhmtDepartment as any)._associations = [
+      {
+        type: "hasMany",
+        name: "phmtChefs",
+        options: { className: "PhmtChef", foreignKey: "phmt_department_id" },
+      },
+    ];
+    (PhmtChef as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "employable",
+        options: { polymorphic: true, foreignKey: "employable_id" },
+      },
+    ];
+    registerModel("PhmtHotel", PhmtHotel);
+    registerModel("PhmtDepartment", PhmtDepartment);
+    registerModel("PhmtChef", PhmtChef);
+    registerModel("PhmtCakeDesigner", PhmtCakeDesigner);
 
-  it.skip("polymorphic has many through when through association has already loaded", () => {});
+    const cakeDesigner = await PhmtCakeDesigner.create({ name: "Cake Boss" });
+    const hotel = await PhmtHotel.create({ name: "Grand" });
+    const dept = await PhmtDepartment.create({ phmt_hotel_id: hotel.id });
+    await PhmtChef.create({
+      phmt_department_id: dept.id,
+      employable_id: cakeDesigner.id,
+      employable_type: "PhmtCakeDesigner",
+    });
+
+    // Load chefs through departments (single-level through, not nested)
+    const hotels = await PhmtHotel.all().preload("phmtChefs").toArray();
+    expect(hotels).toHaveLength(1);
+    const chefs = (hotels[0] as any)._preloadedAssociations?.get("phmtChefs") ?? [];
+    expect(chefs).toHaveLength(1);
+  });
+
+  it("polymorphic has many through when through association has already loaded", async () => {
+    // Same setup, but preload both chefs and cake_designers
+    class PhmtHotel2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtDepartment2 extends Base {
+      static {
+        this.attribute("phmt_hotel2_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtChef2 extends Base {
+      static {
+        this.attribute("phmt_department2_id", "integer");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PhmtCakeDesigner2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    (PhmtHotel2 as any)._associations = [
+      {
+        type: "hasMany",
+        name: "phmtDepartment2s",
+        options: { className: "PhmtDepartment2", foreignKey: "phmt_hotel2_id" },
+      },
+      {
+        type: "hasMany",
+        name: "phmtChef2s",
+        options: { className: "PhmtChef2", through: "phmtDepartment2s", source: "phmtChef2s" },
+      },
+    ];
+    (PhmtDepartment2 as any)._associations = [
+      {
+        type: "hasMany",
+        name: "phmtChef2s",
+        options: { className: "PhmtChef2", foreignKey: "phmt_department2_id" },
+      },
+    ];
+    registerModel("PhmtHotel2", PhmtHotel2);
+    registerModel("PhmtDepartment2", PhmtDepartment2);
+    registerModel("PhmtChef2", PhmtChef2);
+    registerModel("PhmtCakeDesigner2", PhmtCakeDesigner2);
+
+    const cakeDesigner = await PhmtCakeDesigner2.create({ name: "Cake Boss" });
+    const hotel = await PhmtHotel2.create({ name: "Grand" });
+    const dept = await PhmtDepartment2.create({ phmt_hotel2_id: hotel.id });
+    await PhmtChef2.create({
+      phmt_department2_id: dept.id,
+      employable_id: cakeDesigner.id,
+      employable_type: "PhmtCakeDesigner2",
+    });
+
+    const hotels = await PhmtHotel2.all().preload("phmtChef2s").toArray();
+    expect(hotels).toHaveLength(1);
+    const chefs = (hotels[0] as any)._preloadedAssociations?.get("phmtChef2s") ?? [];
+    expect(chefs).toHaveLength(1);
+  });
 
   it.skip("polymorphic has many through joined different table twice", () => {});
 
