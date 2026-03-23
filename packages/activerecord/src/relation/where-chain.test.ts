@@ -320,7 +320,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "Exclude" });
     const found = await Post.whereNot({ title: "Exclude" }).toArray();
     expect(found.length).toBe(1);
-    expect(found[0].readAttribute("title")).toBe("Include");
+    expect(found[0].title).toBe("Include");
   });
 
   it("not with nil", async () => {
@@ -328,7 +328,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "With Title" });
     await Post.create({ title: null });
     const found = await Post.whereNot({ title: null }).toArray();
-    expect(found.every((p: any) => p.readAttribute("title") !== null)).toBe(true);
+    expect(found.every((p: any) => p.title !== null)).toBe(true);
   });
 
   it("not eq with preceding where", async () => {
@@ -338,7 +338,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "C", author_id: 2 });
     const found = await Post.where({ author_id: 1 }).whereNot({ title: "B" }).toArray();
     expect(found.length).toBe(1);
-    expect(found[0].readAttribute("title")).toBe("A");
+    expect(found[0].title).toBe("A");
   });
 
   it("not eq with succeeding where", async () => {
@@ -356,7 +356,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "Keep", author_id: 2 });
     const found = await Post.whereNot({ title: "Drop" }).where({ author_id: 1 }).toArray();
     expect(found.length).toBe(1);
-    expect(found[0].readAttribute("title")).toBe("Keep");
+    expect(found[0].title).toBe("Keep");
   });
 
   it("rewhere with one condition", async () => {
@@ -389,7 +389,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "With Author", author_id: 1 });
     await Post.create({ title: "No Author", author_id: null });
     const withAuthor = await Post.whereNot({ author_id: null }).toArray();
-    expect(withAuthor.every((p: any) => p.readAttribute("author_id") !== null)).toBe(true);
+    expect(withAuthor.every((p: any) => p.author_id !== null)).toBe(true);
   });
 
   it("missing with association", async () => {
@@ -397,7 +397,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "With Author", author_id: 1 });
     await Post.create({ title: "No Author", author_id: null });
     const missing = await Post.where({ author_id: null }).toArray();
-    expect(missing.every((p: any) => p.readAttribute("author_id") === null)).toBe(true);
+    expect(missing.every((p: any) => p.author_id === null)).toBe(true);
   });
 
   it("not inverts where clause (rewhere variant)", async () => {
@@ -414,7 +414,7 @@ describe("WhereChainTest", () => {
     await Post.create({ title: "NoMatch", author_id: 10 });
     const found = await Post.whereNot({ author_id: 10 }).toArray();
     expect(found.length).toBe(1);
-    expect(found[0].readAttribute("title")).toBe("Match");
+    expect(found[0].title).toBe("Match");
   });
 
   it("associated with multiple associations", async () => {
@@ -450,7 +450,7 @@ describe("WhereChainTest", () => {
     await MaPost.create({ title: "Neither", author_id: null, category_id: null });
     const results = await MaPost.all().whereAssociated("maAuthor", "maCategory").toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("Both");
+    expect(results[0].title).toBe("Both");
   });
 
   it("associated with invalid association name", async () => {
@@ -483,7 +483,7 @@ describe("WhereChainTest", () => {
     expect(baseResults.length).toBe(2);
     const rewrittenResults = await rewritten.toArray();
     expect(rewrittenResults.length).toBe(4);
-    const titles = rewrittenResults.map((r: any) => r.readAttribute("title")).sort();
+    const titles = rewrittenResults.map((r: any) => r.title).sort();
     expect(titles).toEqual(["At10", "At30", "High", "Mid"]);
   });
 });

@@ -90,7 +90,7 @@ describe("ExcludingTest", () => {
     await Post.create({ title: "exclude", score: 5 });
     const results = await Post.where({ title: "keep" }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("keep");
+    expect(results[0].title).toBe("keep");
   });
 
   it("result set through association does not include single excluded record", async () => {
@@ -139,7 +139,7 @@ describe("ExcludingTest", () => {
     await Post.create({ title: "third" });
     const results = await Post.all().excluding(p1, p2).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("third");
+    expect(results[0].title).toBe("third");
   });
 });
 
@@ -163,7 +163,7 @@ describe("excluding() / without()", () => {
 
     const remaining = await Item.all().excluding(a).toArray();
     expect(remaining).toHaveLength(2);
-    expect(remaining.every((r: any) => r.readAttribute("name") !== "A")).toBe(true);
+    expect(remaining.every((r: any) => r.name !== "A")).toBe(true);
   });
 
   it("without() is an alias for excluding()", async () => {
@@ -201,7 +201,7 @@ describe("Excluding (Rails-guided)", () => {
 
     const result = await Item.all().excluding(a).toArray();
     expect(result).toHaveLength(2);
-    expect(result.every((r: any) => r.readAttribute("name") !== "A")).toBe(true);
+    expect(result.every((r: any) => r.name !== "A")).toBe(true);
   });
 
   it("without is an alias for excluding", async () => {
@@ -231,6 +231,6 @@ describe("Excluding (Rails-guided)", () => {
 
     const result = await Item.all().excluding(a, b).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("C");
+    expect(result[0].name).toBe("C");
   });
 });

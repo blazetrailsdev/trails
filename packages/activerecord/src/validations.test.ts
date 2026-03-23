@@ -105,7 +105,7 @@ describe("ValidationsTest", () => {
   it("throw away typing", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "typed" });
-    expect(t.readAttribute("title")).toBe("typed");
+    expect(t.title).toBe("typed");
   });
 
   it("validates acceptance of with undefined attribute methods", async () => {
@@ -131,13 +131,13 @@ describe("ValidationsTest", () => {
   it("numericality validation with mutation", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "num", score: 42 });
-    expect(t.readAttribute("score")).toBe(42);
+    expect(t.score).toBe(42);
   });
 
   it("numericality validation checks against raw value", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "raw", score: 5 });
-    expect(t.readAttribute("score")).toBe(5);
+    expect(t.score).toBe(5);
   });
 
   it("numericality validator wont be affected by custom getter", async () => {
@@ -186,8 +186,8 @@ describe("ValidationsTest", () => {
     expect(saved2).toBe(true);
 
     // Can update without invite_code (validation skipped for update context)
-    user2.writeAttribute("invite_code", null);
-    user2.writeAttribute("name", "Bob");
+    user2.invite_code = null;
+    user2.name = "Bob";
     const saved3 = await user2.save();
     expect(saved3).toBe(true);
   });
@@ -207,12 +207,12 @@ describe("ValidationsTest", () => {
     expect(user.isPersisted()).toBe(true);
 
     // Can't update without reason
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     const saved = await user.save();
     expect(saved).toBe(false);
 
     // Can update with reason
-    user.writeAttribute("reason", "Name change");
+    user.reason = "Name change";
     const saved2 = await user.save();
     expect(saved2).toBe(true);
   });
@@ -309,7 +309,7 @@ describe("ValidationsTest", () => {
     const u = new User();
     await u.save(); // fails
     expect(u.errors.size).toBeGreaterThan(0);
-    u.writeAttribute("name", "Alice");
+    u.name = "Alice";
     await u.save(); // succeeds
     expect(u.errors.size).toBe(0);
   });

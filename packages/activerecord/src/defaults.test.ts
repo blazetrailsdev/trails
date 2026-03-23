@@ -46,19 +46,19 @@ describe("DefaultNumbersTest", () => {
   it("default positive integer", async () => {
     const { Counter } = makeModel();
     const c = await Counter.create({ value: 42 });
-    expect(c.readAttribute("value")).toBe(42);
+    expect(c.value).toBe(42);
   });
 
   it("default negative integer", async () => {
     const { Counter } = makeModel();
     const c = await Counter.create({ value: -5 });
-    expect(c.readAttribute("value")).toBe(-5);
+    expect(c.value).toBe(-5);
   });
 
   it("default decimal number", async () => {
     const { Counter } = makeModel();
     const c = await Counter.create({ value: 0 });
-    expect(c.readAttribute("value")).toBe(0);
+    expect(c.value).toBe(0);
   });
 });
 
@@ -72,7 +72,7 @@ describe("DefaultBinaryTest", () => {
       }
     }
     const r = await BinRecord.create({ data: "binary_data" });
-    expect(r.readAttribute("data")).toBe("binary_data");
+    expect(r.data).toBe("binary_data");
   });
   it("default binary string", async () => {
     const adp = freshAdapter();
@@ -83,7 +83,7 @@ describe("DefaultBinaryTest", () => {
       }
     }
     const r = new BinRecord({});
-    expect(r.readAttribute("data")).toBe("");
+    expect(r.data).toBe("");
   });
   it("default varbinary string that looks like hex", async () => {
     const adp = freshAdapter();
@@ -94,7 +94,7 @@ describe("DefaultBinaryTest", () => {
       }
     }
     const r = await BinRecord.create({ data: "0xDEADBEEF" });
-    expect(r.readAttribute("data")).toBe("0xDEADBEEF");
+    expect(r.data).toBe("0xDEADBEEF");
   });
 });
 
@@ -108,7 +108,7 @@ describe("DefaultTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("title")).toBeNull();
+    expect(p.title).toBeNull();
   });
 
   it("multiline default text", async () => {
@@ -120,7 +120,7 @@ describe("DefaultTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("body")).toBe("line1\nline2\nline3");
+    expect(p.body).toBe("line1\nline2\nline3");
   });
 });
 
@@ -146,7 +146,7 @@ describe("DefaultTextTest", () => {
       }
     }
     const p = await Post.create({ body: "some text" });
-    expect(p.readAttribute("body")).toBe("some text");
+    expect(p.body).toBe("some text");
   });
   it("default texts containing single quotes", async () => {
     class Post extends Base {
@@ -156,7 +156,7 @@ describe("DefaultTextTest", () => {
       }
     }
     const p = await Post.create({ body: "it's some text" });
-    expect(p.readAttribute("body")).toBe("it's some text");
+    expect(p.body).toBe("it's some text");
   });
 });
 
@@ -173,7 +173,7 @@ describe("DefaultStringsTest", () => {
       }
     }
     const p = await Post.create({ title: "hello" });
-    expect(p.readAttribute("title")).toBe("hello");
+    expect(p.title).toBe("hello");
   });
   it("default strings containing single quotes", async () => {
     class Post extends Base {
@@ -183,7 +183,7 @@ describe("DefaultStringsTest", () => {
       }
     }
     const p = await Post.create({ title: "it's a test" });
-    expect(p.readAttribute("title")).toBe("it's a test");
+    expect(p.title).toBe("it's a test");
   });
 });
 
@@ -209,7 +209,7 @@ describe("DefaultTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(new M().readAttribute("count")).toBe(42);
+    expect(new M().count).toBe(42);
   });
 
   it("default attribute value for string", () => {
@@ -219,7 +219,7 @@ describe("DefaultTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(new M().readAttribute("name")).toBe("hello");
+    expect(new M().name).toBe("hello");
   });
 
   it("default attribute value for boolean", () => {
@@ -229,7 +229,7 @@ describe("DefaultTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(new M().readAttribute("active")).toBe(true);
+    expect(new M().active).toBe(true);
   });
 
   it.skip("default attribute value for datetime", () => {});
@@ -243,7 +243,7 @@ describe("DefaultTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(new M().readAttribute("score")).toBeCloseTo(3.14);
+    expect(new M().score).toBeCloseTo(3.14);
   });
 
   it("default attribute value for text", () => {
@@ -253,7 +253,7 @@ describe("DefaultTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(new M().readAttribute("bio")).toBe("none");
+    expect(new M().bio).toBe("none");
   });
 
   it("default attribute value is available on new record", () => {
@@ -264,7 +264,7 @@ describe("DefaultTest", () => {
       }
     }
     const m = new M();
-    expect(m.readAttribute("status")).toBe("draft");
+    expect(m.status).toBe("draft");
   });
 
   it("default attribute value accessible through class", () => {

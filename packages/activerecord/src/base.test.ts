@@ -63,7 +63,7 @@ describe("BasicsTest", () => {
       }
     }
     const u = new User({ name: "test" });
-    expect(u.readAttribute("name")).toBe("test");
+    expect(u.name).toBe("test");
     expect(u.isNewRecord()).toBe(true);
   });
 
@@ -146,7 +146,7 @@ describe("BasicsTest", () => {
       }
     }
     const u = await User.create({ name: "old" });
-    u.writeAttribute("name", "new");
+    u.name = "new";
     await u.save();
     const sc = u.savedChanges;
     expect(sc).toHaveProperty("name");
@@ -253,7 +253,7 @@ describe("BasicsTest", () => {
     }
     // Should not throw when setting unknown attributes
     const u = new User({ name: "test", unknown: "value" } as any);
-    expect(u.readAttribute("name")).toBe("test");
+    expect(u.name).toBe("test");
   });
 
   it("many mutations", async () => {
@@ -264,10 +264,10 @@ describe("BasicsTest", () => {
       }
     }
     const u = new User({ name: "a" });
-    u.writeAttribute("name", "b");
-    u.writeAttribute("name", "c");
-    u.writeAttribute("name", "d");
-    expect(u.readAttribute("name")).toBe("d");
+    u.name = "b";
+    u.name = "c";
+    u.name = "d";
+    expect(u.name).toBe("d");
   });
 
   it("custom mutator", async () => {
@@ -278,8 +278,8 @@ describe("BasicsTest", () => {
       }
     }
     const u = new User();
-    u.writeAttribute("name", "test");
-    expect(u.readAttribute("name")).toBe("test");
+    u.name = "test";
+    expect(u.name).toBe("test");
   });
 
   it("equality of destroyed records", async () => {
@@ -328,7 +328,7 @@ describe("BasicsTest", () => {
       }
     }
     const u = await User.create({ name: "old" });
-    u.writeAttribute("name", "new");
+    u.name = "new";
     await u.save();
     expect(u.savedChanges).toHaveProperty("name");
   });
@@ -341,7 +341,7 @@ describe("BasicsTest", () => {
       }
     }
     const u = new User();
-    expect(u.readAttribute("name")).toBe("default");
+    expect(u.name).toBe("default");
   });
 
   it("successful comparison of like class records", async () => {
@@ -657,7 +657,7 @@ describe("BasicsTest", () => {
     await Post.create({ score: 15 });
     const last = await Post.order("score").last();
     expect(last).not.toBeNull();
-    expect((last as any).readAttribute("score")).toBe(15);
+    expect((last as any).score).toBe(15);
   });
 
   it("attribute names on table not exists", () => {
@@ -681,7 +681,7 @@ describe("BasicsTest", () => {
       }
     }
     const p = await Post.create({ count: "5" } as any);
-    expect((p as any).readAttribute("count")).toBe(5);
+    expect((p as any).count).toBe(5);
   });
 
   it("typecasting aliases", async () => {
@@ -693,7 +693,7 @@ describe("BasicsTest", () => {
       }
     }
     const p = new Post({ views: "3" } as any);
-    expect((p as any).readAttribute("views")).toBe(3);
+    expect((p as any).views).toBe(3);
   });
 
   it("dont clear inheritance column when setting explicitly", () => {
@@ -809,7 +809,7 @@ describe("BasicsTest", () => {
     }
     await Topic.create({ approved: false });
     const t = (await Topic.first()) as any;
-    expect(t!.readAttribute("approved")).toBe(false);
+    expect(t!.approved).toBe(false);
   });
 
   it("type cast attribute from select to true", async () => {
@@ -821,7 +821,7 @@ describe("BasicsTest", () => {
     }
     await Topic.create({ approved: true });
     const t = (await Topic.first()) as any;
-    expect(t!.readAttribute("approved")).toBe(true);
+    expect(t!.approved).toBe(true);
   });
 
   it("type cast attribute from select to null", async () => {
@@ -833,7 +833,7 @@ describe("BasicsTest", () => {
     }
     await Topic.create({ title: null });
     const t = (await Topic.first()) as any;
-    expect(t!.readAttribute("title")).toBeNull();
+    expect(t!.title).toBeNull();
   });
 
   it("type cast attribute from select to integer", async () => {
@@ -845,7 +845,7 @@ describe("BasicsTest", () => {
     }
     await Topic.create({ views: 42 });
     const t = (await Topic.first()) as any;
-    expect(t!.readAttribute("views")).toBe(42);
+    expect(t!.views).toBe(42);
   });
 
   it("type cast attribute from select to string", async () => {
@@ -857,7 +857,7 @@ describe("BasicsTest", () => {
     }
     await Topic.create({ title: "hello" });
     const t = (await Topic.first()) as any;
-    expect(t!.readAttribute("title")).toBe("hello");
+    expect(t!.title).toBe("hello");
   });
 
   it("attributes_before_type_cast returns user input for integers", () => {
@@ -868,7 +868,7 @@ describe("BasicsTest", () => {
       }
     }
     const t = new Topic({ views: "42" });
-    expect(t.readAttribute("views")).toBe(42);
+    expect(t.views).toBe(42);
     expect(t.readAttributeBeforeTypeCast("views")).toBe("42");
     expect(t.attributesBeforeTypeCast.views).toBe("42");
   });
@@ -1010,7 +1010,7 @@ describe("BasicsTest", () => {
     const p = await Post.create({ title: "test" });
     expect(p.isPersisted()).toBe(true);
     const reloaded = (await Post.find(p.id)) as any;
-    expect(reloaded.readAttribute("lock_version")).toBe(0);
+    expect(reloaded.lock_version).toBe(0);
   });
   it("create with custom timestamps", async () => {
     class User extends Base {
@@ -1034,7 +1034,7 @@ describe("BasicsTest", () => {
     }
     const u = await User.create({ name: "old" });
     await u.update({ name: "new" });
-    expect(u.readAttribute("name")).toBe("new");
+    expect(u.name).toBe("new");
     expect(u.isPersisted()).toBe(true);
   });
   it("update attributes with bang", async () => {
@@ -1046,7 +1046,7 @@ describe("BasicsTest", () => {
     }
     const u = await User.create({ name: "old" });
     await u.updateBang({ name: "new" });
-    expect(u.readAttribute("name")).toBe("new");
+    expect(u.name).toBe("new");
   });
   it("destroy! raises RecordNotDestroyed", async () => {
     class User extends Base {
@@ -1076,7 +1076,7 @@ describe("BasicsTest", () => {
     const u = await User.create({ name: "a" });
     const admin = u.becomes(Admin);
     expect(admin).toBeInstanceOf(Admin);
-    expect(admin.readAttribute("name")).toBe("a");
+    expect(admin.name).toBe("a");
   });
   it("becoming maintains changed status", async () => {
     class User extends Base {
@@ -1092,9 +1092,9 @@ describe("BasicsTest", () => {
       }
     }
     const u = await User.create({ name: "a" });
-    u.writeAttribute("name", "b");
+    u.name = "b";
     const admin = u.becomes(Admin);
-    expect(admin.readAttribute("name")).toBe("b");
+    expect(admin.name).toBe("b");
   });
   it("column for attribute with inherited class", () => {
     class Parent extends Base {
@@ -1145,7 +1145,7 @@ describe("BasicsTest", () => {
     await User.create({ name: "a" });
     const first = await User.first();
     expect(first).not.toBeNull();
-    expect((first as Base).readAttribute("name")).toBe("a");
+    expect((first as Base).name).toBe("a");
   });
   it("first!", async () => {
     class User extends Base {
@@ -1156,7 +1156,7 @@ describe("BasicsTest", () => {
     }
     await User.create({ name: "a" });
     const first = await User.firstBang();
-    expect(first.readAttribute("name")).toBe("a");
+    expect(first.name).toBe("a");
   });
   it("first! with empty table raises RecordNotFound", async () => {
     class User extends Base {
@@ -1186,7 +1186,7 @@ describe("BasicsTest", () => {
     }
     await User.create({ name: "a" });
     const last = await User.lastBang();
-    expect(last.readAttribute("name")).toBe("a");
+    expect(last.name).toBe("a");
   });
   it("last! with empty table raises RecordNotFound", async () => {
     class User extends Base {
@@ -1245,7 +1245,7 @@ describe("BasicsTest", () => {
     await User.create({ name: "bob" });
     const found = await User.findBy({ name: "alice" });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("alice");
+    expect(found!.name).toBe("alice");
   });
   it("find or create from one attribute", async () => {
     class User extends Base {
@@ -1269,7 +1269,7 @@ describe("BasicsTest", () => {
     }
     const u = await User.findOrCreateBy({ name: "alice", age: 30 });
     expect(u.isPersisted()).toBe(true);
-    expect(u.readAttribute("name")).toBe("alice");
+    expect(u.name).toBe("alice");
   });
   it("find or initialize from one attribute", async () => {
     class User extends Base {
@@ -1280,7 +1280,7 @@ describe("BasicsTest", () => {
     }
     const u = await User.findOrInitializeBy({ name: "alice" });
     expect(u.isNewRecord()).toBe(true);
-    expect(u.readAttribute("name")).toBe("alice");
+    expect(u.name).toBe("alice");
   });
   it.skip("implicit readonly on left joins", () => {});
   it("to param with id", async () => {
@@ -1360,7 +1360,7 @@ describe("BasicsTest", () => {
     await User.create({ name: "bob" });
     const results = await User.where({ name: "alice" }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("alice");
+    expect(results[0].name).toBe("alice");
   });
   it("where with conditions returns empty when nothing matches", async () => {
     class User extends Base {
@@ -1405,8 +1405,8 @@ describe("BasicsTest", () => {
       }
     }
     const w = new Widget();
-    expect(w.readAttribute("name")).toBe("widget");
-    expect(w.readAttribute("count")).toBe(0);
+    expect(w.name).toBe("widget");
+    expect(w.count).toBe(0);
   });
   it("find does not apply default scope when unscoped", async () => {
     class User extends Base {
@@ -1455,7 +1455,7 @@ describe("BasicsTest", () => {
     await User.create({ name: "alice" });
     const results = await User.findBySql('SELECT * FROM "users"');
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("alice");
+    expect(results[0].name).toBe("alice");
   });
   it("pluck returns column values", async () => {
     class User extends Base {
@@ -1740,7 +1740,7 @@ describe("BasicsTest", () => {
       id: [`${t1.id}-meowmeow`, "9223372036854775808-hello"],
     }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("first");
+    expect(results[0].title).toBe("first");
   });
   it("find by slug with array", async () => {
     class Topic extends Base {
@@ -1753,10 +1753,10 @@ describe("BasicsTest", () => {
     const t2 = await Topic.create({ title: "second" });
     const results = await Topic.find([`${t1.id}-meowmeow`, `${t2.id}-hello`]);
     expect(results).toHaveLength(2);
-    expect(results[0].readAttribute("title")).toBe("first");
-    expect(results[1].readAttribute("title")).toBe("second");
+    expect(results[0].title).toBe("first");
+    expect(results[1].title).toBe("second");
     const reversed = await Topic.find([`${t2.id}-hello`, `${t1.id}-meowmeow`]);
-    expect(reversed[0].readAttribute("title")).toBe("second");
+    expect(reversed[0].title).toBe("second");
   });
   it.skip("find by slug with range", () => {});
   it.skip("equality of relation and collection proxy", () => {});
@@ -1772,7 +1772,7 @@ describe("BasicsTest", () => {
     }
     expect(User.readonlyAttributes).toContain("name");
     const u = new User({ name: "a" });
-    expect(u.readAttribute("name")).toBe("a");
+    expect(u.name).toBe("a");
   });
   it("readonly attributes in abstract class descendant", () => {
     class AbstractModel extends Base {
@@ -1801,10 +1801,10 @@ describe("BasicsTest", () => {
       }
     }
     const p = await Post.create({ title: "Original", body: "Content" });
-    p.writeAttribute("title", "Changed");
+    p.title = "Changed";
     await p.save();
     const reloaded = await Post.find(p.id);
-    expect(reloaded.readAttribute("title")).toBe("Original");
+    expect(reloaded.title).toBe("Original");
   });
   it.skip("readonly attributes on belongs to association", () => {});
   it.skip("respect internal encoding", () => {
@@ -1899,7 +1899,7 @@ describe("BasicsTest", () => {
       }
     }
     const u = new User();
-    expect(u.readAttribute("name")).toBe("");
+    expect(u.name).toBe("");
   });
   it.skip("default in local time", () => {});
   it.skip("default in utc", () => {});
@@ -2189,7 +2189,7 @@ describe("BasicsTest", () => {
       }
     }
     const w = new Widget();
-    expect(w.readAttribute("name")).toBe("unnamed");
+    expect(w.name).toBe("unnamed");
   });
   it("quote", () => {
     class User extends Base {
@@ -2214,7 +2214,7 @@ describe("BasicsTest", () => {
     }
     const u = await User.create({ active: false });
     u.toggle("active");
-    expect(u.readAttribute("active")).toBe(true);
+    expect(u.active).toBe(true);
   });
 
   it("has attribute with symbol", () => {
@@ -2327,7 +2327,7 @@ describe("BasicsTest", () => {
 
   it("attributes", async () => {
     const p = new Post({ title: "hello" });
-    expect(p.readAttribute("title")).toBe("hello");
+    expect(p.title).toBe("hello");
   });
 
   it("clone of new object with defaults", () => {
@@ -2339,7 +2339,7 @@ describe("BasicsTest", () => {
     }
     const i = new Item();
     const c = i.dup();
-    expect(c.readAttribute("name")).toBe("default");
+    expect(c.name).toBe("default");
   });
 
   it("clone of new object marks attributes as dirty", () => {
@@ -2368,7 +2368,7 @@ describe("BasicsTest", () => {
       }
     }
     const c = await Counter.create({ count: 9007199254740991 });
-    expect(Number(c.readAttribute("count"))).toBe(9007199254740991);
+    expect(Number(c.count)).toBe(9007199254740991);
   });
 
   it("clear cache when setting table name", () => {
@@ -2430,8 +2430,8 @@ describe("BasicsTest", () => {
     }
     const a = new M();
     const b = new M();
-    expect(a.readAttribute("name")).toBe("val");
-    expect(b.readAttribute("name")).toBe("val");
+    expect(a.name).toBe("val");
+    expect(b.name).toBe("val");
   });
 
   it("records of different classes have different hashes", () => {
@@ -2453,7 +2453,7 @@ describe("BasicsTest", () => {
   it("dup with aggregate of same name as attribute", async () => {
     const p = await Post.create({ title: "orig" });
     const d = p.dup();
-    expect(d.readAttribute("title")).toBe("orig");
+    expect(d.title).toBe("orig");
     expect(d.isNewRecord()).toBe(true);
   });
 
@@ -2627,11 +2627,11 @@ describe("BasicsTest", () => {
 
     it("save updates an existing record", async () => {
       const p = await Post.create({ title: "Hello", body: "World" });
-      p.writeAttribute("title", "Updated");
+      p.title = "Updated";
       await p.save();
 
       const found = await Post.find(p.id);
-      expect(found.readAttribute("title")).toBe("Updated");
+      expect(found.title).toBe("Updated");
     });
 
     it("saveBang throws on validation failure", async () => {
@@ -2662,10 +2662,10 @@ describe("BasicsTest", () => {
     it("assignAttributes changes attributes without saving", async () => {
       const p = await Post.create({ title: "Old", body: "Content" });
       p.assignAttributes({ title: "New" });
-      expect(p.readAttribute("title")).toBe("New");
+      expect(p.title).toBe("New");
       // Not saved yet — DB still has old value
       const found = await Post.find(p.id);
-      expect(found.readAttribute("title")).toBe("Old");
+      expect(found.title).toBe("Old");
     });
   });
 
@@ -2688,7 +2688,7 @@ describe("BasicsTest", () => {
     it("find by primary key", async () => {
       await User.create({ name: "Alice", email: "alice@test.com" });
       const found = await User.find(1);
-      expect(found.readAttribute("name")).toBe("Alice");
+      expect(found.name).toBe("Alice");
     });
 
     it("find raises record not found exception", async () => {
@@ -2736,9 +2736,9 @@ describe("BasicsTest", () => {
     await u2.update({ name: "Modified" });
 
     // u still has old value
-    expect(u.readAttribute("name")).toBe("Original");
+    expect(u.name).toBe("Original");
     await u.reload();
-    expect(u.readAttribute("name")).toBe("Modified");
+    expect(u.name).toBe("Modified");
   });
 
   // -- Callbacks --

@@ -35,9 +35,9 @@ describe("TimestampTest", () => {
   it("saving a unchanged record doesnt update its timestamp", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
-    const before = post.readAttribute("updated_at");
+    const before = post.updated_at;
     await post.save();
-    const after = post.readAttribute("updated_at");
+    const after = post.updated_at;
     // Timestamps might or might not be equal depending on timing, but no error
     expect(after !== undefined || before !== undefined || true).toBe(true);
   });
@@ -96,10 +96,10 @@ describe("TimestampTest", () => {
   it("touching an attribute updates it", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
-    const orig = post.readAttribute("updated_at");
+    const orig = post.updated_at;
     await new Promise((r) => setTimeout(r, 5));
     await post.touch("updated_at");
-    const newVal = post.readAttribute("updated_at");
+    const newVal = post.updated_at;
     // Touch should set updated_at
     expect(post.id).toBeDefined();
   });
@@ -173,7 +173,7 @@ describe("TimestampTest", () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
     await post.updateAttribute("title", "updated");
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("saving an unchanged record with a non mutating before update callback does not update its timestamp", async () => {
@@ -238,7 +238,7 @@ describe("TimestampTest", () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
     await post.updateAttribute("title", "changed");
-    expect(post.readAttribute("title")).toBe("changed");
+    expect(post.title).toBe("changed");
   });
 
   it("changing parent of a record touches both new and old polymorphic parent record changes within same class", async () => {
@@ -269,7 +269,7 @@ describe("TimestampTest", () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
     await post.updateAttribute("title", "updated");
-    expect(post.readAttribute("title")).toBe("updated");
+    expect(post.title).toBe("updated");
   });
 
   it("timestamp column values are present in save callbacks", async () => {
@@ -289,14 +289,14 @@ describe("TimestampTest", () => {
   it("all timestamp attributes in model", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
-    expect(post.readAttribute("created_at") !== undefined || true).toBe(true);
-    expect(post.readAttribute("updated_at") !== undefined || true).toBe(true);
+    expect(post.created_at !== undefined || true).toBe(true);
+    expect(post.updated_at !== undefined || true).toBe(true);
   });
 
   it("timestamp attributes for create in model", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
-    expect(post.readAttribute("created_at")).toBeDefined();
+    expect(post.created_at).toBeDefined();
   });
 });
 
@@ -312,7 +312,7 @@ describe("TimestampsWithoutTransactionTest", () => {
     // No created_at/updated_at defined, save should work without error
     const p = await Post.create({ title: "no timestamps" });
     expect(p.isPersisted()).toBe(true);
-    expect(p.readAttribute("created_at") ?? undefined).toBeUndefined();
+    expect(p.created_at ?? undefined).toBeUndefined();
   });
   it.skip("index is created for both timestamps", () => {
     /* fixture-dependent */
@@ -335,8 +335,8 @@ describe("TimestampTest", () => {
     const post = await Post.create({ title: "Hello" });
     const after = new Date();
 
-    const createdAt = post.readAttribute("created_at") as Date;
-    const updatedAt = post.readAttribute("updated_at") as Date;
+    const createdAt = post.created_at as Date;
+    const updatedAt = post.updated_at as Date;
     expect(createdAt).toBeInstanceOf(Date);
     expect(updatedAt).toBeInstanceOf(Date);
     expect(createdAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
@@ -358,8 +358,8 @@ describe("TimestampTest", () => {
     const explicit = new Date("2020-01-01T00:00:00Z");
     const post = await Post.create({ title: "Old", created_at: explicit, updated_at: explicit });
 
-    expect((post.readAttribute("created_at") as Date).toISOString()).toBe(explicit.toISOString());
-    expect((post.readAttribute("updated_at") as Date).toISOString()).toBe(explicit.toISOString());
+    expect((post.created_at as Date).toISOString()).toBe(explicit.toISOString());
+    expect((post.updated_at as Date).toISOString()).toBe(explicit.toISOString());
   });
 
   it("saving a changed record updates its timestamp", async () => {
@@ -374,15 +374,15 @@ describe("TimestampTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = post.readAttribute("created_at") as Date;
+    const originalCreatedAt = post.created_at as Date;
 
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
 
-    const updatedAt = post.readAttribute("updated_at") as Date;
+    const updatedAt = post.updated_at as Date;
     expect(updatedAt).toBeInstanceOf(Date);
     // created_at should remain unchanged
-    expect((post.readAttribute("created_at") as Date).getTime()).toBe(originalCreatedAt.getTime());
+    expect((post.created_at as Date).getTime()).toBe(originalCreatedAt.getTime());
   });
 
   it("does not touch timestamps when model has no timestamp attributes", async () => {
@@ -412,11 +412,11 @@ describe("TimestampTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.readAttribute("updated_at") as Date;
+    const originalUpdatedAt = post.updated_at as Date;
 
     await post.touch();
 
-    const newUpdatedAt = post.readAttribute("updated_at") as Date;
+    const newUpdatedAt = post.updated_at as Date;
     expect(newUpdatedAt).toBeInstanceOf(Date);
     expect(newUpdatedAt.getTime()).toBeGreaterThanOrEqual(originalUpdatedAt.getTime());
   });
@@ -436,8 +436,8 @@ describe("TimestampTest", () => {
     const post = await Post.create({ title: "Hello" });
     await post.touch("published_at");
 
-    expect(post.readAttribute("published_at")).toBeInstanceOf(Date);
-    expect(post.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(post.published_at).toBeInstanceOf(Date);
+    expect(post.updated_at).toBeInstanceOf(Date);
   });
 
   it("touch returns false on new record", async () => {
@@ -494,7 +494,7 @@ describe("TimestampTest", () => {
     await post.touch();
 
     const reloaded = await Post.find(post.id);
-    expect(reloaded.readAttribute("updated_at")).not.toBeNull();
+    expect(reloaded.updated_at).not.toBeNull();
   });
 
   it("touch with multiple attribute names", async () => {
@@ -513,9 +513,9 @@ describe("TimestampTest", () => {
     const post = await Post.create({ title: "Hello" });
     await post.touch("replied_at", "viewed_at");
 
-    expect(post.readAttribute("replied_at")).toBeInstanceOf(Date);
-    expect(post.readAttribute("viewed_at")).toBeInstanceOf(Date);
-    expect(post.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(post.replied_at).toBeInstanceOf(Date);
+    expect(post.viewed_at).toBeInstanceOf(Date);
+    expect(post.updated_at).toBeInstanceOf(Date);
   });
 
   it("touch on model without updated_at returns false", async () => {
@@ -613,7 +613,7 @@ describe("TimestampTest", () => {
     const post = await Post.create({ title: "Hello" });
     const after = new Date();
 
-    const createdAt = post.readAttribute("created_at") as Date;
+    const createdAt = post.created_at as Date;
     expect(createdAt).toBeInstanceOf(Date);
     expect(createdAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
     expect(createdAt.getTime()).toBeLessThanOrEqual(after.getTime());
@@ -630,7 +630,7 @@ describe("TimestampTest", () => {
     }
     const explicit = new Date("2020-01-01T00:00:00Z");
     const post = await Post.create({ title: "Old", created_at: explicit, updated_at: explicit });
-    expect((post.readAttribute("created_at") as Date).toISOString()).toBe(explicit.toISOString());
+    expect((post.created_at as Date).toISOString()).toBe(explicit.toISOString());
   });
 
   it("updates updated_at on save", async () => {
@@ -643,14 +643,14 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = (post.readAttribute("created_at") as Date).getTime();
+    const originalCreatedAt = (post.created_at as Date).getTime();
 
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
 
-    const updatedAt = post.readAttribute("updated_at") as Date;
+    const updatedAt = post.updated_at as Date;
     expect(updatedAt).toBeInstanceOf(Date);
-    expect((post.readAttribute("created_at") as Date).getTime()).toBe(originalCreatedAt);
+    expect((post.created_at as Date).getTime()).toBe(originalCreatedAt);
   });
 
   it("created_at never overwritten on subsequent saves", async () => {
@@ -663,14 +663,14 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const original = (post.readAttribute("created_at") as Date).getTime();
+    const original = (post.created_at as Date).getTime();
 
-    post.writeAttribute("title", "v2");
+    post.title = "v2";
     await post.save();
-    post.writeAttribute("title", "v3");
+    post.title = "v3";
     await post.save();
 
-    expect((post.readAttribute("created_at") as Date).getTime()).toBe(original);
+    expect((post.created_at as Date).getTime()).toBe(original);
   });
 
   it("touch updates updated_at", async () => {
@@ -682,9 +682,9 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const original = (post.readAttribute("updated_at") as Date).getTime();
+    const original = (post.updated_at as Date).getTime();
     await post.touch();
-    const newTime = (post.readAttribute("updated_at") as Date).getTime();
+    const newTime = (post.updated_at as Date).getTime();
     expect(newTime).toBeGreaterThanOrEqual(original);
   });
 
@@ -726,9 +726,9 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const original = (post.readAttribute("updated_at") as Date).getTime();
+    const original = (post.updated_at as Date).getTime();
     await post.updateColumn("title", "Changed");
-    expect((post.readAttribute("updated_at") as Date).getTime()).toBe(original);
+    expect((post.updated_at as Date).getTime()).toBe(original);
   });
 });
 
@@ -771,40 +771,40 @@ describe("TimestampTest", () => {
 
   it("created_at and updated_at match on first save", async () => {
     const article = await Article.create({ title: "Hello" });
-    const createdAt = article.readAttribute("created_at") as Date;
-    const updatedAt = article.readAttribute("updated_at") as Date;
+    const createdAt = article.created_at as Date;
+    const updatedAt = article.updated_at as Date;
     expect(createdAt.getTime()).toBe(updatedAt.getTime());
   });
 
   it("updates updated_at but not created_at on update", async () => {
     const article = await Article.create({ title: "Hello" });
-    const originalCreatedAt = (article.readAttribute("created_at") as Date).getTime();
+    const originalCreatedAt = (article.created_at as Date).getTime();
 
-    article.writeAttribute("title", "Updated");
+    article.title = "Updated";
     await article.save();
 
-    expect((article.readAttribute("created_at") as Date).getTime()).toBe(originalCreatedAt);
-    expect(article.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect((article.created_at as Date).getTime()).toBe(originalCreatedAt);
+    expect(article.updated_at).toBeInstanceOf(Date);
   });
 
   it("does not overwrite user-supplied created_at", async () => {
     const custom = new Date("2000-01-01T00:00:00Z");
     const article = await Article.create({ title: "Old", created_at: custom });
-    expect((article.readAttribute("created_at") as Date).toISOString()).toBe(custom.toISOString());
+    expect((article.created_at as Date).toISOString()).toBe(custom.toISOString());
   });
 
   it("does not overwrite user-supplied updated_at on create", async () => {
     const custom = new Date("2000-01-01T00:00:00Z");
     const article = await Article.create({ title: "Old", updated_at: custom });
-    expect((article.readAttribute("updated_at") as Date).toISOString()).toBe(custom.toISOString());
+    expect((article.updated_at as Date).toISOString()).toBe(custom.toISOString());
   });
 
   it("timestamps are persisted to the database", async () => {
     const article = await Article.create({ title: "Persisted" });
     const reloaded = await Article.find(article.id);
     // MemoryAdapter stores the Date as-is, so it should match
-    expect(reloaded.readAttribute("created_at")).not.toBeNull();
-    expect(reloaded.readAttribute("updated_at")).not.toBeNull();
+    expect(reloaded.created_at).not.toBeNull();
+    expect(reloaded.updated_at).not.toBeNull();
   });
 });
 
@@ -841,12 +841,12 @@ describe("TimestampTest", () => {
     registerModel(Comment);
 
     const post = await Post.create({ title: "Hello" });
-    const before = post.readAttribute("updated_at");
+    const before = post.updated_at;
 
     await new Promise((r) => setTimeout(r, 10));
     await Comment.create({ body: "Reply", post_id: post.id });
 
     await post.reload();
-    expect(post.readAttribute("updated_at")).not.toEqual(before);
+    expect(post.updated_at).not.toEqual(before);
   });
 });

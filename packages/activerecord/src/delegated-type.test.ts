@@ -35,7 +35,7 @@ describe("DelegatedTypeTest", () => {
   it("delegated types", () => {
     const { Entry } = makeModels();
     const e = new Entry({ title: "hi", entryable_type: "Message", entryable_id: 1 });
-    expect(e.readAttribute("entryable_type")).toBe("Message");
+    expect(e.entryable_type).toBe("Message");
   });
 
   it("delegated class", () => {
@@ -98,7 +98,7 @@ describe("DelegatedTypeTest", () => {
     await Entry.create({ title: "b", entryable_type: "Comment", entryable_id: 2 });
     const messages = await (Entry as any).messages().toArray();
     expect(messages.length).toBe(1);
-    expect(messages[0].readAttribute("title")).toBe("a");
+    expect(messages[0].title).toBe("a");
   });
 
   it("scope with custom foreign_type", async () => {
@@ -119,7 +119,7 @@ describe("DelegatedTypeTest", () => {
     await Entry2.create({ title: "b", custom_type: "Comment", custom_id: 2 });
     const comments = await (Entry2 as any).comments().toArray();
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("title")).toBe("b");
+    expect(comments[0].title).toBe("b");
   });
 
   it("accessor", () => {
@@ -132,7 +132,7 @@ describe("DelegatedTypeTest", () => {
   it("association id", () => {
     const { Entry } = makeModels();
     const e = new Entry({ entryable_type: "Message", entryable_id: 99 });
-    expect(e.readAttribute("entryable_id")).toBe(99);
+    expect(e.entryable_id).toBe(99);
   });
 
   it.skip("association uuid", () => {
@@ -147,7 +147,7 @@ describe("DelegatedTypeTest", () => {
     const { Entry } = makeModels();
     const e = new Entry({ title: "test" });
     (e as any).buildMessage({ entryable_id: 5 });
-    expect(e.readAttribute("entryable_type")).toBe("Message");
-    expect(e.readAttribute("entryable_id")).toBe(5);
+    expect(e.entryable_type).toBe("Message");
+    expect(e.entryable_id).toBe(5);
   });
 });

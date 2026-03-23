@@ -414,7 +414,7 @@ describe("WhereTest", () => {
     await Post.create({ title: "Owned", author_id: 1 });
     const result = await Post.all().whereMissing("author").toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Orphan");
+    expect(result[0].title).toBe("Orphan");
   });
   it("where missing with multiple associations", async () => {
     class Editor extends Base {
@@ -470,7 +470,7 @@ describe("WhereTest", () => {
     await Post.create({ title: "Owned", author_id: 1 });
     const result = await Post.all().whereAssociated("author").toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Owned");
+    expect(result[0].title).toBe("Owned");
   });
   it("where associated with has many association", async () => {
     class WahmAuthor extends Base {
@@ -501,7 +501,7 @@ describe("WhereTest", () => {
     await WahmPost.create({ title: "P1", wahm_author_id: a1.id });
     const result = await WahmAuthor.all().whereAssociated("wahmPosts").toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("With Posts");
+    expect(result[0].name).toBe("With Posts");
   });
   it("where associated with multiple associations", async () => {
     class Author extends Base {
@@ -551,7 +551,7 @@ describe("WhereTest", () => {
     await WnaPost.create({ title: "Owned", author_id: 1 });
     const result = await WnaPost.all().whereMissing("author").toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Orphan");
+    expect(result[0].title).toBe("Orphan");
   });
 
   it("where not associated with has many association", async () => {
@@ -583,7 +583,7 @@ describe("WhereTest", () => {
     await WnahmPost.create({ title: "P1", wnahm_author_id: a1.id });
     const result = await WnahmAuthor.all().whereMissing("wnahmPosts").toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("No Posts");
+    expect(result[0].name).toBe("No Posts");
   });
 
   it("where not associated with multiple associations", async () => {
@@ -630,7 +630,7 @@ describe("WhereTest", () => {
     await WnammPost.create({ wnamm_author_id: a2.id });
     const result = await WnammAuthor.all().whereMissing("wnamm_posts", "wnamm_comments").toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Has Nothing");
+    expect(result[0].name).toBe("Has Nothing");
   });
   it("where with enum conditions", async () => {
     class Post extends Base {
@@ -646,7 +646,7 @@ describe("WhereTest", () => {
     // Enum where uses the integer value
     const result = await Post.where({ status: 1 }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("status")).toBe(1);
+    expect(result[0].status).toBe(1);
   });
   it("where with enum conditions string", async () => {
     class Post extends Base {
@@ -783,7 +783,7 @@ describe("WhereTest", () => {
     // invertWhere swaps where <-> whereNot
     const result = await Post.where({ title: "hello" }).invertWhere().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("world");
+    expect(result[0].title).toBe("world");
   });
   it("nested conditional on enum", async () => {
     class Post extends Base {
@@ -802,7 +802,7 @@ describe("WhereTest", () => {
     // Chain enum where with another condition
     const result = await Post.where({ status: 1 }).where({ title: "B" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("B");
+    expect(result[0].title).toBe("B");
   });
 });
 
@@ -837,7 +837,7 @@ describe("where with Range", () => {
 
     const result = await User.where({ age: new Range(18, 30) }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Adult");
+    expect(result[0].name).toBe("Adult");
   });
 
   it("BETWEEN is inclusive on both ends", async () => {
@@ -938,7 +938,7 @@ describe("where with raw SQL", () => {
     const inactive = active.rewhere({ status: "inactive" });
     const records = await inactive.toArray();
     expect(records.length).toBe(1);
-    expect(records[0].readAttribute("name")).toBe("Bob");
+    expect(records[0].name).toBe("Bob");
   });
 });
 
@@ -995,7 +995,7 @@ describe("rewhere clears NOT clauses", () => {
     const rel = User.all().whereNot({ role: "admin" }).rewhere({ role: "admin" });
     const result = await rel.toArray();
     expect(result.length).toBe(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 });
 
@@ -1018,7 +1018,7 @@ describe("where with named binds", () => {
       .where("age > :min AND age < :max", { min: 20, max: 30 })
       .toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 
   it("handles string named binds with quoting", async () => {
@@ -1035,7 +1035,7 @@ describe("where with named binds", () => {
 
     const results = await User.all().where("name = :name", { name: "Alice" }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 });
 
@@ -1076,7 +1076,7 @@ describe("whereAny", () => {
 
     const results = await User.where({}).whereAny({ name: "Alice" }, { name: "Bob" }).toArray();
     expect(results.length).toBe(2);
-    const names = results.map((u: any) => u.readAttribute("name")).sort();
+    const names = results.map((u: any) => u.name).sort();
     expect(names).toEqual(["Alice", "Bob"]);
   });
 });
@@ -1099,8 +1099,8 @@ describe("whereAll", () => {
 
     const results = await User.where({}).whereAll({ name: "Alice" }, { role: "admin" }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
-    expect(results[0].readAttribute("role")).toBe("admin");
+    expect(results[0].name).toBe("Alice");
+    expect(results[0].role).toBe("admin");
   });
 });
 
@@ -1127,7 +1127,7 @@ describe("Relation Where (Rails-guided)", () => {
   it("where with hash conditions", async () => {
     const result = await User.where({ name: "Alice" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 
   it("where with multiple conditions", async () => {
@@ -1138,7 +1138,7 @@ describe("Relation Where (Rails-guided)", () => {
   it("where with null generates IS NULL", async () => {
     const result = await User.where({ email: null }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Charlie");
+    expect(result[0].name).toBe("Charlie");
   });
 
   it("where with array generates IN", async () => {
@@ -1154,7 +1154,7 @@ describe("Relation Where (Rails-guided)", () => {
   it("whereNot excludes matching records", async () => {
     const result = await User.all().whereNot({ name: "Alice" }).toArray();
     expect(result).toHaveLength(2);
-    expect(result.every((r: any) => r.readAttribute("name") !== "Alice")).toBe(true);
+    expect(result.every((r: any) => r.name !== "Alice")).toBe(true);
   });
 
   it("whereNot with null generates IS NOT NULL", async () => {
@@ -1167,7 +1167,7 @@ describe("Relation Where (Rails-guided)", () => {
       .whereNot({ name: ["Alice", "Bob"] })
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Charlie");
+    expect(result[0].name).toBe("Charlie");
   });
 
   it("where with Range generates BETWEEN", async () => {
@@ -1183,13 +1183,13 @@ describe("Relation Where (Rails-guided)", () => {
   it("chaining multiple whereNot clauses", async () => {
     const result = await User.all().whereNot({ name: "Alice" }).whereNot({ name: "Bob" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Charlie");
+    expect(result[0].name).toBe("Charlie");
   });
 
   it("rewhere replaces existing where conditions for same key", async () => {
     const result = await User.where({ name: "Alice" }).rewhere({ name: "Bob" }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 
   it("where with raw SQL string", async () => {
@@ -1200,7 +1200,7 @@ describe("Relation Where (Rails-guided)", () => {
   it("where with named bind parameters", async () => {
     const result = await User.where("age > :min AND age < :max", { min: 26, max: 34 }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 });
 
@@ -1226,7 +1226,7 @@ describe("where with Range (Rails-guided)", () => {
   it("Range in where generates BETWEEN", async () => {
     const result = await Person.where({ age: new Range(15, 30) }).toArray();
     expect(result).toHaveLength(2);
-    const names = result.map((r: Base) => r.readAttribute("name"));
+    const names = result.map((r: Base) => r.name);
     expect(names).toContain("Teen");
     expect(names).toContain("Adult");
   });
@@ -1241,7 +1241,7 @@ describe("where with Range (Rails-guided)", () => {
       .where({ name: "Teen" })
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Teen");
+    expect(result[0].name).toBe("Teen");
   });
 
   it("Range generates valid SQL", () => {
@@ -1275,7 +1275,7 @@ describe("Range / BETWEEN (Rails-guided)", () => {
 
     const results = await Product.where({ price: new Range(10, 20) }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("name")).toBe("Mid");
+    expect(results[0].name).toBe("Mid");
   });
 
   // Rails: test_range_with_aggregation
@@ -1296,7 +1296,7 @@ describe("Range / BETWEEN (Rails-guided)", () => {
 
     const results = await Product.where({ price: new Range(10, 20), name: "A" }).toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("name")).toBe("A");
+    expect(results[0].name).toBe("A");
   });
 });
 
@@ -1362,7 +1362,7 @@ describe("Raw SQL Where (Rails-guided)", () => {
 
     const records = await rewritten.toArray();
     expect(records.length).toBe(1);
-    expect(records[0].readAttribute("name")).toBe("Bob");
+    expect(records[0].name).toBe("Bob");
   });
 
   // Rails: test "rewhere preserves other conditions"
@@ -1387,7 +1387,7 @@ describe("Raw SQL Where (Rails-guided)", () => {
 
     const records = await rewritten.toArray();
     expect(records.length).toBe(1);
-    expect(records[0].readAttribute("name")).toBe("Bob");
+    expect(records[0].name).toBe("Bob");
   });
 });
 

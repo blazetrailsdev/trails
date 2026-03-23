@@ -97,7 +97,7 @@ describe("and()", () => {
     const alices = User.all().where({ name: "Alice" });
     const results = await admins.and(alices).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 });
 
@@ -123,6 +123,6 @@ describe("Relation And (Rails-guided)", () => {
       .and(User.where({ name: "Alice" }))
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 });

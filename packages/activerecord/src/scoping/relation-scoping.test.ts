@@ -96,7 +96,7 @@ describe("RelationScopingTest", () => {
     const rel = SfPost.where({ title: "InScope" });
     await SfPost.scoping(rel, async () => {
       const found = await SfPost.find(inScope.id);
-      expect(found.readAttribute("title")).toBe("InScope");
+      expect(found.title).toBe("InScope");
       await expect(SfPost.find(outOfScope.id)).rejects.toThrow(RecordNotFound);
     });
   });
@@ -115,7 +115,7 @@ describe("RelationScopingTest", () => {
     await SffPost.scoping(rel, async () => {
       const first = (await SffPost.first()) as Base | null;
       expect(first).not.toBeNull();
-      expect(first!.readAttribute("title")).toBe("Target");
+      expect(first!.title).toBe("Target");
     });
   });
 
@@ -135,7 +135,7 @@ describe("RelationScopingTest", () => {
     await SflPost.scoping(rel, async () => {
       const last = (await SflPost.last()) as Base | null;
       expect(last).not.toBeNull();
-      expect(last!.readAttribute("salary")).toBe((highestSalary as Base).readAttribute("salary"));
+      expect(last!.salary).toBe((highestSalary as Base).salary);
     });
   });
 
@@ -148,7 +148,7 @@ describe("RelationScopingTest", () => {
     await Developer.scoping(rel, async () => {
       const last = (await Developer.last()) as Base | null;
       expect(last).not.toBeNull();
-      expect(last!.readAttribute("name")).toBe("Alice");
+      expect(last!.name).toBe("Alice");
     });
   });
 
@@ -167,7 +167,7 @@ describe("RelationScopingTest", () => {
     await ScPost.scoping(rel, async () => {
       const found = (await ScPost.where({ title: "O'Brien's Post" }).first()) as Base | null;
       expect(found).not.toBeNull();
-      expect(found!.readAttribute("published")).toBe(true);
+      expect(found!.published).toBe(true);
     });
   });
 
@@ -195,7 +195,7 @@ describe("RelationScopingTest", () => {
     await SdsPost.create({ title: "Draft", published: false });
     const all = await SdsPost.all().toArray();
     expect(all.length).toBe(1);
-    expect(all[0].readAttribute("title")).toBe("Published");
+    expect(all[0].title).toBe("Published");
   });
 
   it("scoped find all", async () => {
@@ -212,7 +212,7 @@ describe("RelationScopingTest", () => {
     await SfaPost.scoping(rel, async () => {
       const all = await SfaPost.all().toArray();
       expect(all.length).toBe(1);
-      expect(all[0].readAttribute("title")).toBe("A");
+      expect(all[0].title).toBe("A");
     });
   });
 
@@ -297,7 +297,7 @@ describe("RelationScopingTest", () => {
     const rel = Developer.where({ salary: 100000 });
     await Developer.scoping(rel, async () => {
       const dev = await Developer.create({ name: "Scoped" });
-      expect(dev.readAttribute("salary")).toBe(100000);
+      expect(dev.salary).toBe(100000);
     });
   });
 
@@ -309,7 +309,7 @@ describe("RelationScopingTest", () => {
     await Developer.scoping(rel, async () => {
       const all = await Developer.all().toArray();
       expect(all.length).toBe(1);
-      expect(all[0].readAttribute("name")).toBe("Alice");
+      expect(all[0].name).toBe("Alice");
     });
   });
 
@@ -322,7 +322,7 @@ describe("RelationScopingTest", () => {
     await Developer.scoping(rel, async () => {
       const all = await Developer.all().toArray();
       expect(all.length).toBe(1);
-      expect(all[0].readAttribute("name")).toBe("Bob");
+      expect(all[0].name).toBe("Bob");
     });
   });
 
@@ -331,7 +331,7 @@ describe("RelationScopingTest", () => {
     const rel = Developer.all().createWith({ salary: 75000 });
     await Developer.scoping(rel, async () => {
       const dev = await Developer.create({ name: "CW" });
-      expect(dev.readAttribute("salary")).toBe(75000);
+      expect(dev.salary).toBe(75000);
     });
   });
 
@@ -340,7 +340,7 @@ describe("RelationScopingTest", () => {
     const rel = Developer.where({ salary: 50000 }).createWith({ salary: 99000 });
     await Developer.scoping(rel, async () => {
       const dev = await Developer.create({ name: "Priority" });
-      expect(dev.readAttribute("salary")).toBe(99000);
+      expect(dev.salary).toBe(99000);
     });
   });
 
@@ -438,7 +438,7 @@ describe("RelationScopingTest", () => {
     await Developer.scoping(rel, async () => {
       const first = await Developer.first();
       expect(first).not.toBeNull();
-      expect((first as Base).readAttribute("name")).toBe("Alice");
+      expect((first as Base).name).toBe("Alice");
     });
   });
 
@@ -459,9 +459,9 @@ describe("RelationScopingTest", () => {
       await Developer.updateAll({ salary: 90000 });
     });
     const alice = (await Developer.where({ name: "Alice" }).first()) as Base;
-    expect(alice.readAttribute("salary")).toBe(90000);
+    expect(alice.salary).toBe(90000);
     const bob = (await Developer.where({ name: "Bob" }).first()) as Base;
-    expect(bob.readAttribute("salary")).toBe(60000);
+    expect(bob.salary).toBe(60000);
   });
 
   it("scoping applies to delete with all queries", async () => {
@@ -474,7 +474,7 @@ describe("RelationScopingTest", () => {
     });
     const remaining = await Developer.all().toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("name")).toBe("Bob");
+    expect(remaining[0].name).toBe("Bob");
   });
 
   it.skip("scoping applies to reload with all queries", () => {
@@ -492,7 +492,7 @@ describe("RelationScopingTest", () => {
       await Developer.scoping(inner, async () => {
         const all = await Developer.all().toArray();
         expect(all.length).toBe(1);
-        expect(all[0].readAttribute("name")).toBe("Alice");
+        expect(all[0].name).toBe("Alice");
       });
       const outerAll = await Developer.all().toArray();
       expect(outerAll.length).toBe(2);
@@ -541,7 +541,7 @@ describe("NestedRelationScopingTest", () => {
       await Post.scoping(inner, async () => {
         const all = await Post.all().toArray();
         expect(all.length).toBe(1);
-        expect(all[0].readAttribute("title")).toBe("A");
+        expect(all[0].title).toBe("A");
       });
     });
   });
@@ -556,7 +556,7 @@ describe("NestedRelationScopingTest", () => {
       await Post.scoping(inner, async () => {
         const all = await Post.all().toArray();
         expect(all.length).toBe(1);
-        expect(all[0].readAttribute("author")).toBe("Bob");
+        expect(all[0].author).toBe("Bob");
       });
     });
   });
@@ -584,7 +584,7 @@ describe("NestedRelationScopingTest", () => {
         await Post.scoping(Post.where({ author: "Charlie" }), async () => {
           const all = await Post.all().toArray();
           expect(all.length).toBe(1);
-          expect(all[0].readAttribute("author")).toBe("Charlie");
+          expect(all[0].author).toBe("Charlie");
         });
       });
     });
@@ -595,7 +595,7 @@ describe("NestedRelationScopingTest", () => {
     const rel = Post.where({ author: "Scoped" });
     await Post.scoping(rel, async () => {
       const post = await Post.create({ title: "Created" });
-      expect(post.readAttribute("author")).toBe("Scoped");
+      expect(post.author).toBe("Scoped");
     });
   });
 
@@ -606,7 +606,7 @@ describe("NestedRelationScopingTest", () => {
       const inner = Post.where({ author: "Inner" });
       await Post.scoping(inner, async () => {
         const post = await Post.create({ title: "Nested" });
-        expect(post.readAttribute("author")).toBe("Inner");
+        expect(post.author).toBe("Inner");
       });
     });
   });
@@ -732,7 +732,7 @@ describe("Static shorthands (Rails-guided)", () => {
     await Post.create({ title: "Second" });
     const first = (await Post.first()) as Base;
     expect(first).not.toBeNull();
-    expect(first.readAttribute("title")).toBe("First");
+    expect(first.title).toBe("First");
   });
 
   it("Base.last returns the last record", async () => {
@@ -746,7 +746,7 @@ describe("Static shorthands (Rails-guided)", () => {
     await Post.create({ title: "Last" });
     const last = (await Post.last()) as Base;
     expect(last).not.toBeNull();
-    expect(last.readAttribute("title")).toBe("Last");
+    expect(last.title).toBe("Last");
   });
 
   it("Base.count returns count", async () => {

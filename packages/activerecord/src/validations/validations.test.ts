@@ -36,7 +36,7 @@ describe("Validation Contexts (Rails-guided)", () => {
     expect(u2.isPersisted()).toBe(true);
 
     // Can update without terms
-    u2.writeAttribute("terms", null);
+    u2.terms = null;
     expect(await u2.save()).toBe(true);
   });
 
@@ -58,11 +58,11 @@ describe("Validation Contexts (Rails-guided)", () => {
     expect(user.isPersisted()).toBe(true);
 
     // Update fails without change_reason
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(await user.save()).toBe(false);
 
     // Update succeeds with change_reason
-    user.writeAttribute("change_reason", "Typo fix");
+    user.change_reason = "Typo fix";
     expect(await user.save()).toBe(true);
   });
 });

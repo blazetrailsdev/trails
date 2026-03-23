@@ -41,7 +41,7 @@ describe("SignedIdTest", () => {
     const token = u.signedId({ expiresIn: 60_000 });
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Alice");
+    expect(found!.name).toBe("Alice");
   });
 
   it("fail to find signed record within expiration duration", async () => {
@@ -80,7 +80,7 @@ describe("SignedIdTest", () => {
     const u = await User.create({ name: "Eve" });
     const token = u.signedId({ purpose: "confirm" });
     const found = await User.findSignedBang(token, { purpose: "confirm" });
-    expect(found.readAttribute("name")).toBe("Eve");
+    expect(found.name).toBe("Eve");
   });
 
   it("find signed record with bang with purpose raises", async () => {
@@ -128,7 +128,7 @@ describe("SignedIdTest", () => {
     const token = d.signedId();
     const found = await Dog.findSigned(token);
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Rex");
+    expect(found!.name).toBe("Rex");
   });
 
   it.skip("find signed record raises UnknownPrimaryKey when a model has no primary key", () => {
@@ -154,7 +154,7 @@ describe("SignedIdTest", () => {
     const c = await Car.create({ name: "Sedan" });
     const token = c.signedId();
     const found = await Car.findSignedBang(token);
-    expect(found.readAttribute("name")).toBe("Sedan");
+    expect(found.name).toBe("Sedan");
   });
 
   it("find signed record within expiration time", async () => {
@@ -163,7 +163,7 @@ describe("SignedIdTest", () => {
     const token = u.signedId({ expiresIn: 30_000 });
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Timed");
+    expect(found!.name).toBe("Timed");
   });
 
   it("fail to find signed record within expiration time", async () => {

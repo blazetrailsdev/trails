@@ -80,7 +80,7 @@ describe("SerializationTest", () => {
 
   it("read attribute for serialization with format after find", async () => {
     const created = await Contact.create({ name: "David", age: 30 });
-    const found = await Contact.find(created.readAttribute("id"));
+    const found = await Contact.find(created.id);
     const hash = found.serializableHash();
     expect(hash.name).toBe("David");
   });
@@ -148,7 +148,7 @@ describe("fromJson on Base", () => {
     }
     const u = new User({});
     u.fromJson('{"name":"Alice"}');
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.name).toBe("Alice");
   });
 
   it("supports includeRoot", () => {
@@ -162,6 +162,6 @@ describe("fromJson on Base", () => {
     }
     const u = new User({});
     u.fromJson('{"user":{"name":"Bob"}}', true);
-    expect(u.readAttribute("name")).toBe("Bob");
+    expect(u.name).toBe("Bob");
   });
 });

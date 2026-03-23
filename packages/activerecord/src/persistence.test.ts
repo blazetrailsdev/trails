@@ -43,7 +43,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old" });
     await t.updateBang({ title: "new" });
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update attribute", async () => {
@@ -55,7 +55,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old" });
     await t.updateAttribute("title", "new");
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("destroy!", async () => {
@@ -116,9 +116,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "original" });
-    t.writeAttribute("title", "updated");
+    t.title = "updated";
     await t.save();
-    expect(t.readAttribute("title")).toBe("updated");
+    expect(t.title).toBe("updated");
   });
 
   it("update does not run sql if record has not changed", async () => {
@@ -143,7 +143,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ replies_count: 0 });
     t.increment("replies_count");
-    expect(t.readAttribute("replies_count")).toBe(1);
+    expect(t.replies_count).toBe(1);
   });
 
   it("increment attribute by", async () => {
@@ -155,7 +155,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ replies_count: 0 });
     t.increment("replies_count", 5);
-    expect(t.readAttribute("replies_count")).toBe(5);
+    expect(t.replies_count).toBe(5);
   });
 
   it("decrement attribute", async () => {
@@ -167,7 +167,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ replies_count: 10 });
     t.decrement("replies_count");
-    expect(t.readAttribute("replies_count")).toBe(9);
+    expect(t.replies_count).toBe(9);
   });
 
   it("decrement attribute by", async () => {
@@ -179,7 +179,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ replies_count: 10 });
     t.decrement("replies_count", 3);
-    expect(t.readAttribute("replies_count")).toBe(7);
+    expect(t.replies_count).toBe(7);
   });
 
   it("save with duping of destroyed object", async () => {
@@ -204,7 +204,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old" });
     await t.updateColumn("title", "new");
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update columns", async () => {
@@ -217,8 +217,8 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old", body: "old" });
     await t.updateColumns({ title: "new", body: "new" });
-    expect(t.readAttribute("title")).toBe("new");
-    expect(t.readAttribute("body")).toBe("new");
+    expect(t.title).toBe("new");
+    expect(t.body).toBe("new");
   });
 
   it("find raises record not found exception", async () => {
@@ -241,7 +241,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "a" });
     // becomes creates a new instance of a different class with same attributes
     const d = t.dup();
-    expect(d.readAttribute("title")).toBe("a");
+    expect(d.title).toBe("a");
   });
 
   it("class level update without ids", async () => {
@@ -254,7 +254,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.readAttribute("title")).toBe("new");
+    expect(reloaded.title).toBe("new");
   });
 
   it("update many", async () => {
@@ -270,8 +270,8 @@ describe("PersistenceTest", () => {
     await Topic.update(t2.id, { title: "y" });
     const r1 = await Topic.find(t1.id);
     const r2 = await Topic.find(t2.id);
-    expect(r1.readAttribute("title")).toBe("x");
-    expect(r2.readAttribute("title")).toBe("y");
+    expect(r1.title).toBe("x");
+    expect(r2.title).toBe("y");
   });
 });
 
@@ -302,7 +302,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("new");
+    expect(found.title).toBe("new");
   });
 
   it("save touch false", async () => {
@@ -314,9 +314,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "a" });
-    t.writeAttribute("title", "b");
+    t.title = "b";
     await t.save({ touch: false });
-    expect(t.readAttribute("title")).toBe("b");
+    expect(t.title).toBe("b");
   });
 
   it("increment with no arg", () => {
@@ -328,7 +328,7 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.increment("count");
-    expect(c.readAttribute("count")).toBe(1);
+    expect(c.count).toBe(1);
   });
 
   it("reload removes custom selects", async () => {
@@ -339,9 +339,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "a" });
-    t.writeAttribute("title", "modified");
+    t.title = "modified";
     await t.reload();
-    expect(t.readAttribute("title")).toBe("a");
+    expect(t.title).toBe("a");
   });
 });
 
@@ -358,7 +358,7 @@ describe("PersistenceTest", () => {
       }
     }
     const post = Post.new({ title: "built" });
-    expect((post as any).readAttribute("title")).toBe("built");
+    expect((post as any).title).toBe("built");
     expect((post as any).isNewRecord()).toBe(true);
   });
 
@@ -443,7 +443,7 @@ describe("PersistenceTest", () => {
     const p = (await Post.create({ title: "original" })) as any;
     await Post.update(p.id, { title: "updated" });
     const found = (await Post.find(p.id)) as any;
-    expect(found.readAttribute("title")).toBe("updated");
+    expect(found.title).toBe("updated");
   });
 
   it("update many with invalid id", async () => {
@@ -467,7 +467,7 @@ describe("PersistenceTest", () => {
     }
     const p = (await Post.create({ title: "original" })) as any;
     await p.update({ title: "updated" });
-    expect(p.readAttribute("title")).toBe("updated");
+    expect(p.title).toBe("updated");
   });
 
   it("update many with array of active record base objects", async () => {
@@ -482,8 +482,8 @@ describe("PersistenceTest", () => {
     const p2 = (await Post.create({ title: "b" })) as any;
     await p1.update({ title: "a2" });
     await p2.update({ title: "b2" });
-    expect(p1.readAttribute("title")).toBe("a2");
-    expect(p2.readAttribute("title")).toBe("b2");
+    expect(p1.title).toBe("a2");
+    expect(p2.title).toBe("b2");
   });
 
   it("becomes includes errors", () => {
@@ -550,7 +550,7 @@ describe("PersistenceTest", () => {
   it("update attribute", async () => {
     const p = await Post.create({ title: "old" });
     await p.updateAttribute("title", "new");
-    expect(p.readAttribute("title")).toBe("new");
+    expect(p.title).toBe("new");
   });
 
   it("update all with hash", async () => {
@@ -599,14 +599,14 @@ describe("PersistenceTest", () => {
     }
     const p = await TimedPost.create({ title: "timed" });
     await p.updateColumn("title", "changed");
-    expect(p.readAttribute("title")).toBe("changed");
+    expect(p.title).toBe("changed");
   });
 
   it("update parameters", async () => {
     const p = await Post.create({ title: "params" });
     await Post.update(p.id, { title: "updated-params" });
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("updated-params");
+    expect(found.title).toBe("updated-params");
   });
 
   it("instantiate creates a new instance", () => {
@@ -618,7 +618,7 @@ describe("PersistenceTest", () => {
   it("build through factory with block", () => {
     const p = new Post({ title: "built" });
     expect(p.isNewRecord()).toBe(true);
-    expect(p.readAttribute("title")).toBe("built");
+    expect(p.title).toBe("built");
   });
 
   it("create through factory with block", async () => {
@@ -628,9 +628,9 @@ describe("PersistenceTest", () => {
 
   it("update sti type", async () => {
     const p = await Post.create({ title: "sti" });
-    p.writeAttribute("title", "updated-sti");
+    p.title = "updated-sti";
     await p.save();
-    expect(p.readAttribute("title")).toBe("updated-sti");
+    expect(p.title).toBe("updated-sti");
   });
 
   it("update attribute in before validation respects callback chain", async () => {
@@ -640,13 +640,13 @@ describe("PersistenceTest", () => {
         this.adapter = createTestAdapter();
         this.attribute("title", "string");
         this.beforeValidation((record: any) => {
-          const val = record.readAttribute("title");
-          if (!val) record.writeAttribute("title", "default");
+          const val = record.title;
+          if (!val) record.title = "default";
         });
       }
     }
     const p = await CBPost.create({});
-    expect(p.readAttribute("title")).toBe("default");
+    expect(p.title).toBe("default");
   });
 
   it("delete isnt affected by scoping", async () => {
@@ -660,7 +660,7 @@ describe("PersistenceTest", () => {
     const p = await Post.create({ title: "v1" });
     await Post.update(p.id, { title: "v2" });
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("v2");
+    expect(found.title).toBe("v2");
   });
 
   it("persist inherited class with different table name", async () => {
@@ -677,7 +677,7 @@ describe("PersistenceTest", () => {
   it("reload via querycache", async () => {
     const p = await Post.create({ title: "cached" });
     await p.reload();
-    expect(p.readAttribute("title")).toBe("cached");
+    expect(p.title).toBe("cached");
   });
 
   it("model with no auto populated fields still returns primary key after insert", async () => {
@@ -695,7 +695,7 @@ describe("PersistenceTest", () => {
     }
     const p = await CountPost.create({});
     p.increment("count");
-    expect(p.readAttribute("count")).toBe(1);
+    expect(p.count).toBe(1);
   });
 
   it("decrement with touch updates timestamps", async () => {
@@ -708,13 +708,13 @@ describe("PersistenceTest", () => {
     }
     const p = await CountPost2.create({});
     p.decrement("count");
-    expect(p.readAttribute("count")).toBe(4);
+    expect(p.count).toBe(4);
   });
 
   it("update columns with default scope", async () => {
     const p = await Post.create({ title: "scope-cols" });
     await p.updateColumns({ title: "updated-scope-cols" });
-    expect(p.readAttribute("title")).toBe("updated-scope-cols");
+    expect(p.title).toBe("updated-scope-cols");
   });
 
   it("create with custom timestamps", async () => {
@@ -734,7 +734,7 @@ describe("PersistenceTest", () => {
     const p = await Post.create({ title: "one" });
     await p.updateAttribute("title", "two");
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("two");
+    expect(found.title).toBe("two");
   });
 
   it("becomes errors base", () => {
@@ -745,7 +745,7 @@ describe("PersistenceTest", () => {
   it("duped becomes persists changes from the original", async () => {
     const p = await Post.create({ title: "original" });
     const d = p.dup();
-    d.writeAttribute("title", "duped");
+    d.title = "duped";
     await d.save();
     expect(d.isPersisted()).toBe(true);
     expect(d.id).not.toBe(p.id);
@@ -753,15 +753,15 @@ describe("PersistenceTest", () => {
 
   it("save uses query constraints config", async () => {
     const p = await Post.create({ title: "save-qc" });
-    p.writeAttribute("title", "saved-qc");
+    p.title = "saved-qc";
     await p.save();
-    expect(p.readAttribute("title")).toBe("saved-qc");
+    expect(p.title).toBe("saved-qc");
   });
 
   it("reload uses query constraints config", async () => {
     const p = await Post.create({ title: "reload-qc" });
     await p.reload();
-    expect(p.readAttribute("title")).toBe("reload-qc");
+    expect(p.title).toBe("reload-qc");
   });
 });
 
@@ -934,7 +934,7 @@ describe("PersistenceTest", () => {
     }
     const now = new Date();
     const p = await Post.create({ title: "auto", created_at: now });
-    expect(p.readAttribute("created_at")).toEqual(now);
+    expect(p.created_at).toEqual(now);
     expect(p.isPersisted()).toBe(true);
   });
 
@@ -954,7 +954,7 @@ describe("PersistenceTest", () => {
     log.length = 0;
     // updateAttribute skips validations but runs callbacks (via save)
     await t.updateAttribute("title", "new");
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
     // updateAttribute calls save(), which does run callbacks
     expect(log.length).toBeGreaterThan(0);
   });
@@ -971,7 +971,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await t.updateAttribute("title", "new");
     // lock_version attribute exists but value may change; key point is no error
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update columns should not modify specific columns", async () => {
@@ -985,12 +985,12 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "old", body: "content" });
-    const origUpdatedAt = t.readAttribute("updated_at");
+    const origUpdatedAt = t.updated_at;
     await t.updateColumns({ title: "new" });
-    expect(t.readAttribute("title")).toBe("new");
-    expect(t.readAttribute("body")).toBe("content");
+    expect(t.title).toBe("new");
+    expect(t.body).toBe("content");
     // updateColumns should not auto-touch updated_at
-    expect(t.readAttribute("updated_at")).toEqual(origUpdatedAt);
+    expect(t.updated_at).toEqual(origUpdatedAt);
   });
 
   it("update columns changing id", async () => {
@@ -1032,7 +1032,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old" });
     await t.update({ title: "new" });
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update with block", async () => {
@@ -1044,9 +1044,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "old" });
-    t.writeAttribute("title", "new");
+    t.title = "new";
     await t.save();
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update association", async () => {
@@ -1060,7 +1060,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "test" });
     await t.update({ title: "updated" });
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("updated");
+    expect(found.title).toBe("updated");
   });
 
   it("becomes keeps the type column if an STI model", async () => {
@@ -1082,7 +1082,7 @@ describe("PersistenceTest", () => {
     const a = await Animal.create({ name: "Rex" });
     const d = a.becomes(Dog);
     expect(d).toBeInstanceOf(Dog);
-    expect(d.readAttribute("name")).toBe("Rex");
+    expect(d.name).toBe("Rex");
   });
 
   it("becomes keeps errors", async () => {
@@ -1164,7 +1164,7 @@ describe("PersistenceTest", () => {
     const a = await Animal.create({ name: "Rex" });
     const d = a.becomesBang(Dog);
     expect(d).toBeInstanceOf(Dog);
-    expect(d.readAttribute("name")).toBe("Rex");
+    expect(d.name).toBe("Rex");
   });
 
   it("save update with dirty timestamp", async () => {
@@ -1177,9 +1177,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "old" });
-    t.writeAttribute("title", "new");
+    t.title = "new";
     await t.save();
-    expect(t.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(t.updated_at).toBeInstanceOf(Date);
   });
 
   it("save without N+1", async () => {
@@ -1191,10 +1191,10 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "test" });
-    t.writeAttribute("title", "updated");
+    t.title = "updated";
     await t.save();
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("updated");
+    expect(found.title).toBe("updated");
   });
 
   it("create columns not equal to fields", async () => {
@@ -1208,7 +1208,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "test" });
     expect(t.isPersisted()).toBe(true);
-    expect(t.readAttribute("body")).toBeNull();
+    expect(t.body).toBeNull();
   });
 
   it("instantiate creates a new record from the given hash", () => {
@@ -1220,7 +1220,7 @@ describe("PersistenceTest", () => {
       }
     }
     const t = new Topic({ title: "instantiated" });
-    expect(t.readAttribute("title")).toBe("instantiated");
+    expect(t.title).toBe("instantiated");
     expect(t.isNewRecord()).toBe(true);
   });
 
@@ -1264,8 +1264,8 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "test" });
-    expect(t.readAttribute("created_at")).toBeInstanceOf(Date);
-    expect(t.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(t.created_at).toBeInstanceOf(Date);
+    expect(t.updated_at).toBeInstanceOf(Date);
   });
 
   it("update_attribute_vs_update_column", async () => {
@@ -1354,9 +1354,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "original" });
-    t.writeAttribute("title", "modified");
+    t.title = "modified";
     await t.reload();
-    expect(t.readAttribute("title")).toBe("original");
+    expect(t.title).toBe("original");
   });
 
   it("reload does not forget the PK", async () => {
@@ -1438,9 +1438,9 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ active: false });
     await t.toggleBang("active");
-    expect(t.readAttribute("active")).toBe(true);
+    expect(t.active).toBe(true);
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.readAttribute("active")).toBe(true);
+    expect(reloaded.active).toBe(true);
   });
 
   it("increment!", async () => {
@@ -1453,9 +1453,9 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ count: 5 });
     await t.incrementBang("count");
-    expect(t.readAttribute("count")).toBe(6);
+    expect(t.count).toBe(6);
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.readAttribute("count")).toBe(6);
+    expect(reloaded.count).toBe(6);
   });
 
   it("populates non primary key autoincremented column for a cpk model", async () => {
@@ -1482,8 +1482,8 @@ describe("PersistenceTest", () => {
     const t2 = await Topic.create({ title: "b" });
     await Topic.update(t1.id, { title: "x" });
     await Topic.update(t2.id, { title: "y" });
-    expect((await Topic.find(t1.id)).readAttribute("title")).toBe("x");
-    expect((await Topic.find(t2.id)).readAttribute("title")).toBe("y");
+    expect((await Topic.find(t1.id)).title).toBe("x");
+    expect((await Topic.find(t2.id)).title).toBe("y");
   });
 
   it("class level update without ids!", async () => {
@@ -1497,7 +1497,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("new");
+    expect(found.title).toBe("new");
   });
 
   it("class level update is affected by scoping!", async () => {
@@ -1511,7 +1511,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("new");
+    expect(found.title).toBe("new");
   });
 
   it("increment aliased attribute", () => {
@@ -1524,7 +1524,7 @@ describe("PersistenceTest", () => {
     }
     const t = new Topic();
     t.increment("count");
-    expect(t.readAttribute("count")).toBe(1);
+    expect(t.count).toBe(1);
   });
 
   it("increment nil attribute", () => {
@@ -1537,7 +1537,7 @@ describe("PersistenceTest", () => {
     }
     const t = new Topic();
     t.increment("count");
-    expect(t.readAttribute("count")).toBe(1);
+    expect(t.count).toBe(1);
   });
 
   it("increment updates counter in db using offset", async () => {
@@ -1551,7 +1551,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ count: 0 });
     await t.incrementBang("count", 5);
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.readAttribute("count")).toBe(5);
+    expect(reloaded.count).toBe(5);
   });
 
   it("increment with touch updates timestamps", async () => {
@@ -1565,7 +1565,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ count: 0 });
     await t.incrementBang("count");
-    expect(t.readAttribute("count")).toBe(1);
+    expect(t.count).toBe(1);
   });
 
   it("destroy many", async () => {
@@ -1643,8 +1643,8 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "test" });
     await t.updateColumns({ title: "updated" });
-    expect(t.readAttribute("title")).toBe("updated");
-    expect(t.readAttribute("body")).toBeNull();
+    expect(t.title).toBe("updated");
+    expect(t.body).toBeNull();
   });
 
   it("update for record with only primary key", async () => {
@@ -1670,7 +1670,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "v1" });
     await t.update({ title: "v2" });
     await t.updateAttribute("title", "v3");
-    expect(t.readAttribute("title")).toBe("v3");
+    expect(t.title).toBe("v3");
   });
 
   it("update attribute does not run sql if attribute is not changed", async () => {
@@ -1683,7 +1683,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "same" });
     await t.updateAttribute("title", "same");
-    expect(t.readAttribute("title")).toBe("same");
+    expect(t.title).toBe("same");
     expect(t.isPersisted()).toBe(true);
   });
 
@@ -1709,8 +1709,8 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "a", body: "b" });
     await t.updateAttribute("title", "c");
-    expect(t.readAttribute("title")).toBe("c");
-    expect(t.readAttribute("body")).toBe("b");
+    expect(t.title).toBe("c");
+    expect(t.body).toBe("b");
   });
 
   it("update attribute for updated at on", async () => {
@@ -1723,9 +1723,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "test" });
-    const before = t.readAttribute("updated_at") as Date;
+    const before = t.updated_at as Date;
     await t.updateAttribute("title", "new");
-    const after = t.readAttribute("updated_at") as Date;
+    const after = t.updated_at as Date;
     expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime());
   });
 
@@ -1739,7 +1739,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old" });
     await t.updateAttributeBang("title", "new");
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update attribute for updated at on!", async () => {
@@ -1753,7 +1753,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "test" });
     await t.updateAttributeBang("title", "new");
-    expect(t.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(t.updated_at).toBeInstanceOf(Date);
   });
 
   it("update column for readonly attribute", async () => {
@@ -1767,7 +1767,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     // updateColumn bypasses readonly checks
     await t.updateColumn("title", "new");
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("update column with one changed and one updated", async () => {
@@ -1780,9 +1780,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "a", body: "b" });
-    t.writeAttribute("body", "modified");
+    t.body = "modified";
     await t.updateColumn("title", "c");
-    expect(t.readAttribute("title")).toBe("c");
+    expect(t.title).toBe("c");
     // updateColumn clears dirty state
     expect(t.changed).toBe(false);
   });
@@ -1798,7 +1798,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await t.updateColumn("title", "new");
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("new");
+    expect(found.title).toBe("new");
   });
 
   it("update columns should not use setter method", async () => {
@@ -1828,7 +1828,7 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "old" });
-    t.writeAttribute("title", "dirty");
+    t.title = "dirty";
     expect(t.changed).toBe(true);
     await t.updateColumns({ title: "clean" });
     expect(t.changed).toBe(false);
@@ -1845,8 +1845,8 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "old", body: "content" });
     await t.updateColumns({ title: "new", body: "updated" });
-    expect(t.readAttribute("title")).toBe("new");
-    expect(t.readAttribute("body")).toBe("updated");
+    expect(t.title).toBe("new");
+    expect(t.body).toBe("updated");
   });
 
   it("update columns with one changed and one updated", async () => {
@@ -1859,9 +1859,9 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "a", body: "b" });
-    t.writeAttribute("body", "dirty");
+    t.body = "dirty";
     await t.updateColumns({ title: "new" });
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
     expect(t.changed).toBe(false);
   });
 
@@ -1876,7 +1876,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     // updateColumns returns void (Promise<void>), but should not throw
     const result = await t.updateColumns({ title: "new" });
-    expect(t.readAttribute("title")).toBe("new");
+    expect(t.title).toBe("new");
   });
 
   it("class level destroy", async () => {
@@ -1942,7 +1942,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     await t.update({ title: "new" });
     const found = await Topic.find(t.id);
-    expect(found.readAttribute("title")).toBe("new");
+    expect(found.title).toBe("new");
   });
 
   describe("QueryConstraintsTest", () => {
@@ -1956,7 +1956,7 @@ describe("PersistenceTest", () => {
       }
       const t = await Topic.create({ title: "test" });
       const id = t.id;
-      t.writeAttribute("title", "updated");
+      t.title = "updated";
       await t.save();
       expect(t.id).toBe(id);
     });
@@ -1984,7 +1984,7 @@ describe("PersistenceTest", () => {
 
     await u.updateColumn("age", 30);
 
-    expect(u.readAttribute("age")).toBe(30);
+    expect(u.age).toBe(30);
     expect(log).toHaveLength(0); // No callbacks fired
   });
 
@@ -2005,8 +2005,8 @@ describe("PersistenceTest", () => {
     // This would fail validation since name becomes empty, but updateColumns skips it
     await u.updateColumns({ name: "", email: "new@example.com" });
 
-    expect(u.readAttribute("name")).toBe("");
-    expect(u.readAttribute("email")).toBe("new@example.com");
+    expect(u.name).toBe("");
+    expect(u.email).toBe("new@example.com");
   });
 
   it("persists to database", async () => {
@@ -2023,7 +2023,7 @@ describe("PersistenceTest", () => {
     await u.updateColumn("name", "Bob");
 
     const reloaded = await User.find(u.id);
-    expect(reloaded.readAttribute("name")).toBe("Bob");
+    expect(reloaded.name).toBe("Bob");
   });
 
   it("update column should raise exception if new record", async () => {
@@ -2086,12 +2086,12 @@ describe("PersistenceTest", () => {
     }
 
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "Changed");
+    u.name = "Changed";
     expect(u.changed).toBe(true);
 
     await u.reload();
     expect(u.changed).toBe(false);
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.name).toBe("Alice");
   });
 
   it("assignAttributes triggers dirty tracking", async () => {
@@ -2126,15 +2126,15 @@ describe("PersistenceTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = (post.readAttribute("created_at") as Date).getTime();
+    const originalCreatedAt = (post.created_at as Date).getTime();
 
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
 
-    post.writeAttribute("title", "Updated again");
+    post.title = "Updated again";
     await post.save();
 
-    expect((post.readAttribute("created_at") as Date).getTime()).toBe(originalCreatedAt);
+    expect((post.created_at as Date).getTime()).toBe(originalCreatedAt);
   });
 
   it("updateColumn does not auto-update updated_at", async () => {
@@ -2149,12 +2149,12 @@ describe("PersistenceTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = (post.readAttribute("updated_at") as Date).getTime();
+    const originalUpdatedAt = (post.updated_at as Date).getTime();
 
     await post.updateColumn("title", "Changed");
 
     // updateColumn should NOT auto-bump updated_at
-    expect((post.readAttribute("updated_at") as Date).getTime()).toBe(originalUpdatedAt);
+    expect((post.updated_at as Date).getTime()).toBe(originalUpdatedAt);
   });
 });
 
@@ -2217,7 +2217,7 @@ describe("PersistenceTest", () => {
 
     await Item.updateAll({ status: "new" });
     const items = await Item.all().toArray();
-    expect(items.every((i: any) => i.readAttribute("status") === "new")).toBe(true);
+    expect(items.every((i: any) => i.status === "new")).toBe(true);
   });
 });
 
@@ -2237,7 +2237,7 @@ describe("PersistenceTest", () => {
 
     const item = await Item.create({ name: "Old" });
     const updated = await Item.update(item.id, { name: "New" });
-    expect(updated.readAttribute("name")).toBe("New");
+    expect(updated.name).toBe("New");
   });
 });
 
@@ -2295,13 +2295,13 @@ describe("PersistenceTest", () => {
     Post.adapter = adapter;
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.readAttribute("updated_at");
+    const originalUpdatedAt = post.updated_at;
 
     // Wait a tiny bit so Date.now() would differ
     await new Promise((r) => setTimeout(r, 5));
 
     await post.update({ title: "Updated" });
-    const afterUpdate = post.readAttribute("updated_at");
+    const afterUpdate = post.updated_at;
     expect(afterUpdate).not.toEqual(originalUpdatedAt);
   });
 
@@ -2316,12 +2316,12 @@ describe("PersistenceTest", () => {
     Post.adapter = adapter;
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.readAttribute("updated_at");
+    const originalUpdatedAt = post.updated_at;
 
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save({ touch: false });
 
-    expect(post.readAttribute("updated_at")).toEqual(originalUpdatedAt);
+    expect(post.updated_at).toEqual(originalUpdatedAt);
   });
 });
 
@@ -2340,7 +2340,7 @@ describe("PersistenceTest", () => {
     const user = await User.create({ name: "Alice", email: "alice@test.com" });
     // updateAttribute skips validations
     await user.updateAttribute("email", "");
-    expect(user.readAttribute("email")).toBe("");
+    expect(user.email).toBe("");
     expect(user.isPersisted()).toBe(true);
   });
 });
@@ -2391,7 +2391,7 @@ describe("PersistenceTest", () => {
 
     const user = await User.create({ name: "Alice" });
     const updated = await User.updateBang(user.id, { name: "Bob" });
-    expect(updated.readAttribute("name")).toBe("Bob");
+    expect(updated.name).toBe("Bob");
 
     await expect(User.updateBang(user.id, { name: "" })).rejects.toThrow();
   });
@@ -2487,7 +2487,7 @@ describe("PersistenceTest", () => {
     const p = await Post.create({ title: "Old" });
     await p.update({ title: "New" });
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("New");
+    expect(found.title).toBe("New");
   });
 
   it("update! throws on validation failure", async () => {
@@ -2555,7 +2555,7 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({ views: 5 });
     p.increment("views");
-    expect(p.readAttribute("views")).toBe(6);
+    expect(p.views).toBe(6);
   });
 
   it("increment attribute by amount", async () => {
@@ -2567,7 +2567,7 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({ views: 5 });
     p.increment("views", 3);
-    expect(p.readAttribute("views")).toBe(8);
+    expect(p.views).toBe(8);
   });
 
   it("increment nil attribute starts from 0", async () => {
@@ -2579,7 +2579,7 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({});
     p.increment("views");
-    expect(p.readAttribute("views")).toBe(1);
+    expect(p.views).toBe(1);
   });
 
   it("decrement attribute", async () => {
@@ -2591,7 +2591,7 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({ views: 5 });
     p.decrement("views");
-    expect(p.readAttribute("views")).toBe(4);
+    expect(p.views).toBe(4);
   });
 
   it("toggle boolean attribute", async () => {
@@ -2603,9 +2603,9 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({ published: false });
     p.toggle("published");
-    expect(p.readAttribute("published")).toBe(true);
+    expect(p.published).toBe(true);
     p.toggle("published");
-    expect(p.readAttribute("published")).toBe(false);
+    expect(p.published).toBe(false);
   });
 
   it("becomes transforms to another class", async () => {
@@ -2624,7 +2624,7 @@ describe("PersistenceTest", () => {
     const animal = await Animal.create({ name: "Rex" });
     const dog = animal.becomes(Dog);
     expect(dog).toBeInstanceOf(Dog);
-    expect(dog.readAttribute("name")).toBe("Rex");
+    expect(dog.name).toBe("Rex");
   });
 
   it("save destroyed object raises", async () => {
@@ -2674,7 +2674,7 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({ title: "Old" });
     const updated = await Post.update(p.id, { title: "New" });
-    expect(updated.readAttribute("title")).toBe("New");
+    expect(updated.title).toBe("New");
   });
 
   it("reload clears local changes", async () => {
@@ -2685,9 +2685,9 @@ describe("PersistenceTest", () => {
       }
     }
     const p = await Post.create({ title: "Original" });
-    p.writeAttribute("title", "Changed");
+    p.title = "Changed";
     await p.reload();
-    expect(p.readAttribute("title")).toBe("Original");
+    expect(p.title).toBe("Original");
   });
 
   it("update does not run sql if record has not changed", async () => {
@@ -2711,9 +2711,9 @@ describe("PersistenceTest", () => {
     }
     const p = await Post.create({ title: "Old" });
     p.assignAttributes({ title: "New" });
-    expect(p.readAttribute("title")).toBe("New");
+    expect(p.title).toBe("New");
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("Old");
+    expect(found.title).toBe("Old");
   });
 
   it("updateColumn skips callbacks and validations", async () => {
@@ -2731,7 +2731,7 @@ describe("PersistenceTest", () => {
     const p = await Post.create({ title: "Hello" });
     log.length = 0;
     await p.updateColumn("title", "");
-    expect(p.readAttribute("title")).toBe("");
+    expect(p.title).toBe("");
     expect(log).toHaveLength(0);
   });
 
@@ -2746,8 +2746,8 @@ describe("PersistenceTest", () => {
     const p = await Post.create({ title: "Old", body: "content" });
     await p.updateColumns({ title: "New", body: "updated" });
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("New");
-    expect(found.readAttribute("body")).toBe("updated");
+    expect(found.title).toBe("New");
+    expect(found.body).toBe("updated");
   });
 
   it("updateColumn raises on new record", async () => {
@@ -2796,7 +2796,7 @@ describe("PersistenceTest", () => {
     const copy = original.dup();
     expect(copy.isNewRecord()).toBe(true);
     expect(copy.id).toBeNull();
-    expect(copy.readAttribute("title")).toBe("Original");
+    expect(copy.title).toBe("Original");
   });
 });
 
@@ -2833,12 +2833,12 @@ describe("PersistenceTest", () => {
 
   it("save returns the object (not a boolean) via update path", async () => {
     const p = await Post.create({ title: "Hello", body: "World" });
-    p.writeAttribute("title", "Updated");
+    p.title = "Updated";
     const result = await p.save();
     expect(result).toBe(true);
 
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("Updated");
+    expect(found.title).toBe("Updated");
   });
 
   // -- create / create! --
@@ -3012,7 +3012,7 @@ describe("PersistenceTest", () => {
   it("update column", async () => {
     const topic = await Topic.create({ title: "Original" });
     await topic.updateColumn("title", "Updated");
-    expect(topic.readAttribute("title")).toBe("Updated");
+    expect(topic.title).toBe("Updated");
   });
 
   it("update_column persists to the database", async () => {
@@ -3020,7 +3020,7 @@ describe("PersistenceTest", () => {
     await topic.updateColumn("title", "Updated");
 
     const reloaded = await Topic.find(topic.id);
-    expect(reloaded.readAttribute("title")).toBe("Updated");
+    expect(reloaded.title).toBe("Updated");
   });
 
   it("update_column does not run validations", async () => {
@@ -3035,7 +3035,7 @@ describe("PersistenceTest", () => {
     const v = await Validated.create({ title: "Valid" });
     // Would fail validation, but update_column skips it
     await v.updateColumn("title", "");
-    expect(v.readAttribute("title")).toBe("");
+    expect(v.title).toBe("");
   });
 
   it("update column should not use setter method", async () => {
@@ -3071,9 +3071,9 @@ describe("PersistenceTest", () => {
     const topic = await Topic.create({ title: "Original", content: "Body", approved: false });
     await topic.updateColumns({ title: "New Title", approved: true });
 
-    expect(topic.readAttribute("title")).toBe("New Title");
-    expect(topic.readAttribute("approved")).toBe(true);
-    expect(topic.readAttribute("content")).toBe("Body"); // unchanged
+    expect(topic.title).toBe("New Title");
+    expect(topic.approved).toBe(true);
+    expect(topic.content).toBe("Body"); // unchanged
   });
 
   it("update columns should raise exception if new record", async () => {
@@ -3093,7 +3093,7 @@ describe("PersistenceTest", () => {
 
   it("update column should not leave the object dirty", async () => {
     const topic = await Topic.create({ title: "Original" });
-    topic.writeAttribute("title", "Dirty");
+    topic.title = "Dirty";
     expect(topic.changed).toBe(true);
 
     await topic.updateColumn("title", "Clean");
@@ -3120,11 +3120,11 @@ describe("PersistenceTest", () => {
 
   it("touching a record updates its timestamp", async () => {
     const topic = await Topic.create({ title: "Test" });
-    const before = topic.readAttribute("updated_at") as Date;
+    const before = topic.updated_at as Date;
 
     await topic.touch();
 
-    const after = topic.readAttribute("updated_at") as Date;
+    const after = topic.updated_at as Date;
     expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime());
   });
 
@@ -3133,8 +3133,8 @@ describe("PersistenceTest", () => {
 
     await topic.touch("replied_at");
 
-    expect(topic.readAttribute("replied_at")).toBeInstanceOf(Date);
-    expect(topic.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(topic.replied_at).toBeInstanceOf(Date);
+    expect(topic.updated_at).toBeInstanceOf(Date);
   });
 
   it("touch does not run callbacks", async () => {
@@ -3182,29 +3182,29 @@ describe("PersistenceTest", () => {
     const result = await user.save();
     expect(result).toBe(true);
     // Verify data is unchanged
-    const reloaded = await User.find(user.readAttribute("id")!);
-    expect(reloaded.readAttribute("name")).toBe("Alice");
+    const reloaded = await User.find(user.id!);
+    expect(reloaded.name).toBe("Alice");
   });
 
   // Rails: test_reload
   it("reload fetches fresh values from DB", async () => {
     const user = await User.create({ name: "Alice" });
     // Manually change in DB via another instance
-    await User.where({ id: user.readAttribute("id") }).updateAll({ name: "Bob" });
+    await User.where({ id: user.id }).updateAll({ name: "Bob" });
 
-    expect(user.readAttribute("name")).toBe("Alice");
+    expect(user.name).toBe("Alice");
     await user.reload();
-    expect(user.readAttribute("name")).toBe("Bob");
+    expect(user.name).toBe("Bob");
   });
 
   // Rails: test_reload_resets_changes
   it("reload resets dirty tracking", async () => {
     const user = await User.create({ name: "Alice" });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.changed).toBe(true);
     await user.reload();
     expect(user.changed).toBe(false);
-    expect(user.readAttribute("name")).toBe("Alice");
+    expect(user.name).toBe("Alice");
   });
 
   // Rails: test_create_returns_persisted_record
@@ -3218,16 +3218,16 @@ describe("PersistenceTest", () => {
   it("update changes attributes and saves", async () => {
     const user = await User.create({ name: "Alice", email: "a@b.com" });
     await user.update({ email: "new@b.com" });
-    const reloaded = await User.find(user.readAttribute("id")!);
-    expect(reloaded.readAttribute("email")).toBe("new@b.com");
+    const reloaded = await User.find(user.id!);
+    expect(reloaded.email).toBe("new@b.com");
   });
 
   // Rails: test_assign_attributes_does_not_save
   it("assignAttributes does not persist", async () => {
     const user = await User.create({ name: "Alice" });
     user.assignAttributes({ name: "Bob" });
-    const reloaded = await User.find(user.readAttribute("id")!);
-    expect(reloaded.readAttribute("name")).toBe("Alice");
+    const reloaded = await User.find(user.id!);
+    expect(reloaded.name).toBe("Alice");
   });
 
   // Rails: test_destroy_returns_frozen_record
@@ -3241,24 +3241,24 @@ describe("PersistenceTest", () => {
   // Rails: test_created_at_not_overwritten_on_update
   it("saving a unchanged record doesnt update its timestamp", async () => {
     const user = await User.create({ name: "Alice" });
-    const createdAt = user.readAttribute("created_at");
+    const createdAt = user.created_at;
 
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     await user.save();
-    expect(user.readAttribute("created_at")).toBe(createdAt);
+    expect(user.created_at).toBe(createdAt);
   });
 
   // Rails: test_updated_at_changes_on_save
   it("updated_at changes on attribute update", async () => {
     const user = await User.create({ name: "Alice" });
-    const originalUpdatedAt = user.readAttribute("updated_at");
+    const originalUpdatedAt = user.updated_at;
 
     // Need a slight delay so the timestamp differs
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     await user.save();
     // updated_at should be set (may or may not differ due to timing,
     // but at minimum it should be a Date)
-    expect(user.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(user.updated_at).toBeInstanceOf(Date);
   });
 });
 
@@ -3288,7 +3288,7 @@ describe("PersistenceTest", () => {
 
     const all = await Post.all().toArray();
     for (const p of all) {
-      expect(p.readAttribute("status")).toBe("published");
+      expect(p.status).toBe("published");
     }
   });
 
@@ -3349,7 +3349,7 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
         this.adapter = adapter;
         this.beforeDestroy((record: any) => {
-          destroyed.push(record.readAttribute("title"));
+          destroyed.push(record.title);
         });
       }
     }
@@ -3393,7 +3393,7 @@ describe("PersistenceTest", () => {
 
     await user.updateColumn("name", "Bob");
     expect(log).toHaveLength(0);
-    expect(user.readAttribute("name")).toBe("Bob");
+    expect(user.name).toBe("Bob");
   });
 
   // Rails: test_update_columns_updates_multiple
@@ -3409,9 +3409,9 @@ describe("PersistenceTest", () => {
     const user = await User.create({ name: "Alice", email: "a@b.com" });
     await user.updateColumns({ name: "Bob", email: "bob@b.com" });
 
-    const reloaded = await User.find(user.readAttribute("id")!);
-    expect(reloaded.readAttribute("name")).toBe("Bob");
-    expect(reloaded.readAttribute("email")).toBe("bob@b.com");
+    const reloaded = await User.find(user.id!);
+    expect(reloaded.name).toBe("Bob");
+    expect(reloaded.email).toBe("bob@b.com");
   });
 
   // Rails: test_touch_updates_updated_at
@@ -3425,9 +3425,9 @@ describe("PersistenceTest", () => {
     }
 
     const user = await User.create({ name: "Alice" });
-    const before = user.readAttribute("updated_at") as Date;
+    const before = user.updated_at as Date;
     await user.touch();
-    const after = user.readAttribute("updated_at") as Date;
+    const after = user.updated_at as Date;
     expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime());
   });
 
@@ -3443,10 +3443,10 @@ describe("PersistenceTest", () => {
     }
 
     const user = await User.create({ name: "Alice" });
-    expect(user.readAttribute("last_login_at")).toBeNull();
+    expect(user.last_login_at).toBeNull();
     await user.touch("last_login_at");
-    expect(user.readAttribute("last_login_at")).toBeInstanceOf(Date);
-    expect(user.readAttribute("updated_at")).toBeInstanceOf(Date);
+    expect(user.last_login_at).toBeInstanceOf(Date);
+    expect(user.updated_at).toBeInstanceOf(Date);
   });
 
   // Rails: test_touch_persists_to_database
@@ -3461,8 +3461,8 @@ describe("PersistenceTest", () => {
 
     const user = await User.create({ name: "Alice" });
     await user.touch();
-    const reloaded = await User.find(user.readAttribute("id")!);
-    expect(reloaded.readAttribute("updated_at")).toBeInstanceOf(Date);
+    const reloaded = await User.find(user.id!);
+    expect(reloaded.updated_at).toBeInstanceOf(Date);
   });
 });
 
@@ -3526,9 +3526,9 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.increment("hits");
-    expect(c.readAttribute("hits")).toBe(1);
+    expect(c.hits).toBe(1);
     c.increment("hits", 5);
-    expect(c.readAttribute("hits")).toBe(6);
+    expect(c.hits).toBe(6);
   });
 
   it("decrement attribute", () => {
@@ -3540,7 +3540,7 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.decrement("stock");
-    expect(c.readAttribute("stock")).toBe(9);
+    expect(c.stock).toBe(9);
   });
 
   it("toggle flips boolean in memory", () => {
@@ -3552,7 +3552,7 @@ describe("PersistenceTest", () => {
     }
     const f = new Feature();
     f.toggle("enabled");
-    expect(f.readAttribute("enabled")).toBe(true);
+    expect(f.enabled).toBe(true);
   });
 
   it("incrementBang persists change", async () => {
@@ -3565,7 +3565,7 @@ describe("PersistenceTest", () => {
     const c = await Counter.create({ count: 10 });
     await c.incrementBang("count", 2);
     const reloaded = await Counter.find(c.id);
-    expect(reloaded.readAttribute("count")).toBe(12);
+    expect(reloaded.count).toBe(12);
   });
 
   it("decrementBang persists change", async () => {
@@ -3578,7 +3578,7 @@ describe("PersistenceTest", () => {
     const c = await Counter.create({ count: 10 });
     await c.decrementBang("count", 3);
     const reloaded = await Counter.find(c.id);
-    expect(reloaded.readAttribute("count")).toBe(7);
+    expect(reloaded.count).toBe(7);
   });
 
   it("toggleBang persists change", async () => {
@@ -3591,7 +3591,7 @@ describe("PersistenceTest", () => {
     const f = await Feature.create({ active: true });
     await f.toggleBang("active");
     const reloaded = await Feature.find(f.id);
-    expect(reloaded.readAttribute("active")).toBe(false);
+    expect(reloaded.active).toBe(false);
   });
 });
 
@@ -3605,7 +3605,7 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.increment("count");
-    expect(c.readAttribute("count")).toBe(1);
+    expect(c.count).toBe(1);
   });
 
   it("increment attribute by", () => {
@@ -3617,7 +3617,7 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.increment("count", 3);
-    expect(c.readAttribute("count")).toBe(8);
+    expect(c.count).toBe(8);
   });
 
   it("decrement attribute", () => {
@@ -3629,7 +3629,7 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.decrement("count");
-    expect(c.readAttribute("count")).toBe(9);
+    expect(c.count).toBe(9);
   });
 
   it("decrement attribute by", () => {
@@ -3641,7 +3641,7 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.decrement("count", 3);
-    expect(c.readAttribute("count")).toBe(7);
+    expect(c.count).toBe(7);
   });
 
   it("toggle flips boolean", () => {
@@ -3653,9 +3653,9 @@ describe("PersistenceTest", () => {
     }
     const f = new Feature();
     f.toggle("active");
-    expect(f.readAttribute("active")).toBe(true);
+    expect(f.active).toBe(true);
     f.toggle("active");
-    expect(f.readAttribute("active")).toBe(false);
+    expect(f.active).toBe(false);
   });
 
   it("incrementBang persists to DB", async () => {
@@ -3669,7 +3669,7 @@ describe("PersistenceTest", () => {
     const c = await Counter.create({ count: 5 });
     await c.incrementBang("count");
     const reloaded = await Counter.find(c.id);
-    expect(reloaded.readAttribute("count")).toBe(6);
+    expect(reloaded.count).toBe(6);
   });
 
   it("decrementBang persists to DB", async () => {
@@ -3683,7 +3683,7 @@ describe("PersistenceTest", () => {
     const c = await Counter.create({ count: 5 });
     await c.decrementBang("count");
     const reloaded = await Counter.find(c.id);
-    expect(reloaded.readAttribute("count")).toBe(4);
+    expect(reloaded.count).toBe(4);
   });
 
   it("toggleBang persists to DB", async () => {
@@ -3697,7 +3697,7 @@ describe("PersistenceTest", () => {
     const f = await Feature.create({ active: false });
     await f.toggleBang("active");
     const reloaded = await Feature.find(f.id);
-    expect(reloaded.readAttribute("active")).toBe(true);
+    expect(reloaded.active).toBe(true);
   });
 
   it("increment returns this for chaining", () => {
@@ -3710,8 +3710,8 @@ describe("PersistenceTest", () => {
     }
     const c = new Counter();
     c.increment("a").increment("b");
-    expect(c.readAttribute("a")).toBe(1);
-    expect(c.readAttribute("b")).toBe(1);
+    expect(c.a).toBe(1);
+    expect(c.b).toBe(1);
   });
 });
 
@@ -3824,10 +3824,10 @@ describe("PersistenceTest", () => {
 
     it("updates an existing record", async () => {
       const a = await Article.create({ title: "Old" });
-      a.writeAttribute("title", "New");
+      a.title = "New";
       await a.save();
       const found = await Article.find(a.id);
-      expect(found.readAttribute("title")).toBe("New");
+      expect(found.title).toBe("New");
     });
 
     it("returns false for invalid record", async () => {
@@ -3911,9 +3911,9 @@ describe("PersistenceTest", () => {
     it("updates attributes and saves", async () => {
       const a = await Article.create({ title: "Old", body: "Content" });
       await a.update({ title: "New" });
-      expect(a.readAttribute("title")).toBe("New");
+      expect(a.title).toBe("New");
       const found = await Article.find(a.id);
-      expect(found.readAttribute("title")).toBe("New");
+      expect(found.title).toBe("New");
     });
 
     it("returns false on validation failure", async () => {
@@ -3949,7 +3949,7 @@ describe("PersistenceTest", () => {
       const a = await Article.create({ title: "Old" });
       await Article.update(a.id, { title: "New" });
       const found = await Article.find(a.id);
-      expect(found.readAttribute("title")).toBe("New");
+      expect(found.title).toBe("New");
     });
   });
 
@@ -4025,9 +4025,9 @@ describe("PersistenceTest", () => {
       const a = await Article.create({ title: "Original" });
       const a2 = await Article.find(a.id);
       await a2.update({ title: "Modified" });
-      expect(a.readAttribute("title")).toBe("Original");
+      expect(a.title).toBe("Original");
       await a.reload();
-      expect(a.readAttribute("title")).toBe("Modified");
+      expect(a.title).toBe("Modified");
     });
 
     it("throws if record no longer exists", async () => {
@@ -4094,7 +4094,7 @@ describe("PersistenceTest", () => {
     it("prevents attribute modification", async () => {
       const a = await Article.create({ title: "test" });
       a.freeze();
-      expect(() => a.writeAttribute("title", "new")).toThrow("frozen");
+      expect(() => (a.title = "new")).toThrow("frozen");
     });
   });
 
@@ -4102,19 +4102,19 @@ describe("PersistenceTest", () => {
     it("increment increases attribute value", () => {
       const a = new Article({ views: 5 });
       a.increment("views");
-      expect(a.readAttribute("views")).toBe(6);
+      expect(a.views).toBe(6);
     });
 
     it("increment with custom amount", () => {
       const a = new Article({ views: 5 });
       a.increment("views", 10);
-      expect(a.readAttribute("views")).toBe(15);
+      expect(a.views).toBe(15);
     });
 
     it("decrement decreases attribute value", () => {
       const a = new Article({ views: 5 });
       a.decrement("views");
-      expect(a.readAttribute("views")).toBe(4);
+      expect(a.views).toBe(4);
     });
 
     it("toggle flips boolean", () => {
@@ -4125,21 +4125,21 @@ describe("PersistenceTest", () => {
       }
       const p = new Post({ published: false });
       p.toggle("published");
-      expect(p.readAttribute("published")).toBe(true);
+      expect(p.published).toBe(true);
     });
 
     it("incrementBang persists the change", async () => {
       const a = await Article.create({ title: "test", views: 0 });
       await a.incrementBang("views", 3);
       const found = await Article.find(a.id);
-      expect(found.readAttribute("views")).toBe(3);
+      expect(found.views).toBe(3);
     });
 
     it("decrementBang persists the change", async () => {
       const a = await Article.create({ title: "test", views: 10 });
       await a.decrementBang("views", 2);
       const found = await Article.find(a.id);
-      expect(found.readAttribute("views")).toBe(8);
+      expect(found.views).toBe(8);
     });
   });
 
@@ -4208,9 +4208,9 @@ describe("PersistenceTest", () => {
     it("sets attributes without saving", async () => {
       const a = await Article.create({ title: "Old" });
       a.assignAttributes({ title: "New" });
-      expect(a.readAttribute("title")).toBe("New");
+      expect(a.title).toBe("New");
       const found = await Article.find(a.id);
-      expect(found.readAttribute("title")).toBe("Old");
+      expect(found.title).toBe("Old");
     });
   });
 
@@ -4224,7 +4224,7 @@ describe("PersistenceTest", () => {
     it("creates when not found", async () => {
       const found = await Article.findOrCreateBy({ title: "New" });
       expect(found.isPersisted()).toBe(true);
-      expect(found.readAttribute("title")).toBe("New");
+      expect(found.title).toBe("New");
     });
   });
 
@@ -4238,7 +4238,7 @@ describe("PersistenceTest", () => {
     it("initializes unsaved record when not found", async () => {
       const found = await Article.findOrInitializeBy({ title: "New" });
       expect(found.isNewRecord()).toBe(true);
-      expect(found.readAttribute("title")).toBe("New");
+      expect(found.title).toBe("New");
     });
   });
 
@@ -4330,7 +4330,7 @@ describe("PersistenceTest", () => {
     const p = await Post.create({ title: "Old", body: "Content" });
     await p.update({ title: "New" });
     const found = await Post.find(p.id);
-    expect(found.readAttribute("title")).toBe("New");
+    expect(found.title).toBe("New");
   });
 
   it("persisted returns boolean", async () => {

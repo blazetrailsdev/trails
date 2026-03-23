@@ -166,7 +166,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
       primaryKey: "author_code",
     });
     const author = new BlankPkAuthor({ name: "Eve" });
-    expect(author.readAttribute("author_code")).toBeNull();
+    expect(author.author_code).toBeNull();
     const executeSpy = vi.spyOn(adapter, "execute");
     const posts = await loadHasMany(author, "blank_pk_posts", {
       className: "BlankPkPost",
@@ -280,7 +280,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const matching = posts.filter((p: any) => p.readAttribute("title") === "match");
+    const matching = posts.filter((p: any) => p.title === "match");
     expect(matching.length).toBe(1);
   });
 
@@ -439,7 +439,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const matched = posts.filter((p: any) => p.readAttribute("title") === "match");
+    const matched = posts.filter((p: any) => p.title === "match");
     expect(matched.length).toBe(1);
   });
 
@@ -496,7 +496,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const titles: string[] = [];
     for (const p of posts) {
-      titles.push((p as any).readAttribute("title"));
+      titles.push((p as any).title);
     }
     expect(titles).toContain("A");
     expect(titles).toContain("B");
@@ -523,7 +523,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "New" });
     // Setting the FK manually simulates adding
-    post.writeAttribute("author_id", author.id);
+    post.author_id = author.id;
     await post.save();
     const posts = await loadHasMany(author, "posts", {
       className: "Post",
@@ -552,7 +552,7 @@ describe("HasManyAssociationsTest", () => {
     const p1 = await Post.create({ title: "X" });
     const p2 = await Post.create({ title: "Y" });
     for (const p of [p1, p2]) {
-      p.writeAttribute("author_id", author.id);
+      p.author_id = author.id;
       await p.save();
     }
     const posts = await loadHasMany(author, "posts", {
@@ -585,7 +585,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("title")).toBe("Created");
+    expect((posts[0] as any).title).toBe("Created");
   });
 
   // -- Build --
@@ -609,7 +609,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await Author.create({ name: "Alice" });
     const post = Post.new({ author_id: author.id, title: "Built" });
     expect(post.isNewRecord()).toBe(true);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
 
   it("build many", async () => {
@@ -707,8 +707,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Post);
     const author = await Author.create({ name: "Alice" });
     const post = Post.new({ author_id: author.id });
-    (post as any).writeAttribute("title", "Via block");
-    expect((post as any).readAttribute("title")).toBe("Via block");
+    (post as any).title = "Via block";
+    expect((post as any).title).toBe("Via block");
   });
 
   it("new aliased to build", async () => {
@@ -848,7 +848,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Post);
     const author = await Author.create({ name: "Alice" });
     const post = Post.new({ author_id: author.id, title: "Draft", published: false });
-    expect((post as any).readAttribute("title")).toBe("Draft");
+    expect((post as any).title).toBe("Draft");
   });
 
   // -- Deleting --
@@ -1142,7 +1142,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await NullifyPost.create({ author_id: author.id, title: "A" });
     await processDependentAssociations(author);
     const reloaded = await NullifyPost.find(post.id!);
-    expect((reloaded as any).readAttribute("author_id")).toBeNull();
+    expect((reloaded as any).author_id).toBeNull();
   });
 
   // -- Dependence --
@@ -1413,7 +1413,7 @@ describe("HasManyAssociationsTest", () => {
     // Post.create automatically triggers counter cache increment
     await Post.create({ author_id: author.id, title: "A" });
     const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
 
   it("pushing association updates counter cache", async () => {
@@ -1442,7 +1442,7 @@ describe("HasManyAssociationsTest", () => {
     // Post.create automatically triggers counter cache increment
     await Post.create({ author_id: author.id, title: "A" });
     const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBeGreaterThanOrEqual(1);
+    expect((reloaded as any).posts_count).toBeGreaterThanOrEqual(1);
   });
 
   it("calling empty with counter cache", async () => {
@@ -1848,7 +1848,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await Author.create({ name: "Alice" });
     // FK is set even if it's "protected"
     const post = await Post.create({ author_id: author.id, title: "Test" });
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
 
   it("include method in has many association should return true for instance added with build", async () => {
@@ -1968,7 +1968,7 @@ describe("HasManyAssociationsTest", () => {
     await Post.create({ author_id: author.id, title: "Old" });
     await Post.where({ author_id: author.id }).updateAll({ title: "Updated" });
     const posts = await Post.where({ author_id: author.id }).toArray();
-    expect(posts.every((p: any) => p.readAttribute("title") === "Updated")).toBe(true);
+    expect(posts.every((p: any) => p.title === "Updated")).toBe(true);
   });
 
   it("no sql should be fired if association already loaded", async () => {
@@ -2053,10 +2053,10 @@ describe("HasManyAssociationsTest", () => {
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ author_id: author.id, title: "Saved" });
     expect(post.isNewRecord()).toBe(false);
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
     const reloaded = await Post.find(post.id!);
-    expect((reloaded as any).readAttribute("title")).toBe("Updated");
+    expect((reloaded as any).title).toBe("Updated");
   });
 
   it("does not duplicate associations when used with natural primary keys", async () => {
@@ -2264,15 +2264,15 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UpdAtPost);
     const author = await UpdAtAuthor.create({ name: "Alice" });
     const post = await UpdAtPost.create({ title: "A" });
-    post.writeAttribute("author_id", author.id);
-    post.writeAttribute("updated_at", new Date());
+    post.author_id = author.id;
+    post.updated_at = new Date();
     await post.save();
     const posts = await loadHasMany(author, "upd_at_posts", {
       className: "UpdAtPost",
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("updated_at")).toBeDefined();
+    expect((posts[0] as any).updated_at).toBeDefined();
   });
   it("clear collection should not change updated at", async () => {
     class ClrUpdAuthor extends Base {
@@ -2298,10 +2298,10 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await ClrUpdAuthor.create({ name: "Alice", updated_at: new Date("2020-01-01") });
     await ClrUpdPost.create({ author_id: author.id, title: "A" });
-    const originalUpdatedAt = (author as any).readAttribute("updated_at");
+    const originalUpdatedAt = (author as any).updated_at;
     await processDependentAssociations(author);
     // The author's updated_at should not have been changed by clearing children
-    expect((author as any).readAttribute("updated_at")).toEqual(originalUpdatedAt);
+    expect((author as any).updated_at).toEqual(originalUpdatedAt);
   });
   it("create from association should respect default scope", async () => {
     class DefScopeAuthor extends Base {
@@ -2322,7 +2322,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DefScopeAuthor.create({ name: "Alice" });
     const post = await DefScopePost.create({ author_id: author.id, title: "Scoped" });
     expect(post.isNewRecord()).toBe(false);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
   it("build and create from association should respect passed attributes over default scope", async () => {
     class AttrAuthor extends Base {
@@ -2342,7 +2342,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(AttrPost);
     const author = await AttrAuthor.create({ name: "Alice" });
     const post = await AttrPost.create({ author_id: author.id, title: "Custom" });
-    expect((post as any).readAttribute("title")).toBe("Custom");
+    expect((post as any).title).toBe("Custom");
   });
   it("build and create from association should respect unscope over default scope", async () => {
     class UnscopeAuthor extends Base {
@@ -2362,8 +2362,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UnscopePost);
     const author = await UnscopeAuthor.create({ name: "Alice" });
     const post = await UnscopePost.create({ author_id: author.id, title: "Unscoped" });
-    expect((post as any).readAttribute("title")).toBe("Unscoped");
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).title).toBe("Unscoped");
+    expect((post as any).author_id).toBe(author.id);
   });
   it("build from association should respect scope", async () => {
     class ScopeAuthor extends Base {
@@ -2383,7 +2383,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ScopePost);
     const author = await ScopeAuthor.create({ name: "Alice" });
     const post = ScopePost.new({ author_id: author.id, title: "Built" });
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
     expect(post.isNewRecord()).toBe(true);
   });
   it("build from association sets inverse instance", async () => {
@@ -2405,7 +2405,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await InvAuthor.create({ name: "Alice" });
     const post = InvPost.new({ author_id: author.id, title: "Built" });
     // The FK should be set, establishing the inverse link
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
     expect(post.isNewRecord()).toBe(true);
   });
   it("delete all on association is the same as not loaded", async () => {
@@ -2465,7 +2465,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await NilDepPost.create({ author_id: author.id, title: "A" });
     await processDependentAssociations(author);
     const reloaded = await NilDepPost.find(post.id!);
-    expect((reloaded as any).readAttribute("author_id")).toBeNull();
+    expect((reloaded as any).author_id).toBeNull();
   });
 
   it("building the associated object with implicit sti base class", () => {
@@ -2765,7 +2765,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ProtAuthor.create({ name: "Alice" });
     const post = await ProtPost.create({ author_id: author.id, title: "A" });
     // FK should be set correctly
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
   it("association enum works properly", async () => {
     class Author extends Base {
@@ -2791,7 +2791,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const published = posts.filter((p: any) => p.readAttribute("status") === "published");
+    const published = posts.filter((p: any) => p.status === "published");
     expect(published.length).toBe(1);
   });
   it("build and create should not happen within scope", async () => {
@@ -2813,7 +2813,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ author_id: author.id, title: "Created" });
     expect(post.isNewRecord()).toBe(false);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
   it("finder method with dirty target", async () => {
     class FinderDirtyAuthor extends Base {
@@ -2888,10 +2888,10 @@ describe("HasManyAssociationsTest", () => {
     const author = await CcResetAuthor.create({ name: "Alice", posts_count: 0 });
     await CcResetPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcResetAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
     await CcResetPost.create({ author_id: author.id, title: "B" });
     const reloaded2 = await CcResetAuthor.find(author.id!);
-    expect((reloaded2 as any).readAttribute("posts_count")).toBe(2);
+    expect((reloaded2 as any).posts_count).toBe(2);
   });
   it("counting with counter sql", async () => {
     class CcSqlAuthor extends Base {
@@ -2938,7 +2938,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const withTitle = posts.filter((p: any) => p.readAttribute("title") === "A");
+    const withTitle = posts.filter((p: any) => p.title === "A");
     expect(withTitle.length).toBe(1);
   });
   it("finding array compatibility", async () => {
@@ -3151,7 +3151,7 @@ describe("HasManyAssociationsTest", () => {
     // Mark as readonly
     (post as any)._readonly = true;
     expect(() => {
-      post.writeAttribute("title", "Modified");
+      post.title = "Modified";
     }).not.toThrow();
     // Readonly records can't be saved
     try {
@@ -3239,7 +3239,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("title")).toBe("A");
+    expect((posts[0] as any).title).toBe("A");
   });
 
   it("finding with condition hash", async () => {
@@ -3265,7 +3265,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const filtered = posts.filter((p: any) => p.readAttribute("title") === "match");
+    const filtered = posts.filter((p: any) => p.title === "match");
     expect(filtered.length).toBe(1);
   });
   it("finding using primary key", async () => {
@@ -3308,10 +3308,10 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UpdAllPost);
     const author = await UpdAllAuthor.create({ name: "Alice" });
     const post = await UpdAllPost.create({ author_id: author.id, title: "Old" });
-    post.writeAttribute("title", "New");
+    post.title = "New";
     await post.save();
     const reloaded = await UpdAllPost.find(post.id!);
-    expect((reloaded as any).readAttribute("title")).toBe("New");
+    expect((reloaded as any).title).toBe("New");
   });
   it("update all on association accessed before save with explicit foreign key", async () => {
     class UpdAllFkAuthor extends Base {
@@ -3332,13 +3332,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await UpdAllFkAuthor.create({ name: "Alice" });
     const post = await UpdAllFkPost.create({ author_id: author.id, title: "Old" });
     // Update via explicit FK
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
     const posts = await loadHasMany(author, "upd_all_fk_posts", {
       className: "UpdAllFkPost",
       foreignKey: "author_id",
     });
-    expect((posts[0] as any).readAttribute("title")).toBe("Updated");
+    expect((posts[0] as any).title).toBe("Updated");
   });
   it("belongs to with new object", async () => {
     class Author extends Base {
@@ -3435,7 +3435,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const matched: any[] = [];
     for (const p of posts) {
-      if ((p as any).readAttribute("title") === "match") matched.push(p);
+      if ((p as any).title === "match") matched.push(p);
     }
     expect(matched.length).toBe(1);
   });
@@ -3534,7 +3534,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts[0]).toBeDefined();
-    expect((posts[0] as any).readAttribute("title")).toBe("First");
+    expect((posts[0] as any).title).toBe("First");
   });
   it("find first after reload", async () => {
     class ReloadAuthor extends Base {
@@ -3566,7 +3566,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts2[0]).toBeDefined();
-    expect((posts2[0] as any).readAttribute("title")).toBe("First");
+    expect((posts2[0] as any).title).toBe("First");
   });
   it("reload with query cache", async () => {
     class Author extends Base {
@@ -3649,7 +3649,7 @@ describe("HasManyAssociationsTest", () => {
     await FICPost.create({ title: "P2", fic_author_id: a2.id });
     const authors = await FICAuthor.all().includes("ficPosts").where({ name: "Alice" }).toArray();
     expect(authors.length).toBe(1);
-    expect(authors[0].readAttribute("name")).toBe("Alice");
+    expect(authors[0].name).toBe("Alice");
     const posts = (authors[0] as any)._preloadedAssociations?.get("ficPosts") ?? [];
     expect(posts.length).toBe(1);
   });
@@ -3680,7 +3680,7 @@ describe("HasManyAssociationsTest", () => {
     // Group by title manually
     const groups: Record<string, any[]> = {};
     for (const p of posts) {
-      const title = (p as any).readAttribute("title");
+      const title = (p as any).title;
       if (!groups[title]) groups[title] = [];
       groups[title].push(p);
     }
@@ -3712,7 +3712,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const xPosts = posts.filter((p: any) => p.readAttribute("title") === "X");
+    const xPosts = posts.filter((p: any) => p.title === "X");
     expect(xPosts.length).toBe(2);
   });
   it("find scoped grouped having", async () => {
@@ -3742,7 +3742,7 @@ describe("HasManyAssociationsTest", () => {
     // Group by title and filter
     const grouped: Record<string, number> = {};
     for (const p of posts) {
-      const t = (p as any).readAttribute("title");
+      const t = (p as any).title;
       grouped[t] = (grouped[t] || 0) + 1;
     }
     expect(grouped["A"]).toBe(2);
@@ -3771,7 +3771,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     // Default select should return all attributes
-    expect((posts[0] as any).readAttribute("title")).toBe("A");
+    expect((posts[0] as any).title).toBe("A");
   });
   it("select with block and dirty target", async () => {
     class Author extends Base {
@@ -3796,7 +3796,7 @@ describe("HasManyAssociationsTest", () => {
       className: "Post",
       foreignKey: "author_id",
     });
-    const selected = posts.filter((p: any) => p.readAttribute("title") === "A");
+    const selected = posts.filter((p: any) => p.title === "A");
     expect(selected.length).toBe(1);
   });
   it("select without foreign key", async () => {
@@ -3822,7 +3822,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("title")).toBe("A");
+    expect((posts[0] as any).title).toBe("A");
   });
   it("regular create on has many when parent is new raises", async () => {
     class Author extends Base {
@@ -3845,7 +3845,7 @@ describe("HasManyAssociationsTest", () => {
     // Creating a child with null FK since parent isn't persisted
     const post = Post.new({ author_id: author.id, title: "Test" });
     expect(post.isNewRecord()).toBe(true);
-    expect((post as any).readAttribute("author_id")).toBeNull();
+    expect((post as any).author_id).toBeNull();
   });
   it("create with bang on has many raises when record not saved", async () => {
     class Author extends Base {
@@ -3867,7 +3867,7 @@ describe("HasManyAssociationsTest", () => {
     expect(author.isNewRecord()).toBe(true);
     // Parent is unsaved, so FK will be null
     const post = Post.new({ author_id: author.id, title: "Test" });
-    expect((post as any).readAttribute("author_id")).toBeNull();
+    expect((post as any).author_id).toBeNull();
   });
   it("create with bang on habtm when parent is new raises", async () => {
     class Author extends Base {
@@ -3921,7 +3921,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await TxAddAuthor.create({ name: "Alice" });
     const post = await TxAddPost.create({ author_id: author.id, title: "Added" });
     expect(post.isPersisted()).toBe(true);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
   it("transactions when adding to new record", async () => {
     class TxNewAuthor extends Base {
@@ -3978,7 +3978,7 @@ describe("HasManyAssociationsTest", () => {
       inverseOf: "inv_val_posts",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Alice");
+    expect(loaded!.name).toBe("Alice");
   });
   it("collection size with dirty target", async () => {
     class SizeDirtyAuthor extends Base {
@@ -4106,7 +4106,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await BuildNoLoadAuthor.create({ name: "Alice" });
     const post = BuildNoLoadPost.new({ author_id: author.id, title: "Built" });
     expect(post.isNewRecord()).toBe(true);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
 
   it("build many via block", async () => {
@@ -4128,12 +4128,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await BuildManyBlockAuthor.create({ name: "Alice" });
     const posts = ["A", "B", "C"].map((title) => {
       const post = BuildManyBlockPost.new({ author_id: author.id });
-      post.writeAttribute("title", title);
+      post.title = title;
       return post;
     });
     expect(posts.length).toBe(3);
     expect(posts.every((p) => p.isNewRecord())).toBe(true);
-    expect((posts[0] as any).readAttribute("title")).toBe("A");
+    expect((posts[0] as any).title).toBe("A");
   });
 
   it("create without loading association", async () => {
@@ -4180,14 +4180,14 @@ describe("HasManyAssociationsTest", () => {
     registerModel(CreateSavePost);
     const author = await CreateSaveAuthor.create({ name: "Alice" });
     const post = await CreateSavePost.create({ author_id: author.id, title: "Created" });
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
     const posts = await loadHasMany(author, "create_save_posts", {
       className: "CreateSavePost",
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("title")).toBe("Updated");
+    expect((posts[0] as any).title).toBe("Updated");
   });
   it("deleting models with composite keys", async () => {
     class CompKeyAuthor extends Base {
@@ -4265,7 +4265,7 @@ describe("HasManyAssociationsTest", () => {
     await CcConcatPost.create({ author_id: author.id, title: "A" });
     // create() automatically calls updateCounterCaches
     const reloaded = await CcConcatAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
   it("counter cache updates in memory after create with array", async () => {
     class CcArrAuthor extends Base {
@@ -4293,7 +4293,7 @@ describe("HasManyAssociationsTest", () => {
     await CcArrPost.create({ author_id: author.id, title: "A" });
     await CcArrPost.create({ author_id: author.id, title: "B" });
     const reloaded = await CcArrAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(2);
+    expect((reloaded as any).posts_count).toBe(2);
   });
   it("counter cache updates in memory after update with inverse of disabled", async () => {
     class CcUpdDisAuthor extends Base {
@@ -4320,7 +4320,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await CcUpdDisAuthor.create({ name: "Alice", posts_count: 0 });
     await CcUpdDisPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcUpdDisAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
   it("counter cache updates in memory after create with overlapping counter cache columns", async () => {
     class CcOverlapAuthor extends Base {
@@ -4347,7 +4347,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await CcOverlapAuthor.create({ name: "Alice", posts_count: 0 });
     await CcOverlapPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcOverlapAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
   it("counter cache updates in memory after update with inverse of enabled", async () => {
     class CcUpdEnAuthor extends Base {
@@ -4374,7 +4374,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await CcUpdEnAuthor.create({ name: "Alice", posts_count: 0 });
     await CcUpdEnPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcUpdEnAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
   it("deleting updates counter cache without dependent option", async () => {
     class CcDelNdAuthor extends Base {
@@ -4402,7 +4402,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcDelNdPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
     const reloaded = await CcDelNdAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(0);
+    expect((reloaded as any).posts_count).toBe(0);
   });
   it("deleting updates counter cache with dependent delete all", async () => {
     class CcDelDaAuthor extends Base {
@@ -4435,7 +4435,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcDelDaPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
     const reloaded = await CcDelDaAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(0);
+    expect((reloaded as any).posts_count).toBe(0);
   });
   it("deleting updates counter cache with dependent destroy", async () => {
     class CcDelDsAuthor extends Base {
@@ -4468,7 +4468,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcDelDsPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
     const reloaded = await CcDelDsAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(0);
+    expect((reloaded as any).posts_count).toBe(0);
   });
   it("calling update on id changes the counter cache", async () => {
     class CcUpdIdAuthor extends Base {
@@ -4497,13 +4497,13 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcUpdIdPost.create({ author_id: author1.id, title: "A" });
     // Move post to author2
     await updateCounterCaches(post, "decrement");
-    post.writeAttribute("author_id", author2.id);
+    post.author_id = author2.id;
     await post.save();
     await updateCounterCaches(post, "increment");
     const reloaded1 = await CcUpdIdAuthor.find(author1.id!);
     const reloaded2 = await CcUpdIdAuthor.find(author2.id!);
-    expect((reloaded1 as any).readAttribute("posts_count")).toBe(0);
-    expect((reloaded2 as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded1 as any).posts_count).toBe(0);
+    expect((reloaded2 as any).posts_count).toBe(1);
   });
   it("calling update changing ids changes the counter cache", async () => {
     class CcChgAuthor extends Base {
@@ -4531,13 +4531,13 @@ describe("HasManyAssociationsTest", () => {
     const author2 = await CcChgAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcChgPost.create({ author_id: author1.id, title: "A" });
     await updateCounterCaches(post, "decrement");
-    post.writeAttribute("author_id", author2.id);
+    post.author_id = author2.id;
     await post.save();
     await updateCounterCaches(post, "increment");
     const reloaded1 = await CcChgAuthor.find(author1.id!);
     const reloaded2 = await CcChgAuthor.find(author2.id!);
-    expect((reloaded1 as any).readAttribute("posts_count")).toBe(0);
-    expect((reloaded2 as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded1 as any).posts_count).toBe(0);
+    expect((reloaded2 as any).posts_count).toBe(1);
   });
   it("calling update changing ids of inversed association changes the counter cache", async () => {
     class CcInvAuthor extends Base {
@@ -4565,11 +4565,11 @@ describe("HasManyAssociationsTest", () => {
     const author2 = await CcInvAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcInvPost.create({ author_id: author1.id, title: "A" });
     await updateCounterCaches(post, "decrement");
-    post.writeAttribute("author_id", author2.id);
+    post.author_id = author2.id;
     await post.save();
     await updateCounterCaches(post, "increment");
     const reloaded2 = await CcInvAuthor.find(author2.id!);
-    expect((reloaded2 as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded2 as any).posts_count).toBe(1);
   });
   it("clearing updates counter cache", async () => {
     class CcClrAuthor extends Base {
@@ -4605,7 +4605,7 @@ describe("HasManyAssociationsTest", () => {
     await p1.destroy();
     await p2.destroy();
     const reloaded = await CcClrAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(0);
+    expect((reloaded as any).posts_count).toBe(0);
   });
   it("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
     class CcClrSymAuthor extends Base {
@@ -4638,7 +4638,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcClrSymPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
     const reloaded = await CcClrSymAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(0);
+    expect((reloaded as any).posts_count).toBe(0);
   });
   it("delete all with option nullify", async () => {
     class NullifyAllAuthor extends Base {
@@ -4665,7 +4665,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await NullifyAllPost.create({ author_id: author.id, title: "A" });
     await processDependentAssociations(author);
     const reloaded = await NullifyAllPost.find(post.id!);
-    expect((reloaded as any).readAttribute("author_id")).toBeNull();
+    expect((reloaded as any).author_id).toBeNull();
   });
   it("delete all accepts limited parameters", async () => {
     class LimitedDelAuthor extends Base {
@@ -5278,12 +5278,12 @@ describe("HasManyAssociationsTest", () => {
       author_type: "DnpPerson",
       body: "Hello",
     });
-    expect(comment.readAttribute("author_id")).toBe(author.id);
-    expect(comment.readAttribute("author_type")).toBe("DnpPerson");
+    expect(comment.author_id).toBe(author.id);
+    expect(comment.author_type).toBe("DnpPerson");
     await processDependentAssociations(author);
     const reloaded = await DnpComment.find(comment.id as number);
-    expect(reloaded.readAttribute("author_id")).toBeNull();
-    expect(reloaded.readAttribute("author_type")).toBeNull();
+    expect(reloaded.author_id).toBeNull();
+    expect(reloaded.author_type).toBeNull();
   });
   it("restrict with error", async () => {
     class ReAuthor extends Base {
@@ -5422,7 +5422,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ReplFailAuthor.create({ name: "Alice" });
     const post = await ReplFailPost.create({ author_id: author.id, title: "A" });
     // Replacing FK with invalid value
-    post.writeAttribute("author_id", 999999);
+    post.author_id = 999999;
     await post.save();
     const posts = await loadHasMany(author, "repl_fail_posts", {
       className: "ReplFailPost",
@@ -5449,7 +5449,7 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await TxReplAuthor.create({ name: "Alice" });
     const author2 = await TxReplAuthor.create({ name: "Bob" });
     const post = await TxReplPost.create({ author_id: author1.id, title: "A" });
-    post.writeAttribute("author_id", author2.id);
+    post.author_id = author2.id;
     await post.save();
     const posts1 = await loadHasMany(author1, "tx_repl_posts", {
       className: "TxReplPost",
@@ -5770,10 +5770,10 @@ describe("HasManyAssociationsTest", () => {
     const author = await ThrModAuthor.create({ name: "Alice" });
     const post = await ThrModPost.create({ author_id: author.id, title: "A" });
     // Direct modification of the through record is fine
-    post.writeAttribute("title", "Modified");
+    post.title = "Modified";
     await post.save();
     const reloaded = await ThrModPost.find(post.id!);
-    expect((reloaded as any).readAttribute("title")).toBe("Modified");
+    expect((reloaded as any).title).toBe("Modified");
   });
   it("associations order should be priority over throughs order", async () => {
     class OrdThrAuthor extends Base {
@@ -5877,7 +5877,7 @@ describe("HasManyAssociationsTest", () => {
       scope: (rel: any) => rel.where({ body: "hello" }),
     });
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("hello");
+    expect(comments[0].body).toBe("hello");
   });
   it("include checks if record exists if target not loaded", async () => {
     class InclAuthor extends Base {
@@ -6199,7 +6199,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     // Block-style: filter and check many
-    const filtered = posts.filter((p: any) => p.readAttribute("title") === "A");
+    const filtered = posts.filter((p: any) => p.title === "A");
     expect(filtered.length > 1).toBe(false);
   });
   it("calling none should count instead of loading association", async () => {
@@ -6272,7 +6272,7 @@ describe("HasManyAssociationsTest", () => {
       className: "NoneBlkPost",
       foreignKey: "author_id",
     });
-    const filtered = posts.filter((p: any) => p.readAttribute("title") === "Z");
+    const filtered = posts.filter((p: any) => p.title === "Z");
     expect(filtered.length === 0).toBe(true);
   });
   it("calling one should count instead of loading association", async () => {
@@ -6376,7 +6376,7 @@ describe("HasManyAssociationsTest", () => {
       className: "OneBlkPost",
       foreignKey: "author_id",
     });
-    const filtered = posts.filter((p: any) => p.readAttribute("title") === "A");
+    const filtered = posts.filter((p: any) => p.title === "A");
     expect(filtered.length === 1).toBe(true);
   });
   it("calling one should return false if zero", async () => {
@@ -6498,7 +6498,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await PkAuthor.create({ name: "Alice" });
     const post = await PkPost.create({ author_id: author.id, title: "PK Created" });
     expect(post.isNewRecord()).toBe(false);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
     const posts = await loadHasMany(author, "pk_posts", {
       className: "PkPost",
       foreignKey: "author_id",
@@ -6561,7 +6561,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await LazyNullPost.create({ author_id: author.id, title: "A" });
     await processDependentAssociations(author);
     const reloaded = await LazyNullPost.find(post.id!);
-    expect((reloaded as any).readAttribute("author_id")).toBeNull();
+    expect((reloaded as any).author_id).toBeNull();
   });
   it("attributes are being set when initialized from has many association with where clause", async () => {
     class WhereInitAuthor extends Base {
@@ -6581,8 +6581,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(WhereInitPost);
     const author = await WhereInitAuthor.create({ name: "Alice" });
     const post = WhereInitPost.new({ author_id: author.id, title: "Initialized" });
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
-    expect((post as any).readAttribute("title")).toBe("Initialized");
+    expect((post as any).author_id).toBe(author.id);
+    expect((post as any).title).toBe("Initialized");
   });
   it("attributes are being set when initialized from has many association with multiple where clauses", async () => {
     class MultiWhereAuthor extends Base {
@@ -6603,9 +6603,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(MultiWherePost);
     const author = await MultiWhereAuthor.create({ name: "Alice" });
     const post = MultiWherePost.new({ author_id: author.id, title: "Init", status: "draft" });
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
-    expect((post as any).readAttribute("title")).toBe("Init");
-    expect((post as any).readAttribute("status")).toBe("draft");
+    expect((post as any).author_id).toBe(author.id);
+    expect((post as any).title).toBe("Init");
+    expect((post as any).status).toBe("draft");
   });
   it("load target respects protected attributes", async () => {
     class ProtAuthor extends Base {
@@ -6630,7 +6630,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
-    expect((posts[0] as any).readAttribute("title")).toBe("A");
+    expect((posts[0] as any).title).toBe("A");
   });
   it("merging with custom attribute writer", async () => {
     class MergeAuthor extends Base {
@@ -6650,9 +6650,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(MergePost);
     const author = await MergeAuthor.create({ name: "Alice" });
     const post = MergePost.new({ author_id: author.id });
-    post.writeAttribute("title", "Merged");
-    expect((post as any).readAttribute("title")).toBe("Merged");
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    post.title = "Merged";
+    expect((post as any).title).toBe("Merged");
+    expect((post as any).author_id).toBe(author.id);
   });
   it("joining through a polymorphic association with a where clause", async () => {
     class JpComment extends Base {
@@ -6705,8 +6705,8 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(post, "bphmComments");
     // Attempt to override type and id — they should be set by the association
     const comment = proxy.build({ body: "nice", commentable_id: 999, commentable_type: "Evil" });
-    expect(comment.readAttribute("commentable_id")).toBe(post.id);
-    expect(comment.readAttribute("commentable_type")).toBe("BphmPost");
+    expect(comment.commentable_id).toBe(post.id);
+    expect(comment.commentable_type).toBe("BphmPost");
   });
   it("build from polymorphic association sets inverse instance", async () => {
     class BpInvComment extends Base {
@@ -6732,8 +6732,8 @@ describe("HasManyAssociationsTest", () => {
     const post = await BpInvPost.create({ title: "Hello" });
     const proxy = association(post, "bpInvComments");
     const comment = proxy.build({ body: "nice" });
-    expect(comment.readAttribute("commentable_id")).toBe(post.id);
-    expect(comment.readAttribute("commentable_type")).toBe("BpInvPost");
+    expect(comment.commentable_id).toBe(post.id);
+    expect(comment.commentable_type).toBe("BpInvPost");
   });
   it("dont call save callbacks twice on has many", async () => {
     class NoDblAuthor extends Base {
@@ -6756,7 +6756,7 @@ describe("HasManyAssociationsTest", () => {
     // Saving again should work without issues
     await post.save();
     const reloaded = await NoDblPost.find(post.id!);
-    expect((reloaded as any).readAttribute("title")).toBe("A");
+    expect((reloaded as any).title).toBe("A");
   });
   it("association attributes are available to after initialize", async () => {
     class InitAttrAuthor extends Base {
@@ -6777,8 +6777,8 @@ describe("HasManyAssociationsTest", () => {
     const author = await InitAttrAuthor.create({ name: "Alice" });
     const post = InitAttrPost.new({ author_id: author.id, title: "Init" });
     // Association attributes should be available immediately after initialization
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
-    expect((post as any).readAttribute("title")).toBe("Init");
+    expect((post as any).author_id).toBe(author.id);
+    expect((post as any).title).toBe("Init");
   });
   it("attributes are set when initialized from has many null relationship", async () => {
     class NullRelAuthor extends Base {
@@ -6798,8 +6798,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(NullRelPost);
     // Building a post with null FK (no parent)
     const post = NullRelPost.new({ author_id: null as any, title: "Orphan" });
-    expect((post as any).readAttribute("author_id")).toBeNull();
-    expect((post as any).readAttribute("title")).toBe("Orphan");
+    expect((post as any).author_id).toBeNull();
+    expect((post as any).title).toBe("Orphan");
   });
   it("attributes are set when initialized from polymorphic has many null relationship", async () => {
     class NullPolyComment extends Base {
@@ -6816,9 +6816,9 @@ describe("HasManyAssociationsTest", () => {
       commentable_type: null as any,
       body: "Orphan",
     });
-    expect((comment as any).readAttribute("commentable_id")).toBeNull();
-    expect((comment as any).readAttribute("commentable_type")).toBeNull();
-    expect((comment as any).readAttribute("body")).toBe("Orphan");
+    expect((comment as any).commentable_id).toBeNull();
+    expect((comment as any).commentable_type).toBeNull();
+    expect((comment as any).body).toBe("Orphan");
   });
   it("replace returns target", async () => {
     class Author extends Base {
@@ -6839,8 +6839,8 @@ describe("HasManyAssociationsTest", () => {
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ author_id: author.id, title: "A" });
     // Reassigning FK returns the target value
-    post.writeAttribute("author_id", author.id);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    post.author_id = author.id;
+    expect((post as any).author_id).toBe(author.id);
   });
   it("collection association with private kernel method", async () => {
     class KernelAuthor extends Base {
@@ -6939,7 +6939,7 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length).toBe(0);
     const post = FoiPost.new({ author_id: author.id, title: "Initialized" });
     expect(post.isNewRecord()).toBe(true);
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
   it("first_or_create adds the record to the association", async () => {
     class FocAuthor extends Base {
@@ -7286,7 +7286,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await CcDsAuthor.create({ name: "Alice", posts_count: 0 });
     await CcDsPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcDsAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
   it("passes custom context validation to validate children", async () => {
     class CtxValAuthor extends Base {
@@ -7356,9 +7356,9 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts1.length).toBe(1);
-    expect((posts1[0] as any).readAttribute("title")).toBe("Original");
+    expect((posts1[0] as any).title).toBe("Original");
     // Update the post
-    post.writeAttribute("title", "Updated");
+    post.title = "Updated";
     await post.save();
     // Reload - should get updated version
     const posts2 = await loadHasMany(author, "repl_mem_posts", {
@@ -7366,7 +7366,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts2.length).toBe(1);
-    expect((posts2[0] as any).readAttribute("title")).toBe("Updated");
+    expect((posts2[0] as any).title).toBe("Updated");
   });
   it("in memory replacement executes no queries", async () => {
     class InMemAuthor extends Base {
@@ -7387,8 +7387,8 @@ describe("HasManyAssociationsTest", () => {
     const author = await InMemAuthor.create({ name: "Alice" });
     const post = InMemPost.new({ author_id: author.id, title: "A" });
     // In-memory: changing FK doesn't require DB query
-    post.writeAttribute("author_id", null as any);
-    expect((post as any).readAttribute("author_id")).toBeNull();
+    post.author_id = null as any;
+    expect((post as any).author_id).toBeNull();
   });
   it("in memory replacements do not execute callbacks", async () => {
     class InMemCbAuthor extends Base {
@@ -7409,8 +7409,8 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await InMemCbAuthor.create({ name: "Alice" });
     const author2 = await InMemCbAuthor.create({ name: "Bob" });
     const post = InMemCbPost.new({ author_id: author1.id, title: "A" });
-    post.writeAttribute("author_id", author2.id);
-    expect((post as any).readAttribute("author_id")).toBe(author2.id);
+    post.author_id = author2.id;
+    expect((post as any).author_id).toBe(author2.id);
   });
   it("in memory replacements sets inverse instance", async () => {
     class InMemInvAuthor extends Base {
@@ -7430,7 +7430,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InMemInvPost);
     const author = await InMemInvAuthor.create({ name: "Alice" });
     const post = InMemInvPost.new({ author_id: author.id, title: "A" });
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
   it("reattach to new objects replaces inverse association and foreign key", async () => {
     class ReattachAuthor extends Base {
@@ -7451,10 +7451,10 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await ReattachAuthor.create({ name: "Alice" });
     const author2 = await ReattachAuthor.create({ name: "Bob" });
     const post = await ReattachPost.create({ author_id: author1.id, title: "A" });
-    post.writeAttribute("author_id", author2.id);
+    post.author_id = author2.id;
     await post.save();
     const reloaded = await ReattachPost.find(post.id!);
-    expect((reloaded as any).readAttribute("author_id")).toBe(author2.id);
+    expect((reloaded as any).author_id).toBe(author2.id);
     const oldPosts = await loadHasMany(author1, "reattach_posts", {
       className: "ReattachPost",
       foreignKey: "author_id",
@@ -7895,7 +7895,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     registerModel(CpkAsgPost);
     const author = await CpkAsgAuthor.create({ name: "Alice" });
     const post = await CpkAsgPost.create({ author_id: author.id, title: "A" });
-    expect((post as any).readAttribute("author_id")).toBe(author.id);
+    expect((post as any).author_id).toBe(author.id);
   });
 });
 
@@ -7992,11 +7992,11 @@ describe("HasManyAssociationsTest", () => {
     const author = await DelCcAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await DelCcPost.create({ author_id: author.id, title: "A" });
     let reloaded = await DelCcAuthor.find(author.id!);
-    expect((reloaded as any).readAttribute("posts_count")).toBe(1);
+    expect((reloaded as any).posts_count).toBe(1);
     await post.destroy();
     reloaded = await DelCcAuthor.find(author.id!);
     // Counter cache may or may not decrement on destroy depending on implementation
-    expect((reloaded as any).readAttribute("posts_count")).toBeLessThanOrEqual(1);
+    expect((reloaded as any).posts_count).toBeLessThanOrEqual(1);
   });
   it("destroy dependent when deleted from association", async () => {
     class DepDelAuthor extends Base {
@@ -8053,7 +8053,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await NullPost.create({ author_id: author.id, title: "A" });
     await processDependentAssociations(author);
     const reloaded = await NullPost.find(post.id!);
-    expect(reloaded.readAttribute("author_id")).toBeNull();
+    expect(reloaded.author_id).toBeNull();
   });
   it("calling one should return true if one", async () => {
     class OneAuthor extends Base {
@@ -8103,8 +8103,8 @@ describe("HasManyAssociationsTest", () => {
     const post = await AbsPolyPost.create({ title: "Hello" });
     const proxy = association(post, "absPolyComments");
     const comment = proxy.build({ body: "nice" });
-    expect(comment.readAttribute("commentable_id")).toBe(post.id);
-    expect(comment.readAttribute("commentable_type")).toBe("AbsPolyPost");
+    expect(comment.commentable_id).toBe(post.id);
+    expect(comment.commentable_type).toBe("AbsPolyPost");
   });
   it("with polymorphic has many with custom columns name", async () => {
     class CustPolyComment extends Base {
@@ -8130,8 +8130,8 @@ describe("HasManyAssociationsTest", () => {
     const post = await CustPolyPost.create({ title: "Hello" });
     const proxy = association(post, "custPolyComments");
     const comment = proxy.build({ body: "nice" });
-    expect(comment.readAttribute("taggable_id")).toBe(post.id);
-    expect(comment.readAttribute("taggable_type")).toBe("CustPolyPost");
+    expect(comment.taggable_id).toBe(post.id);
+    expect(comment.taggable_type).toBe("CustPolyPost");
   });
   it("destroy does not raise when association errors on destroy", async () => {
     class NoRaiseAuthor extends Base {
@@ -8255,7 +8255,7 @@ describe("HasManyAssociationsTest", () => {
     await CnComment.create({ body: "Hi", post_id: post.id });
 
     const reloaded = await CnPost.find(post.id as number);
-    expect(reloaded.readAttribute("my_comment_count")).toBe(1);
+    expect(reloaded.my_comment_count).toBe(1);
   });
 
   it("restrict with exception", async () => {

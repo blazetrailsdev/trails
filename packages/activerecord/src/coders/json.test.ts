@@ -14,7 +14,7 @@ describe("JSONTest", () => {
     serialize(Topic, "content");
     const t = await Topic.create({ content: "" });
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.readAttribute("content")).toBeNull();
+    expect(reloaded.content).toBeNull();
   });
 
   it("returns nil if nil given", async () => {
@@ -28,6 +28,6 @@ describe("JSONTest", () => {
     serialize(Topic, "content");
     const t = await Topic.create({ content: null });
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.readAttribute("content")).toBeNull();
+    expect(reloaded.content).toBeNull();
   });
 });

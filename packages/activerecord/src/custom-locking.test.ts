@@ -19,6 +19,6 @@ describe("CustomLockingTest", () => {
     }
     const p = await Post.create({ title: "test" });
     await p.update({ title: "updated" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
   });
 });

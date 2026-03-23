@@ -275,7 +275,7 @@ describe("OrTest", () => {
       .limit(1);
     const results = await r.toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("alice");
+    expect(results[0].name).toBe("alice");
   });
 });
 
@@ -319,7 +319,7 @@ describe("OrTest", () => {
     const result = await young.or(old).toArray();
 
     expect(result).toHaveLength(2);
-    const names = result.map((r: Base) => r.readAttribute("name"));
+    const names = result.map((r: Base) => r.name);
     expect(names).toContain("Alice");
     expect(names).toContain("Charlie");
   });
@@ -409,7 +409,7 @@ describe("OrTest", () => {
     const editors = (User as any).editors();
     const result = await admins.or(editors).toArray();
     expect(result.length).toBe(2);
-    const names = result.map((r: any) => r.readAttribute("name")).sort();
+    const names = result.map((r: any) => r.name).sort();
     expect(names).toEqual(["Alice", "Bob"]);
   });
 });
@@ -437,7 +437,7 @@ describe("OrTest", () => {
       .or(User.where({ name: "Charlie" }))
       .toArray();
     expect(result).toHaveLength(2);
-    const names = result.map((r: Base) => r.readAttribute("name"));
+    const names = result.map((r: Base) => r.name);
     expect(names).toContain("Alice");
     expect(names).toContain("Charlie");
   });
@@ -492,7 +492,7 @@ describe("OrTest", () => {
       .toArray();
 
     expect(result).toHaveLength(2);
-    const ids = result.map((r: Base) => r.readAttribute("author_id"));
+    const ids = result.map((r: Base) => r.author_id);
     expect(ids).toContain(1);
     expect(ids).toContain(3);
   });
@@ -538,8 +538,8 @@ describe("OrTest", () => {
       .order("title")
       .toArray();
 
-    expect(result[0].readAttribute("title")).toBe("A");
-    expect(result[1].readAttribute("title")).toBe("Z");
+    expect(result[0].title).toBe("A");
+    expect(result[1].title).toBe("Z");
   });
 });
 
@@ -569,7 +569,7 @@ describe("OrTest", () => {
       .or(User.where({ role: "mod" }))
       .toArray();
     expect(result).toHaveLength(2);
-    const names = result.map((u: any) => u.readAttribute("name")).sort();
+    const names = result.map((u: any) => u.name).sort();
     expect(names).toEqual(["Alice", "Charlie"]);
   });
 
@@ -585,7 +585,7 @@ describe("OrTest", () => {
       .or(User.where({ role: "mod" }))
       .toArray();
     expect(result).toHaveLength(3);
-    const names = result.map((u: any) => u.readAttribute("name")).sort();
+    const names = result.map((u: any) => u.name).sort();
     expect(names).toEqual(["Alice", "Bob", "Charlie"]);
   });
 

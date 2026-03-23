@@ -74,8 +74,7 @@ describe("JsonSerializationTest", () => {
 
   it("methods are called on object", async () => {
     const contact = await Contact.create({ name: "David", age: 30 });
-    (contact as any).label = () =>
-      `${contact.readAttribute("name")} (${contact.readAttribute("age")})`;
+    (contact as any).label = () => `${contact.name} (${contact.age})`;
     const hash = contact.asJson({ methods: ["label"] });
     expect(hash.label).toBe("David (30)");
   });

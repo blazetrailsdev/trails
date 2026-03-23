@@ -137,9 +137,9 @@ describe("ModulesTest", () => {
       }
     }
     const p = await Post.create({ title: "a", author_id: 1 });
-    p.writeAttribute("author_id", null);
+    p.author_id = null;
     await p.save();
-    expect(p.readAttribute("author_id")).toBeNull();
+    expect(p.author_id).toBeNull();
   });
 
   it.skip("table name in mixins", () => {});

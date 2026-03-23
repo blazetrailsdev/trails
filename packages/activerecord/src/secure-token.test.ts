@@ -34,7 +34,7 @@ describe("SecureTokenTest", () => {
   it("token values are generated for specified attributes and persisted on save", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Alice" });
-    const tok = u.readAttribute("token");
+    const tok = u.token;
     expect(tok).toBeTruthy();
     expect(typeof tok).toBe("string");
     expect((tok as string).length).toBeGreaterThanOrEqual(24);
@@ -44,26 +44,26 @@ describe("SecureTokenTest", () => {
     const { User } = makeModel();
     const u = new User({ name: "Bob" });
     // token should be empty before save
-    expect(u.readAttribute("token")).toBeFalsy();
+    expect(u.token).toBeFalsy();
     await u.save();
-    expect(u.readAttribute("token")).toBeTruthy();
+    expect(u.token).toBeTruthy();
   });
 
   it("generating token on initialize happens only once", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Carol" });
-    const token1 = u.readAttribute("token");
+    const token1 = u.token;
     await u.save();
-    const token2 = u.readAttribute("token");
+    const token2 = u.token;
     expect(token1).toBe(token2);
   });
 
   it("regenerating the secure token", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Dan" });
-    const originalToken = u.readAttribute("token") as string;
+    const originalToken = u.token as string;
     await (u as any).regenerateToken();
-    const newToken = u.readAttribute("token") as string;
+    const newToken = u.token as string;
     expect(newToken).not.toBe(originalToken);
     expect(newToken.length).toBeGreaterThanOrEqual(24);
   });
@@ -71,7 +71,7 @@ describe("SecureTokenTest", () => {
   it("token value not overwritten when present", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Eve", token: "preset-token-value-abc" });
-    expect(u.readAttribute("token")).toBe("preset-token-value-abc");
+    expect(u.token).toBe("preset-token-value-abc");
   });
 
   it("token length cannot be less than 24 characters", async () => {
@@ -84,7 +84,7 @@ describe("SecureTokenTest", () => {
     }
     hasSecureToken(UserWithToken, "token", { length: 24 });
     const u = await UserWithToken.create({ name: "Frank" });
-    expect((u.readAttribute("token") as string).length).toBeGreaterThanOrEqual(24);
+    expect((u.token as string).length).toBeGreaterThanOrEqual(24);
   });
 
   it("token on callback", async () => {
@@ -100,7 +100,7 @@ describe("SecureTokenTest", () => {
   it("token calls the setter method", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Henry" });
-    const t = u.readAttribute("token");
+    const t = u.token;
     expect(typeof t).toBe("string");
   });
 
@@ -125,9 +125,9 @@ describe("has_secure_token", () => {
     hasSecureToken(ApiKey);
 
     const key = await ApiKey.create({});
-    expect(key.readAttribute("token")).toBeTruthy();
-    expect(typeof key.readAttribute("token")).toBe("string");
-    expect((key.readAttribute("token") as string).length).toBeGreaterThan(0);
+    expect(key.token).toBeTruthy();
+    expect(typeof key.token).toBe("string");
+    expect((key.token as string).length).toBeGreaterThan(0);
   });
 
   it("allows regeneration of token", async () => {
@@ -140,11 +140,11 @@ describe("has_secure_token", () => {
     hasSecureToken(ApiKey);
 
     const key = await ApiKey.create({});
-    const originalToken = key.readAttribute("token");
+    const originalToken = key.token;
 
     const newToken = await (key as any).regenerateToken();
     expect(newToken).not.toBe(originalToken);
-    expect(key.readAttribute("token")).toBe(newToken);
+    expect(key.token).toBe(newToken);
   });
 
   it("supports custom attribute name", async () => {
@@ -157,7 +157,7 @@ describe("has_secure_token", () => {
     hasSecureToken(Session, "auth_token");
 
     const s = await Session.create({});
-    expect(s.readAttribute("auth_token")).toBeTruthy();
+    expect(s.auth_token).toBeTruthy();
   });
 });
 
@@ -181,8 +181,8 @@ describe("has_secure_token (Rails-guided)", () => {
     hasSecureToken(User);
 
     const user = await User.create({});
-    expect(user.readAttribute("token")).toBeTruthy();
-    expect(typeof user.readAttribute("token")).toBe("string");
+    expect(user.token).toBeTruthy();
+    expect(typeof user.token).toBe("string");
   });
 
   // Rails: test "does not overwrite existing token"
@@ -199,7 +199,7 @@ describe("has_secure_token (Rails-guided)", () => {
 
     const user = new User({ token: "my-custom-token" });
     await user.save();
-    expect(user.readAttribute("token")).toBe("my-custom-token");
+    expect(user.token).toBe("my-custom-token");
   });
 
   // Rails: test "regenerate token"
@@ -215,11 +215,11 @@ describe("has_secure_token (Rails-guided)", () => {
     hasSecureToken(User);
 
     const user = await User.create({});
-    const original = user.readAttribute("token");
+    const original = user.token;
 
     const newToken = await (user as any).regenerateToken();
     expect(newToken).not.toBe(original);
-    expect(user.readAttribute("token")).toBe(newToken);
+    expect(user.token).toBe(newToken);
   });
 
   // Rails: test "custom attribute name"
@@ -235,7 +235,7 @@ describe("has_secure_token (Rails-guided)", () => {
     hasSecureToken(Session, "session_token");
 
     const session = await Session.create({});
-    expect(session.readAttribute("session_token")).toBeTruthy();
+    expect(session.session_token).toBeTruthy();
     expect(typeof (session as any).regenerateSessionToken).toBe("function");
   });
 });

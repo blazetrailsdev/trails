@@ -204,9 +204,9 @@ describeIfMysql("MysqlAdapter", () => {
       expect(user.isPersisted()).toBe(true);
 
       const found = await User.find(1);
-      expect(found.readAttribute("name")).toBe("Alice");
-      expect(found.readAttribute("email")).toBe("alice@test.com");
-      expect(found.readAttribute("age")).toBe(30);
+      expect(found.name).toBe("Alice");
+      expect(found.email).toBe("alice@test.com");
+      expect(found.age).toBe(30);
     });
 
     it("updates records", async () => {
@@ -218,8 +218,8 @@ describeIfMysql("MysqlAdapter", () => {
       await user.update({ name: "Alicia", age: 31 });
 
       const found = await User.find(user.id);
-      expect(found.readAttribute("name")).toBe("Alicia");
-      expect(found.readAttribute("age")).toBe(31);
+      expect(found.name).toBe("Alicia");
+      expect(found.age).toBe(31);
     });
 
     it("destroys records", async () => {
@@ -247,8 +247,8 @@ describeIfMysql("MysqlAdapter", () => {
       });
 
       const found = await User.find(user.id);
-      expect(found.readAttribute("email")).toBeNull();
-      expect(found.readAttribute("age")).toBeNull();
+      expect(found.email).toBeNull();
+      expect(found.age).toBeNull();
     });
   });
 
@@ -303,7 +303,7 @@ describeIfMysql("MysqlAdapter", () => {
     it("updateAll with where", async () => {
       await Product.where({ category: "fruit" }).updateAll({ price: 99 });
       const apple = await Product.find(1);
-      expect(apple.readAttribute("price")).toBe(99);
+      expect(apple.price).toBe(99);
     });
   });
 
@@ -398,7 +398,7 @@ describeIfMysql("MysqlAdapter", () => {
 
       const loaded = await loadBelongsTo(book, "author", {});
       expect(loaded).not.toBeNull();
-      expect(loaded!.readAttribute("name")).toBe("Tolkien");
+      expect(loaded!.name).toBe("Tolkien");
     });
 
     it("hasMany loads children from real DB", async () => {

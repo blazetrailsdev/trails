@@ -38,11 +38,11 @@ describe("SuppressorTest", () => {
     }
     const post = await Post.create({ title: "original" });
     await Post.suppress(async () => {
-      post.writeAttribute("title", "changed");
+      post.title = "changed";
       await post.save();
     });
     const found = await Post.find(post.id);
-    expect(found.readAttribute("title")).toBe("original");
+    expect(found.title).toBe("original");
   });
 
   it("suppresses create in callback", async () => {

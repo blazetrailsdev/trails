@@ -32,7 +32,7 @@ describe("secure_password", () => {
     (user as any).password = "secret123";
     await user.save();
 
-    const digest = user.readAttribute("password_digest") as string;
+    const digest = user.password_digest as string;
     expect(digest).toBeTruthy();
     expect(digest).toContain(":");
 

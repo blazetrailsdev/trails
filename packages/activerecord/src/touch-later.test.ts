@@ -66,11 +66,11 @@ describe("TouchLaterTest", () => {
   it("touch later update the attributes", async () => {
     const Invoice = makeTouchModel();
     const inv = await Invoice.create({ amount: 100 });
-    const before = inv.readAttribute("updated_at");
+    const before = inv.updated_at;
     // Small delay so timestamp differs
     await new Promise((r) => setTimeout(r, 5));
     await inv.touch();
-    const after = inv.readAttribute("updated_at");
+    const after = inv.updated_at;
     expect(after).toBeDefined();
     // updated_at should have changed
     if (before && after) {
@@ -85,7 +85,7 @@ describe("TouchLaterTest", () => {
     expect(result).toBe(true);
     // Verify it persisted by reloading
     const reloaded = await Invoice.find(inv.id);
-    expect(reloaded.readAttribute("updated_at")).toBeDefined();
+    expect(reloaded.updated_at).toBeDefined();
   });
 
   it.skip("touch later an association dont autosave parent", () => {
@@ -97,7 +97,7 @@ describe("TouchLaterTest", () => {
     const inv = await Invoice.create({ amount: 100 });
     // touch updates updated_at to current time
     await inv.touch();
-    const updatedAt = inv.readAttribute("updated_at") as Date;
+    const updatedAt = inv.updated_at as Date;
     expect(updatedAt).toBeInstanceOf(Date);
   });
 

@@ -133,7 +133,7 @@ describe("WithAnnotationsTest", () => {
     await Post.create({ title: "first-test" });
     const post = await Post.all().annotate("first-hint").first();
     expect(post).not.toBeNull();
-    expect((post as any).readAttribute("title")).toBe("first-test");
+    expect((post as any).title).toBe("first-test");
   });
 
   it("annotate on toArray query", async () => {

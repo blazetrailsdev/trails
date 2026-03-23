@@ -312,7 +312,7 @@ describe("TransactionTest", () => {
     } catch (_) {
       /* expected */
     }
-    expect(p.readAttribute("title")).toBe("no-id-yet");
+    expect(p.title).toBe("no-id-yet");
   });
 
   it("rollback on composite key model", async () => {
@@ -366,7 +366,7 @@ describe("TransactionTest", () => {
     } catch (_) {
       /* expected */
     }
-    expect(p.readAttribute("title")).toBeDefined();
+    expect(p.title).toBeDefined();
   });
 
   it("callback rollback in create", async () => {
@@ -459,13 +459,13 @@ describe("TransactionTest", () => {
         this.attribute("title", "string");
         this.adapter = adp;
         this.afterCommit((record: any) => {
-          log.push("committed:" + record.readAttribute("title"));
+          log.push("committed:" + record.title);
         });
       }
     }
     const p = await Post.create({ title: "orig" });
     log.length = 0;
-    p.writeAttribute("title", "updated");
+    p.title = "updated";
     await p.save();
     expect(log).toContain("committed:updated");
   });
@@ -534,7 +534,7 @@ describe("TransactionTest", () => {
         this.adapter = adp;
         this.afterRollback(
           (r: any) => {
-            history.push("rollback:" + r.readAttribute("title"));
+            history.push("rollback:" + r.title);
           },
           { on: "create" },
         );
@@ -643,7 +643,7 @@ describe("TransactionTest", () => {
     }
     const p = await Post.create({ title: "test" });
     expect(savedRecord).not.toBeNull();
-    expect(savedRecord.readAttribute("title")).toBe("test");
+    expect(savedRecord.title).toBe("test");
   });
 
   it.skip("after_commit_returns_record_with_destroy", () => {
@@ -769,8 +769,8 @@ describe("TransactionTest", () => {
 
     const r1 = await Topic.find(t1.id);
     const r2 = await Topic.find(t2.id);
-    expect(r1.readAttribute("approved")).toBe(false);
-    expect(r2.readAttribute("approved")).toBe(true);
+    expect(r1.approved).toBe(false);
+    expect(r2.approved).toBe(true);
   });
   it.skip("force savepoint on instance", () => {});
   it.skip("rollback when commit raises", () => {});
@@ -861,7 +861,7 @@ describe("TransactionTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "changed");
+    post.title = "changed";
     try {
       await transaction(Post, async () => {
         await post.save();
@@ -882,11 +882,11 @@ describe("TransactionTest", () => {
       }
     }
     const post = (await Post.create({ title: "v1" })) as any;
-    post.writeAttribute("title", "v2");
+    post.title = "v2";
     await post.save();
-    post.writeAttribute("title", "v3");
+    post.title = "v3";
     await post.save();
-    expect(post.readAttribute("title")).toBe("v3");
+    expect(post.title).toBe("v3");
   });
 
   it("update should rollback on failure", async () => {
@@ -928,8 +928,8 @@ describe("TransactionTest", () => {
     const post2 = (await Post.create({ title: "p2" })) as any;
     try {
       await transaction(Post, async () => {
-        post1.writeAttribute("title", "p1-mod");
-        post2.writeAttribute("title", "p2-mod");
+        post1.title = "p1-mod";
+        post2.title = "p2-mod";
         throw new Error("rollback");
       });
     } catch {
@@ -1010,8 +1010,8 @@ describe("TransactionTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "changed");
-    expect(post.readAttribute("title")).toBe("changed");
+    post.title = "changed";
+    expect(post.title).toBe("changed");
   });
 
   it("write attribute after rollback", async () => {
@@ -1023,8 +1023,8 @@ describe("TransactionTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "new value");
-    expect(post.readAttribute("title")).toBe("new value");
+    post.title = "new value";
+    expect(post.title).toBe("new value");
   });
 
   it("rollback for freshly persisted records", async () => {
@@ -1093,9 +1093,9 @@ describe("TransactionTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "retry");
+    post.title = "retry";
     await post.save();
-    expect(post.readAttribute("title")).toBe("retry");
+    expect(post.title).toBe("retry");
   });
 
   it("transaction commits on success", async () => {

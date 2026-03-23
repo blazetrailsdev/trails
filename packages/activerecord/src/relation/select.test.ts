@@ -168,7 +168,7 @@ describe("SelectTest", () => {
     await Developer.create({ name: "Alice", salary: 100 });
     const devs = await Developer.select("name").toArray();
     expect(devs.length).toBe(1);
-    expect(devs[0].readAttribute("name")).toBe("Alice");
+    expect(devs[0].name).toBe("Alice");
   });
 
   it("merging select from different model", () => {
@@ -241,9 +241,7 @@ describe("select block form", () => {
     await Item.create({ name: "Banana" });
     await Item.create({ name: "Avocado" });
 
-    const items = await Item.all().select((r: any) =>
-      (r.readAttribute("name") as string).startsWith("A"),
-    );
+    const items = await Item.all().select((r: any) => (r.name as string).startsWith("A"));
     expect(items).toHaveLength(2);
   });
 });
@@ -354,9 +352,7 @@ describe("Relation Select (Rails-guided)", () => {
     await User.create({ name: "Apple" });
     await User.create({ name: "Banana" });
     await User.create({ name: "Avocado" });
-    const result = await User.all().select((r: any) =>
-      (r.readAttribute("name") as string).startsWith("A"),
-    );
+    const result = await User.all().select((r: any) => (r.name as string).startsWith("A"));
     expect(result).toHaveLength(2);
   });
 

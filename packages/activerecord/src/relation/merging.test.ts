@@ -77,7 +77,7 @@ describe("RelationMergingTest", () => {
     const r = Post.where({ title: "merged" }).merge(Post.where({ author: "alice" }));
     const results = await r.toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("merged");
+    expect(results[0].title).toBe("merged");
   });
 
   it("relation to sql", () => {
@@ -324,7 +324,7 @@ describe("merge()", () => {
     const active = Item.all().where({ status: "active" });
     const items = await Item.all().where({ name: "A" }).merge(active).toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("name")).toBe("A");
+    expect(items[0].name).toBe("A");
   });
 
   it("merges order from other relation", async () => {
@@ -340,7 +340,7 @@ describe("merge()", () => {
 
     const ordered = Item.all().order({ name: "asc" });
     const items = await Item.all().merge(ordered).toArray();
-    expect(items[0].readAttribute("name")).toBe("A");
+    expect(items[0].name).toBe("A");
   });
 });
 
@@ -446,7 +446,7 @@ describe("only()", () => {
     const simplified = rel.only("where");
     const results = await simplified.toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 });
 
@@ -492,7 +492,7 @@ describe("Relation Merging (Rails-guided)", () => {
     const other = User.where({ name: "Alice" });
     const result = await base.merge(other).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 });
 

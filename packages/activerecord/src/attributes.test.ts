@@ -32,7 +32,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new (CustomPost as any)({ title: "hi", score: "42" });
-    expect(p.readAttribute("score")).toBe(42);
+    expect(p.score).toBe(42);
   });
   it("overloaded properties save", async () => {
     const adp = freshAdapter();
@@ -44,11 +44,11 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = await Post.create({ title: "test" });
-    expect(p.readAttribute("priority")).toBe(1);
-    p.writeAttribute("priority", 5);
+    expect(p.priority).toBe(1);
+    p.priority = 5;
     await p.save();
     const reloaded = await Post.find(p.id);
-    expect(reloaded.readAttribute("priority")).toBe(5);
+    expect(reloaded.priority).toBe(5);
   });
 
   it("properties assigned in constructor", () => {
@@ -60,8 +60,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ title: "hello", score: 42 });
-    expect(p.readAttribute("title")).toBe("hello");
-    expect(p.readAttribute("score")).toBe(42);
+    expect(p.title).toBe("hello");
+    expect(p.score).toBe(42);
   });
 
   it(".type_for_attribute supports attribute aliases", () => {
@@ -86,7 +86,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ short_title: "abcdefghij" });
-    expect(p.readAttribute("short_title")).toBe("abcdefghij");
+    expect(p.short_title).toBe("abcdefghij");
   });
   it("overloaded default but keeping its own type", () => {
     const adp = freshAdapter();
@@ -97,8 +97,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("count")).toBe(10);
-    expect(typeof p.readAttribute("count")).toBe("number");
+    expect(p.count).toBe(10);
+    expect(typeof p.count).toBe("number");
   });
   it("attributes with overridden types keep their type when a default value is configured separately", () => {
     const adp = freshAdapter();
@@ -114,8 +114,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new (CustomPost as any)({});
-    expect(p.readAttribute("score")).toBe(99);
-    expect(typeof p.readAttribute("score")).toBe("number");
+    expect(p.score).toBe(99);
+    expect(typeof p.score).toBe("number");
   });
   it("extra options are forwarded to the type caster constructor", () => {
     const adp = freshAdapter();
@@ -126,7 +126,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("title")).toBe("forwarded");
+    expect(p.title).toBe("forwarded");
   });
   it("time zone aware attribute", () => {
     const adp = freshAdapter();
@@ -138,7 +138,7 @@ describe("CustomPropertiesTest", () => {
     }
     const now = new Date().toISOString();
     const p = new Post({ created_at: now });
-    expect(p.readAttribute("created_at")).toBe(now);
+    expect(p.created_at).toBe(now);
   });
   it("nonexistent attribute", () => {
     const adp = freshAdapter();
@@ -163,7 +163,7 @@ describe("CustomPropertiesTest", () => {
     }
     const p = await Post.create({ title: "test" });
     expect(p.isPersisted()).toBe(true);
-    expect(p.readAttribute("virtual_field")).toBe("computed");
+    expect(p.virtual_field).toBe("computed");
   });
 
   it("changing defaults", () => {
@@ -176,7 +176,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("status")).toBe("draft");
+    expect(p.status).toBe("draft");
   });
 
   it("defaults are not touched on the columns", () => {
@@ -190,7 +190,7 @@ describe("CustomPropertiesTest", () => {
     }
     // The column itself should not have the default baked in; only instances get it
     const p = new Post({});
-    expect(p.readAttribute("status")).toBe("active");
+    expect(p.status).toBe("active");
   });
 
   it("children inherit custom properties", () => {
@@ -204,8 +204,8 @@ describe("CustomPropertiesTest", () => {
     }
     class Dog extends (Animal as any) {}
     const d = new (Dog as any)({ name: "Rex" });
-    expect(d.readAttribute("legs")).toBe(4);
-    expect(d.readAttribute("name")).toBe("Rex");
+    expect(d.legs).toBe(4);
+    expect(d.name).toBe("Rex");
   });
 
   it("children can override parents", () => {
@@ -223,7 +223,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const b = new (Bicycle as any)({ name: "Trek" });
-    expect(b.readAttribute("speed")).toBe(15);
+    expect(b.speed).toBe(15);
   });
 
   it("overloading properties does not attribute method order", () => {
@@ -242,8 +242,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new (CustomPost as any)({ title: "hi" });
-    expect(p.readAttribute("title")).toBe("hi");
-    expect(p.readAttribute("body")).toBe("default body");
+    expect(p.title).toBe("hi");
+    expect(p.body).toBe("default body");
   });
   it("caches are cleared", () => {
     const adp = freshAdapter();
@@ -255,7 +255,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p1 = new Post({});
-    expect(p1.readAttribute("count")).toBe(0);
+    expect(p1.count).toBe(0);
     // Creating a new subclass with different defaults should not affect the parent
     class SpecialPost extends (Post as any) {
       static {
@@ -263,10 +263,10 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p2 = new (SpecialPost as any)({});
-    expect(p2.readAttribute("count")).toBe(100);
+    expect(p2.count).toBe(100);
     // Original class still has its own default
     const p3 = new Post({});
-    expect(p3.readAttribute("count")).toBe(0);
+    expect(p3.count).toBe(0);
   });
 
   it("the given default value is cast from user", () => {
@@ -278,8 +278,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(typeof p.readAttribute("count")).toBe("number");
-    expect(p.readAttribute("count")).toBe(0);
+    expect(typeof p.count).toBe("number");
+    expect(p.count).toBe(0);
   });
 
   it("procs for default values", () => {
@@ -298,8 +298,8 @@ describe("CustomPropertiesTest", () => {
     }
     const p1 = new Post({});
     const p2 = new Post({});
-    expect(p1.readAttribute("token")).toBe("generated");
-    expect(p2.readAttribute("token")).toBe("generated");
+    expect(p1.token).toBe("generated");
+    expect(p2.token).toBe("generated");
     // Each instance calls the proc independently
     expect(calls.length).toBeGreaterThanOrEqual(2);
   });
@@ -317,7 +317,7 @@ describe("CustomPropertiesTest", () => {
     expect(typeof defaults["seq"]).toBe("number");
     // New instances still get their own evaluation
     const p = new Post({});
-    expect(typeof p.readAttribute("seq")).toBe("number");
+    expect(typeof p.seq).toBe("number");
   });
 
   it("procs are memoized before type casting", () => {
@@ -335,8 +335,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    const val1 = p.readAttribute("token");
-    const val2 = p.readAttribute("token");
+    const val1 = p.token;
+    const val2 = p.token;
     // The default proc result should be consistent for the same instance
     expect(val1).toBe(val2);
   });
@@ -353,7 +353,7 @@ describe("CustomPropertiesTest", () => {
     const p = await Post.create({ title: "test" });
     const reloaded = await Post.find(p.id);
     // The default should have been persisted
-    expect(reloaded.readAttribute("status")).toBe("draft");
+    expect(reloaded.status).toBe("draft");
   });
 
   it("array types can be specified", () => {
@@ -365,9 +365,9 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("tags")).toBe("[]");
-    p.writeAttribute("tags", '["a","b"]');
-    expect(p.readAttribute("tags")).toBe('["a","b"]');
+    expect(p.tags).toBe("[]");
+    p.tags = '["a","b"]';
+    expect(p.tags).toBe('["a","b"]');
   });
   it("range types can be specified", () => {
     const adp = freshAdapter();
@@ -378,7 +378,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("price_range")).toBe("0-100");
+    expect(p.price_range).toBe("0-100");
   });
   it("attributes added after subclasses load are inherited", () => {
     const adp = freshAdapter();
@@ -392,7 +392,7 @@ describe("CustomPropertiesTest", () => {
     // Add attribute to parent after subclass is defined
     (Animal as any).attribute("color", "string", { default: "brown" });
     const d = new (Dog as any)({ name: "Rex" });
-    expect(d.readAttribute("name")).toBe("Rex");
+    expect(d.name).toBe("Rex");
   });
 
   it("attributes not backed by database columns are not dirty when unchanged", () => {
@@ -419,7 +419,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.readAttribute("memo")).toBe("");
+    expect(p.memo).toBe("");
   });
 
   it("attributes not backed by database columns return the default on models loaded from database", async () => {
@@ -433,7 +433,7 @@ describe("CustomPropertiesTest", () => {
     }
     const p = await Post.create({ title: "test" });
     const reloaded = await Post.find(p.id);
-    expect(reloaded.readAttribute("virtual_status")).toBe("pending");
+    expect(reloaded.virtual_status).toBe("pending");
   });
   it("attributes not backed by database columns keep their type when a default value is configured separately", () => {
     const adp = freshAdapter();
@@ -449,8 +449,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new (CustomPost as any)({});
-    expect(p.readAttribute("score")).toBe(42);
-    expect(typeof p.readAttribute("score")).toBe("number");
+    expect(p.score).toBe(42);
+    expect(typeof p.score).toBe("number");
   });
 
   it("attributes not backed by database columns properly interact with mutation and dirty", () => {
@@ -464,7 +464,7 @@ describe("CustomPropertiesTest", () => {
     }
     const p = new Post({ title: "hello" });
     (p as any)._dirty.snapshot(p._attributes);
-    p.writeAttribute("note", "added");
+    p.note = "added";
     expect(p.changed).toBe(true);
     expect(p.changedAttributes).toContain("note");
   });
@@ -480,7 +480,7 @@ describe("CustomPropertiesTest", () => {
     }
     const p = new Post({ title: "hi" });
     // The attribute is accessible
-    expect(p.readAttribute("virtual_field")).toBe("v");
+    expect(p.virtual_field).toBe("v");
   });
 
   it("attributes do not require a type", () => {
@@ -493,7 +493,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ metadata: "anything" });
-    expect(p.readAttribute("metadata")).toBe("anything");
+    expect(p.metadata).toBe("anything");
   });
   it("attributes do not require a connection is established", () => {
     const adp = freshAdapter();
@@ -506,7 +506,7 @@ describe("CustomPropertiesTest", () => {
     }
     // Can define and instantiate without any connection/query
     const p = new Post({});
-    expect(p.readAttribute("cached")).toBe("yes");
+    expect(p.cached).toBe("yes");
   });
   it("unknown type error is raised", () => {
     const adp = freshAdapter();
@@ -518,7 +518,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ title: "test" });
-    expect(p.readAttribute("title")).toBe("test");
+    expect(p.title).toBe("test");
   });
   it("immutable_strings_by_default changes schema inference for string columns", () => {
     const adp = freshAdapter();
@@ -529,7 +529,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ title: "hello" });
-    const val = p.readAttribute("title");
+    const val = p.title;
     expect(val).toBe("hello");
   });
   it("immutable_strings_by_default retains limit information", () => {
@@ -541,7 +541,7 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ title: "hello" });
-    expect(typeof p.readAttribute("title")).toBe("string");
+    expect(typeof p.title).toBe("string");
   });
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", () => {
     const adp = freshAdapter();
@@ -552,9 +552,9 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p = new Post({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
-    p.writeAttribute("name", "changed");
-    expect(p.readAttribute("name")).toBe("changed");
+    expect(p.name).toBe("test");
+    p.name = "changed";
+    expect(p.name).toBe("changed");
   });
   it("serialize boolean for both string types", () => {
     const adp = freshAdapter();
@@ -565,8 +565,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
     const p1 = new Post({ active: 1 });
-    expect(p1.readAttribute("active")).toBe(1);
+    expect(p1.active).toBe(1);
     const p2 = new Post({ active: 0 });
-    expect(p2.readAttribute("active")).toBe(0);
+    expect(p2.active).toBe(0);
   });
 });

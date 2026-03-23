@@ -197,7 +197,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "PnTag",
     });
     expect(tags).toHaveLength(1);
-    expect(tags[0].readAttribute("name")).toBe("ruby");
+    expect(tags[0].name).toBe("ruby");
   });
   it("preload sti rhs class", async () => {
     class PsrCompany extends Base {
@@ -252,7 +252,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "PsrDeveloper",
     });
     expect(devs).toHaveLength(1);
-    expect(devs[0].readAttribute("name")).toBe("Alice");
+    expect(devs[0].name).toBe("Alice");
   });
   it("preload sti middle relation", async () => {
     // Club -> Members through Memberships (STI: SuperMembership, CurrentMembership)
@@ -329,7 +329,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const clubs = await PsClub.all().includes("members").toArray();
     const members = (clubs[0] as any)._preloadedAssociations.get("members");
     expect(members).toHaveLength(2);
-    const names = members.map((m: any) => m.readAttribute("name")).sort();
+    const names = members.map((m: any) => m.name).sort();
     expect(names).toEqual(["Aaron", "Cat"]);
   });
   it("preload multiple instances of the same record", async () => {
@@ -360,21 +360,21 @@ describe("HasManyThroughAssociationsTest", () => {
     const p2 = await PreloadMultiParent.create({ name: "B" });
     await PreloadMultiChild.create({
       value: "c1",
-      preload_multi_parent_id: p1.readAttribute("id"),
+      preload_multi_parent_id: p1.id,
     });
     await PreloadMultiChild.create({
       value: "c2",
-      preload_multi_parent_id: p1.readAttribute("id"),
+      preload_multi_parent_id: p1.id,
     });
     await PreloadMultiChild.create({
       value: "c3",
-      preload_multi_parent_id: p2.readAttribute("id"),
+      preload_multi_parent_id: p2.id,
     });
 
     const parents = await PreloadMultiParent.all().includes("preloadMultiChildren").toArray();
     expect(parents).toHaveLength(2);
-    const pa = parents.find((p: any) => p.readAttribute("name") === "A")!;
-    const pb = parents.find((p: any) => p.readAttribute("name") === "B")!;
+    const pa = parents.find((p: any) => p.name === "A")!;
+    const pb = parents.find((p: any) => p.name === "B")!;
     expect((pa as any)._preloadedAssociations.get("preloadMultiChildren")).toHaveLength(2);
     expect((pb as any)._preloadedAssociations.get("preloadMultiChildren")).toHaveLength(1);
   });
@@ -428,8 +428,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtSingletonOwner.create({ name: "Solo" });
     const item = await HmtSingletonItem.create({ label: "Only" });
     await HmtSingletonJoin.create({
-      hmt_singleton_owner_id: owner.readAttribute("id"),
-      hmt_singleton_item_id: item.readAttribute("id"),
+      hmt_singleton_owner_id: owner.id,
+      hmt_singleton_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtSingletonItems", {
@@ -438,7 +438,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtSingletonItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("Only");
+    expect(items[0].label).toBe("Only");
   });
   it("no pk join table append", async () => {
     class HmtNoPkOwner extends Base {
@@ -486,8 +486,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtNoPkOwner.create({ name: "O" });
     const item = await HmtNoPkItem.create({ label: "I" });
     await HmtNoPkJoin.create({
-      hmt_no_pk_owner_id: owner.readAttribute("id"),
-      hmt_no_pk_item_id: item.readAttribute("id"),
+      hmt_no_pk_owner_id: owner.id,
+      hmt_no_pk_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtNoPkItems", {
@@ -496,7 +496,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtNoPkItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I");
+    expect(items[0].label).toBe("I");
   });
   it("no pk join table delete", async () => {
     class HmtNoPkDelOwner extends Base {
@@ -548,8 +548,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtNoPkDelOwner.create({ name: "O" });
     const item = await HmtNoPkDelItem.create({ label: "I" });
     const join = await HmtNoPkDelJoin.create({
-      hmt_no_pk_del_owner_id: owner.readAttribute("id"),
-      hmt_no_pk_del_item_id: item.readAttribute("id"),
+      hmt_no_pk_del_owner_id: owner.id,
+      hmt_no_pk_del_item_id: item.id,
     });
 
     await join.destroy();
@@ -607,8 +607,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtPkOptOwner.create({ name: "O" });
     const item = await HmtPkOptItem.create({ label: "I" });
     await HmtPkOptJoin.create({
-      hmt_pk_opt_owner_id: owner.readAttribute("id"),
-      hmt_pk_opt_item_id: item.readAttribute("id"),
+      hmt_pk_opt_owner_id: owner.id,
+      hmt_pk_opt_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtPkOptItems", {
@@ -665,8 +665,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const person = await HmtPerson.create({ name: "Alice" });
     const club = await HmtClub.create({ name: "Chess" });
     await HmtMembership.create({
-      person_id: person.readAttribute("id"),
-      hmt_club_id: club.readAttribute("id"),
+      person_id: person.id,
+      hmt_club_id: club.id,
     });
 
     const clubs = await loadHasManyThrough(person, "hmtClubs", {
@@ -674,7 +674,7 @@ describe("HasManyThroughAssociationsTest", () => {
       source: "hmtClub",
       className: "HmtClub",
     });
-    expect(clubs.some((c) => c.readAttribute("id") === club.readAttribute("id"))).toBe(true);
+    expect(clubs.some((c) => c.id === club.id)).toBe(true);
   });
 
   it("delete all for with dependent option destroy", async () => {
@@ -704,8 +704,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDepDestroyOwner.create({ name: "O" });
     const item = await HmtDepDestroyItem.create({ label: "I" });
     const join = await HmtDepDestroyJoin.create({
-      hmt_dep_destroy_owner_id: owner.readAttribute("id"),
-      hmt_dep_destroy_item_id: item.readAttribute("id"),
+      hmt_dep_destroy_owner_id: owner.id,
+      hmt_dep_destroy_item_id: item.id,
     });
 
     // Destroying the join record removes the through association
@@ -735,12 +735,12 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtDepNullOwner.create({ name: "O" });
     const join = await HmtDepNullJoin.create({
-      hmt_dep_null_owner_id: owner.readAttribute("id"),
+      hmt_dep_null_owner_id: owner.id,
       hmt_dep_null_item_id: 99,
     });
 
     // Nullify the FK
-    join.writeAttribute("hmt_dep_null_owner_id", null);
+    join.hmt_dep_null_owner_id = null;
     await join.save();
 
     const joins = await loadHasMany(owner, "hmtDepNullJoins", {
@@ -768,11 +768,11 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtDepDelAllOwner.create({ name: "O" });
     await HmtDepDelAllJoin.create({
-      hmt_dep_del_all_owner_id: owner.readAttribute("id"),
+      hmt_dep_del_all_owner_id: owner.id,
       hmt_dep_del_all_item_id: 1,
     });
     await HmtDepDelAllJoin.create({
-      hmt_dep_del_all_owner_id: owner.readAttribute("id"),
+      hmt_dep_del_all_owner_id: owner.id,
       hmt_dep_del_all_item_id: 2,
     });
 
@@ -839,12 +839,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag1 = await HmtTag.create({ name: "ruby" });
     const tag2 = await HmtTag.create({ name: "rails" });
     await HmtPostTag.create({
-      post_id: post.readAttribute("id"),
-      hmt_tag_id: tag1.readAttribute("id"),
+      post_id: post.id,
+      hmt_tag_id: tag1.id,
     });
     await HmtPostTag.create({
-      post_id: post.readAttribute("id"),
-      hmt_tag_id: tag2.readAttribute("id"),
+      post_id: post.id,
+      hmt_tag_id: tag2.id,
     });
 
     const tags = await loadHasManyThrough(post, "hmtTags", {
@@ -902,12 +902,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const club = await HmtDupClub.create({ name: "Chess" });
     // Associate the same club twice via two join records
     await HmtDupMembership.create({
-      hmt_dup_person_id: person.readAttribute("id"),
-      hmt_dup_club_id: club.readAttribute("id"),
+      hmt_dup_person_id: person.id,
+      hmt_dup_club_id: club.id,
     });
     await HmtDupMembership.create({
-      hmt_dup_person_id: person.readAttribute("id"),
-      hmt_dup_club_id: club.readAttribute("id"),
+      hmt_dup_person_id: person.id,
+      hmt_dup_club_id: club.id,
     });
 
     const memberships = await loadHasMany(person, "hmtDupMemberships", {
@@ -950,18 +950,16 @@ describe("HasManyThroughAssociationsTest", () => {
     const person = await HmtDup2Person.create({ name: "Bob" });
     const item = await HmtDup2Item.create({ name: "Thing" });
     await HmtDup2Join.create({
-      hmt_dup2_person_id: person.readAttribute("id"),
-      hmt_dup2_item_id: item.readAttribute("id"),
+      hmt_dup2_person_id: person.id,
+      hmt_dup2_item_id: item.id,
     });
     await HmtDup2Join.create({
-      hmt_dup2_person_id: person.readAttribute("id"),
-      hmt_dup2_item_id: item.readAttribute("id"),
+      hmt_dup2_person_id: person.id,
+      hmt_dup2_item_id: item.id,
     });
 
     const allJoins = await HmtDup2Join.all().toArray();
-    const personJoins = allJoins.filter(
-      (j: any) => j.readAttribute("hmt_dup2_person_id") === person.readAttribute("id"),
-    );
+    const personJoins = allJoins.filter((j: any) => j.hmt_dup2_person_id === person.id);
     expect(personJoins).toHaveLength(2);
   });
   it("add two instance and then deleting", async () => {
@@ -1011,12 +1009,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtDelItem.create({ label: "I1" });
     const item2 = await HmtDelItem.create({ label: "I2" });
     const j1 = await HmtDelJoin.create({
-      hmt_del_owner_id: owner.readAttribute("id"),
-      hmt_del_item_id: item1.readAttribute("id"),
+      hmt_del_owner_id: owner.id,
+      hmt_del_item_id: item1.id,
     });
     await HmtDelJoin.create({
-      hmt_del_owner_id: owner.readAttribute("id"),
-      hmt_del_item_id: item2.readAttribute("id"),
+      hmt_del_owner_id: owner.id,
+      hmt_del_item_id: item2.id,
     });
 
     // Delete one join record
@@ -1028,7 +1026,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtDelItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I2");
+    expect(items[0].label).toBe("I2");
   });
 
   it("associating new", async () => {
@@ -1058,12 +1056,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const student = await HmtStudent.create({ name: "Bob" });
     const course = await HmtCourse.create({ title: "Math" });
     const enrollment = await HmtEnrollment.create({
-      student_id: student.readAttribute("id"),
-      course_id: course.readAttribute("id"),
+      student_id: student.id,
+      course_id: course.id,
     });
 
-    expect(enrollment.readAttribute("student_id")).toBe(student.readAttribute("id"));
-    expect(enrollment.readAttribute("course_id")).toBe(course.readAttribute("id"));
+    expect(enrollment.student_id).toBe(student.id);
+    expect(enrollment.course_id).toBe(course.id);
   });
 
   it("associate new by building", async () => {
@@ -1113,7 +1111,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await AnbPost.create({ title: "Thinking", body: "..." });
     const proxy = association(post, "anbPeople");
     const person = proxy.build({ first_name: "Bob" });
-    expect(person.readAttribute("first_name")).toBe("Bob");
+    expect(person.first_name).toBe("Bob");
     expect(person.isNewRecord()).toBe(true);
   });
   it("build then save with has many inverse", async () => {
@@ -1267,7 +1265,7 @@ describe("HasManyThroughAssociationsTest", () => {
     // The Rails test saves post (which triggers autosave) - we verify Bob gets saved via create.
     const bob = await proxy.create({ first_name: "Bob" });
     const people = await proxy.toArray();
-    expect(people.map((p) => p.readAttribute("first_name"))).toContain("Bob");
+    expect(people.map((p) => p.first_name)).toContain("Bob");
   });
 
   it("both parent ids set when saving new", async () => {
@@ -1297,12 +1295,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const writer = await HmtWriter.create({ name: "Tolkien" });
     const book = await HmtWriterBookTitle.create({ title: "LOTR" });
     const join = await HmtWriterBook.create({
-      writer_id: writer.readAttribute("id"),
-      book_id: book.readAttribute("id"),
+      writer_id: writer.id,
+      book_id: book.id,
     });
 
-    expect(join.readAttribute("writer_id")).not.toBeNull();
-    expect(join.readAttribute("book_id")).not.toBeNull();
+    expect(join.writer_id).not.toBeNull();
+    expect(join.book_id).not.toBeNull();
   });
 
   it("delete association", async () => {
@@ -1355,8 +1353,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDelAssocOwner.create({ name: "O" });
     const item = await HmtDelAssocItem.create({ label: "I" });
     const join = await HmtDelAssocJoin.create({
-      hmt_del_assoc_owner_id: owner.readAttribute("id"),
-      hmt_del_assoc_item_id: item.readAttribute("id"),
+      hmt_del_assoc_owner_id: owner.id,
+      hmt_del_assoc_item_id: item.id,
     });
 
     await join.destroy();
@@ -1419,12 +1417,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtDestroyAssocItem.create({ label: "I1" });
     const item2 = await HmtDestroyAssocItem.create({ label: "I2" });
     const j1 = await HmtDestroyAssocJoin.create({
-      hmt_destroy_assoc_owner_id: owner.readAttribute("id"),
-      hmt_destroy_assoc_item_id: item1.readAttribute("id"),
+      hmt_destroy_assoc_owner_id: owner.id,
+      hmt_destroy_assoc_item_id: item1.id,
     });
     await HmtDestroyAssocJoin.create({
-      hmt_destroy_assoc_owner_id: owner.readAttribute("id"),
-      hmt_destroy_assoc_item_id: item2.readAttribute("id"),
+      hmt_destroy_assoc_owner_id: owner.id,
+      hmt_destroy_assoc_item_id: item2.id,
     });
 
     await j1.destroy();
@@ -1435,7 +1433,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtDestroyAssocItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I2");
+    expect(items[0].label).toBe("I2");
   });
   it("destroy all", async () => {
     class HmtDestroyAllOwner extends Base {
@@ -1488,12 +1486,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtDestroyAllItem.create({ label: "I1" });
     const item2 = await HmtDestroyAllItem.create({ label: "I2" });
     await HmtDestroyAllJoin.create({
-      hmt_destroy_all_owner_id: owner.readAttribute("id"),
-      hmt_destroy_all_item_id: item1.readAttribute("id"),
+      hmt_destroy_all_owner_id: owner.id,
+      hmt_destroy_all_item_id: item1.id,
     });
     await HmtDestroyAllJoin.create({
-      hmt_destroy_all_owner_id: owner.readAttribute("id"),
-      hmt_destroy_all_item_id: item2.readAttribute("id"),
+      hmt_destroy_all_owner_id: owner.id,
+      hmt_destroy_all_item_id: item2.id,
     });
 
     // Destroy all join records
@@ -1587,7 +1585,7 @@ describe("HasManyThroughAssociationsTest", () => {
       source: "cpkJtItem",
     });
     expect(items.length).toBe(1);
-    expect(items[0].readAttribute("name")).toBe("Widget");
+    expect(items[0].name).toBe("Widget");
   });
   it("destroy all on association clears scope", async () => {
     class HmtDaClrOwner extends Base {
@@ -1636,12 +1634,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtDaClrItem.create({ label: "I1" });
     const item2 = await HmtDaClrItem.create({ label: "I2" });
     await HmtDaClrJoin.create({
-      hmt_da_clr_owner_id: owner.readAttribute("id"),
-      hmt_da_clr_item_id: item1.readAttribute("id"),
+      hmt_da_clr_owner_id: owner.id,
+      hmt_da_clr_item_id: item1.id,
     });
     await HmtDaClrJoin.create({
-      hmt_da_clr_owner_id: owner.readAttribute("id"),
-      hmt_da_clr_item_id: item2.readAttribute("id"),
+      hmt_da_clr_owner_id: owner.id,
+      hmt_da_clr_item_id: item2.id,
     });
 
     const joins = await loadHasMany(owner, "hmtDaClrJoins", {
@@ -1706,12 +1704,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtDstClrItem.create({ label: "I1" });
     const item2 = await HmtDstClrItem.create({ label: "I2" });
     const j1 = await HmtDstClrJoin.create({
-      hmt_dst_clr_owner_id: owner.readAttribute("id"),
-      hmt_dst_clr_item_id: item1.readAttribute("id"),
+      hmt_dst_clr_owner_id: owner.id,
+      hmt_dst_clr_item_id: item1.id,
     });
     await HmtDstClrJoin.create({
-      hmt_dst_clr_owner_id: owner.readAttribute("id"),
-      hmt_dst_clr_item_id: item2.readAttribute("id"),
+      hmt_dst_clr_owner_id: owner.id,
+      hmt_dst_clr_item_id: item2.id,
     });
 
     await j1.destroy();
@@ -1722,7 +1720,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtDstClrItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I2");
+    expect(items[0].label).toBe("I2");
   });
   it("delete on association clears scope", async () => {
     class HmtDelClrOwner extends Base {
@@ -1770,8 +1768,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDelClrOwner.create({ name: "O" });
     const item = await HmtDelClrItem.create({ label: "I" });
     const join = await HmtDelClrJoin.create({
-      hmt_del_clr_owner_id: owner.readAttribute("id"),
-      hmt_del_clr_item_id: item.readAttribute("id"),
+      hmt_del_clr_owner_id: owner.id,
+      hmt_del_clr_item_id: item.id,
     });
 
     await join.destroy();
@@ -1834,8 +1832,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner2 = await HmtMismatchOwner.create({ name: "O2" });
     const item = await HmtMismatchItem.create({ label: "I" });
     await HmtMismatchJoin.create({
-      hmt_mismatch_owner_id: owner2.readAttribute("id"),
-      hmt_mismatch_item_id: item.readAttribute("id"),
+      hmt_mismatch_owner_id: owner2.id,
+      hmt_mismatch_item_id: item.id,
     });
 
     // owner1 has no association with item - loading through should return empty
@@ -1883,13 +1881,13 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await DepNullOwner.create({ name: "O" });
     const item = await DepNullItem.create({ label: "I" });
     await DepNullJoin.create({
-      dep_null_owner_id: owner.readAttribute("id"),
-      dep_null_item_id: item.readAttribute("id"),
+      dep_null_owner_id: owner.id,
+      dep_null_item_id: item.id,
     });
     await processDependentAssociations(owner);
     const joins = await DepNullJoin.all().toArray();
     expect(joins.length).toBe(1);
-    expect(joins[0].readAttribute("dep_null_owner_id")).toBeNull();
+    expect(joins[0].dep_null_owner_id).toBeNull();
   });
   it("delete through belongs to with dependent delete all", async () => {
     class DepDelOwner extends Base {
@@ -1915,7 +1913,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("DepDelOwner", DepDelOwner);
     registerModel("DepDelJoin", DepDelJoin);
     const owner = await DepDelOwner.create({ name: "O" });
-    await DepDelJoin.create({ dep_del_owner_id: owner.readAttribute("id"), dep_del_item_id: 1 });
+    await DepDelJoin.create({ dep_del_owner_id: owner.id, dep_del_item_id: 1 });
     await processDependentAssociations(owner);
     const joins = await DepDelJoin.all().toArray();
     expect(joins.length).toBe(0);
@@ -1944,7 +1942,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("DepDesOwner", DepDesOwner);
     registerModel("DepDesJoin", DepDesJoin);
     const owner = await DepDesOwner.create({ name: "O" });
-    await DepDesJoin.create({ dep_des_owner_id: owner.readAttribute("id"), dep_des_item_id: 1 });
+    await DepDesJoin.create({ dep_des_owner_id: owner.id, dep_des_item_id: 1 });
     await processDependentAssociations(owner);
     const joins = await DepDesJoin.all().toArray();
     expect(joins.length).toBe(0);
@@ -1979,7 +1977,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("BtDesParent", BtDesParent);
     registerModel("BtDesChild", BtDesChild);
     const parent = await BtDesParent.create({ name: "P" });
-    await BtDesChild.create({ bt_des_parent_id: parent.readAttribute("id") });
+    await BtDesChild.create({ bt_des_parent_id: parent.id });
     await processDependentAssociations(parent);
     const children = await BtDesChild.all().toArray();
     expect(children.length).toBe(0);
@@ -2007,7 +2005,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("BtDelParent", BtDelParent);
     registerModel("BtDelChild", BtDelChild);
     const parent = await BtDelParent.create({ name: "P" });
-    await BtDelChild.create({ bt_del_parent_id: parent.readAttribute("id") });
+    await BtDelChild.create({ bt_del_parent_id: parent.id });
     await processDependentAssociations(parent);
     const children = await BtDelChild.all().toArray();
     expect(children.length).toBe(0);
@@ -2039,11 +2037,11 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("BtNullParent", BtNullParent);
     registerModel("BtNullChild", BtNullChild);
     const parent = await BtNullParent.create({ name: "P" });
-    await BtNullChild.create({ bt_null_parent_id: parent.readAttribute("id") });
+    await BtNullChild.create({ bt_null_parent_id: parent.id });
     await processDependentAssociations(parent);
     const children = await BtNullChild.all().toArray();
     expect(children.length).toBe(1);
-    expect(children[0].readAttribute("bt_null_parent_id")).toBeNull();
+    expect(children[0].bt_null_parent_id).toBeNull();
   });
   it("update counter caches on delete", async () => {
     class CcOwner extends Base {
@@ -2083,10 +2081,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await CcOwner.create({ name: "Owner" });
     const tag = await CcTag.create({ name: "Tag1" });
     await CcTagging.create({ cc_owner_id: owner.id, cc_tag_id: tag.id });
-    expect((await CcOwner.find(owner.id)).readAttribute("tags_count")).toBe(1);
+    expect((await CcOwner.find(owner.id)).tags_count).toBe(1);
     const tagging = (await CcTagging.where({ cc_owner_id: owner.id }).first()) as Base;
     await tagging.destroy();
-    expect((await CcOwner.find(owner.id)).readAttribute("tags_count")).toBe(0);
+    expect((await CcOwner.find(owner.id)).tags_count).toBe(0);
   });
 
   it.skip("update counter caches on delete with dependent destroy", () => {
@@ -2137,10 +2135,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await CcDOwner.create({ name: "Owner" });
     const tag = await CcDTag.create({ name: "Tag1" });
     const tagging = await CcDTagging.create({ cc_d_owner_id: owner.id, cc_d_tag_id: tag.id });
-    expect((await CcDOwner.find(owner.id)).readAttribute("taggings_count")).toBe(1);
+    expect((await CcDOwner.find(owner.id)).taggings_count).toBe(1);
     // Destroy the through record (join model), which should decrement the counter
     await tagging.destroy();
-    expect((await CcDOwner.find(owner.id)).readAttribute("taggings_count")).toBe(0);
+    expect((await CcDOwner.find(owner.id)).taggings_count).toBe(0);
   });
 
   it.skip("update counter caches on destroy with indestructible through record", () => {
@@ -2193,8 +2191,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtReplItem.create({ label: "I1" });
     const item2 = await HmtReplItem.create({ label: "I2" });
     await HmtReplJoin.create({
-      hmt_repl_owner_id: owner.readAttribute("id"),
-      hmt_repl_item_id: item1.readAttribute("id"),
+      hmt_repl_owner_id: owner.id,
+      hmt_repl_item_id: item1.id,
     });
 
     // Replace: destroy old join, create new one
@@ -2206,8 +2204,8 @@ describe("HasManyThroughAssociationsTest", () => {
       await j.destroy();
     }
     await HmtReplJoin.create({
-      hmt_repl_owner_id: owner.readAttribute("id"),
-      hmt_repl_item_id: item2.readAttribute("id"),
+      hmt_repl_owner_id: owner.id,
+      hmt_repl_item_id: item2.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtReplItems", {
@@ -2216,7 +2214,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtReplItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I2");
+    expect(items[0].label).toBe("I2");
   });
   it("replace association with duplicates", async () => {
     class HmtReplDupOwner extends Base {
@@ -2269,12 +2267,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtReplDupItem.create({ label: "I1" });
     // Create two joins to the same item (duplicates)
     await HmtReplDupJoin.create({
-      hmt_repl_dup_owner_id: owner.readAttribute("id"),
-      hmt_repl_dup_item_id: item1.readAttribute("id"),
+      hmt_repl_dup_owner_id: owner.id,
+      hmt_repl_dup_item_id: item1.id,
     });
     await HmtReplDupJoin.create({
-      hmt_repl_dup_owner_id: owner.readAttribute("id"),
-      hmt_repl_dup_item_id: item1.readAttribute("id"),
+      hmt_repl_dup_owner_id: owner.id,
+      hmt_repl_dup_item_id: item1.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtReplDupItems", {
@@ -2428,11 +2426,11 @@ describe("HasManyThroughAssociationsTest", () => {
     const sponsor = await HmtSponsor.create({ name: "Acme" });
     const event = await HmtEvent.create({ name: "Conf" });
     const ship = await HmtSponsorShip.create({
-      sponsor_id: sponsor.readAttribute("id"),
-      event_id: event.readAttribute("id"),
+      sponsor_id: sponsor.id,
+      event_id: event.id,
     });
 
-    expect(ship.readAttribute("sponsor_id")).toBe(sponsor.readAttribute("id"));
+    expect(ship.sponsor_id).toBe(sponsor.id);
   });
 
   it("through record is built when created with where", async () => {
@@ -2488,7 +2486,7 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "trb_post_id",
     });
     expect(taggings).toHaveLength(1);
-    expect(taggings[0].readAttribute("trb_tag_id")).toBe(tag.id);
+    expect(taggings[0].trb_tag_id).toBe(tag.id);
   });
   it("associate with create and no options", async () => {
     class HmtSimpleOwner extends Base {
@@ -2517,11 +2515,11 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtSimpleOwner.create({ name: "Owner1" });
     const target = await HmtSimpleTarget.create({ label: "Target1" });
     const join = await HmtSimpleJoin.create({
-      hmt_simple_owner_id: owner.readAttribute("id"),
-      hmt_simple_target_id: target.readAttribute("id"),
+      hmt_simple_owner_id: owner.id,
+      hmt_simple_target_id: target.id,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
-    expect(join.readAttribute("hmt_simple_owner_id")).toBe(owner.readAttribute("id"));
+    expect(join.id).not.toBeNull();
+    expect(join.hmt_simple_owner_id).toBe(owner.id);
   });
   it("associate with create with through having conditions", async () => {
     class AccTag extends Base {
@@ -2569,7 +2567,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await AccPost.create({ title: "Hello" });
     const proxy = association(post, "accTags");
     const tag = await proxy.create({ name: "Sports" });
-    expect(tag.readAttribute("name")).toBe("Sports");
+    expect(tag.name).toBe("Sports");
     expect(tag.isNewRecord()).toBe(false);
 
     // Verify the join record was created linking post to tag
@@ -2578,7 +2576,7 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "acc_post_id",
     });
     expect(taggings).toHaveLength(1);
-    expect(taggings[0].readAttribute("acc_tag_id")).toBe(tag.id);
+    expect(taggings[0].acc_tag_id).toBe(tag.id);
   });
   it("associate with create exclamation and no options", async () => {
     class HmtBangNoOptOwner extends Base {
@@ -2607,11 +2605,11 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtBangNoOptOwner.create({ name: "Owner1" });
     const target = await HmtBangNoOptTarget.create({ label: "Target1" });
     const join = await HmtBangNoOptJoin.create({
-      hmt_bang_no_opt_owner_id: owner.readAttribute("id"),
-      hmt_bang_no_opt_target_id: target.readAttribute("id"),
+      hmt_bang_no_opt_owner_id: owner.id,
+      hmt_bang_no_opt_target_id: target.id,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
-    expect(join.readAttribute("hmt_bang_no_opt_owner_id")).toBe(owner.readAttribute("id"));
+    expect(join.id).not.toBeNull();
+    expect(join.hmt_bang_no_opt_owner_id).toBe(owner.id);
   });
   it("create on new record", async () => {
     class HmtNewRecOwner extends Base {
@@ -2640,13 +2638,13 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtNewRecOwner.create({ name: "NewOwner" });
     const thing = await HmtNewRecThing.create({ value: "V" });
     const join = await HmtNewRecJoin.create({
-      hmt_new_rec_owner_id: owner.readAttribute("id"),
-      hmt_new_rec_thing_id: thing.readAttribute("id"),
+      hmt_new_rec_owner_id: owner.id,
+      hmt_new_rec_thing_id: thing.id,
     });
 
-    expect(join.readAttribute("id")).not.toBeNull();
-    expect(join.readAttribute("hmt_new_rec_owner_id")).toBe(owner.readAttribute("id"));
-    expect(join.readAttribute("hmt_new_rec_thing_id")).toBe(thing.readAttribute("id"));
+    expect(join.id).not.toBeNull();
+    expect(join.hmt_new_rec_owner_id).toBe(owner.id);
+    expect(join.hmt_new_rec_thing_id).toBe(thing.id);
   });
   it("associate with create and invalid options", async () => {
     class HmtInvOptOwner extends Base {
@@ -2668,10 +2666,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtInvOptOwner.create({ name: "O" });
     // Creating a join record with a non-existent target FK still persists the join record
     const join = await HmtInvOptJoin.create({
-      hmt_inv_opt_owner_id: owner.readAttribute("id"),
+      hmt_inv_opt_owner_id: owner.id,
       hmt_inv_opt_item_id: 9999,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
+    expect(join.id).not.toBeNull();
   });
   it("associate with create and valid options", async () => {
     class HmtValOptOwner extends Base {
@@ -2700,12 +2698,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtValOptOwner.create({ name: "O" });
     const item = await HmtValOptItem.create({ label: "I" });
     const join = await HmtValOptJoin.create({
-      hmt_val_opt_owner_id: owner.readAttribute("id"),
-      hmt_val_opt_item_id: item.readAttribute("id"),
+      hmt_val_opt_owner_id: owner.id,
+      hmt_val_opt_item_id: item.id,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
-    expect(join.readAttribute("hmt_val_opt_owner_id")).toBe(owner.readAttribute("id"));
-    expect(join.readAttribute("hmt_val_opt_item_id")).toBe(item.readAttribute("id"));
+    expect(join.id).not.toBeNull();
+    expect(join.hmt_val_opt_owner_id).toBe(owner.id);
+    expect(join.hmt_val_opt_item_id).toBe(item.id);
   });
   it("associate with create bang and invalid options", async () => {
     class HmtBangInvOwner extends Base {
@@ -2726,10 +2724,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const owner = await HmtBangInvOwner.create({ name: "O" });
     const join = await HmtBangInvJoin.create({
-      hmt_bang_inv_owner_id: owner.readAttribute("id"),
+      hmt_bang_inv_owner_id: owner.id,
       hmt_bang_inv_item_id: 9999,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
+    expect(join.id).not.toBeNull();
   });
   it("associate with create bang and valid options", async () => {
     class HmtBangValOwner extends Base {
@@ -2758,12 +2756,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtBangValOwner.create({ name: "O" });
     const item = await HmtBangValItem.create({ label: "I" });
     const join = await HmtBangValJoin.create({
-      hmt_bang_val_owner_id: owner.readAttribute("id"),
-      hmt_bang_val_item_id: item.readAttribute("id"),
+      hmt_bang_val_owner_id: owner.id,
+      hmt_bang_val_item_id: item.id,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
-    expect(join.readAttribute("hmt_bang_val_owner_id")).toBe(owner.readAttribute("id"));
-    expect(join.readAttribute("hmt_bang_val_item_id")).toBe(item.readAttribute("id"));
+    expect(join.id).not.toBeNull();
+    expect(join.hmt_bang_val_owner_id).toBe(owner.id);
+    expect(join.hmt_bang_val_item_id).toBe(item.id);
   });
   it.skip("push with invalid record", () => {});
 
@@ -2815,12 +2813,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtClrItem.create({ label: "I1" });
     const item2 = await HmtClrItem.create({ label: "I2" });
     await HmtClrJoin.create({
-      hmt_clr_owner_id: owner.readAttribute("id"),
-      hmt_clr_item_id: item1.readAttribute("id"),
+      hmt_clr_owner_id: owner.id,
+      hmt_clr_item_id: item1.id,
     });
     await HmtClrJoin.create({
-      hmt_clr_owner_id: owner.readAttribute("id"),
-      hmt_clr_item_id: item2.readAttribute("id"),
+      hmt_clr_owner_id: owner.id,
+      hmt_clr_item_id: item2.id,
     });
 
     // Clear by destroying all join records
@@ -2875,10 +2873,10 @@ describe("HasManyThroughAssociationsTest", () => {
           source: "acoPerson",
           className: "AcoPerson",
           beforeAdd: (owner: Base, record: Base) => {
-            log.push(["added", "before", record.readAttribute("first_name") as string]);
+            log.push(["added", "before", record.first_name as string]);
           },
           afterAdd: (owner: Base, record: Base) => {
-            log.push(["added", "after", record.readAttribute("first_name") as string]);
+            log.push(["added", "after", record.first_name as string]);
           },
         },
       },
@@ -3030,12 +3028,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const item1 = await HmtIdsCondItem.create({ label: "I1" });
     const item2 = await HmtIdsCondItem.create({ label: "I2" });
     await HmtIdsCondJoin.create({
-      hmt_ids_cond_owner_id: owner.readAttribute("id"),
-      hmt_ids_cond_item_id: item1.readAttribute("id"),
+      hmt_ids_cond_owner_id: owner.id,
+      hmt_ids_cond_item_id: item1.id,
     });
     await HmtIdsCondJoin.create({
-      hmt_ids_cond_owner_id: owner.readAttribute("id"),
-      hmt_ids_cond_item_id: item2.readAttribute("id"),
+      hmt_ids_cond_owner_id: owner.id,
+      hmt_ids_cond_item_id: item2.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtIdsCondItems", {
@@ -3043,7 +3041,7 @@ describe("HasManyThroughAssociationsTest", () => {
       source: "hmtIdsCondItem",
       className: "HmtIdsCondItem",
     });
-    const ids = items.map((i: any) => i.readAttribute("id"));
+    const ids = items.map((i: any) => i.id);
     expect(ids).toHaveLength(2);
     // Verify _preloadedAssociations was not set on owner
     expect((owner as any)._preloadedAssociations?.get("hmtIdsCondItems")).toBeUndefined();
@@ -3067,16 +3065,16 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtMemberRecord", HmtMemberRecord);
 
     const group = await HmtGroup.create({ name: "Team A" });
-    const m1 = await HmtMemberRecord.create({ name: "Alice", group_id: group.readAttribute("id") });
-    const m2 = await HmtMemberRecord.create({ name: "Bob", group_id: group.readAttribute("id") });
+    const m1 = await HmtMemberRecord.create({ name: "Alice", group_id: group.id });
+    const m2 = await HmtMemberRecord.create({ name: "Bob", group_id: group.id });
 
     const members = await loadHasMany(group, "hmtMemberRecords", {
       className: "HmtMemberRecord",
       foreignKey: "group_id",
     });
-    const ids = members.map((m) => m.readAttribute("id"));
-    expect(ids).toContain(m1.readAttribute("id"));
-    expect(ids).toContain(m2.readAttribute("id"));
+    const ids = members.map((m) => m.id);
+    expect(ids).toContain(m1.id);
+    expect(ids).toContain(m2.id);
   });
 
   it("get ids for unloaded associations does not load them", async () => {
@@ -3099,7 +3097,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const group = await HmtUnloadGroup.create({ name: "Team" });
     const m1 = await HmtUnloadMember.create({
       name: "Alice",
-      hmt_unload_group_id: group.readAttribute("id"),
+      hmt_unload_group_id: group.id,
     });
 
     // Loading via loadHasMany should return the members without pre-populating _preloadedAssociations
@@ -3108,7 +3106,7 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "hmt_unload_group_id",
     });
     expect(members).toHaveLength(1);
-    expect(members[0].readAttribute("id")).toBe(m1.readAttribute("id"));
+    expect(members[0].id).toBe(m1.id);
   });
   it.skip("association proxy transaction method starts transaction in association class", () => {});
 
@@ -3270,7 +3268,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "NpkItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I");
+    expect(items[0].label).toBe("I");
   });
   it("find on has many association collection with include and conditions", async () => {
     class FicOwner extends Base {
@@ -3333,7 +3331,7 @@ describe("HasManyThroughAssociationsTest", () => {
       scope: (rel: any) => rel.where({ title: "Authorless" }),
     });
     expect(posts).toHaveLength(1);
-    expect(posts[0].readAttribute("title")).toBe("Authorless");
+    expect(posts[0].title).toBe("Authorless");
   });
   it("has many through has one reflection", async () => {
     class HmtHoReflOwner extends Base {
@@ -3381,8 +3379,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtHoReflOwner.create({ name: "O" });
     const item = await HmtHoReflItem.create({ label: "I" });
     await HmtHoReflJoin.create({
-      hmt_ho_refl_owner_id: owner.readAttribute("id"),
-      hmt_ho_refl_item_id: item.readAttribute("id"),
+      hmt_ho_refl_owner_id: owner.id,
+      hmt_ho_refl_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtHoReflItems", {
@@ -3391,7 +3389,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtHoReflItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I");
+    expect(items[0].label).toBe("I");
   });
   it("modifying has many through has one reflection should raise", async () => {
     class MhrAuthor extends Base {
@@ -3493,7 +3491,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const tags = await proxy.toArray();
     expect(tags).toHaveLength(1);
-    expect(tags[0].readAttribute("name")).toBe("ruby");
+    expect(tags[0].name).toBe("ruby");
   });
   it("collection build with nonstandard primary key on belongs to", async () => {
     class CbkPost extends Base {
@@ -3541,7 +3539,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await CbkPost.create({ title: "Hello" });
     const proxy = association(post, "cbkTags");
     const tag = proxy.build({ name: "ruby" });
-    expect(tag.readAttribute("name")).toBe("ruby");
+    expect(tag.name).toBe("ruby");
     expect(tag.isNewRecord()).toBe(true);
   });
   it("collection create with nonstandard primary key on belongs to", async () => {
@@ -3590,7 +3588,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await CckPost.create({ title: "Hello" });
     const proxy = association(post, "cckTags");
     const tag = await proxy.create({ name: "ruby" });
-    expect(tag.readAttribute("name")).toBe("ruby");
+    expect(tag.name).toBe("ruby");
     expect(tag.isNewRecord()).toBe(false);
   });
 
@@ -3612,7 +3610,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtTask", HmtTask);
 
     const project = await HmtProject.create({ name: "Alpha" });
-    await HmtTask.create({ title: "Task 1", project_id: project.readAttribute("id") });
+    await HmtTask.create({ title: "Task 1", project_id: project.id });
 
     const tasks = await loadHasMany(project, "hmtTasks", {
       className: "HmtTask",
@@ -3747,14 +3745,14 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtBook", HmtBook);
 
     const library = await HmtLibrary.create({ name: "Central" });
-    const book = await HmtBook.create({ title: "Guide", library_id: library.readAttribute("id") });
+    const book = await HmtBook.create({ title: "Guide", library_id: library.id });
 
     const books = await loadHasMany(library, "hmtBooks", {
       className: "HmtBook",
       foreignKey: "library_id",
     });
-    const ids = books.map((b) => b.readAttribute("id"));
-    expect(ids).toContain(book.readAttribute("id"));
+    const ids = books.map((b) => b.id);
+    expect(ids).toContain(book.id);
   });
 
   it("collection singular ids setter with required type cast", async () => {
@@ -3982,8 +3980,8 @@ describe("HasManyThroughAssociationsTest", () => {
     // Just verify models can be created independently
     const owner = await HmtBuildOwner.create({ name: "O" });
     const item = new HmtBuildItem();
-    item.writeAttribute("label", "Built");
-    expect(item.readAttribute("label")).toBe("Built");
+    item.label = "Built";
+    expect(item.label).toBe("Built");
     expect(item.isNewRecord()).toBe(true);
   });
   it("attributes are being set when initialized from hm through association with where clause", async () => {
@@ -4010,7 +4008,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtAttrJoin", HmtAttrJoin);
     registerModel("HmtAttrItem", HmtAttrItem);
     const item = new HmtAttrItem({ label: "Initialized" });
-    expect(item.readAttribute("label")).toBe("Initialized");
+    expect(item.label).toBe("Initialized");
   });
   it("attributes are being set when initialized from hm through association with multiple where clauses", async () => {
     class HmtMwOwner extends Base {
@@ -4037,8 +4035,8 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtMwJoin", HmtMwJoin);
     registerModel("HmtMwItem", HmtMwItem);
     const item = new HmtMwItem({ label: "L", status: "active" });
-    expect(item.readAttribute("label")).toBe("L");
-    expect(item.readAttribute("status")).toBe("active");
+    expect(item.label).toBe("L");
+    expect(item.status).toBe("active");
   });
   it("include method in association through should return true for instance added with build", async () => {
     class IncBPost extends Base {
@@ -4184,8 +4182,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtRoOwner.create({ name: "O" });
     const item = await HmtRoItem.create({ label: "I" });
     await HmtRoJoin.create({
-      hmt_ro_owner_id: owner.readAttribute("id"),
-      hmt_ro_item_id: item.readAttribute("id"),
+      hmt_ro_owner_id: owner.id,
+      hmt_ro_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtRoItems", {
@@ -4195,10 +4193,10 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     // Through association records should not be readonly - we can update them
     expect(items).toHaveLength(1);
-    items[0].writeAttribute("label", "Updated");
+    items[0].label = "Updated";
     await items[0].save();
-    const reloaded = await HmtRoItem.find(items[0].readAttribute("id"));
-    expect(reloaded.readAttribute("label")).toBe("Updated");
+    const reloaded = await HmtRoItem.find(items[0].id);
+    expect(reloaded.label).toBe("Updated");
   });
   it("can update through association", async () => {
     class HmtUpdOwner extends Base {
@@ -4246,8 +4244,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtUpdOwner.create({ name: "O" });
     const item = await HmtUpdItem.create({ label: "Original" });
     await HmtUpdJoin.create({
-      hmt_upd_owner_id: owner.readAttribute("id"),
-      hmt_upd_item_id: item.readAttribute("id"),
+      hmt_upd_owner_id: owner.id,
+      hmt_upd_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtUpdItems", {
@@ -4255,11 +4253,11 @@ describe("HasManyThroughAssociationsTest", () => {
       source: "hmtUpdItem",
       className: "HmtUpdItem",
     });
-    items[0].writeAttribute("label", "Modified");
+    items[0].label = "Modified";
     await items[0].save();
 
-    const reloaded = await HmtUpdItem.find(item.readAttribute("id"));
-    expect(reloaded.readAttribute("label")).toBe("Modified");
+    const reloaded = await HmtUpdItem.find(item.id);
+    expect(reloaded.label).toBe("Modified");
   });
   it.skip("has many through with source scope", () => {});
 
@@ -4423,8 +4421,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtPkOwner.create({ name: "O" });
     const item = await HmtPkItem.create({ label: "I" });
     await HmtPkJoin.create({
-      hmt_pk_owner_id: owner.readAttribute("id"),
-      hmt_pk_item_id: item.readAttribute("id"),
+      hmt_pk_owner_id: owner.id,
+      hmt_pk_item_id: item.id,
     });
     const items = await loadHasManyThrough(owner, "hmtPkItems", {
       through: "hmtPkJoins",
@@ -4478,8 +4476,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtDsOwner.create({ name: "O" });
     const item = await HmtDsItem.create({ label: "I" });
     await HmtDsJoin.create({
-      hmt_ds_owner_id: owner.readAttribute("id"),
-      hmt_ds_item_id: item.readAttribute("id"),
+      hmt_ds_owner_id: owner.id,
+      hmt_ds_item_id: item.id,
     });
     const items = await loadHasManyThrough(owner, "hmtDsItems", {
       through: "hmtDsJoins",
@@ -4514,8 +4512,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtCdOwner.create({ name: "O" });
     const item = await HmtCdItem.create({ label: "Created" });
     await HmtCdJoin.create({
-      hmt_cd_owner_id: owner.readAttribute("id"),
-      hmt_cd_item_id: item.readAttribute("id"),
+      hmt_cd_owner_id: owner.id,
+      hmt_cd_item_id: item.id,
     });
     const joins = await loadHasMany(owner, "hmtCdJoins", {
       className: "HmtCdJoin",
@@ -4677,8 +4675,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtSelOwner.create({ name: "O" });
     const item = await HmtSelItem.create({ label: "L", extra: "E" });
     await HmtSelJoin.create({
-      hmt_sel_owner_id: owner.readAttribute("id"),
-      hmt_sel_item_id: item.readAttribute("id"),
+      hmt_sel_owner_id: owner.id,
+      hmt_sel_item_id: item.id,
     });
     const items = await loadHasManyThrough(owner, "hmtSelItems", {
       through: "hmtSelJoins",
@@ -4686,7 +4684,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtSelItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("L");
+    expect(items[0].label).toBe("L");
   });
   it("get has many through belongs to ids with conditions", async () => {
     class GidAuthor extends Base {
@@ -4866,12 +4864,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const t1 = await HmtFkTarget.create({ label: "T1" });
     const t2 = await HmtFkTarget.create({ label: "T2" });
     const join = await HmtFkJoin.create({
-      hmt_fk_owner_id: owner.readAttribute("id"),
-      hmt_fk_target_id: t1.readAttribute("id"),
+      hmt_fk_owner_id: owner.id,
+      hmt_fk_target_id: t1.id,
     });
 
     // Change the FK to point to t2
-    join.writeAttribute("hmt_fk_target_id", t2.readAttribute("id"));
+    join.hmt_fk_target_id = t2.id;
     await join.save();
 
     const targets = await loadHasManyThrough(owner, "hmtFkTargets", {
@@ -4880,7 +4878,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtFkTarget",
     });
     expect(targets).toHaveLength(1);
-    expect(targets[0].readAttribute("label")).toBe("T2");
+    expect(targets[0].label).toBe("T2");
   });
   it("deleting from has many through a belongs to should not try to update counter", async () => {
     class HmtNoCounterOwner extends Base {
@@ -4932,8 +4930,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtNoCounterOwner.create({ name: "O" });
     const item = await HmtNoCounterItem.create({ label: "I" });
     const join = await HmtNoCounterJoin.create({
-      hmt_no_counter_owner_id: owner.readAttribute("id"),
-      hmt_no_counter_item_id: item.readAttribute("id"),
+      hmt_no_counter_owner_id: owner.id,
+      hmt_no_counter_item_id: item.id,
     });
 
     // Deleting the join record should work without counter cache issues
@@ -4946,8 +4944,8 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
     // The target item should still exist
-    const reloadedItem = await HmtNoCounterItem.find(item.readAttribute("id"));
-    expect(reloadedItem.readAttribute("label")).toBe("I");
+    const reloadedItem = await HmtNoCounterItem.find(item.id);
+    expect(reloadedItem.label).toBe("I");
   });
   it("primary key option on source", async () => {
     class PkoOwner extends Base {
@@ -5023,10 +5021,10 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await HmtNoErrOwner.create({ name: "O" });
     // Creating a join with a non-existent target still persists
     const join = await HmtNoErrJoin.create({
-      hmt_no_err_owner_id: owner.readAttribute("id"),
+      hmt_no_err_owner_id: owner.id,
       hmt_no_err_item_id: 9999,
     });
-    expect(join.readAttribute("id")).not.toBeNull();
+    expect(join.id).not.toBeNull();
   });
   it("assign array to new record builds join records", async () => {
     class HmtArrOwner extends Base {
@@ -5078,16 +5076,16 @@ describe("HasManyThroughAssociationsTest", () => {
 
     // Manually build join records for each item
     await HmtArrJoin.create({
-      hmt_arr_owner_id: owner.readAttribute("id"),
-      hmt_arr_item_id: item1.readAttribute("id"),
+      hmt_arr_owner_id: owner.id,
+      hmt_arr_item_id: item1.id,
     });
     await HmtArrJoin.create({
-      hmt_arr_owner_id: owner.readAttribute("id"),
-      hmt_arr_item_id: item2.readAttribute("id"),
+      hmt_arr_owner_id: owner.id,
+      hmt_arr_item_id: item2.id,
     });
     await HmtArrJoin.create({
-      hmt_arr_owner_id: owner.readAttribute("id"),
-      hmt_arr_item_id: item3.readAttribute("id"),
+      hmt_arr_owner_id: owner.id,
+      hmt_arr_item_id: item3.id,
     });
 
     const items = await loadHasManyThrough(owner, "hmtArrItems", {
@@ -5096,7 +5094,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtArrItem",
     });
     expect(items).toHaveLength(3);
-    const labels = items.map((i: any) => i.readAttribute("label")).sort();
+    const labels = items.map((i: any) => i.label).sort();
     expect(labels).toEqual(["I1", "I2", "I3"]);
   });
   it.skip("create bang should raise exception when join record has errors", () => {});
@@ -5320,7 +5318,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "PsPost",
     });
     expect(posts).toHaveLength(1);
-    expect(posts[0].readAttribute("title")).toBe("Hello");
+    expect(posts[0].title).toBe("Hello");
   });
   it("has many through with polymorhic join model", async () => {
     class PjmPost extends Base {
@@ -5380,7 +5378,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "PjmTag",
     });
     expect(tags).toHaveLength(1);
-    expect(tags[0].readAttribute("name")).toBe("ruby");
+    expect(tags[0].name).toBe("ruby");
   });
   it("has many through obeys order on through association", async () => {
     class OrdPost extends Base {
@@ -5512,7 +5510,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const results = await activePersons.toArray();
     let manualSum = 0;
     for (const p of results) {
-      manualSum += p.readAttribute("followers_count") as number;
+      manualSum += p.followers_count as number;
     }
     expect(manualSum).toBe(10);
 
@@ -5599,7 +5597,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "StiAddMember",
     });
     expect(members).toHaveLength(1);
-    expect(members[0].readAttribute("name")).toBe("Alice");
+    expect(members[0].name).toBe("Alice");
   });
   it("build for has many through association", async () => {
     class BfAuthor extends Base {
@@ -5847,7 +5845,7 @@ describe("HasManyThroughAssociationsTest", () => {
           className: "CvPet",
           beforeAdd: (_owner: Base, record: Base) => {
             // The child should be visible (have an id) by the time the callback fires
-            if (record.readAttribute("name")) callbackFired = true;
+            if (record.name) callbackFired = true;
           },
         },
       },
@@ -6042,7 +6040,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const owner = await CpkBOwner.create({ name: "O" });
     const proxy = association(owner, "cpkBItems");
     const item = proxy.build({ label: "New" });
-    expect(item.readAttribute("label")).toBe("New");
+    expect(item.label).toBe("New");
     expect(item.isNewRecord()).toBe(true);
   });
 
@@ -6096,7 +6094,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const book = await HmtCrBook.create({ title: "AWDR" });
     const proxy = association(book, "hmtCrSubscribers");
     const subscriber = await proxy.create({ nick: "bob" });
-    expect(subscriber.readAttribute("nick")).toBe("bob");
+    expect(subscriber.nick).toBe("bob");
     expect(subscriber.isNewRecord()).toBe(false);
 
     const subscribers = await loadHasManyThrough(book, "hmtCrSubscribers", {
@@ -6105,7 +6103,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtCrSubscriber",
     });
     expect(subscribers).toHaveLength(1);
-    expect(subscribers[0].readAttribute("nick")).toBe("bob");
+    expect(subscribers[0].nick).toBe("bob");
   });
   it("ordered has many through", async () => {
     class OhtPost extends Base {
@@ -6372,7 +6370,7 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "primary_contact_id",
     });
     expect(agents.length).toBe(1);
-    expect(agents[0].readAttribute("first_name")).toBe("Sarah");
+    expect(agents[0].first_name).toBe("Sarah");
 
     const agentsOfAgents = await loadHasManyThrough(susan, "agentsOfAgents", {
       through: "agents",
@@ -6380,7 +6378,7 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "SelfPerson",
     });
     expect(agentsOfAgents.length).toBe(1);
-    expect(agentsOfAgents[0].readAttribute("first_name")).toBe("John");
+    expect(agentsOfAgents[0].first_name).toBe("John");
   });
   it("create with conditions hash on through association", async () => {
     class CwcTag extends Base {
@@ -6428,7 +6426,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await CwcPost.create({ title: "Hello" });
     const proxy = association(post, "cwcTags");
     const tag = await proxy.create({ name: "General" });
-    expect(tag.readAttribute("name")).toBe("General");
+    expect(tag.name).toBe("General");
 
     const tags = await proxy.toArray();
     expect(tags).toHaveLength(1);
@@ -6535,7 +6533,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await proxy.push(person);
 
     const people = await proxy.toArray();
-    expect(people.some((p) => p.readAttribute("first_name") === "David")).toBe(true);
+    expect(people.some((p) => p.first_name === "David")).toBe(true);
   });
 
   it("size of through association should increase correctly when has many association is added", async () => {

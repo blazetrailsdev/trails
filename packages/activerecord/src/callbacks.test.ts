@@ -89,7 +89,7 @@ describe("CallbacksTest", () => {
     }
     const p = await Person.create({ name: "Alice" });
     expect(p.isPersisted()).toBe(true);
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p.name).toBe("Alice");
   });
 
   it("existing valid?", async () => {
@@ -263,12 +263,12 @@ describe("CallbacksTest", () => {
     }
     const p = await CbPost.create({ title: "test" });
     CbPost.beforeUpdate(() => false);
-    p.writeAttribute("title", "changed");
+    p.title = "changed";
     const result = await p.save();
     expect(result).toBe(false);
     // Verify the update was not persisted
     const reloaded = await CbPost.find(p.id);
-    expect(reloaded.readAttribute("title")).toBe("test");
+    expect(reloaded.title).toBe("test");
   });
 
   it("after find", async () => {
@@ -348,7 +348,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = await CbPost.create({ title: "test" });
-    p.writeAttribute("title", "");
+    p.title = "";
     const result = await p.save();
     expect(result).toBe(false);
   });
@@ -375,7 +375,7 @@ describe("CallbacksTest", () => {
     }
     const p = await CbPost.create({ title: "test" });
     CbPost.beforeUpdate(() => false);
-    p.writeAttribute("title", "changed");
+    p.title = "changed";
     const result = await p.save();
     expect(result).toBe(false);
   });
@@ -517,7 +517,7 @@ describe("CallbacksTest", () => {
         this.attribute("title", "string");
         this.adapter = adp;
         this.afterCreate((record: any) => {
-          log.push("created:" + record.readAttribute("title"));
+          log.push("created:" + record.title);
         });
       }
     }
@@ -536,7 +536,7 @@ describe("CallbacksTest", () => {
         this.attribute("title", "string");
         this.adapter = adp;
         this.afterCreate((record: any) => {
-          log.push("created:" + record.readAttribute("title"));
+          log.push("created:" + record.title);
         });
       }
     }
@@ -559,7 +559,7 @@ describe("CallbacksTest", () => {
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
     Topic.afterUpdate((record: any) => {
-      log.push("updated:" + record.readAttribute("title"));
+      log.push("updated:" + record.title);
     });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
@@ -580,7 +580,7 @@ describe("CallbacksTest", () => {
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
     Topic.afterUpdate((record: any) => {
-      log.push("updated:" + record.readAttribute("title"));
+      log.push("updated:" + record.title);
     });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
@@ -601,10 +601,10 @@ describe("CallbacksTest", () => {
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
     Topic.afterDestroy((record: any) => {
-      log.push("destroyed:" + record.readAttribute("title"));
+      log.push("destroyed:" + record.title);
     });
     Topic.afterUpdate((record: any) => {
-      log.push("updated:" + record.readAttribute("title"));
+      log.push("updated:" + record.title);
     });
     await transaction(Topic, async () => {
       await t1.update({ title: "a2" });
@@ -626,10 +626,10 @@ describe("CallbacksTest", () => {
     const t2 = await Topic.create({ title: "b" });
     const log: string[] = [];
     Topic.afterDestroy((record: any) => {
-      log.push("destroyed:" + record.readAttribute("title"));
+      log.push("destroyed:" + record.title);
     });
     Topic.afterUpdate((record: any) => {
-      log.push("updated:" + record.readAttribute("title"));
+      log.push("updated:" + record.title);
     });
     await transaction(Topic, async () => {
       await t1.destroy();
@@ -726,13 +726,13 @@ describe("CallbacksTest", () => {
     Thing.attribute("status", "string");
     Thing.adapter = adapter;
     Thing.afterInitialize((r: any) => {
-      if (!r.readAttribute("status")) {
+      if (!r.status) {
         r._attributes.set("status", "draft");
       }
     });
 
     const t = new Thing({});
-    expect(t.readAttribute("status")).toBe("draft");
+    expect(t.status).toBe("draft");
   });
 
   it("fires after_find when loading from database", async () => {
@@ -744,7 +744,7 @@ describe("CallbacksTest", () => {
     Record.attribute("name", "string");
     Record.adapter = adapter;
     Record.afterFind((r: any) => {
-      log.push(`found:${r.readAttribute("name")}`);
+      log.push(`found:${r.name}`);
     });
 
     await Record.create({ name: "Alice" });
@@ -773,7 +773,7 @@ describe("CallbacksTest", () => {
       (r: any) => {
         log.push("important-save");
       },
-      { if: (r: any) => r.readAttribute("important") === true },
+      { if: (r: any) => r.important === true },
     );
 
     await Task.create({ name: "normal", important: false });
@@ -796,7 +796,7 @@ describe("CallbacksTest", () => {
       (r: any) => {
         log.push("saved");
       },
-      { unless: (r: any) => r.readAttribute("skip") === true },
+      { unless: (r: any) => r.skip === true },
     );
 
     await Task.create({ name: "regular" });
@@ -840,7 +840,7 @@ describe("CallbacksTest", () => {
     User.attribute("name", "string");
     User.attribute("updated_at", "datetime");
     User.afterTouch((record: any) => {
-      touched.push(record.readAttribute("name"));
+      touched.push(record.name);
     });
     User.adapter = adapter;
 
@@ -981,7 +981,7 @@ describe("CallbacksTest", () => {
       }
     }
     const g = await Guarded.create({ name: "test" });
-    g.writeAttribute("name", "updated");
+    g.name = "updated";
     const result = await g.save();
     expect(result).toBe(false);
   });
@@ -1300,14 +1300,14 @@ describe("CallbacksTest", () => {
         this.attribute("slug", "string");
         this.adapter = adapter;
         this.beforeSave((record: any) => {
-          const title = record.readAttribute("title");
-          record.writeAttribute("slug", title.toLowerCase().replace(/\s+/g, "-"));
+          const title = record.title;
+          record.slug = title.toLowerCase().replace(/\s+/g, "-");
         });
       }
     }
 
     const post = await AutoSlug.create({ title: "Hello World" });
-    expect(post.readAttribute("slug")).toBe("hello-world");
+    expect(post.slug).toBe("hello-world");
   });
 
   it("before_validation callbacks run exactly once", async () => {
@@ -1409,7 +1409,7 @@ describe("CallbacksTest", () => {
         this.attribute("salary", "integer");
         this.adapter = adapter;
         this.afterInitialize((r: any) => {
-          if (r.readAttribute("salary") === null) {
+          if (r.salary === null) {
             r._attributes.set("salary", 50000);
           }
         });
@@ -1417,7 +1417,7 @@ describe("CallbacksTest", () => {
     }
 
     const dev = new Developer({ name: "Alice" });
-    expect(dev.readAttribute("salary")).toBe(50000);
+    expect(dev.salary).toBe(50000);
   });
 
   // Rails: test "after_initialize is called on find"
@@ -1430,7 +1430,7 @@ describe("CallbacksTest", () => {
         this.attribute("name", "string");
         this.adapter = adapter;
         this.afterInitialize((r: any) => {
-          initialized.push(r.readAttribute("name") ?? "new");
+          initialized.push(r.name ?? "new");
         });
       }
     }
@@ -1452,7 +1452,7 @@ describe("CallbacksTest", () => {
         this.attribute("name", "string");
         this.adapter = adapter;
         this.afterFind((r: any) => {
-          found.push(r.readAttribute("id"));
+          found.push(r.id);
         });
       }
     }
@@ -1480,7 +1480,7 @@ describe("CallbacksTest", () => {
         this.attribute("name", "string");
         this.adapter = adapter;
         this.afterFind((r: any) => {
-          found.push(r.readAttribute("name"));
+          found.push(r.name);
         });
       }
     }
@@ -1515,7 +1515,7 @@ describe("CallbacksTest", () => {
           () => {
             log.push("apply_discount");
           },
-          { if: (r: any) => r.readAttribute("discount_code") !== null },
+          { if: (r: any) => r.discount_code !== null },
         );
       }
     }
@@ -1539,9 +1539,9 @@ describe("CallbacksTest", () => {
         this.adapter = adapter;
         this.afterSave(
           (r: any) => {
-            notifications.push(`order:${r.readAttribute("total")}`);
+            notifications.push(`order:${r.total}`);
           },
-          { unless: (r: any) => r.readAttribute("silent") === true },
+          { unless: (r: any) => r.silent === true },
         );
       }
     }
@@ -1561,7 +1561,7 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("locked", "boolean");
         this.adapter = adapter;
-        this.beforeSave(() => false, { if: (r: any) => r.readAttribute("locked") === true });
+        this.beforeSave(() => false, { if: (r: any) => r.locked === true });
       }
     }
 
@@ -1570,7 +1570,7 @@ describe("CallbacksTest", () => {
     expect(record.isPersisted()).toBe(true);
 
     // Cannot save when locked
-    record.writeAttribute("locked", true);
+    record.locked = true;
     const result = await record.save();
     expect(result).toBe(false);
   });

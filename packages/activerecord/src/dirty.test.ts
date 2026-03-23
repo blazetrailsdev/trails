@@ -31,7 +31,7 @@ describe("DirtyTest", () => {
       }
     }
     const t = new Topic({ title: "old" });
-    t.writeAttribute("title", "new");
+    t.title = "new";
     expect(t.changed).toBe(true);
   });
 
@@ -43,7 +43,7 @@ describe("DirtyTest", () => {
       }
     }
     const t = new Topic({ title: "old" });
-    t.writeAttribute("title", "new");
+    t.title = "new";
     expect(t.changed).toBe(true);
   });
 
@@ -55,8 +55,8 @@ describe("DirtyTest", () => {
       }
     }
     const t = new Topic({ title: "old" });
-    t.writeAttribute("title", "new");
-    t.writeAttribute("title", "old");
+    t.title = "new";
+    t.title = "old";
     // After reverting, may or may not be dirty depending on implementation
     expect(typeof t.changed).toBe("boolean");
   });
@@ -69,7 +69,7 @@ describe("DirtyTest", () => {
       }
     }
     const t = await Topic.create({ title: "old" });
-    t.writeAttribute("title", "new");
+    t.title = "new";
     await t.save();
     const changes = t.savedChanges;
     expect(changes).toHaveProperty("title");
@@ -83,7 +83,7 @@ describe("DirtyTest", () => {
       }
     }
     const t = new Topic({ title: "old" });
-    t.writeAttribute("title", "new");
+    t.title = "new";
     // Before save, changes should exist
     expect(t.changed).toBe(true);
   });
@@ -96,7 +96,7 @@ describe("DirtyTest", () => {
       }
     }
     const t = await Topic.create({ title: "old" });
-    t.writeAttribute("title", "modified");
+    t.title = "modified";
     expect(t.changed).toBe(true);
     await t.reload();
     expect(t.changed).toBe(false);
@@ -110,9 +110,9 @@ describe("DirtyTest", () => {
       }
     }
     const t = new Topic({ title: "original" });
-    t.writeAttribute("title", "changed1");
-    t.writeAttribute("title", "changed2");
-    t.writeAttribute("title", "original");
+    t.title = "changed1";
+    t.title = "changed2";
+    t.title = "original";
     expect(typeof t.changed).toBe("boolean");
   });
 
@@ -128,7 +128,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = await Person.create({ first_name: "Sean" });
-    p.writeAttribute("first_name", "Bob");
+    p.first_name = "Bob";
     await p.save();
     expect(p.savedChangeToAttribute("first_name")).toBe(true);
     expect(p.savedChangeToAttribute("first_name", { from: "Sean", to: "Bob" })).toBe(true);
@@ -143,7 +143,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = await Person.create({ first_name: "Sean" });
-    p.writeAttribute("first_name", "Bob");
+    p.first_name = "Bob";
     await p.save();
     const change = p.savedChangeToAttributeValues("first_name");
     expect(change).toEqual(["Sean", "Bob"]);
@@ -157,7 +157,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = await Person.create({ first_name: "Sean" });
-    p.writeAttribute("first_name", "Bob");
+    p.first_name = "Bob";
     await p.save();
     expect(p.attributeBeforeLastSave("first_name")).toBe("Sean");
   });
@@ -192,7 +192,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "hello", views: 0 })) as any;
-    post.writeAttribute("title", "world");
+    post.title = "world";
     const changes = post.changes;
     expect(changes).toHaveProperty("title");
     expect(changes.title[0]).toBe("hello");
@@ -208,7 +208,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
-    post.writeAttribute("title", "world");
+    post.title = "world";
     expect(post.changed).toBe(true);
   });
 
@@ -221,11 +221,11 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "changed");
+    post.title = "changed";
     expect(post.changed).toBe(true);
     await post.reload();
     expect(post.changed).toBe(false);
-    expect(post.readAttribute("title")).toBe("original");
+    expect(post.title).toBe("original");
   });
 
   it("clear attribute change", async () => {
@@ -237,7 +237,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
-    post.writeAttribute("title", "world");
+    post.title = "world";
     expect(post.changed).toBe(true);
     // Clear by reloading or saving
     await post.save();
@@ -254,10 +254,10 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original", views: 0 })) as any;
-    post.writeAttribute("title", "updated");
+    post.title = "updated";
     await post.save();
-    expect(post.readAttribute("title")).toBe("updated");
-    expect(post.readAttribute("views")).toBe(0);
+    expect(post.title).toBe("updated");
+    expect(post.views).toBe(0);
   });
 
   it("dup objects should not copy dirty flag from creator", async () => {
@@ -269,7 +269,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "changed");
+    post.title = "changed";
     expect(post.changed).toBe(true);
     // Just verify the original is dirty; dup not required
     expect(post).toBeTruthy();
@@ -284,7 +284,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "updated");
+    post.title = "updated";
     await post.save();
     expect(post.savedChanges).toHaveProperty("title");
   });
@@ -299,11 +299,11 @@ describe("DirtyTest", () => {
     }
     Post.validates("title", { presence: true });
     const post = (await Post.create({ title: "valid" })) as any;
-    post.writeAttribute("title", "");
+    post.title = "";
     const saved = await post.save();
     // Either save fails and dirty is preserved, or save succeeds (implementation dependent)
     // Just verify the attribute was set
-    expect(post.readAttribute("title")).toBe("");
+    expect(post.title).toBe("");
   });
 
   it("nullable number not marked as changed if new value is blank", async () => {
@@ -315,7 +315,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ views: null })) as any;
-    post.writeAttribute("views", null);
+    post.views = null;
     expect(post.changed).toBe(false);
   });
 
@@ -328,7 +328,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ count: 0 })) as any;
-    post.writeAttribute("count", 0);
+    post.count = 0;
     expect(post.changed).toBe(false);
   });
 
@@ -341,7 +341,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
-    post.writeAttribute("title", "hello");
+    post.title = "hello";
     expect(post.changed).toBe(false);
   });
 
@@ -355,10 +355,10 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "test", meta: "data" })) as any;
-    post.writeAttribute("title", "updated");
+    post.title = "updated";
     await post.save();
-    expect(post.readAttribute("title")).toBe("updated");
-    expect(post.readAttribute("meta")).toBe("data");
+    expect(post.title).toBe("updated");
+    expect(post.meta).toBe("data");
   });
 
   it("saved changes returns a hash of all the changes that occurred", async () => {
@@ -370,7 +370,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "updated");
+    post.title = "updated";
     await post.save();
     const sc = post.savedChanges;
     expect(typeof sc).toBe("object");
@@ -394,7 +394,7 @@ describe("DirtyTest", () => {
     }
     const author = (await Author.create({ name: "Alice" })) as any;
     const post = (await Post.create({ title: "test", author_id: null })) as any;
-    post.writeAttribute("author_id", author.id);
+    post.author_id = author.id;
     expect(post.changedAttributes.includes("author_id")).toBe(true);
   });
 
@@ -407,9 +407,9 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "a");
-    post.writeAttribute("title", "b");
-    post.writeAttribute("title", "original");
+    post.title = "a";
+    post.title = "b";
+    post.title = "original";
     expect(post.changed).toBe(false);
   });
 
@@ -422,7 +422,7 @@ describe("DirtyTest", () => {
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
-    post.writeAttribute("title", "changed");
+    post.title = "changed";
     expect(post.changed).toBe(true);
     await post.reload();
     expect(post.changed).toBe(false);
@@ -590,7 +590,7 @@ describe("DirtyTest", () => {
     Item.adapter = adapter;
 
     const item = await Item.create({ name: "Original" });
-    item.writeAttribute("name", "Updated");
+    item.name = "Updated";
     await item.save();
     expect(item.savedChanges).toHaveProperty("name");
     expect(item.savedChanges.name[1]).toBe("Updated");
@@ -605,7 +605,7 @@ describe("DirtyTest", () => {
     Item.adapter = adapter;
 
     const item = await Item.create({ name: "Original" });
-    item.writeAttribute("name", "Updated");
+    item.name = "Updated";
     await item.save();
     expect(item.savedChangeToAttribute("name")).toBe(true);
     expect(item.savedChangeToAttribute("id")).toBe(false);
@@ -623,7 +623,7 @@ describe("DirtyTest", () => {
     User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.attributeInDatabase("name")).toBe("Alice");
   });
 
@@ -652,7 +652,7 @@ describe("DirtyTest", () => {
     User.adapter = adapter;
 
     const user = await User.create({ name: "Alice", age: 25 });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.changedAttributeNamesToSave).toContain("name");
     expect(user.changedAttributeNamesToSave).not.toContain("age");
   });
@@ -695,7 +695,7 @@ describe("DirtyTest", () => {
     User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.isChangedForAutosave()).toBe(true);
   });
 });
@@ -713,7 +713,7 @@ describe("DirtyTest", () => {
     }
 
     const user = await User.create({ name: "Alice" });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.attributeChanged("name")).toBe(true);
     expect(user.attributeChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
     expect(user.attributeChanged("name", { from: "Wrong" })).toBe(false);
@@ -731,7 +731,7 @@ describe("DirtyTest", () => {
     }
 
     const user = await User.create({ name: "Alice" });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     await user.save();
     expect(user.savedChangeToAttribute("name")).toBe(true);
     expect(user.savedChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
@@ -754,7 +754,7 @@ describe("DirtyTest", () => {
     }
     const u = await User.create({ name: "Alice" });
     expect(u.changed).toBe(false);
-    u.writeAttribute("name", "Bob");
+    u.name = "Bob";
     expect(u.changed).toBe(true);
     expect(u.changedAttributes).toContain("name");
   });
@@ -768,7 +768,7 @@ describe("DirtyTest", () => {
       }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });
-    u.writeAttribute("email", "new@b.com");
+    u.email = "new@b.com";
     expect(u.changed).toBe(true);
     expect(u.changedAttributes).toContain("email");
     expect(u.changedAttributes).not.toContain("name");
@@ -782,9 +782,9 @@ describe("DirtyTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "Bob");
+    u.name = "Bob";
     expect(u.changed).toBe(true);
-    u.writeAttribute("name", "Alice");
+    u.name = "Alice";
     expect(u.changed).toBe(false);
   });
 
@@ -796,7 +796,7 @@ describe("DirtyTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "Changed");
+    u.name = "Changed";
     expect(u.changed).toBe(true);
     await u.reload();
     expect(u.changed).toBe(false);
@@ -811,7 +811,7 @@ describe("DirtyTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "");
+    u.name = "";
     const result = await u.save();
     expect(result).toBe(false);
     expect(u.changed).toBe(true);
@@ -825,7 +825,7 @@ describe("DirtyTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "Bob");
+    u.name = "Bob";
     await u.save();
     expect(u.savedChanges).toHaveProperty("name");
     expect(u.savedChanges.name[1]).toBe("Bob");
@@ -839,7 +839,7 @@ describe("DirtyTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "Bob");
+    u.name = "Bob";
     await u.save();
     expect(u.savedChangeToAttribute("name")).toBe(true);
     expect(u.savedChangeToAttribute("id")).toBe(false);
@@ -880,7 +880,7 @@ describe("DirtyTest", () => {
     }
     const u = await User.create({ name: "Alice" });
     expect(u.hasChangesToSave).toBe(false);
-    u.writeAttribute("name", "Bob");
+    u.name = "Bob";
     expect(u.hasChangesToSave).toBe(true);
   });
 });

@@ -62,7 +62,7 @@ describe("HasOneThroughAssociationsTest", () => {
       primaryKey: "club_id",
     });
     expect(loadedClub).not.toBeNull();
-    expect(loadedClub!.readAttribute("name")).toBe("Rails Club");
+    expect(loadedClub!.name).toBe("Rails Club");
   });
 
   it.skip("has one through executes limited query", () => {
@@ -112,13 +112,13 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = await Member.create({ name: "Replacer" });
     const membership = await Membership.create({ member_id: member.id, club_id: club1.id });
     // Replace: update membership to point to club2
-    membership.writeAttribute("club_id", club2.id);
+    membership.club_id = club2.id;
     await membership.save();
     const reloaded = await loadHasOne(member, "membership", {
       className: "Membership",
       foreignKey: "member_id",
     });
-    expect(reloaded!.readAttribute("club_id")).toBe(club2.id);
+    expect(reloaded!.club_id).toBe(club2.id);
   });
 
   it("replacing target record deletes old association", async () => {
@@ -134,7 +134,7 @@ describe("HasOneThroughAssociationsTest", () => {
       foreignKey: "member_id",
     });
     expect(membership).not.toBeNull();
-    expect(membership!.readAttribute("club_id")).toBe(club2.id);
+    expect(membership!.club_id).toBe(club2.id);
   });
 
   it("set record to nil should delete association", async () => {
@@ -203,7 +203,7 @@ describe("HasOneThroughAssociationsTest", () => {
       className: "HotpClub",
     });
     expect(sponsorClub).not.toBeNull();
-    expect(sponsorClub!.readAttribute("name")).toBe("Moustache Club");
+    expect(sponsorClub!.name).toBe("Moustache Club");
   });
 
   it("has one through eager loading", async () => {
@@ -234,7 +234,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(members).toHaveLength(1);
     const preloaded = (members[0] as any)._preloadedAssociations?.get("club");
     expect(preloaded).not.toBeNull();
-    expect(preloaded?.readAttribute("name")).toBe("Eager Club");
+    expect(preloaded?.name).toBe("Eager Club");
   });
 
   it("has one through eager loading through polymorphic", async () => {
@@ -287,7 +287,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(members).toHaveLength(1);
     const preloaded = (members[0] as any)._preloadedAssociations?.get("sponsorClub");
     expect(preloaded).not.toBeNull();
-    expect(preloaded?.readAttribute("name")).toBe("Polymorphic Eager Club");
+    expect(preloaded?.name).toBe("Polymorphic Eager Club");
   });
 
   it.skip("has one through with conditions eager loading", () => {
@@ -345,7 +345,7 @@ describe("HasOneThroughAssociationsTest", () => {
       primaryKey: "club_id",
     });
     expect(loadedClub).not.toBeNull();
-    expect(loadedClub!.readAttribute("name")).toBe("AssignClub");
+    expect(loadedClub!.name).toBe("AssignClub");
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
@@ -367,19 +367,19 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = await Member.create({ name: "ReassignMember" });
     const membership = await Membership.create({ member_id: member.id, club_id: club1.id });
     // Reassign to club2
-    membership.writeAttribute("club_id", club2.id);
+    membership.club_id = club2.id;
     await membership.save();
     const reloaded = await loadHasOne(member, "membership", {
       className: "Membership",
       foreignKey: "member_id",
     });
-    expect(reloaded!.readAttribute("club_id")).toBe(club2.id);
+    expect(reloaded!.club_id).toBe(club2.id);
     const loadedClub = await loadHasOne(reloaded!, "club", {
       className: "Club",
       foreignKey: "id",
       primaryKey: "club_id",
     });
-    expect(loadedClub!.readAttribute("name")).toBe("ReassignClub2");
+    expect(loadedClub!.name).toBe("ReassignClub2");
   });
 
   it("preloading has one through on belongs to", async () => {
@@ -410,7 +410,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(members).toHaveLength(1);
     const preloaded = (members[0] as any)._preloadedAssociations?.get("club");
     expect(preloaded).not.toBeNull();
-    expect(preloaded?.readAttribute("name")).toBe("Preload Club");
+    expect(preloaded?.name).toBe("Preload Club");
   });
 
   it("save of record with loaded has one through", async () => {
@@ -424,10 +424,10 @@ describe("HasOneThroughAssociationsTest", () => {
     });
     expect(membership).not.toBeNull();
     // Saving the member after loading through should still work
-    member.writeAttribute("name", "UpdatedMember");
+    member.name = "UpdatedMember";
     await member.save();
     const reloaded = await Member.find(member.id as number);
-    expect(reloaded.readAttribute("name")).toBe("UpdatedMember");
+    expect(reloaded.name).toBe("UpdatedMember");
   });
 
   it("through belongs to after destroy", async () => {
@@ -479,9 +479,9 @@ describe("HasOneThroughAssociationsTest", () => {
       foreignKey: "id",
       primaryKey: "club_id",
     });
-    expect(loadedClub!.readAttribute("name")).toBe("FKClub1");
+    expect(loadedClub!.name).toBe("FKClub1");
     // Change FK
-    membership.writeAttribute("club_id", club2.id);
+    membership.club_id = club2.id;
     await membership.save();
     // Re-load should point to club2
     const reloadedMembership = await Membership.find(membership.id as number);
@@ -490,7 +490,7 @@ describe("HasOneThroughAssociationsTest", () => {
       foreignKey: "id",
       primaryKey: "club_id",
     });
-    expect(loadedClub!.readAttribute("name")).toBe("FKClub2");
+    expect(loadedClub!.name).toBe("FKClub2");
   });
 
   it("has one through belongs to setting belongs to foreign key after nil target loaded", async () => {
@@ -510,7 +510,7 @@ describe("HasOneThroughAssociationsTest", () => {
       foreignKey: "member_id",
     });
     expect(loadedMembership).not.toBeNull();
-    expect(loadedMembership!.readAttribute("club_id")).toBe(club.id);
+    expect(loadedMembership!.club_id).toBe(club.id);
   });
 
   it.skip("assigning has one through belongs to with new record owner", () => {
@@ -621,6 +621,6 @@ describe("HasOneThroughAssociationsTest", () => {
       foreignKey: "member_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("club_id")).toBe(club.id);
+    expect(loaded!.club_id).toBe(club.id);
   });
 });

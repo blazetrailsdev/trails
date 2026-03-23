@@ -251,7 +251,7 @@ describe("ReadonlyTest", () => {
     Product.attrReadonly("sku");
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
-    expect(product.readAttribute("sku")).toBe("ABC-123");
+    expect(product.sku).toBe("ABC-123");
   });
 
   it("ignores readonly attribute changes on update", async () => {
@@ -266,14 +266,14 @@ describe("ReadonlyTest", () => {
     Product.attrReadonly("sku");
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
-    product.writeAttribute("sku", "CHANGED");
-    product.writeAttribute("name", "Updated Widget");
+    product.sku = "CHANGED";
+    product.name = "Updated Widget";
     await product.save();
 
     // The in-memory value changes, but the SQL should not include sku
     await product.reload();
-    expect(product.readAttribute("sku")).toBe("ABC-123");
-    expect(product.readAttribute("name")).toBe("Updated Widget");
+    expect(product.sku).toBe("ABC-123");
+    expect(product.name).toBe("Updated Widget");
   });
 
   it("exposes readonlyAttributes list", () => {
@@ -306,7 +306,7 @@ describe("ReadonlyTest", () => {
     await User.create({ name: "Alice" });
     const records = await User.all().readonly().toArray();
     const user = records[0];
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     await expect(user.save()).rejects.toThrow();
   });
 });

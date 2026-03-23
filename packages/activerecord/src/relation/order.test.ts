@@ -90,8 +90,8 @@ describe("OrderTest", () => {
     await Post.create({ title: "b", score: 2 });
     await Post.create({ title: "a", score: 1 });
     const results = await Post.order("title").toArray();
-    expect(results[0].readAttribute("title")).toBe("a");
-    expect(results[1].readAttribute("title")).toBe("b");
+    expect(results[0].title).toBe("a");
+    expect(results[1].title).toBe("b");
   });
 
   it("order desc", async () => {
@@ -99,7 +99,7 @@ describe("OrderTest", () => {
     await Post.create({ title: "a", score: 1 });
     await Post.create({ title: "b", score: 2 });
     const results = await Post.order("title DESC").toArray();
-    expect(results[0].readAttribute("title")).toBe("b");
+    expect(results[0].title).toBe("b");
   });
 
   it("order with association", async () => {
@@ -107,7 +107,7 @@ describe("OrderTest", () => {
     await Post.create({ title: "c" });
     await Post.create({ title: "a" });
     const results = await Post.order("title").toArray();
-    expect(results[0].readAttribute("title")).toBe("a");
+    expect(results[0].title).toBe("a");
   });
 
   it("order with association alias", async () => {
@@ -115,7 +115,7 @@ describe("OrderTest", () => {
     await Post.create({ title: "z", score: 1 });
     await Post.create({ title: "a", score: 2 });
     const results = await Post.order("title").toArray();
-    expect(results[0].readAttribute("title")).toBe("a");
+    expect(results[0].title).toBe("a");
   });
 });
 
@@ -139,29 +139,29 @@ describe("Relation Order (Rails-guided)", () => {
 
   it("order asc", async () => {
     const result = await Item.all().order({ name: "asc" }).toArray();
-    expect(result[0].readAttribute("name")).toBe("Alice");
-    expect(result[2].readAttribute("name")).toBe("Charlie");
+    expect(result[0].name).toBe("Alice");
+    expect(result[2].name).toBe("Charlie");
   });
 
   it("order desc", async () => {
     const result = await Item.all().order({ name: "desc" }).toArray();
-    expect(result[0].readAttribute("name")).toBe("Charlie");
-    expect(result[2].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Charlie");
+    expect(result[2].name).toBe("Alice");
   });
 
   it("order by string column name", async () => {
     const result = await Item.all().order("name").toArray();
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 
   it("reorder replaces existing order", async () => {
     const result = await Item.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
-    expect(result[0].readAttribute("name")).toBe("Charlie");
+    expect(result[0].name).toBe("Charlie");
   });
 
   it("reverseOrder flips direction", async () => {
     const result = await Item.all().order({ price: "asc" }).reverseOrder().toArray();
-    expect(result[0].readAttribute("price")).toBe(30);
+    expect(result[0].price).toBe(30);
   });
 
   it("multiple order columns", async () => {

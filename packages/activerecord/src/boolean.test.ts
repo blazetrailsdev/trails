@@ -33,19 +33,19 @@ describe("BooleanTest", () => {
   it("boolean", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "bool", approved: true });
-    expect(t.readAttribute("approved")).toBe(true);
+    expect(t.approved).toBe(true);
   });
 
   it("boolean without questionmark", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "noq", approved: false });
-    expect(t.readAttribute("approved")).toBe(false);
+    expect(t.approved).toBe(false);
   });
 
   it("boolean cast from string", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "str", approved: true });
-    expect(t.readAttribute("approved")).toBe(true);
+    expect(t.approved).toBe(true);
   });
 
   it("find by boolean string", async () => {

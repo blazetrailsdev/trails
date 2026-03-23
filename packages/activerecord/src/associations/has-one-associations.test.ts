@@ -58,7 +58,7 @@ describe("HasOneAssociationsTest", () => {
     await Account.create({ firm_id: firm.id, credit_limit: 50 });
     const assoc = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
     expect(assoc).not.toBeNull();
-    expect((assoc as any).readAttribute("credit_limit")).toBe(50);
+    expect((assoc as any).credit_limit).toBe(50);
   });
 
   it("has one does not use order by", async () => {
@@ -87,8 +87,8 @@ describe("HasOneAssociationsTest", () => {
     await Account.create({ firm_id: firm.id, credit_limit: 55 });
     const acct = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
     expect(acct).not.toBeNull();
-    expect(acct!.readAttribute("credit_limit")).toBe(55);
-    expect(acct!.readAttribute("firm_id")).toBe(firm.id);
+    expect(acct!.credit_limit).toBe(55);
+    expect(acct!.firm_id).toBe(firm.id);
   });
 
   it("finding using primary key", async () => {
@@ -96,17 +96,17 @@ describe("HasOneAssociationsTest", () => {
     await Account.create({ firm_id: firm.id, credit_limit: 100 });
     const acct = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
     expect(acct).not.toBeNull();
-    expect(acct!.readAttribute("firm_id")).toBe(firm.id);
+    expect(acct!.firm_id).toBe(firm.id);
   });
 
   it("update with foreign and primary keys", async () => {
     const firm = await Firm.create({ name: "Update FK Firm" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    account.writeAttribute("credit_limit", 200);
+    account.credit_limit = 200;
     await account.save();
     const reloaded = await Account.find(account.id as number);
-    expect(reloaded.readAttribute("credit_limit")).toBe(200);
-    expect(reloaded.readAttribute("firm_id")).toBe(firm.id);
+    expect(reloaded.credit_limit).toBe(200);
+    expect(reloaded.firm_id).toBe(firm.id);
   });
 
   it.skip("can marshal has one association with nil target", () => {
@@ -134,13 +134,13 @@ describe("HasOneAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("credit_limit")).toBe(75);
+    expect(loaded!.credit_limit).toBe(75);
   });
 
   it("natural assignment to nil", async () => {
     const firm = await Firm.create({ name: "Nil Corp" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 50 });
-    account.writeAttribute("firm_id", null);
+    account.firm_id = null;
     await account.save();
     const after = await loadHasOne(firm, "account", {
       className: "Account",
@@ -155,7 +155,7 @@ describe("HasOneAssociationsTest", () => {
     const firm2 = await Firm.create({ name: "Firm2" });
     const account = await Account.create({ firm_id: firm1.id, credit_limit: 50 });
     // Reassign account to firm2
-    account.writeAttribute("firm_id", firm2.id);
+    account.firm_id = firm2.id;
     await account.save();
     const loaded1 = await loadHasOne(firm1, "account", {
       className: "Account",
@@ -167,7 +167,7 @@ describe("HasOneAssociationsTest", () => {
     });
     expect(loaded1).toBeNull();
     expect(loaded2).not.toBeNull();
-    expect(loaded2!.readAttribute("credit_limit")).toBe(50);
+    expect(loaded2!.credit_limit).toBe(50);
   });
 
   it("nullify on polymorphic association", async () => {
@@ -198,8 +198,8 @@ describe("HasOneAssociationsTest", () => {
     // Nullify the has_one polymorphic
     await setHasOne(post, "polyTag", null, { as: "taggable", className: "PolyTag" });
     const reloaded = await PolyTag.find(tag.id!);
-    expect(reloaded.readAttribute("taggable_id")).toBeNull();
-    expect(reloaded.readAttribute("taggable_type")).toBeNull();
+    expect(reloaded.taggable_id).toBeNull();
+    expect(reloaded.taggable_type).toBeNull();
   });
 
   it("nullification on destroyed association", async () => {
@@ -246,7 +246,7 @@ describe("HasOneAssociationsTest", () => {
       className: "CpkAccount",
     });
     expect(account).not.toBeNull();
-    expect(account!.readAttribute("credit_limit")).toBe(100);
+    expect(account!.credit_limit).toBe(100);
   });
 
   it("natural assignment to nil after destroy", async () => {
@@ -324,14 +324,14 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "Same Corp" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 80 });
     // Re-assign same FK value
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
     const loaded = await loadHasOne(firm, "account", {
       className: "Account",
       foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("credit_limit")).toBe(80);
+    expect(loaded!.credit_limit).toBe(80);
   });
 
   it("dependence", async () => {
@@ -374,7 +374,7 @@ describe("HasOneAssociationsTest", () => {
     const account = await ExclAccount.create({ firm_id: firm.id, credit_limit: 10 });
     await processDependentAssociations(firm);
     const after = await ExclAccount.find(account.id as number);
-    expect(after.readAttribute("firm_id")).toBeNull();
+    expect(after.firm_id).toBeNull();
   });
 
   it("dependence with nil associate", async () => {
@@ -640,7 +640,7 @@ describe("HasOneAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("credit_limit")).toBe(300);
+    expect(found!.credit_limit).toBe(300);
   });
 
   it("clearing an association clears the associations inverse", async () => {
@@ -668,7 +668,7 @@ describe("HasOneAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("credit_limit")).toBe(500);
+    expect(found!.credit_limit).toBe(500);
   });
 
   it("create association with bang failing", async () => {
@@ -734,7 +734,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "Build2 Corp" });
     const account = new Account({ firm_id: firm.id as number, credit_limit: 50 });
     (account.constructor as any).adapter = adapter;
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("create", async () => {
@@ -755,7 +755,7 @@ describe("HasOneAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("credit_limit")).toBe(150);
+    expect(found!.credit_limit).toBe(150);
   });
 
   it("dependence with missing association", async () => {
@@ -820,7 +820,7 @@ describe("HasOneAssociationsTest", () => {
     const account = new Account({ firm_id: firm.id, credit_limit: 99 });
     await account.save();
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("save still works after accessing nil has one", async () => {
@@ -859,8 +859,8 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "Hash Build Corp" });
     const account = new Account({ firm_id: firm.id, credit_limit: 77 });
     await account.save();
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
-    expect(account.readAttribute("credit_limit")).toBe(77);
+    expect(account.firm_id).toBe(firm.id);
+    expect(account.credit_limit).toBe(77);
   });
 
   it("create respects hash condition", async () => {
@@ -872,7 +872,7 @@ describe("HasOneAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("credit_limit")).toBe(88);
+    expect(found!.credit_limit).toBe(88);
   });
 
   it("attributes are being set when initialized from has one association with where clause", async () => {
@@ -883,7 +883,7 @@ describe("HasOneAssociationsTest", () => {
       className: "Account",
       foreignKey: "firm_id",
     });
-    expect(found!.readAttribute("credit_limit")).toBe(42);
+    expect(found!.credit_limit).toBe(42);
   });
 
   it.skip("creation failure replaces existing without dependent option", () => {
@@ -901,7 +901,7 @@ describe("HasOneAssociationsTest", () => {
     expect(firm.id).toBeNull();
     // Creating an account with null FK
     const account = new Account({ firm_id: firm.id, credit_limit: 50 });
-    expect(account.readAttribute("firm_id")).toBeNull();
+    expect(account.firm_id).toBeNull();
   });
 
   it.skip("replacement failure due to existing record should raise error", () => {
@@ -925,8 +925,8 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "Block Build Corp" });
     const account = new Account({ firm_id: firm.id, credit_limit: 123 });
     (account.constructor as any).adapter = adapter;
-    expect(account.readAttribute("credit_limit")).toBe(123);
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.credit_limit).toBe(123);
+    expect(account.firm_id).toBe(firm.id);
     expect(account.isNewRecord()).toBe(true);
   });
 
@@ -934,14 +934,14 @@ describe("HasOneAssociationsTest", () => {
     // Simulate block-form create by passing attrs
     const firm = await Firm.create({ name: "Block Create Corp" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 456 });
-    expect(account.readAttribute("credit_limit")).toBe(456);
+    expect(account.credit_limit).toBe(456);
     expect(account.isNewRecord()).toBe(false);
     const found = await loadHasOne(firm, "account", {
       className: "Account",
       foreignKey: "firm_id",
     });
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("credit_limit")).toBe(456);
+    expect(found!.credit_limit).toBe(456);
   });
 
   it("create bang with block", async () => {
@@ -949,7 +949,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "Bang Block Corp" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 789 });
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("credit_limit")).toBe(789);
+    expect(account.credit_limit).toBe(789);
   });
 
   it("association attributes are available to after initialize", async () => {
@@ -957,8 +957,8 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "Init Corp" });
     const account = new Account({ firm_id: firm.id, credit_limit: 42 });
     // Attributes should be available right after construction
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
-    expect(account.readAttribute("credit_limit")).toBe(42);
+    expect(account.firm_id).toBe(firm.id);
+    expect(account.credit_limit).toBe(42);
   });
 
   it("has one transaction", async () => {
@@ -978,13 +978,13 @@ describe("HasOneAssociationsTest", () => {
     // Assigning the same FK value should not mark the record as changed
     const firm = await Firm.create({ name: "SameObj Corp" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    const originalLimit = account.readAttribute("credit_limit");
+    const originalLimit = account.credit_limit;
     // Re-assign same FK — no actual change
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
     const reloaded = await Account.find(account.id as number);
-    expect(reloaded.readAttribute("credit_limit")).toBe(originalLimit);
-    expect(reloaded.readAttribute("firm_id")).toBe(firm.id);
+    expect(reloaded.credit_limit).toBe(originalLimit);
+    expect(reloaded.firm_id).toBe(firm.id);
   });
 
   it("has one assignment triggers save on change on replacing object", async () => {
@@ -992,10 +992,10 @@ describe("HasOneAssociationsTest", () => {
     const firm1 = await Firm.create({ name: "Replace1" });
     const firm2 = await Firm.create({ name: "Replace2" });
     const account = await Account.create({ firm_id: firm1.id, credit_limit: 100 });
-    account.writeAttribute("firm_id", firm2.id);
+    account.firm_id = firm2.id;
     await account.save();
     const reloaded = await Account.find(account.id as number);
-    expect(reloaded.readAttribute("firm_id")).toBe(firm2.id);
+    expect(reloaded.firm_id).toBe(firm2.id);
   });
 
   it.skip("has one autosave with primary key manually set", () => {
@@ -1071,7 +1071,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = await TouchFirm.create({ name: "Touch Corp", updated_at: originalTime });
     await TouchAccount.create({ touch_firm_id: firm.id, credit_limit: 100 });
     const reloaded = await TouchFirm.find(firm.id);
-    const updatedAt = reloaded.readAttribute("updated_at");
+    const updatedAt = reloaded.updated_at;
     const updatedTime =
       updatedAt instanceof Date ? updatedAt.getTime() : Number(new Date(String(updatedAt)));
     expect(updatedTime).toBeGreaterThan(originalTime.getTime());
@@ -1113,7 +1113,7 @@ describe("HasOneAssociationsTest", () => {
     });
     const acct = await TouchUpdAccount.create({ touch_upd_firm_id: firm.id, credit_limit: 100 });
     const afterCreate = await TouchUpdFirm.find(firm.id);
-    const timeAfterCreate = afterCreate.readAttribute("updated_at");
+    const timeAfterCreate = afterCreate.updated_at;
     const createTime =
       timeAfterCreate instanceof Date
         ? timeAfterCreate.getTime()
@@ -1122,10 +1122,10 @@ describe("HasOneAssociationsTest", () => {
     // Ensure time advances so we can detect the touch
     await new Promise((r) => setTimeout(r, 10));
 
-    acct.writeAttribute("credit_limit", 200);
+    acct.credit_limit = 200;
     await acct.save();
     const afterUpdate = await TouchUpdFirm.find(firm.id);
-    const timeAfterUpdate = afterUpdate.readAttribute("updated_at");
+    const timeAfterUpdate = afterUpdate.updated_at;
     const updateTime =
       timeAfterUpdate instanceof Date
         ? timeAfterUpdate.getTime()
@@ -1163,7 +1163,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = await TouchDesFirm.create({ name: "Touch Corp", updated_at: originalTime });
     const acct = await TouchDesAccount.create({ touch_des_firm_id: firm.id, credit_limit: 100 });
     const afterCreate = await TouchDesFirm.find(firm.id);
-    const afterCreateAt = afterCreate.readAttribute("updated_at");
+    const afterCreateAt = afterCreate.updated_at;
     const afterCreateTime =
       afterCreateAt instanceof Date
         ? afterCreateAt.getTime()
@@ -1173,7 +1173,7 @@ describe("HasOneAssociationsTest", () => {
 
     await acct.destroy();
     const afterDestroy = await TouchDesFirm.find(firm.id);
-    const afterDestroyAt = afterDestroy.readAttribute("updated_at");
+    const afterDestroyAt = afterDestroy.updated_at;
     const afterDestroyTime =
       afterDestroyAt instanceof Date
         ? afterDestroyAt.getTime()
@@ -1322,7 +1322,7 @@ describe("HasOneAssociationsTest", () => {
       className: "Company",
       foreignKey: "company_id",
     });
-    expect((loaded as any).readAttribute("name")).toBe("Acme");
+    expect((loaded as any).name).toBe("Acme");
   });
 });
 
@@ -1357,6 +1357,6 @@ describe("AsyncHasOneAssociationsTest", () => {
       foreignKey: "ah_firm_id",
     });
     expect(account).not.toBeNull();
-    expect(account!.readAttribute("credit_limit")).toBe(100);
+    expect(account!.credit_limit).toBe(100);
   });
 });

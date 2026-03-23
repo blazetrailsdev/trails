@@ -1237,7 +1237,7 @@ describe("CalculationsTest", () => {
     const { Account } = makeModel();
     await Account.create({ name: "pick1" });
     const first = await Account.order("name").first();
-    expect(first?.readAttribute("name")).toBe("pick1");
+    expect(first?.name).toBe("pick1");
   });
   it("pick loaded relation aliased attribute", async () => {
     const { Account } = makeModel();
@@ -1745,7 +1745,7 @@ describe("CalculationsTest", () => {
     await Account.create({ credit_limit: 10 });
     await Account.create({ credit_limit: 20 });
     const all = await Account.all().toArray();
-    const total = all.reduce((sum: number, a: any) => sum + a.readAttribute("credit_limit"), 0);
+    const total = all.reduce((sum: number, a: any) => sum + a.credit_limit, 0);
     expect(total).toBe(30);
   });
 
@@ -2558,7 +2558,7 @@ describe("CalculationsTest", () => {
     await Post.incrementCounter("comments_count", post.id);
 
     await post.reload();
-    expect(post.readAttribute("comments_count")).toBe(6);
+    expect(post.comments_count).toBe(6);
   });
 
   it("decrements a counter column by primary key", async () => {
@@ -2574,7 +2574,7 @@ describe("CalculationsTest", () => {
     await Post.decrementCounter("comments_count", post.id);
 
     await post.reload();
-    expect(post.readAttribute("comments_count")).toBe(4);
+    expect(post.comments_count).toBe(4);
   });
 });
 
@@ -2598,8 +2598,8 @@ describe("CalculationsTest", () => {
     await Post.updateCounters(post.id, { likes_count: 3, comments_count: -2 });
 
     await post.reload();
-    expect(post.readAttribute("likes_count")).toBe(13);
-    expect(post.readAttribute("comments_count")).toBe(3);
+    expect(post.likes_count).toBe(13);
+    expect(post.comments_count).toBe(3);
   });
 });
 
@@ -2961,7 +2961,7 @@ describe("CalculationsTest", () => {
 
     await Topic.create({ title: "First" });
     const topic = (await Topic.all().readonly().first()) as Base;
-    topic.writeAttribute("title", "Modified");
+    topic.title = "Modified";
     await expect(topic.save()).rejects.toThrow(ReadOnlyRecord);
   });
 
@@ -2998,7 +2998,7 @@ describe("CalculationsTest", () => {
 
     await Topic.create({ title: "Unique" });
     const topic = await Topic.all().where({ title: "Unique" }).sole();
-    expect(topic.readAttribute("title")).toBe("Unique");
+    expect(topic.title).toBe("Unique");
   });
 
   // Rails: test "sole when no records"
@@ -3158,8 +3158,8 @@ describe("CalculationsTest", () => {
     const published = Post.all().where({ status: "published" });
     const result = await named.merge(published).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("A");
-    expect(result[0].readAttribute("status")).toBe("published");
+    expect(result[0].title).toBe("A");
+    expect(result[0].status).toBe("published");
   });
 
   // Rails: test "merge with scope"
@@ -3200,7 +3200,7 @@ describe("CalculationsTest", () => {
 
     const ordered = Post.all().order({ title: "asc" });
     const result = await Post.all().merge(ordered).toArray();
-    expect(result[0].readAttribute("title")).toBe("A");
+    expect(result[0].title).toBe("A");
   });
 
   // =====================================================================
@@ -3360,7 +3360,7 @@ describe("CalculationsTest", () => {
 
     await Topic.create({ title: "Sole Topic" });
     const topic = await Topic.findSoleBy({ title: "Sole Topic" });
-    expect(topic.readAttribute("title")).toBe("Sole Topic");
+    expect(topic.title).toBe("Sole Topic");
   });
 
   // Rails: test "find_sole_by raises when not found"
@@ -3412,8 +3412,8 @@ describe("CalculationsTest", () => {
     const topic = await Topic.all()
       .createWith({ status: "published" })
       .findOrCreateBy({ title: "New Topic" });
-    expect(topic.readAttribute("status")).toBe("published");
-    expect(topic.readAttribute("title")).toBe("New Topic");
+    expect(topic.status).toBe("published");
+    expect(topic.title).toBe("New Topic");
   });
 
   // Rails: test "create_with does not affect existing record lookup"
@@ -3432,7 +3432,7 @@ describe("CalculationsTest", () => {
     const topic = await Topic.all()
       .createWith({ status: "published" })
       .findOrCreateBy({ title: "Existing" });
-    expect(topic.readAttribute("status")).toBe("draft"); // kept original
+    expect(topic.status).toBe("draft"); // kept original
   });
 
   // =====================================================================
@@ -3512,7 +3512,7 @@ describe("CalculationsTest", () => {
     const copy = topic.dup();
     expect(copy.isNewRecord()).toBe(true);
     expect(copy.id).toBeNull();
-    expect(copy.readAttribute("title")).toBe("Original");
+    expect(copy.title).toBe("Original");
   });
 
   // Rails: test "dup can be saved"
@@ -3561,7 +3561,7 @@ describe("CalculationsTest", () => {
     const vehicle = await Vehicle.create({ name: "Tesla", type: "Car" });
     const car = vehicle.becomes(Car);
     expect(car).toBeInstanceOf(Car);
-    expect(car.readAttribute("name")).toBe("Tesla");
+    expect(car.name).toBe("Tesla");
     expect(car.id).toBe(vehicle.id);
     expect(car.isPersisted()).toBe(true);
   });
@@ -3690,7 +3690,7 @@ describe("CalculationsTest", () => {
 
     const posts = await Post.all().extending(myScope).publishedOnly().toArray();
     expect(posts).toHaveLength(1);
-    expect(posts[0].readAttribute("title")).toBe("Live");
+    expect(posts[0].title).toBe("Live");
   });
 
   // Rails: test "extending with multiple modules"
@@ -3738,7 +3738,7 @@ describe("CalculationsTest", () => {
     await (conv as any).archivedBang();
     expect((conv as any).isArchived()).toBe(true);
     const reloaded = await Conversation.find(conv.id);
-    expect(reloaded.readAttribute("status")).toBe(1);
+    expect(reloaded.status).toBe(1);
   });
 
   // Rails: test "enum generates not-scopes"
@@ -3798,7 +3798,7 @@ describe("CalculationsTest", () => {
     }
 
     const topic = await Topic.create({ title: "First" });
-    topic.writeAttribute("title", "Second");
+    topic.title = "Second";
     await topic.save();
     expect(topic.savedChanges).toHaveProperty("title");
     const [before, after] = topic.savedChanges.title;
@@ -3819,7 +3819,7 @@ describe("CalculationsTest", () => {
     }
 
     const topic = await Topic.create({ title: "First", body: "Content" });
-    topic.writeAttribute("title", "Second");
+    topic.title = "Second";
     await topic.save();
     expect(topic.savedChangeToAttribute("title")).toBe(true);
     expect(topic.savedChangeToAttribute("body")).toBe(false);
@@ -3848,7 +3848,7 @@ describe("CalculationsTest", () => {
     expect(destroyed).toHaveLength(2);
     const remaining = await Topic.all().toArray();
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].readAttribute("title")).toBe("Keep");
+    expect(remaining[0].title).toBe("Keep");
   });
 
   // Rails: test "delete_by"
@@ -3887,7 +3887,7 @@ describe("CalculationsTest", () => {
 
     await Topic.updateAll({ status: "published" });
     const topics = await Topic.all().toArray();
-    expect(topics.every((t: any) => t.readAttribute("status") === "published")).toBe(true);
+    expect(topics.every((t: any) => t.status === "published")).toBe(true);
   });
 
   // =====================================================================
@@ -3969,7 +3969,7 @@ describe("CalculationsTest", () => {
 
     const topic = await Topic.create({ title: "Old" });
     const updated = await Topic.update(topic.id, { title: "New" });
-    expect(updated.readAttribute("title")).toBe("New");
+    expect(updated.title).toBe("New");
   });
 
   // =====================================================================
@@ -4079,7 +4079,7 @@ describe("CalculationsTest", () => {
 
     const topic = await Topic.second();
     expect(topic).not.toBeNull();
-    expect(topic!.readAttribute("title")).toBe("Second");
+    expect(topic!.title).toBe("Second");
   });
 
   // Rails: test "third"
@@ -4098,7 +4098,7 @@ describe("CalculationsTest", () => {
     await Topic.create({ title: "Third" });
 
     const topic = await Topic.third();
-    expect(topic!.readAttribute("title")).toBe("Third");
+    expect(topic!.title).toBe("Third");
   });
 
   // Rails: test "fourth"
@@ -4116,7 +4116,7 @@ describe("CalculationsTest", () => {
       await Topic.create({ title: t });
     }
     const topic = await Topic.fourth();
-    expect(topic!.readAttribute("title")).toBe("D");
+    expect(topic!.title).toBe("D");
   });
 
   // Rails: test "fifth"
@@ -4134,7 +4134,7 @@ describe("CalculationsTest", () => {
       await Topic.create({ title: t });
     }
     const topic = await Topic.fifth();
-    expect(topic!.readAttribute("title")).toBe("E");
+    expect(topic!.title).toBe("E");
   });
 
   // Rails: test "second_to_last"
@@ -4153,7 +4153,7 @@ describe("CalculationsTest", () => {
     await Topic.create({ title: "Third" });
 
     const topic = await Topic.secondToLast();
-    expect(topic!.readAttribute("title")).toBe("Second");
+    expect(topic!.title).toBe("Second");
   });
 
   // Rails: test "third_to_last"
@@ -4173,7 +4173,7 @@ describe("CalculationsTest", () => {
     await Topic.create({ title: "Fourth" });
 
     const topic = await Topic.thirdToLast();
-    expect(topic!.readAttribute("title")).toBe("Second");
+    expect(topic!.title).toBe("Second");
   });
 
   // Rails: test "forty_two"
@@ -4192,7 +4192,7 @@ describe("CalculationsTest", () => {
       await Topic.create({ title: `Topic ${i}` });
     }
     const topic = await Topic.fortyTwo();
-    expect(topic!.readAttribute("title")).toBe("Topic 42");
+    expect(topic!.title).toBe("Topic 42");
   });
 
   // =====================================================================
@@ -4215,9 +4215,9 @@ describe("CalculationsTest", () => {
     await Topic.create({ title: "Not Approved", approved: false });
     await Topic.create({ title: "Also Approved", approved: true });
 
-    const approved = await Topic.all().select((t: any) => t.readAttribute("approved") === true);
+    const approved = await Topic.all().select((t: any) => t.approved === true);
     expect(approved).toHaveLength(2);
-    expect(approved.every((t: any) => t.readAttribute("approved") === true)).toBe(true);
+    expect(approved.every((t: any) => t.approved === true)).toBe(true);
   });
 
   // =====================================================================
@@ -4241,7 +4241,7 @@ describe("CalculationsTest", () => {
 
     const titles: string[] = [];
     for await (const post of Post.all().findEach({ batchSize: 3 })) {
-      titles.push(post.readAttribute("title") as string);
+      titles.push(post.title as string);
     }
     expect(titles).toHaveLength(10);
   });
@@ -4317,7 +4317,7 @@ describe("CalculationsTest", () => {
 
     const remaining = await Topic.all().excluding(first).toArray();
     expect(remaining).toHaveLength(2);
-    expect(remaining.every((t: any) => t.readAttribute("title") !== "First")).toBe(true);
+    expect(remaining.every((t: any) => t.title !== "First")).toBe(true);
   });
 
   // Rails: test "without is an alias"
@@ -4337,7 +4337,7 @@ describe("CalculationsTest", () => {
 
     const remaining = await Topic.all().without(t1, t2).toArray();
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].readAttribute("title")).toBe("C");
+    expect(remaining[0].title).toBe("C");
   });
 
   // =====================================================================
@@ -4739,7 +4739,7 @@ describe("CalculationsTest", () => {
       .rewhere({ role: "admin" })
       .toArray();
     expect(result.length).toBe(1);
-    expect(result[0].readAttribute("role")).toBe("admin");
+    expect(result[0].role).toBe("admin");
   });
 
   // Rails: test "pluck with Arel attributes"
@@ -4800,7 +4800,7 @@ describe("CalculationsTest", () => {
     await user.destroy();
     expect(user.isFrozen()).toBe(true);
     expect(user.isDestroyed()).toBe(true);
-    expect(() => user.writeAttribute("name", "Bob")).toThrow("Cannot modify a frozen");
+    expect(() => (user.name = "Bob")).toThrow("Cannot modify a frozen");
   });
 
   // Rails: test "frozen after delete"
@@ -4851,7 +4851,7 @@ describe("CalculationsTest", () => {
     const user = new User({ name: "Alice" });
     user.freeze();
     expect(user.isFrozen()).toBe(true);
-    expect(() => user.writeAttribute("name", "Bob")).toThrow();
+    expect(() => (user.name = "Bob")).toThrow();
   });
 
   // Rails: test "save(validate: false)"
@@ -4884,7 +4884,7 @@ describe("CalculationsTest", () => {
     }
 
     const user = await User.createOrFindBy({ name: "Alice" });
-    expect(user.readAttribute("name")).toBe("Alice");
+    expect(user.name).toBe("Alice");
     expect(user.isPersisted()).toBe(true);
   });
 
@@ -4905,7 +4905,7 @@ describe("CalculationsTest", () => {
     );
 
     await account.lockBang();
-    expect(account.readAttribute("balance")).toBe(200);
+    expect(account.balance).toBe(200);
   });
 
   // Rails: test "attribute_for_inspect"
@@ -4977,8 +4977,8 @@ describe("CalculationsTest", () => {
     }
 
     const user = await User.all().createOrFindBy({ name: "Alice", role: "admin" });
-    expect(user.readAttribute("name")).toBe("Alice");
-    expect(user.readAttribute("role")).toBe("admin");
+    expect(user.name).toBe("Alice");
+    expect(user.role).toBe("admin");
   });
 
   // Rails: test "find_by_sql"
@@ -4997,7 +4997,7 @@ describe("CalculationsTest", () => {
 
     const results = await User.findBySql('SELECT * FROM "users" WHERE "name" = \'Bob\'');
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Bob");
+    expect(results[0].name).toBe("Bob");
     expect(results[0].isPersisted()).toBe(true);
   });
 
@@ -5015,7 +5015,7 @@ describe("CalculationsTest", () => {
     const post = await Post.create({ comments_count: 3 });
     await Post.incrementCounter("comments_count", post.id);
     await post.reload();
-    expect(post.readAttribute("comments_count")).toBe(4);
+    expect(post.comments_count).toBe(4);
   });
 
   // Rails: test "decrement_counter"
@@ -5032,7 +5032,7 @@ describe("CalculationsTest", () => {
     const post = await Post.create({ comments_count: 5 });
     await Post.decrementCounter("comments_count", post.id);
     await post.reload();
-    expect(post.readAttribute("comments_count")).toBe(4);
+    expect(post.comments_count).toBe(4);
   });
 
   // Rails: test "update_counters"
@@ -5050,8 +5050,8 @@ describe("CalculationsTest", () => {
     const post = await Post.create({ likes_count: 10, views_count: 100 });
     await Post.updateCounters(post.id, { likes_count: 5, views_count: -10 });
     await post.reload();
-    expect(post.readAttribute("likes_count")).toBe(15);
-    expect(post.readAttribute("views_count")).toBe(90);
+    expect(post.likes_count).toBe(15);
+    expect(post.views_count).toBe(90);
   });
 
   // Rails: test "save(touch: false)"
@@ -5067,11 +5067,11 @@ describe("CalculationsTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.readAttribute("updated_at");
+    const originalUpdatedAt = post.updated_at;
 
-    post.writeAttribute("title", "Changed");
+    post.title = "Changed";
     await post.save({ touch: false });
-    expect(post.readAttribute("updated_at")).toEqual(originalUpdatedAt);
+    expect(post.updated_at).toEqual(originalUpdatedAt);
   });
 
   // Rails: test "attr_readonly"
@@ -5088,13 +5088,13 @@ describe("CalculationsTest", () => {
     }
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
-    product.writeAttribute("sku", "CHANGED");
-    product.writeAttribute("name", "Better Widget");
+    product.sku = "CHANGED";
+    product.name = "Better Widget";
     await product.save();
     await product.reload();
 
-    expect(product.readAttribute("sku")).toBe("ABC-123");
-    expect(product.readAttribute("name")).toBe("Better Widget");
+    expect(product.sku).toBe("ABC-123");
+    expect(product.name).toBe("Better Widget");
   });
 
   // Rails: test "readonly_attributes"
@@ -5125,7 +5125,7 @@ describe("CalculationsTest", () => {
     const user = await User.create({ name: "Alice" });
     expect(user.willSaveChangeToAttribute("name")).toBe(false);
 
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.willSaveChangeToAttribute("name")).toBe(true);
     expect(user.willSaveChangeToAttributeValues("name")).toEqual(["Alice", "Bob"]);
   });
@@ -5146,7 +5146,7 @@ describe("CalculationsTest", () => {
     const user = await User.create({ name: "Alice", email: "a@b.com" });
     const result = await user.updateAttribute("email", "");
     expect(result).toBe(true);
-    expect(user.readAttribute("email")).toBe("");
+    expect(user.email).toBe("");
   });
 
   // Rails: test "attribute_in_database"
@@ -5161,7 +5161,7 @@ describe("CalculationsTest", () => {
     }
 
     const user = await User.create({ name: "Alice" });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.attributeInDatabase("name")).toBe("Alice");
   });
 
@@ -5194,7 +5194,7 @@ describe("CalculationsTest", () => {
     }
 
     const user = await User.create({ name: "Alice", age: 25 });
-    user.writeAttribute("name", "Bob");
+    user.name = "Bob";
     expect(user.changedAttributeNamesToSave).toContain("name");
     expect(user.changedAttributeNamesToSave).not.toContain("age");
   });
@@ -5299,7 +5299,7 @@ describe("CalculationsTest", () => {
     const saved = await User.create({ name: "Bob" });
     expect(saved.isChangedForAutosave()).toBe(false);
 
-    saved.writeAttribute("name", "Changed");
+    saved.name = "Changed";
     expect(saved.isChangedForAutosave()).toBe(true);
   });
 
@@ -5452,7 +5452,7 @@ describe("CalculationsTest", () => {
       .and(User.all().where({ name: "Alice" }))
       .toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 
   // Rails: test "reject"
@@ -5468,9 +5468,9 @@ describe("CalculationsTest", () => {
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
-    const results = await User.all().reject((u: any) => u.readAttribute("name") === "Alice");
+    const results = await User.all().reject((u: any) => u.name === "Alice");
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Bob");
+    expect(results[0].name).toBe("Bob");
   });
 
   // Rails: test "compact_blank"
@@ -5490,7 +5490,7 @@ describe("CalculationsTest", () => {
 
     const results = await User.all().compactBlank("email").toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 
   // Rails: test "sanitize_sql_array"
@@ -5549,7 +5549,7 @@ describe("CalculationsTest", () => {
 
     const user = User.new({ name: "Alice" });
     expect(user.isNewRecord()).toBe(true);
-    expect(user.readAttribute("name")).toBe("Alice");
+    expect(user.name).toBe("Alice");
   });
 
   // Rails: test "attribute_present?"
@@ -5696,7 +5696,7 @@ describe("CalculationsTest", () => {
 
     const results = await User.all().where("age >= :min", { min: 20 }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("name")).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
   });
 
   // Rails: test "only keeps specified relation parts"
@@ -5752,7 +5752,7 @@ describe("CalculationsTest", () => {
     User.normalizes("email", (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : v));
 
     const user = await User.create({ email: "  ALICE@TEST.COM  " });
-    expect(user.readAttribute("email")).toBe("alice@test.com");
+    expect(user.email).toBe("alice@test.com");
   });
 
   // Rails: test "destroy(id)"
@@ -5804,7 +5804,7 @@ describe("CalculationsTest", () => {
 
     const user = await User.create({ name: "Alice" });
     const updated = await User.updateBang(user.id, { name: "Bob" });
-    expect(updated.readAttribute("name")).toBe("Bob");
+    expect(updated.name).toBe("Bob");
   });
 
   // Rails: test "one?"
@@ -5861,7 +5861,7 @@ describe("CalculationsTest", () => {
     }
 
     const p = await Person.create({ name: "Alice", age: 25 });
-    p.writeAttribute("age", 30);
+    p.age = 30;
 
     // Rails: person.attribute_changed?(:age) => true
     expect(p.attributeChanged("age")).toBe(true);
@@ -5964,7 +5964,7 @@ describe("CalculationsTest", () => {
     }
     const u = new User({ age: "42" });
     expect(u.attributesBeforeTypeCast.age).toBe("42");
-    expect(u.readAttribute("age")).toBe(42);
+    expect(u.age).toBe(42);
   });
 
   // Rails guide: encrypts — encrypted attributes
@@ -5981,12 +5981,12 @@ describe("CalculationsTest", () => {
       }
     }
     const user = await User.create({ name: "Alice", ssn: "123-45-6789" });
-    expect(user.readAttribute("ssn")).toBe("123-45-6789");
+    expect(user.ssn).toBe("123-45-6789");
     // Raw internal value is encrypted
     expect(user._attributes.get("ssn")).not.toBe("123-45-6789");
     // Reload from DB still decrypts
     const loaded = await User.find(1);
-    expect(loaded.readAttribute("ssn")).toBe("123-45-6789");
+    expect(loaded.ssn).toBe("123-45-6789");
   });
 
   // Rails guide: human_attribute_name on Model (inherited by Base)
@@ -6090,7 +6090,7 @@ describe("CalculationsTest", () => {
     const token = (user as any).generateTokenFor("email_verify");
     const found = await (User as any).findByTokenFor("email_verify", token);
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Alice");
+    expect(found!.name).toBe("Alice");
   });
 
   // Rails guide: Relation#readonly? — check readonly status
@@ -6140,8 +6140,8 @@ describe("CalculationsTest", () => {
       }
     }
     const u = new User({ name: "  ", bio: "  " });
-    expect(u.readAttribute("name")).toBeNull();
-    expect(u.readAttribute("bio")).toBe("  ");
+    expect(u.name).toBeNull();
+    expect(u.bio).toBe("  ");
   });
 
   // Rails guide: prepend callbacks
@@ -6239,7 +6239,7 @@ describe("CalculationsTest", () => {
     }
     const u = new User({});
     u.fromJson('{"name":"Alice"}');
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.name).toBe("Alice");
   });
 
   // Rails guide: from_json with root
@@ -6255,7 +6255,7 @@ describe("CalculationsTest", () => {
     }
     const u = new User({});
     u.fromJson('{"user":{"name":"Bob"}}', true);
-    expect(u.readAttribute("name")).toBe("Bob");
+    expect(u.name).toBe("Bob");
   });
 
   // Rails guide: persisted? — checks if record is saved
@@ -6321,8 +6321,8 @@ describe("CalculationsTest", () => {
       }
     }
     const u = User.where({ role: "admin" }).build({ name: "Alice" });
-    expect(u.readAttribute("role")).toBe("admin");
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.role).toBe("admin");
+    expect(u.name).toBe("Alice");
     expect(u.isPersisted()).toBe(false);
   });
 
@@ -6340,7 +6340,7 @@ describe("CalculationsTest", () => {
     }
     const u = await User.where({ role: "admin" }).create({ name: "Bob" });
     expect(u.isPersisted()).toBe(true);
-    expect(u.readAttribute("role")).toBe("admin");
+    expect(u.role).toBe("admin");
   });
 
   // Rails guide: Relation#spawn — independent copy
@@ -6377,7 +6377,7 @@ describe("CalculationsTest", () => {
     expect(active.length).toBe(1);
     const inactive = await User.where({ active: true }).invertWhere().toArray();
     expect(inactive.length).toBe(1);
-    expect(inactive[0].readAttribute("name")).toBe("Bob");
+    expect(inactive[0].name).toBe("Bob");
   });
 
   // Rails guide: Relation#inspect — debug representation
@@ -6437,7 +6437,7 @@ describe("CalculationsTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    u.writeAttribute("name", "Bob");
+    u.name = "Bob";
     await u.save();
     expect(u.attributePreviouslyChanged("name")).toBe(true);
     expect(u.attributePreviouslyChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
@@ -6548,7 +6548,7 @@ describe("CalculationsTest", () => {
     const names: string[] = [];
     const rel = User.where({});
     for await (const u of rel.findEach({ order: "desc" })) {
-      names.push(u.readAttribute("name") as string);
+      names.push(u.name as string);
     }
     expect(names[0]).toBe("B");
   });
@@ -6613,7 +6613,7 @@ describe("CalculationsTest", () => {
     await User.create({ name: "Alice" });
     const found = await User.findByAttribute("name", "Alice");
     expect(found).not.toBeNull();
-    expect(found!.readAttribute("name")).toBe("Alice");
+    expect(found!.name).toBe("Alice");
   });
 
   // Rails guide: confirmation validator with caseSensitive: false

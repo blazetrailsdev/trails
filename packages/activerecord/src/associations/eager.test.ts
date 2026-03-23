@@ -46,8 +46,8 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerInvChild", EagerInvChild);
 
     const parent = await EagerInvParent.create({ name: "P" });
-    await EagerInvChild.create({ value: "C1", eager_inv_parent_id: parent.readAttribute("id") });
-    await EagerInvChild.create({ value: "C2", eager_inv_parent_id: parent.readAttribute("id") });
+    await EagerInvChild.create({ value: "C1", eager_inv_parent_id: parent.id });
+    await EagerInvChild.create({ value: "C2", eager_inv_parent_id: parent.id });
 
     const parents = await EagerInvParent.all().includes("eagerInvChildren").toArray();
     expect(parents).toHaveLength(1);
@@ -80,8 +80,8 @@ describe("EagerAssociationTest", () => {
 
     const p1 = await EagerOrPost.create({ title: "First" });
     const p2 = await EagerOrPost.create({ title: "Second" });
-    await EagerOrComment.create({ body: "c1", eager_or_post_id: p1.readAttribute("id") });
-    await EagerOrComment.create({ body: "c2", eager_or_post_id: p2.readAttribute("id") });
+    await EagerOrComment.create({ body: "c1", eager_or_post_id: p1.id });
+    await EagerOrComment.create({ body: "c2", eager_or_post_id: p2.id });
 
     const posts = await EagerOrPost.all().includes("eagerOrComments").toArray();
     expect(posts).toHaveLength(2);
@@ -122,11 +122,11 @@ describe("EagerAssociationTest", () => {
 
     const p1 = await EagerPost.create({ title: "A" });
     const p2 = await EagerPost.create({ title: "B" });
-    await EagerComment.create({ body: "c1", eager_post_id: p1.readAttribute("id") });
+    await EagerComment.create({ body: "c1", eager_post_id: p1.id });
 
     const posts = await EagerPost.all().includes("eagerComments").toArray();
-    const post1 = posts.find((p: any) => p.readAttribute("title") === "A")!;
-    const post2 = posts.find((p: any) => p.readAttribute("title") === "B")!;
+    const post1 = posts.find((p: any) => p.title === "A")!;
+    const post2 = posts.find((p: any) => p.title === "B")!;
     expect((post1 as any)._preloadedAssociations.get("eagerComments")).toHaveLength(1);
     expect((post2 as any)._preloadedAssociations.get("eagerComments")).toHaveLength(0);
   });
@@ -156,8 +156,8 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerOrderComment", EagerOrderComment);
 
     const post = await EagerOrderPost.create({ title: "Post1" });
-    await EagerOrderComment.create({ body: "c1", eager_order_post_id: post.readAttribute("id") });
-    await EagerOrderComment.create({ body: "c2", eager_order_post_id: post.readAttribute("id") });
+    await EagerOrderComment.create({ body: "c1", eager_order_post_id: post.id });
+    await EagerOrderComment.create({ body: "c2", eager_order_post_id: post.id });
 
     const posts = await EagerOrderPost.all().includes("eagerOrderComments").toArray();
     expect(posts).toHaveLength(1);
@@ -215,12 +215,12 @@ describe("EagerAssociationTest", () => {
     const book1 = await EagerHmtBook.create({ title: "LOTR" });
     const book2 = await EagerHmtBook.create({ title: "Hobbit" });
     await EagerHmtAuthorship.create({
-      eager_hmt_author_id: author.readAttribute("id"),
-      eager_hmt_book_id: book1.readAttribute("id"),
+      eager_hmt_author_id: author.id,
+      eager_hmt_book_id: book1.id,
     });
     await EagerHmtAuthorship.create({
-      eager_hmt_author_id: author.readAttribute("id"),
-      eager_hmt_book_id: book2.readAttribute("id"),
+      eager_hmt_author_id: author.id,
+      eager_hmt_book_id: book2.id,
     });
 
     const books = await loadHasManyThrough(author, "eagerHmtBooks", {
@@ -257,13 +257,13 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerHoRefParent.create({ name: "P" });
     await EagerHoRefChild.create({
       value: "C",
-      eager_ho_ref_parent_id: parent.readAttribute("id"),
+      eager_ho_ref_parent_id: parent.id,
     });
 
     const results = await EagerHoRefParent.all().includes("eagerHoRefChild").toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerHoRefChild");
-    expect(preloaded?.readAttribute("value")).toBe("C");
+    expect(preloaded?.value).toBe("C");
   });
   it("eager loaded has one association without primary key", async () => {
     class EagerHoNoPkParent extends Base {
@@ -292,13 +292,13 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerHoNoPkParent.create({ name: "P" });
     await EagerHoNoPkChild.create({
       value: "C",
-      eager_ho_no_pk_parent_id: parent.readAttribute("id"),
+      eager_ho_no_pk_parent_id: parent.id,
     });
 
     const parents = await EagerHoNoPkParent.all().includes("eagerHoNoPkChild").toArray();
     expect(parents).toHaveLength(1);
     const preloaded = (parents[0] as any)._preloadedAssociations.get("eagerHoNoPkChild");
-    expect(preloaded?.readAttribute("value")).toBe("C");
+    expect(preloaded?.value).toBe("C");
   });
   it("eager loaded has many association without primary key", async () => {
     class EagerHmNoPkParent extends Base {
@@ -327,7 +327,7 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerHmNoPkParent.create({ name: "P" });
     await EagerHmNoPkChild.create({
       value: "C1",
-      eager_hm_no_pk_parent_id: parent.readAttribute("id"),
+      eager_hm_no_pk_parent_id: parent.id,
     });
 
     const parents = await EagerHmNoPkParent.all().includes("eagerHmNoPkChildren").toArray();
@@ -364,8 +364,8 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDupChild", EagerDupChild);
 
     const parent = await EagerDupParent.create({ name: "P" });
-    await EagerDupChild.create({ label: "c1", eager_dup_parent_id: parent.readAttribute("id") });
-    await EagerDupChild.create({ label: "c2", eager_dup_parent_id: parent.readAttribute("id") });
+    await EagerDupChild.create({ label: "c1", eager_dup_parent_id: parent.id });
+    await EagerDupChild.create({ label: "c2", eager_dup_parent_id: parent.id });
 
     const parents = await EagerDupParent.all().includes("eagerDupChildren").toArray();
     expect(parents).toHaveLength(1);
@@ -397,16 +397,16 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDupPost", EagerDupPost);
 
     const author = await EagerDupAuthor.create({ name: "Same" });
-    await EagerDupPost.create({ title: "P1", eager_dup_author_id: author.readAttribute("id") });
-    await EagerDupPost.create({ title: "P2", eager_dup_author_id: author.readAttribute("id") });
+    await EagerDupPost.create({ title: "P1", eager_dup_author_id: author.id });
+    await EagerDupPost.create({ title: "P2", eager_dup_author_id: author.id });
 
     const posts = await EagerDupPost.all().includes("eagerDupAuthor").toArray();
     expect(posts).toHaveLength(2);
     // Both posts should have the same author preloaded
     const a1 = (posts[0] as any)._preloadedAssociations.get("eagerDupAuthor");
     const a2 = (posts[1] as any)._preloadedAssociations.get("eagerDupAuthor");
-    expect(a1?.readAttribute("id")).toBe(author.readAttribute("id"));
-    expect(a2?.readAttribute("id")).toBe(author.readAttribute("id"));
+    expect(a1?.id).toBe(author.id);
+    expect(a2?.id).toBe(author.id);
   });
 
   it("finding with includes on has many association with same include includes only once", async () => {
@@ -434,7 +434,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerArticle", EagerArticle);
 
     const article = await EagerArticle.create({ title: "X" });
-    await EagerTag.create({ name: "t1", eager_article_id: article.readAttribute("id") });
+    await EagerTag.create({ name: "t1", eager_article_id: article.id });
 
     const results = await EagerArticle.all().includes("eagerTags").includes("eagerTags").toArray();
     expect(results).toHaveLength(1);
@@ -467,7 +467,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHoChild", EagerHoChild);
 
     const parent = await EagerHoParent.create({ name: "P" });
-    await EagerHoChild.create({ value: "C", eager_ho_parent_id: parent.readAttribute("id") });
+    await EagerHoChild.create({ value: "C", eager_ho_parent_id: parent.id });
 
     const results = await EagerHoParent.all()
       .includes("eagerHoChild")
@@ -475,7 +475,7 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerHoChild");
-    expect(preloaded?.readAttribute("value")).toBe("C");
+    expect(preloaded?.value).toBe("C");
   });
   it("finding with includes on belongs to association with same include includes only once", async () => {
     class EagerBtParent extends Base {
@@ -502,7 +502,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerBtChild", EagerBtChild);
 
     const parent = await EagerBtParent.create({ name: "P" });
-    await EagerBtChild.create({ value: "C", eager_bt_parent_id: parent.readAttribute("id") });
+    await EagerBtChild.create({ value: "C", eager_bt_parent_id: parent.id });
 
     const results = await EagerBtChild.all()
       .includes("eagerBtParent")
@@ -510,7 +510,7 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerBtParent");
-    expect(preloaded?.readAttribute("name")).toBe("P");
+    expect(preloaded?.name).toBe("P");
   });
   it("finding with includes on null belongs to association with same include includes only once", async () => {
     class EagerNullParent extends Base {
@@ -615,12 +615,12 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerBook", EagerBook);
 
     const author = await EagerAuthor.create({ name: "Orwell" });
-    await EagerBook.create({ title: "1984", eager_author_id: author.readAttribute("id") });
+    await EagerBook.create({ title: "1984", eager_author_id: author.id });
 
     const books = await EagerBook.all().includes("eagerAuthor").toArray();
     expect(books).toHaveLength(1);
     const preloaded = (books[0] as any)._preloadedAssociations.get("eagerAuthor");
-    expect(preloaded?.readAttribute("name")).toBe("Orwell");
+    expect(preloaded?.name).toBe("Orwell");
   });
 
   it("nested loading does not raise exception when association does not exist", async () => {
@@ -673,12 +673,12 @@ describe("EagerAssociationTest", () => {
     registerModel("NestHoPost", NestHoPost);
 
     const author = await NestHoAuthor.create({ name: "Alice" });
-    await NestHoPost.create({ title: "First Post", nest_ho_author_id: author.readAttribute("id") });
+    await NestHoPost.create({ title: "First Post", nest_ho_author_id: author.id });
 
     const authors = await NestHoAuthor.all().includes("nestHoPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoPost");
-    expect(post?.readAttribute("title")).toBe("First Post");
+    expect(post?.title).toBe("First Post");
   });
   it("nested loading through has one association with order", async () => {
     class NestHoOrdAuthor extends Base {
@@ -707,13 +707,13 @@ describe("EagerAssociationTest", () => {
     const author = await NestHoOrdAuthor.create({ name: "Bob" });
     await NestHoOrdPost.create({
       title: "Only Post",
-      nest_ho_ord_author_id: author.readAttribute("id"),
+      nest_ho_ord_author_id: author.id,
     });
 
     const authors = await NestHoOrdAuthor.all().includes("nestHoOrdPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoOrdPost");
-    expect(post?.readAttribute("title")).toBe("Only Post");
+    expect(post?.title).toBe("Only Post");
   });
   it("nested loading through has one association with order on association", async () => {
     class NestHoOaAuthor extends Base {
@@ -742,13 +742,13 @@ describe("EagerAssociationTest", () => {
     const author = await NestHoOaAuthor.create({ name: "Carol" });
     await NestHoOaPost.create({
       title: "Carol Post",
-      nest_ho_oa_author_id: author.readAttribute("id"),
+      nest_ho_oa_author_id: author.id,
     });
 
     const authors = await NestHoOaAuthor.all().includes("nestHoOaPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoOaPost");
-    expect(post?.readAttribute("title")).toBe("Carol Post");
+    expect(post?.title).toBe("Carol Post");
   });
   it("nested loading through has one association with order on nested association", async () => {
     class NestHoOnAuthor extends Base {
@@ -777,13 +777,13 @@ describe("EagerAssociationTest", () => {
     const author = await NestHoOnAuthor.create({ name: "Dave" });
     await NestHoOnPost.create({
       title: "Dave Post",
-      nest_ho_on_author_id: author.readAttribute("id"),
+      nest_ho_on_author_id: author.id,
     });
 
     const authors = await NestHoOnAuthor.all().includes("nestHoOnPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoOnPost");
-    expect(post?.readAttribute("title")).toBe("Dave Post");
+    expect(post?.title).toBe("Dave Post");
   });
   it("nested loading through has one association with conditions", async () => {
     class NestHoCAuthor extends Base {
@@ -812,13 +812,13 @@ describe("EagerAssociationTest", () => {
     const author = await NestHoCAuthor.create({ name: "Eve" });
     await NestHoCPost.create({
       title: "Eve Post",
-      nest_ho_c_author_id: author.readAttribute("id"),
+      nest_ho_c_author_id: author.id,
     });
 
     const authors = await NestHoCAuthor.all().includes("nestHoCPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoCPost");
-    expect(post?.readAttribute("title")).toBe("Eve Post");
+    expect(post?.title).toBe("Eve Post");
   });
   it("nested loading through has one association with conditions on association", async () => {
     class NestHoCaAuthor extends Base {
@@ -847,13 +847,13 @@ describe("EagerAssociationTest", () => {
     const author = await NestHoCaAuthor.create({ name: "Frank" });
     await NestHoCaPost.create({
       title: "Frank Post",
-      nest_ho_ca_author_id: author.readAttribute("id"),
+      nest_ho_ca_author_id: author.id,
     });
 
     const authors = await NestHoCaAuthor.all().includes("nestHoCaPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoCaPost");
-    expect(post?.readAttribute("title")).toBe("Frank Post");
+    expect(post?.title).toBe("Frank Post");
   });
   it("nested loading through has one association with conditions on nested association", async () => {
     class NestHoCnAuthor extends Base {
@@ -882,13 +882,13 @@ describe("EagerAssociationTest", () => {
     const author = await NestHoCnAuthor.create({ name: "Grace" });
     await NestHoCnPost.create({
       title: "Grace Post",
-      nest_ho_cn_author_id: author.readAttribute("id"),
+      nest_ho_cn_author_id: author.id,
     });
 
     const authors = await NestHoCnAuthor.all().includes("nestHoCnPost").toArray();
     expect(authors).toHaveLength(1);
     const post = (authors[0] as any)._preloadedAssociations.get("nestHoCnPost");
-    expect(post?.readAttribute("title")).toBe("Grace Post");
+    expect(post?.title).toBe("Grace Post");
   });
 
   it("eager association loading with belongs to and foreign keys", async () => {
@@ -916,7 +916,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerClient", EagerClient);
 
     const firm = await EagerFirm.create({ name: "Acme" });
-    await EagerClient.create({ name: "Client A", firm_id: firm.readAttribute("id") });
+    await EagerClient.create({ name: "Client A", firm_id: firm.id });
 
     const clients = await EagerClient.all().includes("eagerFirm").toArray();
     expect(clients).toHaveLength(1);
@@ -948,15 +948,15 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLimitClient", EagerLimitClient);
 
     const firm = await EagerLimitFirm.create({ name: "Acme" });
-    await EagerLimitClient.create({ name: "C1", eager_limit_firm_id: firm.readAttribute("id") });
-    await EagerLimitClient.create({ name: "C2", eager_limit_firm_id: firm.readAttribute("id") });
+    await EagerLimitClient.create({ name: "C1", eager_limit_firm_id: firm.id });
+    await EagerLimitClient.create({ name: "C2", eager_limit_firm_id: firm.id });
 
     // Load clients with includes and verify belongsTo is preloaded
     const clients = await EagerLimitClient.all().includes("eagerLimitFirm").toArray();
     expect(clients).toHaveLength(2);
     for (const client of clients) {
       const preloaded = (client as any)._preloadedAssociations.get("eagerLimitFirm");
-      expect(preloaded?.readAttribute("name")).toBe("Acme");
+      expect(preloaded?.name).toBe("Acme");
     }
   });
   it("eager association loading with belongs to and limit and conditions", async () => {
@@ -984,14 +984,14 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLCClient", EagerLCClient);
 
     const firm = await EagerLCFirm.create({ name: "Acme" });
-    await EagerLCClient.create({ name: "C1", eager_lc_firm_id: firm.readAttribute("id") });
-    await EagerLCClient.create({ name: "C2", eager_lc_firm_id: firm.readAttribute("id") });
+    await EagerLCClient.create({ name: "C1", eager_lc_firm_id: firm.id });
+    await EagerLCClient.create({ name: "C2", eager_lc_firm_id: firm.id });
 
     const clients = await EagerLCClient.all().includes("eagerLCFirm").toArray();
     expect(clients).toHaveLength(2);
     for (const client of clients) {
       const preloaded = (client as any)._preloadedAssociations.get("eagerLCFirm");
-      expect(preloaded?.readAttribute("name")).toBe("Acme");
+      expect(preloaded?.name).toBe("Acme");
     }
   });
   it("eager association loading with belongs to and limit and offset", async () => {
@@ -1019,15 +1019,15 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLOClient", EagerLOClient);
 
     const firm = await EagerLOFirm.create({ name: "Corp" });
-    await EagerLOClient.create({ name: "C1", eager_lo_firm_id: firm.readAttribute("id") });
-    await EagerLOClient.create({ name: "C2", eager_lo_firm_id: firm.readAttribute("id") });
-    await EagerLOClient.create({ name: "C3", eager_lo_firm_id: firm.readAttribute("id") });
+    await EagerLOClient.create({ name: "C1", eager_lo_firm_id: firm.id });
+    await EagerLOClient.create({ name: "C2", eager_lo_firm_id: firm.id });
+    await EagerLOClient.create({ name: "C3", eager_lo_firm_id: firm.id });
 
     const clients = await EagerLOClient.all().includes("eagerLOFirm").toArray();
     expect(clients).toHaveLength(3);
     for (const client of clients) {
       const preloaded = (client as any)._preloadedAssociations.get("eagerLOFirm");
-      expect(preloaded?.readAttribute("name")).toBe("Corp");
+      expect(preloaded?.name).toBe("Corp");
     }
   });
   it("eager association loading with belongs to and limit and offset and conditions", async () => {
@@ -1055,12 +1055,12 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLOCClient", EagerLOCClient);
 
     const firm = await EagerLOCFirm.create({ name: "BigCo" });
-    await EagerLOCClient.create({ name: "C1", eager_loc_firm_id: firm.readAttribute("id") });
+    await EagerLOCClient.create({ name: "C1", eager_loc_firm_id: firm.id });
 
     const clients = await EagerLOCClient.all().includes("eagerLOCFirm").toArray();
     expect(clients).toHaveLength(1);
     const preloaded = (clients[0] as any)._preloadedAssociations.get("eagerLOCFirm");
-    expect(preloaded?.readAttribute("name")).toBe("BigCo");
+    expect(preloaded?.name).toBe("BigCo");
   });
   it("eager association loading with belongs to and limit and offset and conditions array", async () => {
     class EagerLOCAFirm extends Base {
@@ -1087,14 +1087,14 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLOCAClient", EagerLOCAClient);
 
     const firm = await EagerLOCAFirm.create({ name: "Acme" });
-    await EagerLOCAClient.create({ name: "C1", eager_loca_firm_id: firm.readAttribute("id") });
-    await EagerLOCAClient.create({ name: "C2", eager_loca_firm_id: firm.readAttribute("id") });
+    await EagerLOCAClient.create({ name: "C1", eager_loca_firm_id: firm.id });
+    await EagerLOCAClient.create({ name: "C2", eager_loca_firm_id: firm.id });
 
     const clients = await EagerLOCAClient.all().includes("eagerLOCAFirm").toArray();
     expect(clients).toHaveLength(2);
     for (const client of clients) {
       const preloaded = (client as any)._preloadedAssociations.get("eagerLOCAFirm");
-      expect(preloaded?.readAttribute("name")).toBe("Acme");
+      expect(preloaded?.name).toBe("Acme");
     }
   });
   it("eager association loading with belongs to and conditions string with unquoted table name", async () => {
@@ -1121,11 +1121,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerBtCsuFirm", EagerBtCsuFirm);
     registerModel("EagerBtCsuClient", EagerBtCsuClient);
     const firm = await EagerBtCsuFirm.create({ name: "Acme" });
-    await EagerBtCsuClient.create({ name: "C1", eager_bt_csu_firm_id: firm.readAttribute("id") });
+    await EagerBtCsuClient.create({ name: "C1", eager_bt_csu_firm_id: firm.id });
     const clients = await EagerBtCsuClient.all().includes("eagerBtCsuFirm").toArray();
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerBtCsuFirm")?.readAttribute("name"),
-    ).toBe("Acme");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsuFirm")?.name).toBe("Acme");
   });
   it("eager association loading with belongs to and conditions hash", async () => {
     class EagerCondCompany extends Base {
@@ -1154,13 +1152,13 @@ describe("EagerAssociationTest", () => {
     const company = await EagerCondCompany.create({ name: "Acme" });
     await EagerCondClient.create({
       name: "Client1",
-      eager_cond_company_id: company.readAttribute("id"),
+      eager_cond_company_id: company.id,
     });
 
     const clients = await EagerCondClient.all().includes("eagerCondCompany").toArray();
     expect(clients).toHaveLength(1);
     const preloaded = (clients[0] as any)._preloadedAssociations.get("eagerCondCompany");
-    expect(preloaded?.readAttribute("name")).toBe("Acme");
+    expect(preloaded?.name).toBe("Acme");
   });
   it("eager association loading with belongs to and conditions string with quoted table name", async () => {
     class EagerBtCsqFirm extends Base {
@@ -1186,11 +1184,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerBtCsqFirm", EagerBtCsqFirm);
     registerModel("EagerBtCsqClient", EagerBtCsqClient);
     const firm = await EagerBtCsqFirm.create({ name: "Corp" });
-    await EagerBtCsqClient.create({ name: "C1", eager_bt_csq_firm_id: firm.readAttribute("id") });
+    await EagerBtCsqClient.create({ name: "C1", eager_bt_csq_firm_id: firm.id });
     const clients = await EagerBtCsqClient.all().includes("eagerBtCsqFirm").toArray();
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerBtCsqFirm")?.readAttribute("name"),
-    ).toBe("Corp");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsqFirm")?.name).toBe("Corp");
   });
   it("eager association loading with belongs to and order string with unquoted table name", async () => {
     class EagerBtOuFirm extends Base {
@@ -1216,11 +1212,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerBtOuFirm", EagerBtOuFirm);
     registerModel("EagerBtOuClient", EagerBtOuClient);
     const firm = await EagerBtOuFirm.create({ name: "Firm" });
-    await EagerBtOuClient.create({ name: "C1", eager_bt_ou_firm_id: firm.readAttribute("id") });
+    await EagerBtOuClient.create({ name: "C1", eager_bt_ou_firm_id: firm.id });
     const clients = await EagerBtOuClient.all().includes("eagerBtOuFirm").toArray();
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerBtOuFirm")?.readAttribute("name"),
-    ).toBe("Firm");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtOuFirm")?.name).toBe("Firm");
   });
   it("eager association loading with belongs to and order string with quoted table name", async () => {
     class EagerBtOqFirm extends Base {
@@ -1246,11 +1240,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerBtOqFirm", EagerBtOqFirm);
     registerModel("EagerBtOqClient", EagerBtOqClient);
     const firm = await EagerBtOqFirm.create({ name: "BigCo" });
-    await EagerBtOqClient.create({ name: "C1", eager_bt_oq_firm_id: firm.readAttribute("id") });
+    await EagerBtOqClient.create({ name: "C1", eager_bt_oq_firm_id: firm.id });
     const clients = await EagerBtOqClient.all().includes("eagerBtOqFirm").toArray();
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerBtOqFirm")?.readAttribute("name"),
-    ).toBe("BigCo");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerBtOqFirm")?.name).toBe("BigCo");
   });
   it("eager association loading with belongs to and limit and multiple associations", async () => {
     class EagerLMAFirm extends Base {
@@ -1293,8 +1285,8 @@ describe("EagerAssociationTest", () => {
     const dept = await EagerLMADept.create({ label: "Sales" });
     await EagerLMAClient.create({
       name: "C1",
-      eager_lma_firm_id: firm.readAttribute("id"),
-      eager_lma_dept_id: dept.readAttribute("id"),
+      eager_lma_firm_id: firm.id,
+      eager_lma_dept_id: dept.id,
     });
 
     const clients = await EagerLMAClient.all()
@@ -1302,12 +1294,8 @@ describe("EagerAssociationTest", () => {
       .includes("eagerLMADept")
       .toArray();
     expect(clients).toHaveLength(1);
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerLMAFirm")?.readAttribute("name"),
-    ).toBe("Acme");
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerLMADept")?.readAttribute("label"),
-    ).toBe("Sales");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerLMAFirm")?.name).toBe("Acme");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerLMADept")?.label).toBe("Sales");
   });
   it("eager association loading with belongs to and limit and offset and multiple associations", async () => {
     class EagerLOMFirm extends Base {
@@ -1350,18 +1338,18 @@ describe("EagerAssociationTest", () => {
     const dept = await EagerLOMDept.create({ label: "Engineering" });
     await EagerLOMClient.create({
       name: "C1",
-      eager_lom_firm_id: firm.readAttribute("id"),
-      eager_lom_dept_id: dept.readAttribute("id"),
+      eager_lom_firm_id: firm.id,
+      eager_lom_dept_id: dept.id,
     });
     await EagerLOMClient.create({
       name: "C2",
-      eager_lom_firm_id: firm.readAttribute("id"),
-      eager_lom_dept_id: dept.readAttribute("id"),
+      eager_lom_firm_id: firm.id,
+      eager_lom_dept_id: dept.id,
     });
     await EagerLOMClient.create({
       name: "C3",
-      eager_lom_firm_id: firm.readAttribute("id"),
-      eager_lom_dept_id: dept.readAttribute("id"),
+      eager_lom_firm_id: firm.id,
+      eager_lom_dept_id: dept.id,
     });
 
     const clients = await EagerLOMClient.all()
@@ -1370,12 +1358,8 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(clients).toHaveLength(3);
     for (const client of clients) {
-      expect(
-        (client as any)._preloadedAssociations.get("eagerLOMFirm")?.readAttribute("name"),
-      ).toBe("Corp");
-      expect(
-        (client as any)._preloadedAssociations.get("eagerLOMDept")?.readAttribute("label"),
-      ).toBe("Engineering");
+      expect((client as any)._preloadedAssociations.get("eagerLOMFirm")?.name).toBe("Corp");
+      expect((client as any)._preloadedAssociations.get("eagerLOMDept")?.label).toBe("Engineering");
     }
   });
   it("eager association loading with belongs to inferred foreign key from association name", async () => {
@@ -1405,13 +1389,13 @@ describe("EagerAssociationTest", () => {
     const company = await EagerInferredCompany.create({ name: "Acme" });
     await EagerInferredEmployee.create({
       name: "Alice",
-      eager_inferred_company_id: company.readAttribute("id"),
+      eager_inferred_company_id: company.id,
     });
 
     const employees = await EagerInferredEmployee.all().includes("eagerInferredCompany").toArray();
     expect(employees).toHaveLength(1);
     const preloaded = (employees[0] as any)._preloadedAssociations.get("eagerInferredCompany");
-    expect(preloaded?.readAttribute("name")).toBe("Acme");
+    expect(preloaded?.name).toBe("Acme");
   });
   it("eager load belongs to quotes table and column names", async () => {
     class EagerQtCompany extends Base {
@@ -1437,11 +1421,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerQtCompany", EagerQtCompany);
     registerModel("EagerQtClient", EagerQtClient);
     const co = await EagerQtCompany.create({ name: "Acme" });
-    await EagerQtClient.create({ name: "C1", eager_qt_company_id: co.readAttribute("id") });
+    await EagerQtClient.create({ name: "C1", eager_qt_company_id: co.id });
     const clients = await EagerQtClient.all().includes("eagerQtCompany").toArray();
-    expect(
-      (clients[0] as any)._preloadedAssociations.get("eagerQtCompany")?.readAttribute("name"),
-    ).toBe("Acme");
+    expect((clients[0] as any)._preloadedAssociations.get("eagerQtCompany")?.name).toBe("Acme");
   });
   it("eager load has one quotes table and column names", async () => {
     class EagerQtHoParent extends Base {
@@ -1467,11 +1449,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerQtHoParent", EagerQtHoParent);
     registerModel("EagerQtHoChild", EagerQtHoChild);
     const p = await EagerQtHoParent.create({ name: "P" });
-    await EagerQtHoChild.create({ value: "V", eager_qt_ho_parent_id: p.readAttribute("id") });
+    await EagerQtHoChild.create({ value: "V", eager_qt_ho_parent_id: p.id });
     const parents = await EagerQtHoParent.all().includes("eagerQtHoChild").toArray();
-    expect(
-      (parents[0] as any)._preloadedAssociations.get("eagerQtHoChild")?.readAttribute("value"),
-    ).toBe("V");
+    expect((parents[0] as any)._preloadedAssociations.get("eagerQtHoChild")?.value).toBe("V");
   });
   it("eager load has many quotes table and column names", async () => {
     class EagerQtHmParent extends Base {
@@ -1497,7 +1477,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerQtHmParent", EagerQtHmParent);
     registerModel("EagerQtHmChild", EagerQtHmChild);
     const p = await EagerQtHmParent.create({ name: "P" });
-    await EagerQtHmChild.create({ value: "C1", eager_qt_hm_parent_id: p.readAttribute("id") });
+    await EagerQtHmChild.create({ value: "C1", eager_qt_hm_parent_id: p.id });
     const parents = await EagerQtHmParent.all().includes("eagerQtHmChildren").toArray();
     expect((parents[0] as any)._preloadedAssociations.get("eagerQtHmChildren")).toHaveLength(1);
   });
@@ -1550,8 +1530,8 @@ describe("EagerAssociationTest", () => {
     const owner = await EagerQtThrOwner.create({ name: "O" });
     const item = await EagerQtThrItem.create({ label: "I1" });
     await EagerQtThrJoin.create({
-      eager_qt_thr_owner_id: owner.readAttribute("id"),
-      eager_qt_thr_item_id: item.readAttribute("id"),
+      eager_qt_thr_owner_id: owner.id,
+      eager_qt_thr_item_id: item.id,
     });
     const owners = await EagerQtThrOwner.all().includes("eagerQtThrItems").toArray();
     expect((owners[0] as any)._preloadedAssociations.get("eagerQtThrItems")).toHaveLength(1);
@@ -1581,7 +1561,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerStrChild", EagerStrChild);
 
     const parent = await EagerStrParent.create({ name: "P" });
-    await EagerStrChild.create({ value: "C1", eager_str_parent_id: parent.readAttribute("id") });
+    await EagerStrChild.create({ value: "C1", eager_str_parent_id: parent.id });
 
     const parents = await EagerStrParent.all().includes("eagerStrChildren").toArray();
     expect(parents).toHaveLength(1);
@@ -1639,8 +1619,8 @@ describe("EagerAssociationTest", () => {
     const owner = await EagerStrThrOwner.create({ name: "O" });
     const item = await EagerStrThrItem.create({ label: "I" });
     await EagerStrThrJoin.create({
-      eager_str_thr_owner_id: owner.readAttribute("id"),
-      eager_str_thr_item_id: item.readAttribute("id"),
+      eager_str_thr_owner_id: owner.id,
+      eager_str_thr_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "eagerStrThrItems", {
@@ -1649,7 +1629,7 @@ describe("EagerAssociationTest", () => {
       className: "EagerStrThrItem",
     });
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("label")).toBe("I");
+    expect(items[0].label).toBe("I");
   });
   it("eager load belongs to with string keys", async () => {
     class EagerStrBtParent extends Base {
@@ -1678,13 +1658,13 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerStrBtParent.create({ name: "P" });
     await EagerStrBtChild.create({
       value: "C",
-      eager_str_bt_parent_id: parent.readAttribute("id"),
+      eager_str_bt_parent_id: parent.id,
     });
 
     const children = await EagerStrBtChild.all().includes("eagerStrBtParent").toArray();
     expect(children).toHaveLength(1);
     const preloaded = (children[0] as any)._preloadedAssociations.get("eagerStrBtParent");
-    expect(preloaded?.readAttribute("name")).toBe("P");
+    expect(preloaded?.name).toBe("P");
   });
   it("eager association loading with explicit join", async () => {
     class EjAuthor extends Base {
@@ -1715,7 +1695,7 @@ describe("EagerAssociationTest", () => {
     expect(authors).toHaveLength(1);
     const posts = (authors[0] as any)._preloadedAssociations?.get("ejPosts");
     expect(posts).toHaveLength(2);
-    const titles = posts.map((p: any) => p.readAttribute("title")).sort();
+    const titles = posts.map((p: any) => p.title).sort();
     expect(titles).toEqual(["P1", "P2"]);
   });
   it("eager association loading with explicit join belongs to", async () => {
@@ -1746,7 +1726,7 @@ describe("EagerAssociationTest", () => {
     expect(posts2).toHaveLength(1);
     const loaded = (posts2[0] as any)._preloadedAssociations?.get("ejBtAuthor");
     expect(loaded).not.toBeNull();
-    expect(loaded.readAttribute("name")).toBe("BtAuthor");
+    expect(loaded.name).toBe("BtAuthor");
   });
   it("eager association loading with explicit join has one", async () => {
     class EjHoUser extends Base {
@@ -1776,7 +1756,7 @@ describe("EagerAssociationTest", () => {
     expect(users).toHaveLength(1);
     const profile = (users[0] as any)._preloadedAssociations?.get("ejHoProfile");
     expect(profile).not.toBeNull();
-    expect(profile.readAttribute("bio")).toBe("HoBio");
+    expect(profile.bio).toBe("HoBio");
   });
   it("eager with has many through", async () => {
     class EagerHmtReader extends Base {
@@ -1829,12 +1809,12 @@ describe("EagerAssociationTest", () => {
     const mag1 = await EagerHmtMagazine.create({ title: "Wired" });
     const mag2 = await EagerHmtMagazine.create({ title: "Time" });
     await EagerHmtSubscription.create({
-      eager_hmt_reader_id: reader.readAttribute("id"),
-      eager_hmt_magazine_id: mag1.readAttribute("id"),
+      eager_hmt_reader_id: reader.id,
+      eager_hmt_magazine_id: mag1.id,
     });
     await EagerHmtSubscription.create({
-      eager_hmt_reader_id: reader.readAttribute("id"),
-      eager_hmt_magazine_id: mag2.readAttribute("id"),
+      eager_hmt_reader_id: reader.id,
+      eager_hmt_magazine_id: mag2.id,
     });
 
     const mags = await loadHasManyThrough(reader, "eagerHmtMagazines", {
@@ -1895,11 +1875,11 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtBtAuthor.create({ name: "Bob" });
     const post = await EagerHmtBtPost.create({
       title: "Hello",
-      eager_hmt_bt_author_id: author.readAttribute("id"),
+      eager_hmt_bt_author_id: author.id,
     });
     await EagerHmtBtComment.create({
       body: "Great",
-      eager_hmt_bt_post_id: post.readAttribute("id"),
+      eager_hmt_bt_post_id: post.id,
     });
 
     const posts = await loadHasMany(author, "eagerHmtBtPosts", {
@@ -1912,7 +1892,7 @@ describe("EagerAssociationTest", () => {
       foreignKey: "eager_hmt_bt_post_id",
     });
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("body")).toBe("Great");
+    expect(comments[0].body).toBe("Great");
   });
   it("eager with has many through an sti join model", async () => {
     // Author -> SpecialPost (STI) -> Comments (through)
@@ -1988,7 +1968,7 @@ describe("EagerAssociationTest", () => {
     const authors = await EagerStiAuthor.all().includes("specialPostComments").toArray();
     const comments = (authors[0] as any)._preloadedAssociations.get("specialPostComments");
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("body")).toBe("does it hurt");
+    expect(comments[0].body).toBe("does it hurt");
   });
   it.skip("preloading with has one through an sti with after initialize", () => {});
   it("preloading has many through with implicit source", async () => {
@@ -2036,8 +2016,8 @@ describe("EagerAssociationTest", () => {
     const owner = await EagerImpOwner.create({ name: "O" });
     const item = await EagerImpItem.create({ label: "I" });
     await EagerImpJoin.create({
-      eager_imp_owner_id: owner.readAttribute("id"),
-      eager_imp_item_id: item.readAttribute("id"),
+      eager_imp_owner_id: owner.id,
+      eager_imp_item_id: item.id,
     });
     const items = await loadHasManyThrough(owner, "eagerImpItems", {
       through: "eagerImpJoins",
@@ -2098,12 +2078,12 @@ describe("EagerAssociationTest", () => {
     const book1 = await EagerHmtCondBook.create({ title: "Book1" });
     const book2 = await EagerHmtCondBook.create({ title: "Book2" });
     await EagerHmtCondAuthorship.create({
-      eager_hmt_cond_author_id: author.readAttribute("id"),
-      eager_hmt_cond_book_id: book1.readAttribute("id"),
+      eager_hmt_cond_author_id: author.id,
+      eager_hmt_cond_book_id: book1.id,
     });
     await EagerHmtCondAuthorship.create({
-      eager_hmt_cond_author_id: author.readAttribute("id"),
-      eager_hmt_cond_book_id: book2.readAttribute("id"),
+      eager_hmt_cond_author_id: author.id,
+      eager_hmt_cond_book_id: book2.id,
     });
 
     const books = await loadHasManyThrough(author, "eagerHmtCondBooks", {
@@ -2164,12 +2144,12 @@ describe("EagerAssociationTest", () => {
     const a2 = await EagerHmtTopAuthor.create({ name: "A2" });
     const book = await EagerHmtTopBook.create({ title: "Shared" });
     await EagerHmtTopAuthorship.create({
-      eager_hmt_top_author_id: a1.readAttribute("id"),
-      eager_hmt_top_book_id: book.readAttribute("id"),
+      eager_hmt_top_author_id: a1.id,
+      eager_hmt_top_book_id: book.id,
     });
     await EagerHmtTopAuthorship.create({
-      eager_hmt_top_author_id: a2.readAttribute("id"),
-      eager_hmt_top_book_id: book.readAttribute("id"),
+      eager_hmt_top_author_id: a2.id,
+      eager_hmt_top_book_id: book.id,
     });
 
     const books1 = await loadHasManyThrough(a1, "eagerHmtTopBooks", {
@@ -2236,12 +2216,12 @@ describe("EagerAssociationTest", () => {
     const book1 = await EagerHmtIncBook.create({ title: "Book1" });
     const book2 = await EagerHmtIncBook.create({ title: "Book2" });
     await EagerHmtIncAuthorship.create({
-      eager_hmt_inc_author_id: author.readAttribute("id"),
-      eager_hmt_inc_book_id: book1.readAttribute("id"),
+      eager_hmt_inc_author_id: author.id,
+      eager_hmt_inc_book_id: book1.id,
     });
     await EagerHmtIncAuthorship.create({
-      eager_hmt_inc_author_id: author.readAttribute("id"),
-      eager_hmt_inc_book_id: book2.readAttribute("id"),
+      eager_hmt_inc_author_id: author.id,
+      eager_hmt_inc_book_id: book2.id,
     });
 
     const books = await loadHasManyThrough(author, "eagerHmtIncBooks", {
@@ -2250,7 +2230,7 @@ describe("EagerAssociationTest", () => {
       className: "EagerHmtIncBook",
     });
     expect(books).toHaveLength(2);
-    const titles = books.map((b) => b.readAttribute("title"));
+    const titles = books.map((b) => b.title);
     expect(titles).toContain("Book1");
     expect(titles).toContain("Book2");
   });
@@ -2304,8 +2284,8 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtCjAuthor.create({ name: "A" });
     const book = await EagerHmtCjBook.create({ title: "B" });
     await EagerHmtCjAuthorship.create({
-      eager_hmt_cj_author_id: author.readAttribute("id"),
-      eager_hmt_cj_book_id: book.readAttribute("id"),
+      eager_hmt_cj_author_id: author.id,
+      eager_hmt_cj_book_id: book.id,
     });
 
     const books = await loadHasManyThrough(author, "eagerHmtCjBooks", {
@@ -2314,7 +2294,7 @@ describe("EagerAssociationTest", () => {
       className: "EagerHmtCjBook",
     });
     expect(books).toHaveLength(1);
-    expect(books[0].readAttribute("title")).toBe("B");
+    expect(books[0].title).toBe("B");
   });
   it("eager with has many through join model ignores default includes", async () => {
     class EagerHmtDiAuthor extends Base {
@@ -2366,8 +2346,8 @@ describe("EagerAssociationTest", () => {
     const author = await EagerHmtDiAuthor.create({ name: "A" });
     const book = await EagerHmtDiBook.create({ title: "B" });
     await EagerHmtDiAuthorship.create({
-      eager_hmt_di_author_id: author.readAttribute("id"),
-      eager_hmt_di_book_id: book.readAttribute("id"),
+      eager_hmt_di_author_id: author.id,
+      eager_hmt_di_book_id: book.id,
     });
 
     const books = await loadHasManyThrough(author, "eagerHmtDiBooks", {
@@ -2404,11 +2384,11 @@ describe("EagerAssociationTest", () => {
     const post = await EagerHmLimitPost.create({ title: "Post" });
     await EagerHmLimitComment.create({
       body: "c1",
-      eager_hm_limit_post_id: post.readAttribute("id"),
+      eager_hm_limit_post_id: post.id,
     });
     await EagerHmLimitComment.create({
       body: "c2",
-      eager_hm_limit_post_id: post.readAttribute("id"),
+      eager_hm_limit_post_id: post.id,
     });
 
     const posts = await EagerHmLimitPost.all().includes("eagerHmLimitComments").toArray();
@@ -2443,11 +2423,11 @@ describe("EagerAssociationTest", () => {
     const post = await EagerHmCondPost.create({ title: "Post" });
     await EagerHmCondComment.create({
       body: "good",
-      eager_hm_cond_post_id: post.readAttribute("id"),
+      eager_hm_cond_post_id: post.id,
     });
     await EagerHmCondComment.create({
       body: "great",
-      eager_hm_cond_post_id: post.readAttribute("id"),
+      eager_hm_cond_post_id: post.id,
     });
 
     const posts = await EagerHmCondPost.all().includes("eagerHmCondComments").toArray();
@@ -2479,8 +2459,8 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHmLcaPost", EagerHmLcaPost);
     registerModel("EagerHmLcaComment", EagerHmLcaComment);
     const post = await EagerHmLcaPost.create({ title: "P" });
-    await EagerHmLcaComment.create({ body: "c1", eager_hm_lca_post_id: post.readAttribute("id") });
-    await EagerHmLcaComment.create({ body: "c2", eager_hm_lca_post_id: post.readAttribute("id") });
+    await EagerHmLcaComment.create({ body: "c1", eager_hm_lca_post_id: post.id });
+    await EagerHmLcaComment.create({ body: "c2", eager_hm_lca_post_id: post.id });
     const posts = await EagerHmLcaPost.all().includes("eagerHmLcaComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerHmLcaComments")).toHaveLength(2);
   });
@@ -2508,7 +2488,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHmLcePost", EagerHmLcePost);
     registerModel("EagerHmLceComment", EagerHmLceComment);
     const post = await EagerHmLcePost.create({ title: "P" });
-    await EagerHmLceComment.create({ body: "c1", eager_hm_lce_post_id: post.readAttribute("id") });
+    await EagerHmLceComment.create({ body: "c1", eager_hm_lce_post_id: post.id });
     const posts = await EagerHmLcePost.all().includes("eagerHmLceComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerHmLceComments")).toHaveLength(1);
   });
@@ -2536,9 +2516,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHmHoPost", EagerHmHoPost);
     registerModel("EagerHmHoComment", EagerHmHoComment);
     const post = await EagerHmHoPost.create({ title: "P" });
-    await EagerHmHoComment.create({ body: "c1", eager_hm_ho_post_id: post.readAttribute("id") });
-    await EagerHmHoComment.create({ body: "c2", eager_hm_ho_post_id: post.readAttribute("id") });
-    await EagerHmHoComment.create({ body: "c3", eager_hm_ho_post_id: post.readAttribute("id") });
+    await EagerHmHoComment.create({ body: "c1", eager_hm_ho_post_id: post.id });
+    await EagerHmHoComment.create({ body: "c2", eager_hm_ho_post_id: post.id });
+    await EagerHmHoComment.create({ body: "c3", eager_hm_ho_post_id: post.id });
     // With high offset, the main query still returns the post, and includes loads all children
     const posts = await EagerHmHoPost.all().includes("eagerHmHoComments").toArray();
     expect(posts).toHaveLength(1);
@@ -2570,7 +2550,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerHmHoacPost.create({ title: "P" });
     await EagerHmHoacComment.create({
       body: "c1",
-      eager_hm_hoac_post_id: post.readAttribute("id"),
+      eager_hm_hoac_post_id: post.id,
     });
     const posts = await EagerHmHoacPost.all().includes("eagerHmHoacComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerHmHoacComments")).toHaveLength(1);
@@ -2601,11 +2581,11 @@ describe("EagerAssociationTest", () => {
     const post = await EagerHmHohcPost.create({ title: "P" });
     await EagerHmHohcComment.create({
       body: "c1",
-      eager_hm_hohc_post_id: post.readAttribute("id"),
+      eager_hm_hohc_post_id: post.id,
     });
     await EagerHmHohcComment.create({
       body: "c2",
-      eager_hm_hohc_post_id: post.readAttribute("id"),
+      eager_hm_hohc_post_id: post.id,
     });
     const posts = await EagerHmHohcPost.all().includes("eagerHmHohcComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerHmHohcComments")).toHaveLength(2);
@@ -2634,8 +2614,8 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerCntHoPost", EagerCntHoPost);
     registerModel("EagerCntHoComment", EagerCntHoComment);
     const post = await EagerCntHoPost.create({ title: "P" });
-    await EagerCntHoComment.create({ body: "c1", eager_cnt_ho_post_id: post.readAttribute("id") });
-    await EagerCntHoComment.create({ body: "c2", eager_cnt_ho_post_id: post.readAttribute("id") });
+    await EagerCntHoComment.create({ body: "c1", eager_cnt_ho_post_id: post.id });
+    await EagerCntHoComment.create({ body: "c2", eager_cnt_ho_post_id: post.id });
     // Count should work independently of includes
     const count = await EagerCntHoPost.all().count();
     expect(count).toBe(1);
@@ -2800,7 +2780,7 @@ describe("EagerAssociationTest", () => {
     expect(parents).toHaveLength(1);
     const profile = (parents[0] as any)._preloadedAssociations?.get("eagerHoiProfile");
     expect(profile).not.toBeNull();
-    expect(profile.readAttribute("bio")).toBe("Special");
+    expect(profile.bio).toBe("Special");
   });
   it("eager has many with association inheritance", async () => {
     class EagerHmiAuthor extends Base {
@@ -2970,12 +2950,12 @@ describe("EagerAssociationTest", () => {
     const b1 = await EagerHmtOrdBook.create({ title: "Zebra" });
     const b2 = await EagerHmtOrdBook.create({ title: "Alpha" });
     await EagerHmtOrdAuthorship.create({
-      eager_hmt_ord_author_id: author.readAttribute("id"),
-      eager_hmt_ord_book_id: b1.readAttribute("id"),
+      eager_hmt_ord_author_id: author.id,
+      eager_hmt_ord_book_id: b1.id,
     });
     await EagerHmtOrdAuthorship.create({
-      eager_hmt_ord_author_id: author.readAttribute("id"),
-      eager_hmt_ord_book_id: b2.readAttribute("id"),
+      eager_hmt_ord_author_id: author.id,
+      eager_hmt_ord_book_id: b2.id,
     });
 
     const books = await loadHasManyThrough(author, "eagerHmtOrdBooks", {
@@ -3036,12 +3016,12 @@ describe("EagerAssociationTest", () => {
     const a2 = await EagerHmtMoAuthor.create({ name: "A2" });
     const book = await EagerHmtMoBook.create({ title: "Shared" });
     await EagerHmtMoAuthorship.create({
-      eager_hmt_mo_author_id: a1.readAttribute("id"),
-      eager_hmt_mo_book_id: book.readAttribute("id"),
+      eager_hmt_mo_author_id: a1.id,
+      eager_hmt_mo_book_id: book.id,
     });
     await EagerHmtMoAuthorship.create({
-      eager_hmt_mo_author_id: a2.readAttribute("id"),
-      eager_hmt_mo_book_id: book.readAttribute("id"),
+      eager_hmt_mo_author_id: a2.id,
+      eager_hmt_mo_book_id: book.id,
     });
 
     const books1 = await loadHasManyThrough(a1, "eagerHmtMoBooks", {
@@ -3056,7 +3036,7 @@ describe("EagerAssociationTest", () => {
     });
     expect(books1).toHaveLength(1);
     expect(books2).toHaveLength(1);
-    expect(books1[0].readAttribute("id")).toBe(books2[0].readAttribute("id"));
+    expect(books1[0].id).toBe(books2[0].id);
   });
   it("eager with default scope", async () => {
     class EagerDsPost extends Base {
@@ -3082,7 +3062,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDsPost", EagerDsPost);
     registerModel("EagerDsComment", EagerDsComment);
     const post = await EagerDsPost.create({ title: "P" });
-    await EagerDsComment.create({ body: "c1", eager_ds_post_id: post.readAttribute("id") });
+    await EagerDsComment.create({ body: "c1", eager_ds_post_id: post.id });
     const posts = await EagerDsPost.all().includes("eagerDsComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerDsComments")).toHaveLength(1);
   });
@@ -3110,7 +3090,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDsCmPost", EagerDsCmPost);
     registerModel("EagerDsCmComment", EagerDsCmComment);
     const post = await EagerDsCmPost.create({ title: "P" });
-    await EagerDsCmComment.create({ body: "c1", eager_ds_cm_post_id: post.readAttribute("id") });
+    await EagerDsCmComment.create({ body: "c1", eager_ds_cm_post_id: post.id });
     const posts = await EagerDsCmPost.all().includes("eagerDsCmComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerDsCmComments")).toHaveLength(1);
   });
@@ -3123,8 +3103,8 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("EagerDsFmPost", EagerDsFmPost);
     const post = await EagerDsFmPost.create({ title: "P" });
-    const found = await EagerDsFmPost.find(post.readAttribute("id"));
-    expect(found.readAttribute("title")).toBe("P");
+    const found = await EagerDsFmPost.find(post.id);
+    expect(found.title).toBe("P");
   });
   it("eager with default scope as class method using find by method", async () => {
     class EagerDsFbPost extends Base {
@@ -3136,7 +3116,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDsFbPost", EagerDsFbPost);
     await EagerDsFbPost.create({ title: "Unique" });
     const found = await EagerDsFbPost.findBy({ title: "Unique" });
-    expect(found?.readAttribute("title")).toBe("Unique");
+    expect(found?.title).toBe("Unique");
   });
   it("eager with default scope as lambda", async () => {
     class EagerDsLPost extends Base {
@@ -3162,7 +3142,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDsLPost", EagerDsLPost);
     registerModel("EagerDsLComment", EagerDsLComment);
     const post = await EagerDsLPost.create({ title: "P" });
-    await EagerDsLComment.create({ body: "c1", eager_ds_l_post_id: post.readAttribute("id") });
+    await EagerDsLComment.create({ body: "c1", eager_ds_l_post_id: post.id });
     const posts = await EagerDsLPost.all().includes("eagerDsLComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerDsLComments")).toHaveLength(1);
   });
@@ -3190,7 +3170,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerDsBPost", EagerDsBPost);
     registerModel("EagerDsBComment", EagerDsBComment);
     const post = await EagerDsBPost.create({ title: "P" });
-    await EagerDsBComment.create({ body: "c1", eager_ds_b_post_id: post.readAttribute("id") });
+    await EagerDsBComment.create({ body: "c1", eager_ds_b_post_id: post.id });
     const posts = await EagerDsBPost.all().includes("eagerDsBComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerDsBComments")).toHaveLength(1);
   });
@@ -3220,7 +3200,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerDsCallPost.create({ title: "P" });
     await EagerDsCallComment.create({
       body: "c1",
-      eager_ds_call_post_id: post.readAttribute("id"),
+      eager_ds_call_post_id: post.id,
     });
     const posts = await EagerDsCallPost.all().includes("eagerDsCallComments").toArray();
     expect((posts[0] as any)._preloadedAssociations.get("eagerDsCallComments")).toHaveLength(1);
@@ -3249,8 +3229,8 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLeoPost", EagerLeoPost);
     registerModel("EagerLeoComment", EagerLeoComment);
     const post = await EagerLeoPost.create({ title: "P" });
-    await EagerLeoComment.create({ body: "c1", eager_leo_post_id: post.readAttribute("id") });
-    await EagerLeoComment.create({ body: "c2", eager_leo_post_id: post.readAttribute("id") });
+    await EagerLeoComment.create({ body: "c1", eager_leo_post_id: post.id });
+    await EagerLeoComment.create({ body: "c2", eager_leo_post_id: post.id });
     const posts = await EagerLeoPost.all()
       .order("title")
       .limit(1)
@@ -3284,7 +3264,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLmoPost", EagerLmoPost);
     registerModel("EagerLmoComment", EagerLmoComment);
     const post = await EagerLmoPost.create({ title: "P", priority: 1 });
-    await EagerLmoComment.create({ body: "c1", eager_lmo_post_id: post.readAttribute("id") });
+    await EagerLmoComment.create({ body: "c1", eager_lmo_post_id: post.id });
     const posts = await EagerLmoPost.all()
       .order("priority", "title")
       .limit(1)
@@ -3317,11 +3297,11 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerLnPost", EagerLnPost);
     registerModel("EagerLnComment", EagerLnComment);
     const post = await EagerLnPost.create({ title: "P" });
-    await EagerLnComment.create({ rating: 4.5, eager_ln_post_id: post.readAttribute("id") });
+    await EagerLnComment.create({ rating: 4.5, eager_ln_post_id: post.id });
     const posts = await EagerLnPost.all().includes("eagerLnComments").toArray();
     const comments = (posts[0] as any)._preloadedAssociations.get("eagerLnComments");
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("rating")).toBe(4.5);
+    expect(comments[0].rating).toBe(4.5);
   });
   it("polymorphic type condition", async () => {
     class PtcPost extends Base {
@@ -3361,7 +3341,7 @@ describe("EagerAssociationTest", () => {
     expect(posts).toHaveLength(1);
     const taggings = (posts[0] as any)._preloadedAssociations?.get("ptcTaggings") ?? [];
     expect(taggings).toHaveLength(1);
-    expect(taggings[0].readAttribute("taggable_type")).toBe("PtcPost");
+    expect(taggings[0].taggable_type).toBe("PtcPost");
   });
   it("eager with multiple associations with same table has many and habtm", async () => {
     class MaHabtmAuthor extends Base {
@@ -3443,11 +3423,11 @@ describe("EagerAssociationTest", () => {
     const p2 = await EagerMultiHoParent.create({ name: "Bob" });
     await EagerMultiHoProfile.create({
       bio: "Alice bio",
-      eager_multi_ho_parent_id: p1.readAttribute("id"),
+      eager_multi_ho_parent_id: p1.id,
     });
     await EagerMultiHoProfile.create({
       bio: "Bob bio",
-      eager_multi_ho_parent_id: p2.readAttribute("id"),
+      eager_multi_ho_parent_id: p2.id,
     });
 
     const parents = await EagerMultiHoParent.all().includes("eagerMultiHoProfile").toArray();
@@ -3455,7 +3435,7 @@ describe("EagerAssociationTest", () => {
     for (const parent of parents) {
       const profile = (parent as any)._preloadedAssociations.get("eagerMultiHoProfile");
       expect(profile).toBeDefined();
-      expect(profile.readAttribute("bio")).toContain("bio");
+      expect(profile.bio).toContain("bio");
     }
   });
   it("eager with multiple associations with same table belongs to", async () => {
@@ -3492,8 +3472,8 @@ describe("EagerAssociationTest", () => {
     const c2 = await EagerMultiBtCompany.create({ name: "Globex" });
     await EagerMultiBtEmployee.create({
       name: "Alice",
-      company_id: c1.readAttribute("id"),
-      mentor_company_id: c2.readAttribute("id"),
+      company_id: c1.id,
+      mentor_company_id: c2.id,
     });
 
     const employees = await EagerMultiBtEmployee.all()
@@ -3501,12 +3481,8 @@ describe("EagerAssociationTest", () => {
       .includes("mentorCompany")
       .toArray();
     expect(employees).toHaveLength(1);
-    expect((employees[0] as any)._preloadedAssociations.get("company")?.readAttribute("name")).toBe(
-      "Acme",
-    );
-    expect(
-      (employees[0] as any)._preloadedAssociations.get("mentorCompany")?.readAttribute("name"),
-    ).toBe("Globex");
+    expect((employees[0] as any)._preloadedAssociations.get("company")?.name).toBe("Acme");
+    expect((employees[0] as any)._preloadedAssociations.get("mentorCompany")?.name).toBe("Globex");
   });
 
   it("eager with valid association as string not symbol", async () => {
@@ -3534,7 +3510,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerEdge", EagerEdge);
 
     const node = await EagerNode.create({ value: "root" });
-    await EagerEdge.create({ label: "e1", eager_node_id: node.readAttribute("id") });
+    await EagerEdge.create({ label: "e1", eager_node_id: node.id });
 
     // Passing association name as string (not symbol — no difference in TS)
     const nodes = await EagerNode.all().includes("eagerEdges").toArray();
@@ -3568,12 +3544,12 @@ describe("EagerAssociationTest", () => {
     const item = await EagerFloatItem.create({ price: 19.99 });
     await EagerFloatDetail.create({
       info: "detail",
-      eager_float_item_id: item.readAttribute("id"),
+      eager_float_item_id: item.id,
     });
 
     const items = await EagerFloatItem.all().includes("eagerFloatDetails").toArray();
     expect(items).toHaveLength(1);
-    expect(items[0].readAttribute("price")).toBe(19.99);
+    expect(items[0].price).toBe(19.99);
     const details = (items[0] as any)._preloadedAssociations.get("eagerFloatDetails");
     expect(details).toHaveLength(1);
   });
@@ -3604,13 +3580,13 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerPreHoParent.create({ name: "P" });
     await EagerPreHoChild.create({
       value: "V",
-      eager_pre_ho_parent_id: parent.readAttribute("id"),
+      eager_pre_ho_parent_id: parent.id,
     });
 
     const results = await EagerPreHoParent.all().includes("eagerPreHoChild").toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerPreHoChild");
-    expect(preloaded?.readAttribute("value")).toBe("V");
+    expect(preloaded?.value).toBe("V");
   });
   it.skip("eager association with scope with joins", () => {});
   it("preconfigured includes with habtm", async () => {
@@ -3783,7 +3759,7 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     const loaded = (comments[0] as any)._preloadedAssociations.get("stiSharePost");
     expect(loaded).not.toBeNull();
-    expect(loaded.readAttribute("title")).toBe("T");
+    expect(loaded.title).toBe("T");
   });
   it.skip("conditions on join table with include and limit", () => {});
   it.skip("dont create temporary active record instances", () => {});
@@ -3855,7 +3831,7 @@ describe("EagerAssociationTest", () => {
     expect(authors).toHaveLength(1);
     const posts = (authors[0] as any)._preloadedAssociations?.get("incPkPosts") ?? [];
     expect(posts).toHaveLength(1);
-    expect(posts[0].readAttribute("title")).toBe("Q1");
+    expect(posts[0].title).toBe("Q1");
   });
   it("preloading through empty belongs to", async () => {
     class EagerEmptyBtParent extends Base {
@@ -3955,12 +3931,12 @@ describe("EagerAssociationTest", () => {
     const item = await EagerDistItem.create({ label: "I" });
     // Two join records pointing to the same item
     await EagerDistJoin.create({
-      eager_dist_owner_id: owner.readAttribute("id"),
-      eager_dist_item_id: item.readAttribute("id"),
+      eager_dist_owner_id: owner.id,
+      eager_dist_item_id: item.id,
     });
     await EagerDistJoin.create({
-      eager_dist_owner_id: owner.readAttribute("id"),
-      eager_dist_item_id: item.readAttribute("id"),
+      eager_dist_owner_id: owner.id,
+      eager_dist_item_id: item.id,
     });
 
     const items = await loadHasManyThrough(owner, "eagerDistItems", {
@@ -3995,11 +3971,9 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerReordParent", EagerReordParent);
     registerModel("EagerReordChild", EagerReordChild);
     const parent = await EagerReordParent.create({ name: "P" });
-    await EagerReordChild.create({ value: "V", eager_reord_parent_id: parent.readAttribute("id") });
+    await EagerReordChild.create({ value: "V", eager_reord_parent_id: parent.id });
     const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
-    expect(
-      (parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.readAttribute("value"),
-    ).toBe("V");
+    expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.value).toBe("V");
   });
   it.skip("preloading polymorphic with custom foreign type", () => {});
   it.skip("joins with includes should preload via joins", () => {});
@@ -4053,7 +4027,7 @@ describe("EagerAssociationTest", () => {
     const projects = await PcsProject.all().includes("scopedDevs").toArray();
     const devs = (projects[0] as any)._preloadedAssociations.get("scopedDevs");
     expect(devs.length).toBe(1);
-    expect(devs[0].readAttribute("name")).toBe("David");
+    expect(devs[0].name).toBe("David");
   });
   it.skip("scoping with a circular preload", () => {});
 
@@ -4174,8 +4148,8 @@ describe("EagerAssociationTest", () => {
     const owner = await EagerTwiceOwner.create({ name: "O" });
     const t1 = await EagerTwiceTarget.create({ label: "T1" });
     await EagerTwiceJoin.create({
-      eager_twice_owner_id: owner.readAttribute("id"),
-      eager_twice_target_id: t1.readAttribute("id"),
+      eager_twice_owner_id: owner.id,
+      eager_twice_target_id: t1.id,
     });
 
     // Loading twice should return the same results
@@ -4351,7 +4325,7 @@ describe("EagerAssociationTest", () => {
     expect(authors).toHaveLength(1);
     const comments = (authors[0] as any)._preloadedAssociations.get("phmtComments");
     expect(comments).toHaveLength(1);
-    expect(comments[0].readAttribute("body")).toBe("C");
+    expect(comments[0].body).toBe("C");
   });
   it.skip("preloading through a polymorphic association doesn't require the association to exist", () => {});
   it.skip("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", () => {});
@@ -4393,7 +4367,7 @@ describe("EagerAssociationTest", () => {
     expect(items).toHaveLength(1);
     const order = (items[0] as any)._preloadedAssociations.get("cpkOrder");
     expect(order).not.toBeNull();
-    expect(order.readAttribute("name")).toBe("Order1");
+    expect(order.name).toBe("Order1");
   });
 
   it.skip("preloading has_many with cpk", async () => {
@@ -4463,7 +4437,7 @@ describe("EagerAssociationTest", () => {
     expect(orders).toHaveLength(1);
     const receipt = (orders[0] as any)._preloadedAssociations.get("cpkHoReceipt");
     expect(receipt).not.toBeNull();
-    expect(receipt.readAttribute("number")).toBe("R001");
+    expect(receipt.number).toBe("R001");
   });
 });
 

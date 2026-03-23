@@ -43,39 +43,39 @@ describe("NormalizedAttributeTest", () => {
 
   it("normalizes value from create", async () => {
     const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
-    expect(aircraft.readAttribute("name")).toBe("Fly High");
+    expect(aircraft.name).toBe("Fly High");
   });
 
   it("normalizes value from update", async () => {
     const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
-    expect(aircraft.readAttribute("name")).toBe("Fly High");
+    expect(aircraft.name).toBe("Fly High");
     await aircraft.update({ name: "fly HIGHER" });
-    expect(aircraft.readAttribute("name")).toBe("Fly Higher");
+    expect(aircraft.name).toBe("Fly Higher");
   });
 
   it("normalizes value from assignment", async () => {
     const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
-    aircraft.writeAttribute("name", "fly HIGHER");
-    expect(aircraft.readAttribute("name")).toBe("Fly Higher");
+    aircraft.name = "fly HIGHER";
+    expect(aircraft.name).toBe("Fly Higher");
   });
 
   it("normalizes changed-in-place value before validation", async () => {
     const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
-    expect(aircraft.readAttribute("name")).toBe("Fly High");
+    expect(aircraft.name).toBe("Fly High");
     // In-place mutation isn't possible with immutable strings in JS,
     // but we can test that re-normalization works via normalizeAttribute
     aircraft._attributes.set("name", "fly high");
-    expect(aircraft.readAttribute("name")).toBe("fly high");
+    expect(aircraft.name).toBe("fly high");
     aircraft.normalizeAttribute("name");
-    expect(aircraft.readAttribute("name")).toBe("Fly High");
+    expect(aircraft.name).toBe("Fly High");
   });
 
   it("normalizes value on demand", async () => {
     const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
     aircraft._attributes.set("name", "fly high");
-    expect(aircraft.readAttribute("name")).toBe("fly high");
+    expect(aircraft.name).toBe("fly high");
     aircraft.normalizeAttribute("name");
-    expect(aircraft.readAttribute("name")).toBe("Fly High");
+    expect(aircraft.name).toBe("Fly High");
   });
 
   it("normalizes value without record", () => {
@@ -91,7 +91,7 @@ describe("NormalizedAttributeTest", () => {
   it("casts value before applying normalization", async () => {
     // manufactured_at normalizer receives the cast value
     const aircraft = await NormalizedAircraft.create({ manufactured_at: "2000-01-01" });
-    expect(aircraft.readAttribute("manufactured_at")).toBe("noon:2000-01-01");
+    expect(aircraft.manufactured_at).toBe("noon:2000-01-01");
   });
 
   it("ignores nil by default", () => {
@@ -114,9 +114,9 @@ describe("NormalizedAttributeTest", () => {
     // Our implementation currently normalizes in the constructor, so we test
     // that at least the value is consistently normalized when loaded.
     const plain = await Aircraft.create({ name: "NOT titlecase" });
-    const fromDb = await NormalizedAircraft.find(plain.readAttribute("id"));
+    const fromDb = await NormalizedAircraft.find(plain.id);
     // Our constructor normalizes on load — test the current behavior
-    expect(fromDb.readAttribute("name")).toBe("Not Titlecase");
+    expect(fromDb.name).toBe("Not Titlecase");
   });
 
   it("finds record by normalized value", async () => {
@@ -124,11 +124,11 @@ describe("NormalizedAttributeTest", () => {
       name: "fly HIGH",
       manufactured_at: "noon:2000-01-01",
     });
-    expect(aircraft.readAttribute("manufactured_at")).toBe("noon:noon:2000-01-01");
+    expect(aircraft.manufactured_at).toBe("noon:noon:2000-01-01");
     // Test that findBy works with the stored value directly
     const found = await NormalizedAircraft.findBy({ manufactured_at: "noon:noon:2000-01-01" });
     expect(found).toBeTruthy();
-    expect(found!.readAttribute("id")).toBe(aircraft.readAttribute("id"));
+    expect(found!.id).toBe(aircraft.id);
   });
 
   it("uses the same query when finding record by nil and normalized nil values", () => {
@@ -165,18 +165,18 @@ describe("NormalizedAttributeTest", () => {
 
     count = 0;
     const aircraft = await CountApplied.create({ name: "0" });
-    expect(aircraft.readAttribute("name")).toBe("1");
+    expect(aircraft.name).toBe("1");
     expect(count).toBe(1);
 
     count = 0;
-    aircraft.writeAttribute("name", "0");
-    expect(aircraft.readAttribute("name")).toBe("1");
+    aircraft.name = "0";
+    expect(aircraft.name).toBe("1");
     expect(count).toBe(1);
 
     count = 0;
     await aircraft.save();
     // save should not re-normalize if value hasn't changed
-    expect(aircraft.readAttribute("name")).toBe("1");
+    expect(aircraft.name).toBe("1");
   });
 });
 
@@ -192,6 +192,6 @@ describe("normalizes on Base", () => {
     User.adapter = adapter;
 
     const user = await User.create({ email: "  ALICE@TEST.COM  " });
-    expect(user.readAttribute("email")).toBe("alice@test.com");
+    expect(user.email).toBe("alice@test.com");
   });
 });

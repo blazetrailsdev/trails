@@ -198,7 +198,7 @@ describe("CacheKeyTest", () => {
     const p = new Post({ title: "test", updated_at: "2025-01-01T00:00:00.000Z" });
     const version = p.cacheVersion();
     // If the datetime type casts the string to a Date, we get a version; otherwise null
-    if (p.readAttribute("updated_at") instanceof Date) {
+    if (p.updated_at instanceof Date) {
       expect(version).not.toBeNull();
     } else {
       expect(version).toBeNull();
@@ -308,7 +308,7 @@ describe("CacheKeyTest", () => {
       }
     }
     const p = await Post.create({ title: "gen" });
-    const updatedAt = p.readAttribute("updated_at");
+    const updatedAt = p.updated_at;
     if (updatedAt instanceof Date) {
       const version = p.cacheVersion();
       expect(version).not.toBeNull();

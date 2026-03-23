@@ -41,7 +41,7 @@ describe("QueryCacheTest", () => {
     await Task.all().toArray();
     expect(cached.cache.size).toBeGreaterThan(0);
     const t = await Task.first();
-    (t as any).writeAttribute("title", "updated");
+    (t as any).title = "updated";
     await (t as any).save();
     expect(cached.cache.empty).toBe(true);
   });
@@ -123,8 +123,8 @@ describe("QueryCacheTest", () => {
       const r1 = await Task.find(t.id);
       const hitsAfterFirst = cached.cacheHits;
       const r2 = await Task.find(t.id);
-      expect(r1.readAttribute("title")).toBe("test");
-      expect(r2.readAttribute("title")).toBe("test");
+      expect(r1.title).toBe("test");
+      expect(r2.title).toBe("test");
       expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
     });
   });
@@ -298,7 +298,7 @@ describe("QueryCacheTest", () => {
     await cached.rollback();
     const results = await Task.all().toArray();
     expect(results).toHaveLength(1);
-    expect(results[0].readAttribute("title")).toBe("before");
+    expect(results[0].title).toBe("before");
   });
 
   it.skip("query cached even when types are reset", () => {

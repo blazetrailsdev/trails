@@ -76,7 +76,7 @@ describe("PresenceValidationTest", () => {
   it("validations run on persisted record", async () => {
     const { Topic } = makeModel();
     const t = await Topic.create({ title: "valid" });
-    t.writeAttribute("title", "");
+    t.title = "";
     const valid = await t.isValid();
     expect(valid).toBe(false);
   });

@@ -72,7 +72,7 @@ describe("BelongsToAssociations", () => {
     const account = await Account.create({ company_id: company.id, credit_limit: 50 });
     const loaded = await loadBelongsTo(account, "company", {});
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("37signals");
+    expect(loaded!.name).toBe("37signals");
   });
 
   // Rails: test_belongs_to_with_primary_key
@@ -100,7 +100,7 @@ describe("BelongsToAssociations", () => {
       primaryKey: "uuid",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Acme");
+    expect(loaded!.name).toBe("Acme");
   });
 
   // Rails: test_belongs_to_with_null_foreign_key
@@ -132,7 +132,7 @@ describe("BelongsToAssociations", () => {
       className: "Company",
       foreignKey: "sponsor_club_id",
     });
-    expect(loaded!.readAttribute("name")).toBe("Club");
+    expect(loaded!.name).toBe("Club");
   });
 
   // Rails: test_polymorphic_belongs_to
@@ -162,7 +162,7 @@ describe("BelongsToAssociations", () => {
     });
     const loaded = await loadBelongsTo(comment, "commentable", { polymorphic: true });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("Hello");
+    expect(loaded!.title).toBe("Hello");
   });
 
   // Rails: test_polymorphic_belongs_to_with_null_type
@@ -289,7 +289,7 @@ describe("HasOneAssociations", () => {
     await AccountDetail.create({ firm_id: firm.id, credit_limit: 50 });
     const detail = await loadHasOne(firm, "accountDetail", {});
     expect(detail).not.toBeNull();
-    expect(detail!.readAttribute("credit_limit")).toBe(50);
+    expect(detail!.credit_limit).toBe(50);
   });
 
   // Rails: test_has_one_with_no_record
@@ -312,7 +312,7 @@ describe("HasOneAssociations", () => {
     const firm = await Firm.create({ name: "Corp" });
     await Profile.create({ owner_id: firm.id, bio: "A firm" });
     const loaded = await loadHasOne(firm, "profile", { foreignKey: "owner_id" });
-    expect(loaded!.readAttribute("bio")).toBe("A firm");
+    expect(loaded!.bio).toBe("A firm");
   });
 
   // Rails: test_has_one_polymorphic_as
@@ -332,7 +332,7 @@ describe("HasOneAssociations", () => {
 
     const img = await loadHasOne(firm, "image", { as: "imageable" });
     expect(img).not.toBeNull();
-    expect(img!.readAttribute("url")).toBe("logo.png");
+    expect(img!.url).toBe("logo.png");
   });
 
   // Rails: test_has_one_inverse_of
@@ -498,7 +498,7 @@ describe("HasManyAssociations", () => {
       scope: (rel: any) => rel.order("title", "asc"),
     });
     expect(posts).toHaveLength(2);
-    expect(posts[0].readAttribute("title")).toBe("AAA");
+    expect(posts[0].title).toBe("AAA");
   });
 });
 
@@ -606,7 +606,7 @@ describe("HasManyThroughAssociations", () => {
       source: "patient",
     });
     expect(patients1).toHaveLength(1);
-    expect(patients1[0].readAttribute("name")).toBe("Alice");
+    expect(patients1[0].name).toBe("Alice");
   });
 });
 
@@ -646,7 +646,7 @@ describe("CollectionProxy", () => {
     const team = await Team.create({ name: "Bulls" });
     const proxy = association(team, "players");
     const player = proxy.build({ name: "Jordan" });
-    expect(player.readAttribute("team_id")).toBe(team.id);
+    expect(player.team_id).toBe(team.id);
     expect(player.isNewRecord()).toBe(true);
   });
 
@@ -656,7 +656,7 @@ describe("CollectionProxy", () => {
     const proxy = association(team, "players");
     const player = await proxy.create({ name: "Pippen" });
     expect(player.isPersisted()).toBe(true);
-    expect(player.readAttribute("team_id")).toBe(team.id);
+    expect(player.team_id).toBe(team.id);
   });
 
   // Rails: test_count
@@ -724,9 +724,9 @@ describe("CollectionProxy", () => {
     const team = await Team.create({ name: "Bulls" });
     const proxy = association(team, "players");
     const player = await Player.create({ name: "Rodman" });
-    expect(player.readAttribute("team_id")).toBeFalsy();
+    expect(player.team_id).toBeFalsy();
     await proxy.push(player);
-    expect(player.readAttribute("team_id")).toBe(team.id);
+    expect(player.team_id).toBe(team.id);
     expect(player.isPersisted()).toBe(true);
   });
 
@@ -746,7 +746,7 @@ describe("CollectionProxy", () => {
     const player = await Player.create({ name: "Jordan", team_id: team.id });
     const proxy = association(team, "players");
     await proxy.delete(player);
-    expect(player.readAttribute("team_id")).toBeNull();
+    expect(player.team_id).toBeNull();
   });
 
   // Rails: test_destroy_on_proxy
@@ -903,7 +903,7 @@ describe("DependentAssociations", () => {
     await processDependentAssociations(post);
 
     const reloaded = await Comment.find(c.id);
-    expect(reloaded.readAttribute("post_id")).toBeNull();
+    expect(reloaded.post_id).toBeNull();
   });
 
   // Rails: test_dependent_restrict_with_exception
@@ -1033,7 +1033,7 @@ describe("DependentAssociations", () => {
     const p = await Profile.create({ user_id: user.id, bio: "Hi" });
     await processDependentAssociations(user);
     const reloaded = await Profile.find(p.id);
-    expect(reloaded.readAttribute("user_id")).toBeNull();
+    expect(reloaded.user_id).toBeNull();
   });
 
   // Rails: test_dependent_restrict_has_one
@@ -1527,7 +1527,7 @@ describe("CounterCache", () => {
     await Reply.create({ content: "Hi", topic_id: topic.id });
 
     const reloaded = await Topic.find(topic.id);
-    expect(reloaded.readAttribute("replies_count")).toBe(1);
+    expect(reloaded.replies_count).toBe(1);
   });
 
   // Rails: test_update_counter_cache_on_destroy
@@ -1556,7 +1556,7 @@ describe("CounterCache", () => {
     await updateCounterCaches(reply, "decrement");
 
     const reloaded = await Topic.find(topic.id);
-    expect(reloaded.readAttribute("replies_count")).toBe(0);
+    expect(reloaded.replies_count).toBe(0);
   });
 
   // Rails: test_counter_cache_with_custom_column_name
@@ -1584,7 +1584,7 @@ describe("CounterCache", () => {
     await Product.create({ name: "Phone", category_id: cat.id });
 
     const reloaded = await Category.find(cat.id);
-    expect(reloaded.readAttribute("num_products")).toBe(1);
+    expect(reloaded.num_products).toBe(1);
   });
 
   // Rails: test_counter_cache_null_fk_skips
@@ -1643,7 +1643,7 @@ describe("TouchBelongsToParents", () => {
     registerModel(Pet);
 
     const owner = await Owner.create({ name: "Alice" });
-    const originalTs = owner.readAttribute("updated_at");
+    const originalTs = owner.updated_at;
 
     // Small delay so timestamp differs
     await new Promise((r) => setTimeout(r, 10));
@@ -1652,7 +1652,7 @@ describe("TouchBelongsToParents", () => {
     await touchBelongsToParents(pet);
 
     const reloaded = await Owner.find(owner.id);
-    const newTs = reloaded.readAttribute("updated_at");
+    const newTs = reloaded.updated_at;
     // updated_at should have been set (could be different from original if original was set)
     expect(newTs).toBeDefined();
   });
@@ -1818,7 +1818,7 @@ describe("Rails-guided: association features", () => {
     const machine = await Machine.create({ name: "Lathe" });
     const proxy = association(machine, "parts");
     const part = proxy.build({ name: "Gear" });
-    expect(part.readAttribute("machine_id")).toBe(machine.id);
+    expect(part.machine_id).toBe(machine.id);
     expect(part.isNewRecord()).toBe(true);
   });
 
@@ -1971,7 +1971,7 @@ describe("AssociationsTest", () => {
     await reloaded.updateColumn("name", "Deck");
     const parts = await proxy.toArray();
     expect(parts).toHaveLength(1);
-    expect(parts[0].readAttribute("name")).toBe("Deck");
+    expect(parts[0].name).toBe("Deck");
   });
   it("loading cpk association when persisted and in memory differ", async () => {
     const adapter = freshAdapter();
@@ -2003,7 +2003,7 @@ describe("AssociationsTest", () => {
     const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
     await CpkOrderItem.create({ cpk_order_shop_id: 1, cpk_order_id: 1, name: "Widget" });
     // Change in memory but don't persist
-    order.writeAttribute("status", "closed");
+    order.status = "closed";
     // Loading association should still find items by persisted CPK
     const items = await loadHasMany(order, "cpkOrderItems", {
       foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
@@ -2039,8 +2039,8 @@ describe("AssociationsTest", () => {
     await IOPost.create({ title: "A", score: 1 });
     const posts = await IOPost.all().includes("ioComments").order("score").toArray();
     expect(posts.length).toBe(2);
-    expect(posts[0].readAttribute("title")).toBe("A");
-    expect(posts[1].readAttribute("title")).toBe("B");
+    expect(posts[0].title).toBe("A");
+    expect(posts[1].title).toBe("B");
   });
   it("bad collection keys", async () => {
     const adapter = freshAdapter();
@@ -2180,7 +2180,7 @@ describe("AssociationsTest", () => {
       className: "CpkOrder",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("status")).toBe("pending");
+    expect(loaded!.status).toBe("pending");
   });
   it("belongs to a cpk model by id attribute", async () => {
     const adapter = freshAdapter();
@@ -2216,7 +2216,7 @@ describe("AssociationsTest", () => {
       className: "CpkBook",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("CPK Guide");
+    expect(loaded!.title).toBe("CPK Guide");
     expect(loaded!.id).toEqual([1, 10]);
   });
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
@@ -2283,7 +2283,7 @@ describe("AssociationsTest", () => {
 
     const results = await QrkAuthor.where({ region_id: 1 }).toArray();
     expect(results).toHaveLength(2);
-    expect(results.map((r: any) => r.readAttribute("name")).sort()).toEqual(["Alice", "Bob"]);
+    expect(results.map((r: any) => r.name).sort()).toEqual(["Alice", "Bob"]);
   });
   it("has many association with composite foreign key loads records", async () => {
     const adapter = freshAdapter();
@@ -2321,7 +2321,7 @@ describe("AssociationsTest", () => {
       foreignKey: ["author_region_id", "author_id"],
     });
     expect(posts).toHaveLength(2);
-    expect(posts.map((p) => p.readAttribute("title")).sort()).toEqual(["Post1", "Post2"]);
+    expect(posts.map((p) => p.title).sort()).toEqual(["Post1", "Post2"]);
   });
   it.skip("has many association from a model with query constraints different from the association", () => {
     /* needs composite key / query constraints support */
@@ -2400,8 +2400,8 @@ describe("AssociationsTest", () => {
     const item = await CpkItem.create({ label: "New Item" });
     const proxy = association(owner, "cpkItems");
     await proxy.push(item);
-    expect(item.readAttribute("owner_region_id")).toBe(1);
-    expect(item.readAttribute("owner_id")).toBe(10);
+    expect(item.owner_region_id).toBe(1);
+    expect(item.owner_id).toBe(10);
   });
 
   it("nullify composite foreign key has many association", async () => {
@@ -2433,8 +2433,8 @@ describe("AssociationsTest", () => {
     const item = await CpkItem2.create({ owner_region_id: 1, owner_id: 10, label: "Item" });
     const proxy = association(owner, "cpkItems2");
     await proxy.delete(item);
-    expect(item.readAttribute("owner_region_id")).toBeNull();
-    expect(item.readAttribute("owner_id")).toBeNull();
+    expect(item.owner_region_id).toBeNull();
+    expect(item.owner_id).toBeNull();
   });
   it("assign persisted composite foreign key belongs to association", async () => {
     const adapter = freshAdapter();
@@ -2467,8 +2467,8 @@ describe("AssociationsTest", () => {
       foreignKey: ["parent_region_id", "parent_id"],
       className: "CpkParent",
     });
-    expect(child.readAttribute("parent_region_id")).toBe(1);
-    expect(child.readAttribute("parent_id")).toBe(20);
+    expect(child.parent_region_id).toBe(1);
+    expect(child.parent_id).toBe(20);
   });
 
   it("nullify composite foreign key belongs to association", async () => {
@@ -2501,8 +2501,8 @@ describe("AssociationsTest", () => {
       foreignKey: ["parent_region_id", "parent_id"],
       className: "CpkParent2",
     });
-    expect(child.readAttribute("parent_region_id")).toBeNull();
-    expect(child.readAttribute("parent_id")).toBeNull();
+    expect(child.parent_region_id).toBeNull();
+    expect(child.parent_id).toBeNull();
   });
 
   it("assign composite foreign key belongs to association", async () => {
@@ -2536,8 +2536,8 @@ describe("AssociationsTest", () => {
       foreignKey: ["parent_region_id", "parent_id"],
       className: "CpkParent3",
     });
-    expect(child.readAttribute("parent_region_id")).toBe(2);
-    expect(child.readAttribute("parent_id")).toBe(30);
+    expect(child.parent_region_id).toBe(2);
+    expect(child.parent_id).toBe(30);
   });
   it("setBelongsTo infers composite foreign key from target primary key", async () => {
     const adapter = freshAdapter();
@@ -2564,8 +2564,8 @@ describe("AssociationsTest", () => {
     const parent = await InfParent.create({ region_id: 3, id: 7, name: "Inferred" });
     const child = new InfChild({ label: "Child" });
     setBelongsTo(child, "infParent", parent, { className: "InfParent" });
-    expect(child.readAttribute("inf_parent_region_id")).toBe(3);
-    expect(child.readAttribute("inf_parent_id")).toBe(7);
+    expect(child.inf_parent_region_id).toBe(3);
+    expect(child.inf_parent_id).toBe(7);
   });
 
   it("setBelongsTo nullifies inferred composite foreign key", async () => {
@@ -2596,8 +2596,8 @@ describe("AssociationsTest", () => {
       label: "Child",
     });
     setBelongsTo(child, "infParent2", null, { className: "InfParent2" });
-    expect(child.readAttribute("inf_parent2_region_id")).toBeNull();
-    expect(child.readAttribute("inf_parent2_id")).toBeNull();
+    expect(child.inf_parent2_region_id).toBeNull();
+    expect(child.inf_parent2_id).toBeNull();
   });
 
   it.skip("query constraints that dont include the primary key raise with a single column", () => {
@@ -2688,7 +2688,7 @@ describe("AssociationsTest", () => {
       className: "CfkOrder",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("status")).toBe("active");
+    expect(loaded!.status).toBe("active");
     expect(loaded!.id).toEqual([1, 100]);
   });
 
@@ -2728,7 +2728,7 @@ describe("AssociationsTest", () => {
       className: "CpkChild",
     });
     expect(children.length).toBe(2);
-    expect(children.map((c) => c.readAttribute("label")).sort()).toEqual(["A", "B"]);
+    expect(children.map((c) => c.label).sort()).toEqual(["A", "B"]);
   });
 });
 
@@ -2774,7 +2774,7 @@ describe("Associations", () => {
 
     const loaded = await loadBelongsTo(book, "author", {});
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("J.K.");
+    expect(loaded!.name).toBe("J.K.");
   });
 
   it("loadBelongsTo returns null when FK is null", async () => {
@@ -2789,7 +2789,7 @@ describe("Associations", () => {
 
     const loaded = await loadHasOne(author, "profile", {});
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("bio")).toBe("A developer");
+    expect(loaded!.bio).toBe("A developer");
   });
 
   it("loadHasMany loads all children", async () => {
@@ -2895,7 +2895,7 @@ describe("Associations: dependent", () => {
 
     const replies = await Reply.all().toArray();
     expect(replies).toHaveLength(1);
-    expect(replies[0].readAttribute("thread_id")).toBe(null);
+    expect(replies[0].thread_id).toBe(null);
   });
 });
 
@@ -2964,7 +2964,7 @@ describe("CollectionProxy", () => {
     const invoice = await Invoice.create({ number: "INV-001" });
     const proxy = association(invoice, "lineItems");
     const item = proxy.build({ name: "Widget" });
-    expect(item.readAttribute("invoice_id")).toBe(invoice.id);
+    expect(item.invoice_id).toBe(invoice.id);
     expect(item.isNewRecord()).toBe(true);
   });
 
@@ -2996,7 +2996,7 @@ describe("CollectionProxy", () => {
     const proxy = association(doc, "notes");
     const note = await proxy.create({ text: "Remember this" });
     expect(note.isPersisted()).toBe(true);
-    expect(note.readAttribute("doc_id")).toBe(doc.id);
+    expect(note.doc_id).toBe(doc.id);
   });
 
   it("count returns number of associated records", async () => {
@@ -3081,11 +3081,11 @@ describe("Polymorphic Associations", () => {
 
     const parent1 = await loadBelongsTo(c1, "commentable", { polymorphic: true });
     expect(parent1).toBeInstanceOf(Article);
-    expect(parent1!.readAttribute("title")).toBe("Hello");
+    expect(parent1!.title).toBe("Hello");
 
     const parent2 = await loadBelongsTo(c2, "commentable", { polymorphic: true });
     expect(parent2).toBeInstanceOf(Photo);
-    expect(parent2!.readAttribute("url")).toBe("pic.jpg");
+    expect(parent2!.url).toBe("pic.jpg");
   });
 
   it("hasMany with as: loads polymorphic children", async () => {
@@ -3357,7 +3357,7 @@ describe("CollectionProxy enhancements", () => {
     const post = await Post.create({ title: "Hello" });
     const proxy = association(author, "posts");
     await proxy.push(post);
-    expect(post.readAttribute("author_id")).toBe(author.id);
+    expect(post.author_id).toBe(author.id);
   });
 
   it("size returns count", async () => {
@@ -3448,9 +3448,9 @@ describe("CollectionProxy enhancements", () => {
     const proxy = association(author, "posts");
     const first = await proxy.first();
     expect(first).not.toBeNull();
-    expect((first as any)!.readAttribute("title")).toBe("First");
+    expect((first as any)!.title).toBe("First");
     const last = await proxy.last();
-    expect((last as any)!.readAttribute("title")).toBe("Second");
+    expect((last as any)!.title).toBe("Second");
   });
 
   it("includes checks for record membership", async () => {
@@ -3521,7 +3521,7 @@ describe("Associations (Rails-guided)", () => {
     const book = await Book.create({ title: "Harry Potter", author_id: author.id });
     const loaded = await loadBelongsTo(book, "author", {});
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("J.K.");
+    expect(loaded!.name).toBe("J.K.");
   });
 
   it("belongs_to returns null when FK is null", async () => {
@@ -3535,7 +3535,7 @@ describe("Associations (Rails-guided)", () => {
     await Profile.create({ bio: "Developer", author_id: author.id });
     const loaded = await loadHasOne(author, "profile", {});
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("bio")).toBe("Developer");
+    expect(loaded!.bio).toBe("Developer");
   });
 
   it("has_many loads all children", async () => {
@@ -3631,7 +3631,7 @@ describe("Associations (Rails-guided)", () => {
       foreignKey: "author_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Writer");
+    expect(loaded!.name).toBe("Writer");
   });
 
   // -- hasOne --
@@ -3648,7 +3648,7 @@ describe("Associations (Rails-guided)", () => {
 
     const loaded = await loadHasOne(author, "profile", {});
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("bio")).toBe("A developer");
+    expect(loaded!.bio).toBe("A developer");
   });
 
   // -- hasMany --
@@ -3757,10 +3757,10 @@ describe("Polymorphic Associations (Rails-guided)", () => {
     });
 
     const parent1 = await loadBelongsTo(c1, "commentable", { polymorphic: true });
-    expect(parent1!.readAttribute("title")).toBe("Hello");
+    expect(parent1!.title).toBe("Hello");
 
     const parent2 = await loadBelongsTo(c2, "commentable", { polymorphic: true });
-    expect(parent2!.readAttribute("url")).toBe("cat.jpg");
+    expect(parent2!.url).toBe("cat.jpg");
   });
 
   // Rails: test "has_many :as"
@@ -3848,7 +3848,7 @@ describe("HABTM (Rails-guided)", () => {
 
     const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
     expect(projects).toHaveLength(2);
-    expect(projects.map((p: any) => p.readAttribute("name")).sort()).toEqual(["Basecamp", "Rails"]);
+    expect(projects.map((p: any) => p.name).sort()).toEqual(["Basecamp", "Rails"]);
   });
 });
 
@@ -3965,7 +3965,7 @@ describe("Association Scopes (Rails-guided)", () => {
       scope: (rel: any) => rel.where({ approved: true }),
     });
     expect(approved.length).toBe(2);
-    expect(approved.every((c: any) => c.readAttribute("approved") === true)).toBe(true);
+    expect(approved.every((c: any) => c.approved === true)).toBe(true);
   });
 
   // Rails: test "has_many scope with ordering"
@@ -3999,7 +3999,7 @@ describe("Association Scopes (Rails-guided)", () => {
     const ordered = await loadHasMany(post, "comments", {
       scope: (rel: any) => rel.order({ position: "asc" }),
     });
-    expect(ordered.map((c: any) => c.readAttribute("body"))).toEqual(["First", "Second", "Third"]);
+    expect(ordered.map((c: any) => c.body)).toEqual(["First", "Second", "Third"]);
   });
 });
 
@@ -4094,7 +4094,7 @@ describe("BelongsToAssociationsTest", () => {
     // Simulate buildAssociation — create unsaved firm and set FK
     const firm = new BuildFirm({ name: "Apple" });
     await firm.save();
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
 
     const reloaded = await loadBelongsTo(account, "buildFirm", {
@@ -4102,7 +4102,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(reloaded).not.toBeNull();
-    expect(reloaded!.readAttribute("name")).toBe("Apple");
+    expect(reloaded!.name).toBe("Apple");
   });
 
   it("creating the belonging object", async () => {
@@ -4125,7 +4125,7 @@ describe("BelongsToAssociationsTest", () => {
     const account = await CreateAccount.create({ credit_limit: 10 });
 
     const firm = await CreateFirm.create({ name: "Apple" });
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
 
     const loaded = await loadBelongsTo(account, "createFirm", {
@@ -4133,7 +4133,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("name")).toBe("Apple");
+    expect(loaded!.name).toBe("Apple");
     expect(loaded!.isNewRecord()).toBe(false);
   });
 
@@ -4161,10 +4161,10 @@ describe("BelongsToAssociationsTest", () => {
     const apple = await NatFirm.create({ name: "Apple" });
     const account = await NatAccount.create({ credit_limit: 10 });
 
-    account.writeAttribute("firm_id", apple.id);
+    account.firm_id = apple.id;
     await account.save();
 
-    expect(account.readAttribute("firm_id")).toBe(apple.id);
+    expect(account.firm_id).toBe(apple.id);
   });
 
   it("natural assignment to nil removes the association", async () => {
@@ -4192,7 +4192,7 @@ describe("BelongsToAssociationsTest", () => {
     });
 
     // Clear the FK
-    account.writeAttribute("firm_id", null);
+    account.firm_id = null;
     await account.save();
 
     const loaded = await loadBelongsTo(account, "nilFirm", {
@@ -4299,7 +4299,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const reloaded = await TouchPost.find(post.id as number);
     // updated_at should be updated (not necessarily the same as before)
-    expect(reloaded.readAttribute("updated_at")).not.toBe(new Date("2020-01-01").toISOString());
+    expect(reloaded.updated_at).not.toBe(new Date("2020-01-01").toISOString());
   });
 
   // -------------------------------------------------------------------------
@@ -4337,7 +4337,7 @@ describe("BelongsToAssociationsTest", () => {
     await CcComment.create({ body: "Hi", post_id: post.id });
 
     const reloaded = await CcPost.find(post.id as number);
-    expect(reloaded.readAttribute("cc_comments_count")).toBe(1);
+    expect(reloaded.cc_comments_count).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -4374,7 +4374,7 @@ describe("BelongsToAssociationsTest", () => {
       polymorphic: true,
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("Hello");
+    expect(loaded!.title).toBe("Hello");
   });
 
   // -------------------------------------------------------------------------
@@ -4406,10 +4406,10 @@ describe("BelongsToAssociationsTest", () => {
       className: "ReloadFirm",
       foreignKey: "firm_id",
     });
-    expect(first!.readAttribute("name")).toBe("Odegy");
+    expect(first!.name).toBe("Odegy");
 
     // Update firm name directly
-    firm.writeAttribute("name", "ODEGY");
+    firm.name = "ODEGY";
     await firm.save();
 
     // Reload by clearing cache and reloading
@@ -4420,7 +4420,7 @@ describe("BelongsToAssociationsTest", () => {
       className: "ReloadFirm",
       foreignKey: "firm_id",
     });
-    expect(second!.readAttribute("name")).toBe("ODEGY");
+    expect(second!.name).toBe("ODEGY");
   });
 
   // -------------------------------------------------------------------------
@@ -4448,10 +4448,10 @@ describe("BelongsToAssociationsTest", () => {
     const firm = await AbsFirm.create({ name: "New Firm" });
     const client = new AbsClient({ name: "New Client" });
 
-    client.writeAttribute("firm_id", firm.id);
+    client.firm_id = firm.id;
     await client.save();
 
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.firm_id).toBe(firm.id);
     expect(client.isNewRecord()).toBe(false);
   });
 
@@ -4496,7 +4496,7 @@ describe("BelongsToAssociationsTest", () => {
       inverseOf: "comments",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("title")).toBe("Hello");
+    expect(loaded!.title).toBe("Hello");
   });
 
   // -------------------------------------------------------------------------
@@ -4525,18 +4525,18 @@ describe("BelongsToAssociationsTest", () => {
     const firm2 = await StFirm.create({ name: "Second" });
     const client = await StClient.create({ name: "Movable", firm_id: firm1.id });
 
-    expect(client.readAttribute("firm_id")).toBe(firm1.id);
+    expect(client.firm_id).toBe(firm1.id);
 
-    client.writeAttribute("firm_id", firm2.id);
+    client.firm_id = firm2.id;
     await client.save();
 
-    expect(client.readAttribute("firm_id")).toBe(firm2.id);
+    expect(client.firm_id).toBe(firm2.id);
 
     const loaded = await loadBelongsTo(client, "stFirm", {
       className: "StFirm",
       foreignKey: "firm_id",
     });
-    expect(loaded!.readAttribute("name")).toBe("Second");
+    expect(loaded!.name).toBe("Second");
   });
 
   // -------------------------------------------------------------------------
@@ -4565,7 +4565,7 @@ describe("BelongsToAssociationsTest", () => {
     // It's a new record so is not persisted
     expect(client.isNewRecord()).toBe(true);
     // FK is set
-    expect(client.readAttribute("firm_id")).toBe(1);
+    expect(client.firm_id).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -4625,7 +4625,7 @@ describe("BelongsToAssociationsTest", () => {
     const comment = await NilInvComment.create({ body: "Hi", post_id: post.id });
 
     // Simulate clearing — set FK to null
-    comment.writeAttribute("post_id", null);
+    comment.post_id = null;
     await comment.save();
 
     const loaded = await loadBelongsTo(comment, "nilInvPost", {
@@ -4657,7 +4657,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const firm = await IdFirm.create({ name: "Corp" });
     const account = new IdAccount({});
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
 
     const loaded = await loadBelongsTo(account, "idFirm", {
@@ -4685,7 +4685,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const firm = await NilFirm.create({ name: "Corp" });
     const account = await NilAccount.create({ firm_id: firm.id });
-    account.writeAttribute("firm_id", null);
+    account.firm_id = null;
     await account.save();
 
     const loaded = await loadBelongsTo(account, "nilFirm", {
@@ -4717,7 +4717,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const account = new CrNrAccount({});
     const firm = await CrNrFirm.create({ name: "New Parent" });
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
 
     expect(account.isNewRecord()).toBe(false);
@@ -4764,7 +4764,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded).toBeNull();
 
     const firm = await FkNilFirm.create({ name: "Later Corp" });
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
 
     loaded = await loadBelongsTo(account, "fkNilFirm", {
@@ -4798,7 +4798,7 @@ describe("BelongsToAssociationsTest", () => {
     const firmB = await StkFirm.create({ name: "Firm B" });
     const account = await StkAccount.create({ firm_id: firmA.id });
 
-    account.writeAttribute("firm_id", firmB.id);
+    account.firm_id = firmB.id;
     await account.save();
 
     const loaded = await loadBelongsTo(account, "stkFirm", {
@@ -4831,8 +4831,8 @@ describe("BelongsToAssociationsTest", () => {
 
     const owner = await PolyOwner.create({ name: "Owner" });
     const item = new PolyItem({});
-    item.writeAttribute("owner_id", owner.id);
-    item.writeAttribute("owner_type", "PolyOwner");
+    item.owner_id = owner.id;
+    item.owner_type = "PolyOwner";
     await item.save();
 
     const loaded = await loadBelongsTo(item, "polyOwner", {
@@ -4922,10 +4922,10 @@ describe("BelongsToAssociationsTest", () => {
 
     const firm = await FkCrFirm.create({ name: "Corp" });
     const account = new FkCrAccount({});
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
     await account.save();
 
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("should set foreign key on save", async () => {
@@ -4949,7 +4949,7 @@ describe("BelongsToAssociationsTest", () => {
     await account.save();
 
     const reloaded = await FkSvAccount.find(account.id as number);
-    expect(reloaded.readAttribute("firm_id")).toBe(firm.id);
+    expect(reloaded.firm_id).toBe(firm.id);
   });
 
   // -------------------------------------------------------------------------
@@ -4974,9 +4974,9 @@ describe("BelongsToAssociationsTest", () => {
 
     const account = await TcAccount.create({ firm_id: null });
     const firm = await TcFirm.create({ name: "Corp" });
-    account.writeAttribute("firm_id", firm.id);
+    account.firm_id = firm.id;
 
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("tracking change from persisted record to nil", async () => {
@@ -4997,9 +4997,9 @@ describe("BelongsToAssociationsTest", () => {
 
     const firm = await Tc2Firm.create({ name: "Corp" });
     const account = await Tc2Account.create({ firm_id: firm.id });
-    account.writeAttribute("firm_id", null);
+    account.firm_id = null;
 
-    expect(account.readAttribute("firm_id")).toBeNull();
+    expect(account.firm_id).toBeNull();
   });
 
   it("tracking change from one persisted record to another", async () => {
@@ -5021,9 +5021,9 @@ describe("BelongsToAssociationsTest", () => {
     const firmA = await Tc3Firm.create({ name: "A" });
     const firmB = await Tc3Firm.create({ name: "B" });
     const account = await Tc3Account.create({ firm_id: firmA.id });
-    account.writeAttribute("firm_id", firmB.id);
+    account.firm_id = firmB.id;
 
-    expect(account.readAttribute("firm_id")).toBe(firmB.id);
+    expect(account.firm_id).toBe(firmB.id);
   });
 
   // -------------------------------------------------------------------------
@@ -5059,7 +5059,7 @@ describe("BelongsToAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(loaded).not.toBeNull();
-    expect(loaded!.readAttribute("active")).toBe(true);
+    expect(loaded!.active).toBe(true);
   });
 
   it("build with conditions", async () => {
@@ -5084,8 +5084,8 @@ describe("BelongsToAssociationsTest", () => {
     const account = new BcAccount({ firm_id: firm.id, name: "New Account" });
     await account.save();
 
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
-    expect(account.readAttribute("name")).toBe("New Account");
+    expect(account.firm_id).toBe(firm.id);
+    expect(account.name).toBe("New Account");
   });
 
   it("create with conditions", async () => {
@@ -5109,7 +5109,7 @@ describe("BelongsToAssociationsTest", () => {
     const account = await CcAccount.create({ firm_id: firm.id, name: "Created Account" });
 
     expect(account.isNewRecord()).toBe(false);
-    expect(account.readAttribute("firm_id")).toBe(firm.id);
+    expect(account.firm_id).toBe(firm.id);
   });
 });
 // ---------------------------------------------------------------------------
@@ -5182,7 +5182,7 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "firm_id",
     });
     expect(clients.length).toBe(1);
-    expect(clients[0].readAttribute("name")).toBe("Active Client");
+    expect(clients[0].name).toBe("Active Client");
   });
 
   it("finding", async () => {
@@ -5219,7 +5219,7 @@ describe("HasManyAssociationsTest", () => {
 
     const proxy = association(firm, "clients");
     const all = await proxy.toArray();
-    const microsoft = all.filter((c) => c.readAttribute("name") === "Microsoft");
+    const microsoft = all.filter((c) => c.name === "Microsoft");
     expect(microsoft.length).toBe(1);
   });
 
@@ -5234,7 +5234,7 @@ describe("HasManyAssociationsTest", () => {
 
     const proxy = association(firm, "clients");
     const c = proxy.build({});
-    expect(c.readAttribute("firm_id")).toBe(firm.id);
+    expect(c.firm_id).toBe(firm.id);
   });
 
   it("build overrides supplied foreign key with correct value", async () => {
@@ -5245,7 +5245,7 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     // Even when a different firm_id is passed, it should use the owner's id
     const c = proxy.build({ firm_id: 99999 });
-    expect(c.readAttribute("firm_id")).toBe(firm.id);
+    expect(c.firm_id).toBe(firm.id);
   });
 
   it("adding", async () => {
@@ -5319,11 +5319,11 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("name")).toBe("Apple");
+    expect(remaining[0].name).toBe("Apple");
 
     // FK should be nullified
     const reloaded = await Client.find(clientA.id as number);
-    expect(reloaded.readAttribute("firm_id")).toBeNull();
+    expect(reloaded.firm_id).toBeNull();
   });
 
   it("deleting a collection", async () => {
@@ -5339,7 +5339,7 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("name")).toBe("C");
+    expect(remaining[0].name).toBe("C");
   });
 
   it("clearing an association collection", async () => {
@@ -5367,7 +5367,7 @@ describe("HasManyAssociationsTest", () => {
     await proxy.clear();
 
     const reloaded = await Client.find(client.id as number);
-    expect(reloaded.readAttribute("firm_id")).toBeNull();
+    expect(reloaded.firm_id).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -5484,8 +5484,8 @@ describe("HasManyAssociationsTest", () => {
 
     const reloaded1 = await Child.find(c1.id as number);
     const reloaded2 = await Child.find(c2.id as number);
-    expect(reloaded1.readAttribute("parent_id")).toBeNull();
-    expect(reloaded2.readAttribute("parent_id")).toBeNull();
+    expect(reloaded1.parent_id).toBeNull();
+    expect(reloaded2.parent_id).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -5576,7 +5576,7 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("name")).toBe("B");
+    expect(remaining[0].name).toBe("B");
   });
 
   it("replace with new", async () => {
@@ -5592,7 +5592,7 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("name")).toBe("Replacement");
+    expect(remaining[0].name).toBe("Replacement");
   });
 
   // -------------------------------------------------------------------------
@@ -5694,7 +5694,7 @@ describe("HasManyAssociationsTest", () => {
       scope: (rel: any) => rel.where({ approved: true }),
     });
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("Good");
+    expect(comments[0].body).toBe("Good");
   });
 
   // -------------------------------------------------------------------------
@@ -5708,7 +5708,7 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     const built = proxy.build({ name: "Built Client" });
 
-    expect(built.readAttribute("firm_id")).toBe(firm.id);
+    expect(built.firm_id).toBe(firm.id);
   });
 
   // -------------------------------------------------------------------------
@@ -5867,8 +5867,8 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     const client = await proxy.firstOrInitialize({ name: "New Client" });
 
-    expect(client.readAttribute("name")).toBe("New Client");
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.name).toBe("New Client");
+    expect(client.firm_id).toBe(firm.id);
     expect(client.isNewRecord()).toBe(true);
   });
 
@@ -5890,8 +5890,8 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     const client = await proxy.firstOrCreate({ name: "New Client" });
 
-    expect(client.readAttribute("name")).toBe("New Client");
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.name).toBe("New Client");
+    expect(client.firm_id).toBe(firm.id);
     expect(client.isNewRecord()).toBe(false);
 
     const all = await Client.all().toArray();
@@ -5906,7 +5906,7 @@ describe("HasManyAssociationsTest", () => {
     const client = await proxy.firstOrCreate_({ name: "New Client" });
 
     expect(client.isNewRecord()).toBe(false);
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.firm_id).toBe(firm.id);
 
     const all = await Client.all().toArray();
     expect(all.length).toBe(1);
@@ -5941,7 +5941,7 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     const built = proxy.build({ name: "Via Build" });
 
-    expect(built.readAttribute("firm_id")).toBe(firm.id);
+    expect(built.firm_id).toBe(firm.id);
     expect(built.isNewRecord()).toBe(true);
   });
 
@@ -5956,8 +5956,8 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     const client = await proxy.firstOrInitialize({ name: "Scoped Client" });
 
-    expect(client.readAttribute("name")).toBe("Scoped Client");
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
+    expect(client.name).toBe("Scoped Client");
+    expect(client.firm_id).toBe(firm.id);
   });
 
   // -------------------------------------------------------------------------
@@ -5991,7 +5991,7 @@ describe("HasManyAssociationsTest", () => {
 
     const result = await proxy.toArray();
     expect(result.length).toBe(1);
-    expect(result[0].readAttribute("name")).toBe("New");
+    expect(result[0].name).toBe("New");
   });
 
   // -------------------------------------------------------------------------
@@ -6006,8 +6006,8 @@ describe("HasManyAssociationsTest", () => {
     const client = await proxy.create({ name: null });
 
     expect(client.isNewRecord()).toBe(false);
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
-    expect(client.readAttribute("name")).toBeNull();
+    expect(client.firm_id).toBe(firm.id);
+    expect(client.name).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -6023,7 +6023,7 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(firm, "clients");
     const matches = await proxy.where({ name: "Microsoft" });
     expect(matches.length).toBe(1);
-    expect(matches[0].readAttribute("name")).toBe("Microsoft");
+    expect(matches[0].name).toBe("Microsoft");
   });
 
   it("finding with condition hash", async () => {
@@ -6075,7 +6075,7 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(1);
-    expect(remaining[0].readAttribute("name")).toBe("New C");
+    expect(remaining[0].name).toBe("New C");
   });
 
   it("replace with same content", async () => {
@@ -6093,7 +6093,7 @@ describe("HasManyAssociationsTest", () => {
 
     const remaining = await proxy.toArray();
     expect(remaining.length).toBe(2);
-    expect(remaining.map((r) => r.readAttribute("name")).sort()).toEqual(["C", "D"]);
+    expect(remaining.map((r) => r.name).sort()).toEqual(["C", "D"]);
   });
 
   // -------------------------------------------------------------------------
@@ -6111,7 +6111,7 @@ describe("HasManyAssociationsTest", () => {
     await proxy.clear();
 
     const all = await Client.all().toArray();
-    expect(all.every((c: any) => c.readAttribute("firm_id") === null)).toBe(true);
+    expect(all.every((c: any) => c.firm_id === null)).toBe(true);
   });
 
   // -------------------------------------------------------------------------
@@ -6159,7 +6159,7 @@ describe("HasManyAssociationsTest", () => {
 
     const proxy = association(firm, "clients");
     const found = (await proxy.find(a.id as number)) as Base;
-    expect(found.readAttribute("name")).toBe("A");
+    expect(found.name).toBe("A");
   });
 
   // -------------------------------------------------------------------------
@@ -6177,7 +6177,7 @@ describe("HasManyAssociationsTest", () => {
 
     const members = await proxy.toArray();
     expect(members.length).toBe(2);
-    expect(members.every((m) => m.readAttribute("firm_id") === firm.id)).toBe(true);
+    expect(members.every((m) => m.firm_id === firm.id)).toBe(true);
   });
 
   it("assign ids ignoring blanks", async () => {
@@ -6204,7 +6204,7 @@ describe("HasManyAssociationsTest", () => {
 
     const all = await Client.all().toArray();
     expect(all.length).toBe(1);
-    expect(all[0].readAttribute("firm_id")).toBe(firm.id);
+    expect(all[0].firm_id).toBe(firm.id);
   });
 
   // -------------------------------------------------------------------------
@@ -6217,8 +6217,8 @@ describe("HasManyAssociationsTest", () => {
 
     const client = await association(firm, "clients").create({ name: "Conditioned" });
 
-    expect(client.readAttribute("firm_id")).toBe(firm.id);
-    expect(client.readAttribute("name")).toBe("Conditioned");
+    expect(client.firm_id).toBe(firm.id);
+    expect(client.name).toBe("Conditioned");
   });
 
   // -------------------------------------------------------------------------
@@ -6232,7 +6232,7 @@ describe("HasManyAssociationsTest", () => {
     // build on unsaved parent: FK is null since parent has no id
     const proxy = association(firm, "clients");
     const built = proxy.build({ name: "Child" });
-    expect(built.readAttribute("firm_id")).toBeNull();
+    expect(built.firm_id).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -6396,7 +6396,7 @@ describe("AssociationProxyTest", () => {
     await proxy.push(comment);
     const comments = await proxy.toArray();
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("new comment");
+    expect(comments[0].body).toBe("new comment");
   });
 
   it("append behaves like push", async () => {
@@ -6407,7 +6407,7 @@ describe("AssociationProxyTest", () => {
     await proxy.concat(c1);
     const comments = await proxy.toArray();
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("c1");
+    expect(comments[0].body).toBe("c1");
   });
 
   it("prepend is not defined", () => {
@@ -6424,7 +6424,7 @@ describe("AssociationProxyTest", () => {
     const proxy = association(post, "apComments");
     const loaded = await proxy.toArray();
     expect(loaded.length).toBe(1);
-    expect(loaded[0].readAttribute("body")).toBe("loaded");
+    expect(loaded[0].body).toBe("loaded");
   });
 
   it("create via association with block", async () => {
@@ -6433,8 +6433,8 @@ describe("AssociationProxyTest", () => {
     const proxy = association(post, "apComments");
     const comment = await proxy.create({ body: "created" });
     expect(comment.isPersisted()).toBe(true);
-    expect(comment.readAttribute("body")).toBe("created");
-    expect(comment.readAttribute("ap_post_id")).toBe(post.id);
+    expect(comment.body).toBe("created");
+    expect(comment.ap_post_id).toBe(post.id);
   });
 
   it("create with bang via association with block", async () => {
@@ -6443,7 +6443,7 @@ describe("AssociationProxyTest", () => {
     const proxy = association(post, "apComments");
     const comment = await proxy.create({ body: "bang created" });
     expect(comment.isPersisted()).toBe(true);
-    expect(comment.readAttribute("ap_post_id")).toBe(post.id);
+    expect(comment.ap_post_id).toBe(post.id);
   });
 
   it("proxy association accessor", async () => {
@@ -6461,7 +6461,7 @@ describe("AssociationProxyTest", () => {
     const proxy = association(post, "apComments");
     const filtered = await proxy.where({ body: "match" });
     expect(filtered.length).toBe(1);
-    expect(filtered[0].readAttribute("body")).toBe("match");
+    expect(filtered[0].body).toBe("match");
   });
 
   it("proxy object is cached", async () => {
@@ -6480,7 +6480,7 @@ describe("AssociationProxyTest", () => {
     const proxy = association(post, "apComments");
     const first = await proxy.first();
     expect(first).not.toBeNull();
-    expect(first!.readAttribute("body")).toBe("first one");
+    expect(first!.body).toBe("first one");
   });
 
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
@@ -6581,7 +6581,7 @@ describe("PreloaderTest", () => {
     const posts = await PwsPost.all().includes("scopedComments").toArray();
     const comments = (posts[0] as any)._preloadedAssociations.get("scopedComments");
     expect(comments.length).toBe(1);
-    expect(comments[0].readAttribute("body")).toBe("Thank you");
+    expect(comments[0].body).toBe("Thank you");
   });
 
   it("preload makes correct number of queries on array", async () => {
@@ -6652,7 +6652,7 @@ describe("PreloaderTest", () => {
     expect(posts).toHaveLength(1);
     const preloaded = (posts[0] as any)._preloadedAssociations.get("prAuthor");
     expect(preloaded).toBeDefined();
-    expect(preloaded.readAttribute("name")).toBe("A1");
+    expect(preloaded.name).toBe("A1");
   });
 
   it("preload does not concatenate duplicate records", async () => {
@@ -6748,7 +6748,7 @@ describe("PreloaderTest", () => {
     const posts = await HmtcPost.all().includes("hmtSpecialCategories").toArray();
     const cats = (posts[0] as any)._preloadedAssociations.get("hmtSpecialCategories");
     expect(cats.length).toBe(1);
-    expect(cats[0].readAttribute("name")).toBe("Special");
+    expect(cats[0].name).toBe("Special");
   });
   it.skip("preload groups queries with same scope", () => {
     /* needs scope tracking */
@@ -6925,7 +6925,7 @@ describe("PreloaderTest", () => {
     expect(posts).toHaveLength(1);
     const preloaded = (posts[0] as any)._preloadedAssociations.get("paAuthor");
     expect(preloaded).toBeDefined();
-    expect(preloaded.readAttribute("name")).toBe("Available");
+    expect(preloaded.name).toBe("Available");
   });
 
   it.skip("preload with available records sti", () => {
@@ -6965,9 +6965,7 @@ describe("PreloaderTest", () => {
     const posts = await PSPost.all().includes("psAuthor").toArray();
     expect(posts).toHaveLength(2);
     // Both should have preloaded authors
-    const names = posts.map((p: any) =>
-      p._preloadedAssociations.get("psAuthor")?.readAttribute("name"),
-    );
+    const names = posts.map((p: any) => p._preloadedAssociations.get("psAuthor")?.name);
     expect(names).toContain("A1");
     expect(names).toContain("A2");
   });
@@ -7006,8 +7004,8 @@ describe("PreloaderTest", () => {
     // Both should point to the same author
     const author1 = (posts[0] as any)._preloadedAssociations.get("plAuthor");
     const author2 = (posts[1] as any)._preloadedAssociations.get("plAuthor");
-    expect(author1.readAttribute("name")).toBe("Loaded");
-    expect(author2.readAttribute("name")).toBe("Loaded");
+    expect(author1.name).toBe("Loaded");
+    expect(author2.name).toBe("Loaded");
   });
 
   it.skip("preload with available records with through association", () => {
@@ -7062,9 +7060,7 @@ describe("PreloaderTest", () => {
     // Preload both belongsTo and hasMany
     const posts = await PMPost.all().includes("pmAuthor").toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.get("pmAuthor").readAttribute("name")).toBe(
-      "Auth",
-    );
+    expect((posts[0] as any)._preloadedAssociations.get("pmAuthor").name).toBe("Auth");
   });
 
   it.skip("preload with available records queries when scoped", () => {
@@ -7145,8 +7141,8 @@ describe("PreloaderTest", () => {
     const posts = await PWPost.all().includes("pwAuthor").toArray();
     expect(posts).toHaveLength(1);
     const preloaded = (posts[0] as any)._preloadedAssociations.get("pwAuthor");
-    expect(preloaded.readAttribute("name")).toBe("Right");
-    expect(preloaded.readAttribute("name")).not.toBe("Wrong");
+    expect(preloaded.name).toBe("Right");
+    expect(preloaded.name).not.toBe("Wrong");
   });
 
   it.skip("preload has many association with composite foreign key", () => {
@@ -7265,7 +7261,7 @@ describe("PreloaderTest", () => {
     expect(authors).toHaveLength(1);
     const preloaded = (authors[0] as any)._preloadedAssociations.get("pkPosts");
     expect(preloaded).toHaveLength(1);
-    expect(preloaded[0].readAttribute("title")).toBe("P1");
+    expect(preloaded[0].title).toBe("P1");
   });
 
   it("preload keeps built has many records after query", async () => {
@@ -7335,7 +7331,7 @@ describe("PreloaderTest", () => {
     expect(posts).toHaveLength(1);
     const preloaded = (posts[0] as any)._preloadedAssociations.get("pkbAuthor");
     expect(preloaded).toBeDefined();
-    expect(preloaded.readAttribute("name")).toBe("Auth");
+    expect(preloaded.name).toBe("Auth");
   });
 
   it("preload keeps built belongs to records after query", async () => {
@@ -7626,7 +7622,7 @@ describe("GeneratedMethodsTest", () => {
     }
     // Model has attribute "title", no association named "title" should conflict
     const p = new Post({ title: "hello" });
-    expect(p.readAttribute("title")).toBe("hello");
+    expect(p.title).toBe("hello");
   });
 
   it("included module overwrites association methods", () => {

@@ -52,7 +52,7 @@ describe("AssociationCallbacksTest", () => {
     const log: string[] = [];
     // "macro" style: callback defined as a named function (equivalent to Ruby's method name symbol)
     function onAdd(_owner: any, record: any) {
-      log.push("macro:add:" + record.readAttribute("body"));
+      log.push("macro:add:" + record.body);
     }
     const { Post, Comment } = makePostWithCallbacks(adapter, { afterAdd: onAdd });
     const post = await Post.create({ title: "Post" });
@@ -67,10 +67,10 @@ describe("AssociationCallbacksTest", () => {
     const log: string[] = [];
     const { Post, Comment } = makePostWithCallbacks(adapter, {
       beforeAdd: (_owner: any, record: any) => {
-        log.push("before:" + record.readAttribute("body"));
+        log.push("before:" + record.body);
       },
       afterAdd: (_owner: any, record: any) => {
-        log.push("after:" + record.readAttribute("body"));
+        log.push("after:" + record.body);
       },
     });
     const post = await Post.create({ title: "Post" });
@@ -85,7 +85,7 @@ describe("AssociationCallbacksTest", () => {
     const adapter = freshAdapter();
     const log: string[] = [];
     function onRemove(_owner: any, record: any) {
-      log.push("macro:remove:" + record.readAttribute("body"));
+      log.push("macro:remove:" + record.body);
     }
     const { Post, Comment } = makePostWithCallbacks(adapter, { afterRemove: onRemove });
     const post = await Post.create({ title: "Post" });
@@ -100,10 +100,10 @@ describe("AssociationCallbacksTest", () => {
     const log: string[] = [];
     const { Post, Comment } = makePostWithCallbacks(adapter, {
       beforeRemove: (_owner: any, record: any) => {
-        log.push("before:remove:" + record.readAttribute("body"));
+        log.push("before:remove:" + record.body);
       },
       afterRemove: (_owner: any, record: any) => {
-        log.push("after:remove:" + record.readAttribute("body"));
+        log.push("after:remove:" + record.body);
       },
     });
     const post = await Post.create({ title: "Post" });

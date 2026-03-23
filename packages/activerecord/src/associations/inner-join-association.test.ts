@@ -257,7 +257,7 @@ describe("InnerJoinAssociationTest", () => {
     await Post.create({ title: "P1", author_id: a.id });
     const results = await Post.where({ author_id: a.id }).toArray();
     expect(results.length).toBe(1);
-    expect(results[0].readAttribute("title")).toBe("P1");
+    expect(results[0].title).toBe("P1");
   });
 
   it("find with conditions on through reflection", async () => {
@@ -322,7 +322,7 @@ describe("InnerJoinAssociationTest", () => {
 
     const results = await ThrPost.joins("thrTags").where({ id: post.id }).toArray();
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].readAttribute("title")).toBe("P1");
+    expect(results[0].title).toBe("P1");
   });
 
   it("the default scope of the target is applied when joining associations", () => {
@@ -347,7 +347,7 @@ describe("InnerJoinAssociationTest", () => {
     await Post.create({ title: "hello", author_id: a.id });
     const posts = await Post.where({ author_id: a.id }).toArray();
     expect(posts.length).toBe(1);
-    expect(posts[0].readAttribute("title")).toBe("hello");
+    expect(posts[0].title).toBe("hello");
   });
 
   it("joins a belongs_to association with a composite foreign key", () => {

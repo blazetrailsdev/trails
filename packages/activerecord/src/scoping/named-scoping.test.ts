@@ -658,7 +658,7 @@ describe("NamedScopingTest", () => {
     await Post.create({ title: "b", published: true });
     const results = await (Post as any).published().toArray();
     expect(results.length).toBe(2);
-    expect(results[0].readAttribute("title")).toBeDefined();
+    expect(results[0].title).toBeDefined();
   });
 });
 
@@ -822,7 +822,7 @@ describe("NamedScopingTest", () => {
       }
     }
     const post = Post.where({ status: "draft" }).new({ title: "new post" }) as any;
-    expect(post.readAttribute("status")).toBe("draft");
+    expect(post.status).toBe("draft");
     expect(post.isNewRecord()).toBe(true);
   });
 
@@ -836,7 +836,7 @@ describe("NamedScopingTest", () => {
       }
     }
     const post = (await Post.where({ status: "active" }).create({ title: "bang created" })) as any;
-    expect(post.readAttribute("status")).toBe("active");
+    expect(post.status).toBe("active");
     expect(post.isPersisted()).toBe(true);
   });
 
@@ -912,7 +912,7 @@ describe("NamedScopingTest", () => {
     }
     await Post.create({ title: "old" });
     await Post.create({ title: "new" });
-    expect(((await Post.order("id DESC").first()) as any).readAttribute("title")).toBe("new");
+    expect(((await Post.order("id DESC").first()) as any).title).toBe("new");
   });
 
   it("test index on scope", async () => {
@@ -974,7 +974,7 @@ describe("NamedScopingTest", () => {
     }
     class Dog extends Animal {}
     const dog = (await Dog.create({ name: "Fido" })) as any;
-    expect(dog.readAttribute("name")).toBe("Fido");
+    expect(dog.name).toBe("Fido");
     expect((await Dog.where({ name: "Fido" }).toArray()).length).toBe(1);
   });
 
@@ -1148,7 +1148,7 @@ describe("NamedScopingTest", () => {
     expect(scoped).toBeDefined();
     const result = await scoped!(Product.all()).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("A");
+    expect(result[0].name).toBe("A");
   });
 });
 
@@ -1170,7 +1170,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (User.all() as any).active().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 
   it("scope is chainable with other query methods", async () => {
@@ -1210,7 +1210,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (User as any).active().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 
   it("scopes chain together", async () => {
@@ -1233,7 +1233,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (User as any).active().admins().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Alice");
+    expect(result[0].name).toBe("Alice");
   });
 
   it("scope with arguments", async () => {
@@ -1253,7 +1253,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (User as any).olderThan(30).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("name")).toBe("Bob");
+    expect(result[0].name).toBe("Bob");
   });
 });
 
@@ -1442,7 +1442,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post as any).published().byAuthor(1).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Pub A1");
+    expect(result[0].title).toBe("Pub A1");
   });
 
   it("scope with arguments", async () => {
@@ -1451,7 +1451,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post as any).byAuthor(2).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Post 2");
+    expect(result[0].title).toBe("Post 2");
   });
 
   it("scope chained with standard relation methods", async () => {
@@ -1461,7 +1461,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post as any).published().order("title").toArray();
     expect(result).toHaveLength(2);
-    expect(result[0].readAttribute("title")).toBe("A Published");
+    expect(result[0].title).toBe("A Published");
   });
 
   it("scope with count", async () => {
@@ -1488,7 +1488,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post.where({ author_id: 1 }) as any).published().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("Pub A1");
+    expect(result[0].title).toBe("Pub A1");
   });
 });
 
@@ -1517,7 +1517,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post as any).published().where({ featured: true }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("A");
+    expect(result[0].title).toBe("A");
   });
 
   // Rails: test_scope_with_scope
@@ -1539,7 +1539,7 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post as any).published().featured().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("A");
+    expect(result[0].title).toBe("A");
   });
 
   // Rails: test_scope_on_relation
@@ -1579,6 +1579,6 @@ describe("NamedScopingTest", () => {
 
     const result = await (Post as any).published().toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].readAttribute("title")).toBe("A");
+    expect(result[0].title).toBe("A");
   });
 });

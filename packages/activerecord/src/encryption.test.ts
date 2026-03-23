@@ -26,7 +26,7 @@ describe("encrypts()", () => {
 
     const user = await User.create({ name: "Alice", ssn: "123-45-6789" });
     // Reading returns decrypted value
-    expect(user.readAttribute("ssn")).toBe("123-45-6789");
+    expect(user.ssn).toBe("123-45-6789");
 
     // The raw stored value should be encrypted (base64)
     const raw = user._attributes.get("ssn");
@@ -47,7 +47,7 @@ describe("encrypts()", () => {
 
     await User.create({ name: "Alice", secret: "my-secret-data" });
     const loaded = await User.find(1);
-    expect(loaded.readAttribute("secret")).toBe("my-secret-data");
+    expect(loaded.secret).toBe("my-secret-data");
   });
 
   it("supports custom encryptor", async () => {
@@ -66,7 +66,7 @@ describe("encrypts()", () => {
     }
 
     const user = await User.create({ token: "abc123" });
-    expect(user.readAttribute("token")).toBe("abc123");
+    expect(user.token).toBe("abc123");
     expect(user._attributes.get("token")).toBe("ENC:abc123");
   });
 });

@@ -117,11 +117,11 @@ describe("CascadedEagerLoadingTest", () => {
     const topics = await StiTopic.all().where({ type: null }).includes("replies").toArray();
     expect(topics).toHaveLength(2);
     const t1Replies = (
-      topics.find((t: any) => t.readAttribute("title") === "First") as any
+      topics.find((t: any) => t.title === "First") as any
     )._preloadedAssociations.get("replies");
     expect(t1Replies).toHaveLength(2);
     const t2Replies = (
-      topics.find((t: any) => t.readAttribute("title") === "Second") as any
+      topics.find((t: any) => t.title === "Second") as any
     )._preloadedAssociations.get("replies");
     expect(t2Replies).toHaveLength(0);
   });
@@ -205,7 +205,7 @@ describe("CascadedEagerLoadingTest", () => {
     expect(replies).toHaveLength(1);
     const parentTopic = (replies[0] as any)._preloadedAssociations.get("topic");
     expect(parentTopic).not.toBeNull();
-    expect(parentTopic.readAttribute("title")).toBe("First");
+    expect(parentTopic.title).toBe("First");
   });
   it.skip("eager association loading with multiple stis and order", () => {
     /* fixture-dependent */

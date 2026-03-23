@@ -14,7 +14,7 @@ describe("DateTest", () => {
     const date = new Date(2024, 0, 15, 10, 30, 0);
     const e = await Event.create({ start_date: date });
     const reloaded = await Event.find(e.id);
-    const val = reloaded.readAttribute("start_date");
+    const val = reloaded.start_date;
     expect(val).toBeInstanceOf(Date);
   });
 
@@ -28,7 +28,7 @@ describe("DateTest", () => {
     }
     const e = await Event.create({ start_date: "2024-01-15" });
     const reloaded = await Event.find(e.id);
-    const val = reloaded.readAttribute("start_date");
+    const val = reloaded.start_date;
     expect(val).toBeInstanceOf(Date);
     expect((val as Date).getFullYear()).toBe(2024);
   });

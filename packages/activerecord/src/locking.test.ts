@@ -49,21 +49,21 @@ describe("OptimisticLockingTest", () => {
     const p = new Person({ lock_version: null });
     // When nil is passed, default should still apply or be null
     // Rails sets it to 0 by default
-    expect(p.readAttribute("lock_version")).toBe(null);
+    expect(p.lock_version).toBe(null);
   });
 
   it("lock new when explicitly passing value", () => {
     const { Person } = makePerson();
     const p = new Person({ lock_version: 42 });
-    expect(p.readAttribute("lock_version")).toBe(42);
+    expect(p.lock_version).toBe(42);
   });
 
   it("touch existing lock", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Szymon" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
     await p.update({ name: "Szymon Updated" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
   });
 
   it("touch stale object", async () => {
@@ -99,7 +99,7 @@ describe("OptimisticLockingTest", () => {
   it("lock column is mass assignable", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Test", lock_version: 5 });
-    expect(p.readAttribute("lock_version")).toBe(5);
+    expect(p.lock_version).toBe(5);
   });
 
   it("lock without default sets version to zero", async () => {
@@ -114,7 +114,7 @@ describe("OptimisticLockingTest", () => {
     }
     const p = await PersonNoDefault.create({ name: "Test" });
     // Without a default, lock_version starts as null/undefined, but update treats it as 0
-    const ver = Number(p.readAttribute("lock_version")) || 0;
+    const ver = Number(p.lock_version) || 0;
     expect(ver).toBe(0);
   });
 
@@ -137,7 +137,7 @@ describe("OptimisticLockingTest", () => {
     }
     const p = await Person.create({ name: "Test" });
     await p.update({ name: "Updated" });
-    expect(p.readAttribute("name")).toBe("Updated");
+    expect(p.name).toBe("Updated");
   });
 
   it("update with lock version without default should work on dirty value before type cast", async () => {
@@ -152,7 +152,7 @@ describe("OptimisticLockingTest", () => {
     }
     const p = await Person.create({ name: "Test" });
     await p.update({ name: "Updated" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
   });
 
   it("destroy with lock version without default should work on dirty value before type cast", async () => {
@@ -198,11 +198,11 @@ describe("OptimisticLockingTest", () => {
       }
     }
     const t1 = new LockCustom();
-    const ver = Number(t1.readAttribute("custom_lock_version")) || 0;
+    const ver = Number(t1.custom_lock_version) || 0;
     expect(ver).toBe(0);
     await t1.save();
     const reloaded = await LockCustom.find(t1.id);
-    expect(Number(reloaded.readAttribute("custom_lock_version")) || 0).toBe(0);
+    expect(Number(reloaded.custom_lock_version) || 0).toBe(0);
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
@@ -219,7 +219,7 @@ describe("OptimisticLockingTest", () => {
     const t1 = await LockCustom.create({ title: "title1" });
     const t2 = await LockCustom.find(t1.id);
     await t1.update({ title: "new title1" });
-    expect(t1.readAttribute("custom_lock_version")).toBe(1);
+    expect(t1.custom_lock_version).toBe(1);
     await expect(t2.update({ title: "new title2" })).rejects.toThrow("StaleObjectError");
   });
 
@@ -245,24 +245,24 @@ describe("OptimisticLockingTest", () => {
       }
     }
     const ref = await Reference.create({ favorite: false });
-    ref.writeAttribute("favorite", true);
+    ref.favorite = true;
     await ref.save();
-    expect(ref.readAttribute("favorite")).toBe(true);
-    expect(ref.readAttribute("lock_version")).toBe(1);
+    expect(ref.favorite).toBe(true);
+    expect(ref.lock_version).toBe(1);
   });
 
   it("update without attributes does not only update lock version", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Test" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
     // Saving without changes should not increment lock_version
     // (In our impl it may or may not - let's test actual behavior)
-    const versionBefore = p.readAttribute("lock_version");
+    const versionBefore = p.lock_version;
     // No attribute changes, just save
     await p.save();
     // lock_version should stay the same if no real attributes changed
     // This depends on implementation - our save skips if not dirty
-    expect(p.readAttribute("lock_version")).toBe(versionBefore);
+    expect(p.lock_version).toBe(versionBefore);
   });
 
   it.skip("counter cache with touch and lock version", () => {
@@ -287,13 +287,13 @@ describe("OptimisticLockingTest", () => {
   it("lock version increments on each save", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Test" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
     await p.update({ name: "V1" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
     await p.update({ name: "V2" });
-    expect(p.readAttribute("lock_version")).toBe(2);
+    expect(p.lock_version).toBe(2);
     await p.update({ name: "V3" });
-    expect(p.readAttribute("lock_version")).toBe(3);
+    expect(p.lock_version).toBe(3);
   });
 
   it("stale object error includes record", async () => {
@@ -314,7 +314,7 @@ describe("OptimisticLockingTest", () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Test" });
     const reloaded = await Person.find(p.id);
-    expect(reloaded.readAttribute("lock_version")).toBe(0);
+    expect(reloaded.lock_version).toBe(0);
   });
 
   it("lock version is persisted after update", async () => {
@@ -322,7 +322,7 @@ describe("OptimisticLockingTest", () => {
     const p = await Person.create({ name: "Test" });
     await p.update({ name: "Updated" });
     const reloaded = await Person.find(p.id);
-    expect(reloaded.readAttribute("lock_version")).toBe(1);
+    expect(reloaded.lock_version).toBe(1);
   });
 
   it("multiple sequential updates increment correctly", async () => {
@@ -330,22 +330,22 @@ describe("OptimisticLockingTest", () => {
     const p = await Person.create({ name: "Test" });
     for (let i = 1; i <= 5; i++) {
       await p.update({ name: `Version ${i}` });
-      expect(p.readAttribute("lock_version")).toBe(i);
+      expect(p.lock_version).toBe(i);
     }
   });
 
   it("new record has default lock version", () => {
     const { Person } = makePerson();
     const p = new Person({ name: "Test" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
   });
 
   it("create with explicit lock version preserves it", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Test", lock_version: 10 });
-    expect(p.readAttribute("lock_version")).toBe(10);
+    expect(p.lock_version).toBe(10);
     await p.update({ name: "Updated" });
-    expect(p.readAttribute("lock_version")).toBe(11);
+    expect(p.lock_version).toBe(11);
   });
 
   it.skip("non integer lock existing", () => {
@@ -355,19 +355,19 @@ describe("OptimisticLockingTest", () => {
   it("lock repeating", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "Test" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
     await p.update({ name: "V1" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
     await p.update({ name: "V2" });
-    expect(p.readAttribute("lock_version")).toBe(2);
+    expect(p.lock_version).toBe(2);
     await p.update({ name: "V3" });
-    expect(p.readAttribute("lock_version")).toBe(3);
+    expect(p.lock_version).toBe(3);
   });
 
   it("lock new", async () => {
     const { Person } = makePerson();
     const p = await Person.create({ name: "New" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
   });
 });
 
@@ -453,8 +453,8 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     }
     const p = await Person.create({ name: "Test" });
     await p.update({ name: "Changed" });
-    expect(p.readAttribute("lock_version")).toBe(1);
-    expect(p.readAttribute("name")).toBe("Changed");
+    expect(p.lock_version).toBe(1);
+    expect(p.name).toBe("Changed");
   });
 
   it("stale update after schema change", async () => {
@@ -486,7 +486,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     const p = await Person.create({ name: "Test" });
     // lock_version starts as null (no default), update should still work
     await p.update({ name: "Updated" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
   });
 
   it("reloaded record has correct lock version", async () => {
@@ -502,7 +502,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     const p = await Person.create({ name: "Test" });
     await p.update({ name: "V1" });
     const reloaded = await Person.find(p.id);
-    expect(reloaded.readAttribute("lock_version")).toBe(1);
+    expect(reloaded.lock_version).toBe(1);
   });
 });
 
@@ -523,13 +523,13 @@ describe("OptimisticLockingTest", () => {
     Post.adapter = adapter;
 
     const post = await Post.create({ title: "Hello" });
-    expect(post.readAttribute("lock_version")).toBe(0);
+    expect(post.lock_version).toBe(0);
 
     await post.update({ title: "Updated" });
-    expect(post.readAttribute("lock_version")).toBe(1);
+    expect(post.lock_version).toBe(1);
 
     await post.update({ title: "Updated Again" });
-    expect(post.readAttribute("lock_version")).toBe(2);
+    expect(post.lock_version).toBe(2);
   });
 
   it("lock exception record", async () => {
@@ -572,10 +572,10 @@ describe("OptimisticLockingTest", () => {
     }
 
     const p = await Person.create({ name: "Szymon" });
-    expect(p.readAttribute("lock_version")).toBe(0);
+    expect(p.lock_version).toBe(0);
 
     await p.update({ name: "Szymon Nowak" });
-    expect(p.readAttribute("lock_version")).toBe(1);
+    expect(p.lock_version).toBe(1);
   });
 
   // Rails: test "stale object raises"
@@ -612,7 +612,7 @@ describe("PessimisticLockingTest", () => {
     const p = await Person.create({ name: "Test" });
     await transaction(Person, async () => {
       const locked = await Person.all().lock().find(p.id);
-      expect(locked.readAttribute("name")).toBe("Test");
+      expect(locked.name).toBe("Test");
     });
   });
 
@@ -646,7 +646,7 @@ describe("PessimisticLockingTest", () => {
       }
     }
     const p = await Person.create({ first_name: "Test" });
-    p.writeAttribute("first_name", "fooman");
+    p.first_name = "fooman";
     await expect(p.lockBang()).rejects.toThrow(/Changed attributes: "first_name"/);
   });
   it("locking in after save callback", async () => {
@@ -662,9 +662,9 @@ describe("PessimisticLockingTest", () => {
       }
     }
     const frog = await Frog.create({ name: "Old Frog" });
-    frog.writeAttribute("name", "New Frog");
+    frog.name = "New Frog";
     await frog.save();
-    expect(frog.readAttribute("name")).toBe("New Frog");
+    expect(frog.name).toBe("New Frog");
   });
 
   it("with lock commits transaction", async () => {
@@ -696,7 +696,7 @@ describe("PessimisticLockingTest", () => {
     const p = await Person.create({ name: "Original" });
     try {
       await p.withLock(async (record) => {
-        record.writeAttribute("name", "Changed");
+        record.name = "Changed";
         await record.save();
         throw new Error("oops");
       });
@@ -704,7 +704,7 @@ describe("PessimisticLockingTest", () => {
       // expected
     }
     const reloaded = await Person.find(p.id);
-    expect(reloaded.readAttribute("name")).toBe("Original");
+    expect(reloaded.name).toBe("Original");
   });
 
   it.skip("with lock configures transaction", () => {
@@ -758,7 +758,7 @@ describe("PessimisticLockingTest", () => {
     }
     const p = await Person.create({ name: "Test" });
     await p.withLock(async () => {
-      expect(p.readAttribute("name")).toBe("Test");
+      expect(p.name).toBe("Test");
     });
   });
 

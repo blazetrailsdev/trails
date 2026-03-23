@@ -56,19 +56,19 @@ describe("PrimaryKeysTest", () => {
   it("read attribute id", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
-    expect(t.readAttribute("id")).toBeDefined();
+    expect(t.id).toBeDefined();
   });
 
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
-    expect(t.id).toBe(t.readAttribute("id"));
+    expect(t.id).toBe(t.id);
   });
 
   it("read attribute with composite primary key", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
-    expect(t.readAttribute("id")).toBeDefined();
+    expect(t.id).toBeDefined();
   });
 
   it("id was", async () => {
@@ -114,14 +114,14 @@ describe("PrimaryKeysTest", () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
     await t.updateAttribute("title", "updated");
-    expect(t.readAttribute("title")).toBe("updated");
+    expect(t.title).toBe("updated");
   });
 
   it("update columns with non primary key id column", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
     await t.updateColumns({ title: "updated" });
-    expect(t.readAttribute("title")).toBe("updated");
+    expect(t.title).toBe("updated");
   });
 
   it("string key", async () => {
@@ -166,7 +166,7 @@ describe("PrimaryKeysTest", () => {
     }
     const c = await Counter.create({ count: 0 });
     await c.incrementBang("count");
-    expect((await Counter.find(c.id!)).readAttribute("count")).toBe(1);
+    expect((await Counter.find(c.id!)).count).toBe(1);
   });
 
   it("find with one id should quote pkey", async () => {
@@ -180,7 +180,7 @@ describe("PrimaryKeysTest", () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
     await t.updateAttribute("title", "updated");
-    expect(t.readAttribute("title")).toBe("updated");
+    expect(t.title).toBe("updated");
   });
 
   it("instance destroy should quote pkey", async () => {
@@ -223,7 +223,7 @@ describe("PrimaryKeysTest", () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "test" });
     expect(t.id).toBeDefined();
-    expect(t.readAttribute("id")).toBeDefined();
+    expect(t.id).toBeDefined();
   });
 
   it("serial with quoted sequence name", async () => {
@@ -273,7 +273,7 @@ describe("PrimaryKeysTest", () => {
     expect(t.id).toBe(42);
     await t.update({ title: "updated" });
     await t.reload();
-    expect(t.readAttribute("title")).toBe("updated");
+    expect(t.title).toBe("updated");
     expect(t.id).toBe(42);
   });
   it("reconfiguring primary key resets composite primary key", () => {
@@ -584,7 +584,7 @@ describe("CompositePrimaryKeyTest", () => {
     }
     const p = await Product.create({ product_id: 99, name: "Widget" });
     expect(p.id).toBe(99);
-    expect(p.readAttribute("name")).toBe("Widget");
+    expect(p.name).toBe("Widget");
   });
 
   it("primary key values present for a composite pk model", async () => {
@@ -660,7 +660,7 @@ describe("CompositePrimaryKeyTest", () => {
     expect(o.isPersisted()).toBe(true);
 
     const found = await Order.find([1, 42]);
-    expect(found.readAttribute("name")).toBe("Widget");
+    expect(found.name).toBe("Widget");
   });
 
   it("composite primary key update", async () => {
@@ -677,7 +677,7 @@ describe("CompositePrimaryKeyTest", () => {
     const o = await Order.create({ shop_id: 1, id: 1, status: "pending" });
     await o.update({ status: "shipped" });
     await o.reload();
-    expect(o.readAttribute("status")).toBe("shipped");
+    expect(o.status).toBe("shipped");
   });
 
   it("composite primary key destroy", async () => {
