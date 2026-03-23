@@ -1871,10 +1871,9 @@ export class CollectionProxy {
       );
     }
 
-    const pkQuoted =
-      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
-    const subquery = `"${targetPkCol}" IN (SELECT "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted})`;
-    let rel = (targetModel as any).all().where(subquery);
+    const targetTable = targetModel.tableName;
+    const subquery = `"${targetTable}"."${targetPkCol}" IN (SELECT "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" = ?)`;
+    let rel = (targetModel as any).all().where(subquery, pkValue);
     if (this._assocDef.options.scope) {
       rel = this._assocDef.options.scope(rel);
     }
@@ -1905,33 +1904,36 @@ export class CollectionProxy {
 
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+
+    if (Array.isArray(ownerPk)) {
+      throw new Error(
+        `CollectionProxy#scope does not support composite primary keys for through associations on "${this._assocName}".`,
+      );
+    }
+
     const pkValue = this._record.readAttribute(ownerPk as string);
 
     if (pkValue == null) return (targetModel as any).all().none();
 
     const throughTable = throughModel.tableName;
-    const pkQuoted =
-      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
-
+    const targetTable = targetModel.tableName;
     const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
 
     if (sourceAssocKind === "belongsTo") {
-      // Through record has FK to target (e.g., tagging.tag_id -> tags.id)
       const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
       const targetPkCol = targetModel.primaryKey as string;
-      const subquery = `"${targetPkCol}" IN (SELECT "${targetFk}" FROM "${throughTable}" WHERE "${ownerFk}" = ${pkQuoted})`;
-      let rel = (targetModel as any).all().where(subquery);
+      const subquery = `"${targetTable}"."${targetPkCol}" IN (SELECT "${targetFk}" FROM "${throughTable}" WHERE "${ownerFk}" = ?)`;
+      let rel = (targetModel as any).all().where(subquery, pkValue);
       if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
       return rel;
     } else {
-      // Source is has_many/has_one: target has FK pointing to through record
       const sourceAsName = sourceAssoc?.options?.as;
       const sourceFk = sourceAsName
         ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
         : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
       const throughPkCol = throughModel.primaryKey as string;
-      const subquery = `"${sourceFk}" IN (SELECT "${throughPkCol}" FROM "${throughTable}" WHERE "${ownerFk}" = ${pkQuoted})`;
-      let rel = (targetModel as any).all().where(subquery);
+      const subquery = `"${targetTable}"."${sourceFk}" IN (SELECT "${throughPkCol}" FROM "${throughTable}" WHERE "${ownerFk}" = ?)`;
+      let rel = (targetModel as any).all().where(subquery, pkValue);
       if (sourceAsName) {
         rel = rel.where({ [`${underscore(sourceAsName)}_type`]: throughClassName });
       }
