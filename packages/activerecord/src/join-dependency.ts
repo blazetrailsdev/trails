@@ -378,7 +378,12 @@ export class JoinDependency {
       // We already consumed a table index for the target, give it back
       this._nextTableIndex--;
 
-      // Add the through table JOIN as a standalone node (no columns — it's intermediate)
+      // Snapshot state for rollback if recursive call fails
+      const snapshotNodes = this._nodes.length;
+      const snapshotAliases = this._aliases.length;
+      const snapshotNextIndex = this._nextTableIndex;
+
+      // Add the through table JOIN as a standalone node (intermediate)
       const throughColumns = getModelColumns(throughModel);
       for (let i = 0; i < throughColumns.length; i++) {
         this._aliases.push({
@@ -389,7 +394,6 @@ export class JoinDependency {
         });
       }
 
-      // Push through node (intermediate, won't be used for association attachment)
       const throughNodeName = parentAssocName
         ? `${parentAssocName}._through_${assocDef.options.through}`
         : `_through_${assocDef.options.through}`;
@@ -400,7 +404,7 @@ export class JoinDependency {
         modelClass: throughModel as typeof Base,
         columns: throughColumns,
         assocName: throughNodeName,
-        immediateAssocName: assocDef.options.through,
+        immediateAssocName: `_through_${assocDef.options.through}`,
         parentPath: parentAssocName ?? null,
         assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
         joinSql: throughJoinSql,
@@ -413,7 +417,13 @@ export class JoinDependency {
         parentAssocName: parentAssocName,
       });
 
-      if (!recursiveNode) return null;
+      if (!recursiveNode) {
+        // Roll back intermediate state
+        this._nodes.length = snapshotNodes;
+        this._aliases.length = snapshotAliases;
+        this._nextTableIndex = snapshotNextIndex;
+        return null;
+      }
 
       // Patch the recursive node to reflect the outer association
       recursiveNode.assocName = parentAssocName
