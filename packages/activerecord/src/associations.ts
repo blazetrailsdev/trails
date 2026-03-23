@@ -1118,10 +1118,11 @@ export class CollectionProxy {
     }
 
     const record = this._buildRaw(attrs);
-    if (fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+    const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+    if (allowed) {
+      this._target.push(record);
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     }
-    this._target.push(record);
     return record;
   }
 
@@ -1381,13 +1382,11 @@ export class CollectionProxy {
     // HABTM: remove join table records
     if (this._isHabtm) {
       await this._deleteHabtm(records);
-      this._removeFromTarget(records);
       return;
     }
     // Through association: delete the join records
     if (this._assocDef.options.through) {
       await this._deleteThrough(records);
-      this._removeFromTarget(records);
       return;
     }
 
@@ -1402,6 +1401,7 @@ export class CollectionProxy {
           ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
     const typeCol = asName ? `${underscore(asName)}_type` : null;
+    const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       if (Array.isArray(foreignKey)) {
@@ -1413,9 +1413,10 @@ export class CollectionProxy {
       }
       if (typeCol) record.writeAttribute(typeCol, null);
       await record.save();
+      removed.push(record);
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
-    this._removeFromTarget(records);
+    this._removeFromTarget(removed);
   }
 
   private _removeFromTarget(records: Base[]): void {
@@ -1460,6 +1461,7 @@ export class CollectionProxy {
     const pkQuoted =
       typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
 
+    const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       const targetPkCol = (record.constructor as typeof Base).primaryKey;
@@ -1477,8 +1479,10 @@ export class CollectionProxy {
       await ctor.adapter.executeMutation(
         `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted} AND "${targetFk}" = ${targetQuoted}`,
       );
+      removed.push(record);
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
+    this._removeFromTarget(removed);
   }
 
   private async _deleteThrough(records: Base[]): Promise<void> {
@@ -1496,19 +1500,21 @@ export class CollectionProxy {
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
+    const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       const targetPk = record.readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
-      // Find and destroy the join record
       const joinRecord = await throughModel.findBy({
         [ownerFk as string]: pkValue,
         [sourceFk]: targetPk,
       });
       if (joinRecord) await joinRecord.destroy();
+      removed.push(record);
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
+    this._removeFromTarget(removed);
   }
 
   /**
@@ -1748,10 +1754,11 @@ export class CollectionProxy {
     return columns.map((c) => records[0].readAttribute(c));
   }
 
-  async reload(): Promise<Base[]> {
+  async reload(): Promise<this> {
     this._loaded = false;
     this._target = [];
-    return this.load();
+    await this.load();
+    return this;
   }
 
   reset(): void {
@@ -1782,11 +1789,20 @@ export class CollectionProxy {
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
       : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
     const pkValue = this._record.readAttribute(primaryKey as string);
+    let rel = (targetModel as any).all();
+
+    if (pkValue === null || pkValue === undefined) {
+      if (this._assocDef.options.scope) {
+        rel = this._assocDef.options.scope(rel);
+      }
+      return rel.none();
+    }
+
     const conditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
     if (asName) {
       conditions[`${underscore(asName)}_type`] = ctor.name;
     }
-    let rel = (targetModel as any).all().where(conditions);
+    rel = rel.where(conditions);
     if (this._assocDef.options.scope) {
       rel = this._assocDef.options.scope(rel);
     }

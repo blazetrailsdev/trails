@@ -2527,6 +2527,7 @@ export class Base extends Model {
 
       this._destroyed = true;
       this._frozen = true;
+      this._collectionProxies.clear();
     }));
 
     if (halted) return false;
@@ -2627,6 +2628,8 @@ export class Base extends Model {
     }
 
     (this as any)._dirty.snapshot(this._attributes);
+    this._collectionProxies.clear();
+    this._preloadedAssociations.clear();
     return this;
   }
 

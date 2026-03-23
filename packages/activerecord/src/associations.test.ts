@@ -6511,6 +6511,7 @@ describe("AssociationProxyTest", () => {
     const proxy = association(post, "apComments");
     const comment = new APComment({ body: "pushed" });
     await proxy.push(comment);
+    await post.save();
     expect(proxy.loaded).toBe(false);
   });
   it.skip("save on parent does not load target", () => {
@@ -6530,10 +6531,12 @@ describe("AssociationProxyTest", () => {
     const post = await APPost.create({ title: "reload test" });
     await APComment.create({ body: "original", ap_post_id: post.id });
     const proxy = association(post, "apComments");
-    const results = await proxy.reload();
-    expect(results.length).toBe(1);
-    expect(results[0].body).toBe("original");
+    const reloaded = await proxy.reload();
+    expect(reloaded).toBe(proxy);
     expect(proxy.loaded).toBe(true);
+    const records = await proxy.toArray();
+    expect(records.length).toBe(1);
+    expect(records[0].body).toBe("original");
   });
   it("getting a scope from an association", async () => {
     const { APPost, APComment } = setupProxyModels();
