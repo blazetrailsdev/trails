@@ -131,7 +131,8 @@ describeIfPg("PostgresAdapter", () => {
     it("enum schema dump", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain("postgresql_enums");
-      expect(output).toContain("current_mood");
+      expect(output).toContain('t.enum("current_mood"');
+      expect(output).toContain('enum_type: "mood"');
     });
 
     it("enum where", async () => {

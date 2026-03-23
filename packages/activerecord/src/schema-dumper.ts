@@ -32,6 +32,162 @@ export interface SchemaSource {
   indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
 }
 
+interface DslMapping {
+  dslType: string;
+  extraOpts?: Record<string, unknown>;
+}
+
+/** Map SQL type strings (as returned by pg_catalog.format_type) to DSL method names. */
+const SQL_TYPE_MAP: Record<string, DslMapping> = {
+  "character varying": { dslType: "string" },
+  varchar: { dslType: "string" },
+  text: { dslType: "text" },
+  integer: { dslType: "integer" },
+  int: { dslType: "integer" },
+  int4: { dslType: "integer" },
+  bigint: { dslType: "bigint" },
+  int8: { dslType: "bigint" },
+  smallint: { dslType: "integer", extraOpts: { limit: 2 } },
+  int2: { dslType: "integer", extraOpts: { limit: 2 } },
+  "double precision": { dslType: "float" },
+  float8: { dslType: "float" },
+  real: { dslType: "float" },
+  float4: { dslType: "float" },
+  numeric: { dslType: "decimal" },
+  decimal: { dslType: "decimal" },
+  boolean: { dslType: "boolean" },
+  bool: { dslType: "boolean" },
+  date: { dslType: "date" },
+  "timestamp without time zone": { dslType: "datetime" },
+  timestamp: { dslType: "datetime" },
+  "timestamp with time zone": { dslType: "timestamptz" },
+  timestamptz: { dslType: "timestamptz" },
+  "time without time zone": { dslType: "time" },
+  time: { dslType: "time" },
+  "time with time zone": { dslType: "time" },
+  timetz: { dslType: "time" },
+  bytea: { dslType: "binary" },
+  json: { dslType: "json" },
+  jsonb: { dslType: "jsonb" },
+  uuid: { dslType: "uuid" },
+  money: { dslType: "money", extraOpts: { scale: 2 } },
+  inet: { dslType: "inet" },
+  cidr: { dslType: "cidr" },
+  macaddr: { dslType: "macaddr" },
+  hstore: { dslType: "hstore" },
+  xml: { dslType: "xml" },
+  point: { dslType: "point" },
+  line: { dslType: "line" },
+  lseg: { dslType: "lseg" },
+  box: { dslType: "box" },
+  path: { dslType: "path" },
+  polygon: { dslType: "polygon" },
+  circle: { dslType: "circle" },
+  interval: { dslType: "interval" },
+  bit: { dslType: "bit" },
+  "bit varying": { dslType: "bit" },
+  citext: { dslType: "citext" },
+  ltree: { dslType: "ltree" },
+  oid: { dslType: "oid" },
+  serial: { dslType: "serial" },
+  bigserial: { dslType: "bigserial" },
+};
+
+const KNOWN_DSL_TYPES = new Set([
+  "string",
+  "text",
+  "integer",
+  "bigint",
+  "float",
+  "decimal",
+  "boolean",
+  "date",
+  "datetime",
+  "timestamp",
+  "binary",
+]);
+
+function sqlTypeToDsl(sqlType: string): DslMapping {
+  const normalized = sqlType.toLowerCase().trim();
+  const isArray = normalized.endsWith("[]");
+  const baseType = isArray ? normalized.slice(0, -2) : normalized;
+
+  let result = SQL_TYPE_MAP[baseType];
+
+  if (!result) {
+    // Handle parameterized types
+    const varcharMatch = baseType.match(/^character varying\((\d+)\)$/);
+    if (varcharMatch) {
+      result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
+    } else {
+      const numericMatch = baseType.match(/^numeric\((\d+),(\d+)\)$/);
+      if (numericMatch) {
+        result = {
+          dslType: "decimal",
+          extraOpts: { precision: Number(numericMatch[1]), scale: Number(numericMatch[2]) },
+        };
+      } else {
+        // Handle precision-bearing timestamp/time types: timestamp(3) without time zone
+        const tsMatch = baseType.match(/^timestamp(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/);
+        if (tsMatch) {
+          result =
+            tsMatch[2].startsWith("with ") || tsMatch[2] === "with time zone"
+              ? { dslType: "timestamptz" }
+              : { dslType: "datetime" };
+        } else if (baseType.match(/^time(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)) {
+          result = { dslType: "time" };
+        } else {
+          // If it's already a known DSL type name, pass it through
+          if (KNOWN_DSL_TYPES.has(baseType)) {
+            result = { dslType: baseType };
+          } else {
+            // Unknown types (enums, domains, etc.)
+            result = { dslType: "enum", extraOpts: { enum_type: baseType } };
+          }
+        }
+      }
+    }
+  }
+
+  if (isArray) {
+    return { ...result, extraOpts: { ...result.extraOpts, array: true } };
+  }
+
+  return result;
+}
+
+/**
+ * Clean up a PG default expression to a human-readable literal value.
+ * E.g. "'happy'::mood" -> "happy", "'192.168.1.1'::inet" -> "192.168.1.1"
+ */
+function cleanDefault(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return raw;
+  const str = String(raw);
+
+  // Strip type casts (supports chained casts like 'value'::type::type2)
+  const castMatch = str.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
+  if (castMatch) {
+    return castMatch[1].replace(/''/g, "'");
+  }
+
+  // Numeric defaults: 150.55::type, (150.55)::type, with chained casts
+  const numericCastMatch = str.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
+  if (numericCastMatch) {
+    return Number(numericCastMatch[1]);
+  }
+
+  // Expression defaults like nextval(...) — keep as-is
+  if (str.includes("(") && !str.startsWith("'")) {
+    return str;
+  }
+
+  if (str === "true") return true;
+  if (str === "false") return false;
+  if (/^-?\d+(\.\d+)?$/.test(str)) return Number(str);
+
+  return raw;
+}
+
 export class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
 
@@ -90,7 +246,6 @@ export class SchemaDumper {
     }
     for (const tableName of tableNames) {
       if (this.shouldIgnore(tableName)) continue;
-      // Sync path — columns/indexes must also be sync
       const columns = this._source.columns(tableName);
       const indexes = this._source.indexes(tableName);
       if (columns instanceof Promise || indexes instanceof Promise) {
@@ -143,17 +298,41 @@ export class SchemaDumper {
 
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
+
+      const { dslType, extraOpts } = sqlTypeToDsl(col.type);
       const opts: string[] = [];
+
       if (col.null === false) opts.push("null: false");
-      if (col.default !== undefined && col.default !== null) {
-        opts.push(`default: ${JSON.stringify(col.default)}`);
+
+      const cleanedDefault = cleanDefault(col.default);
+      if (cleanedDefault !== undefined && cleanedDefault !== null) {
+        opts.push(`default: ${JSON.stringify(cleanedDefault)}`);
       }
-      if (col.limit !== undefined && col.limit !== null) opts.push(`limit: ${col.limit}`);
-      if (col.precision !== undefined && col.precision !== null)
+
+      if (extraOpts) {
+        for (const [key, value] of Object.entries(extraOpts)) {
+          opts.push(`${key}: ${JSON.stringify(value)}`);
+        }
+      }
+
+      if (col.limit !== undefined && col.limit !== null && extraOpts?.limit === undefined)
+        opts.push(`limit: ${col.limit}`);
+      if (
+        col.precision !== undefined &&
+        col.precision !== null &&
+        extraOpts?.precision === undefined
+      )
         opts.push(`precision: ${col.precision}`);
-      if (col.scale !== undefined) opts.push(`scale: ${col.scale}`);
+      if (col.scale !== undefined && extraOpts?.scale === undefined)
+        opts.push(`scale: ${col.scale}`);
+
       const optionsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      lines.push(`    t.${col.type}(${JSON.stringify(col.name)}${optionsStr});`);
+
+      if (dslType === "enum" && extraOpts?.enum_type) {
+        lines.push(`    t.enum(${JSON.stringify(col.name)}${optionsStr});`);
+      } else {
+        lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
+      }
     }
 
     lines.push("  });");
