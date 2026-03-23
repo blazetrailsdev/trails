@@ -93,11 +93,15 @@ export class Relation<T extends Base> {
     if (conditionsOrSql === undefined) return this._clone();
     if (
       typeof conditionsOrSql !== "string" &&
-      (typeof conditionsOrSql !== "object" || conditionsOrSql === null)
+      (typeof conditionsOrSql !== "object" ||
+        conditionsOrSql === null ||
+        Array.isArray(conditionsOrSql))
     ) {
-      throw new Error(
+      const err = new Error(
         `Unsupported argument type: ${typeof conditionsOrSql} (${String(conditionsOrSql)})`,
       );
+      err.name = "ArgumentError";
+      throw err;
     }
     const rel = this._clone();
     if (typeof conditionsOrSql === "string") {

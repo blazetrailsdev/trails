@@ -548,9 +548,9 @@ describe("NestedRelationScopingTest", () => {
 
   it("merge inner scope has priority", async () => {
     const { Post } = makeModel();
-    for (let i = 0; i < 15; i++) {
-      await Post.create({ title: `Post ${i}`, author: "Someone" });
-    }
+    await Promise.all(
+      Array.from({ length: 11 }, (_v, i) => Post.create({ title: `Post ${i}`, author: "Someone" })),
+    );
     const outer = Post.limit(5);
     await Post.scoping(outer, async () => {
       const inner = Post.limit(10);
