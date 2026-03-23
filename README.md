@@ -10,7 +10,7 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 
 | Package                   | Rails Equivalent                                                        | Convention Compare | Description                                                |
 | ------------------------- | ----------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------- |
-| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **59.7%**          | ORM — persistence, querying, associations, migrations      |
+| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **60.8%**          | ORM — persistence, querying, associations, migrations      |
 | `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**            | Core utilities, inflection, caching, notifications         |
 | `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%**          | SQL AST builder and query generation                       |
 | `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%**          | Attributes, validations, callbacks, dirty tracking, i18n   |
@@ -23,7 +23,7 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 | `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **28.4%**          | Routing, middleware stack, cookies, sessions, security |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**           | Controller layer, rendering, filters, parameters       |
 
-**70%** of the active focus packages — 9,576 of 13,690 tests matched. (58.8% including actionpack.)
+**70.6%** of the active focus packages — 9,672 of 13,690 tests matched. (58.7% including actionpack.)
 
 Progress is measured by `npm run convention:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.
 
