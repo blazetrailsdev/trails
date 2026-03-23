@@ -101,7 +101,7 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
   let result = SQL_TYPE_MAP[baseType];
 
   if (!result) {
-    // Handle parameterized types: character varying(N), numeric(P,S)
+    // Handle parameterized types
     const varcharMatch = baseType.match(/^character varying\((\d+)\)$/);
     if (varcharMatch) {
       result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
@@ -113,8 +113,37 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
           extraOpts: { precision: Number(numericMatch[1]), scale: Number(numericMatch[2]) },
         };
       } else {
-        // Unknown types (enums, domains, etc.)
-        result = { dslType: "enum", extraOpts: { enum_type: baseType } };
+        // Handle precision-bearing timestamp/time types: timestamp(3) without time zone
+        const tsMatch = baseType.match(/^timestamp(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/);
+        if (tsMatch) {
+          result =
+            tsMatch[2].startsWith("with ") || tsMatch[2] === "with time zone"
+              ? { dslType: "timestamptz" }
+              : { dslType: "datetime" };
+        } else if (baseType.match(/^time(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)) {
+          result = { dslType: "time" };
+        } else {
+          // If it's already a known DSL type name, pass it through
+          const knownDslTypes = new Set([
+            "string",
+            "text",
+            "integer",
+            "bigint",
+            "float",
+            "decimal",
+            "boolean",
+            "date",
+            "datetime",
+            "timestamp",
+            "binary",
+          ]);
+          if (knownDslTypes.has(baseType)) {
+            result = { dslType: baseType };
+          } else {
+            // Unknown types (enums, domains, etc.)
+            result = { dslType: "enum", extraOpts: { enum_type: baseType } };
+          }
+        }
       }
     }
   }
@@ -134,14 +163,14 @@ function cleanDefault(raw: unknown): unknown {
   if (raw === null || raw === undefined) return raw;
   const str = String(raw);
 
-  // Strip type casts: 'value'::type -> value
-  const castMatch = str.match(/^'((?:[^']|'')*)'::[\w\s."[\]]+$/);
+  // Strip type casts (supports chained casts like 'value'::type::type2)
+  const castMatch = str.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
   if (castMatch) {
     return castMatch[1].replace(/''/g, "'");
   }
 
-  // Numeric defaults: 150.55::type or (150.55)::type
-  const numericCastMatch = str.match(/^\(?([\d.]+)\)?::[\w\s]+$/);
+  // Numeric defaults: 150.55::type, (150.55)::type, with chained casts
+  const numericCastMatch = str.match(/^\(?([\d.]+)\)?(::[\w\s."[\](),]+)+$/);
   if (numericCastMatch) {
     return Number(numericCastMatch[1]);
   }
