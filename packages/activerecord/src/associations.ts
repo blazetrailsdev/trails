@@ -997,6 +997,24 @@ export class CollectionProxy {
   private _record: Base;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
+  private _target: Base[] = [];
+  private _loaded = false;
+
+  get loaded(): boolean {
+    return this._loaded;
+  }
+
+  get target(): Base[] {
+    return this._target;
+  }
+
+  /** @internal Initialize from preloaded association data. */
+  _hydrateFromPreload(records: Base[]): void {
+    // Preserve any unsaved in-memory records (from build/push before preload ran)
+    const unsaved = this._target.filter((r) => r.isNewRecord());
+    this._target = unsaved.length > 0 ? [...records, ...unsaved] : records;
+    this._loaded = true;
+  }
 
   constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
     this._record = record;
@@ -1025,10 +1043,31 @@ export class CollectionProxy {
    * Load and return all associated records.
    */
   async toArray(): Promise<Base[]> {
+    let results: Base[];
     if (this._isHabtm) {
-      return loadHabtm(this._record, this._assocName, this._assocDef.options);
+      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
+    } else {
+      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
     }
-    return loadHasMany(this._record, this._assocName, this._assocDef.options);
+    const unsaved = this._target.filter((r) => r.isNewRecord());
+    if (unsaved.length > 0) {
+      return [...results, ...unsaved];
+    }
+    return results;
+  }
+
+  async load(): Promise<Base[]> {
+    if (this._loaded) return this._target;
+    let results: Base[];
+    if (this._isHabtm) {
+      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
+    } else {
+      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
+    }
+    const unsaved = this._target.filter((r) => r.isNewRecord());
+    this._target = [...results, ...unsaved];
+    this._loaded = true;
+    return this._target;
   }
 
   private get _isThrough(): boolean {
@@ -1086,11 +1125,19 @@ export class CollectionProxy {
   build(attrs: Record<string, unknown> = {}): Base {
     // Through association: build the target record (no FK on target)
     if (this._isThrough) {
-      return this._buildThrough(attrs);
+      const record = this._buildThrough(attrs);
+      const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      if (allowed) {
+        this._target.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      }
+      return record;
     }
 
     const record = this._buildRaw(attrs);
-    if (fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+    const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+    if (allowed) {
+      this._target.push(record);
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     }
     return record;
@@ -1152,8 +1199,11 @@ export class CollectionProxy {
     if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
       return record;
     }
-    await record.save();
-    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    const saved = await record.save();
+    if (saved) {
+      this._target.push(record);
+      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    }
     return record;
   }
 
@@ -1176,8 +1226,13 @@ export class CollectionProxy {
    * Count associated records.
    */
   async count(): Promise<number> {
-    const records = await this.toArray();
-    return records.length;
+    let results: Base[];
+    if (this._isHabtm) {
+      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
+    } else {
+      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
+    }
+    return results.length;
   }
 
   /**
@@ -1186,6 +1241,7 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#size
    */
   async size(): Promise<number> {
+    if (this._loaded) return this._target.length;
     return this.count();
   }
 
@@ -1248,8 +1304,11 @@ export class CollectionProxy {
         record.writeAttribute(foreignKey as string, pkValue);
       }
       if (typeCol) record.writeAttribute(typeCol, ctor.name);
-      await record.save();
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      const saved = await record.save();
+      if (saved) {
+        this._target.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      }
     }
   }
 
@@ -1275,7 +1334,10 @@ export class CollectionProxy {
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
       // Save the target record if it's new
-      if (record.isNewRecord()) await record.save();
+      if (record.isNewRecord()) {
+        const saved = await record.save();
+        if (!saved) continue;
+      }
       // Create the join record
       const joinAttrs: Record<string, unknown> = {
         [ownerFk as string]: pkValue,
@@ -1288,8 +1350,11 @@ export class CollectionProxy {
         joinAttrs[typeCol] = ctor.name;
         delete joinAttrs[ownerFk as string];
       }
-      await throughModel.create(joinAttrs);
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      const joinRecord = await throughModel.create(joinAttrs);
+      if (joinRecord.isPersisted()) {
+        this._target.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      }
     }
   }
 
@@ -1326,6 +1391,7 @@ export class CollectionProxy {
       await ctor.adapter.executeMutation(
         `INSERT INTO "${joinTable}" ("${ownerFk}", "${targetFk}") VALUES (${pkQuoted}, ${targetQuoted})`,
       );
+      this._target.push(record);
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     }
   }
@@ -1366,6 +1432,7 @@ export class CollectionProxy {
           ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
     const typeCol = asName ? `${underscore(asName)}_type` : null;
+    const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       if (Array.isArray(foreignKey)) {
@@ -1376,9 +1443,43 @@ export class CollectionProxy {
         record.writeAttribute(foreignKey as string, null);
       }
       if (typeCol) record.writeAttribute(typeCol, null);
-      await record.save();
-      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      const saved = await record.save();
+      if (saved) {
+        removed.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      }
     }
+    this._removeFromTarget(removed);
+  }
+
+  private _removeFromTarget(records: Base[]): void {
+    const identityFor = (r: Base): string | null => {
+      const pk = (r.constructor as typeof Base).primaryKey;
+      if (Array.isArray(pk)) {
+        const vals = pk.map((col) => r.readAttribute(col));
+        if (vals.some((v) => v == null)) return null;
+        return JSON.stringify(vals);
+      }
+      const val = r.readAttribute(pk as string);
+      return val == null ? null : String(val);
+    };
+
+    const pkIdentities = new Set<string>();
+    const nullPkRecords = new Set<Base>();
+    for (const r of records) {
+      const id = identityFor(r);
+      if (id == null) {
+        nullPkRecords.add(r);
+      } else {
+        pkIdentities.add(id);
+      }
+    }
+
+    this._target = this._target.filter((r) => {
+      const id = identityFor(r);
+      if (id != null) return !pkIdentities.has(id);
+      return !nullPkRecords.has(r);
+    });
   }
 
   private async _deleteHabtm(records: Base[]): Promise<void> {
@@ -1393,6 +1494,7 @@ export class CollectionProxy {
     const pkQuoted =
       typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
 
+    const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       const targetPkCol = (record.constructor as typeof Base).primaryKey;
@@ -1410,8 +1512,10 @@ export class CollectionProxy {
       await ctor.adapter.executeMutation(
         `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted} AND "${targetFk}" = ${targetQuoted}`,
       );
+      removed.push(record);
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
+    this._removeFromTarget(removed);
   }
 
   private async _deleteThrough(records: Base[]): Promise<void> {
@@ -1429,19 +1533,25 @@ export class CollectionProxy {
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
+    const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       const targetPk = record.readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
-      // Find and destroy the join record
       const joinRecord = await throughModel.findBy({
         [ownerFk as string]: pkValue,
         [sourceFk]: targetPk,
       });
-      if (joinRecord) await joinRecord.destroy();
-      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      if (joinRecord) {
+        await joinRecord.destroy();
+        if (joinRecord.isDestroyed()) {
+          removed.push(record);
+          fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+        }
+      }
     }
+    this._removeFromTarget(removed);
   }
 
   /**
@@ -1461,6 +1571,8 @@ export class CollectionProxy {
         await this._deleteHabtm(destroyed);
       } else if (this._isThrough) {
         await this._deleteThrough(destroyed);
+      } else {
+        this._removeFromTarget(destroyed);
       }
     }
   }
@@ -1473,7 +1585,14 @@ export class CollectionProxy {
   async clear(): Promise<void> {
     return this._withoutStrictLoading(async () => {
       const records = await this.toArray();
-      await this.delete(...records);
+      const persisted = records.filter((r) => !r.isNewRecord());
+      if (persisted.length > 0) {
+        await this.delete(...persisted);
+      }
+      const unsaved = this._target.filter((r) => r.isNewRecord());
+      if (unsaved.length > 0) {
+        this._removeFromTarget(unsaved);
+      }
     });
   }
 
@@ -1660,19 +1779,115 @@ export class CollectionProxy {
     const records = await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))));
     await this.replace(records);
   }
+
+  async pluck(...columns: string[]): Promise<unknown[]> {
+    const records = this._loaded ? this._target : await this.toArray();
+    if (columns.length === 1) {
+      return records.map((r) => r.readAttribute(columns[0]));
+    }
+    return records.map((r) => columns.map((c) => r.readAttribute(c)));
+  }
+
+  async pick(...columns: string[]): Promise<unknown> {
+    const records = this._loaded ? this._target : await this.toArray();
+    if (records.length === 0) return null;
+    if (columns.length === 1) {
+      return records[0].readAttribute(columns[0]);
+    }
+    return columns.map((c) => records[0].readAttribute(c));
+  }
+
+  async reload(): Promise<this> {
+    this._loaded = false;
+    this._target = [];
+    await this.load();
+    return this;
+  }
+
+  reset(): void {
+    this._loaded = false;
+    this._target = [];
+  }
+
+  scope(): any {
+    if (this._isThrough || this._isHabtm) {
+      throw new Error(
+        `CollectionProxy#scope is not yet implemented for through/HABTM associations on "${this._assocName}".`,
+      );
+    }
+
+    const ctor = this._record.constructor as typeof Base;
+    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
+
+    if (Array.isArray(primaryKey) || Array.isArray(this._assocDef.options.foreignKey)) {
+      throw new Error(
+        `CollectionProxy#scope is not yet implemented for composite primary/foreign keys on "${this._assocName}".`,
+      );
+    }
+
+    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+    const targetModel = resolveModel(className);
+    const asName = this._assocDef.options.as;
+    const foreignKey = asName
+      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+    const pkValue = this._record.readAttribute(primaryKey as string);
+    let rel = (targetModel as any).all();
+
+    if (pkValue === null || pkValue === undefined) {
+      if (this._assocDef.options.scope) {
+        rel = this._assocDef.options.scope(rel);
+      }
+      return rel.none();
+    }
+
+    const conditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
+    if (asName) {
+      conditions[`${underscore(asName)}_type`] = ctor.name;
+    }
+    rel = rel.where(conditions);
+    if (this._assocDef.options.scope) {
+      rel = this._assocDef.options.scope(rel);
+    }
+    return rel;
+  }
 }
 
 /**
  * Factory to get a CollectionProxy for a has_many association.
+ * Returns a cached proxy if one exists on the record.
  */
 export function association(record: Base, assocName: string): CollectionProxy {
+  const existing = record._collectionProxies.get(assocName) as CollectionProxy | undefined;
+  if (existing) {
+    // Hydrate from preloaded data if proxy was cached before preloading ran
+    if (!existing.loaded) {
+      const preloaded = record._preloadedAssociations?.get(assocName);
+      if (preloaded != null) {
+        const records = Array.isArray(preloaded) ? preloaded : [preloaded];
+        existing._hydrateFromPreload(records as Base[]);
+      }
+    }
+    return existing;
+  }
+
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName);
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
-  return new CollectionProxy(record, assocName, assocDef);
+  const proxy = new CollectionProxy(record, assocName, assocDef);
+
+  // Hydrate from preloaded data if available
+  const preloaded = record._preloadedAssociations?.get(assocName);
+  if (preloaded != null) {
+    const records = Array.isArray(preloaded) ? preloaded : [preloaded];
+    proxy._hydrateFromPreload(records as Base[]);
+  }
+
+  record._collectionProxies.set(assocName, proxy);
+  return proxy;
 }
 
 /**

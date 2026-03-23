@@ -1823,6 +1823,7 @@ export class Base extends Model {
   _strictLoading = false;
   _strictLoadingBypassCount = 0;
   _preloadedAssociations: Map<string, unknown> = new Map();
+  _collectionProxies: Map<string, unknown> = new Map();
 
   /**
    * Track whether we're inside _instantiate (loading from DB).
@@ -2526,6 +2527,8 @@ export class Base extends Model {
 
       this._destroyed = true;
       this._frozen = true;
+      this._collectionProxies.clear();
+      this._preloadedAssociations.clear();
     }));
 
     if (halted) return false;
@@ -2626,6 +2629,8 @@ export class Base extends Model {
     }
 
     (this as any)._dirty.snapshot(this._attributes);
+    this._collectionProxies.clear();
+    this._preloadedAssociations.clear();
     return this;
   }
 
@@ -3276,6 +3281,14 @@ export class Base extends Model {
     const assocDef = associations.find((a: any) => a.name === name);
     if (!assocDef) {
       throw new Error(`Association '${name}' not found on ${ctor.name}`);
+    }
+    const proxy = this._collectionProxies.get(name) as any;
+    if (proxy) {
+      return {
+        name,
+        loaded: proxy.loaded,
+        target: proxy.loaded ? proxy.target : null,
+      };
     }
     const cached = this._preloadedAssociations?.get(name) ?? null;
     return {
