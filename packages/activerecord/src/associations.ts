@@ -1534,9 +1534,13 @@ export class CollectionProxy {
         [ownerFk as string]: pkValue,
         [sourceFk]: targetPk,
       });
-      if (joinRecord) await joinRecord.destroy();
-      removed.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      if (joinRecord) {
+        await joinRecord.destroy();
+        if (joinRecord.isDestroyed()) {
+          removed.push(record);
+          fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+        }
+      }
     }
     this._removeFromTarget(removed);
   }
