@@ -508,16 +508,17 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.text AS text`);
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.varchar AS varchar`);
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.numeric AS numeric`);
+      await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.bpchar AS bpchar`);
       await adapter.exec(`DROP TABLE IF EXISTS defaults`);
       await adapter.exec(`
         CREATE TABLE defaults (
           id serial primary key,
-          text_col text DEFAULT 'some value',
-          string_col varchar(50) DEFAULT 'some value',
-          decimal_col numeric DEFAULT 3.14159265358979323846
+          text_col ${DOMAIN_SCHEMA}.text DEFAULT 'some value',
+          string_col ${DOMAIN_SCHEMA}.varchar DEFAULT 'some value',
+          decimal_col ${DOMAIN_SCHEMA}.numeric DEFAULT 3.14159265358979323846
         )
       `);
-      await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA},public`);
+      await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA},public,pg_catalog`);
     });
     afterEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS defaults`);
@@ -546,7 +547,9 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("bpchar defaults in new schema when overriding domain", async () => {
-      await adapter.exec(`ALTER TABLE defaults ADD bpchar_col bpchar DEFAULT 'some value'`);
+      await adapter.exec(
+        `ALTER TABLE defaults ADD bpchar_col ${DOMAIN_SCHEMA}.bpchar DEFAULT 'some value'`,
+      );
       const cols = await adapter.columns("defaults");
       const bpcharCol = cols.find((c) => c.name === "bpchar_col");
       expect(bpcharCol).toBeDefined();
