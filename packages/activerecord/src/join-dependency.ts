@@ -371,6 +371,71 @@ export class JoinDependency {
 
     if (!sourceAssocDef) return null;
 
+    // If the source association is itself a through, recursively resolve
+    // the chain by first adding the through JOIN, then delegating to
+    // addAssociation on the through model for the source name.
+    if (sourceAssocDef.options?.through) {
+      // We already consumed a table index for the target, give it back
+      this._nextTableIndex--;
+
+      // Snapshot state for rollback if recursive call fails
+      const snapshotNodes = this._nodes.length;
+      const snapshotAliases = this._aliases.length;
+      const snapshotNextIndex = this._nextTableIndex;
+
+      // Add the through table JOIN as a standalone node (intermediate)
+      const throughColumns = getModelColumns(throughModel);
+      for (let i = 0; i < throughColumns.length; i++) {
+        this._aliases.push({
+          alias: `t${throughTableIndex}_r${i}`,
+          tableIndex: throughTableIndex,
+          columnIndex: i,
+          column: throughColumns[i],
+        });
+      }
+
+      const throughNodeName = parentAssocName
+        ? `${parentAssocName}._through_${assocDef.options.through}`
+        : `_through_${assocDef.options.through}`;
+      this._nodes.push({
+        tableIndex: throughTableIndex,
+        tableAlias: throughAlias,
+        tableName: throughTable,
+        modelClass: throughModel as typeof Base,
+        columns: throughColumns,
+        assocName: throughNodeName,
+        immediateAssocName: `_through_${assocDef.options.through}`,
+        parentPath: parentAssocName ?? null,
+        assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
+        joinSql: throughJoinSql,
+      });
+
+      // Now recursively add the source association from the through model
+      const recursiveNode = this.addAssociation(sourceName, {
+        fromModel: throughModel,
+        fromAlias: throughAlias,
+        parentAssocName: parentAssocName,
+      });
+
+      if (!recursiveNode) {
+        // Roll back intermediate state
+        this._nodes.length = snapshotNodes;
+        this._aliases.length = snapshotAliases;
+        this._nextTableIndex = snapshotNextIndex;
+        return null;
+      }
+
+      // Patch the recursive node to reflect the outer association
+      recursiveNode.assocName = parentAssocName
+        ? `${parentAssocName}.${assocDef.name}`
+        : assocDef.name;
+      recursiveNode.immediateAssocName = assocDef.name;
+      recursiveNode.parentPath = parentAssocName ?? null;
+      recursiveNode.assocType = assocDef.type;
+
+      return recursiveNode;
+    }
+
     if (sourceAssocDef.type === "belongsTo") {
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) return null;
