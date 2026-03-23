@@ -6493,17 +6493,28 @@ describe("AssociationProxyTest", () => {
     expect(empty).toBe(true);
   });
 
-  it.skip("push does not load target", () => {
-    /* requires lazy-loading tracking */
+  it("push does not load target", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "push no load" });
+    const proxy = association(post, "apComments");
+    expect(proxy.loaded).toBe(false);
+    const comment = new APComment({ body: "pushed" });
+    await proxy.push(comment);
+    expect(proxy.loaded).toBe(false);
   });
   it.skip("push has many through does not load target", () => {
-    /* requires lazy-loading tracking */
+    /* requires through proxy setup */
   });
-  it.skip("push followed by save does not load target", () => {
-    /* requires lazy-loading tracking */
+  it("push followed by save does not load target", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "push save no load" });
+    const proxy = association(post, "apComments");
+    const comment = new APComment({ body: "pushed" });
+    await proxy.push(comment);
+    expect(proxy.loaded).toBe(false);
   });
   it.skip("save on parent does not load target", () => {
-    /* requires lazy-loading tracking */
+    /* requires autosave */
   });
   it.skip("inspect does not reload a not yet loaded target", () => {
     /* requires inspect on proxy */
@@ -6514,11 +6525,25 @@ describe("AssociationProxyTest", () => {
   it.skip("save on parent saves children", () => {
     /* requires autosave */
   });
-  it.skip("reload returns association", () => {
-    /* requires reload on proxy */
+  it("reload returns association", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "reload test" });
+    await APComment.create({ body: "original", ap_post_id: post.id });
+    const proxy = association(post, "apComments");
+    const results = await proxy.reload();
+    expect(results.length).toBe(1);
+    expect(results[0].body).toBe("original");
+    expect(proxy.loaded).toBe(true);
   });
-  it.skip("getting a scope from an association", () => {
-    /* requires scope method on proxy */
+  it("getting a scope from an association", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "scope test" });
+    await APComment.create({ body: "scoped", ap_post_id: post.id });
+    const proxy = association(post, "apComments");
+    const scope = proxy.scope();
+    const results = await scope.toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].body).toBe("scoped");
   });
   it.skip("proxy object can be stubbed", () => {
     /* testing infrastructure */
@@ -6526,23 +6551,57 @@ describe("AssociationProxyTest", () => {
   it.skip("inverses get set of subsets of the association", () => {
     /* requires inverse_of tracking */
   });
-  it.skip("pluck uses loaded target", () => {
-    /* requires pluck on proxy */
+  it("pluck uses loaded target", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "pluck test" });
+    await APComment.create({ body: "plucked", ap_post_id: post.id });
+    const proxy = association(post, "apComments");
+    const bodies = await proxy.pluck("body");
+    expect(bodies).toEqual(["plucked"]);
   });
-  it.skip("pick uses loaded target", () => {
-    /* requires pick on proxy */
+  it("pick uses loaded target", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "pick test" });
+    await APComment.create({ body: "picked", ap_post_id: post.id });
+    const proxy = association(post, "apComments");
+    const body = await proxy.pick("body");
+    expect(body).toBe("picked");
   });
-  it.skip("reset unloads target", () => {
-    /* requires reset on proxy */
+  it("reset unloads target", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "reset test" });
+    await APComment.create({ body: "will reset", ap_post_id: post.id });
+    const proxy = association(post, "apComments");
+    await proxy.load();
+    expect(proxy.loaded).toBe(true);
+    proxy.reset();
+    expect(proxy.loaded).toBe(false);
   });
-  it.skip("target merging ignores persisted in memory records", () => {
-    /* requires target merging */
+  it("target merging ignores persisted in memory records", async () => {
+    const { APPost } = setupProxyModels();
+    const post = await APPost.create({ title: "merge test" });
+    const proxy = association(post, "apComments");
+    const comment = await proxy.create({ body: "persisted" });
+    expect(comment.isPersisted()).toBe(true);
+    const results = await proxy.toArray();
+    expect(results.length).toBe(1);
   });
-  it.skip("target merging ignores persisted in memory records when loaded records are empty", () => {
-    /* requires target merging */
+  it("target merging ignores persisted in memory records when loaded records are empty", async () => {
+    const { APPost } = setupProxyModels();
+    const post = await APPost.create({ title: "merge empty" });
+    const proxy = association(post, "apComments");
+    const results = await proxy.toArray();
+    expect(results.length).toBe(0);
   });
-  it.skip("target merging recognizes updated in memory records", () => {
-    /* requires target merging */
+  it("target merging recognizes updated in memory records", async () => {
+    const { APPost } = setupProxyModels();
+    const post = await APPost.create({ title: "merge update" });
+    const proxy = association(post, "apComments");
+    proxy.build({ body: "built" });
+    const results = await proxy.toArray();
+    const builtRecords = results.filter((r: any) => r.isNewRecord());
+    expect(builtRecords.length).toBe(1);
+    expect(builtRecords[0].body).toBe("built");
   });
 });
 

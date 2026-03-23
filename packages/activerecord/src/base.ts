@@ -1823,6 +1823,7 @@ export class Base extends Model {
   _strictLoading = false;
   _strictLoadingBypassCount = 0;
   _preloadedAssociations: Map<string, unknown> = new Map();
+  _collectionProxies: Map<string, unknown> = new Map();
 
   /**
    * Track whether we're inside _instantiate (loading from DB).
