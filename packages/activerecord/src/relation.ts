@@ -1764,6 +1764,8 @@ export class Relation<T extends Base> {
       const pk = parent.readAttribute(basePk);
       const assocs = associations.get(pk);
       for (const node of jd.nodes) {
+        // Skip intermediate through nodes (used only for JOIN chain)
+        if (node.immediateAssocName.startsWith("_through_")) continue;
         const children = assocs?.get(node.assocName) ?? [];
         const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
         if (isSingular) {
