@@ -126,7 +126,8 @@ export class DatabaseTasks {
   }
 
   static async migrate(version?: number | string): Promise<void> {
-    const effectiveVersion = version ?? this.targetVersion();
+    const raw = version ?? this.targetVersion();
+    const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
     if (!this.databaseConfiguration) return;
