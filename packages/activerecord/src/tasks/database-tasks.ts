@@ -126,32 +126,24 @@ export class DatabaseTasks {
   }
 
   static async migrate(version?: number | string): Promise<void> {
-    this.checkTargetVersion(version);
+    const effectiveVersion = version ?? this.targetVersion();
+    this.checkTargetVersion(effectiveVersion ?? undefined);
+
     if (!this.databaseConfiguration) return;
     const configs = this.configsFor(this._normalizeEnv());
     if (configs.length === 0) return;
 
-    const config = configs.find((c) => c.name === "primary") ?? configs[0];
-    const handler = this.resolveTask(config.adapter ?? "");
-    if (!handler) return;
-
     const { Migrator } = await import("../migrator.js");
-    const adapter = await this._resolveAdapter(config);
+    const adapter = await this._resolveAdapter(configs[0]);
     if (!adapter) return;
 
     const migrator = new Migrator(adapter, this._migrations);
-    const target =
-      version !== undefined && version !== null
-        ? typeof version === "string"
-          ? parseInt(version, 10)
-          : version
-        : undefined;
-    await migrator.migrate(target ?? null);
+    await migrator.migrate(effectiveVersion ?? null);
   }
 
   private static _adapterInstance: import("../adapter.js").DatabaseAdapter | null = null;
 
-  static setAdapter(adapter: import("../adapter.js").DatabaseAdapter): void {
+  static setAdapter(adapter: import("../adapter.js").DatabaseAdapter | null): void {
     this._adapterInstance = adapter;
   }
 

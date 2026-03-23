@@ -409,7 +409,7 @@ describe("DatabaseTasksMigrateTest", () => {
     if (originalVersion === undefined) delete process.env.VERSION;
     else process.env.VERSION = originalVersion;
     DatabaseTasks.registerMigrations([]);
-    DatabaseTasks.setAdapter(null as any);
+    DatabaseTasks.setAdapter(null);
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.clearRegisteredTasks();
   });
