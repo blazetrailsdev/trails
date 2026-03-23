@@ -1045,6 +1045,7 @@ export class CollectionProxy {
   }
 
   async load(): Promise<Base[]> {
+    if (this._loaded) return this._target;
     let results: Base[];
     if (this._isHabtm) {
       results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
@@ -1113,7 +1114,11 @@ export class CollectionProxy {
     // Through association: build the target record (no FK on target)
     if (this._isThrough) {
       const record = this._buildThrough(attrs);
-      this._target.push(record);
+      const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
+      if (allowed) {
+        this._target.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      }
       return record;
     }
 
