@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100%
 
-Current state: **59.7%** (5,003 / 8,385 tests). 3,144 skipped, 340/342 files.
+Current state: **60.8%** (5,101 / 8,385 tests). 3,046 skipped, 340 of 342 Rails test files matched.
 
 ```bash
 pnpm run convention:compare -- --package activerecord
@@ -10,17 +10,17 @@ pnpm run convention:compare -- --package activerecord
 
 The core source files and their roles:
 
-| File                   | Lines | Role                                                                                                                         |
-| ---------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `relation.ts`          | 4328  | Lazy chainable query builder. WHERE, ORDER, JOIN, GROUP, preload, eager load.                                                |
-| `base.ts`              | 3321  | Model class. Persistence (save/create/update/destroy), finders, attribute access, association accessor dispatch.             |
-| `associations.ts`      | 1964  | Association definitions (belongsTo/hasOne/hasMany/HABTM), loaders (loadHasMany, loadBelongsTo, etc.), and `CollectionProxy`. |
-| `reflection.ts`        | 245   | `AssociationReflection`, `ThroughReflection`, `ColumnReflection`. Metadata about associations and columns.                   |
-| `autosave.ts`          | 228   | `autosaveAssociations()` — saves dirty/new children when parent saves. `markForDestruction` / `isMarkedForDestruction`.      |
-| `nested-attributes.ts` | ~180  | `acceptsNestedAttributesFor` — assigns nested attrs, processes `_destroy`, wraps save.                                       |
-| `schema-dumper.ts`     | 175   | `SchemaDumper` — generates migration-like schema output from adapter introspection.                                          |
-| `migration.ts`         | —     | Migration DSL: `createTable`, `addColumn`, `addIndex`, etc.                                                                  |
-| `migrator.ts`          | —     | `Migrator` — discovers and runs migration files, tracks versions.                                                            |
+| File                   | Role                                                                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `relation.ts`          | Lazy chainable query builder. WHERE, ORDER, JOIN, GROUP, preload, eager load.                                                |
+| `base.ts`              | Model class. Persistence (save/create/update/destroy), finders, attribute access, association accessor dispatch.             |
+| `associations.ts`      | Association definitions (belongsTo/hasOne/hasMany/HABTM), loaders (loadHasMany, loadBelongsTo, etc.), and `CollectionProxy`. |
+| `reflection.ts`        | `AssociationReflection`, `ThroughReflection`, `ColumnReflection`. Metadata about associations and columns.                   |
+| `autosave.ts`          | `autosaveAssociations()` — saves dirty/new children when parent saves. `markForDestruction` / `isMarkedForDestruction`.      |
+| `nested-attributes.ts` | `acceptsNestedAttributesFor` — assigns nested attrs, processes `_destroy`, wraps save.                                       |
+| `schema-dumper.ts`     | `SchemaDumper` — generates migration-like schema output from adapter introspection.                                          |
+| `migration.ts`         | Migration DSL: `createTable`, `addColumn`, `addIndex`, etc.                                                                  |
+| `migrator.ts`          | `Migrator` — discovers and runs migration files, tracks versions.                                                            |
 
 Association loading flow: `base.ts` accessor -> `loadHasMany`/`loadBelongsTo`/etc. in `associations.ts` -> builds a `Relation` query -> executes via adapter. Collections return `CollectionProxy` wrapping the results.
 
@@ -36,7 +36,7 @@ These are sequential — each builds on the previous.
 
 **What's missing / broken based on skipped tests:**
 
-1. **`push` / `<<` should not reload target** — Tests like "push does not load target" (associations.test.ts:6496) indicate push should append to an in-memory list without re-querying. Currently `push` saves the record and returns, but doesn't maintain an internal `_records` cache. CollectionProxy needs an internal `_target` array that accumulates built/pushed records and is used by `toArray` when loaded.
+1. **`push` / `<<` should not reload target** — Tests like "push does not load target" (associations.test.ts:6496) indicate push should append to an in-memory list without re-querying. Currently `push` saves the record and returns, but `CollectionProxy` doesn't yet maintain an in-memory association target cache. CollectionProxy needs an internal `_target` array that accumulates built/pushed records and is used by `toArray` when loaded.
 
    Rails source: `activerecord/lib/active_record/associations/collection_proxy.rb` and `collection_association.rb`. The key concept is the `target` array on `CollectionAssociation` — it holds the in-memory array, and `loaded?` tracks whether the full set has been fetched.
 
@@ -223,16 +223,16 @@ Each type is self-contained. They primarily involve adding type classes to the a
 
 **What exists:** `pg-range.ts` and `hstore.ts` under `adapters/postgresql/`. The PG adapter is in `adapters/postgres-adapter.ts`.
 
-| Type                                   | File to create/extend                      | Rails source                        | Skip count |
-| -------------------------------------- | ------------------------------------------ | ----------------------------------- | ---------- |
-| Range                                  | `adapters/postgresql/pg-range.ts` (exists) | `oid/range.rb`                      | 36         |
-| Geometric (point, line, polygon, etc.) | `adapters/postgresql/geometric.ts` (new)   | `oid/point.rb`, `oid/line.rb`, etc. | 28         |
-| UUID                                   | `adapters/postgresql/uuid.ts` (new)        | `oid/uuid.rb`                       | 29         |
-| HStore                                 | `adapters/postgresql/hstore.ts` (exists)   | `oid/hstore.rb`                     | 24         |
-| Array                                  | extend adapter                             | `oid/array.rb`, `array_parser.rb`   | 22         |
-| PG adapter internals                   | `adapters/postgres-adapter.ts`             | `postgresql_adapter.rb`             | 31         |
-| PG schema introspection                | `adapters/postgres-adapter.ts`             | `postgresql/schema_statements.rb`   | 35         |
-| PG connection                          | `adapters/postgres-adapter.ts`             | `postgresql_adapter.rb`             | 15         |
+| Type                                   | File to create/extend                       | Rails source                        | Skip count |
+| -------------------------------------- | ------------------------------------------- | ----------------------------------- | ---------- |
+| Range                                  | `adapters/postgresql/pg-range.ts` (exists)  | `oid/range.rb`                      | 36         |
+| Geometric (point, line, polygon, etc.) | `adapters/postgresql/geometric.ts` (exists) | `oid/point.rb`, `oid/line.rb`, etc. | 28         |
+| UUID                                   | `adapters/postgresql/uuid.ts` (exists)      | `oid/uuid.rb`                       | 29         |
+| HStore                                 | `adapters/postgresql/hstore.ts` (exists)    | `oid/hstore.rb`                     | 24         |
+| Array                                  | extend adapter                              | `oid/array.rb`, `array_parser.rb`   | 22         |
+| PG adapter internals                   | `adapters/postgres-adapter.ts`              | `postgresql_adapter.rb`             | 31         |
+| PG schema introspection                | `adapters/postgres-adapter.ts`              | `postgresql/schema_statements.rb`   | 35         |
+| PG connection                          | `adapters/postgres-adapter.ts`              | `postgresql_adapter.rb`             | 15         |
 
 ---
 
@@ -240,7 +240,7 @@ Each type is self-contained. They primarily involve adding type classes to the a
 
 #### C1. Schema dumper (schema-dumper.test.ts, ~59 skip)
 
-**What exists:** `SchemaDumper` class in `schema-dumper.ts` (175 lines). Basic structure.
+**What exists:** `SchemaDumper` class in `schema-dumper.ts`. Basic structure.
 
 **What's missing:** Most of the actual dumping logic — timestamps columns, type-specific column options (limit, precision, scale), `force: :cascade`, index dumping (partial, sort order, expression), check constraints, unique constraints, default values, comment support.
 
