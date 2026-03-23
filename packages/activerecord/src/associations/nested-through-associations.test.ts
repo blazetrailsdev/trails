@@ -1388,11 +1388,9 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
-    // Without distinct, we'd get the same tag twice
+    // Same tag attached via two posts — without distinct_tags association, duplicates are returned
     expect(preloadedTags).toHaveLength(2);
-    // Both are the same tag
-    expect(preloadedTags[0].name).toBe("general");
-    expect(preloadedTags[1].name).toBe("general");
+    expect(preloadedTags.every((t: any) => t.name === "general")).toBe(true);
   });
 
   it.skip("distinct has many through a has many through association on through reflection", () => {});
@@ -1790,12 +1788,18 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("nested has many through with conditions on through associations preload", async () => {
+    // Scope on the outer through filters tags to only "blue" ones
     (Author as any)._associations = [
       { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
       {
         type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
+        name: "blueThroughTags",
+        options: {
+          className: "Tag",
+          through: "posts",
+          source: "tags",
+          scope: (rel: any) => rel.where({ name: "blue" }),
+        },
       },
     ];
     (Post as any)._associations = [
@@ -1816,11 +1820,14 @@ describe("NestedThroughAssociationsTest", () => {
     const author = await Author.create({ name: "Bob" });
     const post = await Post.create({ author_id: author.id, title: "Misc", body: "B" });
     const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
     await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
 
-    const authors = await Author.all().preload("tags").toArray();
+    const authors = await Author.all().preload("blueThroughTags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("blueThroughTags") ?? [];
+    // Only blue tag should be returned due to scope
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("blue");
   });
@@ -2074,11 +2081,12 @@ describe("NestedThroughAssociationsTest", () => {
       employable_type: "PhmtCakeDesigner",
     });
 
-    // Load chefs through departments (single-level through, not nested)
+    // Preload chefs through departments (tests the through path with polymorphic source defined)
     const hotels = await PhmtHotel.all().preload("phmtChefs").toArray();
     expect(hotels).toHaveLength(1);
     const chefs = (hotels[0] as any)._preloadedAssociations?.get("phmtChefs") ?? [];
     expect(chefs).toHaveLength(1);
+    expect(chefs[0].employable_type).toBe("PhmtCakeDesigner");
   });
 
   it("polymorphic has many through when through association has already loaded", async () => {
