@@ -34,7 +34,7 @@ These are sequential — each builds on the previous.
 
 **What exists:** `CollectionProxy` (associations.ts:996) already has `build`, `create`, `push`, `toArray`, `count`, `size`, `isEmpty`, `delete`, `destroy`, `clear`, `includes`, `first`, `last`, `take`, `many`, `none`, `one`, `exists`, `where`, `firstOrInitialize`, `firstOrCreate`, `find`, `findOrCreateBy`, `pluck`, `pick`. Through operations (`_pushThrough`, `_createThrough`, `_pushHabtm`) exist.
 
-**Done (PR #189):** Target tracking (`_target`/`_loaded`), proxy caching per record, `build`/`push` append without loading, `load`/`reload`/`reset`, `pluck`/`pick`, `scope()`, callback gating on `_target` mutations. 10 tests unskipped.
+**Done:** Target tracking (`_target`/`_loaded`), proxy caching per record, `build`/`push` append without loading, `load`/`reload`/`reset`, `pluck`/`pick`, `scope()`, callback gating on `_target` mutations. 10 tests unskipped.
 
 **Remaining follow-ups:**
 

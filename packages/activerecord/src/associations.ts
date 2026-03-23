@@ -1334,7 +1334,10 @@ export class CollectionProxy {
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
       // Save the target record if it's new
-      if (record.isNewRecord()) await record.save();
+      if (record.isNewRecord()) {
+        const saved = await record.save();
+        if (!saved) continue;
+      }
       // Create the join record
       const joinAttrs: Record<string, unknown> = {
         [ownerFk as string]: pkValue,
@@ -1347,9 +1350,11 @@ export class CollectionProxy {
         joinAttrs[typeCol] = ctor.name;
         delete joinAttrs[ownerFk as string];
       }
-      await throughModel.create(joinAttrs);
-      this._target.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      const joinRecord = await throughModel.create(joinAttrs);
+      if (joinRecord.isPersisted()) {
+        this._target.push(record);
+        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      }
     }
   }
 
