@@ -87,9 +87,12 @@ export class Relation<T extends Base> {
    *   where("name LIKE ?", "%dean%")
    */
   where(): Relation<T>;
-  where(conditions: Record<string, unknown>): Relation<T>;
+  where(conditions: Record<string, unknown> | null | undefined): Relation<T>;
   where(sql: string, ...binds: unknown[]): Relation<T>;
-  where(conditionsOrSql?: Record<string, unknown> | string, ...binds: unknown[]): Relation<T> {
+  where(
+    conditionsOrSql?: Record<string, unknown> | string | null,
+    ...binds: unknown[]
+  ): Relation<T> {
     if (conditionsOrSql === undefined || conditionsOrSql === null) return this._clone();
     if (
       typeof conditionsOrSql !== "string" &&
@@ -3678,13 +3681,19 @@ export class Relation<T extends Base> {
               resolvedSourceName,
             ]);
 
+            const throughByFkHasOne = new Map<unknown, any>();
+            for (const tr of throughRecords) {
+              const fkVal = (tr as any).readAttribute(throughFk);
+              if (fkVal != null && !throughByFkHasOne.has(fkVal)) {
+                throughByFkHasOne.set(fkVal, tr);
+              }
+            }
+
             for (const record of records) {
               if (!(record as any)._preloadedAssociations)
                 (record as any)._preloadedAssociations = new Map();
               const pkVal = record.readAttribute(primaryKey);
-              const myThroughRecord = throughRecords.find(
-                (tr: any) => tr.readAttribute(throughFk) == pkVal,
-              );
+              const myThroughRecord = throughByFkHasOne.get(pkVal) ?? null;
               const preloaded = myThroughRecord
                 ? ((myThroughRecord as any)._preloadedAssociations?.get(resolvedSourceName) ?? null)
                 : null;
