@@ -1797,7 +1797,10 @@ export class CollectionProxy {
       }
       return this._target.map((r) => columns.map((c) => r.readAttribute(c)));
     }
-    // Delegate to scope() for DB-level column selection
+    // Strict loading check: this is a lazy load
+    if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
+      throw new StrictLoadingViolationError(this._record, this._assocName);
+    }
     const rel = this.scope();
     return rel.pluck(...columns);
   }
@@ -1807,6 +1810,9 @@ export class CollectionProxy {
       if (this._target.length === 0) return null;
       if (columns.length === 1) return this._target[0].readAttribute(columns[0]);
       return columns.map((c) => this._target[0].readAttribute(c));
+    }
+    if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
+      throw new StrictLoadingViolationError(this._record, this._assocName);
     }
     const rel = this.scope();
     return rel.pick(...columns);
@@ -1836,7 +1842,11 @@ export class CollectionProxy {
     if (rel === null) {
       const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
       const targetModel = resolveModel(className);
-      return (targetModel as any).all().none();
+      let emptyRel = (targetModel as any).all();
+      if (this._assocDef.options.scope) {
+        emptyRel = this._assocDef.options.scope(emptyRel);
+      }
+      return emptyRel.none();
     }
     return rel;
   }
