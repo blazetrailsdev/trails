@@ -48,6 +48,11 @@ describe("NestedThroughAssociationsTest", () => {
     Post.adapter = adapter;
     Tag.adapter = adapter;
     Tagging.adapter = adapter;
+    // Reset associations to avoid cross-test coupling
+    (Author as any)._associations = [];
+    (Post as any)._associations = [];
+    (Tag as any)._associations = [];
+    (Tagging as any)._associations = [];
     registerModel(Author);
     registerModel(Post);
     registerModel(Tag);

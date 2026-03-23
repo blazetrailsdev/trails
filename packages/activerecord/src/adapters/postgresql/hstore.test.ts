@@ -167,7 +167,7 @@ describeIfPg("PostgresAdapter", () => {
       await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
         serializeHstore({ a: "1", b: "2" }),
       ]);
-      const rows = await adapter.execute(`SELECT * FROM hstores WHERE tags ? 'a'`);
+      const rows = await adapter.execute(`SELECT * FROM hstores WHERE exist(tags, 'a')`);
       expect(rows).toHaveLength(1);
     });
     it("hstore where value", async () => {

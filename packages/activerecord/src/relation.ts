@@ -90,12 +90,10 @@ export class Relation<T extends Base> {
   where(conditions: Record<string, unknown>): Relation<T>;
   where(sql: string, ...binds: unknown[]): Relation<T>;
   where(conditionsOrSql?: Record<string, unknown> | string, ...binds: unknown[]): Relation<T> {
-    if (conditionsOrSql === undefined) return this._clone();
+    if (conditionsOrSql === undefined || conditionsOrSql === null) return this._clone();
     if (
       typeof conditionsOrSql !== "string" &&
-      (typeof conditionsOrSql !== "object" ||
-        conditionsOrSql === null ||
-        Array.isArray(conditionsOrSql))
+      (typeof conditionsOrSql !== "object" || Array.isArray(conditionsOrSql))
     ) {
       const err = new Error(
         `Unsupported argument type: ${typeof conditionsOrSql} (${String(conditionsOrSql)})`,
@@ -3476,13 +3474,19 @@ export class Relation<T extends Base> {
               resolvedSourceName,
             ]);
 
+            const throughByFk = new Map<unknown, any[]>();
+            for (const tr of throughRecords) {
+              const key = (tr as any).readAttribute(throughFk);
+              const arr = throughByFk.get(key);
+              if (arr) arr.push(tr);
+              else throughByFk.set(key, [tr]);
+            }
+
             for (const record of records) {
               if (!(record as any)._preloadedAssociations)
                 (record as any)._preloadedAssociations = new Map();
               const pkVal = record.readAttribute(primaryKey);
-              const myThroughRecords = throughRecords.filter(
-                (tr: any) => tr.readAttribute(throughFk) == pkVal,
-              );
+              const myThroughRecords = throughByFk.get(pkVal) ?? [];
               const myTargets = myThroughRecords.flatMap((tr: any) => {
                 const preloaded = (tr as any)._preloadedAssociations?.get(resolvedSourceName);
                 if (!preloaded) return [];
