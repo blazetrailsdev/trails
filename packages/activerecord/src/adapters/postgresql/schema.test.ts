@@ -106,9 +106,32 @@ describeIfPg("PostgresAdapter", () => {
       await teardownSchemas(adapter);
     });
 
-    it.skip("schema test 1", async () => {});
-    it.skip("schema test 2", async () => {});
-    it.skip("schema test 3", async () => {});
+    it("schema test 1", async () => {
+      await adapter.setSchemaSearchPath(SCHEMA_NAME);
+      const cols = await adapter.columns(TABLE_NAME);
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toContain("id");
+      expect(colNames).toContain("name");
+      expect(colNames).toContain("email");
+      expect(colNames).toContain("description");
+      expect(colNames).toContain("moment");
+    });
+
+    it("schema test 2", async () => {
+      const cols = await adapter.columns(`${SCHEMA_NAME}.${TABLE_NAME}`);
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toContain("id");
+      expect(colNames).toContain("name");
+      expect(colNames).toContain("email");
+    });
+
+    it("schema test 3", async () => {
+      await adapter.setSchemaSearchPath(SCHEMA2_NAME);
+      const cols = await adapter.columns(TABLE_NAME);
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toContain("id");
+      expect(colNames).toContain("name");
+    });
 
     it("schema names", async () => {
       const names = await adapter.schemaNames();
@@ -211,9 +234,24 @@ describeIfPg("PostgresAdapter", () => {
       expect(await adapter.dataSourceExists(`"${TABLE_NAME}.table"`)).toBe(true);
     });
 
-    it.skip("with schema prefixed table name", () => {});
-    it.skip("with schema prefixed capitalized table name", () => {});
-    it.skip("with schema search path", () => {});
+    it("with schema prefixed table name", async () => {
+      const cols = await adapter.columns(`${SCHEMA_NAME}.${TABLE_NAME}`);
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toEqual(["id", "name", "email", "description", "name_vector", "moment"]);
+    });
+
+    it("with schema prefixed capitalized table name", async () => {
+      const cols = await adapter.columns(`${SCHEMA_NAME}."${CAPITALIZED_TABLE_NAME}"`);
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toEqual(["id", "name", "email", "description", "name_vector", "moment"]);
+    });
+
+    it("with schema search path", async () => {
+      await adapter.setSchemaSearchPath(SCHEMA_NAME);
+      const cols = await adapter.columns(TABLE_NAME);
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toEqual(["id", "name", "email", "description", "name_vector", "moment"]);
+    });
 
     it("proper encoding of table name", async () => {
       expect(adapter.quoteTableName("table_name")).toBe('"table_name"');
@@ -462,12 +500,79 @@ describeIfPg("PostgresAdapter", () => {
   });
 
   describe("DefaultsUsingMultipleSchemasAndDomainTest", () => {
-    it.skip("text defaults in new schema when overriding domain", () => {});
-    it.skip("string defaults in new schema when overriding domain", () => {});
-    it.skip("decimal defaults in new schema when overriding domain", () => {});
-    it.skip("bpchar defaults in new schema when overriding domain", () => {});
-    it.skip("text defaults after updating column default", () => {});
-    it.skip("default containing quote and colons", () => {});
+    const DOMAIN_SCHEMA = "schema_1";
+
+    beforeEach(async () => {
+      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true, cascade: true });
+      await adapter.createSchema(DOMAIN_SCHEMA);
+      await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.text AS text`);
+      await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.varchar AS varchar`);
+      await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.numeric AS numeric`);
+      await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.bpchar AS bpchar`);
+      await adapter.exec(`DROP TABLE IF EXISTS defaults`);
+      await adapter.exec(`
+        CREATE TABLE defaults (
+          id serial primary key,
+          text_col ${DOMAIN_SCHEMA}.text DEFAULT 'some value',
+          string_col ${DOMAIN_SCHEMA}.varchar DEFAULT 'some value',
+          decimal_col ${DOMAIN_SCHEMA}.numeric DEFAULT 3.14159265358979323846
+        )
+      `);
+      await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA},public,pg_catalog`);
+    });
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS defaults`);
+      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true, cascade: true });
+    });
+
+    it("text defaults in new schema when overriding domain", async () => {
+      const cols = await adapter.columns("defaults");
+      const textCol = cols.find((c) => c.name === "text_col");
+      expect(textCol).toBeDefined();
+      expect(textCol!.default).toMatch(/some value/);
+    });
+
+    it("string defaults in new schema when overriding domain", async () => {
+      const cols = await adapter.columns("defaults");
+      const stringCol = cols.find((c) => c.name === "string_col");
+      expect(stringCol).toBeDefined();
+      expect(stringCol!.default).toMatch(/some value/);
+    });
+
+    it("decimal defaults in new schema when overriding domain", async () => {
+      const cols = await adapter.columns("defaults");
+      const decimalCol = cols.find((c) => c.name === "decimal_col");
+      expect(decimalCol).toBeDefined();
+      expect(decimalCol!.default).toMatch(/3\.14159265358979323846/);
+    });
+
+    it("bpchar defaults in new schema when overriding domain", async () => {
+      await adapter.exec(
+        `ALTER TABLE defaults ADD bpchar_col ${DOMAIN_SCHEMA}.bpchar DEFAULT 'some value'`,
+      );
+      const cols = await adapter.columns("defaults");
+      const bpcharCol = cols.find((c) => c.name === "bpchar_col");
+      expect(bpcharCol).toBeDefined();
+      expect(bpcharCol!.default).toMatch(/some value/);
+    });
+
+    it("text defaults after updating column default", async () => {
+      await adapter.exec(
+        `ALTER TABLE defaults ALTER COLUMN text_col SET DEFAULT 'some text'::${DOMAIN_SCHEMA}.text`,
+      );
+      const cols = await adapter.columns("defaults");
+      const textCol = cols.find((c) => c.name === "text_col");
+      expect(textCol).toBeDefined();
+      expect(textCol!.default).toMatch(/some text/);
+    });
+
+    it("default containing quote and colons", async () => {
+      await adapter.exec(`ALTER TABLE defaults ALTER COLUMN string_col SET DEFAULT 'foo''::bar'`);
+      const cols = await adapter.columns("defaults");
+      const stringCol = cols.find((c) => c.name === "string_col");
+      expect(stringCol).toBeDefined();
+      expect(stringCol!.default).toMatch(/foo.*::bar/);
+    });
   });
 
   describe("SchemaWithDotsTest", () => {
