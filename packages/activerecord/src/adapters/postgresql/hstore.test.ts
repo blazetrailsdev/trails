@@ -151,71 +151,156 @@ describeIfPg("PostgresAdapter", () => {
     it.skip("hstore nested", async () => {
       /* needs Base model */
     });
-    it.skip("hstore where", async () => {
-      /* needs where with hstore operators */
+    it("hstore where", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ c: "3" }),
+      ]);
+      const rows = await adapter.execute(`SELECT * FROM hstores WHERE tags @> $1::hstore`, [
+        serializeHstore({ a: "1" }),
+      ]);
+      expect(rows).toHaveLength(1);
     });
-    it.skip("hstore where key", async () => {
-      /* needs hstore ? operator */
+    it("hstore where key", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      const rows = await adapter.execute(`SELECT * FROM hstores WHERE exist(tags, 'a')`);
+      expect(rows).toHaveLength(1);
     });
-    it.skip("hstore where value", async () => {
-      /* needs hstore -> operator */
+    it("hstore where value", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      const rows = await adapter.execute(`SELECT tags -> 'a' AS val FROM hstores`);
+      expect(rows[0].val).toBe("1");
     });
-    it.skip("hstore contains", async () => {
-      /* needs hstore @> operator */
+    it("hstore contains", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      const rows = await adapter.execute(`SELECT tags @> '"a"=>"1"'::hstore AS r FROM hstores`);
+      expect(rows[0].r).toBe(true);
     });
-    it.skip("hstore contained", async () => {
-      /* needs hstore <@ operator */
+    it("hstore contained", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1" }),
+      ]);
+      const rows = await adapter.execute(
+        `SELECT tags <@ '"a"=>"1", "b"=>"2"'::hstore AS r FROM hstores`,
+      );
+      expect(rows[0].r).toBe(true);
     });
-    it.skip("hstore keys", async () => {
-      /* needs akeys() */
+    it("hstore keys", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      const rows = await adapter.execute(`SELECT akeys(tags) AS keys FROM hstores`);
+      const keys = rows[0].keys as string[];
+      expect(keys.sort()).toEqual(["a", "b"]);
     });
-    it.skip("hstore values", async () => {
-      /* needs avals() */
+    it("hstore values", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      const rows = await adapter.execute(`SELECT avals(tags) AS vals FROM hstores`);
+      const vals = rows[0].vals as string[];
+      expect(vals.sort()).toEqual(["1", "2"]);
     });
-    it.skip("hstore merge", async () => {
-      /* needs hstore || operator */
+    it("hstore merge", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1" }),
+      ]);
+      const rows = await adapter.execute(`SELECT id FROM hstores`);
+      const id = rows[0].id;
+      await adapter.execute(`UPDATE hstores SET tags = tags || '"b"=>"2"'::hstore WHERE id = $1`, [
+        id,
+      ]);
+      const updated = await adapter.execute(`SELECT tags FROM hstores WHERE id = $1`, [id]);
+      const parsed = parseHstore(updated[0].tags as string);
+      expect(parsed).toEqual({ a: "1", b: "2" });
     });
-    it.skip("hstore delete key", async () => {
-      /* needs hstore - operator */
+    it("hstore delete key", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2" }),
+      ]);
+      const rows = await adapter.execute(`SELECT delete(tags, 'a') AS r FROM hstores`);
+      const parsed = parseHstore(rows[0].r as string);
+      expect(parsed).toEqual({ b: "2" });
     });
-    it.skip("hstore delete keys", async () => {
-      /* needs hstore - operator */
+    it("hstore delete keys", async () => {
+      await adapter.execute(`INSERT INTO hstores (tags) VALUES ($1)`, [
+        serializeHstore({ a: "1", b: "2", c: "3" }),
+      ]);
+      const rows = await adapter.execute(`SELECT delete(tags, ARRAY['a', 'b']) AS r FROM hstores`);
+      const parsed = parseHstore(rows[0].r as string);
+      expect(parsed).toEqual({ c: "3" });
     });
-    it.skip("hstore concat", async () => {
-      /* needs hstore || operator */
+    it("hstore concat", async () => {
+      const rows = await adapter.execute(`SELECT '"a"=>"1"'::hstore || '"b"=>"2"'::hstore AS r`);
+      const parsed = parseHstore(rows[0].r as string);
+      expect(parsed).toEqual({ a: "1", b: "2" });
     });
-    it.skip("hstore replace", async () => {
-      /* needs hstore || operator */
+    it("hstore replace", async () => {
+      const rows = await adapter.execute(
+        `SELECT '"a"=>"1", "b"=>"2"'::hstore || '"a"=>"99"'::hstore AS r`,
+      );
+      const parsed = parseHstore(rows[0].r as string);
+      expect(parsed.a).toBe("99");
+      expect(parsed.b).toBe("2");
     });
-    it.skip("hstore to array", async () => {
-      /* needs hstore_to_array() */
+    it("hstore to array", async () => {
+      const rows = await adapter.execute(`SELECT hstore_to_array('"a"=>"1"'::hstore) AS r`);
+      expect(rows[0].r).toEqual(["a", "1"]);
     });
-    it.skip("hstore each", async () => {
-      /* needs each_hstore() */
+    it("hstore each", async () => {
+      const rows = await adapter.execute(
+        `SELECT key, value FROM each('"a"=>"1", "b"=>"2"'::hstore) ORDER BY key`,
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows[0].key).toBe("a");
+      expect(rows[0].value).toBe("1");
     });
-    it.skip("hstore exists", async () => {
-      /* needs exist() */
+    it("hstore exists", async () => {
+      const rows = await adapter.execute(`SELECT exist('"a"=>"1"'::hstore, 'a') AS r`);
+      expect(rows[0].r).toBe(true);
     });
-    it.skip("hstore defined", async () => {
-      /* needs defined() */
+    it("hstore defined", async () => {
+      const rows = await adapter.execute(`SELECT defined('"a"=>"1"'::hstore, 'a') AS r`);
+      expect(rows[0].r).toBe(true);
+      const nullRows = await adapter.execute(`SELECT defined('"a"=>NULL'::hstore, 'a') AS r`);
+      expect(nullRows[0].r).toBe(false);
     });
-    it.skip("hstore akeys", async () => {
-      /* needs akeys() */
+    it("hstore akeys", async () => {
+      const rows = await adapter.execute(`SELECT akeys('"a"=>"1", "b"=>"2"'::hstore) AS r`);
+      expect((rows[0].r as string[]).sort()).toEqual(["a", "b"]);
     });
-    it.skip("hstore avals", async () => {
-      /* needs avals() */
+    it("hstore avals", async () => {
+      const rows = await adapter.execute(`SELECT avals('"a"=>"1", "b"=>"2"'::hstore) AS r`);
+      expect((rows[0].r as string[]).sort()).toEqual(["1", "2"]);
     });
-    it.skip("hstore skeys", async () => {
-      /* needs skeys() */
+    it("hstore skeys", async () => {
+      const rows = await adapter.execute(
+        `SELECT skeys('"a"=>"1", "b"=>"2"'::hstore) AS skeys ORDER BY skeys`,
+      );
+      expect(rows.map((r) => r.skeys)).toEqual(["a", "b"]);
     });
-    it.skip("hstore svals", async () => {
-      /* needs svals() */
+    it("hstore svals", async () => {
+      const rows = await adapter.execute(
+        `SELECT svals('"a"=>"1", "b"=>"2"'::hstore) AS svals ORDER BY svals`,
+      );
+      expect(rows.map((r) => r.svals)).toEqual(["1", "2"]);
     });
-    it.skip("hstore to json", async () => {
-      /* needs hstore_to_json() */
+    it("hstore to json", async () => {
+      const rows = await adapter.execute(
+        `SELECT hstore_to_json('"a"=>"1", "b"=>"2"'::hstore) AS r`,
+      );
+      expect(rows[0].r).toEqual({ a: "1", b: "2" });
     });
     it.skip("hstore populate", async () => {
-      /* needs populate_record() */
+      /* needs populate_record() with a composite type */
     });
     it.skip("hstore schema dump", async () => {
       /* needs schema dumper */
