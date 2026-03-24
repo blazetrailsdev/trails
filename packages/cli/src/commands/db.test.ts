@@ -43,6 +43,24 @@ describe("DbCommand", () => {
     const db = program.commands.find((c) => c.name() === "db");
     expect(db?.commands.some((c) => c.name() === "migrate:status")).toBe(true);
   });
+
+  it("has migrate:redo subcommand", () => {
+    const program = createProgram();
+    const db = program.commands.find((c) => c.name() === "db");
+    expect(db?.commands.some((c) => c.name() === "migrate:redo")).toBe(true);
+  });
+
+  it("has reset subcommand", () => {
+    const program = createProgram();
+    const db = program.commands.find((c) => c.name() === "db");
+    expect(db?.commands.some((c) => c.name() === "reset")).toBe(true);
+  });
+
+  it("has setup subcommand", () => {
+    const program = createProgram();
+    const db = program.commands.find((c) => c.name() === "db");
+    expect(db?.commands.some((c) => c.name() === "setup")).toBe(true);
+  });
 });
 
 describe("resolveEnv", () => {
