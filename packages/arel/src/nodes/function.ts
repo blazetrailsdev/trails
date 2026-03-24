@@ -1,8 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
 
-/**
- * Exists — EXISTS(subquery)
- */
 export class Exists extends Node {
   readonly expressions: Node;
   readonly alias: Node | null;

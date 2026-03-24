@@ -1,35 +1,32 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node, NodeVisitor } from "../nodes/node.js";
 import type { Table } from "../table.js";
 import {
-  Equality,
   NotEqual,
   GreaterThan,
   GreaterThanOrEqual,
   LessThan,
   LessThanOrEqual,
-  Matches,
-  DoesNotMatch,
-  In,
-  NotIn,
   Between,
-  Addition,
-  Subtraction,
-  Multiplication,
-  Division,
   As,
-} from "./binary.js";
-import { Ascending, Descending } from "./unary.js";
-import { Quoted } from "./quoted.js";
-import { Grouping } from "./grouping.js";
-import { And } from "./and.js";
-import { Or } from "./or.js";
-import { Not } from "./not.js";
-import { SqlLiteral } from "./sql-literal.js";
-import { NamedFunction } from "./named-function.js";
-import { Extract } from "./extract.js";
-import { Regexp as RegexpNode, NotRegexp } from "./regexp.js";
-import { IsDistinctFrom, IsNotDistinctFrom } from "./distinct-from.js";
-import { Case } from "./case.js";
+} from "../nodes/binary.js";
+import { Equality } from "../nodes/equality.js";
+import { Matches, DoesNotMatch } from "../nodes/matches.js";
+import { In } from "../nodes/in.js";
+import { NotIn } from "../nodes/binary.js";
+import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
+import { Ascending } from "../nodes/ascending.js";
+import { Descending } from "../nodes/descending.js";
+import { Quoted } from "../nodes/casted.js";
+import { Grouping } from "../nodes/grouping.js";
+import { And } from "../nodes/and.js";
+import { Or } from "../nodes/or.js";
+import { Not } from "../nodes/unary.js";
+import { SqlLiteral } from "../nodes/sql-literal.js";
+import { NamedFunction } from "../nodes/named-function.js";
+import { Extract } from "../nodes/extract.js";
+import { Regexp as RegexpNode, NotRegexp } from "../nodes/regexp.js";
+import { IsDistinctFrom, IsNotDistinctFrom } from "../nodes/binary.js";
+import { Case } from "../nodes/case.js";
 import {
   InfixOperation,
   BitwiseAnd,
@@ -37,9 +34,10 @@ import {
   BitwiseXor,
   BitwiseShiftLeft,
   BitwiseShiftRight,
-} from "./infix-operation.js";
-import { Over, NamedWindow, Window } from "./window.js";
-import { True } from "./true-false.js";
+} from "../nodes/infix-operation.js";
+import { Over } from "../nodes/over.js";
+import { NamedWindow, Window } from "../nodes/window.js";
+import { True } from "../nodes/true.js";
 
 function buildQuoted(value: unknown): Node {
   if (value instanceof Node) return value;

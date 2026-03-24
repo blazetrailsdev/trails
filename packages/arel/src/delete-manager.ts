@@ -1,10 +1,10 @@
-import { Node } from "../nodes/node.js";
-import { DeleteStatement } from "../nodes/delete-statement.js";
-import { Limit } from "../nodes/unary.js";
-import { Quoted } from "../nodes/quoted.js";
-import { SqlLiteral } from "../nodes/sql-literal.js";
-import { Table } from "../table.js";
-import { ToSql } from "../visitors/to-sql.js";
+import { Node } from "./nodes/node.js";
+import { DeleteStatement } from "./nodes/delete-statement.js";
+import { Limit } from "./nodes/unary.js";
+import { Quoted } from "./nodes/casted.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
+import { Table } from "./table.js";
+import { ToSql } from "./visitors/to-sql.js";
 
 /**
  * DeleteManager — chainable API for building DELETE statements.

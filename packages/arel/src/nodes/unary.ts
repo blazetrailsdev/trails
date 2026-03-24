@@ -1,10 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
 
-/**
- * Unary — base class for nodes with a single expression.
- *
- * Mirrors: Arel::Nodes::Unary
- */
 export class Unary extends Node {
   readonly expr: Node | string | number | null;
 
@@ -26,88 +21,59 @@ export class DistinctOn extends Unary {}
 export class Bin extends Unary {}
 export class On extends Unary {}
 
-/**
- * Ascending — ORDER BY ... ASC
- *
- * Mirrors: Arel::Nodes::Ascending
- */
-export class Ascending extends Unary {
-  get direction(): "asc" {
-    return "asc";
+export class Not extends Node {
+  readonly expr: Node;
+
+  constructor(expr: Node) {
+    super();
+    this.expr = expr;
   }
 
-  isAscending(): boolean {
-    return true;
-  }
-
-  isDescending(): boolean {
-    return false;
-  }
-
-  reverse(): Descending {
-    return new Descending(this.expr);
-  }
-
-  nullsFirst(): NullsFirst {
-    return new NullsFirst(this);
-  }
-
-  nullsLast(): NullsLast {
-    return new NullsLast(this);
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
   }
 }
 
-/**
- * Descending — ORDER BY ... DESC
- *
- * Mirrors: Arel::Nodes::Descending
- */
-export class Descending extends Unary {
-  get direction(): "desc" {
-    return "desc";
+export class Lateral extends Node {
+  readonly subquery: Node;
+
+  constructor(subquery: Node) {
+    super();
+    this.subquery = subquery;
   }
 
-  isAscending(): boolean {
-    return false;
-  }
-
-  isDescending(): boolean {
-    return true;
-  }
-
-  reverse(): Ascending {
-    return new Ascending(this.expr);
-  }
-
-  nullsFirst(): NullsFirst {
-    return new NullsFirst(this);
-  }
-
-  nullsLast(): NullsLast {
-    return new NullsLast(this);
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
   }
 }
 
-/**
- * NullsFirst — ORDER BY ... NULLS FIRST
- *
- * Mirrors: Arel::Nodes::NullsFirst
- */
-export class NullsFirst extends Unary {
-  reverse(): NullsLast {
-    const inner = this.expr as Ascending | Descending;
-    return new NullsLast(inner.reverse());
+export class GroupingElement extends Node {
+  readonly expressions: Node[];
+
+  constructor(expressions: Node | Node[]) {
+    super();
+    this.expressions = Array.isArray(expressions) ? expressions : [expressions];
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
   }
 }
 
-/**
- * NullsLast — ORDER BY ... NULLS LAST
- *
- * Mirrors: Arel::Nodes::NullsLast
- */
-export class NullsLast extends Unary {
-  reverse(): NullsFirst {
-    const inner = this.expr as Ascending | Descending;
-    return new NullsFirst(inner.reverse());
+export class Cube extends GroupingElement {
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}
+
+export class Rollup extends GroupingElement {
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}
+
+export class GroupingSet extends GroupingElement {
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
   }
 }

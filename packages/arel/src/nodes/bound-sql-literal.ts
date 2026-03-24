@@ -1,6 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { Quoted } from "./quoted.js";
+import { Quoted } from "./casted.js";
 
 /**
  * BoundSqlLiteral — a SQL literal with bind parameters.

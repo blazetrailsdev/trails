@@ -62,3 +62,35 @@ export class BitwiseShiftRight extends InfixOperation {
     super(">>", left, right);
   }
 }
+
+/** Math operations — these live here to match Rails infix_operation.rb */
+export class Addition extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("+", left, right);
+  }
+}
+
+export class Subtraction extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("-", left, right);
+  }
+}
+
+export class Multiplication extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("*", left, right);
+  }
+}
+
+export class Division extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("/", left, right);
+  }
+}
+
+/** String concatenation: left || right */
+export class Concat extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("||", left, right);
+  }
+}

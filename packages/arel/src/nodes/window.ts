@@ -49,24 +49,6 @@ export class NamedWindow extends Window {
   }
 }
 
-/**
- * Over — applies a window to an expression.
- */
-export class Over extends Node {
-  readonly left: Node;
-  readonly right: Node | null;
-
-  constructor(left: Node, right: Node | null = null) {
-    super();
-    this.left = left;
-    this.right = right;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-}
-
 /** Row-based frame bounds */
 export class Preceding extends Node {
   readonly expr: Node | null;

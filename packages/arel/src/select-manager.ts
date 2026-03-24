@@ -1,35 +1,35 @@
-import { Node } from "../nodes/node.js";
-import { SelectStatement } from "../nodes/select-statement.js";
-import { SelectCore } from "../nodes/select-core.js";
-import { SqlLiteral } from "../nodes/sql-literal.js";
-import { Distinct } from "../nodes/distinct.js";
-import { Offset, Limit, Lock, On, DistinctOn } from "../nodes/unary.js";
-import {
-  InnerJoin,
-  OuterJoin,
-  RightOuterJoin,
-  FullOuterJoin,
-  CrossJoin,
-  StringJoin,
-} from "../nodes/join.js";
-import type { Join } from "../nodes/join.js";
-import { Quoted } from "../nodes/quoted.js";
-import { Union, UnionAll, Intersect, Except } from "../nodes/set-operations.js";
-import { With, WithRecursive, TableAlias } from "../nodes/with.js";
-import { Exists } from "../nodes/exists.js";
-import { NamedWindow } from "../nodes/window.js";
-import { Table } from "../table.js";
-import { ToSql } from "../visitors/to-sql.js";
-import { UpdateStatement } from "../nodes/update-statement.js";
-import { Assignment } from "../nodes/binary.js";
-import { DeleteStatement } from "../nodes/delete-statement.js";
-import { Comment } from "../nodes/comment.js";
-import { Lateral } from "../nodes/lateral.js";
-import { True, False } from "../nodes/true-false.js";
-import { And } from "../nodes/and.js";
-import { Grouping } from "../nodes/grouping.js";
-import { NamedFunction } from "../nodes/named-function.js";
-import { JoinSource } from "../nodes/join-source.js";
+import { Node } from "./nodes/node.js";
+import { SelectStatement } from "./nodes/select-statement.js";
+import { SelectCore } from "./nodes/select-core.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
+import { Distinct } from "./nodes/terminal.js";
+import { Offset, Limit, Lock, On, DistinctOn } from "./nodes/unary.js";
+import { CrossJoin } from "./nodes/binary.js";
+import type { Join } from "./nodes/binary.js";
+import { InnerJoin } from "./nodes/inner-join.js";
+import { OuterJoin } from "./nodes/outer-join.js";
+import { RightOuterJoin } from "./nodes/right-outer-join.js";
+import { FullOuterJoin } from "./nodes/full-outer-join.js";
+import { StringJoin } from "./nodes/string-join.js";
+import { Quoted } from "./nodes/casted.js";
+import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
+import { With, WithRecursive } from "./nodes/with.js";
+import { TableAlias } from "./nodes/table-alias.js";
+import { Exists } from "./nodes/function.js";
+import { NamedWindow } from "./nodes/window.js";
+import { Table } from "./table.js";
+import { ToSql } from "./visitors/to-sql.js";
+import { UpdateStatement } from "./nodes/update-statement.js";
+import { Assignment } from "./nodes/binary.js";
+import { DeleteStatement } from "./nodes/delete-statement.js";
+import { Comment } from "./nodes/comment.js";
+import { Lateral } from "./nodes/unary.js";
+import { True } from "./nodes/true.js";
+import { False } from "./nodes/false.js";
+import { And } from "./nodes/and.js";
+import { Grouping } from "./nodes/grouping.js";
+import { NamedFunction } from "./nodes/named-function.js";
+import { JoinSource } from "./nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
 
 /**

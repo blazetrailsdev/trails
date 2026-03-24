@@ -1,11 +1,11 @@
-import { Node } from "../nodes/node.js";
-import { UpdateStatement } from "../nodes/update-statement.js";
-import { Assignment } from "../nodes/binary.js";
-import { Quoted } from "../nodes/quoted.js";
-import { Limit } from "../nodes/unary.js";
-import { SqlLiteral } from "../nodes/sql-literal.js";
-import { Table } from "../table.js";
-import { ToSql } from "../visitors/to-sql.js";
+import { Node } from "./nodes/node.js";
+import { UpdateStatement } from "./nodes/update-statement.js";
+import { Assignment } from "./nodes/binary.js";
+import { Quoted } from "./nodes/casted.js";
+import { Limit } from "./nodes/unary.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
+import { Table } from "./table.js";
+import { ToSql } from "./visitors/to-sql.js";
 
 /**
  * UpdateManager — chainable API for building UPDATE statements.
