@@ -1925,8 +1925,12 @@ export class CollectionProxy {
     const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
 
     // Build the through table subquery
-    const ownerFkStr = Array.isArray(ownerFk) ? ownerFk[0] : ownerFk;
-    let throughSubquery = throughTable.from().where(throughTable.get(ownerFkStr).eq(pkValue));
+    if (Array.isArray(ownerFk)) {
+      throw new Error(
+        `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+      );
+    }
+    let throughSubquery = throughTable.from().where(throughTable.get(ownerFk).eq(pkValue));
     if (throughAs) {
       throughSubquery = throughSubquery.where(
         throughTable.get(`${underscore(throughAs)}_type`).eq(ctor.name),
@@ -1935,8 +1939,18 @@ export class CollectionProxy {
 
     if (sourceAssocKind === "belongsTo") {
       const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
-      const targetFkStr = Array.isArray(targetFk) ? targetFk[0] : targetFk;
-      const targetPkCol = targetModel.primaryKey as string;
+      if (Array.isArray(targetFk)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+        );
+      }
+      if (Array.isArray(targetModel.primaryKey)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite primary keys on target model for through associations on "${this._assocName}".`,
+        );
+      }
+      const targetFkStr = targetFk;
+      const targetPkCol = targetModel.primaryKey;
 
       // Handle sourceType for polymorphic belongsTo sources
       if (sourceAssoc?.options?.polymorphic && this._assocDef.options.sourceType) {
@@ -1954,10 +1968,21 @@ export class CollectionProxy {
       return rel;
     } else {
       const sourceAsName = sourceAssoc?.options?.as;
-      const sourceFkStr = sourceAsName
-        ? ((sourceAssoc?.options?.foreignKey as string) ?? `${underscore(sourceAsName)}_id`)
-        : ((sourceAssoc?.options?.foreignKey as string) ?? `${underscore(throughClassName)}_id`);
-      const throughPkCol = throughModel.primaryKey as string;
+      const sourceFk = sourceAsName
+        ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+        : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+      if (Array.isArray(sourceFk)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+        );
+      }
+      if (Array.isArray(throughModel.primaryKey)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite primary keys on through model for "${this._assocName}".`,
+        );
+      }
+      const sourceFkStr = sourceFk;
+      const throughPkCol = throughModel.primaryKey;
 
       throughSubquery.project(throughTable.get(throughPkCol));
       const inNode = targetArelTable.get(sourceFkStr).in(throughSubquery);

@@ -3116,42 +3116,41 @@ export class Relation<T extends Base> {
         const combined = nonNull.reduce((left, right) => new Nodes.Or(left, right));
         manager.where(new Nodes.Grouping(combined));
       }
-      return;
-    }
-
-    for (const clause of this._whereClauses) {
-      for (const [key, value] of Object.entries(clause)) {
-        const attr = this._resolveColumn(table, key);
-        if (value === null) {
-          manager.where(attr.isNull());
-        } else if (value instanceof Range) {
-          if (value.excludeEnd) {
-            manager.where(attr.gteq(value.begin));
-            manager.where(attr.lt(value.end));
+    } else {
+      for (const clause of this._whereClauses) {
+        for (const [key, value] of Object.entries(clause)) {
+          const attr = this._resolveColumn(table, key);
+          if (value === null) {
+            manager.where(attr.isNull());
+          } else if (value instanceof Range) {
+            if (value.excludeEnd) {
+              manager.where(attr.gteq(value.begin));
+              manager.where(attr.lt(value.end));
+            } else {
+              manager.where(attr.between(value.begin, value.end));
+            }
+          } else if (Array.isArray(value)) {
+            manager.where(attr.in(value));
           } else {
-            manager.where(attr.between(value.begin, value.end));
+            manager.where(attr.eq(value));
           }
-        } else if (Array.isArray(value)) {
-          manager.where(attr.in(value));
-        } else {
-          manager.where(attr.eq(value));
         }
       }
-    }
-    for (const clause of this._whereNotClauses) {
-      for (const [key, value] of Object.entries(clause)) {
-        const attr = this._resolveColumn(table, key);
-        if (value === null) {
-          manager.where(attr.isNotNull());
-        } else if (value instanceof Range) {
-          manager.where(attr.notBetween(value.begin, value.end));
-        } else if (Array.isArray(value)) {
-          manager.where(attr.notIn(value));
-        } else {
-          manager.where(attr.notEq(value));
+      for (const clause of this._whereNotClauses) {
+        for (const [key, value] of Object.entries(clause)) {
+          const attr = this._resolveColumn(table, key);
+          if (value === null) {
+            manager.where(attr.isNotNull());
+          } else if (value instanceof Range) {
+            manager.where(attr.notBetween(value.begin, value.end));
+          } else if (Array.isArray(value)) {
+            manager.where(attr.notIn(value));
+          } else {
+            manager.where(attr.notEq(value));
+          }
         }
       }
-    }
+    } // end else (non-OR branch)
     // Raw SQL WHERE clauses
     for (const rawClause of this._whereRawClauses) {
       manager.where(new Nodes.SqlLiteral(rawClause));
