@@ -1,4 +1,5 @@
-import { Errors } from "./errors.js";
+import { Errors, StrictValidationFailed } from "./errors.js";
+import { ValidationError } from "./validations.js";
 import { humanize, underscore } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./type/registry.js";
@@ -1000,7 +1001,7 @@ export class Model {
         entry.validator.validate(this, entry.attribute, value, tempErrors);
         if (tempErrors.any) {
           const msg = tempErrors.fullMessages.join(", ");
-          throw new Error(`${entry.attribute} ${msg}`);
+          throw new StrictValidationFailed(`${entry.attribute} ${msg}`);
         }
       } else {
         entry.validator.validate(this, entry.attribute, value, this.errors);
@@ -1437,7 +1438,7 @@ export class Model {
    */
   validateBang(context?: string): boolean {
     if (!this.isValid(context)) {
-      throw new Error(`Validation failed: ${this.errors.fullMessages.join(", ")}`);
+      throw new ValidationError(this);
     }
     return true;
   }

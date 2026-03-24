@@ -1,7 +1,13 @@
 export { Model } from "./model.js";
 export { I18n } from "./i18n.js";
-export { Errors } from "./errors.js";
+export {
+  Errors,
+  StrictValidationFailed,
+  UnknownAttributeError,
+  ActiveModelRangeError,
+} from "./errors.js";
 export { NestedError } from "./nested-error.js";
+export { ValidationError } from "./validations.js";
 export { ModelName } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
 export { CallbackChain } from "./callbacks.js";
