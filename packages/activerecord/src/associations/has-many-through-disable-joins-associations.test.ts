@@ -114,6 +114,27 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
           disableJoins: true,
         },
       },
+      {
+        type: "hasMany",
+        name: "djMembers",
+        options: {
+          className: "DjMember",
+          through: "djComments",
+          source: "origin",
+          sourceType: "DjMember",
+        },
+      },
+      {
+        type: "hasMany",
+        name: "noJoinsDjMembers",
+        options: {
+          className: "DjMember",
+          through: "djComments",
+          source: "origin",
+          sourceType: "DjMember",
+          disableJoins: true,
+        },
+      },
     ];
     (DjPost as any)._associations = [
       {
@@ -284,7 +305,15 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it.skip("count on disable joins using relation with scope", () => {});
   it.skip("to a on disable joins with multiple scopes", () => {});
   it.skip("preloading has many through disable joins", () => {});
-  it.skip("polymophic disable joins through counting", () => {});
+
+  it("polymophic disable joins through counting", async () => {
+    const { author } = await setupData();
+    const normalCount = await association(author, "djMembers").count();
+    const noJoinsCount = await association(author, "noJoinsDjMembers").count();
+    expect(noJoinsCount).toBe(normalCount);
+    expect(normalCount).toBe(2);
+  });
+
   it.skip("polymophic disable joins through ordering", () => {});
   it.skip("polymorphic disable joins through reordering", () => {});
   it.skip("polymorphic disable joins through ordered scopes", () => {});

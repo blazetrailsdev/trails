@@ -1809,9 +1809,11 @@ export class CollectionProxy {
       throw new StrictLoadingViolationError(this._record, this._assocName);
     }
     // For through associations, scope() may not handle all cases (nested through).
-    // Fall back to toArray() which uses loadHasManyThrough's multi-query approach.
+    // Fall back to loading via the loader, filtering to persisted records only
+    // so pluck/pick don't include unsaved in-memory records.
     if (this._isThrough) {
-      return this.toArray();
+      const all = await this.toArray();
+      return all.filter((r) => !r.isNewRecord());
     }
     return this.scope().toArray();
   }
@@ -2087,60 +2089,79 @@ export async function createThroughAssociation(
     throughAssociations.find((a) => a.name === pluralize(sourceName));
   const sourceType = sourceAssocDef?.type ?? "belongsTo";
 
-  if (sourceType === "belongsTo") {
-    // belongsTo: FK on through record -> save target first to get PK, wire through, save through
-    const targetSaved = await target.save();
-    if (!targetSaved) return target;
+  let success = false;
 
-    const sourceFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
-    if (Array.isArray(sourceFk)) {
-      throw new Error("createThroughAssociation does not support composite foreign keys");
-    }
-    const targetPk =
-      (sourceAssocDef?.options?.primaryKey as string) ??
-      (target.constructor as typeof Base).primaryKey;
-    if (Array.isArray(targetPk)) {
-      throw new Error("createThroughAssociation does not support composite primary keys");
-    }
-    through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
-    if (sourceAssocDef?.options?.polymorphic) {
-      const typeCol = `${underscore(sourceName)}_type`;
-      const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
-      through.writeAttribute(typeCol, typeValue);
+  const { Rollback } = await import("./transactions.js");
+
+  await record.transaction(async () => {
+    if (sourceType === "belongsTo") {
+      // belongsTo: FK on through record -> save target first to get PK, wire through, save through
+      const targetSaved = await target.save();
+      if (!targetSaved) throw new Rollback();
+
+      const sourceFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+      if (Array.isArray(sourceFk)) {
+        throw new Error("createThroughAssociation does not support composite foreign keys");
+      }
+      const targetPk =
+        (sourceAssocDef?.options?.primaryKey as string) ??
+        (target.constructor as typeof Base).primaryKey;
+      if (Array.isArray(targetPk)) {
+        throw new Error("createThroughAssociation does not support composite primary keys");
+      }
+      through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
+      if (sourceAssocDef?.options?.polymorphic) {
+        const typeCol = `${underscore(sourceName)}_type`;
+        const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
+        through.writeAttribute(typeCol, typeValue);
+      }
+
+      const throughSaved = await through.save();
+      if (!throughSaved) throw new Rollback();
+    } else if (sourceType === "hasOne" || sourceType === "hasMany") {
+      // hasOne/hasMany: FK on target -> save through first to get PK, wire target, save target
+      const throughSaved = await through.save();
+      if (!throughSaved) throw new Rollback();
+
+      const sourceAsName = sourceAssocDef?.options?.as;
+      const targetFk = sourceAsName
+        ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+        : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`);
+      if (Array.isArray(targetFk)) {
+        throw new Error("createThroughAssociation does not support composite foreign keys");
+      }
+      const throughPk = sourceAssocDef?.options?.primaryKey ?? throughCtor.primaryKey;
+      if (Array.isArray(throughPk)) {
+        throw new Error("createThroughAssociation does not support composite primary keys");
+      }
+      target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
+      if (sourceAsName) {
+        target.writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
+      }
+      const targetSaved = await target.save();
+      if (!targetSaved) throw new Rollback();
+    } else {
+      throw new Error(
+        `createThroughAssociation: unsupported source type "${sourceType}" for ${assocName}`,
+      );
     }
 
-    const throughSaved = await through.save();
-    if (!throughSaved) return target;
-  } else if (sourceType === "hasOne" || sourceType === "hasMany") {
-    // hasOne/hasMany: FK on target -> save through first to get PK, wire target, save target
-    const throughSaved = await through.save();
-    if (!throughSaved) return target;
+    success = true;
+  });
 
-    const sourceAsName = sourceAssocDef?.options?.as;
-    const targetFk = sourceAsName
-      ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
-      : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`);
-    if (Array.isArray(targetFk)) {
-      throw new Error("createThroughAssociation does not support composite foreign keys");
-    }
-    const throughPk = sourceAssocDef?.options?.primaryKey ?? throughCtor.primaryKey;
-    if (Array.isArray(throughPk)) {
-      throw new Error("createThroughAssociation does not support composite primary keys");
-    }
-    target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
-    if (sourceAsName) {
-      target.writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
-    }
-    const targetSaved = await target.save();
-    if (!targetSaved) return target;
+  if (success) {
+    (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
+    (record as any)._cachedAssociations.set(assocName, target);
   } else {
-    throw new Error(
-      `createThroughAssociation: unsupported source type "${sourceType}" for ${assocName}`,
-    );
+    // Transaction rolled back — reset in-memory persisted state and PKs
+    for (const rec of [target, through]) {
+      rec._newRecord = true;
+      const pk = (rec.constructor as typeof Base).primaryKey;
+      if (!Array.isArray(pk)) {
+        rec.writeAttribute(pk as string, null);
+      }
+    }
   }
-
-  (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
-  (record as any)._cachedAssociations.set(assocName, target);
 
   return target;
 }
