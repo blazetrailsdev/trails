@@ -80,4 +80,4 @@ export class GroupingSet extends GroupingElement {
 
 export class Group extends Unary {}
 export class OptimizerHints extends Unary {}
-export class RollUp extends Unary {}
+export class RollUp extends Rollup {}
