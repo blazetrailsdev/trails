@@ -2066,9 +2066,11 @@ export function buildThroughAssociation(
   const ownerPk = ownerPkOption as string;
   const throughAttrs: Record<string, unknown> = {};
   if (throughAssoc.options.as) {
-    const asName = underscore(throughAssoc.options.as);
-    throughAttrs[`${asName}_id`] = record.readAttribute(ownerPk);
-    throughAttrs[`${asName}_type`] = ctor.name;
+    const polyFk = throughAssoc.options.foreignKey
+      ? (throughAssoc.options.foreignKey as string)
+      : `${underscore(throughAssoc.options.as)}_id`;
+    throughAttrs[polyFk] = record.readAttribute(ownerPk);
+    throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
   } else {
     throughAttrs[ownerFk] = record.readAttribute(ownerPk);
   }
