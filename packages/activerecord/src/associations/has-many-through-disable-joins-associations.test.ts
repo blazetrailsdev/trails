@@ -14,169 +14,174 @@ function freshAdapter(): DatabaseAdapter {
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
-  class Author extends Base {
+  class DjAuthor extends Base {
     static {
+      this._tableName = "dj_authors";
       this.attribute("name", "string");
     }
   }
 
-  class Post extends Base {
+  class DjPost extends Base {
     static {
-      this.attribute("author_id", "integer");
+      this._tableName = "dj_posts";
+      this.attribute("dj_author_id", "integer");
       this.attribute("title", "string");
       this.attribute("body", "string");
     }
   }
 
-  class Comment extends Base {
+  class DjComment extends Base {
     static {
-      this.attribute("post_id", "integer");
+      this._tableName = "dj_comments";
+      this.attribute("dj_post_id", "integer");
       this.attribute("body", "string");
       this.attribute("origin_id", "integer");
       this.attribute("origin_type", "string");
     }
   }
 
-  class Rating extends Base {
+  class DjRating extends Base {
     static {
-      this.attribute("comment_id", "integer");
+      this._tableName = "dj_ratings";
+      this.attribute("dj_comment_id", "integer");
       this.attribute("value", "integer");
     }
   }
 
-  class Member extends Base {
+  class DjMember extends Base {
     static {
+      this._tableName = "dj_members";
       this.attribute("name", "string");
-      this.attribute("member_type_id", "integer");
+      this.attribute("dj_member_type_id", "integer");
     }
   }
 
-  class MemberType extends Base {
+  class DjMemberType extends Base {
     static {
+      this._tableName = "dj_member_types";
       this.attribute("name", "string");
     }
   }
 
   beforeEach(() => {
     adapter = freshAdapter();
-    Author.adapter = adapter;
-    Post.adapter = adapter;
-    Comment.adapter = adapter;
-    Rating.adapter = adapter;
-    Member.adapter = adapter;
-    MemberType.adapter = adapter;
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Comment);
-    registerModel(Rating);
-    registerModel(Member);
-    registerModel(MemberType);
+    DjAuthor.adapter = adapter;
+    DjPost.adapter = adapter;
+    DjComment.adapter = adapter;
+    DjRating.adapter = adapter;
+    DjMember.adapter = adapter;
+    DjMemberType.adapter = adapter;
+    registerModel("DjAuthor", DjAuthor);
+    registerModel("DjPost", DjPost);
+    registerModel("DjComment", DjComment);
+    registerModel("DjRating", DjRating);
+    registerModel("DjMember", DjMember);
+    registerModel("DjMemberType", DjMemberType);
 
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
+    (DjAuthor as any)._associations = [
       {
         type: "hasMany",
-        name: "comments",
-        options: { className: "Comment", through: "posts", source: "comments" },
+        name: "djPosts",
+        options: { className: "DjPost", foreignKey: "dj_author_id" },
       },
       {
         type: "hasMany",
-        name: "noJoinsComments",
+        name: "djComments",
+        options: { className: "DjComment", through: "djPosts", source: "djComments" },
+      },
+      {
+        type: "hasMany",
+        name: "noJoinsDjComments",
         options: {
-          className: "Comment",
-          through: "posts",
-          source: "comments",
+          className: "DjComment",
+          through: "djPosts",
+          source: "djComments",
           disableJoins: true,
         },
       },
       {
         type: "hasMany",
-        name: "ratings",
-        options: { className: "Rating", through: "comments", source: "ratings" },
+        name: "djRatings",
+        options: { className: "DjRating", through: "djComments", source: "djRatings" },
       },
       {
         type: "hasMany",
-        name: "noJoinsRatings",
+        name: "noJoinsDjRatings",
         options: {
-          className: "Rating",
-          through: "comments",
-          source: "ratings",
+          className: "DjRating",
+          through: "djComments",
+          source: "djRatings",
           disableJoins: true,
         },
       },
     ];
-    (Post as any)._associations = [
+    (DjPost as any)._associations = [
       {
         type: "belongsTo",
-        name: "author",
-        options: { className: "Author", foreignKey: "author_id" },
+        name: "djAuthor",
+        options: { className: "DjAuthor", foreignKey: "dj_author_id" },
       },
       {
         type: "hasMany",
-        name: "comments",
-        options: { className: "Comment", foreignKey: "post_id" },
+        name: "djComments",
+        options: { className: "DjComment", foreignKey: "dj_post_id" },
       },
     ];
-    (Comment as any)._associations = [
+    (DjComment as any)._associations = [
       {
         type: "belongsTo",
-        name: "post",
-        options: { className: "Post", foreignKey: "post_id" },
+        name: "djPost",
+        options: { className: "DjPost", foreignKey: "dj_post_id" },
       },
       {
         type: "hasMany",
-        name: "ratings",
-        options: { className: "Rating", foreignKey: "comment_id" },
+        name: "djRatings",
+        options: { className: "DjRating", foreignKey: "dj_comment_id" },
       },
       {
         type: "belongsTo",
         name: "origin",
-        options: {
-          className: "Member",
-          foreignKey: "origin_id",
-          polymorphic: true,
-        },
+        options: { className: "DjMember", foreignKey: "origin_id", polymorphic: true },
       },
     ];
-    (Rating as any)._associations = [
+    (DjRating as any)._associations = [
       {
         type: "belongsTo",
-        name: "comment",
-        options: { className: "Comment", foreignKey: "comment_id" },
+        name: "djComment",
+        options: { className: "DjComment", foreignKey: "dj_comment_id" },
       },
     ];
-    (Member as any)._associations = [
+    (DjMember as any)._associations = [
       {
         type: "belongsTo",
-        name: "memberType",
-        options: { className: "MemberType", foreignKey: "member_type_id" },
+        name: "djMemberType",
+        options: { className: "DjMemberType", foreignKey: "dj_member_type_id" },
       },
     ];
-    (MemberType as any)._associations = [];
+    (DjMemberType as any)._associations = [];
   });
 
-  // Helper to set up standard test data
   async function setupData() {
-    const author = await Author.create({ name: "Mary" });
-    const post = await Post.create({ author_id: author.id, title: "title", body: "body" });
-    const memberType = await MemberType.create({ name: "club" });
-    const member = await Member.create({ member_type_id: memberType.id });
-    const comment = await Comment.create({
-      post_id: post.id,
+    const author = await DjAuthor.create({ name: "Mary" });
+    const post = await DjPost.create({ dj_author_id: author.id, title: "title", body: "body" });
+    const memberType = await DjMemberType.create({ name: "club" });
+    const member = await DjMember.create({ dj_member_type_id: memberType.id });
+    const comment = await DjComment.create({
+      dj_post_id: post.id,
       body: "text",
       origin_id: member.id,
-      origin_type: "Member",
+      origin_type: "DjMember",
     });
-    const post2 = await Post.create({ author_id: author.id, title: "title2", body: "body2" });
-    const member2 = await Member.create({ member_type_id: memberType.id });
-    const comment2 = await Comment.create({
-      post_id: post2.id,
+    const post2 = await DjPost.create({ dj_author_id: author.id, title: "title2", body: "body2" });
+    const member2 = await DjMember.create({ dj_member_type_id: memberType.id });
+    const comment2 = await DjComment.create({
+      dj_post_id: post2.id,
       body: "text2",
       origin_id: member2.id,
-      origin_type: "Member",
+      origin_type: "DjMember",
     });
-    const rating1 = await Rating.create({ comment_id: comment.id, value: 8 });
-    const rating2 = await Rating.create({ comment_id: comment.id, value: 9 });
+    const rating1 = await DjRating.create({ dj_comment_id: comment.id, value: 8 });
+    const rating2 = await DjRating.create({ dj_comment_id: comment.id, value: 9 });
     return {
       author,
       post,
@@ -193,10 +198,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("counting on disable joins through", async () => {
     const { author } = await setupData();
-    const commentsProxy = association(author, "comments");
-    const noJoinsProxy = association(author, "noJoinsComments");
-    const normalCount = await commentsProxy.count();
-    const noJoinsCount = await noJoinsProxy.count();
+    const normalCount = await association(author, "djComments").count();
+    const noJoinsCount = await association(author, "noJoinsDjComments").count();
     expect(noJoinsCount).toBe(normalCount);
     expect(normalCount).toBe(2);
   });
@@ -205,8 +208,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("pluck on disable joins through", async () => {
     const { author } = await setupData();
-    const normalIds = (await association(author, "comments").pluck("id")).sort();
-    const noJoinsIds = (await association(author, "noJoinsComments").pluck("id")).sort();
+    const normalIds = (await association(author, "djComments").pluck("id")).sort();
+    const noJoinsIds = (await association(author, "noJoinsDjComments").pluck("id")).sort();
     expect(noJoinsIds).toEqual(normalIds);
   });
 
@@ -214,8 +217,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("fetching on disable joins through", async () => {
     const { author } = await setupData();
-    const normalFirst = await association(author, "comments").first();
-    const noJoinsFirst = await association(author, "noJoinsComments").first();
+    const normalFirst = await association(author, "djComments").first();
+    const noJoinsFirst = await association(author, "noJoinsDjComments").first();
     expect(noJoinsFirst).not.toBeNull();
     expect(noJoinsFirst!.id).toBe(normalFirst!.id);
   });
@@ -224,8 +227,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("to a on disable joins through", async () => {
     const { author } = await setupData();
-    const normalComments = await association(author, "comments").toArray();
-    const noJoinsComments = await association(author, "noJoinsComments").toArray();
+    const normalComments = await association(author, "djComments").toArray();
+    const noJoinsComments = await association(author, "noJoinsDjComments").toArray();
     const normalIds = normalComments.map((c: any) => c.id).sort();
     const noJoinsIds = noJoinsComments.map((c: any) => c.id).sort();
     expect(noJoinsIds).toEqual(normalIds);
@@ -233,20 +236,20 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("appending on disable joins through", async () => {
     const { author, post } = await setupData();
-    const before = await association(author, "noJoinsComments").count();
-    await Comment.create({ post_id: post.id, body: "new" });
-    const after = await association(author, "noJoinsComments").count();
+    const before = await association(author, "noJoinsDjComments").count();
+    await DjComment.create({ dj_post_id: post.id, body: "new" });
+    const after = await association(author, "noJoinsDjComments").count();
     expect(after).toBe(before + 1);
   });
 
   it.skip("appending on disable joins through using custom foreign key", () => {});
 
   it("empty on disable joins through", async () => {
-    const emptyAuthor = await Author.create({ name: "Bob" });
-    const noJoinsComments = await loadHasMany(emptyAuthor, "noJoinsComments", {
-      className: "Comment",
-      through: "posts",
-      source: "comments",
+    const emptyAuthor = await DjAuthor.create({ name: "Bob" });
+    const noJoinsComments = await loadHasMany(emptyAuthor, "noJoinsDjComments", {
+      className: "DjComment",
+      through: "djPosts",
+      source: "djComments",
       disableJoins: true,
     });
     expect(noJoinsComments).toEqual([]);
@@ -256,16 +259,16 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("pluck on disable joins through a through", async () => {
     const { author, rating1, rating2 } = await setupData();
-    const normalIds = (await association(author, "ratings").pluck("id")).sort();
-    const noJoinsIds = (await association(author, "noJoinsRatings").pluck("id")).sort();
+    const normalIds = (await association(author, "djRatings").pluck("id")).sort();
+    const noJoinsIds = (await association(author, "noJoinsDjRatings").pluck("id")).sort();
     expect(noJoinsIds).toEqual(normalIds);
     expect(normalIds).toEqual([rating1.id, rating2.id].sort());
   });
 
   it("count on disable joins through a through", async () => {
     const { author } = await setupData();
-    const normalCount = await association(author, "ratings").count();
-    const noJoinsCount = await association(author, "noJoinsRatings").count();
+    const normalCount = await association(author, "djRatings").count();
+    const noJoinsCount = await association(author, "noJoinsDjRatings").count();
     expect(noJoinsCount).toBe(normalCount);
     expect(normalCount).toBe(2);
   });
