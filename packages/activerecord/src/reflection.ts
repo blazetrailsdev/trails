@@ -193,6 +193,15 @@ export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
  * Mirrors: ActiveRecord::Base.reflect_on_association
  */
 function buildReflection(assocDef: any, modelClass: typeof Base): AssociationReflection {
+  // HABTM is internally backed by has_many :through, but reflected as HABTM
+  if (assocDef.type === "hasAndBelongsToMany") {
+    return new AssociationReflection(
+      assocDef.name,
+      "hasAndBelongsToMany",
+      assocDef.options,
+      modelClass,
+    );
+  }
   if (
     assocDef.options.through ||
     assocDef.type === "hasManyThrough" ||
@@ -232,6 +241,11 @@ export function reflectOnAllAssociations(
   const associations: any[] = (modelClass as any)._associations ?? [];
   const filtered = macro
     ? associations.filter((a) => {
+        // HABTM is internally implemented as has_many :through, but should
+        // still be reported as hasAndBelongsToMany for reflection purposes
+        if (a.type === "hasAndBelongsToMany") {
+          return macro === "hasAndBelongsToMany";
+        }
         if (a.options?.through || a.type === "hasManyThrough" || a.type === "hasOneThrough") {
           const normalized =
             a.type === "hasOneThrough" || a.type === "hasOne" ? "hasOne" : "hasMany";
