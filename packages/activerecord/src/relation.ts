@@ -3116,9 +3116,7 @@ export class Relation<T extends Base> {
         this._combineNodes(this._collectAllWhereNodes(table, this)),
       ];
       for (const orRel of this._orRelations) {
-        allBranches.push(
-          this._combineNodes(this._collectAllWhereNodes(table, orRel as unknown as Relation<T>)),
-        );
+        allBranches.push(this._combineNodes(this._collectAllWhereNodes(table, orRel)));
       }
       const nonNull = allBranches.filter((n): n is Nodes.Node => n !== null);
       if (nonNull.length > 0) {
