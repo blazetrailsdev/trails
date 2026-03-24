@@ -86,33 +86,29 @@ These are sequential — each builds on the previous.
 
 ### 1C. Autosave propagation
 
-**What exists:** `autosave.ts` has `autosaveAssociations()` called after parent save. It handles hasMany, hasOne, belongsTo, HABTM. `markForDestruction` / `isMarkedForDestruction` exist. Error propagation via `propagateErrors`.
+**Done:**
 
-**What's missing:**
+- `validateAssociations()` runs during parent `isValid()`, propagating child errors. Works for all associations where `validate !== false`. Cycle guard via WeakSet. Passes validation context. 3 tests unskipped.
+- `autosaveBelongsTo` runs before parent INSERT/UPDATE (sets FK). `autosaveChildren` runs after (children need parent PK). Cycle guard on both. 3 tests unskipped.
+- `validate` option added to `AssociationOptions`.
 
-1. **Rollback on failure** — Tests like "should rollback destructions if an exception occurred while saving" (autosave-association.test.ts:127). Currently if a child destroy fails mid-way, already-destroyed children aren't rolled back.
+**Remaining follow-ups (58 skipped):**
 
-   Rails source: `autosave_association.rb` wraps autosave in `save_has_many_records` with transaction.
+1. **Transaction rollback for autosave** (~7 tests) — wrap save+autosave in a transaction so destroyed children roll back if a later save fails. Rails: `save_collection_association` runs inside the parent's transaction.
 
-   **Implementation:** Wrap `autosaveHasMany` and friends in the transaction mechanism from `transactions.ts`. If any child save/destroy fails, roll back all changes in that batch.
+2. **Callback ordering on update** (~2 tests) — verify after_update timing relative to autosave.
 
-2. **Validation propagation without autosave** — Rails validates associated records even without `autosave: true` if the records are new or marked for destruction. Currently we only process associations with `autosave: true`.
+3. **Double-save / inverse callbacks** (~4 tests) — saving same child twice, polymorphic inverse_of callback scenarios.
 
-   Rails source: `autosave_association.rb#validate_single_association`, `#validate_collection_association`
+4. **`validate: false` at depth** (~1 test) — `save({ validate: false })` should skip association validation at all nesting levels.
 
-   **Implementation:** In `autosaveAssociations`, also validate (but don't save) associations that don't have `autosave: true` but have new/changed records. Add validation errors to parent if invalid.
+5. **CPK autosave** (~3 tests) — composite primary key autosave.
 
-3. **Callback ordering** — "callbacks firing order on create/update/save" (autosave-association.test.ts:814-838). Autosave callbacks should fire in a specific order relative to the parent's save callbacks.
+6. **Store in two relations** (~3 tests) — same record referenced by two associations, saved once.
 
-   Rails source: `autosave_association.rb` registers callbacks via `before_save`, `after_create`, `after_update`.
+7. **save! / callback cancelling** (~2 tests) — `save!` raising RecordInvalid, callback returning false stopping save.
 
-   **Implementation:** Hook autosave into the callback chain in `base.ts` save flow. Currently `autosaveAssociations` is called after save — it may need to be split into before-save (for belongsTo that need FK set before parent INSERT) and after-save (for hasMany that need parent PK).
-
-4. **`validate: false` bypass** — "should allow to bypass validations on associated models at any depth" (autosave-association.test.ts:967).
-
-**Files to modify:** `autosave.ts`, `base.ts` (save flow)
-
-**Tests unblocked:** autosave (~40), nested-attributes (~10)
+8. **Various edge cases** (~35 tests) — error message deduplication, inverse polymorphic changes, etc.
 
 ---
 
