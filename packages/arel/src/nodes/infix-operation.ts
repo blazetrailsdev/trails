@@ -94,3 +94,17 @@ export class Concat extends InfixOperation {
     super("||", left, right);
   }
 }
+
+/** PostgreSQL @> contains operator */
+export class Contains extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("@>", left, right);
+  }
+}
+
+/** PostgreSQL && overlaps operator */
+export class Overlaps extends InfixOperation {
+  constructor(left: Node, right: Node) {
+    super("&&", left, right);
+  }
+}

@@ -2,6 +2,8 @@ import { Unary } from "./unary.js";
 import type { Ascending } from "./ascending.js";
 import type { Descending } from "./descending.js";
 
+export class Ordering extends Unary {}
+
 export class NullsFirst extends Unary {
   reverse(): NullsLast {
     const inner = this.expr as Ascending | Descending;

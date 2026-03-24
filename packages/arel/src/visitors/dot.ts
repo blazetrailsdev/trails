@@ -1,5 +1,29 @@
 import { Node } from "../nodes/node.js";
 
+export class DotNode {
+  readonly name: string;
+  readonly id: string;
+  readonly fields: string[];
+
+  constructor(name: string, id: string, fields: string[] = []) {
+    this.name = name;
+    this.id = id;
+    this.fields = fields;
+  }
+}
+
+export class DotEdge {
+  readonly name: string;
+  readonly from: DotNode;
+  readonly to: DotNode;
+
+  constructor(name: string, from: DotNode, to: DotNode) {
+    this.name = name;
+    this.from = from;
+    this.to = to;
+  }
+}
+
 /**
  * Dot visitor — renders the AST as a Graphviz dot graph.
  *

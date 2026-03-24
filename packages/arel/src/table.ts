@@ -1,4 +1,5 @@
 import { Attribute } from "./attributes/attribute.js";
+import { EmptyJoinError } from "./errors.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./select-manager.js";
@@ -113,7 +114,7 @@ export class Table extends Node {
     const manager = new SelectManager(this);
     if (relation === null) return manager;
     if (typeof relation === "string" && relation.trim() === "") {
-      throw new Error("EmptyJoinError");
+      throw new EmptyJoinError("EmptyJoinError");
     }
     manager.join(relation, klass);
     return manager;

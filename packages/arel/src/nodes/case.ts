@@ -1,6 +1,7 @@
 import { Node, NodeVisitor } from "./node.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { As } from "./binary.js";
+import { As, Binary } from "./binary.js";
+import { Unary } from "./unary.js";
 
 /** Writable view of Case for internal mutation during construction. */
 type MutableCase = Case & {
@@ -80,3 +81,6 @@ export class Case extends Node {
     return visitor.visit(this);
   }
 }
+
+export class When extends Binary {}
+export class Else extends Unary {}

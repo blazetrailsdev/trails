@@ -6,6 +6,8 @@ export { SelectManager } from "./select-manager.js";
 export { InsertManager } from "./insert-manager.js";
 export { UpdateManager } from "./update-manager.js";
 export { DeleteManager } from "./delete-manager.js";
+export { TreeManager } from "./tree-manager.js";
+export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
 

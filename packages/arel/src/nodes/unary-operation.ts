@@ -35,3 +35,9 @@ export class UnaryOperation extends Node {
     return visitor.visit(this);
   }
 }
+
+export class BitwiseNot extends UnaryOperation {
+  constructor(operand: Node) {
+    super("~", operand);
+  }
+}

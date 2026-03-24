@@ -77,3 +77,7 @@ export class GroupingSet extends GroupingElement {
     return visitor.visit(this);
   }
 }
+
+export class Group extends Unary {}
+export class OptimizerHints extends Unary {}
+export class RollUp extends Rollup {}
