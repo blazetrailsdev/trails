@@ -2042,7 +2042,8 @@ export function buildThroughAssociation(
   }
 
   // Build target record with STI support
-  const targetClassName = assocDef.options.className ?? camelize(singularize(assocName));
+  // has_one uses camelize(name) directly; singularize is for has_many
+  const targetClassName = assocDef.options.className ?? camelize(assocName);
   let targetModel = resolveModel(targetClassName);
   const inheritanceCol = getInheritanceColumn(targetModel);
   if (inheritanceCol && attrs[inheritanceCol]) {
@@ -2094,11 +2095,7 @@ export async function createThroughAssociation(
 
   const { target, through } = buildThroughAssociation(record, assocName, attrs);
 
-  const targetSaved = await target.save();
-  if (!targetSaved) return target;
-
-  // Wire the source FK on the intermediate to point to the saved target.
-  // Resolve from the through model's association definitions to respect custom FK/PK.
+  // Resolve source type before any saves to determine save ordering
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName)!;
   const sourceName = assocDef.options.source ?? assocName;
@@ -2106,10 +2103,13 @@ export async function createThroughAssociation(
   const throughCtor = through.constructor as typeof Base;
   const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
   const sourceAssocDef = throughAssociations.find((a) => a.name === sourceName);
-
   const sourceType = sourceAssocDef?.type ?? "belongsTo";
 
   if (sourceType === "belongsTo") {
+    // belongsTo: FK on through record -> save target first to get PK, wire through, save through
+    const targetSaved = await target.save();
+    if (!targetSaved) return target;
+
     const sourceFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
     if (Array.isArray(sourceFk)) {
       throw new Error("createThroughAssociation does not support composite foreign keys");
@@ -2121,17 +2121,18 @@ export async function createThroughAssociation(
       throw new Error("createThroughAssociation does not support composite primary keys");
     }
     through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
-    // Polymorphic source: also set the type column
     if (sourceAssocDef?.options?.polymorphic) {
       const typeCol = `${underscore(sourceName)}_type`;
       const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
       through.writeAttribute(typeCol, typeValue);
     }
+
+    const throughSaved = await through.save();
+    if (!throughSaved) return target;
   } else if (sourceType === "hasOne" || sourceType === "hasMany") {
-    // FK lives on the target side, pointing back to the through record.
-    // Save through first to get its PK, then wire target.
-    const throughSavedFirst = await through.save();
-    if (!throughSavedFirst) return target;
+    // hasOne/hasMany: FK on target -> save through first to get PK, wire target, save target
+    const throughSaved = await through.save();
+    if (!throughSaved) return target;
 
     const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`;
     if (Array.isArray(targetFk)) {
@@ -2142,18 +2143,12 @@ export async function createThroughAssociation(
       throw new Error("createThroughAssociation does not support composite primary keys");
     }
     target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
-    const targetResaved = await target.save();
-    if (!targetResaved) return target;
+    const targetSaved = await target.save();
+    if (!targetSaved) return target;
   } else {
     throw new Error(
       `createThroughAssociation: unsupported source type "${sourceType}" for ${assocName}`,
     );
-  }
-
-  // For belongsTo source, through hasn't been saved yet
-  if (sourceType === "belongsTo") {
-    const throughSaved = await through.save();
-    if (!throughSaved) return target;
   }
 
   (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
