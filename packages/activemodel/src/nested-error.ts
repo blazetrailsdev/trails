@@ -1,38 +1,33 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
+import { Error as ActiveModelError } from "./error.js";
 
-import { humanize } from "@rails-ts/activesupport";
-import { I18n } from "./i18n.js";
-import type { ErrorDetail } from "./errors.js";
+interface ErrorLike {
+  attribute: string;
+  type: string;
+  rawType?: string;
+  message: string;
+  options?: Record<string, unknown>;
+}
 
-export class NestedError {
-  readonly base: unknown;
-  readonly innerError: ErrorDetail;
-  readonly attribute: string;
+/**
+ * NestedError — wraps an error from an associated model.
+ *
+ * Mirrors: ActiveModel::NestedError
+ */
+export class NestedError extends ActiveModelError {
+  readonly innerError: ErrorLike;
 
-  constructor(base: unknown, innerError: ErrorDetail, options?: { attribute?: string }) {
-    this.base = base;
+  constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    base: any,
+    innerError: ErrorLike,
+    options?: { attribute?: string },
+  ) {
+    const attribute = options?.attribute ?? innerError.attribute;
+    super(base, attribute, innerError.rawType ?? innerError.type, innerError.options ?? {});
     this.innerError = innerError;
-    this.attribute = options?.attribute ?? innerError.attribute;
   }
 
-  get message(): string {
+  override get message(): string {
     return this.innerError.message;
-  }
-
-  get fullMessage(): string {
-    if (this.attribute === "base") return this.message;
-    const modelClass = (this.base as AnyRecord)?.constructor;
-    const humanAttr = modelClass?.humanAttributeName
-      ? modelClass.humanAttributeName(this.attribute)
-      : humanize(this.attribute);
-    const format = I18n.t("activemodel.errors.format", {
-      defaultValue: "%{attribute} %{message}",
-    });
-    return format.replace("%{attribute}", humanAttr).replace("%{message}", this.message);
-  }
-
-  get type(): string {
-    return this.innerError.type;
   }
 }
