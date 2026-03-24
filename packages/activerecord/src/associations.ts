@@ -1998,6 +1998,97 @@ export class CollectionProxy {
 }
 
 /**
+ * Build a target record for a has_one :through association, along with
+ * the intermediate (through) record. The intermediate record gets the
+ * owner FK set; the source FK is wired when the target is saved.
+ *
+ * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#build
+ */
+export function buildThroughAssociation(
+  record: Base,
+  assocName: string,
+  attrs: Record<string, unknown> = {},
+): { target: Base; through: Base } {
+  const ctor = record.constructor as typeof Base;
+  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a) => a.name === assocName);
+  if (!assocDef || !assocDef.options.through) {
+    throw new Error(`Association "${assocName}" is not a through association on ${ctor.name}`);
+  }
+
+  const throughAssoc = associations.find((a) => a.name === assocDef.options.through);
+  if (!throughAssoc) {
+    throw new Error(`Through association "${assocDef.options.through}" not found on ${ctor.name}`);
+  }
+
+  // Build target record
+  const targetClassName = assocDef.options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveModel(targetClassName);
+  const target = new targetModel(attrs);
+
+  // Build intermediate record with owner FK
+  const throughClassName =
+    throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+  const throughModel = resolveModel(throughClassName);
+  const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+  const throughAttrs: Record<string, unknown> = {
+    [ownerFk as string]: record.readAttribute(ownerPk as string),
+  };
+  // Handle polymorphic through
+  if (throughAssoc.options.as) {
+    throughAttrs[`${underscore(throughAssoc.options.as)}_id`] = record.readAttribute(
+      ownerPk as string,
+    );
+    throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
+    delete throughAttrs[ownerFk as string];
+  }
+  const through = new throughModel(throughAttrs);
+
+  // Cache the target on the owner
+  (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
+  (record as any)._cachedAssociations.set(assocName, target);
+
+  return { target, through };
+}
+
+/**
+ * Create a target record for a has_one :through association, along with
+ * the intermediate (through) record. Both records are persisted.
+ *
+ * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#create
+ */
+export async function createThroughAssociation(
+  record: Base,
+  assocName: string,
+  attrs: Record<string, unknown> = {},
+): Promise<Base> {
+  const { target, through } = buildThroughAssociation(record, assocName, attrs);
+
+  // Save the target first
+  const targetSaved = await target.save();
+  if (!targetSaved) return target;
+
+  // Wire the source FK on the intermediate to point to the saved target
+  const ctor = record.constructor as typeof Base;
+  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a) => a.name === assocName)!;
+  const sourceName = assocDef.options.source ?? assocName;
+  const sourceFk = `${underscore(sourceName)}_id`;
+  const targetPk = (target.constructor as typeof Base).primaryKey as string;
+  through.writeAttribute(sourceFk, target.readAttribute(targetPk));
+
+  // Save the intermediate
+  await through.save();
+
+  // Cache on owner
+  (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
+  (record as any)._cachedAssociations.set(assocName, target);
+
+  return target;
+}
+
+/**
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
