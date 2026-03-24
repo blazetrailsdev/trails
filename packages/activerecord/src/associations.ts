@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { Table as ArelTable } from "@rails-ts/arel";
 import {
   StrictLoadingViolationError,
   DeleteRestrictionError,
@@ -1795,11 +1796,7 @@ export class CollectionProxy {
     if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
       throw new StrictLoadingViolationError(this._record, this._assocName);
     }
-    // Use scope() for direct has_many (DB-level), fall back to toArray for through/HABTM
-    if (!this._isThrough && !this._isHabtm) {
-      return this.scope().toArray();
-    }
-    return this.toArray();
+    return this.scope().toArray();
   }
 
   async pluck(...columns: string[]): Promise<unknown[]> {
@@ -1830,10 +1827,11 @@ export class CollectionProxy {
   }
 
   scope(): any {
-    if (this._isHabtm || this._isThrough) {
-      throw new Error(
-        `CollectionProxy#scope for through/HABTM requires Arel-based Relation#where (not yet implemented) on "${this._assocName}".`,
-      );
+    if (this._isHabtm) {
+      return this._buildHabtmScope();
+    }
+    if (this._isThrough) {
+      return this._buildThroughScope();
     }
 
     const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
@@ -1847,6 +1845,155 @@ export class CollectionProxy {
       return emptyRel.none();
     }
     return rel;
+  }
+
+  private _buildHabtmScope(): any {
+    const ctor = this._record.constructor as typeof Base;
+    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+    const targetModel = resolveModel(className);
+    const joinTableName =
+      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
+    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
+    const targetFk = `${underscore(singularize(this._assocName))}_id`;
+    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
+    const pkValue = this._record.readAttribute(ownerPkCol);
+
+    if (pkValue == null) return (targetModel as any).all().none();
+
+    const targetPkCol = targetModel.primaryKey;
+    if (Array.isArray(targetPkCol)) {
+      throw new Error(
+        "HABTM associations do not support composite primary keys on the target model",
+      );
+    }
+
+    // Build: WHERE "targets"."id" IN (SELECT "target_fk" FROM "join_table" WHERE "owner_fk" = ?)
+    const joinTable = new ArelTable(joinTableName);
+    const subquery = joinTable
+      .project(joinTable.get(targetFk))
+      .where(joinTable.get(ownerFk).eq(pkValue));
+
+    const targetArelTable = new ArelTable(targetModel.tableName);
+    const inNode = targetArelTable.get(targetPkCol as string).in(subquery);
+
+    let rel = (targetModel as any).all().where(inNode);
+    if (this._assocDef.options.scope) {
+      rel = this._assocDef.options.scope(rel);
+    }
+    return rel;
+  }
+
+  private _buildThroughScope(): any {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) {
+      throw new Error(
+        `Through association "${this._assocDef.options.through}" not found on ${ctor.name}`,
+      );
+    }
+
+    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+    const targetModel = resolveModel(className);
+    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+
+    const throughClassName =
+      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    const throughModel = resolveModel(throughClassName);
+    const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
+    const sourceAssoc =
+      throughModelAssocs.find((a) => a.name === sourceName) ??
+      throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+
+    const throughAs = throughAssoc.options.as;
+    const ownerFk = throughAs
+      ? (throughAssoc.options.foreignKey ?? `${underscore(throughAs)}_id`)
+      : (throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+    const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+
+    if (Array.isArray(ownerPk)) {
+      throw new Error(
+        `CollectionProxy#scope does not support composite primary keys for through associations on "${this._assocName}".`,
+      );
+    }
+
+    const pkValue = this._record.readAttribute(ownerPk as string);
+    if (pkValue == null) return (targetModel as any).all().none();
+
+    const throughTable = new ArelTable(throughModel.tableName);
+    const targetArelTable = new ArelTable(targetModel.tableName);
+    const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+
+    // Build the through table subquery
+    if (Array.isArray(ownerFk)) {
+      throw new Error(
+        `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+      );
+    }
+    let throughSubquery = throughTable.from().where(throughTable.get(ownerFk).eq(pkValue));
+    if (throughAs) {
+      throughSubquery = throughSubquery.where(
+        throughTable.get(`${underscore(throughAs)}_type`).eq(ctor.name),
+      );
+    }
+
+    if (sourceAssocKind === "belongsTo") {
+      const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+      if (Array.isArray(targetFk)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+        );
+      }
+      if (Array.isArray(targetModel.primaryKey)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite primary keys on target model for through associations on "${this._assocName}".`,
+        );
+      }
+      const targetFkStr = targetFk;
+      const targetPkCol = targetModel.primaryKey;
+
+      // Handle sourceType for polymorphic belongsTo sources
+      if (sourceAssoc?.options?.polymorphic && this._assocDef.options.sourceType) {
+        const sourceTypeCol = `${underscore(sourceAssoc.name ?? sourceName)}_type`;
+        throughSubquery = throughSubquery.where(
+          throughTable.get(sourceTypeCol).eq(this._assocDef.options.sourceType),
+        );
+      }
+
+      throughSubquery.project(throughTable.get(targetFkStr));
+      const inNode = targetArelTable.get(targetPkCol).in(throughSubquery);
+
+      let rel = (targetModel as any).all().where(inNode);
+      if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
+      return rel;
+    } else {
+      const sourceAsName = sourceAssoc?.options?.as;
+      const sourceFk = sourceAsName
+        ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+        : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+      if (Array.isArray(sourceFk)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+        );
+      }
+      if (Array.isArray(throughModel.primaryKey)) {
+        throw new Error(
+          `CollectionProxy#scope does not support composite primary keys on through model for "${this._assocName}".`,
+        );
+      }
+      const sourceFkStr = sourceFk;
+      const throughPkCol = throughModel.primaryKey;
+
+      throughSubquery.project(throughTable.get(throughPkCol));
+      const inNode = targetArelTable.get(sourceFkStr).in(throughSubquery);
+
+      let rel = (targetModel as any).all().where(inNode);
+      if (sourceAsName) {
+        rel = rel.where({ [`${underscore(sourceAsName)}_type`]: throughClassName });
+      }
+      if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
+      return rel;
+    }
   }
 }
 

@@ -24,6 +24,27 @@ The core source files and their roles:
 
 Association loading flow: `base.ts` accessor -> `loadHasMany`/`loadBelongsTo`/etc. in `associations.ts` -> builds a `Relation` query -> executes via adapter. Collections return `CollectionProxy` wrapping the results.
 
+### Raw SQL that should be converted to Arel
+
+`Relation#where` now accepts Arel nodes. The following places still construct raw SQL strings and should be migrated to use Arel managers/nodes instead:
+
+**associations.ts** — HABTM join table operations (4 calls):
+
+- `loadHabtm`: `SELECT target_fk FROM join_table WHERE owner_fk = ?` — use `SelectManager`
+- `_pushHabtm`: `INSERT INTO join_table ...` — use `InsertManager`
+- `_deleteHabtm`: `DELETE FROM join_table WHERE ...` — use `DeleteManager`
+- `processDependentAssociations`: `DELETE FROM join_table WHERE ...` — use `DeleteManager`
+
+All four use manual quoting (`pkQuoted`/`targetQuoted`) which should be replaced by Arel's value binding.
+
+**relation.ts** — raw SQL in `_whereRawClauses`:
+
+- Relation subquery: `WHERE col IN (SELECT ...)` (line ~167) — use `Attribute.in(subqueryRelation)`
+- `whereAssociated`/`whereMissing` (lines ~244, ~284) — build association subqueries with Arel instead of raw SQL strings
+- `findEach`/`findInBatches` cursor (lines ~2849-2905) — `pk >= ?` / `pk > ?` conditions should use `Attribute.gteq()`/`Attribute.gt()`
+
+Note: `where("raw sql ?", bind)` from user code is intentional (Rails supports this) and should stay.
+
 ---
 
 ## Phase 1: Core associations (do first — unblocks ~500 tests)
@@ -36,11 +57,9 @@ These are sequential — each builds on the previous.
 
 **Done:** Target tracking (`_target`/`_loaded`), proxy caching per record, `build`/`push` append without loading, `load`/`reload`/`reset`, `pluck`/`pick`, `scope()`, callback gating on `_target` mutations. 10 tests unskipped.
 
-**Remaining follow-up:**
-
-1. **`scope()` for through/HABTM** — Requires `Relation#where` to accept Arel nodes (specifically `Nodes.In` with a `SelectManager` subquery). Once that's done, scope() can use `targetAttr.in(throughTable.project(fkCol).where(...))` instead of raw SQL. Tracked as a separate PR.
-
 **Tests unblocked:** associations.test.ts (~30), counter-cache.test.ts (~15), HABTM (~10), HMT (~10)
+
+**Note:** `Relation#where` now accepts Arel nodes (e.g. `Nodes.In`, `Attribute.eq`). `scope()` uses Arel subqueries for through/HABTM associations via `targetAttr.in(throughTable.project(fkCol).where(...))`. No raw SQL.
 
 ---
 
