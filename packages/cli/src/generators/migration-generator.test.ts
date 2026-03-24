@@ -72,4 +72,49 @@ describe("MigrationGenerator", () => {
     expect(lines[0]).toContain("create");
     expect(lines[0]).toContain("db/migrations/");
   });
+
+  it("handles references type in createTable", () => {
+    const gen = makeGen();
+    const files = gen.run("CreatePosts", ["title:string", "user:references"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('t.references("user", { foreignKey: true })');
+    expect(content).toContain('t.string("title")');
+  });
+
+  it("handles belongs_to type in createTable", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateComments", ["post:belongs_to"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('t.references("post", { foreignKey: true })');
+  });
+
+  it("handles addReference from Add*To* name", () => {
+    const gen = makeGen();
+    const files = gen.run("AddUserToPosts", ["user:references"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('addReference("posts", "user", { foreignKey: true })');
+    expect(content).toContain('removeReference("posts", "user")');
+  });
+
+  it("handles removeReference from Remove*From* name", () => {
+    const gen = makeGen();
+    const files = gen.run("RemoveUserFromPosts", ["user:references"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('removeReference("posts", "user")');
+    expect(content).toContain('addReference("posts", "user", { foreignKey: true })');
+  });
+
+  it("handles index modifier on columns", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateUsers", ["email:string:index"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('addIndex("users", "email")');
+  });
+
+  it("handles uniq modifier on columns", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateUsers", ["email:string:uniq"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('addIndex("users", "email", { unique: true })');
+  });
 });

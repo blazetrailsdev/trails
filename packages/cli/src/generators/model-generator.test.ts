@@ -72,4 +72,27 @@ describe("ModelGenerator", () => {
     gen.run("User", ["name:string"]);
     expect(lines.filter((l) => l.includes("create")).length).toBeGreaterThanOrEqual(3);
   });
+
+  it("skips migration with --no-migration", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"], { migration: false });
+    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeUndefined();
+    expect(files).toContain("src/app/models/user.ts");
+    expect(files).toContain("test/models/user.test.ts");
+  });
+
+  it("skips test with --no-test", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"], { test: false });
+    expect(files.find((f) => f.includes("test/"))).toBeUndefined();
+    expect(files).toContain("src/app/models/user.ts");
+    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeDefined();
+  });
+
+  it("handles references type as belongsTo", () => {
+    const gen = makeGen();
+    gen.run("Comment", ["post:references"]);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
+    expect(content).toContain('this.belongsTo("post")');
+  });
 });

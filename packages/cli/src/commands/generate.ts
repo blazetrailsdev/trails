@@ -14,9 +14,11 @@ export function generateCommand(): Command {
     .description("Generate a model with attributes")
     .argument("<name>", "Model name (e.g. User)")
     .argument("[attributes...]", "Attributes as name:type pairs")
-    .action((name: string, attributes: string[]) => {
+    .option("--no-migration", "Skip migration generation")
+    .option("--no-test", "Skip test file generation")
+    .action((name: string, attributes: string[], opts: { migration: boolean; test: boolean }) => {
       const gen = new ModelGenerator({ cwd: process.cwd(), output: console.log });
-      gen.run(name, attributes);
+      gen.run(name, attributes, { migration: opts.migration, test: opts.test });
     });
 
   cmd

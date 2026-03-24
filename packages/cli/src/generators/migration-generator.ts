@@ -5,9 +5,61 @@ import {
   classify,
   underscore,
   dasherize,
-  parseColumns,
   ColumnType,
 } from "./base.js";
+
+interface ParsedColumn {
+  name: string;
+  type: ColumnType;
+  index?: boolean;
+  unique?: boolean;
+}
+
+function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
+  const columns: ParsedColumn[] = [];
+  for (const arg of args) {
+    if (arg.startsWith("-")) continue;
+    const parts = arg.split(":");
+    const [name, type, ...modifiers] = parts;
+    if (!name || !type) continue;
+    columns.push({
+      name,
+      type: type as ColumnType,
+      index: modifiers.includes("index") || modifiers.includes("uniq"),
+      unique: modifiers.includes("uniq"),
+    });
+  }
+  return columns;
+}
+
+function isReference(type: string): boolean {
+  return type === "references" || type === "belongs_to";
+}
+
+function referenceOpts(col: ParsedColumn): string {
+  const opts: string[] = ["foreignKey: true"];
+  if (col.unique) {
+    opts.push("index: { unique: true }");
+  }
+  return `{ ${opts.join(", ")} }`;
+}
+
+function columnLine(col: ParsedColumn): string {
+  if (isReference(col.type)) {
+    return `      t.references("${col.name}", ${referenceOpts(col)});`;
+  }
+  return `      t.${col.type}("${col.name}");`;
+}
+
+function indexLines(table: string, columns: ParsedColumn[]): string {
+  const lines: string[] = [];
+  for (const col of columns) {
+    if (!col.index || isReference(col.type)) continue; // references auto-index
+    const opts = col.unique ? ", { unique: true }" : "";
+    lines.push(`    await this.addIndex("${table}", "${col.name}"${opts});`);
+  }
+  return lines.join("\n");
+}
 
 export class MigrationGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
@@ -15,7 +67,7 @@ export class MigrationGenerator extends GeneratorBase {
   }
 
   run(name: string, args: string[]): string[] {
-    const columns = parseColumns(args);
+    const columns = parseColumnsWithModifiers(args);
     const className = classify(name);
     const body = this.inferBody(name, className, columns);
     const timestamp = migrationTimestamp();
@@ -43,45 +95,73 @@ ${body.down}
   }
 
   private inferBody(
-    name: string,
-    className: string,
-    columns: Array<{ name: string; type: ColumnType }>,
+    _name: string,
+    _className: string,
+    columns: ParsedColumn[],
   ): { up: string; down: string } {
     // CreateUsers -> createTable("users", ...)
-    const createMatch = name.match(/^create[_-]?(.+)$/i);
+    const createMatch = _name.match(/^create[_-]?(.+)$/i);
     if (createMatch) {
       const table = underscore(createMatch[1]);
-      const colLines = columns.map((c) => `      t.${c.type}("${c.name}");`).join("\n");
+      const colLines = columns.map((c) => columnLine(c)).join("\n");
+      const idxLines = indexLines(table, columns);
+      const upParts = [
+        `    await this.createTable("${table}", (t) => {\n${colLines}\n      t.timestamps();\n    });`,
+      ];
+      if (idxLines) upParts.push(idxLines);
       return {
-        up: `    await this.createTable("${table}", (t) => {\n${colLines}\n      t.timestamps();\n    });`,
+        up: upParts.join("\n"),
         down: `    await this.dropTable("${table}");`,
       };
     }
 
-    // AddEmailToUsers -> addColumn("users", "email", "string")
-    const addMatch = name.match(/^add[_-]?(.+?)[_-]?to[_-]?(.+)$/i);
+    // AddEmailToUsers -> addColumn/addReference
+    const addMatch = _name.match(/^add[_-]?(.+?)[_-]?to[_-]?(.+)$/i);
     if (addMatch) {
       const table = underscore(addMatch[2]);
-      const colLines = columns
-        .map((c) => `    await this.addColumn("${table}", "${c.name}", "${c.type}");`)
+      const upLines = columns
+        .map((c) => {
+          if (isReference(c.type)) {
+            return `    await this.addReference("${table}", "${c.name}", ${referenceOpts(c)});`;
+          }
+          return `    await this.addColumn("${table}", "${c.name}", "${c.type}");`;
+        })
         .join("\n");
       const downLines = columns
-        .map((c) => `    await this.removeColumn("${table}", "${c.name}");`)
+        .map((c) => {
+          if (isReference(c.type)) {
+            return `    await this.removeReference("${table}", "${c.name}");`;
+          }
+          return `    await this.removeColumn("${table}", "${c.name}");`;
+        })
         .join("\n");
-      return { up: colLines, down: downLines };
+
+      const idxLines = indexLines(table, columns);
+      const up = idxLines ? `${upLines}\n${idxLines}` : upLines;
+      return { up, down: downLines };
     }
 
-    // RemoveEmailFromUsers -> removeColumn("users", "email")
-    const removeMatch = name.match(/^remove[_-]?(.+?)[_-]?from[_-]?(.+)$/i);
+    // RemoveEmailFromUsers -> removeColumn/removeReference
+    const removeMatch = _name.match(/^remove[_-]?(.+?)[_-]?from[_-]?(.+)$/i);
     if (removeMatch) {
       const table = underscore(removeMatch[2]);
-      const colLines = columns
-        .map((c) => `    await this.removeColumn("${table}", "${c.name}");`)
+      const upLines = columns
+        .map((c) => {
+          if (isReference(c.type)) {
+            return `    await this.removeReference("${table}", "${c.name}");`;
+          }
+          return `    await this.removeColumn("${table}", "${c.name}");`;
+        })
         .join("\n");
       const downLines = columns
-        .map((c) => `    await this.addColumn("${table}", "${c.name}", "${c.type}");`)
+        .map((c) => {
+          if (isReference(c.type)) {
+            return `    await this.addReference("${table}", "${c.name}", ${referenceOpts(c)});`;
+          }
+          return `    await this.addColumn("${table}", "${c.name}", "${c.type}");`;
+        })
         .join("\n");
-      return { up: colLines, down: downLines };
+      return { up: upLines, down: downLines };
     }
 
     // Default: empty body
