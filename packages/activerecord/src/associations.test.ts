@@ -6615,6 +6615,20 @@ describe("AssociationProxyTest", () => {
     expect(builtRecords.length).toBe(1);
     expect(builtRecords[0].body).toBe("built");
   });
+  it("load preserves in-memory instances added via push", async () => {
+    const { APPost, APComment } = setupProxyModels();
+    const post = await APPost.create({ title: "load merge" });
+    const proxy = association(post, "apComments");
+    const comment = await APComment.create({ body: "original", ap_post_id: post.id });
+    await proxy.push(comment);
+    // Mutate the in-memory instance
+    comment.body = "mutated";
+    // load() should preserve the in-memory instance, not replace with fresh DB copy
+    const loaded = await proxy.load();
+    const found = loaded.find((r: any) => r.readAttribute("id") === comment.id);
+    expect(found).toBe(comment);
+    expect(found!.body).toBe("mutated");
+  });
 });
 
 describe("PreloaderTest", () => {

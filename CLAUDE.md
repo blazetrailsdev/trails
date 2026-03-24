@@ -26,6 +26,12 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   where they improve the developer experience without breaking Rails parity.
 - **No magic strings where types work**: Prefer typed column references over
   raw strings when possible, but always support the string form for parity.
+- **Use the package ecosystem like Rails does**: ActiveRecord's power comes
+  from Arel. When building queries, subqueries, or SQL conditions in
+  `activerecord`, use `@rails-ts/arel` (Table, SelectManager, Nodes, Attribute)
+  to build AST nodes — never construct raw SQL strings. Similarly, use
+  `@rails-ts/activemodel` for validations/callbacks and `@rails-ts/activesupport`
+  for inflection/utilities rather than reimplementing them.
 - **Implementation-first**: The goal is to implement Rails features in
   TypeScript. Tests being unskipped is a side effect of implementation, not
   the goal. Don't scan for easy tests to flip — build the feature, then
