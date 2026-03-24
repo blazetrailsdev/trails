@@ -2102,7 +2102,9 @@ export async function createThroughAssociation(
 
   const throughCtor = through.constructor as typeof Base;
   const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
-  const sourceAssocDef = throughAssociations.find((a) => a.name === sourceName);
+  const sourceAssocDef =
+    throughAssociations.find((a) => a.name === sourceName) ??
+    throughAssociations.find((a) => a.name === pluralize(sourceName));
   const sourceType = sourceAssocDef?.type ?? "belongsTo";
 
   if (sourceType === "belongsTo") {
