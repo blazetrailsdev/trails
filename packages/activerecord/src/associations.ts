@@ -1998,6 +1998,176 @@ export class CollectionProxy {
 }
 
 /**
+ * Build a target record for a has_one :through association, along with
+ * the intermediate (through) record. The intermediate record gets the
+ * owner FK set; the source FK is wired when the target is saved.
+ *
+ * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#build
+ */
+export function buildThroughAssociation(
+  record: Base,
+  assocName: string,
+  attrs: Record<string, unknown> = {},
+): { target: Base; through: Base } {
+  const ctor = record.constructor as typeof Base;
+  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a) => a.name === assocName);
+  if (!assocDef || !assocDef.options.through) {
+    throw new Error(`Association "${assocName}" is not a through association on ${ctor.name}`);
+  }
+  if (assocDef.type !== "hasOne" && (assocDef.type as string) !== "hasOneThrough") {
+    throw new Error(
+      `buildThroughAssociation is only for has_one :through (got "${assocDef.type}" for ${ctor.name}#${assocName}). Use CollectionProxy for has_many :through.`,
+    );
+  }
+
+  const throughAssoc = associations.find((a) => a.name === assocDef.options.through);
+  if (!throughAssoc) {
+    throw new Error(`Through association "${assocDef.options.through}" not found on ${ctor.name}`);
+  }
+
+  // Nested through is readonly
+  if (
+    throughAssoc.options.through ||
+    (throughAssoc.type as string) === "hasManyThrough" ||
+    (throughAssoc.type as string) === "hasOneThrough"
+  ) {
+    throw new HasOneThroughNestedAssociationsAreReadonly(ctor.name, assocName);
+  }
+
+  if (throughAssoc.type !== "hasOne" && throughAssoc.type !== "hasMany") {
+    throw new Error(
+      `buildThroughAssociation expects through association "${throughAssoc.name}" to be has_one/has_many (got "${throughAssoc.type}").`,
+    );
+  }
+
+  // Build target record with STI support
+  // has_one uses camelize(name) directly; singularize is for has_many
+  const targetClassName = assocDef.options.className ?? camelize(assocName);
+  let targetModel = resolveModel(targetClassName);
+  const inheritanceCol = getInheritanceColumn(targetModel);
+  if (inheritanceCol && attrs[inheritanceCol]) {
+    targetModel = findStiClass(targetModel, String(attrs[inheritanceCol]));
+  }
+  const target = new targetModel(attrs);
+
+  // Reject composite keys
+  const ownerFkOption = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const ownerPkOption = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+  if (Array.isArray(ownerFkOption) || Array.isArray(ownerPkOption)) {
+    throw new Error("Composite foreignKey/primaryKey is not supported for through associations");
+  }
+
+  // Build intermediate record with owner FK
+  const throughClassName =
+    throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+  const throughModel = resolveModel(throughClassName);
+  const ownerFk = ownerFkOption as string;
+  const ownerPk = ownerPkOption as string;
+  const throughAttrs: Record<string, unknown> = {};
+  if (throughAssoc.options.as) {
+    const polyFk = throughAssoc.options.foreignKey
+      ? (throughAssoc.options.foreignKey as string)
+      : `${underscore(throughAssoc.options.as)}_id`;
+    throughAttrs[polyFk] = record.readAttribute(ownerPk);
+    throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
+  } else {
+    throughAttrs[ownerFk] = record.readAttribute(ownerPk);
+  }
+  const through = new throughModel(throughAttrs);
+
+  return { target, through };
+}
+
+/**
+ * Create a target record for a has_one :through association, along with
+ * the intermediate (through) record. Both records are persisted.
+ *
+ * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#create
+ */
+export async function createThroughAssociation(
+  record: Base,
+  assocName: string,
+  attrs: Record<string, unknown> = {},
+): Promise<Base> {
+  const ctor = record.constructor as typeof Base;
+  if (record.isNewRecord()) {
+    throw new Error(`Cannot create through association on an unpersisted ${ctor.name}`);
+  }
+
+  const { target, through } = buildThroughAssociation(record, assocName, attrs);
+
+  // Resolve source type before any saves to determine save ordering
+  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a) => a.name === assocName)!;
+  const sourceName = assocDef.options.source ?? assocName;
+
+  const throughCtor = through.constructor as typeof Base;
+  const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
+  const sourceAssocDef =
+    throughAssociations.find((a) => a.name === sourceName) ??
+    throughAssociations.find((a) => a.name === pluralize(sourceName));
+  const sourceType = sourceAssocDef?.type ?? "belongsTo";
+
+  if (sourceType === "belongsTo") {
+    // belongsTo: FK on through record -> save target first to get PK, wire through, save through
+    const targetSaved = await target.save();
+    if (!targetSaved) return target;
+
+    const sourceFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+    if (Array.isArray(sourceFk)) {
+      throw new Error("createThroughAssociation does not support composite foreign keys");
+    }
+    const targetPk =
+      (sourceAssocDef?.options?.primaryKey as string) ??
+      (target.constructor as typeof Base).primaryKey;
+    if (Array.isArray(targetPk)) {
+      throw new Error("createThroughAssociation does not support composite primary keys");
+    }
+    through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
+    if (sourceAssocDef?.options?.polymorphic) {
+      const typeCol = `${underscore(sourceName)}_type`;
+      const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
+      through.writeAttribute(typeCol, typeValue);
+    }
+
+    const throughSaved = await through.save();
+    if (!throughSaved) return target;
+  } else if (sourceType === "hasOne" || sourceType === "hasMany") {
+    // hasOne/hasMany: FK on target -> save through first to get PK, wire target, save target
+    const throughSaved = await through.save();
+    if (!throughSaved) return target;
+
+    const sourceAsName = sourceAssocDef?.options?.as;
+    const targetFk = sourceAsName
+      ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+      : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`);
+    if (Array.isArray(targetFk)) {
+      throw new Error("createThroughAssociation does not support composite foreign keys");
+    }
+    const throughPk = sourceAssocDef?.options?.primaryKey ?? throughCtor.primaryKey;
+    if (Array.isArray(throughPk)) {
+      throw new Error("createThroughAssociation does not support composite primary keys");
+    }
+    target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
+    if (sourceAsName) {
+      target.writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
+    }
+    const targetSaved = await target.save();
+    if (!targetSaved) return target;
+  } else {
+    throw new Error(
+      `createThroughAssociation: unsupported source type "${sourceType}" for ${assocName}`,
+    );
+  }
+
+  (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
+  (record as any)._cachedAssociations.set(assocName, target);
+
+  return target;
+}
+
+/**
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
