@@ -40,7 +40,7 @@ All four use manual quoting (`pkQuoted`/`targetQuoted`) which should be replaced
 **relation.ts** — raw SQL in `_whereRawClauses`:
 
 - Relation subquery: `WHERE col IN (SELECT ...)` (line ~167) — use `Attribute.in(subqueryRelation)`
-- `whereAny`/`whereAll` (lines ~244, ~284) — build OR/AND groups with Arel `Or`/`And` nodes
+- `whereAssociated`/`whereMissing` (lines ~244, ~284) — build association subqueries with Arel instead of raw SQL strings
 - `findEach`/`findInBatches` cursor (lines ~2849-2905) — `pk >= ?` / `pk > ?` conditions should use `Attribute.gteq()`/`Attribute.gt()`
 
 Note: `where("raw sql ?", bind)` from user code is intentional (Rails supports this) and should stay.

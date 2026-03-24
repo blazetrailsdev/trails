@@ -3296,7 +3296,7 @@ export class Relation<T extends Base> {
     }
     // Arel node WHERE clauses — compile to SQL for the condition list
     for (const node of this._whereArelNodes) {
-      conditions.push(this._compileArelNode(node));
+      conditions.push(`(${this._compileArelNode(node)})`);
     }
     return conditions;
   }
