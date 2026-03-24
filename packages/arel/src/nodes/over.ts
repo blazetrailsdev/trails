@@ -1,11 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
 
-/**
- * Base join node.
- *
- * Mirrors: Arel::Nodes::Join
- */
-export abstract class Join extends Node {
+export class Over extends Node {
   readonly left: Node;
   readonly right: Node | null;
 
@@ -14,12 +9,7 @@ export abstract class Join extends Node {
     this.left = left;
     this.right = right;
   }
-}
 
-/**
- * CROSS JOIN
- */
-export class CrossJoin extends Join {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }

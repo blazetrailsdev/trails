@@ -85,12 +85,6 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.Assignment) return this.visitAssignment(node);
     if (node instanceof Nodes.As) return this.visitAs(node);
 
-    // Math
-    if (node instanceof Nodes.Addition) return this.visitBinaryOp(node, "+");
-    if (node instanceof Nodes.Subtraction) return this.visitBinaryOp(node, "-");
-    if (node instanceof Nodes.Multiplication) return this.visitBinaryOp(node, "*");
-    if (node instanceof Nodes.Division) return this.visitBinaryOp(node, "/");
-
     // Unary
     if (node instanceof Nodes.Ascending) return this.visitAscending(node);
     if (node instanceof Nodes.Descending) return this.visitDescending(node);
@@ -133,10 +127,10 @@ export class ToSql implements NodeVisitor<SQLString> {
     // Case / Extract / InfixOperation
     if (node instanceof Nodes.Case) return this.visitCase(node);
     if (node instanceof Nodes.Extract) return this.visitExtract(node);
+    if (node instanceof Nodes.Concat) return this.visitConcat(node);
     if (node instanceof Nodes.InfixOperation) return this.visitInfixOperation(node);
     if (node instanceof Nodes.BoundSqlLiteral) return this.visitBoundSqlLiteral(node);
     if (node instanceof Nodes.BindParam) return this.visitBindParam(node);
-    if (node instanceof Nodes.Concat) return this.visitConcat(node);
     if (node instanceof Nodes.Fragments) return this.visitFragments(node);
 
     // Functions

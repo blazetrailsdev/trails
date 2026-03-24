@@ -60,49 +60,21 @@ export class As extends Binary {
 export class Between extends Binary {}
 
 /** Comparison predicates */
-export class Equality extends Binary {}
 export class NotEqual extends Binary {}
 export class GreaterThan extends Binary {}
 export class GreaterThanOrEqual extends Binary {}
 export class LessThan extends Binary {}
 export class LessThanOrEqual extends Binary {}
 
-/** Pattern predicates */
-export class Matches extends Binary {
-  escape: string | null;
-  caseSensitive: boolean;
-  constructor(
-    left: NodeOrValue,
-    right: NodeOrValue,
-    escape: string | null = null,
-    caseSensitive = false,
-  ) {
-    super(left, right);
-    this.escape = escape;
-    this.caseSensitive = caseSensitive;
-  }
-}
-export class DoesNotMatch extends Binary {
-  escape: string | null;
-  caseSensitive: boolean;
-  constructor(
-    left: NodeOrValue,
-    right: NodeOrValue,
-    escape: string | null = null,
-    caseSensitive = false,
-  ) {
-    super(left, right);
-    this.escape = escape;
-    this.caseSensitive = caseSensitive;
+/** IS DISTINCT FROM / IS NOT DISTINCT FROM */
+export class IsDistinctFrom extends Binary {
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
   }
 }
 
-/** Set membership */
-export class In extends Binary {}
-export class NotIn extends Binary {}
-
-/** Math */
-export class Addition extends Binary {}
-export class Subtraction extends Binary {}
-export class Multiplication extends Binary {}
-export class Division extends Binary {}
+export class IsNotDistinctFrom extends Binary {
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}

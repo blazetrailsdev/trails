@@ -1,7 +1,7 @@
 import { Node, NodeVisitor } from "./node.js";
 import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { Over } from "./window.js";
+import { Over } from "./over.js";
 
 /**
  * Filter — FILTER (WHERE ...) clause for aggregate functions.

@@ -1,7 +1,8 @@
 import { Node, NodeVisitor } from "./node.js";
 import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { Ascending, Descending } from "./unary.js";
+import { Ascending } from "./ascending.js";
+import { Descending } from "./descending.js";
 
 /**
  * UnaryOperation — a prefix or postfix unary operation.
