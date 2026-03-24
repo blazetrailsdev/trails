@@ -2021,31 +2021,43 @@ export function buildThroughAssociation(
     throw new Error(`Through association "${assocDef.options.through}" not found on ${ctor.name}`);
   }
 
-  // Build target record
+  // Nested through is readonly
+  if (throughAssoc.options.through) {
+    throw new HasOneThroughNestedAssociationsAreReadonly(ctor.name, assocName);
+  }
+
+  // Build target record with STI support
   const targetClassName = assocDef.options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(targetClassName);
+  let targetModel = resolveModel(targetClassName);
+  const inheritanceCol = getInheritanceColumn(targetModel);
+  if (inheritanceCol && attrs[inheritanceCol]) {
+    targetModel = findStiClass(targetModel, String(attrs[inheritanceCol]));
+  }
   const target = new targetModel(attrs);
+
+  // Reject composite keys
+  const ownerFkOption = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const ownerPkOption = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+  if (Array.isArray(ownerFkOption) || Array.isArray(ownerPkOption)) {
+    throw new Error("Composite foreignKey/primaryKey is not supported for through associations");
+  }
 
   // Build intermediate record with owner FK
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
   const throughModel = resolveModel(throughClassName);
-  const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-  const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+  const ownerFk = ownerFkOption as string;
+  const ownerPk = ownerPkOption as string;
   const throughAttrs: Record<string, unknown> = {
-    [ownerFk as string]: record.readAttribute(ownerPk as string),
+    [ownerFk]: record.readAttribute(ownerPk),
   };
-  // Handle polymorphic through
   if (throughAssoc.options.as) {
-    throughAttrs[`${underscore(throughAssoc.options.as)}_id`] = record.readAttribute(
-      ownerPk as string,
-    );
+    throughAttrs[`${underscore(throughAssoc.options.as)}_id`] = record.readAttribute(ownerPk);
     throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
-    delete throughAttrs[ownerFk as string];
+    delete throughAttrs[ownerFk];
   }
   const through = new throughModel(throughAttrs);
 
-  // Cache the target on the owner
   (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
   (record as any)._cachedAssociations.set(assocName, target);
 
@@ -2063,14 +2075,17 @@ export async function createThroughAssociation(
   assocName: string,
   attrs: Record<string, unknown> = {},
 ): Promise<Base> {
+  const ctor = record.constructor as typeof Base;
+  if (record.isNewRecord()) {
+    throw new Error(`Cannot create through association on an unpersisted ${ctor.name}`);
+  }
+
   const { target, through } = buildThroughAssociation(record, assocName, attrs);
 
-  // Save the target first
   const targetSaved = await target.save();
   if (!targetSaved) return target;
 
   // Wire the source FK on the intermediate to point to the saved target
-  const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName)!;
   const sourceName = assocDef.options.source ?? assocName;
@@ -2078,10 +2093,12 @@ export async function createThroughAssociation(
   const targetPk = (target.constructor as typeof Base).primaryKey as string;
   through.writeAttribute(sourceFk, target.readAttribute(targetPk));
 
-  // Save the intermediate
-  await through.save();
+  const throughSaved = await through.save();
+  if (!throughSaved) {
+    // Intermediate failed — don't cache
+    return target;
+  }
 
-  // Cache on owner
   (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
   (record as any)._cachedAssociations.set(assocName, target);
 
