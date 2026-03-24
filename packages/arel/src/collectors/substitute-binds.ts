@@ -17,7 +17,10 @@ export class SubstituteBinds {
 
   addBind(bind: unknown): this {
     const value =
-      bind && typeof bind === "object" && "valueForDatabase" in bind
+      bind &&
+      typeof bind === "object" &&
+      "valueForDatabase" in bind &&
+      typeof (bind as Record<string, unknown>).valueForDatabase === "function"
         ? (bind as { valueForDatabase(): unknown }).valueForDatabase()
         : bind;
     return this.append(this.quoter.quote(value));
