@@ -1545,5 +1545,64 @@ describe("WhereTest", () => {
 });
 
 // ==========================================================================
+// Arel node support in Relation#where
+// ==========================================================================
+describe("WhereTest Arel nodes", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("where accepts an Arel node", async () => {
+    const { Table, Nodes } = await import("@rails-ts/arel");
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "yes", published: true });
+    await Post.create({ title: "no", published: false });
+    const table = new Table("posts");
+    const node = table.get("published").eq(true);
+    const results = await Post.all().where(node).toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe("yes");
+  });
+
+  it("where accepts an Arel In node with subquery", async () => {
+    const { Table } = await import("@rails-ts/arel");
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const alice = await Author.create({ name: "Alice" });
+    const bob = await Author.create({ name: "Bob" });
+    await Post.create({ title: "Alice post", author_id: alice.id });
+    await Post.create({ title: "Bob post", author_id: bob.id });
+
+    const authorsTable = new Table("authors");
+    const postsTable = new Table("posts");
+    const subquery = authorsTable
+      .project(authorsTable.get("id"))
+      .where(authorsTable.get("name").eq("Alice"));
+    const inNode = postsTable.get("author_id").in(subquery);
+    const results = await Post.all().where(inNode).toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe("Alice post");
+  });
+});
+
+// ==========================================================================
 // WhereTest — targets relation/where_test.rb (continued)
 // ==========================================================================

@@ -36,11 +36,9 @@ These are sequential — each builds on the previous.
 
 **Done:** Target tracking (`_target`/`_loaded`), proxy caching per record, `build`/`push` append without loading, `load`/`reload`/`reset`, `pluck`/`pick`, `scope()`, callback gating on `_target` mutations. 10 tests unskipped.
 
-**Remaining follow-up:**
-
-1. **`scope()` for through/HABTM** — Requires `Relation#where` to accept Arel nodes (specifically `Nodes.In` with a `SelectManager` subquery). Once that's done, scope() can use `targetAttr.in(throughTable.project(fkCol).where(...))` instead of raw SQL. Tracked as a separate PR.
-
 **Tests unblocked:** associations.test.ts (~30), counter-cache.test.ts (~15), HABTM (~10), HMT (~10)
+
+**Note:** `Relation#where` now accepts Arel nodes (e.g. `Nodes.In`, `Attribute.eq`). `scope()` uses Arel subqueries for through/HABTM associations via `targetAttr.in(throughTable.project(fkCol).where(...))`. No raw SQL.
 
 ---
 

@@ -1,4 +1,4 @@
-import { Table, SelectManager, Nodes } from "@rails-ts/arel";
+import { Table, SelectManager, Nodes, Visitors } from "@rails-ts/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
@@ -39,6 +39,7 @@ export class Relation<T extends Base> {
   private _whereClauses: Array<Record<string, unknown>> = [];
   private _whereNotClauses: Array<Record<string, unknown>> = [];
   private _whereRawClauses: string[] = [];
+  private _whereArelNodes: Nodes.Node[] = [];
   private _orderClauses: Array<string | [string, "asc" | "desc"]> = [];
   private _rawOrderClauses: string[] = [];
   private _limitValue: number | null = null;
@@ -89,11 +90,20 @@ export class Relation<T extends Base> {
   where(): Relation<T>;
   where(conditions: Record<string, unknown> | null | undefined): Relation<T>;
   where(sql: string, ...binds: unknown[]): Relation<T>;
+  where(node: Nodes.Node): Relation<T>;
   where(
-    conditionsOrSql?: Record<string, unknown> | string | null,
+    conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | null,
     ...binds: unknown[]
   ): Relation<T> {
     if (conditionsOrSql === undefined || conditionsOrSql === null) return this._clone();
+
+    // Arel node: store directly, bypass string/hash processing
+    if (conditionsOrSql instanceof Nodes.Node) {
+      const rel = this._clone();
+      rel._whereArelNodes.push(conditionsOrSql);
+      return rel;
+    }
+
     if (
       typeof conditionsOrSql !== "string" &&
       (typeof conditionsOrSql !== "object" || Array.isArray(conditionsOrSql))
@@ -391,6 +401,7 @@ export class Relation<T extends Base> {
     rel._whereClauses = [...rel._whereClauses, ...other._whereClauses];
     rel._whereNotClauses = [...rel._whereNotClauses, ...other._whereNotClauses];
     rel._whereRawClauses = [...rel._whereRawClauses, ...other._whereRawClauses];
+    rel._whereArelNodes = [...rel._whereArelNodes, ...other._whereArelNodes];
     return rel;
   }
 
@@ -409,6 +420,7 @@ export class Relation<T extends Base> {
       r._whereClauses = [cond];
       r._whereNotClauses = [];
       r._whereRawClauses = [];
+      r._whereArelNodes = [];
       r._orRelations = [];
       return r;
     };
@@ -843,6 +855,7 @@ export class Relation<T extends Base> {
     rel._whereClauses.push(...other._whereClauses);
     rel._whereNotClauses.push(...other._whereNotClauses);
     rel._whereRawClauses.push(...other._whereRawClauses);
+    rel._whereArelNodes.push(...other._whereArelNodes);
     if (other._orderClauses.length > 0) {
       rel._orderClauses = [...other._orderClauses];
     }
@@ -920,6 +933,7 @@ export class Relation<T extends Base> {
           rel._whereClauses = [];
           rel._whereNotClauses = [];
           rel._whereRawClauses = [];
+          rel._whereArelNodes = [];
           break;
         case "order":
           rel._orderClauses = [];
@@ -3142,6 +3156,14 @@ export class Relation<T extends Base> {
     for (const rawClause of this._whereRawClauses) {
       manager.where(new Nodes.SqlLiteral(rawClause));
     }
+    // Arel node WHERE clauses
+    for (const node of this._whereArelNodes) {
+      manager.where(node);
+    }
+  }
+
+  private _compileArelNode(node: Nodes.Node): string {
+    return new Visitors.ToSql().compile(node);
   }
 
   private _applyOrderToManager(manager: SelectManager, table: Table): void {
@@ -3272,6 +3294,10 @@ export class Relation<T extends Base> {
     // Raw SQL WHERE clauses
     for (const rawClause of this._whereRawClauses) {
       conditions.push(rawClause);
+    }
+    // Arel node WHERE clauses — compile to SQL for the condition list
+    for (const node of this._whereArelNodes) {
+      conditions.push(this._compileArelNode(node));
     }
     return conditions;
   }
@@ -4406,6 +4432,7 @@ export class Relation<T extends Base> {
     rel._whereClauses = [...this._whereClauses];
     rel._whereNotClauses = [...this._whereNotClauses];
     rel._whereRawClauses = [...this._whereRawClauses];
+    rel._whereArelNodes = [...this._whereArelNodes];
     rel._orderClauses = [...this._orderClauses];
     rel._rawOrderClauses = [...this._rawOrderClauses];
     rel._limitValue = this._limitValue;
