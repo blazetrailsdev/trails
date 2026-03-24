@@ -117,6 +117,43 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
         if (classInfo) {
           info.classes[classInfo.name] = classInfo;
         }
+      } else if (ts.isInterfaceDeclaration(node) && node.name) {
+        if (!isExported(node)) return;
+        const name = node.name.text;
+        info.modules[name] = {
+          name,
+          file: relPath,
+          includes: [],
+          extends: [],
+          instanceMethods: [],
+          classMethods: [],
+        };
+      } else if (ts.isModuleDeclaration(node) && node.name) {
+        if (!isExported(node)) return;
+        const name = node.name.text;
+        info.modules[name] = {
+          name,
+          file: relPath,
+          includes: [],
+          extends: [],
+          instanceMethods: [],
+          classMethods: [],
+        };
+      } else if (ts.isExportDeclaration(node)) {
+        // Handle `export * as Foo from "./bar.js"` — namespace re-exports
+        // Only record if not already defined by an interface/namespace declaration
+        if (node.exportClause && ts.isNamespaceExport(node.exportClause)) {
+          const name = node.exportClause.name.text;
+          if (info.modules[name]) return;
+          info.modules[name] = {
+            name,
+            file: relPath,
+            includes: [],
+            extends: [],
+            instanceMethods: [],
+            classMethods: [],
+          };
+        }
       }
     });
   }

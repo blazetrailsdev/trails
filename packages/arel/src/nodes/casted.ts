@@ -1,6 +1,10 @@
 import { Node, NodeVisitor } from "./node.js";
 import type { Attribute } from "../attributes/attribute.js";
 
+export interface Nodes {
+  buildQuoted(other: unknown, attribute?: unknown): Node;
+}
+
 /**
  * Casted — a value bound to a specific attribute for type casting.
  *

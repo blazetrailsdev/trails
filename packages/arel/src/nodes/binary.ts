@@ -134,6 +134,10 @@ export class Intersect extends Node {
   }
 }
 
+export interface FetchAttribute {
+  fetchAttribute(block: (attr: Node) => unknown): unknown;
+}
+
 export class Except extends Node {
   readonly left: Node;
   readonly right: Node;

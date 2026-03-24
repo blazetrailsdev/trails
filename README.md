@@ -8,24 +8,24 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 
 **Active focus** — these packages are where development effort is concentrated:
 
-| Package                   | Rails Equivalent                                                        | Convention Compare | Description                                                |
-| ------------------------- | ----------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------- |
-| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **60.8%**          | ORM — persistence, querying, associations, migrations      |
-| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**            | Core utilities, inflection, caching, notifications         |
-| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%**          | SQL AST builder and query generation                       |
-| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%**          | Attributes, validations, callbacks, dirty tracking, i18n   |
-| `@rails-ts/rack`          | [Rack](https://rack.github.io/)                                         | **98.8%**          | Modular web server interface, request/response, middleware |
+| Package                   | Rails Equivalent                                                        | Tests     | API      | Description                                                |
+| ------------------------- | ----------------------------------------------------------------------- | --------- | -------- | ---------------------------------------------------------- |
+| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **61%**   | **5.5%** | ORM — persistence, querying, associations, migrations      |
+| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**   | **5.8%** | Core utilities, inflection, caching, notifications         |
+| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%** | **100%** | SQL AST builder and query generation                       |
+| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%** | **2%**   | Attributes, validations, callbacks, dirty tracking, i18n   |
+| `@rails-ts/rack`          | [Rack](https://rack.github.io/)                                         | **98.8%** | —        | Modular web server interface, request/response, middleware |
 
 **ActionPack** — started but not the current priority:
 
-| Package                      | Rails Equivalent                                                              | Convention Compare | Description                                            |
-| ---------------------------- | ----------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------ |
-| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **28.4%**          | Routing, middleware stack, cookies, sessions, security |
-| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**           | Controller layer, rendering, filters, parameters       |
+| Package                      | Rails Equivalent                                                              | Tests     | API      | Description                                            |
+| ---------------------------- | ----------------------------------------------------------------------------- | --------- | -------- | ------------------------------------------------------ |
+| `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **28.4%** | **4.3%** | Routing, middleware stack, cookies, sessions, security |
+| `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**  | **2.7%** | Controller layer, rendering, filters, parameters       |
 
-**70.6%** of the active focus packages — 9,672 of 13,690 tests matched. (58.7% including actionpack.)
+**Tests** = `convention:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — tracks class/module existence and file placement against Rails source. Rack doesn't have API comparison yet (it's not a Rails gem).
 
-Progress is measured by `npm run convention:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.
+**59.5%** overall test coverage — 10,102 of 16,982 tests matched. CI runs both comparisons on every push.
 
 ## Quick Example
 
@@ -83,13 +83,13 @@ Post.where({ published: true }).order("title");
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
-# Run tests (uses in-memory SQLite adapter by default)
-npx vitest run
+# Run tests (uses SQLite adapter by default)
+pnpm vitest run
 
 # Build all packages
-npm run build
+pnpm run build
 ```
 
 ### Measuring Progress Against Rails
@@ -97,13 +97,13 @@ npm run build
 ```bash
 # Compare test coverage against the Rails test suite
 # Matches our test file names and it()/it.skip() descriptions against Ruby test names
-npm run convention:compare
+pnpm run convention:compare
 
 # Compare public API surface against Rails
-npm run api:compare
+pnpm run api:compare
 
 # Generate stub tests for any unmatched Rails tests
-npm run test:stubs
+pnpm run test:stubs
 ```
 
 CI runs `convention:compare` on every push to ensure we don't regress.
@@ -112,11 +112,11 @@ CI runs `convention:compare` on every push to ensure we don't regress.
 
 Tests run against all three database backends in CI:
 
-| Backend             | How to run locally                          | Env variable     |
-| ------------------- | ------------------------------------------- | ---------------- |
-| In-memory (default) | `npx vitest run`                            | (none)           |
-| PostgreSQL          | `PG_TEST_URL=postgres://... npx vitest run` | `PG_TEST_URL`    |
-| MySQL/MariaDB       | `MYSQL_TEST_URL=mysql://... npx vitest run` | `MYSQL_TEST_URL` |
+| Backend          | How to run locally                           | Env variable     |
+| ---------------- | -------------------------------------------- | ---------------- |
+| SQLite (default) | `pnpm vitest run`                            | (none)           |
+| PostgreSQL       | `PG_TEST_URL=postgres://... pnpm vitest run` | `PG_TEST_URL`    |
+| MySQL/MariaDB    | `MYSQL_TEST_URL=mysql://... pnpm vitest run` | `MYSQL_TEST_URL` |
 
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 
