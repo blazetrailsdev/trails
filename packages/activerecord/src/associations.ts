@@ -239,8 +239,9 @@ export class Associations {
     const ownerFk = singleFk(options.foreignKey, `${underscore(lhsModel.name)}_id`);
     const targetFk = `${underscore(singularize(name))}_id`;
 
-    // Create anonymous join model (like Rails' HABTM_Tags)
+    // Create anonymous join model (like Rails' HABTM_Projects, registered as Developer::HABTM_Projects)
     const joinModelName = `HABTM_${camelize(name)}`;
+    const registryKey = `${lhsModel.name}::${joinModelName}`;
     const sourceName = singularize(name);
     const JoinModel = createHabtmJoinModel(
       lhsModel,
@@ -252,15 +253,16 @@ export class Associations {
       sourceName,
     );
 
-    modelRegistry.set(joinModelName, JoinModel);
+    modelRegistry.set(registryKey, JoinModel);
 
     // Middle reflection: has_many pointing at the join model
-    const middleName = `_habtm_${name}`;
+    // Rails: [lhs_model.name.downcase.pluralize, association_name].sort.join("_")
+    const middleName = [pluralize(underscore(lhsModel.name).toLowerCase()), name].sort().join("_");
     this._associations.push({
       type: "hasMany",
       name: middleName,
       options: {
-        className: joinModelName,
+        className: registryKey,
         foreignKey: ownerFk,
         dependent: "delete",
       },
@@ -880,9 +882,14 @@ function createHabtmJoinModel(
   targetClassName: string,
   sourceName: string,
 ): typeof Base {
-  // Dynamically create a class that extends Base
-  const BaseClass = (Object.getPrototypeOf(lhsModel).prototype?.constructor ??
-    lhsModel) as typeof Base;
+  // Walk up to the root AR Base class to avoid inheriting domain callbacks/validations.
+  // Stop at the last class that still has `create` (i.e., the AR Base class).
+  let BaseClass: typeof Base = lhsModel;
+  let parent = Object.getPrototypeOf(BaseClass);
+  while (parent && parent !== Function.prototype && typeof parent.create === "function") {
+    BaseClass = parent;
+    parent = Object.getPrototypeOf(BaseClass);
+  }
   const JoinModel = class extends BaseClass {} as typeof Base;
   Object.defineProperty(JoinModel, "name", {
     value: joinModelName,
@@ -890,7 +897,7 @@ function createHabtmJoinModel(
     configurable: true,
   });
 
-  // Set table name directly
+  // Set table name (join model inherits default "id" PK like Rails)
   JoinModel._tableName = joinTableName;
 
   // Define FK attributes
