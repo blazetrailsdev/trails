@@ -208,8 +208,12 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("pluck on disable joins through", async () => {
     const { author } = await setupData();
-    const normalIds = (await association(author, "djComments").pluck("id")).sort();
-    const noJoinsIds = (await association(author, "noJoinsDjComments").pluck("id")).sort();
+    const normalIds = (await association(author, "djComments").pluck("id")).sort(
+      (a: any, b: any) => a - b,
+    );
+    const noJoinsIds = (await association(author, "noJoinsDjComments").pluck("id")).sort(
+      (a: any, b: any) => a - b,
+    );
     expect(noJoinsIds).toEqual(normalIds);
   });
 
@@ -229,8 +233,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     const { author } = await setupData();
     const normalComments = await association(author, "djComments").toArray();
     const noJoinsComments = await association(author, "noJoinsDjComments").toArray();
-    const normalIds = normalComments.map((c: any) => c.id).sort();
-    const noJoinsIds = noJoinsComments.map((c: any) => c.id).sort();
+    const normalIds = normalComments.map((c: any) => c.id).sort((a: any, b: any) => a - b);
+    const noJoinsIds = noJoinsComments.map((c: any) => c.id).sort((a: any, b: any) => a - b);
     expect(noJoinsIds).toEqual(normalIds);
   });
 
@@ -259,10 +263,14 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("pluck on disable joins through a through", async () => {
     const { author, rating1, rating2 } = await setupData();
-    const normalIds = (await association(author, "djRatings").pluck("id")).sort();
-    const noJoinsIds = (await association(author, "noJoinsDjRatings").pluck("id")).sort();
+    const normalIds = (await association(author, "djRatings").pluck("id")).sort(
+      (a: any, b: any) => a - b,
+    );
+    const noJoinsIds = (await association(author, "noJoinsDjRatings").pluck("id")).sort(
+      (a: any, b: any) => a - b,
+    );
     expect(noJoinsIds).toEqual(normalIds);
-    expect(normalIds).toEqual([rating1.id, rating2.id].sort());
+    expect(normalIds).toEqual([rating1.id, rating2.id].sort((a: any, b: any) => a - b));
   });
 
   it("count on disable joins through a through", async () => {
