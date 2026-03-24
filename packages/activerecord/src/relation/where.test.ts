@@ -1554,7 +1554,7 @@ describe("WhereTest Arel nodes", () => {
   });
 
   it("where accepts an Arel node", async () => {
-    const { Table, Nodes } = await import("@rails-ts/arel");
+    const { Table } = await import("@rails-ts/arel");
     class Post extends Base {
       static {
         this.attribute("title", "string");

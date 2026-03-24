@@ -3098,17 +3098,26 @@ export class Relation<T extends Base> {
     return new Nodes.And(nodes);
   }
 
+  private _collectAllWhereNodes(table: Table, rel: Relation<T>): Nodes.Node[] {
+    const nodes = this._buildWhereNodes(table, rel._whereClauses, rel._whereNotClauses);
+    for (const rawClause of rel._whereRawClauses) {
+      nodes.push(new Nodes.SqlLiteral(rawClause));
+    }
+    for (const arelNode of rel._whereArelNodes) {
+      nodes.push(arelNode);
+    }
+    return nodes;
+  }
+
   private _applyWheresToManager(manager: SelectManager, table: Table): void {
     if (this._orRelations.length > 0) {
       // Collect all branches: this relation's wheres + each OR relation's wheres
       const allBranches: (Nodes.Node | null)[] = [
-        this._combineNodes(this._buildWhereNodes(table, this._whereClauses, this._whereNotClauses)),
+        this._combineNodes(this._collectAllWhereNodes(table, this)),
       ];
       for (const orRel of this._orRelations) {
         allBranches.push(
-          this._combineNodes(
-            this._buildWhereNodes(table, orRel._whereClauses, orRel._whereNotClauses),
-          ),
+          this._combineNodes(this._collectAllWhereNodes(table, orRel as unknown as Relation<T>)),
         );
       }
       const nonNull = allBranches.filter((n): n is Nodes.Node => n !== null);
@@ -3150,14 +3159,14 @@ export class Relation<T extends Base> {
           }
         }
       }
-    } // end else (non-OR branch)
-    // Raw SQL WHERE clauses
-    for (const rawClause of this._whereRawClauses) {
-      manager.where(new Nodes.SqlLiteral(rawClause));
-    }
-    // Arel node WHERE clauses
-    for (const node of this._whereArelNodes) {
-      manager.where(node);
+      // Raw SQL WHERE clauses
+      for (const rawClause of this._whereRawClauses) {
+        manager.where(new Nodes.SqlLiteral(rawClause));
+      }
+      // Arel node WHERE clauses
+      for (const node of this._whereArelNodes) {
+        manager.where(node);
+      }
     }
   }
 
