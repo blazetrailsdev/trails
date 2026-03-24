@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { loadHasMany, loadHabtm, association } from "../associations.js";
+import { Associations, loadHasMany, loadHabtm, association } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -47,14 +47,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     registerModel(Developer);
     registerModel(Project);
     registerModel(DeveloperProject);
-    // Reset associations to avoid accumulation across tests
-    (Developer as any)._associations = [
-      {
-        type: "hasAndBelongsToMany",
-        name: "projects",
-        options: { className: "Project", joinTable: "developer_projects" },
-      },
-    ];
+    // Reset associations and re-declare HABTM (creates anonymous join model + through)
+    (Developer as any)._associations = [];
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+    });
   });
 
   it.skip("marshal dump", () => {

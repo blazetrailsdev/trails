@@ -219,6 +219,11 @@ export class Associations {
   /**
    * Define a has_and_belongs_to_many association.
    *
+   * Like Rails, this internally creates an anonymous join model and wires up
+   * two has_many associations (a "middle" pointing at the join model and a
+   * "through" pointing at the target). All HABTM operations then go through
+   * normal ActiveRecord persistence on the join model — no raw SQL.
+   *
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_and_belongs_to_many
    */
   static hasAndBelongsToMany(
@@ -228,7 +233,54 @@ export class Associations {
     if (!Object.prototype.hasOwnProperty.call(this, "_associations")) {
       this._associations = [...(this._associations ?? [])];
     }
-    this._associations.push({ type: "hasAndBelongsToMany", name, options });
+
+    const lhsModel = this as unknown as typeof Base;
+    const targetClassName = options.className ?? camelize(singularize(name));
+    const joinTableName = options.joinTable ?? defaultJoinTableName(lhsModel, name);
+    const ownerFk = singleFk(options.foreignKey, `${underscore(lhsModel.name)}_id`);
+    const targetFk = `${underscore(singularize(name))}_id`;
+
+    // Create anonymous join model (like Rails' HABTM_Projects, registered as Developer::HABTM_Projects)
+    const joinModelName = `HABTM_${camelize(name)}`;
+    const registryKey = `${lhsModel.name}::${joinModelName}`;
+    const sourceName = singularize(name);
+    const JoinModel = createHabtmJoinModel(
+      lhsModel,
+      joinModelName,
+      joinTableName,
+      ownerFk,
+      targetFk,
+      targetClassName,
+      sourceName,
+    );
+
+    modelRegistry.set(registryKey, JoinModel);
+
+    // Middle reflection: has_many pointing at the join model
+    // Rails: [lhs_model.name.downcase.pluralize, association_name].sort.join("_")
+    const middleName = [pluralize(underscore(lhsModel.name).toLowerCase()), name].sort().join("_");
+    this._associations.push({
+      type: "hasMany",
+      name: middleName,
+      options: {
+        className: registryKey,
+        foreignKey: ownerFk,
+        dependent: "delete",
+      },
+    });
+
+    // Store the HABTM definition with through info so CollectionProxy
+    // routes through the through-association code paths
+    this._associations.push({
+      type: "hasAndBelongsToMany",
+      name,
+      options: {
+        ...options,
+        joinTable: joinTableName,
+        through: middleName,
+        source: options.source ?? singularize(name),
+      },
+    });
   }
 }
 
@@ -814,6 +866,76 @@ export async function loadHasOneThrough(
  * Uses the two table names in alphabetical order, joined by underscore.
  */
 /** Coerce a foreignKey option to a single string. HABTM doesn't support composite keys. */
+/**
+ * Create an anonymous join model class for HABTM associations.
+ * The join model has two belongsTo associations (left side and target),
+ * delegates its adapter to the declaring model, and uses the specified
+ * join table name.
+ *
+ * Mirrors: ActiveRecord::Associations::Builder::HasAndBelongsToMany#through_model
+ */
+function createHabtmJoinModel(
+  lhsModel: typeof Base,
+  joinModelName: string,
+  joinTableName: string,
+  ownerFk: string,
+  targetFk: string,
+  targetClassName: string,
+  sourceName: string,
+): typeof Base {
+  // Walk up to the root AR Base class to avoid inheriting domain callbacks/validations.
+  // Stop at the last class that still has `create` (i.e., the AR Base class).
+  let BaseClass: typeof Base = lhsModel;
+  let parent = Object.getPrototypeOf(BaseClass);
+  while (parent && parent !== Function.prototype && typeof parent.create === "function") {
+    BaseClass = parent;
+    parent = Object.getPrototypeOf(BaseClass);
+  }
+  const JoinModel = class extends BaseClass {} as typeof Base;
+  Object.defineProperty(JoinModel, "name", {
+    value: joinModelName,
+    writable: false,
+    configurable: true,
+  });
+
+  // Set table name and composite PK — HABTM join tables typically have no id column,
+  // so the join model uses [ownerFk, targetFk] as its primary key to support
+  // delete/destroy operations that issue PK-based WHERE clauses.
+  JoinModel._tableName = joinTableName;
+  JoinModel.primaryKey = [ownerFk, targetFk];
+
+  // Define FK attributes
+  JoinModel.attribute(ownerFk, "integer");
+  JoinModel.attribute(targetFk, "integer");
+
+  // Delegate adapter to the left (declaring) model
+  Object.defineProperty(JoinModel, "adapter", {
+    get() {
+      return lhsModel.adapter;
+    },
+    set(_v: unknown) {
+      /* no-op: always delegates to lhs */
+    },
+    configurable: true,
+  });
+
+  // Add belongsTo associations matching what loadHasManyThrough expects
+  const joinAssocs: AssociationDefinition[] = [];
+  joinAssocs.push({
+    type: "belongsTo",
+    name: "leftSide",
+    options: { className: lhsModel.name, foreignKey: ownerFk },
+  });
+  joinAssocs.push({
+    type: "belongsTo",
+    name: sourceName,
+    options: { className: targetClassName, foreignKey: targetFk },
+  });
+  (JoinModel as any)._associations = joinAssocs;
+
+  return JoinModel;
+}
+
 function singleFk(fk: string | string[] | undefined, fallback: string): string {
   if (Array.isArray(fk)) {
     throw new Error("HABTM associations do not support composite foreign keys");
@@ -867,20 +989,16 @@ export async function loadHabtm(
     throw new Error("HABTM associations do not support composite primary keys on the target model");
   }
 
-  // Query the join table to get target IDs
-  const pkQuoted =
-    typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
-  const joinRows = await ctor.adapter.execute(
-    `SELECT "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted}`,
-  );
+  // Use Arel subquery: SELECT target_fk FROM join_table WHERE owner_fk = ?
+  const joinArelTable = new ArelTable(joinTable);
+  const subquery = joinArelTable
+    .project(joinArelTable.get(targetFk))
+    .where(joinArelTable.get(ownerFk).eq(pkValue));
 
-  const targetIds = joinRows.map((r) => r[targetFk]).filter((v) => v != null);
-  if (targetIds.length === 0) return [];
+  const targetArelTable = new ArelTable(targetModel.tableName);
+  const inNode = targetArelTable.get(targetPkCol as string).in(subquery);
 
-  return (targetModel as any)
-    .all()
-    .where({ [targetPkCol as string]: targetIds })
-    .toArray();
+  return (targetModel as any).all().where(inNode).toArray();
 }
 
 /**
@@ -891,18 +1009,8 @@ export async function processDependentAssociations(record: Base): Promise<void> 
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
 
   for (const assoc of associations) {
-    // HABTM: always clean up join table records on destroy
+    // HABTM with through: handled by the middle hasMany's dependent: "delete"
     if (assoc.type === "hasAndBelongsToMany") {
-      const ownerPkCol = habtmOwnerPk(assoc.options, ctor);
-      const pkValue = record.readAttribute(ownerPkCol);
-      if (pkValue == null) continue;
-      const joinTable = assoc.options.joinTable ?? defaultJoinTableName(ctor, assoc.name);
-      const ownerFk = singleFk(assoc.options.foreignKey, `${underscore(ctor.name)}_id`);
-      const pkQuoted =
-        typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
-      await ctor.adapter.executeMutation(
-        `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted}`,
-      );
       continue;
     }
 
@@ -918,9 +1026,13 @@ export async function processDependentAssociations(record: Base): Promise<void> 
           await child.destroy();
         }
       } else if (dep === "delete") {
-        for (const child of children) {
-          await child.delete();
-        }
+        // Bulk delete avoids N+1 on join tables (HABTM middle hasMany)
+        const childModel = resolveModel(
+          (assoc.options.className as string) ?? camelize(singularize(assoc.name)),
+        );
+        const fk = (assoc.options.foreignKey as string) ?? `${underscore(ctor.name)}_id`;
+        const pkCol = Array.isArray(ctor.primaryKey) ? ctor.primaryKey[0] : ctor.primaryKey;
+        await childModel.where({ [fk]: record.readAttribute(pkCol as string) }).deleteAll();
       } else if (dep === "nullify") {
         const asName = assoc.options.as;
         const foreignKey = asName
@@ -1037,20 +1149,11 @@ export class CollectionProxy {
     }
   }
 
-  private get _isHabtm(): boolean {
-    return this._assocDef.type === "hasAndBelongsToMany";
-  }
-
   /**
    * Load and return all associated records.
    */
   async toArray(): Promise<Base[]> {
-    let results: Base[];
-    if (this._isHabtm) {
-      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
-    } else {
-      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
-    }
+    const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
     const unsaved = this._target.filter((r) => r.isNewRecord());
     if (unsaved.length > 0) {
       return [...results, ...unsaved];
@@ -1060,12 +1163,7 @@ export class CollectionProxy {
 
   async load(): Promise<Base[]> {
     if (this._loaded) return this._target;
-    let results: Base[];
-    if (this._isHabtm) {
-      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
-    } else {
-      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
-    }
+    const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
     // Merge: prefer existing in-memory instances (from push/build) over fresh DB records
     const existingByPk = new Map<string, Base>();
     for (const r of this._target) {
@@ -1249,12 +1347,7 @@ export class CollectionProxy {
    * Count associated records.
    */
   async count(): Promise<number> {
-    let results: Base[];
-    if (this._isHabtm) {
-      results = await loadHabtm(this._record, this._assocName, this._assocDef.options);
-    } else {
-      results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
-    }
+    const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
     return results.length;
   }
 
@@ -1284,12 +1377,7 @@ export class CollectionProxy {
    */
   async push(...records: Base[]): Promise<void> {
     this._ensureThroughWritable();
-    // HABTM: insert into join table
-    if (this._isHabtm) {
-      await this._pushHabtm(records);
-      return;
-    }
-    // Through association: create join records instead of setting FK on target
+    // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
       return;
@@ -1381,44 +1469,6 @@ export class CollectionProxy {
     }
   }
 
-  private async _pushHabtm(records: Base[]): Promise<void> {
-    const ctor = this._record.constructor as typeof Base;
-    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
-    const pkValue = this._record.readAttribute(ownerPkCol);
-    if (pkValue == null) {
-      throw new Error("Cannot add to HABTM association on an unpersisted record");
-    }
-    const joinTable =
-      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
-    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
-    const targetFk = `${underscore(singularize(this._assocName))}_id`;
-
-    const pkQuoted =
-      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
-
-    for (const record of records) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
-      if (record.isNewRecord()) await record.save();
-      const targetPkCol = (record.constructor as typeof Base).primaryKey;
-      if (Array.isArray(targetPkCol)) {
-        throw new Error(
-          "HABTM associations do not support composite primary keys on the target model",
-        );
-      }
-      const targetPk = record.readAttribute(targetPkCol as string);
-      if (targetPk == null) continue;
-      const targetQuoted =
-        typeof targetPk === "number"
-          ? String(targetPk)
-          : `'${String(targetPk).replace(/'/g, "''")}'`;
-      await ctor.adapter.executeMutation(
-        `INSERT INTO "${joinTable}" ("${ownerFk}", "${targetFk}") VALUES (${pkQuoted}, ${targetQuoted})`,
-      );
-      this._target.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
-    }
-  }
-
   /**
    * Alias for push.
    */
@@ -1433,12 +1483,7 @@ export class CollectionProxy {
    */
   async delete(...records: Base[]): Promise<void> {
     this._ensureThroughWritable();
-    // HABTM: remove join table records
-    if (this._isHabtm) {
-      await this._deleteHabtm(records);
-      return;
-    }
-    // Through association: delete the join records
+    // Through association (including HABTM): delete the join records
     if (this._assocDef.options.through) {
       await this._deleteThrough(records);
       return;
@@ -1494,42 +1539,6 @@ export class CollectionProxy {
     });
   }
 
-  private async _deleteHabtm(records: Base[]): Promise<void> {
-    const ctor = this._record.constructor as typeof Base;
-    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
-    const pkValue = this._record.readAttribute(ownerPkCol);
-    if (pkValue == null) return;
-    const joinTable =
-      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
-    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
-    const targetFk = `${underscore(singularize(this._assocName))}_id`;
-    const pkQuoted =
-      typeof pkValue === "number" ? String(pkValue) : `'${String(pkValue).replace(/'/g, "''")}'`;
-
-    const removed: Base[] = [];
-    for (const record of records) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
-      const targetPkCol = (record.constructor as typeof Base).primaryKey;
-      if (Array.isArray(targetPkCol)) {
-        throw new Error(
-          "HABTM associations do not support composite primary keys on the target model",
-        );
-      }
-      const targetPk = record.readAttribute(targetPkCol as string);
-      if (targetPk == null) continue;
-      const targetQuoted =
-        typeof targetPk === "number"
-          ? String(targetPk)
-          : `'${String(targetPk).replace(/'/g, "''")}'`;
-      await ctor.adapter.executeMutation(
-        `DELETE FROM "${joinTable}" WHERE "${ownerFk}" = ${pkQuoted} AND "${targetFk}" = ${targetQuoted}`,
-      );
-      removed.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
-    }
-    this._removeFromTarget(removed);
-  }
-
   private async _deleteThrough(records: Base[]): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
@@ -1579,9 +1588,7 @@ export class CollectionProxy {
     }
     // Remove join/through rows only for successfully destroyed records
     if (destroyed.length > 0) {
-      if (this._isHabtm) {
-        await this._deleteHabtm(destroyed);
-      } else if (this._isThrough) {
+      if (this._isThrough) {
         await this._deleteThrough(destroyed);
       } else {
         this._removeFromTarget(destroyed);
@@ -1833,9 +1840,6 @@ export class CollectionProxy {
   }
 
   scope(): any {
-    if (this._isHabtm) {
-      return this._buildHabtmScope();
-    }
     if (this._isThrough) {
       return this._buildThroughScope();
     }
@@ -1849,42 +1853,6 @@ export class CollectionProxy {
         emptyRel = this._assocDef.options.scope(emptyRel);
       }
       return emptyRel.none();
-    }
-    return rel;
-  }
-
-  private _buildHabtmScope(): any {
-    const ctor = this._record.constructor as typeof Base;
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-    const targetModel = resolveModel(className);
-    const joinTableName =
-      this._assocDef.options.joinTable ?? defaultJoinTableName(ctor, this._assocName);
-    const ownerFk = singleFk(this._assocDef.options.foreignKey, `${underscore(ctor.name)}_id`);
-    const targetFk = `${underscore(singularize(this._assocName))}_id`;
-    const ownerPkCol = habtmOwnerPk(this._assocDef.options, ctor);
-    const pkValue = this._record.readAttribute(ownerPkCol);
-
-    if (pkValue == null) return (targetModel as any).all().none();
-
-    const targetPkCol = targetModel.primaryKey;
-    if (Array.isArray(targetPkCol)) {
-      throw new Error(
-        "HABTM associations do not support composite primary keys on the target model",
-      );
-    }
-
-    // Build: WHERE "targets"."id" IN (SELECT "target_fk" FROM "join_table" WHERE "owner_fk" = ?)
-    const joinTable = new ArelTable(joinTableName);
-    const subquery = joinTable
-      .project(joinTable.get(targetFk))
-      .where(joinTable.get(ownerFk).eq(pkValue));
-
-    const targetArelTable = new ArelTable(targetModel.tableName);
-    const inNode = targetArelTable.get(targetPkCol as string).in(subquery);
-
-    let rel = (targetModel as any).all().where(inNode);
-    if (this._assocDef.options.scope) {
-      rel = this._assocDef.options.scope(rel);
     }
     return rel;
   }

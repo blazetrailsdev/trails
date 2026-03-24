@@ -1220,11 +1220,13 @@ describe("AssociationDefinitions", () => {
     class Developer extends Base {}
     Associations.hasAndBelongsToMany.call(Developer, "projects", { joinTable: "dev_proj" });
     const defs = (Developer as any)._associations;
-    expect(defs).toContainEqual({
-      type: "hasAndBelongsToMany",
-      name: "projects",
-      options: { joinTable: "dev_proj" },
-    });
+    const habtmDef = defs.find(
+      (d: any) => d.type === "hasAndBelongsToMany" && d.name === "projects",
+    );
+    expect(habtmDef).toBeDefined();
+    expect(habtmDef.options.joinTable).toBe("dev_proj");
+    expect(habtmDef.options.through).toBeDefined();
+    expect(habtmDef.options.source).toBe("project");
   });
 
   // Rails: test_associations_are_inherited_but_independent
