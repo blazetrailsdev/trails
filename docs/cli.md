@@ -7,9 +7,9 @@ console with models loaded, and manage the database lifecycle.
 ## Current state
 
 The CLI exists at `packages/cli` and has command stubs for most Rails commands.
-Generators produce real files. But the database commands are fake -- `db:migrate`
-doesn't track state, `db:create`/`db:drop` are no-ops, and the console doesn't
-connect to a database.
+Generators produce real files. Database commands connect to a real database via
+`config/database.ts`, track migration state in `schema_migrations`, and support
+migrate, rollback, and status. The console doesn't yet connect to a database.
 
 ### What works today
 
@@ -17,93 +17,81 @@ connect to a database.
 | ------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------- |
 | `rails-ts new <name>`                                  | Generates project skeleton                       | Supports `--database sqlite/postgres/mysql` |
 | `rails-ts generate model`                              | Generates model + migration + test               | Infers `createTable` from name              |
-| `rails-ts generate migration`                          | Generates migration file                         | Infers add/remove columns from name         |
+| `rails-ts generate migration`                          | Generates migration file with `version` property | Infers add/remove columns from name         |
 | `rails-ts generate controller`                         | Generates controller + test                      |                                             |
 | `rails-ts generate scaffold`                           | Generates model + controller + migration + tests |                                             |
 | `rails-ts destroy model/controller/migration/scaffold` | Removes generated files                          |                                             |
 | `rails-ts server`                                      | Starts dev server                                | Uses `DevServer`                            |
 | `rails-ts routes`                                      | Prints route table                               | Requires `src/config/routes.ts`             |
 | `rails-ts console`                                     | Opens REPL                                       | Tries to load models from `src/app/models/` |
+| `rails-ts db migrate`                                  | Runs pending migrations                          | Tracks state in `schema_migrations`         |
+| `rails-ts db migrate --version V`                      | Migrates to a specific version                   |                                             |
+| `rails-ts db rollback`                                 | Rolls back last migration                        | Supports `--step N`                         |
+| `rails-ts db migrate:status`                           | Shows up/down status per migration               | Reads from `schema_migrations` table        |
+| `rails-ts db create`                                   | Creates the database                             | SQLite: creates file; PG/MySQL: CREATE DB   |
+| `rails-ts db drop`                                     | Drops the database                               | SQLite: deletes file; PG/MySQL: DROP DB     |
+| `rails-ts db seed`                                     | Runs `db/seeds.ts` or `db/seeds.js`              | Establishes DB connection first             |
 
-### What's broken or stubbed
+### What's still needed
 
-| Command                      | Problem                                                                                                                               |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `rails-ts db:migrate`        | Doesn't use `MigrationRunner` -- just imports files and calls `.up()`. No `schema_migrations` tracking, reruns everything every time. |
-| `rails-ts db:rollback`       | Picks last file alphabetically and calls `.down()`. Doesn't check what's actually applied.                                            |
-| `rails-ts db:migrate:status` | Shows all migrations as "up" without checking the database.                                                                           |
-| `rails-ts db:create`         | No-op (just prints "Database created.")                                                                                               |
-| `rails-ts db:drop`           | No-op (just prints "Database dropped.")                                                                                               |
-| `rails-ts db:seed`           | Imports `db/seeds.ts` but no database connection is established first.                                                                |
-| `rails-ts console`           | No database connection. Models load but can't query.                                                                                  |
+| Command                    | Problem                                                            |
+| -------------------------- | ------------------------------------------------------------------ |
+| `rails-ts console`         | No database connection. Models load but can't query.               |
+| `rails-ts db reset`        | Not implemented. Should be `drop` + `create` + `migrate` + `seed`. |
+| `rails-ts db setup`        | Not implemented. Should be `create` + `migrate` + `seed`.          |
+| `rails-ts db schema:dump`  | Not implemented. `SchemaDumper` exists but isn't wired to CLI.     |
+| `rails-ts db schema:load`  | Not implemented.                                                   |
+| `rails-ts db migrate:redo` | Not implemented. Should be rollback + migrate.                     |
+
+## Architecture
+
+### Database connection
+
+The CLI loads database config and creates adapters through two functions in
+`packages/cli/src/database.ts`:
+
+- **`loadDatabaseConfig(env?, cwd?)`** -- Dynamically imports the database
+  config from the project root. Searches for `config/database.ts`,
+  `config/database.js`, `src/config/database.ts`, or `src/config/database.js`
+  (in that order). Both TypeScript and JavaScript configs are supported.
+  Resolves environment from `RAILS_TS_ENV` > `NODE_ENV` > `"development"`.
+- **`connectAdapter(config)`** -- Creates the right adapter instance based on
+  `config.adapter`: `"sqlite3"` -> `SqliteAdapter`, `"postgresql"` ->
+  `PostgresAdapter`, `"mysql2"` -> `MysqlAdapter`. Supports both connection
+  params and URL-based config.
+
+### Migration discovery
+
+`packages/cli/src/migration-loader.ts` provides `discoverMigrations(dir)`:
+
+- Reads `db/migrations/` and matches `{timestamp}-{name}.ts` or `.js` files
+- When both `.ts` and `.js` exist for the same migration, `.ts` wins (source of truth)
+- Extracts version from the filename prefix
+- Returns `MigrationProxy[]` compatible with the `Migrator` class
+- Lazily imports migration files only when actually running them
+- `.ts` imports require a TypeScript loader at runtime (e.g., run via `npx tsx`)
+
+### Migration execution
+
+The CLI uses the `Migrator` class from `@rails-ts/activerecord` (not the
+simpler `MigrationRunner`). `Migrator` handles:
+
+- State tracking via `schema_migrations` table
+- Duplicate version/name detection
+- Ordered up/down execution
+- Rollback by N steps
+- Status reporting (up/down per migration)
 
 ## What needs to be built
 
-### Phase 1: Database config and connection
-
-**The critical missing piece.** Nothing else works without this.
-
-- **`config/database.ts`** (or `.json`/`.yml`) -- Define database connection per
-  environment (development, test, production). Equivalent to Rails'
-  `config/database.yml`.
-  ```ts
-  export default {
-    development: {
-      adapter: "sqlite3",
-      database: "db/development.sqlite3",
-    },
-    test: {
-      adapter: "sqlite3",
-      database: "db/test.sqlite3",
-    },
-    production: {
-      adapter: "postgresql",
-      url: process.env.DATABASE_URL,
-    },
-  };
-  ```
-- **`loadDatabaseConfig(env)`** -- Read the config, resolve environment, return
-  connection params.
-- **`connectAdapter(config)`** -- Instantiate the right adapter
-  (SqliteAdapter/PostgresAdapter/MysqlAdapter) from config.
-- **`RAILS_TS_ENV` / `NODE_ENV`** -- Environment detection, defaulting to
-  "development".
-
-### Phase 2: Wire db:migrate to MigrationRunner
-
-`MigrationRunner` already exists in `activerecord/src/migration-runner.ts` and
-handles schema_migrations tracking, pending detection, and ordered rollback.
-The CLI just needs to use it.
-
-- **`db:migrate`** -- Load config, connect adapter, discover migration files from
-  `db/migrations/`, instantiate `MigrationRunner`, call `.migrate()`.
-- **`db:rollback`** -- Same setup, call `.rollback(steps)`. Add `--step N` option.
-- **`db:migrate:status`** -- Same setup, call `.status()`, print table.
-- **Migration file convention** -- Files must export a class extending `Migration`
-  with a `version` property (the timestamp prefix). The generator currently
-  produces the class but not the `version` property -- both the generator and
-  the runner need to agree on how version is determined (either a class property
-  or parsed from the filename).
-- **Migration version extraction** -- Parse the timestamp from the filename
-  (e.g., `20260318120000-create-users.ts` -> version `"20260318120000"`).
-  This is probably simpler than requiring a `version` getter on each class.
-
-### Phase 3: db:create and db:drop
-
-- **`db:create`** -- For SQLite: create the file. For PG/MySQL: connect to the
-  system database and run `CREATE DATABASE`. Needs adapter-specific logic.
-- **`db:drop`** -- Reverse of create. Drop the database.
-- **`db:reset`** -- `db:drop` + `db:create` + `db:migrate` + `db:seed`.
-- **`db:setup`** -- `db:create` + `db:migrate` + `db:seed` (skip if exists).
-
-### Phase 4: Console with database connection
+### Phase 1: Console with database connection
 
 - Load database config and connect before starting REPL.
 - Import and register all models from `src/app/models/`.
 - Set the adapter on Base so queries work.
 - Models should be available as globals in the REPL (e.g., `User.all()`).
 
-### Phase 5: Schema management
+### Phase 2: Schema management
 
 - **`db:schema:dump`** -- Dump current schema to `db/schema.ts` (or `.sql`).
   Needs `SchemaDumper` which is partially implemented.
@@ -111,7 +99,12 @@ The CLI just needs to use it.
   migrations. Faster for fresh setups.
 - **`db:migrate:redo`** -- Rollback + migrate (useful for testing a migration).
 
-### Phase 6: Additional generators
+### Phase 3: Composite commands
+
+- **`db:reset`** -- `db:drop` + `db:create` + `db:migrate` + `db:seed`.
+- **`db:setup`** -- `db:create` + `db:migrate` + `db:seed` (skip if exists).
+
+### Phase 4: Additional generators
 
 - **`generate migration` improvements** -- Support `AddIndexToUsers name:index`,
   `references` type, `belongs_to` shorthand.
@@ -120,7 +113,7 @@ The CLI just needs to use it.
 
 ## Migration file convention
 
-Generated migrations should look like:
+Generated migrations look like:
 
 ```ts
 import { Migration } from "@rails-ts/activerecord";
@@ -142,8 +135,9 @@ export class CreateUsers extends Migration {
 }
 ```
 
-The `version` is the timestamp prefix from the filename. `MigrationRunner`
-uses it to track which migrations have been applied.
+The `version` is the timestamp prefix from the filename. The `Migrator` uses
+filename-parsed versions for tracking, so the `version` property is
+belt-and-suspenders.
 
 ## Database config convention
 
@@ -157,8 +151,3 @@ my-app/
     schema.ts          # schema dump (auto-generated)
     development.sqlite3  # SQLite database file
 ```
-
-## Tracking
-
-Phase 1 (config + connection) unblocks everything else. Without it, the CLI
-can generate files but can't talk to a database.

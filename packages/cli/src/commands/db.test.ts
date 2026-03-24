@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createProgram } from "../cli.js";
+import { loadDatabaseConfig, connectAdapter, resolveEnv } from "../database.js";
+import { discoverMigrations } from "../migration-loader.js";
+import { Migrator } from "@rails-ts/activerecord";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 
 describe("DbCommand", () => {
   it("has migrate subcommand", () => {
@@ -36,5 +42,229 @@ describe("DbCommand", () => {
     const program = createProgram();
     const db = program.commands.find((c) => c.name() === "db");
     expect(db?.commands.some((c) => c.name() === "migrate:status")).toBe(true);
+  });
+});
+
+describe("resolveEnv", () => {
+  const origRailsEnv = process.env.RAILS_TS_ENV;
+  const origNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    if (origRailsEnv === undefined) delete process.env.RAILS_TS_ENV;
+    else process.env.RAILS_TS_ENV = origRailsEnv;
+    if (origNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = origNodeEnv;
+  });
+
+  it("prefers RAILS_TS_ENV", () => {
+    process.env.RAILS_TS_ENV = "staging";
+    process.env.NODE_ENV = "production";
+    expect(resolveEnv()).toBe("staging");
+  });
+
+  it("falls back to NODE_ENV", () => {
+    delete process.env.RAILS_TS_ENV;
+    process.env.NODE_ENV = "production";
+    expect(resolveEnv()).toBe("production");
+  });
+
+  it("defaults to development", () => {
+    delete process.env.RAILS_TS_ENV;
+    delete process.env.NODE_ENV;
+    expect(resolveEnv()).toBe("development");
+  });
+});
+
+describe("connectAdapter", () => {
+  let adapter: any;
+
+  afterEach(async () => {
+    if (adapter && typeof adapter.close === "function") {
+      await adapter.close();
+    }
+    adapter = undefined;
+  });
+
+  it("creates SqliteAdapter for sqlite3", async () => {
+    adapter = await connectAdapter({ adapter: "sqlite3", database: ":memory:" });
+    expect(adapter.constructor.name).toBe("SqliteAdapter");
+  });
+
+  it("creates SqliteAdapter for sqlite", async () => {
+    adapter = await connectAdapter({ adapter: "sqlite", database: ":memory:" });
+    expect(adapter.constructor.name).toBe("SqliteAdapter");
+  });
+
+  it("throws for unknown adapter", async () => {
+    await expect(connectAdapter({ adapter: "oracle" })).rejects.toThrow(/Unknown database adapter/);
+  });
+});
+
+describe("loadDatabaseConfig", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-db-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("throws when no config file exists", async () => {
+    await expect(loadDatabaseConfig("development", tmpDir)).rejects.toThrow(
+      /No database config found/,
+    );
+  });
+
+  it("loads config from config/database.ts", async () => {
+    const configDir = path.join(tmpDir, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: ":memory:" },
+};`,
+    );
+
+    const config = await loadDatabaseConfig("development", tmpDir);
+    expect(config.adapter).toBe("sqlite3");
+  });
+
+  it("throws for missing environment", async () => {
+    const configDir = path.join(tmpDir, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "database.ts"),
+      `export default { development: { adapter: "sqlite3" } };`,
+    );
+
+    await expect(loadDatabaseConfig("production", tmpDir)).rejects.toThrow(
+      /No database configuration for environment "production"/,
+    );
+  });
+});
+
+describe("discoverMigrations", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-migrations-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns empty array for missing directory", async () => {
+    const migrations = await discoverMigrations(path.join(tmpDir, "nonexistent"));
+    expect(migrations).toEqual([]);
+  });
+
+  it("discovers migration files and extracts versions", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "20260101000000-create-users.ts"),
+      `export class CreateUsers { version = "20260101000000"; }`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "20260102000000-add-email-to-users.ts"),
+      `export class AddEmailToUsers { version = "20260102000000"; }`,
+    );
+    fs.writeFileSync(path.join(tmpDir, "README.md"), "ignore me");
+
+    const migrations = await discoverMigrations(tmpDir);
+    expect(migrations).toHaveLength(2);
+    expect(migrations[0].version).toBe("20260101000000");
+    expect(migrations[0].name).toBe("create-users");
+    expect(migrations[1].version).toBe("20260102000000");
+    expect(migrations[1].name).toBe("add-email-to-users");
+  });
+
+  it("sorts migrations by version", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "20260202000000-second.ts"),
+      `export class Second { version = "20260202000000"; }`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "20260101000000-first.ts"),
+      `export class First { version = "20260101000000"; }`,
+    );
+
+    const migrations = await discoverMigrations(tmpDir);
+    expect(migrations[0].version).toBe("20260101000000");
+    expect(migrations[1].version).toBe("20260202000000");
+  });
+});
+
+describe("full migration flow", () => {
+  let tmpDir: string;
+  let adapter: any;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-flow-"));
+  });
+
+  afterEach(async () => {
+    if (adapter && typeof adapter.close === "function") {
+      await adapter.close();
+    }
+    adapter = undefined;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("migrate, status, rollback with SQLite", async () => {
+    const { SqliteAdapter } = await import("@rails-ts/activerecord");
+    adapter = new SqliteAdapter(":memory:");
+
+    fs.writeFileSync(
+      path.join(tmpDir, "20260101000000-create-posts.ts"),
+      `import { Migration } from "@rails-ts/activerecord";
+export class CreatePosts extends Migration {
+  async up() {
+    await this.createTable("posts", (t) => {
+      t.string("title");
+      t.timestamps();
+    });
+  }
+  async down() {
+    await this.dropTable("posts");
+  }
+}`,
+    );
+
+    const migrations = await discoverMigrations(tmpDir);
+    const migrator = new Migrator(adapter, migrations);
+
+    // Status before migrate
+    const beforeStatus = await migrator.migrationsStatus();
+    expect(beforeStatus).toHaveLength(1);
+    expect(beforeStatus[0].status).toBe("down");
+
+    // Migrate up
+    await migrator.migrate();
+
+    // Status after migrate
+    const afterStatus = await migrator.migrationsStatus();
+    expect(afterStatus[0].status).toBe("up");
+
+    // Verify table exists
+    const tables = await adapter.execute(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
+    );
+    expect(tables).toHaveLength(1);
+
+    // Rollback
+    await migrator.rollback(1);
+
+    // Status after rollback
+    const rollbackStatus = await migrator.migrationsStatus();
+    expect(rollbackStatus[0].status).toBe("down");
+
+    // Verify table is gone
+    const tablesAfter = await adapter.execute(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
+    );
+    expect(tablesAfter).toHaveLength(0);
   });
 });
