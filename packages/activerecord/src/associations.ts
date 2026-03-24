@@ -2015,7 +2015,7 @@ export function buildThroughAssociation(
   if (!assocDef || !assocDef.options.through) {
     throw new Error(`Association "${assocName}" is not a through association on ${ctor.name}`);
   }
-  if (assocDef.type !== "hasOne") {
+  if (assocDef.type !== "hasOne" && (assocDef.type as string) !== "hasOneThrough") {
     throw new Error(
       `buildThroughAssociation is only for has_one :through (got "${assocDef.type}" for ${ctor.name}#${assocName}). Use CollectionProxy for has_many :through.`,
     );
@@ -2134,7 +2134,10 @@ export async function createThroughAssociation(
     const throughSaved = await through.save();
     if (!throughSaved) return target;
 
-    const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`;
+    const sourceAsName = sourceAssocDef?.options?.as;
+    const targetFk = sourceAsName
+      ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+      : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`);
     if (Array.isArray(targetFk)) {
       throw new Error("createThroughAssociation does not support composite foreign keys");
     }
@@ -2143,6 +2146,9 @@ export async function createThroughAssociation(
       throw new Error("createThroughAssociation does not support composite primary keys");
     }
     target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
+    if (sourceAsName) {
+      target.writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
+    }
     const targetSaved = await target.save();
     if (!targetSaved) return target;
   } else {
