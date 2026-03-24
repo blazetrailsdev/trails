@@ -2015,6 +2015,11 @@ export function buildThroughAssociation(
   if (!assocDef || !assocDef.options.through) {
     throw new Error(`Association "${assocName}" is not a through association on ${ctor.name}`);
   }
+  if (assocDef.type !== "hasOne") {
+    throw new Error(
+      `buildThroughAssociation is only for has_one :through (got "${assocDef.type}" for ${ctor.name}#${assocName}). Use CollectionProxy for has_many :through.`,
+    );
+  }
 
   const throughAssoc = associations.find((a) => a.name === assocDef.options.through);
   if (!throughAssoc) {
@@ -2058,9 +2063,6 @@ export function buildThroughAssociation(
   }
   const through = new throughModel(throughAttrs);
 
-  (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
-  (record as any)._cachedAssociations.set(assocName, target);
-
   return { target, through };
 }
 
@@ -2085,13 +2087,25 @@ export async function createThroughAssociation(
   const targetSaved = await target.save();
   if (!targetSaved) return target;
 
-  // Wire the source FK on the intermediate to point to the saved target
+  // Wire the source FK on the intermediate to point to the saved target.
+  // Resolve from the through model's association definitions to respect custom FK/PK.
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName)!;
   const sourceName = assocDef.options.source ?? assocName;
-  const sourceFk = `${underscore(sourceName)}_id`;
-  const targetPk = (target.constructor as typeof Base).primaryKey as string;
-  through.writeAttribute(sourceFk, target.readAttribute(targetPk));
+
+  const throughCtor = through.constructor as typeof Base;
+  const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
+  const sourceAssocDef = throughAssociations.find((a) => a.name === sourceName);
+
+  const sourceFk =
+    (sourceAssocDef?.options?.foreignKey as string) ?? `${underscore(sourceName)}_id`;
+  const targetPk =
+    (sourceAssocDef?.options?.primaryKey as string) ??
+    (target.constructor as typeof Base).primaryKey;
+  if (Array.isArray(targetPk)) {
+    throw new Error("createThroughAssociation does not support composite primary keys");
+  }
+  through.writeAttribute(sourceFk, target.readAttribute(targetPk as string));
 
   const throughSaved = await through.save();
   if (!throughSaved) {
