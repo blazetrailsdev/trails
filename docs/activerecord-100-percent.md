@@ -24,6 +24,27 @@ The core source files and their roles:
 
 Association loading flow: `base.ts` accessor -> `loadHasMany`/`loadBelongsTo`/etc. in `associations.ts` -> builds a `Relation` query -> executes via adapter. Collections return `CollectionProxy` wrapping the results.
 
+### Raw SQL that should be converted to Arel
+
+`Relation#where` now accepts Arel nodes. The following places still construct raw SQL strings and should be migrated to use Arel managers/nodes instead:
+
+**associations.ts** — HABTM join table operations (4 calls):
+
+- `loadHabtm`: `SELECT target_fk FROM join_table WHERE owner_fk = ?` — use `SelectManager`
+- `_pushHabtm`: `INSERT INTO join_table ...` — use `InsertManager`
+- `_deleteHabtm`: `DELETE FROM join_table WHERE ...` — use `DeleteManager`
+- `processDependentAssociations`: `DELETE FROM join_table WHERE ...` — use `DeleteManager`
+
+All four use manual quoting (`pkQuoted`/`targetQuoted`) which should be replaced by Arel's value binding.
+
+**relation.ts** — raw SQL in `_whereRawClauses`:
+
+- Relation subquery: `WHERE col IN (SELECT ...)` (line ~167) — use `Attribute.in(subqueryRelation)`
+- `whereAny`/`whereAll` (lines ~244, ~284) — build OR/AND groups with Arel `Or`/`And` nodes
+- `findEach`/`findInBatches` cursor (lines ~2849-2905) — `pk >= ?` / `pk > ?` conditions should use `Attribute.gteq()`/`Attribute.gt()`
+
+Note: `where("raw sql ?", bind)` from user code is intentional (Rails supports this) and should stay.
+
 ---
 
 ## Phase 1: Core associations (do first — unblocks ~500 tests)
