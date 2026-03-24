@@ -1,5 +1,5 @@
-import { Type } from "./types/type.js";
-import { typeRegistry } from "./types/registry.js";
+import { Type } from "./type/value.js";
+import { typeRegistry } from "./type/registry.js";
 
 export interface AttributeDefinition {
   name: string;

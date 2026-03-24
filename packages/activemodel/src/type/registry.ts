@@ -1,27 +1,19 @@
-import {
-  Type,
-  StringType,
-  IntegerType,
-  FloatType,
-  BooleanType,
-  DateType,
-  DateTimeType,
-  DecimalType,
-  UuidType,
-  JsonType,
-  BigIntegerType,
-  ImmutableStringType,
-  ValueType,
-  BinaryType,
-  TimeType,
-} from "./type.js";
+import { Type, ValueType } from "./value.js";
+import { StringType } from "./string.js";
+import { IntegerType } from "./integer.js";
+import { FloatType } from "./float.js";
+import { BooleanType } from "./boolean.js";
+import { DateType } from "./date.js";
+import { DateTimeType } from "./date-time.js";
+import { DecimalType } from "./decimal.js";
+import { UuidType } from "./uuid.js";
+import { JsonType } from "./json.js";
+import { BigIntegerType } from "./big-integer.js";
+import { ImmutableStringType } from "./immutable-string.js";
+import { BinaryType } from "./binary.js";
+import { TimeType } from "./time.js";
 
-/**
- * Type registry — maps type names to Type instances.
- *
- * Mirrors: ActiveModel::Type.register / ActiveModel::Type.lookup
- */
-class TypeRegistry {
+export class TypeRegistry {
   private types = new Map<string, () => Type>();
 
   constructor() {

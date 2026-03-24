@@ -62,7 +62,8 @@ function shortName(fqn: string): string {
 
 /**
  * FQN → candidate TS class names to try matching.
- * For `Arel::Visitors::Dot::Node`, returns ["Node", "DotNode"]
+ * For `Arel::Visitors::Dot::Node`, returns ["Node", "DotNode", "NodeDot"]
+ * For `ActiveModel::Type::String`, returns ["String", "TypeString", "StringType"]
  * so inner classes like Dot::Node can match DotNode in TS.
  */
 function candidateNames(fqn: string): string[] {
@@ -71,7 +72,10 @@ function candidateNames(fqn: string): string[] {
   const candidates = [name];
   if (parts.length >= 2) {
     const parent = parts[parts.length - 2];
+    // ParentName — e.g., Dot::Node → DotNode
     candidates.push(parent + name);
+    // NameParent — e.g., Type::String → StringType
+    candidates.push(name + parent);
   }
   return candidates;
 }

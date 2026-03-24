@@ -1,8 +1,8 @@
 import { Errors } from "./errors.js";
 import { humanize, underscore } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
-import { typeRegistry } from "./types/registry.js";
-import { Type } from "./types/type.js";
+import { typeRegistry } from "./type/registry.js";
+import { Type } from "./type/value.js";
 import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
