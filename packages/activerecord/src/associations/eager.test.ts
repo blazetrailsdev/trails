@@ -2685,13 +2685,13 @@ describe("EagerAssociationTest", () => {
     const proxy1 = new CollectionProxy(
       p1,
       "habtmEagerCategories",
-      (HabtmEagerPost as any)._associations[0],
+      (HabtmEagerPost as any)._associations.find((a: any) => a.name === "habtmEagerCategories"),
     );
     await proxy1.push(tech, gen);
     const proxy2 = new CollectionProxy(
       p2,
       "habtmEagerCategories",
-      (HabtmEagerPost as any)._associations[0],
+      (HabtmEagerPost as any)._associations.find((a: any) => a.name === "habtmEagerCategories"),
     );
     await proxy2.push(gen);
 
@@ -2854,7 +2854,7 @@ describe("EagerAssociationTest", () => {
     const proxy = new CollectionProxy(
       post,
       "habtmInhSpecialCategories",
-      (HabtmInhPost as any)._associations[0],
+      (HabtmInhPost as any)._associations.find((a: any) => a.name === "habtmInhSpecialCategories"),
     );
     await proxy.push(special);
 
@@ -3382,7 +3382,7 @@ describe("EagerAssociationTest", () => {
     const proxy = new CollectionProxy(
       author,
       "maHabtmCategories",
-      (MaHabtmAuthor as any)._associations[1],
+      (MaHabtmAuthor as any)._associations.find((a: any) => a.name === "maHabtmCategories"),
     );
     await proxy.push(cat);
 
@@ -3624,7 +3624,11 @@ describe("EagerAssociationTest", () => {
     const cat2 = await PciCategory.create({ name: "General" });
 
     const { CollectionProxy } = await import("../associations.js");
-    const proxy = new CollectionProxy(post, "pciCategories", (PciPost as any)._associations[0]);
+    const proxy = new CollectionProxy(
+      post,
+      "pciCategories",
+      (PciPost as any)._associations.find((a: any) => a.name === "pciCategories"),
+    );
     await proxy.push(cat1, cat2);
 
     // Load author's posts, then preload categories on posts
@@ -3683,7 +3687,11 @@ describe("EagerAssociationTest", () => {
     const cat2 = await PcihCategory.create({ name: "General" });
 
     const { CollectionProxy } = await import("../associations.js");
-    const proxy = new CollectionProxy(post, "pcihCategories", (PcihPost as any)._associations[1]);
+    const proxy = new CollectionProxy(
+      post,
+      "pcihCategories",
+      (PcihPost as any)._associations.find((a: any) => a.name === "pcihCategories"),
+    );
     await proxy.push(cat1, cat2);
 
     const posts = await PcihPost.all()
