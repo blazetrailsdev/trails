@@ -2,17 +2,12 @@ import { Node, NodeVisitor } from "./node.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { And } from "./and.js";
 import { Or } from "./or.js";
-import { Not } from "./not.js";
+import { Not } from "./unary.js";
 import { Grouping } from "./grouping.js";
 import { Cte } from "./cte.js";
 
 export type NodeOrValue = Node | string | number | boolean | bigint | Date | null | undefined;
 
-/**
- * Binary — base class for nodes with left and right operands.
- *
- * Mirrors: Arel::Nodes::Binary
- */
 export class Binary extends Node {
   left: NodeOrValue;
   right: NodeOrValue;
@@ -44,10 +39,8 @@ export class Binary extends Node {
   }
 }
 
-/** Assignment: column = value */
 export class Assignment extends Binary {}
 
-/** As: expr AS alias */
 export class As extends Binary {
   toCte(): Cte {
     const name =
@@ -56,17 +49,13 @@ export class As extends Binary {
   }
 }
 
-/** Between: expr BETWEEN left AND right */
 export class Between extends Binary {}
-
-/** Comparison predicates */
 export class NotEqual extends Binary {}
 export class GreaterThan extends Binary {}
 export class GreaterThanOrEqual extends Binary {}
 export class LessThan extends Binary {}
 export class LessThanOrEqual extends Binary {}
 
-/** IS DISTINCT FROM / IS NOT DISTINCT FROM */
 export class IsDistinctFrom extends Binary {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
@@ -79,5 +68,83 @@ export class IsNotDistinctFrom extends Binary {
   }
 }
 
-/** Set membership */
 export class NotIn extends Binary {}
+
+/** Join base class — Rails defines via const_set in binary.rb */
+export abstract class Join extends Node {
+  readonly left: Node;
+  readonly right: Node | null;
+
+  constructor(left: Node, right: Node | null = null) {
+    super();
+    this.left = left;
+    this.right = right;
+  }
+}
+
+export class CrossJoin extends Join {
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}
+
+/** Set operations — Rails defines via const_set in binary.rb */
+export class Union extends Node {
+  readonly left: Node;
+  readonly right: Node;
+
+  constructor(left: Node, right: Node) {
+    super();
+    this.left = left;
+    this.right = right;
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}
+
+export class UnionAll extends Node {
+  readonly left: Node;
+  readonly right: Node;
+
+  constructor(left: Node, right: Node) {
+    super();
+    this.left = left;
+    this.right = right;
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}
+
+export class Intersect extends Node {
+  readonly left: Node;
+  readonly right: Node;
+
+  constructor(left: Node, right: Node) {
+    super();
+    this.left = left;
+    this.right = right;
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}
+
+export class Except extends Node {
+  readonly left: Node;
+  readonly right: Node;
+
+  constructor(left: Node, right: Node) {
+    super();
+    this.left = left;
+    this.right = right;
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}

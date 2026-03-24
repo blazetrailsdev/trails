@@ -5,7 +5,7 @@ import { SqlLiteral } from "./sql-literal.js";
 import { Over } from "./over.js";
 import { NamedWindow, Window } from "./window.js";
 import { Grouping } from "./grouping.js";
-import { Quoted } from "./quoted.js";
+import { Quoted } from "./casted.js";
 import {
   BitwiseAnd,
   BitwiseOr,

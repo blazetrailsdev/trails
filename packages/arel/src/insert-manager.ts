@@ -1,8 +1,8 @@
 import { Node } from "./nodes/node.js";
 import { InsertStatement } from "./nodes/insert-statement.js";
-import { Attribute } from "./nodes/attribute.js";
+import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
-import { Quoted } from "./nodes/quoted.js";
+import { Quoted } from "./nodes/casted.js";
 import { Table } from "./table.js";
 import { ToSql } from "./visitors/to-sql.js";
 

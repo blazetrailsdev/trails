@@ -16,16 +16,16 @@ import { NotIn } from "../nodes/binary.js";
 import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
-import { Quoted } from "../nodes/quoted.js";
+import { Quoted } from "../nodes/casted.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
-import { Not } from "../nodes/not.js";
+import { Not } from "../nodes/unary.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
 import { Extract } from "../nodes/extract.js";
 import { Regexp as RegexpNode, NotRegexp } from "../nodes/regexp.js";
-import { IsDistinctFrom, IsNotDistinctFrom } from "../nodes/distinct-from.js";
+import { IsDistinctFrom, IsNotDistinctFrom } from "../nodes/binary.js";
 import { Case } from "../nodes/case.js";
 import {
   InfixOperation,
@@ -37,7 +37,7 @@ import {
 } from "../nodes/infix-operation.js";
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
-import { True } from "../nodes/true-false.js";
+import { True } from "../nodes/true.js";
 
 function buildQuoted(value: unknown): Node {
   if (value instanceof Node) return value;

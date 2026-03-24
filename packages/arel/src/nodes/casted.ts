@@ -1,5 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
-import type { Attribute } from "./attribute.js";
+import type { Attribute } from "../attributes/attribute.js";
 
 /**
  * Casted — a value bound to a specific attribute for type casting.
