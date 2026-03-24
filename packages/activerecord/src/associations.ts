@@ -1025,9 +1025,13 @@ export async function processDependentAssociations(record: Base): Promise<void> 
           await child.destroy();
         }
       } else if (dep === "delete") {
-        for (const child of children) {
-          await child.delete();
-        }
+        // Bulk delete avoids N+1 on join tables (HABTM middle hasMany)
+        const childModel = resolveModel(
+          (assoc.options.className as string) ?? camelize(singularize(assoc.name)),
+        );
+        const fk = (assoc.options.foreignKey as string) ?? `${underscore(ctor.name)}_id`;
+        const pkCol = Array.isArray(ctor.primaryKey) ? ctor.primaryKey[0] : ctor.primaryKey;
+        await childModel.where({ [fk]: record.readAttribute(pkCol as string) }).deleteAll();
       } else if (dep === "nullify") {
         const asName = assoc.options.as;
         const foreignKey = asName
