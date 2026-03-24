@@ -277,7 +277,7 @@ export class Associations {
         ...options,
         joinTable: joinTableName,
         through: middleName,
-        source: singularize(name),
+        source: options.source ?? singularize(name),
       },
     });
   }
