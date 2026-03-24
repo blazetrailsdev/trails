@@ -121,10 +121,69 @@ class ApiExtractor
 
     rel_path = Pathname.new(filepath).relative_path_from(Pathname.new(package_root)).to_s
 
-    # Check for file-level :nodoc: all
-    # Note: We still extract Arel even though it's :nodoc: all, since we mirror it
     @current_file = rel_path
     walk(sexp)
+
+    # Handle dynamic class creation via const_set:
+    #   %w{ Foo Bar }.each { |name| const_set(name, Class.new(Superclass)) }
+    extract_const_set_classes(source)
+  end
+
+  def extract_const_set_classes(source)
+    lines = source.lines
+
+    lines.each_with_index do |line, idx|
+      next unless line =~ /const_set\s*\(?[^,]+,\s*Class\.new\((\w+)\)/
+      superclass = $1
+      const_set_indent = line[/^\s*/].length
+
+      # Find the %w{} list by scanning backwards and collecting lines
+      names = []
+      collecting = false
+      collected = ""
+      (0..idx).reverse_each do |i|
+        l = lines[i]
+        if l =~ /%w[\{\[\(]/
+          collected = lines[i..idx].join
+          if collected =~ /%w[\{\[\(]([\w\s]+)[\}\]\)]/
+            names = $1.strip.split(/\s+/)
+          end
+          break
+        end
+      end
+      next if names.empty?
+
+      # Determine enclosing namespace from module declarations only.
+      # Find the indentation of the first class declaration to exclude
+      # modules that are nested inside classes.
+      first_class_indent = const_set_indent
+      (0...idx).each do |i|
+        if lines[i] =~ /^(\s*)class\s/
+          first_class_indent = [$1.length, first_class_indent].min
+          break
+        end
+      end
+
+      namespace_parts = []
+      (0...idx).each do |i|
+        l = lines[i]
+        if l =~ /^(\s*)module\s+([\w:]+)/
+          decl_indent = $1.length
+          if decl_indent < first_class_indent
+            $2.split("::").each { |part| namespace_parts << part }
+          end
+        end
+      end
+
+      fqn_prefix = namespace_parts.join("::")
+
+      names.each do |name|
+        class_fqn = fqn_prefix.empty? ? name : "#{fqn_prefix}::#{name}"
+        @classes[class_fqn] ||= new_class_info(name, class_fqn)
+        @classes[class_fqn][:superclass] = superclass
+        @classes[class_fqn][:file] = @current_file
+      end
+    end
   end
 
   private
