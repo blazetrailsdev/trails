@@ -1804,9 +1804,9 @@ export class CollectionProxy {
     if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
       throw new StrictLoadingViolationError(this._record, this._assocName);
     }
-    // For through/HABTM, scope() may not handle all cases (nested through).
+    // For through associations, scope() may not handle all cases (nested through).
     // Fall back to toArray() which uses loadHasManyThrough's multi-query approach.
-    if (this._isThrough || this._isHabtm) {
+    if (this._isThrough) {
       return this.toArray();
     }
     return this.scope().toArray();

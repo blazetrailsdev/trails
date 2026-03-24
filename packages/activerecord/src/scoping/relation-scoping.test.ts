@@ -520,14 +520,15 @@ describe("NestedRelationScopingTest", () => {
     adapter = freshAdapter();
   });
   function makeModel() {
-    class Post extends Base {
+    class NRSPost extends Base {
       static {
+        this._tableName = "nrs_posts";
         this.attribute("title", "string");
         this.attribute("author", "string");
         this.adapter = adapter;
       }
     }
-    return { Post };
+    return { Post: NRSPost };
   }
 
   it("merge options", async () => {
