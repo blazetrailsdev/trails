@@ -31,6 +31,7 @@ export interface AssociationOptions {
   touch?: boolean | string | string[];
   autosave?: boolean;
   scope?: (rel: any) => any;
+  validate?: boolean;
   required?: boolean;
   optional?: boolean;
   beforeAdd?:

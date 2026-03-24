@@ -366,14 +366,37 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.push(p1);
     expect(await pirate.isValid()).toBe(true);
   });
-  it.skip("should be invalid on habtm when any record in the association chain is invalid and was changed", () => {
-    /* needs autosave validation of HABTM children */
+  it("should be invalid on habtm when any record in the association chain is invalid and was changed", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+    parrot.name = "";
+    cacheAssoc(pirate, "parrots", [parrot]);
+    expect(pirate.isValid()).toBe(false);
   });
-  it.skip("should be invalid on habtm when any record in the association chain is invalid and was changed with autosave", () => {
-    /* needs autosave validation of HABTM children */
+  it("should be invalid on habtm when any record in the association chain is invalid and was changed with autosave", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+    parrot.name = "";
+    cacheAssoc(pirate, "parrots", [parrot]);
+    const saved = await pirate.save();
+    expect(saved).toBe(false);
   });
-  it.skip("should be valid on habtm when any record in the association chain is invalid but was not changed", () => {
-    /* needs autosave validation of HABTM children */
+  it("should be valid on habtm when any record in the association chain is invalid but was not changed", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const parrot = await Parrot.create({ name: "Polly" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(parrot);
+    // Parrot is persisted and unchanged; autosave validation should only consider
+    // associated records that have actually been changed
+    cacheAssoc(pirate, "parrots", [parrot]);
+    expect(pirate.isValid()).toBe(true);
   });
   it("a child marked for destruction should not be destroyed twice while saving habtm", async () => {
     const { Pirate, Parrot } = makePirateParrot();

@@ -30,6 +30,14 @@ export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
   _wrapWithScopeProxy = wrapper;
 }
 
+// Late-bound validateAssociations to break circular dependency with autosave.ts
+let _validateAssociationsFn: ((record: any, context?: string) => void) | null = null;
+
+/** @internal Called by autosave.ts to register validateAssociations. */
+export function _setValidateAssociationsFn(fn: (record: any, context?: string) => void): void {
+  _validateAssociationsFn = fn;
+}
+
 /** @internal Hook called when a model's adapter is set. Used by test-adapter.ts. */
 let _onAdapterSet: ((modelClass: any) => void) | null = null;
 export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): void {
@@ -3235,7 +3243,12 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Validations#valid?
    */
   override isValid(context?: string): boolean {
-    return super.isValid(context);
+    const effectiveContext = context ?? this._validationContext ?? undefined;
+    const result = super.isValid(effectiveContext);
+    if (_validateAssociationsFn) {
+      _validateAssociationsFn(this, effectiveContext);
+    }
+    return result && !this.errors.any;
   }
 
   validate(context?: string): this {
