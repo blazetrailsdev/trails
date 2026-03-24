@@ -65,31 +65,22 @@ These are sequential — each builds on the previous.
 
 ### 1B. Through association operations
 
-**What exists:** `loadHasManyThrough` (associations.ts:660) queries through the join table. `CollectionProxy._pushThrough` creates join records. `_buildThrough` builds target records without FK. `_createThrough` saves target + creates join row.
+**Done:**
 
-**What's missing:**
+- `buildThroughAssociation` / `createThroughAssociation` for has_one :through — builds both target and intermediate record, wires FKs in correct order based on source type (belongsTo vs hasOne/hasMany), handles polymorphic sources and STI. 7 tests unskipped.
+- `disableJoins` option added to `AssociationOptions` for Rails API parity. Currently a no-op since `loadHasManyThrough` already uses multi-query loading. 8 tests unskipped.
 
-1. **Build/create through with intermediate record attributes** — has-one-through `build` should create both the intermediate and target record. Currently `_buildThrough` only builds the target.
+**Remaining follow-ups:**
 
-   Rails source: `has_one_through_association.rb#create_through_record`, `through_association.rb`
+1. **Nested through edge cases** (12 skipped in nested-through-associations.test.ts) — STI on nested through, polymorphic with scope, preload via joins, table referenced multiple times. Requires deeper JoinDependency/table aliasing work. Phase 2.
 
-   **Implementation:** When `build()` is called on a through proxy, also build the intermediate record and wire the FKs. Store both in memory so `save` can persist them in order.
+2. **Polymorphic disable_joins** (12 skipped) — ordering, scopes, chained scopes, limits, first. Need in-memory ordering/limiting when `disableJoins` is set and the final query can't apply ORDER/LIMIT at DB level.
 
-2. **Nested through preload** — `loadHasManyThrough` handles one level of through. For nested (through -> through), it needs to walk the chain. Currently nested through throws `HasManyThroughNestedAssociationsAreReadonly` for writes (correct), but reads should work.
+3. **`disableJoins` becomes meaningful** when we add JOIN-based through loading (currently all through loading is multi-query). At that point, `disableJoins: false` (default) should use JOINs and `disableJoins: true` should use multi-query.
 
-   Rails source: `preloader/through_association.rb`, `preloader.rb`
+4. **`pluck`/`pick` on through includes unsaved records** — `_resolveRecords` falls back to `toArray()` for through associations, which merges unsaved in-memory records. Should filter to persisted-only for DB-semantics methods.
 
-   **Implementation:** In `loadHasManyThrough`, detect when the through association is itself a through. Recursively load: first resolve the intermediate through, then use those records to load the final target. The preloader in `relation.ts` (`_preloadAssociationsForRecords`, line 3264) also needs this — currently it only handles one level.
-
-3. **`disable_joins` through** — has-many-through-disable-joins-associations.test.ts (28 skip). Load through records in two separate queries instead of a JOIN.
-
-   Rails source: `disable_joins_association_scope.rb`
-
-   **Implementation:** If `disableJoins: true` option is set, load intermediate records first, collect their FKs, then load targets with `WHERE id IN (...)`. Add `disableJoins` to `AssociationOptions`.
-
-**Files to modify:** `associations.ts` (loadHasManyThrough, CollectionProxy.\_buildThrough/\_createThrough), `relation.ts` (preloader)
-
-**Tests unblocked:** nested-through (~46), has-one-through (~29), HMT (~15), disable-joins (~28)
+5. **Transaction wrapping for `createThroughAssociation`** — multiple saves without rollback on partial failure. Needs transaction support wired in.
 
 ---
 
