@@ -31,6 +31,10 @@ Many test files define local helper classes or functions instead of importing pr
 
 Some tests appear in multiple `describe` blocks within the same file. This is sometimes needed because `convention:compare` matches tests by their full path (describe > test name), and different Ruby test classes may have tests with the same name. Only flag duplicates if they are within the **same** describe block.
 
+## Use the package ecosystem like Rails does
+
+ActiveRecord's power comes from Arel. When building queries, subqueries, or SQL conditions in `activerecord`, use `@rails-ts/arel` (Table, SelectManager, Nodes, Attribute) to build AST nodes — never construct raw SQL strings. Similarly, use `@rails-ts/activemodel` for validations/callbacks and `@rails-ts/activesupport` for inflection/utilities rather than reimplementing them. If you see raw SQL string construction in activerecord, flag it — it should be using Arel.
+
 ## Code style
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
