@@ -897,8 +897,11 @@ function createHabtmJoinModel(
     configurable: true,
   });
 
-  // Set table name (join model inherits default "id" PK like Rails)
+  // Set table name and composite PK — HABTM join tables typically have no id column,
+  // so the join model uses [ownerFk, targetFk] as its primary key to support
+  // delete/destroy operations that issue PK-based WHERE clauses.
   JoinModel._tableName = joinTableName;
+  JoinModel.primaryKey = [ownerFk, targetFk];
 
   // Define FK attributes
   JoinModel.attribute(ownerFk, "integer");
