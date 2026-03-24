@@ -32,7 +32,8 @@ export {
 export type { NodeOrValue } from "./binary.js";
 
 export { Equality } from "./equality.js";
-export { In, NotIn } from "./in.js";
+export { In } from "./in.js";
+export { NotIn } from "./binary.js";
 export { Matches, DoesNotMatch } from "./matches.js";
 
 export { JoinSource } from "./join-source.js";

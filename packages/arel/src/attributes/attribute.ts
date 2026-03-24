@@ -11,7 +11,8 @@ import {
 } from "../nodes/binary.js";
 import { Equality } from "../nodes/equality.js";
 import { Matches, DoesNotMatch } from "../nodes/matches.js";
-import { In, NotIn } from "../nodes/in.js";
+import { In } from "../nodes/in.js";
+import { NotIn } from "../nodes/binary.js";
 import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";

@@ -78,3 +78,6 @@ export class IsNotDistinctFrom extends Binary {
     return visitor.visit(this);
   }
 }
+
+/** Set membership */
+export class NotIn extends Binary {}
