@@ -2235,9 +2235,18 @@ export class Base extends Model {
 
     // Run save callbacks.
     // Use runBefore/runAfter to control the lifecycle:
-    // before_save → before_create/update → INSERT/UPDATE → after_create/update → after_save
+    // before_save → autosave belongsTo → before_create/update → INSERT/UPDATE →
+    // after_create/update → after_save → autosave children
     let saved = false;
     if (!(await ctor._callbackChain.runBefore("save", this))) return false;
+
+    // Autosave belongsTo BEFORE parent persist (sets FK on parent)
+    const { autosaveBelongsTo, autosaveChildren } = await import("./autosave.js");
+    const belongsToOk = await autosaveBelongsTo(this);
+    if (!belongsToOk) {
+      this._skipTouch = false;
+      return false;
+    }
 
     const wasNewRecord = this._newRecord;
     if (this._newRecord) {
@@ -2277,9 +2286,8 @@ export class Base extends Model {
         await updateCounterCaches(this, "increment");
       }
 
-      // Autosave associations
-      const { autosaveAssociations } = await import("./autosave.js");
-      const autosaveOk = await autosaveAssociations(this);
+      // Autosave hasMany/hasOne/HABTM AFTER parent persist (children need parent PK)
+      const autosaveOk = await autosaveChildren(this);
       if (!autosaveOk) return false;
 
       // Touch parent associations

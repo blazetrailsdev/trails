@@ -834,29 +834,135 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("callbacks firing order on create", () => {
-    /* callbacks not fully implemented */
+  it("callbacks firing order on create", async () => {
+    const log: string[] = [];
+    class CbFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.beforeSave(function () {
+          log.push("before_save");
+        });
+        this.afterCreate(function () {
+          log.push("after_create");
+        });
+        this.afterSave(function () {
+          log.push("after_save");
+        });
+      }
+    }
+    class CbAccount extends Base {
+      static {
+        this.attribute("credit_limit", "integer");
+        this.attribute("cb_firm_id", "integer");
+      }
+    }
+    CbFirm.adapter = adapter;
+    CbAccount.adapter = adapter;
+    registerModel("CbFirm", CbFirm);
+    registerModel("CbAccount", CbAccount);
+    (CbFirm as any)._associations = [
+      {
+        type: "hasOne",
+        name: "cbAccount",
+        options: { autosave: true, className: "CbAccount", foreignKey: "cb_firm_id" },
+      },
+    ];
+    const firm = new CbFirm({ name: "LLC" });
+    const account = new CbAccount({ credit_limit: 100 });
+    cacheAssoc(firm, "cbAccount", account);
+    await firm.save();
+    expect(log).toContain("before_save");
+    expect(log).toContain("after_create");
+    expect(log).toContain("after_save");
+    // before_save should come before after_create
+    expect(log.indexOf("before_save")).toBeLessThan(log.indexOf("after_create"));
+    // after_create before after_save
+    expect(log.indexOf("after_create")).toBeLessThan(log.indexOf("after_save"));
+    // child should be persisted
+    expect(account.isNewRecord()).toBe(false);
   });
   it.skip("callbacks firing order on update", () => {
-    /* callbacks not fully implemented */
+    /* needs more callback infrastructure */
   });
   it.skip("callbacks firing order on save", () => {
-    /* callbacks not fully implemented */
+    /* needs more callback infrastructure */
   });
-  it.skip("callbacks on child when parent autosaves child", () => {
-    /* callbacks not fully implemented */
+  it("callbacks on child when parent autosaves child", async () => {
+    const log: string[] = [];
+    class CbParent extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class CbChild extends Base {
+      static {
+        this.attribute("value", "string");
+        this.attribute("cb_parent_id", "integer");
+        this.afterSave(function () {
+          log.push("child_after_save");
+        });
+      }
+    }
+    CbParent.adapter = adapter;
+    CbChild.adapter = adapter;
+    registerModel("CbParent", CbParent);
+    registerModel("CbChild", CbChild);
+    (CbParent as any)._associations = [
+      {
+        type: "hasOne",
+        name: "cbChild",
+        options: { autosave: true, className: "CbChild", foreignKey: "cb_parent_id" },
+      },
+    ];
+    const parent = await CbParent.create({ name: "P" });
+    const child = new CbChild({ value: "V" });
+    cacheAssoc(parent, "cbChild", child);
+    await parent.save();
+    expect(log).toContain("child_after_save");
+    expect(child.isNewRecord()).toBe(false);
   });
   it.skip("callbacks on child when parent autosaves child twice", () => {
-    /* callbacks not fully implemented */
+    /* needs more callback infrastructure */
   });
   it.skip("callbacks on child when parent autosaves polymorphic child with inverse of", () => {
     /* polymorphic not implemented */
   });
-  it.skip("callbacks on child when child autosaves parent", () => {
-    /* callbacks not fully implemented */
+  it("callbacks on child when child autosaves parent", async () => {
+    const log: string[] = [];
+    class CbOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.afterSave(function () {
+          log.push("owner_after_save");
+        });
+      }
+    }
+    class CbPet extends Base {
+      static {
+        this.attribute("species", "string");
+        this.attribute("cb_owner_id", "integer");
+      }
+    }
+    CbOwner.adapter = adapter;
+    CbPet.adapter = adapter;
+    registerModel("CbOwner", CbOwner);
+    registerModel("CbPet", CbPet);
+    (CbPet as any)._associations = [
+      {
+        type: "belongsTo",
+        name: "cbOwner",
+        options: { autosave: true, className: "CbOwner", foreignKey: "cb_owner_id" },
+      },
+    ];
+    const owner = new CbOwner({ name: "Alice" });
+    const pet = new CbPet({ species: "cat" });
+    cacheAssoc(pet, "cbOwner", owner);
+    await pet.save();
+    expect(log).toContain("owner_after_save");
+    expect(owner.isNewRecord()).toBe(false);
   });
   it.skip("callbacks on child when child autosaves parent twice", () => {
-    /* callbacks not fully implemented */
+    /* needs more callback infrastructure */
   });
   it.skip("callbacks on child when polymorphic child with inverse of autosaves parent", () => {
     /* polymorphic not implemented */
