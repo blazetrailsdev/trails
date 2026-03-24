@@ -2027,7 +2027,11 @@ export function buildThroughAssociation(
   }
 
   // Nested through is readonly
-  if (throughAssoc.options.through) {
+  if (
+    throughAssoc.options.through ||
+    (throughAssoc.type as string) === "hasManyThrough" ||
+    (throughAssoc.type as string) === "hasOneThrough"
+  ) {
     throw new HasOneThroughNestedAssociationsAreReadonly(ctor.name, assocName);
   }
 
@@ -2118,7 +2122,11 @@ export async function createThroughAssociation(
       through.writeAttribute(typeCol, typeValue);
     }
   } else if (sourceType === "hasOne" || sourceType === "hasMany") {
-    // FK lives on the target side, pointing back to the through record
+    // FK lives on the target side, pointing back to the through record.
+    // Save through first to get its PK, then wire target.
+    const throughSavedFirst = await through.save();
+    if (!throughSavedFirst) return target;
+
     const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`;
     if (Array.isArray(targetFk)) {
       throw new Error("createThroughAssociation does not support composite foreign keys");
@@ -2128,7 +2136,6 @@ export async function createThroughAssociation(
       throw new Error("createThroughAssociation does not support composite primary keys");
     }
     target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
-    // Re-save target with the FK set
     await target.save();
   } else {
     throw new Error(
@@ -2136,10 +2143,10 @@ export async function createThroughAssociation(
     );
   }
 
-  const throughSaved = await through.save();
-  if (!throughSaved) {
-    // Intermediate failed — don't cache
-    return target;
+  // For belongsTo source, through hasn't been saved yet
+  if (sourceType === "belongsTo") {
+    const throughSaved = await through.save();
+    if (!throughSaved) return target;
   }
 
   (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
