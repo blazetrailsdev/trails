@@ -7,25 +7,18 @@ import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
-import type {
-  Validator,
-  ConditionalOptions,
-  ConditionFn,
-  AnyRecord,
-} from "./validations/validator.js";
-import { shouldValidate } from "./validations/validator.js";
-import {
-  PresenceValidator,
-  AbsenceValidator,
-  LengthValidator,
-  NumericalityValidator,
-  InclusionValidator,
-  ExclusionValidator,
-  FormatValidator,
-  AcceptanceValidator,
-  ConfirmationValidator,
-  ComparisonValidator,
-} from "./validations/validators.js";
+import type { Validator, ConditionalOptions, ConditionFn, AnyRecord } from "./validator.js";
+import { shouldValidate } from "./validator.js";
+import { PresenceValidator } from "./validations/presence.js";
+import { AbsenceValidator } from "./validations/absence.js";
+import { LengthValidator } from "./validations/length.js";
+import { NumericalityValidator } from "./validations/numericality.js";
+import { InclusionValidator } from "./validations/inclusion.js";
+import { ExclusionValidator } from "./validations/exclusion.js";
+import { FormatValidator } from "./validations/format.js";
+import { AcceptanceValidator } from "./validations/acceptance.js";
+import { ConfirmationValidator } from "./validations/confirmation.js";
+import { ComparisonValidator } from "./validations/comparison.js";
 
 interface AttributeDefinition {
   name: string;
