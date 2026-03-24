@@ -8,7 +8,13 @@ export { Fragments } from "./fragments.js";
 export { Quoted, Casted } from "./casted.js";
 export { Attribute } from "../attributes/attribute.js";
 export { Distinct } from "./terminal.js";
-export { Exists } from "./function.js";
+export { Function, Exists, Sum, Max, Min, Avg } from "./function.js";
+export { Count } from "./count.js";
+export { NodeExpression } from "./node-expression.js";
+export { Nary } from "./nary.js";
+export { HomogeneousIn } from "./homogeneous-in.js";
+export { UnqualifiedColumn } from "./unqualified-column.js";
+export { LeadingJoin } from "./leading-join.js";
 
 export {
   Unary,
@@ -25,10 +31,13 @@ export {
   Cube,
   Rollup,
   GroupingSet,
+  Group,
+  OptimizerHints,
+  RollUp,
 } from "./unary.js";
 export { Ascending } from "./ascending.js";
 export { Descending } from "./descending.js";
-export { NullsFirst, NullsLast } from "./ordering.js";
+export { Ordering, NullsFirst, NullsLast } from "./ordering.js";
 
 export {
   Binary,
@@ -76,7 +85,7 @@ export { Over } from "./over.js";
 
 export { With, WithRecursive } from "./with.js";
 export { TableAlias } from "./table-alias.js";
-export { Case } from "./case.js";
+export { Case, When, Else } from "./case.js";
 export { Extract } from "./extract.js";
 export {
   InfixOperation,
@@ -90,6 +99,8 @@ export {
   Multiplication,
   Division,
   Concat,
+  Contains,
+  Overlaps,
 } from "./infix-operation.js";
 export { BindParam } from "./bind-param.js";
 export { BoundSqlLiteral } from "./bound-sql-literal.js";
@@ -98,7 +109,7 @@ export { False } from "./false.js";
 export { Regexp, NotRegexp } from "./regexp.js";
 export { Comment } from "./comment.js";
 export { Cte } from "./cte.js";
-export { UnaryOperation } from "./unary-operation.js";
+export { UnaryOperation, BitwiseNot } from "./unary-operation.js";
 export { Filter } from "./filter.js";
 
 import { SqlLiteral } from "./sql-literal.js";
