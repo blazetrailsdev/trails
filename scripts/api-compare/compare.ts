@@ -60,73 +60,74 @@ function shortName(fqn: string): string {
   return parts[parts.length - 1];
 }
 
+const OPERATORS = new Set([
+  "[]",
+  "[]=",
+  "==",
+  "===",
+  "!=",
+  "<=>",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "&",
+  "|",
+  "^",
+  "~",
+  "!",
+  "!~",
+  "=~",
+  ">>",
+  "<<",
+  "~@",
+]);
+
+const SKIP = new Set([
+  "dup",
+  "clone",
+  "freeze",
+  "hash",
+  "inspect",
+  "pretty_print",
+  "object_id",
+  "class",
+  "send",
+  "public_send",
+  "tap",
+  "then",
+  "yield_self",
+  "respond_to?",
+  "respond_to_missing?",
+  "method_missing",
+  "is_a?",
+  "kind_of?",
+  "instance_of?",
+  "nil?",
+  "equal?",
+  "eql?",
+  "instance_variable_get",
+  "instance_variable_set",
+  "instance_variables",
+  "initialize_copy",
+  "initialize_dup",
+  "initialize_clone",
+  "encode_with",
+  "init_with",
+  "to_ary",
+  "to_a",
+  "to_i",
+  "to_f",
+  "to_h",
+  "to_hash",
+  "to_r",
+  "to_c",
+]);
+
 /** Convert Ruby method name → expected TS name (null = skip) */
 function rubyMethodToTs(name: string): string | null {
-  const OPERATORS = new Set([
-    "[]",
-    "[]=",
-    "==",
-    "===",
-    "!=",
-    "<=>",
-    "+",
-    "-",
-    "*",
-    "/",
-    "%",
-    "&",
-    "|",
-    "^",
-    "~",
-    "!",
-    "!~",
-    "=~",
-    ">>",
-    "<<",
-    "~@",
-  ]);
   if (OPERATORS.has(name)) return null;
-
-  const SKIP = new Set([
-    "dup",
-    "clone",
-    "freeze",
-    "hash",
-    "inspect",
-    "pretty_print",
-    "object_id",
-    "class",
-    "send",
-    "public_send",
-    "tap",
-    "then",
-    "yield_self",
-    "respond_to?",
-    "respond_to_missing?",
-    "method_missing",
-    "is_a?",
-    "kind_of?",
-    "instance_of?",
-    "nil?",
-    "equal?",
-    "eql?",
-    "instance_variable_get",
-    "instance_variable_set",
-    "instance_variables",
-    "initialize_copy",
-    "initialize_dup",
-    "initialize_clone",
-    "encode_with",
-    "init_with",
-    "to_ary",
-    "to_a",
-    "to_i",
-    "to_f",
-    "to_h",
-    "to_hash",
-    "to_r",
-    "to_c",
-  ]);
   if (SKIP.has(name)) return null;
 
   // Skip _-prefixed
@@ -205,7 +206,16 @@ interface PackageResult {
 
 function main() {
   const args = process.argv.slice(2);
-  const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
+  const pkgIndex = args.indexOf("--package");
+  let filterPkg: string | null = null;
+  if (pkgIndex !== -1) {
+    const value = args[pkgIndex + 1];
+    if (!value || value.startsWith("--")) {
+      console.error("--package requires a package name (e.g. --package activerecord)");
+      process.exit(1);
+    }
+    filterPkg = value;
+  }
   const showMethods = args.includes("--methods");
   const showMissing = args.includes("--missing");
 
@@ -288,7 +298,7 @@ function main() {
     let totalMissing = 0;
     const fileResults: FileResult[] = [];
 
-    for (const [rubyFile, items] of [...byFile.entries()].sort()) {
+    for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
       const expectedTs = rubyFileToTs(rubyFile);
       const tsFileExists = tsFileSet.has(expectedTs);
       const classResults: ClassResult[] = [];
