@@ -44,6 +44,10 @@ export interface AssociationOptions {
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
     | Record<string, (...args: unknown[]) => unknown>[];
+  /** Load through associations via multiple queries instead of JOIN.
+   * Currently a no-op since through loading already uses multi-query by default.
+   * Exists for Rails API parity — Rails uses this to switch between JOIN and
+   * multi-query strategies. */
   disableJoins?: boolean;
 }
 
