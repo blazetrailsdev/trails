@@ -2097,15 +2097,44 @@ export async function createThroughAssociation(
   const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
   const sourceAssocDef = throughAssociations.find((a) => a.name === sourceName);
 
-  const sourceFk =
-    (sourceAssocDef?.options?.foreignKey as string) ?? `${underscore(sourceName)}_id`;
-  const targetPk =
-    (sourceAssocDef?.options?.primaryKey as string) ??
-    (target.constructor as typeof Base).primaryKey;
-  if (Array.isArray(targetPk)) {
-    throw new Error("createThroughAssociation does not support composite primary keys");
+  const sourceType = sourceAssocDef?.type ?? "belongsTo";
+
+  if (sourceType === "belongsTo") {
+    const sourceFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+    if (Array.isArray(sourceFk)) {
+      throw new Error("createThroughAssociation does not support composite foreign keys");
+    }
+    const targetPk =
+      (sourceAssocDef?.options?.primaryKey as string) ??
+      (target.constructor as typeof Base).primaryKey;
+    if (Array.isArray(targetPk)) {
+      throw new Error("createThroughAssociation does not support composite primary keys");
+    }
+    through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
+    // Polymorphic source: also set the type column
+    if (sourceAssocDef?.options?.polymorphic) {
+      const typeCol = `${underscore(sourceName)}_type`;
+      const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
+      through.writeAttribute(typeCol, typeValue);
+    }
+  } else if (sourceType === "hasOne" || sourceType === "hasMany") {
+    // FK lives on the target side, pointing back to the through record
+    const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`;
+    if (Array.isArray(targetFk)) {
+      throw new Error("createThroughAssociation does not support composite foreign keys");
+    }
+    const throughPk = sourceAssocDef?.options?.primaryKey ?? throughCtor.primaryKey;
+    if (Array.isArray(throughPk)) {
+      throw new Error("createThroughAssociation does not support composite primary keys");
+    }
+    target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
+    // Re-save target with the FK set
+    await target.save();
+  } else {
+    throw new Error(
+      `createThroughAssociation: unsupported source type "${sourceType}" for ${assocName}`,
+    );
   }
-  through.writeAttribute(sourceFk, target.readAttribute(targetPk as string));
 
   const throughSaved = await through.save();
   if (!throughSaved) {
