@@ -1,26 +1,214 @@
 #!/usr/bin/env npx tsx
 /**
- * Compares Ruby Rails API with our TypeScript API surface.
- * Loads both JSON manifests, maps Ruby → TS names, and generates reports.
+ * Convention-based API comparison.
+ *
+ * Compares Ruby Rails API surface with our TypeScript API using only naming
+ * conventions — no manual mappings.
+ *
+ * For each Ruby class/module, derives the expected TS class name and file
+ * location from conventions:
+ *   - Class name: short name (last segment of FQN)
+ *   - File path: Ruby path with .rb → .ts, snake_case → kebab-case
+ *
+ * Reports: found (correct file), found (misplaced), missing.
+ *
+ * Usage:
+ *   npx tsx scripts/api-compare/compare.ts [--package activerecord] [--methods] [--missing]
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import type {
-  ApiManifest,
-  ClassInfo,
-  MethodInfo,
-  ComparisonResult,
-  ClassComparison,
-  MethodComparison,
-  MethodStatus,
-} from "./types.js";
-import { rubyMethodToTs, CLASS_MAP, MODULE_CONTRIBUTIONS } from "./naming-map.js";
+import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
+const DETAIL_PACKAGES = new Set([
+  "arel",
+  "activemodel",
+  "activerecord",
+  "activesupport",
+  "actiondispatch",
+  "actioncontroller",
+]);
+
+// ---------------------------------------------------------------------------
+// Conventions
+// ---------------------------------------------------------------------------
+
+function snakeToCamel(name: string): string {
+  return name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
+}
+
+/** Ruby file path → expected TS file path (kebab-case, .ts extension) */
+function rubyFileToTs(rubyFile: string): string {
+  const dir = path.dirname(rubyFile);
+  const base = path.basename(rubyFile, ".rb");
+  const kebab = base.replace(/_/g, "-");
+  const tsFile = kebab + ".ts";
+  if (dir === ".") return tsFile;
+  const tsDir = dir
+    .split("/")
+    .map((d) => d.replace(/_/g, "-"))
+    .join("/");
+  return path.join(tsDir, tsFile);
+}
+
+/** FQN → short class name */
+function shortName(fqn: string): string {
+  const parts = fqn.split("::");
+  return parts[parts.length - 1];
+}
+
+/** Convert Ruby method name → expected TS name (null = skip) */
+function rubyMethodToTs(name: string): string | null {
+  const OPERATORS = new Set([
+    "[]",
+    "[]=",
+    "==",
+    "===",
+    "!=",
+    "<=>",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "&",
+    "|",
+    "^",
+    "~",
+    "!",
+    "!~",
+    "=~",
+    ">>",
+    "<<",
+    "~@",
+  ]);
+  if (OPERATORS.has(name)) return null;
+
+  const SKIP = new Set([
+    "dup",
+    "clone",
+    "freeze",
+    "hash",
+    "inspect",
+    "pretty_print",
+    "object_id",
+    "class",
+    "send",
+    "public_send",
+    "tap",
+    "then",
+    "yield_self",
+    "respond_to?",
+    "respond_to_missing?",
+    "method_missing",
+    "is_a?",
+    "kind_of?",
+    "instance_of?",
+    "nil?",
+    "equal?",
+    "eql?",
+    "instance_variable_get",
+    "instance_variable_set",
+    "instance_variables",
+    "initialize_copy",
+    "initialize_dup",
+    "initialize_clone",
+    "encode_with",
+    "init_with",
+    "to_ary",
+    "to_a",
+    "to_i",
+    "to_f",
+    "to_h",
+    "to_hash",
+    "to_r",
+    "to_c",
+  ]);
+  if (SKIP.has(name)) return null;
+
+  // Skip _-prefixed
+  if (name.startsWith("_")) return null;
+
+  // Special conversions
+  if (name === "initialize") return "constructor";
+  if (name === "to_s" || name === "to_str") return "toString";
+  if (name === "to_json") return "toJSON";
+  if (name === "to_sql") return "toSql";
+
+  // Predicate: foo? → isFoo
+  if (name.endsWith("?")) {
+    const base = name.slice(0, -1);
+    return "is" + snakeToCamel(base).replace(/^./, (c) => c.toUpperCase());
+  }
+
+  // Bang: foo! → fooBang
+  if (name.endsWith("!")) {
+    const base = name.slice(0, -1);
+    return snakeToCamel(base) + "Bang";
+  }
+
+  // Setter: foo= → foo (camelCase)
+  if (name.endsWith("=")) {
+    const base = name.slice(0, -1);
+    return snakeToCamel(base);
+  }
+
+  return snakeToCamel(name);
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type ClassStatus = "found" | "misplaced" | "missing";
+
+interface ClassResult {
+  rubyFqn: string;
+  rubyShortName: string;
+  rubyFile: string;
+  expectedTsFile: string;
+  actualTsFile: string | null;
+  kind: "class" | "module";
+  status: ClassStatus;
+  methodsMatched: number;
+  methodsMissing: number;
+  methodsExtra: number;
+  missingMethods: string[];
+}
+
+interface FileResult {
+  rubyFile: string;
+  expectedTsFile: string;
+  tsFileExists: boolean;
+  classes: ClassResult[];
+  found: number;
+  misplaced: number;
+  missing: number;
+}
+
+interface PackageResult {
+  package: string;
+  totalClasses: number;
+  found: number;
+  misplaced: number;
+  missing: number;
+  percent: number;
+  files: FileResult[];
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 function main() {
+  const args = process.argv.slice(2);
+  const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
+  const showMethods = args.includes("--methods");
+  const showMissing = args.includes("--missing");
+
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
 
@@ -36,376 +224,300 @@ function main() {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // Build a quick lookup: package:ClassName -> ClassInfo from TS
-  const tsLookup = new Map<string, ClassInfo>();
-  for (const [pkg, pkgInfo] of Object.entries(ts.packages)) {
-    for (const [name, cls] of Object.entries(pkgInfo.classes)) {
-      tsLookup.set(`${pkg}:${name}`, cls);
-    }
-  }
+  const results: PackageResult[] = [];
 
-  // Build a lookup for Ruby classes/modules by FQN
-  const rubyLookup = new Map<string, ClassInfo>();
-  for (const pkgInfo of Object.values(ruby.packages)) {
-    for (const [fqn, cls] of Object.entries(pkgInfo.classes)) {
-      rubyLookup.set(fqn, cls as unknown as ClassInfo);
-    }
-    for (const [fqn, mod] of Object.entries(pkgInfo.modules)) {
-      rubyLookup.set(fqn, mod as unknown as ClassInfo);
-    }
-  }
+  for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
+    if (filterPkg && pkg !== filterPkg) continue;
 
-  const result: ComparisonResult = {
-    generatedAt: new Date().toISOString(),
-    railsVersion: "8.0.2",
-    summary: {
-      totalRubyMethods: 0,
-      matched: 0,
-      missing: 0,
-      extra: 0,
-      signatureMismatch: 0,
-      coveragePercent: 0,
-    },
-    packages: {},
-  };
+    const tsPkg = ts.packages[pkg];
 
-  // Get unique TS classes to compare
-  const tsClassesToCompare = new Set<string>();
-  for (const tsKey of Object.values(CLASS_MAP)) {
-    tsClassesToCompare.add(tsKey);
-  }
-
-  // For each TS class, gather all Ruby methods from contributing modules
-  for (const tsKey of tsClassesToCompare) {
-    const tsClass = tsLookup.get(tsKey);
-    if (!tsClass) continue;
-
-    const [pkg] = tsKey.split(":");
-    if (!result.packages[pkg]) {
-      result.packages[pkg] = [];
+    // Build TS lookup: shortName → { file, classInfo }[]
+    const tsClassesByName = new Map<string, { file: string; info: ClassInfo }[]>();
+    if (tsPkg) {
+      for (const [name, cls] of Object.entries(tsPkg.classes)) {
+        const entries = tsClassesByName.get(name) || [];
+        entries.push({ file: cls.file || "", info: cls });
+        tsClassesByName.set(name, entries);
+      }
     }
 
-    const contributions = MODULE_CONTRIBUTIONS[tsKey];
-    if (!contributions) {
-      // Try direct mapping only
-      continue;
+    // Build set of all TS files in this package
+    const tsFileSet = new Set<string>();
+    if (tsPkg) {
+      for (const cls of Object.values(tsPkg.classes)) {
+        if (cls.file) tsFileSet.add(cls.file);
+      }
     }
 
-    // Collect all Ruby instance methods from contributing modules
-    const rubyInstanceMethods = new Map<string, MethodInfo>();
-    const rubyClassMethods = new Map<string, MethodInfo>();
+    // Collect all Ruby classes and modules
+    const allRuby: {
+      fqn: string;
+      info: ClassInfo;
+      kind: "class" | "module";
+    }[] = [];
+    for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
+      allRuby.push({
+        fqn,
+        info: info as unknown as ClassInfo,
+        kind: "class",
+      });
+    }
+    for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
+      allRuby.push({
+        fqn,
+        info: info as unknown as ClassInfo,
+        kind: "module",
+      });
+    }
 
-    for (const rubyFqn of contributions) {
-      const rubyCls = rubyLookup.get(rubyFqn);
-      if (!rubyCls) continue;
+    // Group by Ruby file
+    const byFile = new Map<string, typeof allRuby>();
+    for (const item of allRuby) {
+      const file = item.info.file || "unknown.rb";
+      const list = byFile.get(file) || [];
+      list.push(item);
+      byFile.set(file, list);
+    }
 
-      for (const m of rubyCls.instanceMethods) {
-        if (!rubyInstanceMethods.has(m.name)) {
-          rubyInstanceMethods.set(m.name, m);
+    // Track which TS classes have been consumed (to avoid double-matching
+    // when two Ruby FQNs share the same short name, e.g., Base)
+    const consumedTs = new Set<string>(); // "name:file" keys
+
+    let totalFound = 0;
+    let totalMisplaced = 0;
+    let totalMissing = 0;
+    const fileResults: FileResult[] = [];
+
+    for (const [rubyFile, items] of [...byFile.entries()].sort()) {
+      const expectedTs = rubyFileToTs(rubyFile);
+      const tsFileExists = tsFileSet.has(expectedTs);
+      const classResults: ClassResult[] = [];
+      let fileFound = 0;
+      let fileMisplaced = 0;
+      let fileMissing = 0;
+
+      for (const item of items) {
+        const name = shortName(item.fqn);
+        const tsEntries = tsClassesByName.get(name) || [];
+
+        // Prefer match in expected file, then any unconsumed match
+        const inExpected = tsEntries.find(
+          (e) => e.file === expectedTs && !consumedTs.has(`${name}:${e.file}`),
+        );
+        const inAny = tsEntries.find((e) => !consumedTs.has(`${name}:${e.file}`));
+
+        let status: ClassStatus;
+        let actualFile: string | null = null;
+        let tsClass: ClassInfo | null = null;
+
+        if (inExpected) {
+          status = "found";
+          actualFile = expectedTs;
+          tsClass = inExpected.info;
+          consumedTs.add(`${name}:${expectedTs}`);
+          fileFound++;
+          totalFound++;
+        } else if (inAny) {
+          status = "misplaced";
+          actualFile = inAny.file;
+          tsClass = inAny.info;
+          consumedTs.add(`${name}:${inAny.file}`);
+          fileMisplaced++;
+          totalMisplaced++;
+        } else {
+          status = "missing";
+          fileMissing++;
+          totalMissing++;
         }
-      }
-      for (const m of rubyCls.classMethods) {
-        if (!rubyClassMethods.has(m.name)) {
-          rubyClassMethods.set(m.name, m);
+
+        // Method comparison for found/misplaced classes
+        let methodsMatched = 0;
+        let methodsMissing = 0;
+        let methodsExtra = 0;
+        const missingMethods: string[] = [];
+
+        if (tsClass) {
+          const tsMethodNames = new Set<string>();
+          for (const m of [...tsClass.instanceMethods, ...tsClass.classMethods]) {
+            tsMethodNames.add(m.name);
+          }
+
+          const rubyMethods = [...item.info.instanceMethods, ...item.info.classMethods];
+          const mappedTsNames = new Set<string>();
+
+          for (const rm of rubyMethods) {
+            const tsName = rubyMethodToTs(rm.name);
+            if (tsName === null) continue;
+            mappedTsNames.add(tsName);
+            if (tsMethodNames.has(tsName)) {
+              methodsMatched++;
+            } else {
+              methodsMissing++;
+              missingMethods.push(`${rm.name} → ${tsName}`);
+            }
+          }
+
+          for (const tsName of tsMethodNames) {
+            if (!mappedTsNames.has(tsName) && tsName !== "constructor") {
+              methodsExtra++;
+            }
+          }
         }
+
+        classResults.push({
+          rubyFqn: item.fqn,
+          rubyShortName: name,
+          rubyFile,
+          expectedTsFile: expectedTs,
+          actualTsFile: actualFile,
+          kind: item.kind,
+          status,
+          methodsMatched,
+          methodsMissing,
+          methodsExtra,
+          missingMethods,
+        });
       }
+
+      fileResults.push({
+        rubyFile,
+        expectedTsFile: expectedTs,
+        tsFileExists,
+        classes: classResults,
+        found: fileFound,
+        misplaced: fileMisplaced,
+        missing: fileMissing,
+      });
     }
 
-    // Build TS method lookup
-    const tsInstanceLookup = new Map<string, MethodInfo[]>();
-    for (const m of tsClass.instanceMethods) {
-      const existing = tsInstanceLookup.get(m.name);
-      if (existing) {
-        existing.push(m);
-      } else {
-        tsInstanceLookup.set(m.name, [m]);
-      }
-    }
-    const tsClassLookup = new Map<string, MethodInfo[]>();
-    for (const m of tsClass.classMethods) {
-      const existing = tsClassLookup.get(m.name);
-      if (existing) {
-        existing.push(m);
-      } else {
-        tsClassLookup.set(m.name, [m]);
-      }
-    }
+    const total = totalFound + totalMisplaced + totalMissing;
+    const pct = total > 0 ? Math.round((totalFound / total) * 1000) / 10 : 0;
 
-    const instanceComparisons = compareMethods(rubyInstanceMethods, tsInstanceLookup);
-    const classComparisons = compareMethods(rubyClassMethods, tsClassLookup);
-
-    // Find extras (TS methods with no Ruby counterpart)
-    const instanceExtras = findExtras(tsClass.instanceMethods, rubyInstanceMethods);
-    const classExtras = findExtras(tsClass.classMethods, rubyClassMethods);
-
-    const allComparisons = [...instanceComparisons, ...classComparisons];
-    const matched = allComparisons.filter((c) => c.status === "matched").length;
-    const missing = allComparisons.filter((c) => c.status === "missing").length;
-    const sigMismatch = allComparisons.filter((c) => c.status === "signature_mismatch").length;
-    const extra = instanceExtras.length + classExtras.length;
-    const total = allComparisons.length;
-    const coverage = total > 0 ? Math.round((matched / total) * 1000) / 10 : 0;
-
-    result.packages[pkg].push({
-      rubyClass: contributions.join(" + "),
-      tsClass: tsKey,
+    results.push({
       package: pkg,
-      instanceMethods: [...instanceComparisons, ...instanceExtras],
-      classMethods: [...classComparisons, ...classExtras],
-      coveragePercent: coverage,
-      matched,
-      missing,
-      extra,
-      signatureMismatch: sigMismatch,
+      totalClasses: total,
+      found: totalFound,
+      misplaced: totalMisplaced,
+      missing: totalMissing,
+      percent: pct,
+      files: fileResults,
     });
   }
 
-  // Compute summary
-  for (const comparisons of Object.values(result.packages)) {
-    for (const cls of comparisons) {
-      result.summary.totalRubyMethods += cls.matched + cls.missing + cls.signatureMismatch;
-      result.summary.matched += cls.matched;
-      result.summary.missing += cls.missing;
-      result.summary.extra += cls.extra;
-      result.summary.signatureMismatch += cls.signatureMismatch;
-    }
-  }
-  result.summary.coveragePercent =
-    result.summary.totalRubyMethods > 0
-      ? Math.round((result.summary.matched / result.summary.totalRubyMethods) * 1000) / 10
-      : 0;
+  // Write JSON
+  const jsonPath = path.join(OUTPUT_DIR, "api-comparison.json");
+  fs.writeFileSync(
+    jsonPath,
+    JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
+  );
 
-  // Write JSON report
-  const jsonPath = path.join(OUTPUT_DIR, "comparison-report.json");
-  fs.writeFileSync(jsonPath, JSON.stringify(result, null, 2));
-
-  // Write Markdown report
-  const mdPath = path.join(OUTPUT_DIR, "comparison-report.md");
-  fs.writeFileSync(mdPath, generateMarkdown(result));
-
-  // Print summary to terminal
-  printSummary(result);
+  printReport(results, showMethods, showMissing, filterPkg);
 }
 
-function compareMethods(
-  rubyMethods: Map<string, MethodInfo>,
-  tsMethods: Map<string, MethodInfo[]>,
-): MethodComparison[] {
-  const results: MethodComparison[] = [];
+// ---------------------------------------------------------------------------
+// Report
+// ---------------------------------------------------------------------------
 
-  for (const [rubyName, rubyMethod] of rubyMethods) {
-    const tsName = rubyMethodToTs(rubyName);
-    if (tsName === null) {
-      // Explicitly skipped
-      continue;
-    }
+function printReport(
+  results: PackageResult[],
+  showMethods: boolean,
+  showMissing: boolean,
+  filterPkg: string | null,
+) {
+  let grandTotal = 0;
+  let grandFound = 0;
+  let grandMisplaced = 0;
 
-    const tsOverloads = tsMethods.get(tsName);
-    if (!tsOverloads || tsOverloads.length === 0) {
-      results.push({
-        rubyName,
-        tsName,
-        status: "missing",
-        rubyParams: rubyMethod.params,
-      });
-      continue;
-    }
+  for (const pkg of results) {
+    grandTotal += pkg.totalClasses;
+    grandFound += pkg.found;
+    grandMisplaced += pkg.misplaced;
 
-    // Pick the best-matching overload (closest required param count)
-    const rubyParamCount = countRequiredParams(rubyMethod.params);
-    let bestMatch = tsOverloads[0];
-    let bestDiff = Math.abs(countRequiredParams(bestMatch.params) - rubyParamCount);
-    for (let i = 1; i < tsOverloads.length; i++) {
-      const diff = Math.abs(countRequiredParams(tsOverloads[i].params) - rubyParamCount);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestMatch = tsOverloads[i];
-      }
-    }
-
-    const tsParamCount = countRequiredParams(bestMatch.params);
-
-    if (rubyParamCount !== tsParamCount) {
-      results.push({
-        rubyName,
-        tsName,
-        status: "signature_mismatch",
-        rubyParams: rubyMethod.params,
-        tsParams: bestMatch.params,
-        notes: `Ruby has ${rubyParamCount} required params, TS has ${tsParamCount}`,
-      });
-    } else {
-      results.push({
-        rubyName,
-        tsName,
-        status: "matched",
-        rubyParams: rubyMethod.params,
-        tsParams: bestMatch.params,
-      });
-    }
-  }
-
-  return results;
-}
-
-function findExtras(
-  tsMethods: MethodInfo[],
-  rubyMethods: Map<string, MethodInfo>,
-): MethodComparison[] {
-  const results: MethodComparison[] = [];
-
-  // Build a set of all TS names that Ruby methods map to
-  const mappedTsNames = new Set<string>();
-  for (const rubyName of rubyMethods.keys()) {
-    const tsName = rubyMethodToTs(rubyName);
-    if (tsName) mappedTsNames.add(tsName);
-  }
-
-  for (const tsMethod of tsMethods) {
-    if (!mappedTsNames.has(tsMethod.name)) {
-      // Skip constructor, common TS patterns
-      if (tsMethod.name === "constructor") continue;
-      results.push({
-        rubyName: "",
-        tsName: tsMethod.name,
-        status: "extra",
-        tsParams: tsMethod.params,
-      });
-    }
-  }
-
-  return results;
-}
-
-function countRequiredParams(params: { kind: string }[]): number {
-  return params.filter((p) => p.kind === "required").length;
-}
-
-function generateMarkdown(result: ComparisonResult): string {
-  const lines: string[] = [];
-
-  lines.push("# Rails API Comparison Report");
-  lines.push("");
-  lines.push(`Generated: ${result.generatedAt}`);
-  lines.push(`Rails version: ${result.railsVersion}`);
-  lines.push("");
-
-  lines.push("## Summary");
-  lines.push("");
-  lines.push(`| Metric | Count |`);
-  lines.push(`|--------|-------|`);
-  lines.push(`| Total Ruby methods | ${result.summary.totalRubyMethods} |`);
-  lines.push(`| Matched | ${result.summary.matched} |`);
-  lines.push(`| Missing | ${result.summary.missing} |`);
-  lines.push(`| Signature mismatch | ${result.summary.signatureMismatch} |`);
-  lines.push(`| Extra (TS only) | ${result.summary.extra} |`);
-  lines.push(`| **Coverage** | **${result.summary.coveragePercent}%** |`);
-  lines.push("");
-
-  for (const [pkg, comparisons] of Object.entries(result.packages)) {
-    lines.push(`## ${pkg}`);
-    lines.push("");
-
-    for (const cls of comparisons) {
-      lines.push(`### ${cls.tsClass}`);
-      lines.push(`Ruby source: ${cls.rubyClass}`);
-      lines.push(
-        `Coverage: ${cls.coveragePercent}% (${cls.matched} matched, ${cls.missing} missing, ${cls.signatureMismatch} signature mismatch, ${cls.extra} extra)`,
-      );
-      lines.push("");
-
-      const allMethods = [...cls.instanceMethods, ...cls.classMethods];
-      if (allMethods.length === 0) {
-        lines.push("_No methods to compare_");
-        lines.push("");
-        continue;
-      }
-
-      // Group by status
-      const matched = allMethods.filter((m) => m.status === "matched");
-      const missing = allMethods.filter((m) => m.status === "missing");
-      const sigMismatch = allMethods.filter((m) => m.status === "signature_mismatch");
-      const extra = allMethods.filter((m) => m.status === "extra");
-
-      if (matched.length > 0) {
-        lines.push("<details>");
-        lines.push(`<summary>Matched (${matched.length})</summary>`);
-        lines.push("");
-        for (const m of matched) {
-          lines.push(`- \`${m.rubyName}\` -> \`${m.tsName}\``);
-        }
-        lines.push("");
-        lines.push("</details>");
-        lines.push("");
-      }
-
-      if (missing.length > 0) {
-        lines.push(`**Missing (${missing.length}):**`);
-        for (const m of missing) {
-          const params =
-            m.rubyParams?.map((p) => `${p.name}${p.kind === "optional" ? "?" : ""}`).join(", ") ??
-            "";
-          lines.push(`- \`${m.rubyName}(${params})\` -> expected \`${m.tsName}\``);
-        }
-        lines.push("");
-      }
-
-      if (sigMismatch.length > 0) {
-        lines.push(`**Signature Mismatch (${sigMismatch.length}):**`);
-        for (const m of sigMismatch) {
-          lines.push(`- \`${m.rubyName}\` -> \`${m.tsName}\`: ${m.notes}`);
-        }
-        lines.push("");
-      }
-
-      if (extra.length > 0) {
-        lines.push("<details>");
-        lines.push(`<summary>Extra - TS only (${extra.length})</summary>`);
-        lines.push("");
-        for (const m of extra) {
-          lines.push(`- \`${m.tsName}\``);
-        }
-        lines.push("");
-        lines.push("</details>");
-        lines.push("");
-      }
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function printSummary(result: ComparisonResult) {
-  console.log("\n========================================");
-  console.log("  Rails API Comparison Report");
-  console.log("========================================\n");
-
-  console.log(`  Total Ruby methods:   ${result.summary.totalRubyMethods}`);
-  console.log(`  Matched:              ${result.summary.matched}`);
-  console.log(`  Missing:              ${result.summary.missing}`);
-  console.log(`  Signature mismatch:   ${result.summary.signatureMismatch}`);
-  console.log(`  Extra (TS only):      ${result.summary.extra}`);
-  console.log(`  Coverage:             ${result.summary.coveragePercent}%`);
-  console.log("");
-
-  for (const [pkg, comparisons] of Object.entries(result.packages)) {
-    const pkgMatched = comparisons.reduce((s, c) => s + c.matched, 0);
-    const pkgTotal = comparisons.reduce(
-      (s, c) => s + c.matched + c.missing + c.signatureMismatch,
-      0,
+    console.log(`\n${"=".repeat(100)}`);
+    console.log(
+      `  ${pkg.package}  —  ${pkg.found}/${pkg.totalClasses} classes/modules (${pkg.percent}%)  |  ${pkg.misplaced} misplaced  |  ${pkg.missing} missing`,
     );
-    const pkgCoverage = pkgTotal > 0 ? Math.round((pkgMatched / pkgTotal) * 1000) / 10 : 0;
-    console.log(`  ${pkg}: ${pkgCoverage}% (${pkgMatched}/${pkgTotal})`);
-    for (const cls of comparisons) {
-      const total = cls.matched + cls.missing + cls.signatureMismatch;
-      if (total > 0) {
+    console.log(`${"=".repeat(100)}`);
+
+    // Misplaced classes summary
+    const misplaced = pkg.files.flatMap((f) => f.classes.filter((c) => c.status === "misplaced"));
+    if (misplaced.length > 0) {
+      console.log(`\n  MISPLACED (need to move):`);
+      console.log(`  ${"-".repeat(96)}`);
+
+      const moves = new Map<string, { items: string[]; from: string; to: string }>();
+      for (const c of misplaced) {
+        const key = `${c.actualTsFile} → ${c.expectedTsFile}`;
+        if (!moves.has(key))
+          moves.set(key, {
+            items: [],
+            from: c.actualTsFile!,
+            to: c.expectedTsFile,
+          });
+        moves.get(key)!.items.push(`${c.rubyShortName} (${c.kind})`);
+      }
+
+      for (const [, move] of moves) {
+        console.log(`\n  ${move.from}  →  ${move.to}  (${move.items.length})`);
+        for (const item of move.items) {
+          console.log(`    - ${item}`);
+        }
+      }
+      console.log("");
+    }
+
+    // Per-file table (only for detail packages or when filtered)
+    if (DETAIL_PACKAGES.has(pkg.package) || filterPkg) {
+      console.log(
+        `\n  ${"Ruby file".padEnd(55)} ${"Convention TS".padEnd(40)} ${"OK".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
+      );
+      console.log(
+        `  ${"-".repeat(55)} ${"-".repeat(40)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
+      );
+
+      for (const f of pkg.files) {
+        const total = f.found + f.misplaced + f.missing;
+        const marker = !f.tsFileExists ? " \u2717" : f.found === total ? " \u2713" : "";
         console.log(
-          `    ${cls.tsClass.split(":")[1]}: ${cls.coveragePercent}% (${cls.matched}/${total})`,
+          `  ${f.rubyFile.padEnd(55)} ${f.expectedTsFile.padEnd(40)} ${String(f.found).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(total).padStart(4)}${marker}`,
         );
+
+        if (showMissing) {
+          for (const c of f.classes) {
+            if (c.status === "missing") {
+              console.log(`      - ${c.rubyFqn} (${c.kind})`);
+            }
+          }
+        }
+
+        if (showMethods) {
+          for (const c of f.classes) {
+            if (c.status !== "missing" && (c.methodsMatched > 0 || c.methodsMissing > 0)) {
+              const methodTotal = c.methodsMatched + c.methodsMissing;
+              const pct = methodTotal > 0 ? Math.round((c.methodsMatched / methodTotal) * 100) : 0;
+              console.log(
+                `      ${c.rubyShortName}: ${c.methodsMatched}/${methodTotal} methods (${pct}%)`,
+              );
+              for (const m of c.missingMethods.slice(0, 10)) {
+                console.log(`        - ${m}`);
+              }
+              if (c.missingMethods.length > 10) {
+                console.log(`        ... and ${c.missingMethods.length - 10} more`);
+              }
+            }
+          }
+        }
       }
     }
   }
-  console.log("\n========================================\n");
+
+  const grandPct = grandTotal > 0 ? Math.round((grandFound / grandTotal) * 1000) / 10 : 0;
+  const grandMissing = grandTotal - grandFound - grandMisplaced;
+  console.log(`\n${"=".repeat(100)}`);
+  console.log(
+    `  Overall: ${grandFound}/${grandTotal} classes/modules (${grandPct}%)  |  ${grandMisplaced} misplaced  |  ${grandMissing} missing`,
+  );
+  console.log(`${"=".repeat(100)}\n`);
 }
 
 main();
