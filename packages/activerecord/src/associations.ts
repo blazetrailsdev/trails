@@ -44,6 +44,7 @@ export interface AssociationOptions {
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
     | Record<string, (...args: unknown[]) => unknown>[];
+  disableJoins?: boolean;
 }
 
 export interface AssociationDefinition {
@@ -1795,6 +1796,11 @@ export class CollectionProxy {
     if (this._loaded) return this._target;
     if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
       throw new StrictLoadingViolationError(this._record, this._assocName);
+    }
+    // For through/HABTM, scope() may not handle all cases (nested through).
+    // Fall back to toArray() which uses loadHasManyThrough's multi-query approach.
+    if (this._isThrough || this._isHabtm) {
+      return this.toArray();
     }
     return this.scope().toArray();
   }
