@@ -26,6 +26,5 @@ export class Ascending extends Unary {
   }
 }
 
-// Lazy imports to avoid circular deps
 import { Descending } from "./descending.js";
 import { NullsFirst, NullsLast } from "./ordering.js";

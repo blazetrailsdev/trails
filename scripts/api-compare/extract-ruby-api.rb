@@ -139,11 +139,9 @@ class ApiExtractor
 
       # Find the %w{} list by scanning backwards and collecting lines
       names = []
-      collecting = false
-      collected = ""
       (0..idx).reverse_each do |i|
-        l = lines[i]
-        if l =~ /%w[\{\[\(]/
+
+        if lines[i] =~ /%w[\{\[\(]/
           collected = lines[i..idx].join
           if collected =~ /%w[\{\[\(]([\w\s]+)[\}\]\)]/
             names = $1.strip.split(/\s+/)
@@ -166,8 +164,8 @@ class ApiExtractor
 
       namespace_parts = []
       (0...idx).each do |i|
-        l = lines[i]
-        if l =~ /^(\s*)module\s+([\w:]+)/
+
+        if lines[i] =~ /^(\s*)module\s+([\w:]+)/
           decl_indent = $1.length
           if decl_indent < first_class_indent
             $2.split("::").each { |part| namespace_parts << part }
