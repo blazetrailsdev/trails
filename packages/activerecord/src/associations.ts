@@ -44,6 +44,11 @@ export interface AssociationOptions {
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
     | Record<string, (...args: unknown[]) => unknown>[];
+  /** Load through associations via multiple queries instead of JOIN.
+   * Currently a no-op since through loading already uses multi-query by default.
+   * Exists for Rails API parity — Rails uses this to switch between JOIN and
+   * multi-query strategies. */
+  disableJoins?: boolean;
 }
 
 export interface AssociationDefinition {
@@ -1802,6 +1807,11 @@ export class CollectionProxy {
     if (this._loaded) return this._target;
     if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
       throw new StrictLoadingViolationError(this._record, this._assocName);
+    }
+    // For through associations, scope() may not handle all cases (nested through).
+    // Fall back to toArray() which uses loadHasManyThrough's multi-query approach.
+    if (this._isThrough) {
+      return this.toArray();
     }
     return this.scope().toArray();
   }
