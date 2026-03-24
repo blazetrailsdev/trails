@@ -4,8 +4,9 @@ import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadDatabaseConfig, connectAdapter, type DatabaseConfig } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { Migrator } from "@rails-ts/activerecord";
+import { Migrator, SchemaDumper } from "@rails-ts/activerecord";
 import type { DatabaseAdapter } from "@rails-ts/activerecord";
+import { AdapterSchemaSource } from "../schema-source.js";
 
 // --- Helpers ---
 
@@ -285,6 +286,63 @@ export function dbCommand(): Command {
         const { Base } = await import("@rails-ts/activerecord");
         Base.adapter = adapter;
         await runSeed();
+      });
+    });
+
+  cmd
+    .command("schema:dump")
+    .description("Dump the current database schema to db/schema.ts")
+    .action(async () => {
+      await withAdapter(async (adapter) => {
+        const source = new AdapterSchemaSource(adapter);
+        const output = await SchemaDumper.dump(source);
+        const schemaPath = path.join(process.cwd(), "db", "schema.ts");
+        fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+        fs.writeFileSync(schemaPath, output);
+        console.log(`Schema dumped to ${schemaPath}`);
+      });
+    });
+
+  cmd
+    .command("schema:load")
+    .description("Load the schema from db/schema.ts into the database")
+    .action(async () => {
+      const schemaCandidates = [
+        path.join(process.cwd(), "db", "schema.ts"),
+        path.join(process.cwd(), "db", "schema.js"),
+      ];
+      const schemaFile = schemaCandidates.find((f) => fs.existsSync(f));
+      if (!schemaFile) {
+        console.error("No schema file found at db/schema.ts or db/schema.js");
+        process.exitCode = 1;
+        return;
+      }
+
+      await withAdapter(async (adapter) => {
+        const { MigrationContext } = await import("@rails-ts/activerecord");
+        const ctx = new MigrationContext(adapter);
+        let mod: any;
+        try {
+          mod = await import(pathToFileURL(schemaFile).href);
+        } catch (error: any) {
+          if (schemaFile.endsWith(".ts")) {
+            const enhanced = new Error(
+              `Failed to load schema file "${schemaFile}". ` +
+                `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
+                `or use a compiled db/schema.js instead.`,
+            );
+            (enhanced as any).cause = error;
+            throw enhanced;
+          }
+          throw error;
+        }
+        const defineSchema = mod.default ?? mod;
+        if (typeof defineSchema !== "function") {
+          throw new Error(`Schema file must export a default function, got ${typeof defineSchema}`);
+        }
+        console.log("Loading schema...");
+        await defineSchema(ctx);
+        console.log("Schema loaded.");
       });
     });
 

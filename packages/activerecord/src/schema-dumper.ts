@@ -91,6 +91,9 @@ const SQL_TYPE_MAP: Record<string, DslMapping> = {
   oid: { dslType: "oid" },
   serial: { dslType: "serial" },
   bigserial: { dslType: "bigserial" },
+  // SQLite types
+  blob: { dslType: "binary" },
+  "integer primary key autoincrement": { dslType: "integer" },
 };
 
 const KNOWN_DSL_TYPES = new Set([
@@ -115,12 +118,12 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
   let result = SQL_TYPE_MAP[baseType];
 
   if (!result) {
-    // Handle parameterized types
-    const varcharMatch = baseType.match(/^character varying\((\d+)\)$/);
+    // Handle parameterized types (Postgres: "character varying(N)", SQLite: "varchar(N)")
+    const varcharMatch = baseType.match(/^(?:character varying|varchar)\((\d+)\)$/);
     if (varcharMatch) {
       result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
     } else {
-      const numericMatch = baseType.match(/^numeric\((\d+),(\d+)\)$/);
+      const numericMatch = baseType.match(/^(?:numeric|decimal)\((\d+),\s*(\d+)\)$/);
       if (numericMatch) {
         result = {
           dslType: "decimal",

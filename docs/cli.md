@@ -9,13 +9,6 @@
 - Set the adapter on Base so queries work.
 - Models should be available as globals in the REPL (e.g., `User.all()`).
 
-### Schema management
-
-- **`db schema:dump`** -- Dump current schema to `db/schema.ts` (or `.sql`).
-  `SchemaDumper` exists in activerecord but isn't wired to the CLI.
-- **`db schema:load`** -- Load schema from dump file instead of running all
-  migrations. Faster for fresh setups.
-
 ### Generator improvements
 
 - **`generate migration`** -- Support `AddIndexToUsers name:index`,
