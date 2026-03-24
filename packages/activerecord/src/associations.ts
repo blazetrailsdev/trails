@@ -2064,13 +2064,13 @@ export function buildThroughAssociation(
   const throughModel = resolveModel(throughClassName);
   const ownerFk = ownerFkOption as string;
   const ownerPk = ownerPkOption as string;
-  const throughAttrs: Record<string, unknown> = {
-    [ownerFk]: record.readAttribute(ownerPk),
-  };
+  const throughAttrs: Record<string, unknown> = {};
   if (throughAssoc.options.as) {
-    throughAttrs[`${underscore(throughAssoc.options.as)}_id`] = record.readAttribute(ownerPk);
-    throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
-    delete throughAttrs[ownerFk];
+    const asName = underscore(throughAssoc.options.as);
+    throughAttrs[`${asName}_id`] = record.readAttribute(ownerPk);
+    throughAttrs[`${asName}_type`] = ctor.name;
+  } else {
+    throughAttrs[ownerFk] = record.readAttribute(ownerPk);
   }
   const through = new throughModel(throughAttrs);
 
