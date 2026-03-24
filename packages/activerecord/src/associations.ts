@@ -2035,6 +2035,12 @@ export function buildThroughAssociation(
     throw new HasOneThroughNestedAssociationsAreReadonly(ctor.name, assocName);
   }
 
+  if (throughAssoc.type !== "hasOne" && throughAssoc.type !== "hasMany") {
+    throw new Error(
+      `buildThroughAssociation expects through association "${throughAssoc.name}" to be has_one/has_many (got "${throughAssoc.type}").`,
+    );
+  }
+
   // Build target record with STI support
   const targetClassName = assocDef.options.className ?? camelize(singularize(assocName));
   let targetModel = resolveModel(targetClassName);
@@ -2136,7 +2142,8 @@ export async function createThroughAssociation(
       throw new Error("createThroughAssociation does not support composite primary keys");
     }
     target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
-    await target.save();
+    const targetResaved = await target.save();
+    if (!targetResaved) return target;
   } else {
     throw new Error(
       `createThroughAssociation: unsupported source type "${sourceType}" for ${assocName}`,
