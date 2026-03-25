@@ -1102,8 +1102,17 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it.skip("should not save and return false if a callback cancelled saving", () => {
     /* callbacks not implemented */
   });
-  it.skip("should rollback any changes if an exception occurred while saving", () => {
-    /* transaction rollback */
+  it("should rollback any changes if an exception occurred while saving", async () => {
+    const { Pirate, Ship } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = new Ship({ name: "" }); // invalid — presence required
+    pirate.catchphrase = "Changed";
+    cacheAssoc(pirate, "ship", ship);
+    const saved = await pirate.save();
+    expect(saved).toBe(false);
+    // Parent's update should be rolled back
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded.catchphrase).toBe("Yarr");
   });
 
   it("should not load the associated model", async () => {
@@ -1426,8 +1435,17 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   it.skip("should not save and return false if a callback cancelled saving", () => {
     /* callbacks not implemented */
   });
-  it.skip("should rollback any changes if an exception occurred while saving", () => {
-    /* transaction rollback */
+  it("should rollback any changes if an exception occurred while saving", async () => {
+    const { Pirate, Ship } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    pirate.catchphrase = ""; // invalid — presence required
+    ship.name = "Changed";
+    cacheAssoc(ship, "pirate", pirate);
+    const saved = await ship.save();
+    expect(saved).toBe(false);
+    const reloaded = await Ship.find(ship.id);
+    expect(reloaded.name).toBe("Pearl");
   });
 
   it("should not load the associated model", async () => {
@@ -2689,21 +2707,21 @@ describe("should update children when autosave is true and parent is new but chi
     Associations.hasMany.call(RBArticle, "rbTags", {
       className: "RBTag",
       foreignKey: "rb_article_id",
+      autosave: true,
     });
     acceptsNestedAttributesFor(RBArticle, "rbTags");
     registerModel(RBTag);
     registerModel(RBArticle);
     const article = await RBArticle.create({ title: "rollback test" });
-    // Assign nested attributes including one with an unknown attribute to trigger an error
     assignNestedAttributes(article, "rbTags", [
       { name: "good" },
       { name: "bad", unknownCol: "boom" },
     ]);
     await expect(article.save()).rejects.toThrow(/unknown attribute/);
-    // The first tag should NOT have been persisted due to the error
+    // NOTE: nested attribute processing currently runs after save's transaction,
+    // so the first tag may persist even on error. Full rollback requires moving
+    // nested attribute processing inside the transaction.
     const tags = await RBTag.where({ rb_article_id: article.id }).toArray();
-    // Note: without proper transaction support the first record may have been created
-    // This test verifies the error is raised; the test adapter may not support true rollback
     expect(tags.length).toBeLessThanOrEqual(1);
   });
 
