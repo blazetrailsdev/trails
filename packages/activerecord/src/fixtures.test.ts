@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { identify, compositeIdentify, FixtureSet } from "./fixtures.js";
+import { identify, compositeIdentify, FixtureSet } from "./fixture-set/file.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 

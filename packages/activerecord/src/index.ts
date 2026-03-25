@@ -46,8 +46,12 @@ export { MysqlAdapter } from "./adapters/mysql-adapter.js";
 export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
-export { SchemaDumper } from "./schema-dumper.js";
-export type { SchemaSource, ColumnInfo, IndexInfo } from "./schema-dumper.js";
+export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
+export type {
+  SchemaSource,
+  ColumnInfo,
+  IndexInfo,
+} from "./connection-adapters/abstract/schema-dumper.js";
 export {
   RecordNotFound,
   RecordInvalid,
@@ -93,7 +97,7 @@ export { HashConfig } from "./database-configurations/hash-config.js";
 export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations/connection-url-resolver.js";
 export { ConnectionPool } from "./connection-pool.js";
-export { ConnectionHandler } from "./connection-handler.js";
+export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks } from "./tasks/database-tasks.js";
 export type { DatabaseTaskHandler } from "./tasks/database-tasks.js";
 export { Migrator } from "./migrator.js";

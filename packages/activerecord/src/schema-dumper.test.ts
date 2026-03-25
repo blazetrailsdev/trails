@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
-import { SchemaDumper } from "./schema-dumper.js";
+import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 

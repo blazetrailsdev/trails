@@ -81,7 +81,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("money schema dump", async () => {
-      const { SchemaDumper } = await import("../../schema-dumper.js");
+      const { SchemaDumper } = await import("../../connection-adapters/abstract/schema-dumper.js");
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
       expect(output).toMatch(/t\.money\s*\("wealth"/);
       expect(output).toMatch(/t\.money\s*\("depth"/);

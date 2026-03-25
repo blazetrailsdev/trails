@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 
 describeIfPg("PostgresAdapter", () => {
   let adapter: PostgresAdapter;
