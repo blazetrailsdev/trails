@@ -2,6 +2,8 @@ import { Command } from "commander";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
+import * as vm from "node:vm";
 
 export function consoleCommand(): Command {
   const cmd = new Command("console");
@@ -29,10 +31,53 @@ export function consoleCommand(): Command {
 
     console.log("Loading rails-ts console...");
 
+    // Custom eval that supports top-level await.
+    // Expressions (e.g., `await User.all()`) are wrapped as return values.
+    // Note: `const`/`let` declarations inside the async IIFE don't persist
+    // across inputs — use plain assignment (`x = await ...`) for that.
+    const asyncEval = (code: string, context: any, _filename: string, callback: any) => {
+      // Strip trailing whitespace/semicolons so `return (expr)` wrapper is valid
+      const trimmed = code.replace(/[\s;]+$/, "");
+      (async () => {
+        try {
+          const result = await vm.runInNewContext(
+            `(async () => { return (\n${trimmed}\n); })()`,
+            context,
+            { breakOnSigint: true },
+          );
+          callback(null, result);
+        } catch (exprErr: any) {
+          // Only fall back to statement mode for syntax errors (expression wrapper failed to parse).
+          // Runtime errors should not trigger a re-execution.
+          if (!(exprErr instanceof SyntaxError)) {
+            callback(exprErr);
+            return;
+          }
+          try {
+            const result = await vm.runInNewContext(`(async () => {\n${code}\n})()`, context, {
+              breakOnSigint: true,
+            });
+            callback(null, result);
+          } catch (err: any) {
+            if (isRecoverable(err)) {
+              callback(new (repl as any).Recoverable(err));
+            } else {
+              callback(err);
+            }
+          }
+        }
+      })();
+    };
+
     const r = repl.start({
       prompt: "rails-ts> ",
-      useGlobal: true,
+      eval: asyncEval,
     });
+
+    // Copy globals into the REPL context
+    r.context.console = console;
+    r.context.process = process;
+    r.context.require = createRequire(path.join(process.cwd(), "package.json"));
 
     r.on("exit", async () => {
       if (dbAdapter && typeof dbAdapter.close === "function") {
@@ -74,9 +119,15 @@ export function consoleCommand(): Command {
       }
     }
 
+    console.log("Supports top-level await (e.g., await User.all())");
     console.log('Type ".exit" or Ctrl+D to quit.');
     console.log("");
   });
 
   return cmd;
+}
+
+function isRecoverable(err: Error): boolean {
+  if (!(err instanceof SyntaxError)) return false;
+  return /\b(Unexpected end of input|Unexpected end of script|Unterminated)\b/i.test(err.message);
 }

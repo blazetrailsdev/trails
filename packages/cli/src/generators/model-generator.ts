@@ -11,6 +11,7 @@ import { MigrationGenerator } from "./migration-generator.js";
 interface ModelOptions {
   migration?: boolean;
   test?: boolean;
+  timestamps?: boolean;
 }
 
 export class ModelGenerator extends GeneratorBase {
@@ -19,15 +20,25 @@ export class ModelGenerator extends GeneratorBase {
   }
 
   run(name: string, args: string[], options: ModelOptions = {}): string[] {
-    const { migration = true, test = true } = options;
+    const { migration = true, test = true, timestamps = true } = options;
     const className = classify(name);
     const fileName = dasherize(name);
     const columns = parseColumns(args);
 
     // Model file
+    // Build a set of polymorphic reference names from raw args
+    const polymorphicNames = new Set(
+      args
+        .filter((a) => /:(references|belongs_to)\{polymorphic\}/.test(a))
+        .map((a) => a.split(":")[0]),
+    );
+
     const attrLines = columns
       .map((c) => {
         if (c.type === "references" || c.type === "belongs_to") {
+          if (polymorphicNames.has(c.name)) {
+            return `    this.belongsTo("${c.name}", { polymorphic: true });`;
+          }
           return `    this.belongsTo("${c.name}");`;
         }
         return `    this.attribute("${c.name}", "${c.type}");`;
@@ -65,6 +76,7 @@ describe("${className}", () => {
       const migFiles = migGen.run(
         `Create${tableize(className).replace(/^(.)/, (c) => c.toUpperCase())}`,
         args,
+        { timestamps },
       );
       this.createdFiles.push(...migFiles);
     }

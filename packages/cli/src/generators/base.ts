@@ -107,10 +107,11 @@ export function parseColumns(args: string[]): Array<{ name: string; type: Column
   const columns: Array<{ name: string; type: ColumnType }> = [];
   for (const arg of args) {
     if (arg.startsWith("-")) continue;
-    const [name, type] = arg.split(":");
-    if (name && type) {
-      columns.push({ name, type: type as ColumnType });
-    }
+    const [name, rawType] = arg.split(":");
+    if (!name || !rawType) continue;
+    // Strip modifiers like {polymorphic} for the base type
+    const type = rawType.replace(/\{[^}]*\}/, "") as ColumnType;
+    columns.push({ name, type });
   }
   return columns;
 }

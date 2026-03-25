@@ -16,10 +16,21 @@ export function generateCommand(): Command {
     .argument("[attributes...]", "Attributes as name:type pairs")
     .option("--no-migration", "Skip migration generation")
     .option("--no-test", "Skip test file generation")
-    .action((name: string, attributes: string[], opts: { migration: boolean; test: boolean }) => {
-      const gen = new ModelGenerator({ cwd: process.cwd(), output: console.log });
-      gen.run(name, attributes, { migration: opts.migration, test: opts.test });
-    });
+    .option("--no-timestamps", "Skip timestamps in migration")
+    .action(
+      (
+        name: string,
+        attributes: string[],
+        opts: { migration: boolean; test: boolean; timestamps: boolean },
+      ) => {
+        const gen = new ModelGenerator({ cwd: process.cwd(), output: console.log });
+        gen.run(name, attributes, {
+          migration: opts.migration,
+          test: opts.test,
+          timestamps: opts.timestamps,
+        });
+      },
+    );
 
   cmd
     .command("migration")

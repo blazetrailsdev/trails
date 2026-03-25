@@ -95,4 +95,20 @@ describe("ModelGenerator", () => {
     const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
     expect(content).toContain('this.belongsTo("post")');
   });
+
+  it("handles polymorphic references as belongsTo with polymorphic option", () => {
+    const gen = makeGen();
+    gen.run("Comment", ["commentable:references{polymorphic}"]);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
+    expect(content).toContain('this.belongsTo("commentable", { polymorphic: true })');
+  });
+
+  it("skips timestamps in migration with --no-timestamps", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"], { timestamps: false });
+    const migFile = files.find((f) => f.startsWith("db/migrations/"));
+    expect(migFile).toBeDefined();
+    const content = fs.readFileSync(path.join(tmpDir, migFile!), "utf-8");
+    expect(content).not.toContain("timestamps");
+  });
 });

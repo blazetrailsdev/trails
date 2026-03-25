@@ -117,4 +117,36 @@ describe("MigrationGenerator", () => {
     const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
     expect(content).toContain('addIndex("users", "email", { unique: true })');
   });
+
+  it("handles polymorphic references in createTable", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateComments", ["commentable:references{polymorphic}"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('t.references("commentable", { polymorphic: true })');
+    expect(content).not.toContain("foreignKey");
+  });
+
+  it("handles polymorphic references in Add*To*", () => {
+    const gen = makeGen();
+    const files = gen.run("AddCommentableToComments", ["commentable:references{polymorphic}"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('addReference("comments", "commentable", { polymorphic: true })');
+  });
+
+  it("handles :uniq on references with separate unique index", () => {
+    const gen = makeGen();
+    const files = gen.run("CreatePosts", ["user:references:uniq"]);
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('t.references("user", { foreignKey: true, index: false })');
+    expect(content).toContain('addIndex("posts", "user_id", { unique: true })');
+  });
+
+  it("supports --no-timestamps via options", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateUsers", ["name:string"], { timestamps: false });
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    expect(content).toContain('createTable("users"');
+    expect(content).toContain('t.string("name")');
+    expect(content).not.toContain("timestamps");
+  });
 });

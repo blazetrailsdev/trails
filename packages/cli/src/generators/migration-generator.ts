@@ -13,12 +13,34 @@ interface ParsedColumn {
   type: ColumnType;
   index?: boolean;
   unique?: boolean;
+  polymorphic?: boolean;
 }
 
+/**
+ * Parse column arguments with modifiers.
+ * Supports: name:type, name:type:index, name:type:uniq,
+ * name:references{polymorphic}, name:belongs_to{polymorphic}
+ */
 function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
   const columns: ParsedColumn[] = [];
   for (const arg of args) {
     if (arg.startsWith("-")) continue;
+
+    // Handle {polymorphic} modifier on references: user:references{polymorphic}
+    const polyMatch = arg.match(/^(\w+):(references|belongs_to)\{polymorphic\}(.*)$/);
+    if (polyMatch) {
+      const [, name, type, rest] = polyMatch;
+      const modifiers = rest ? rest.split(":").filter(Boolean) : [];
+      columns.push({
+        name,
+        type: type as ColumnType,
+        polymorphic: true,
+        index: modifiers.includes("index") || modifiers.includes("uniq"),
+        unique: modifiers.includes("uniq"),
+      });
+      continue;
+    }
+
     const parts = arg.split(":");
     const [name, type, ...modifiers] = parts;
     if (!name || !type) continue;
@@ -37,9 +59,15 @@ function isReference(type: string): boolean {
 }
 
 function referenceOpts(col: ParsedColumn): string {
-  const opts: string[] = ["foreignKey: true"];
+  const opts: string[] = [];
+  if (col.polymorphic) {
+    opts.push("polymorphic: true");
+  } else {
+    opts.push("foreignKey: true");
+  }
   if (col.unique) {
-    opts.push("index: { unique: true }");
+    // Suppress the default index — we'll add a unique one separately
+    opts.push("index: false");
   }
   return `{ ${opts.join(", ")} }`;
 }
@@ -54,9 +82,18 @@ function columnLine(col: ParsedColumn): string {
 function indexLines(table: string, columns: ParsedColumn[]): string {
   const lines: string[] = [];
   for (const col of columns) {
-    if (!col.index || isReference(col.type)) continue; // references auto-index
-    const opts = col.unique ? ", { unique: true }" : "";
-    lines.push(`    await this.addIndex("${table}", "${col.name}"${opts});`);
+    if (!col.index && !(isReference(col.type) && col.unique)) continue;
+    if (isReference(col.type) && !col.unique) continue; // references auto-index unless :uniq
+
+    if (isReference(col.type)) {
+      // Polymorphic refs index both _id and _type columns
+      const cols = col.polymorphic ? `["${col.name}_id", "${col.name}_type"]` : `"${col.name}_id"`;
+      const opts = col.unique ? ", { unique: true }" : "";
+      lines.push(`    await this.addIndex("${table}", ${cols}${opts});`);
+    } else {
+      const opts = col.unique ? ", { unique: true }" : "";
+      lines.push(`    await this.addIndex("${table}", "${col.name}"${opts});`);
+    }
   }
   return lines.join("\n");
 }
@@ -66,10 +103,11 @@ export class MigrationGenerator extends GeneratorBase {
     super(options);
   }
 
-  run(name: string, args: string[]): string[] {
+  run(name: string, args: string[], options: { timestamps?: boolean } = {}): string[] {
+    const { timestamps = true } = options;
     const columns = parseColumnsWithModifiers(args);
     const className = classify(name);
-    const body = this.inferBody(name, className, columns);
+    const body = this.inferBody(name, className, columns, timestamps);
     const timestamp = migrationTimestamp();
     const filename = `db/migrations/${timestamp}-${dasherize(name)}.ts`;
 
@@ -98,15 +136,17 @@ ${body.down}
     _name: string,
     _className: string,
     columns: ParsedColumn[],
+    timestamps: boolean = true,
   ): { up: string; down: string } {
     // CreateUsers -> createTable("users", ...)
     const createMatch = _name.match(/^create[_-]?(.+)$/i);
     if (createMatch) {
       const table = underscore(createMatch[1]);
       const colLines = columns.map((c) => columnLine(c)).join("\n");
+      const tsLine = timestamps ? "\n      t.timestamps();" : "";
       const idxLines = indexLines(table, columns);
       const upParts = [
-        `    await this.createTable("${table}", (t) => {\n${colLines}\n      t.timestamps();\n    });`,
+        `    await this.createTable("${table}", (t) => {\n${colLines}${tsLine}\n    });`,
       ];
       if (idxLines) upParts.push(idxLines);
       return {
