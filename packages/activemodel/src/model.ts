@@ -10,7 +10,12 @@ import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
-import type { Validator, ConditionalOptions, ConditionFn, AnyRecord } from "./validator.js";
+import type {
+  ValidatorContract as Validator,
+  ConditionalOptions,
+  ConditionFn,
+  AnyRecord,
+} from "./validator.js";
 import { shouldValidate } from "./validator.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { AbsenceValidator } from "./validations/absence.js";

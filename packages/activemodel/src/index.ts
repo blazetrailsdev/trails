@@ -9,6 +9,8 @@ export {
 } from "./errors.js";
 export { NestedError } from "./nested-error.js";
 export { ValidationError } from "./validations.js";
+export { Validator, EachValidator, BlockValidator } from "./validator.js";
+export type { ValidatorContract } from "./validator.js";
 export { ModelName } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
 export { CallbackChain } from "./callbacks.js";

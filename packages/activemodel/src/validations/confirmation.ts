@@ -1,5 +1,9 @@
 import type { Errors } from "../errors.js";
-import type { AnyRecord, ConditionalOptions, Validator } from "../validator.js";
+import type {
+  AnyRecord,
+  ConditionalOptions,
+  ValidatorContract as Validator,
+} from "../validator.js";
 import { shouldValidate } from "../validator.js";
 import { humanize } from "@rails-ts/activesupport";
 
