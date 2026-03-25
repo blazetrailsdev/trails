@@ -4,7 +4,7 @@ Current state: **70.9%** (2,030 / 2,862 total Ruby tests). 678 skipped, 157/157 
 
 ## How coverage is measured
 
-The compare script (`npm run convention:compare`) extracts test names from both Rails Ruby source and our TypeScript tests, then matches them by normalized description. "Skipped" means `it.skip()` stubs that match a Ruby test name. The goal is to convert all skips to real passing tests.
+The compare script (`pnpm run test:compare`) extracts test names from both Rails Ruby source and our TypeScript tests, then matches them by normalized description. "Skipped" means `it.skip()` stubs that match a Ruby test name. The goal is to convert all skips to real passing tests.
 
 ## What's left
 
@@ -79,7 +79,7 @@ These have test files but no passing tests yet:
 ## Tracking progress
 
 ```bash
-npm run convention:compare -- --package activesupport
+pnpm run test:compare -- --package activesupport
 ```
 
 Target: 2,862/2,862 tests matched, 0 skipped, 0 misplaced.

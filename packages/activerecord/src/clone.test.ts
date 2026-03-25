@@ -103,7 +103,7 @@ describe("CloneTest", () => {
     original.freeze();
     expect(original.isFrozen()).toBe(true);
     // In Rails, clone preserves frozen state (unlike dup).
-    // This test name is misleading but kept for convention:compare matching.
+    // This test name is misleading but kept for test:compare matching.
     const cloned = original.clone();
     expect(cloned.isFrozen()).toBe(true);
   });

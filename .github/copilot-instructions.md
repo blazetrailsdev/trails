@@ -19,7 +19,7 @@ Tests live next to source files as `*.test.ts`.
 
 ## Test names are sacred
 
-Test names are derived from the Rails test suite and are how `convention:compare` matches our tests to Rails tests. **Never suggest renaming or rewording test names**, even if they contain typos, unusual phrasing, or look wrong. The names must match Rails exactly. If a test name looks like a typo (e.g. "shallow" instead of "swallow", "Text" instead of "Test"), it matches the Rails source and should not be changed.
+Test names are derived from the Rails test suite and are how `test:compare` matches our tests to Rails tests. **Never suggest renaming or rewording test names**, even if they contain typos, unusual phrasing, or look wrong. The names must match Rails exactly. If a test name looks like a typo (e.g. "shallow" instead of "swallow", "Text" instead of "Test"), it matches the Rails source and should not be changed.
 
 If a test is failing or the behavior doesn't match the name, the fix is in the test body or the implementation under test, not the test name.
 
@@ -29,7 +29,7 @@ Many test files define local helper classes or functions instead of importing pr
 
 ## Duplicate tests across describe blocks may be intentional
 
-Some tests appear in multiple `describe` blocks within the same file. This is sometimes needed because `convention:compare` matches tests by their full path (describe > test name), and different Ruby test classes may have tests with the same name. Only flag duplicates if they are within the **same** describe block.
+Some tests appear in multiple `describe` blocks within the same file. This is sometimes needed because `test:compare` matches tests by their full path (describe > test name), and different Ruby test classes may have tests with the same name. Only flag duplicates if they are within the **same** describe block.
 
 ## Use the package ecosystem like Rails does
 
@@ -46,4 +46,4 @@ ActiveRecord's power comes from Arel. When building queries, subqueries, or SQL 
 
 ## Measuring progress
 
-Progress is measured by `npm run convention:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.
+Progress is measured by `pnpm run test:compare`, which matches our test files and test names against the actual Rails test suite. CI runs this on every push.

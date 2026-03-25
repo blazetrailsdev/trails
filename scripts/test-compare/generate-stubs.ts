@@ -124,7 +124,7 @@ function main() {
 
   if (!fs.existsSync(railsPath) || !fs.existsSync(conventionPath)) {
     console.error("Missing rails-tests.json or convention-comparison.json in output/");
-    console.error("Run: pnpm test:stubs (or: pnpm convention:compare -- --missing --json)");
+    console.error("Run: pnpm test:stubs (or: pnpm test:compare -- --missing --json)");
     process.exit(1);
   }
 
@@ -192,7 +192,7 @@ function main() {
         // No TS file at all — generate stubs for all tests
         testsToStub = rubyFileInfo.testCases;
       } else {
-        // TS file exists but missingTests wasn't populated — convention:compare
+        // TS file exists but missingTests wasn't populated — test:compare
         // was probably run without --missing. Skip to avoid over-generating.
         console.warn(
           `  [warn] ${rubyFile}: missingTests not populated, skipping (re-run with: pnpm test:stubs)`,

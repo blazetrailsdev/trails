@@ -23,7 +23,7 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 | `@rails-ts/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **28.4%** | **4.3%** | Routing, middleware stack, cookies, sessions, security |
 | `@rails-ts/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **0.4%**  | **2.7%** | Controller layer, rendering, filters, parameters       |
 
-**Tests** = `convention:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — tracks class/module existence and file placement against Rails source. Rack doesn't have API comparison yet (it's not a Rails gem).
+**Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — tracks class/module existence and file placement against Rails source. Rack doesn't have API comparison yet (it's not a Rails gem).
 
 **59.5%** overall test coverage — 10,102 of 16,982 tests matched. CI runs both comparisons on every push.
 
@@ -97,7 +97,7 @@ pnpm run build
 ```bash
 # Compare test coverage against the Rails test suite
 # Matches our test file names and it()/it.skip() descriptions against Ruby test names
-pnpm run convention:compare
+pnpm run test:compare
 
 # Compare public API surface against Rails
 pnpm run api:compare
@@ -106,7 +106,7 @@ pnpm run api:compare
 pnpm run test:stubs
 ```
 
-CI runs `convention:compare` on every push to ensure we don't regress.
+CI runs `test:compare` on every push to ensure we don't regress.
 
 ### Database Adapters
 

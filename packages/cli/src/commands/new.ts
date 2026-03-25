@@ -9,7 +9,7 @@ export function newCommand(): Command {
     .argument("<name>", "Application name")
     .option("-d, --database <type>", "Database adapter (sqlite, postgres, mysql)", "sqlite")
     .option("--skip-git", "Skip git init")
-    .option("--skip-install", "Skip npm install")
+    .option("--skip-install", "Skip dependency installation")
     .action(async (name: string, options) => {
       const cwd = process.cwd();
       const gen = new AppGenerator({

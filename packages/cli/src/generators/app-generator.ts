@@ -209,14 +209,14 @@ export class ApplicationController extends ActionController.Base {
       }
     }
 
-    // npm install
+    // Install dependencies
     if (!options.skipInstall) {
       this.output("  Installing dependencies...");
       try {
-        execSync("npm install", { cwd: appDir, stdio: "pipe" });
+        execSync("pnpm install", { cwd: appDir, stdio: "pipe" });
         this.output("  Dependencies installed");
       } catch {
-        this.output("  Could not install dependencies — run 'npm install' manually");
+        this.output("  Could not install dependencies — run 'pnpm install' manually");
       }
     }
 

@@ -237,7 +237,7 @@ packages/actionpack/src/
 ## Tracking progress
 
 ```bash
-npm run test:compare
+pnpm run test:compare
 ```
 
 The compare script now has an `actioncontroller` package entry alongside `actiondispatch`.

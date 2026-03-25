@@ -6,7 +6,7 @@ Unlike ActiveRecord (which has many `it.skip` stubs to convert), ActionDispatch'
 
 ## How coverage is measured
 
-`npm run test:compare` matches Rails Ruby test names against our TypeScript `it()` tests by description. "Missing" means no TS test with a matching name exists.
+`pnpm run test:compare` matches Rails Ruby test names against our TypeScript `it()` tests by description. "Missing" means no TS test with a matching name exists.
 
 ## Current implementation
 
@@ -406,7 +406,7 @@ If we defer these, the effective target drops from 3,354 to ~3,091, making 100% 
 ## Tracking progress
 
 ```bash
-npm run test:compare
+pnpm run test:compare
 ```
 
 Key metric:

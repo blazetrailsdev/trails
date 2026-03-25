@@ -1,6 +1,6 @@
-# ActiveModel: 100% Convention Compare Coverage
+# ActiveModel: 100% test:compare Coverage
 
-ActiveModel has reached **100% convention:compare coverage** — 963/963 tests
+ActiveModel has reached **100% test:compare coverage** — 963/963 tests
 across 56/56 files with 0 misplaced tests. 5 of those tests are skipped via
 `it.skip()` (railtie — Rails-specific initialization hooks with no TS equivalent).
 

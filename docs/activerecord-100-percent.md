@@ -3,7 +3,7 @@
 Current state: **61.2%** (5,135 / 8,385 tests). 3,012 skipped, 340 of 342 Rails test files matched.
 
 ```bash
-pnpm run convention:compare -- --package activerecord
+pnpm run test:compare -- --package activerecord
 ```
 
 ## Architecture overview
