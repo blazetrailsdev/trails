@@ -21,13 +21,13 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("dump schema information with empty versions", () => {
-    /* needs migration version tracking */
+    /* needs migration version tracking in schema_migrations table */
   });
   it.skip("dump schema information outputs lexically reverse ordered versions regardless of database order", () => {
-    /* needs migration version tracking */
+    /* needs migration version tracking in schema_migrations table */
   });
   it.skip("schema dump include migration version", () => {
-    /* needs migration version tracking */
+    /* needs migration version tracking in schema_migrations table */
   });
 
   it("schema dump", async () => {
@@ -79,8 +79,12 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("null: false");
   });
 
-  it.skip("schema dump includes limit constraint for integer columns", () => {
-    /* needs column metadata tracking in MigrationContext */
+  it("schema dump includes limit constraint for integer columns", async () => {
+    await ctx.createTable("limits", {}, (t) => {
+      t.integer("small_int", { limit: 2 });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("limit: 2");
   });
 
   it("schema dump with string ignored table", async () => {
@@ -115,25 +119,25 @@ describe("SchemaDumperTest", () => {
     /* needs partial index WHERE clause tracking */
   });
   it.skip("schema dumps nulls not distinct", () => {
-    /* needs nulls not distinct tracking */
+    /* needs nulls not distinct tracking (PG 15+) */
   });
   it.skip("schema dumps index sort order", () => {
     /* needs index sort order tracking */
   });
   it.skip("schema dumps index length", () => {
-    /* needs index length tracking */
+    /* needs index length tracking (MySQL) */
   });
   it.skip("schema dumps check constraints", () => {
     /* needs check constraint support */
   });
   it.skip("schema dumps exclusion constraints", () => {
-    /* needs exclusion constraint support */
+    /* needs exclusion constraint support (PG) */
   });
   it.skip("schema dumps unique constraints", () => {
-    /* needs unique constraint support */
+    /* needs unique constraint support (PG) */
   });
   it.skip("schema does not dump unique constraints as indexes", () => {
-    /* needs unique constraint support */
+    /* needs unique constraint support (PG) */
   });
 
   it("schema dump does not emit id false for normal tables", async () => {
@@ -153,20 +157,43 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("id: false");
   });
 
-  it.skip("schema dump should use false as default", () => {
-    /* needs boolean default tracking */
+  it("schema dump should use false as default", async () => {
+    await ctx.createTable("booleans", {}, (t) => {
+      t.boolean("has_fun", { default: false });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/boolean.*"has_fun".*default: false/);
   });
-  it.skip("schema dump does not include limit for text field", () => {
-    /* needs column metadata tracking */
+
+  it("schema dump does not include limit for text field", async () => {
+    await ctx.createTable("posts", {}, (t) => {
+      t.text("params");
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain('t.text("params")');
+    expect(output).not.toMatch(/text.*"params".*limit/);
   });
-  it.skip("schema dump does not include limit for binary field", () => {
-    /* needs column metadata tracking */
+
+  it("schema dump does not include limit for binary field", async () => {
+    await ctx.createTable("binaries", {}, (t) => {
+      t.binary("data");
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain('t.binary("data")');
+    expect(output).not.toMatch(/binary.*"data".*limit/);
   });
-  it.skip("schema dump does not include limit for float field", () => {
-    /* needs column metadata tracking */
+
+  it("schema dump does not include limit for float field", async () => {
+    await ctx.createTable("numeric_data", {}, (t) => {
+      t.float("temperature");
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain('t.float("temperature")');
+    expect(output).not.toMatch(/float.*"temperature".*limit/);
   });
+
   it.skip("schema dump aliased types", () => {
-    /* needs type aliasing */
+    /* needs type aliasing support */
   });
   it.skip("schema dump expression indices", () => {
     /* needs expression index tracking */
@@ -184,14 +211,22 @@ describe("SchemaDumperTest", () => {
     /* needs MySQL-specific handling */
   });
   it.skip("schema dumps index type", () => {
-    /* needs index type tracking */
+    /* needs index type tracking (btree/hash/gin/gist) */
   });
-  it.skip("schema dump includes decimal options", () => {
-    /* needs column metadata tracking */
+
+  it("schema dump includes decimal options", async () => {
+    await ctx.createTable("numeric_data", {}, (t) => {
+      t.decimal("bank_balance", { precision: 10, scale: 2 });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("precision: 10");
+    expect(output).toContain("scale: 2");
   });
+
   it.skip("schema dump includes bigint default", () => {
-    /* needs column metadata tracking */
+    /* needs bigint column type in TableDefinition */
   });
+
   it.skip("schema dump includes limit on array type", () => {
     /* needs PG array support */
   });
@@ -211,45 +246,62 @@ describe("SchemaDumperTest", () => {
     /* needs PG extension dumping */
   });
   it.skip("schema dump include limit for float4 field", () => {
-    /* needs PG float4 support */
+    /* needs PG float4 specific handling */
   });
   it.skip("schema dump keeps enum intact if it contains comma", () => {
-    /* needs enum support */
+    /* needs PG enum support */
   });
   it.skip("schema dump keeps large precision integer columns as decimal", () => {
     /* needs decimal precision handling */
   });
-  it.skip("schema dump keeps id column when id is false and id column added", () => {
-    /* needs id: false + manual id column */
+
+  it("schema dump keeps id column when id is false and id column added", async () => {
+    await ctx.createTable("goofy_string_id", { id: false }, (t) => {
+      t.string("id", { null: false });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("id: false");
+    expect(output).toMatch(/string.*"id".*null: false/);
   });
+
   it.skip("schema dump keeps id false when id is false and unique not null column added", () => {
     /* needs unique constraint + id: false */
   });
+
   it.skip("foreign keys are dumped at the bottom to circumvent dependency issues", () => {
-    /* needs foreign key dumping */
+    /* needs foreign key dumping in SchemaDumper */
   });
   it.skip("do not dump foreign keys for ignored tables", () => {
-    /* needs foreign key dumping */
+    /* needs foreign key dumping in SchemaDumper */
   });
   it.skip("do not dump foreign keys when bypassed by config", () => {
     /* needs foreign key dump config */
   });
 
   it.skip("schema dump with table name prefix and suffix", () => {
-    /* needs prefix/suffix filtering in SchemaDumper */
+    /* needs prefix/suffix stripping in SchemaDumper */
   });
 
   it.skip("schema dump with table name prefix and suffix regexp escape", () => {
-    /* needs prefix/suffix filtering in SchemaDumper */
+    /* needs prefix/suffix stripping in SchemaDumper */
   });
   it.skip("schema dump with table name prefix and ignoring tables", () => {
-    /* needs prefix/suffix filtering in SchemaDumper */
+    /* needs prefix/suffix stripping in SchemaDumper */
   });
-  it.skip("schema dump with correct timestamp types via create table and t column", () => {
-    /* needs timestamp type tracking */
+
+  it("schema dump with correct timestamp types via create table and t column", async () => {
+    await ctx.createTable("posts", {}, (t) => {
+      t.string("title");
+      t.timestamps();
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("datetime");
+    expect(output).toContain("created_at");
+    expect(output).toContain("updated_at");
   });
+
   it.skip("schema dump with timestamptz datetime format", () => {
-    /* needs timestamptz support */
+    /* needs PG timestamptz support */
   });
   it.skip("timestamps schema dump before rails 7", () => {
     /* needs Rails version compat */
@@ -261,30 +313,67 @@ describe("SchemaDumperTest", () => {
     /* needs datetime type migration */
   });
   it.skip("schema dump with correct timestamp types via create table and t timestamptz", () => {
-    /* needs timestamptz support */
+    /* needs PG timestamptz support */
   });
-  it.skip("schema dump with correct timestamp types via add column", () => {
-    /* needs timestamp type tracking */
+
+  it("schema dump with correct timestamp types via add column", async () => {
+    await ctx.createTable("posts", {}, (t) => {
+      t.string("title");
+    });
+    await ctx.addColumn("posts", "created_at", "datetime");
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("datetime");
+    expect(output).toContain("created_at");
   });
+
   it.skip("schema dump with correct timestamp types via add column before rails 7", () => {
     /* needs Rails version compat */
   });
   it.skip("schema dump with correct timestamp types via add column before rails 7 with timestamptz setting", () => {
     /* needs Rails version compat */
   });
-  it.skip("schema dump with correct timestamp types via add column with type as string", () => {
-    /* needs timestamp type tracking */
+
+  it("schema dump with correct timestamp types via add column with type as string", async () => {
+    await ctx.createTable("posts", {}, (t) => {
+      t.string("title");
+    });
+    await ctx.addColumn("posts", "posted_at", "datetime");
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("datetime");
+    expect(output).toContain("posted_at");
   });
 });
 
 describe("SchemaDumperDefaultsTest", () => {
-  it.skip("schema dump defaults with universally supported types", () => {
-    /* needs column default tracking */
+  let ctx: MigrationContext;
+  beforeEach(async () => {
+    const f = freshCtx();
+    ctx = f.ctx;
   });
-  it.skip("schema dump with text column", () => {
-    /* needs text column default tracking */
+
+  it("schema dump defaults with universally supported types", async () => {
+    await ctx.createTable("dump_defaults", {}, (t) => {
+      t.string("string_with_default", { default: "Hello!" });
+      t.date("date_with_default", { default: "2014-06-05" });
+      t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
+      t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
+    expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
+    expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
+    expect(output).toMatch(/decimal.*"decimal_with_default".*precision: 3.*scale: 2/);
   });
+
+  it("schema dump with text column", async () => {
+    await ctx.createTable("dump_defaults", {}, (t) => {
+      t.text("text_with_default", { default: "John" });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
+  });
+
   it.skip("schema dump with column infinity default", () => {
-    /* needs infinity default handling */
+    /* needs Infinity default handling */
   });
 });

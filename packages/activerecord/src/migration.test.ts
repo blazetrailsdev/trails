@@ -4,7 +4,8 @@
  *          activerecord/test/cases/invertible_migration_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, MigrationContext, MigrationRunner } from "./index.js";
+import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
+import type { MigrationProxy } from "./migrator.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration, TableDefinition, Schema } from "./migration.js";
@@ -924,28 +925,113 @@ describe("MigrationTest", () => {
     expect(Article.adapter).toBeDefined();
   });
 
-  it.skip("migration context with default schema migration", () => {
-    // Requires full migration runner
+  it("migration context with default schema migration", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "1",
+        name: "First",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "2",
+        name: "Second",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "3",
+        name: "Third",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    await migrator.up();
+    expect(await migrator.currentVersion()).toBe(3);
+    const pending = await migrator.pendingMigrations();
+    expect(pending.length).toBe(0);
+
+    await migrator.down(0);
+    expect(await migrator.currentVersion()).toBe(0);
+    const pendingAfter = await migrator.pendingMigrations();
+    expect(pendingAfter.length).toBe(3);
   });
 
-  it.skip("migrator versions", () => {
-    // Requires migration version tracking
+  it("migrator versions", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "1",
+        name: "First",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "2",
+        name: "Second",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "3",
+        name: "Third",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    await migrator.up();
+    expect(await migrator.currentVersion()).toBe(3);
+
+    await migrator.down(0);
+    expect(await migrator.currentVersion()).toBe(0);
+
+    const versions = await migrator.getAllVersions();
+    expect(versions.length).toBe(0);
   });
 
   it.skip("name collision across dbs", () => {
     // Requires multi-database support
   });
 
-  it.skip("migration detection without schema migration table", () => {
-    // Requires migration runner
+  it("migration detection without schema migration table", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "1",
+        name: "First",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    const pending = await migrator.pendingMigrations();
+    expect(pending.length).toBe(1);
   });
 
-  it.skip("any migrations", () => {
-    // Requires migration runner
+  it("any migrations", async () => {
+    const adapter = createTestAdapter();
+    const withMigrations = new Migrator(adapter, [
+      {
+        version: "1",
+        name: "First",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ]);
+    expect(withMigrations.migrations.length).toBeGreaterThan(0);
+
+    const empty = new Migrator(adapter, []);
+    expect(empty.migrations.length).toBe(0);
   });
 
-  it.skip("migration version", () => {
-    // Requires migration version tracking
+  it("migration version", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "20131219224947",
+        name: "VersionCheck",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    expect(await migrator.currentVersion()).toBe(0);
+    await migrator.up("20131219224947");
+    expect(await migrator.currentVersion()).toBe(20131219224947);
   });
 
   it("create table with if not exists true", async () => {
@@ -1024,16 +1110,77 @@ describe("MigrationTest", () => {
     // Requires method_missing pattern (not idiomatic in TS)
   });
 
-  it.skip("filtering migrations", () => {
-    // Requires migration runner
+  it("filtering migrations", async () => {
+    const adapter = createTestAdapter();
+    const ran: string[] = [];
+    const migrations: MigrationProxy[] = [
+      {
+        version: "1",
+        name: "First",
+        migration: () => ({
+          up: async () => {
+            ran.push("first");
+          },
+          down: async () => {},
+        }),
+      },
+      {
+        version: "2",
+        name: "Second",
+        migration: () => ({
+          up: async () => {
+            ran.push("second");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    // Run only the first migration
+    await migrator.up("1");
+    expect(ran).toEqual(["first"]);
+    expect(await migrator.currentVersion()).toBe(1);
   });
 
-  it.skip("migrator one up with exception and rollback", () => {
-    // Requires migration runner
+  it("migrator one up with exception and rollback", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "100",
+        name: "Broken",
+        migration: () => ({
+          up: async () => {
+            throw new Error("Something broke");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    await expect(migrator.up()).rejects.toThrow("Something broke");
+    // Migration should not be recorded as applied
+    const versions = await migrator.getAllVersions();
+    expect(versions).not.toContain("100");
   });
 
-  it.skip("migrator one up with exception and rollback using run", () => {
-    // Requires migration runner
+  it("migrator one up with exception and rollback using run", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "100",
+        name: "Broken",
+        migration: () => ({
+          up: async () => {
+            throw new Error("Something broke");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    await expect(migrator.migrate()).rejects.toThrow("Something broke");
+    const versions = await migrator.getAllVersions();
+    expect(versions).not.toContain("100");
   });
 
   it.skip("migration without transaction", () => {
@@ -1073,7 +1220,7 @@ describe("MigrationTest", () => {
   });
 
   it.skip("add drop table with prefix and suffix", () => {
-    // Requires DDL migration runner
+    /* needs prefix/suffix auto-applied by MigrationContext.createTable/dropTable */
   });
 
   it.skip("create table with query", () => {
@@ -1151,14 +1298,28 @@ describe("MigrationTest", () => {
     expect(typeof cols["content"].name).toBe("string");
   });
   describe("ReservedWordsMigrationTest", () => {
-    it.skip("drop index from table named values", () => {
-      /* fixture-dependent */
+    it("drop index from table named values", async () => {
+      const { ctx } = freshContext();
+      await ctx.createTable("values", {}, (t) => {
+        t.integer("value");
+      });
+      await ctx.addIndex("values", "value");
+      await ctx.removeIndex("values", { column: "value" });
+      const indexes = ctx.indexes("values");
+      expect(indexes.length).toBe(0);
     });
   });
 
   describe("ExplicitlyNamedIndexMigrationTest", () => {
-    it.skip("drop index by name", () => {
-      /* fixture-dependent */
+    it("drop index by name", async () => {
+      const { ctx } = freshContext();
+      await ctx.createTable("values", {}, (t) => {
+        t.integer("value");
+      });
+      await ctx.addIndex("values", "value", { name: "a_different_name" });
+      await ctx.removeIndex("values", { name: "a_different_name" });
+      const indexes = ctx.indexes("values");
+      expect(indexes.length).toBe(0);
     });
   });
 
