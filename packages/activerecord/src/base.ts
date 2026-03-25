@@ -2233,84 +2233,109 @@ export class Base extends Model {
       }
     }
 
-    // Run save callbacks.
-    // Use runBefore/runAfter to control the lifecycle:
-    // before_save → autosave belongsTo → before_create/update → INSERT/UPDATE →
-    // after_create/update → after_save → autosave children
-    let saved = false;
-    if (!(await ctor._callbackChain.runBefore("save", this))) return false;
-
-    // Autosave belongsTo BEFORE parent persist (sets FK on parent)
+    // Check if we have autosave associations — if so, wrap in transaction
+    // so failures in autosave roll back the parent's INSERT/UPDATE.
     const { autosaveBelongsTo, autosaveChildren } = await import("./autosave.js");
-    const belongsToOk = await autosaveBelongsTo(this);
-    if (!belongsToOk) {
-      this._skipTouch = false;
-      return false;
-    }
+    const associations: any[] = (ctor as any)._associations ?? [];
+    const hasAutosave = associations.some((a: any) => a.options?.autosave);
 
-    const wasNewRecord = this._newRecord;
-    if (this._newRecord) {
-      const createResult = await ctor._callbackChain.run("create", this, async () => {
-        this._performInsert();
-        if (this._pendingOperation) {
-          await this._pendingOperation;
-          this._pendingOperation = null;
-        }
-        this._previouslyNewRecord = true;
-        this._newRecord = false;
-        this.changesApplied();
-        saved = true;
-      });
-      if (!createResult) saved = false;
-    } else {
-      const updateResult = await ctor._callbackChain.run("update", this, async () => {
-        this._performUpdate();
-        if (this._pendingOperation) {
-          await this._pendingOperation;
-          this._pendingOperation = null;
-        }
-        this._previouslyNewRecord = false;
-        this.changesApplied();
-        saved = true;
-      });
-      if (!updateResult) saved = false;
-    }
-    this._skipTouch = false;
+    const saveBody = async (): Promise<boolean> => {
+      let saved = false;
+      this._transactionAction = undefined;
+      if (!(await ctor._callbackChain.runBefore("save", this))) return false;
 
-    if (saved) {
-      await ctor._callbackChain.runAfter("save", this);
-
-      // Counter cache: increment on create
-      if (wasNewRecord) {
-        const { updateCounterCaches } = await import("./associations.js");
-        await updateCounterCaches(this, "increment");
+      const belongsToOk = await autosaveBelongsTo(this);
+      if (!belongsToOk) {
+        this._skipTouch = false;
+        return false;
       }
 
-      // Autosave hasMany/hasOne/HABTM AFTER parent persist (children need parent PK)
-      const autosaveOk = await autosaveChildren(this);
-      if (!autosaveOk) return false;
+      const wasNewRecord = this._newRecord;
+      if (this._newRecord) {
+        const createResult = await ctor._callbackChain.run("create", this, async () => {
+          this._performInsert();
+          if (this._pendingOperation) {
+            await this._pendingOperation;
+            this._pendingOperation = null;
+          }
+          this._previouslyNewRecord = true;
+          this._newRecord = false;
+          this.changesApplied();
+          saved = true;
+        });
+        if (!createResult) saved = false;
+      } else {
+        const updateResult = await ctor._callbackChain.run("update", this, async () => {
+          this._performUpdate();
+          if (this._pendingOperation) {
+            await this._pendingOperation;
+            this._pendingOperation = null;
+          }
+          this._previouslyNewRecord = false;
+          this.changesApplied();
+          saved = true;
+        });
+        if (!updateResult) saved = false;
+      }
+      this._skipTouch = false;
 
-      // Touch parent associations
-      const { touchBelongsToParents } = await import("./associations.js");
-      await touchBelongsToParents(this);
+      if (saved) {
+        // Set transaction action early so rollback callbacks have correct context
+        this._transactionAction = wasNewRecord ? "create" : "update";
 
-      // Track the transaction action for on: filters in commit/rollback callbacks
-      this._transactionAction = wasNewRecord ? "create" : "update";
+        await ctor._callbackChain.runAfter("save", this);
 
-      // Fire after_commit callbacks
-      const { currentTransaction } = await import("./transactions.js");
-      const tx = currentTransaction();
-      if (tx) {
-        // Inside a transaction — defer to commit
-        tx.afterCommit(async () => {
+        if (wasNewRecord) {
+          const { updateCounterCaches } = await import("./associations.js");
+          await updateCounterCaches(this, "increment");
+        }
+
+        const autosaveOk = await autosaveChildren(this);
+        if (!autosaveOk) return false;
+
+        const { touchBelongsToParents } = await import("./associations.js");
+        await touchBelongsToParents(this);
+      }
+
+      return saved;
+    };
+
+    let saved: boolean;
+    if (hasAutosave) {
+      const { Rollback } = await import("./transactions.js");
+      const txResult = await this.transaction(async () => {
+        const result = await saveBody();
+        if (!result) throw new Rollback();
+        return result;
+      });
+      saved = txResult ?? false;
+    } else {
+      saved = await saveBody();
+    }
+
+    // Fire after_commit/after_rollback callbacks.
+    // If inside an outer transaction, defer. Otherwise fire immediately.
+    const { currentTransaction } = await import("./transactions.js");
+    const outerTx = currentTransaction();
+    if (saved) {
+      if (outerTx) {
+        outerTx.afterCommit(async () => {
           await ctor._callbackChain.runAfter("commit", this);
         });
-        tx.afterRollback(async () => {
+        outerTx.afterRollback(async () => {
           await ctor._callbackChain.runAfter("rollback", this);
         });
       } else {
-        // Not in a transaction — fire immediately
         await ctor._callbackChain.runAfter("commit", this);
+      }
+    } else if (hasAutosave) {
+      // Transaction was rolled back — fire after_rollback
+      if (outerTx) {
+        outerTx.afterRollback(async () => {
+          await ctor._callbackChain.runAfter("rollback", this);
+        });
+      } else {
+        await ctor._callbackChain.runAfter("rollback", this);
       }
     }
 

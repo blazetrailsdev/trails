@@ -91,10 +91,11 @@ These are sequential — each builds on the previous.
 - `validateAssociations()` runs during parent `isValid()`, propagating child errors. Works for all associations where `validate !== false`. Cycle guard via WeakSet. Passes validation context. 3 tests unskipped.
 - `autosaveBelongsTo` runs before parent INSERT/UPDATE (sets FK). `autosaveChildren` runs after (children need parent PK). Cycle guard on both. 3 tests unskipped.
 - `validate` option added to `AssociationOptions`.
+- `save()` wraps in a transaction when autosave associations exist. Failure throws `Rollback`. `after_commit`/`after_rollback` fire outside the transaction, deferring to outer transactions when nested.
 
 **Remaining follow-ups (58 skipped):**
 
-1. **Transaction rollback for autosave** (~7 tests) — wrap save+autosave in a transaction so destroyed children roll back if a later save fails. Rails: `save_collection_association` runs inside the parent's transaction.
+1. **In-memory state revert on rollback** (~7 tests) — when save's transaction rolls back (autosave failure), `_newRecord`, PK, and dirty state are already mutated in memory. Rails has `remember_transaction_record_state` / `restore_transaction_record_state` to snapshot and restore these. Without this, the record thinks it's persisted even though the row was rolled back. Needed to unskip the "should rollback destructions" tests.
 
 2. **Callback ordering on update** (~2 tests) — verify after_update timing relative to autosave.
 

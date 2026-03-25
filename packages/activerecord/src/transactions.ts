@@ -87,7 +87,8 @@ export async function transaction<T>(
   const previousTx = _currentTransaction;
   _currentTransaction = tx;
 
-  // If already in a transaction, use a savepoint for nesting
+  // If already in a transaction (module-level tracker),
+  // use a savepoint for nesting.
   const nested = previousTx !== null;
   const spName = nested ? `sp_${++_savepointCounter}` : null;
 
