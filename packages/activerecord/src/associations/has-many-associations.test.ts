@@ -20,7 +20,7 @@ import {
   processDependentAssociations,
   updateCounterCaches,
 } from "../associations.js";
-import { DeleteRestrictionError } from "../errors.js";
+import { DeleteRestrictionError } from "./errors.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";

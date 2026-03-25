@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ConnectionPool } from "./connection-pool.js";
-import { HashConfig } from "./database-configurations.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 
 function makePool(size: number = 5): ConnectionPool {

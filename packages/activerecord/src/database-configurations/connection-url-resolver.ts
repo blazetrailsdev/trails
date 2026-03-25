@@ -1,80 +1,10 @@
-/**
- * Database configurations — parses and manages database config objects.
- *
- * Mirrors: ActiveRecord::DatabaseConfigurations
- */
-
-export interface DatabaseConfigOptions {
-  adapter?: string;
-  database?: string;
-  host?: string;
-  port?: number;
-  username?: string;
-  password?: string;
-  encoding?: string;
-  pool?: number;
-  url?: string;
-  replicaOf?: string;
-  replica?: boolean;
-  _hidden?: boolean;
-  [key: string]: unknown;
-}
-
-export class DatabaseConfig {
-  readonly envName: string;
-  readonly name: string;
-  readonly configuration: DatabaseConfigOptions;
-
-  constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
-    this.envName = envName;
-    this.name = name;
-    this.configuration = configuration;
-  }
-
-  get adapter(): string | undefined {
-    return this.configuration.adapter;
-  }
-
-  get database(): string | undefined {
-    return this.configuration.database;
-  }
-
-  get host(): string | undefined {
-    return this.configuration.host;
-  }
-
-  get pool(): number {
-    return this.configuration.pool ?? 5;
-  }
-
-  get replica(): boolean {
-    return this.configuration.replica === true;
-  }
-
-  get forCurrentEnv(): boolean {
-    return this.envName === DatabaseConfigurations.defaultEnv;
-  }
-}
-
-export class HashConfig extends DatabaseConfig {
-  constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
-    super(envName, name, configuration);
-  }
-}
-
-export class UrlConfig extends DatabaseConfig {
-  readonly url: string;
-
-  constructor(
-    envName: string,
-    name: string,
-    url: string,
-    configuration: DatabaseConfigOptions = {},
-  ) {
-    super(envName, name, { ...configuration, url });
-    this.url = url;
-  }
-}
+import {
+  DatabaseConfig,
+  type DatabaseConfigOptions,
+  _setDefaultEnvGetter,
+} from "./database-config.js";
+import { HashConfig } from "./hash-config.js";
+import { UrlConfig } from "./url-config.js";
 
 type RawConfigurations = Record<
   string,
@@ -194,3 +124,6 @@ export class DatabaseConfigurations {
     return new HashConfig(envName, name, config);
   }
 }
+
+// Register the default env getter so DatabaseConfig.forCurrentEnv works
+_setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);

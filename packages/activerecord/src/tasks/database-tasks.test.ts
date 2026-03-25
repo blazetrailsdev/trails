@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations, HashConfig } from "../database-configurations.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
+import { DatabaseConfigurations } from "../database-configurations/connection-url-resolver.js";
 import { createTestAdapter } from "../test-adapter.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {

@@ -4,8 +4,8 @@
  * Mirrors: ActiveRecord::Tasks::DatabaseTasks
  */
 
-import type { DatabaseConfig } from "../database-configurations.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import { DatabaseConfigurations } from "../database-configurations/connection-url-resolver.js";
 
 export class DatabaseTasks {
   static get env(): string {

@@ -1,14 +1,14 @@
 import type { Base } from "./base.js";
 import { Table as ArelTable } from "@rails-ts/arel";
+import { StrictLoadingViolationError } from "./errors.js";
 import {
-  StrictLoadingViolationError,
   DeleteRestrictionError,
   InverseOfAssociationNotFoundError,
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
-} from "./errors.js";
+} from "./associations/errors.js";
 import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
 import { getInheritanceColumn, findStiClass } from "./sti.js";
 

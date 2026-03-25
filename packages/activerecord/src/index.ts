@@ -57,16 +57,18 @@ export {
   ReadOnlyRecord,
   SoleRecordExceeded,
   StrictLoadingViolationError,
-  DeleteRestrictionError,
   UnknownAttributeError,
   SubclassNotFound,
   NameError,
+} from "./errors.js";
+export {
+  DeleteRestrictionError,
   InverseOfAssociationNotFoundError,
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
-} from "./errors.js";
+} from "./associations/errors.js";
 export {
   AssociationReflection,
   ThroughReflection,
@@ -85,12 +87,11 @@ export { encrypts, defaultEncryptor, getEncryptor, isEncryptedAttribute } from "
 export type { Encryptor } from "./encryption.js";
 export { generatesTokenFor } from "./generates-token-for.js";
 export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
-export {
-  DatabaseConfigurations,
-  DatabaseConfig,
-  HashConfig,
-  UrlConfig,
-} from "./database-configurations.js";
+export { DatabaseConfig } from "./database-configurations/database-config.js";
+export type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
+export { HashConfig } from "./database-configurations/hash-config.js";
+export { UrlConfig } from "./database-configurations/url-config.js";
+export { DatabaseConfigurations } from "./database-configurations/connection-url-resolver.js";
 export { ConnectionPool } from "./connection-pool.js";
 export { ConnectionHandler } from "./connection-handler.js";
 export { DatabaseTasks } from "./tasks/database-tasks.js";
