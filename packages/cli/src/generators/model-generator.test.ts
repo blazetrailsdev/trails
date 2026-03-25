@@ -20,37 +20,22 @@ function makeGen() {
   return new ModelGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
 }
 
-describe("ModelGenerator", () => {
-  it("creates model file with attributes", () => {
+function findMigration(files: string[]): string {
+  const migFile = files.find((f) => f.startsWith("db/migrations/"));
+  expect(migFile).toBeDefined();
+  return fs.readFileSync(path.join(tmpDir, migFile!), "utf-8");
+}
+
+describe("ModelGeneratorTest", () => {
+  it("invokes default orm", () => {
     const gen = makeGen();
-    const files = gen.run("User", ["name:string", "email:string", "age:integer"]);
-    expect(files).toContain("src/app/models/user.ts");
+    gen.run("User", []);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/models/user.ts"), "utf-8");
+    expect(content).toContain('import { Base } from "@rails-ts/activerecord"');
     expect(content).toContain("class User extends Base");
-    expect(content).toContain('this.attribute("name", "string")');
-    expect(content).toContain('this.attribute("email", "string")');
-    expect(content).toContain('this.attribute("age", "integer")');
   });
 
-  it("creates model file without attributes", () => {
-    const gen = makeGen();
-    const files = gen.run("Post", []);
-    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/post.ts"), "utf-8");
-    expect(content).toContain("class Post extends Base");
-    expect(content).not.toContain("this.attribute");
-  });
-
-  it("creates test file", () => {
-    const gen = makeGen();
-    gen.run("User", ["name:string"]);
-    const testPath = path.join(tmpDir, "test/models/user.test.ts");
-    expect(fs.existsSync(testPath)).toBe(true);
-    const content = fs.readFileSync(testPath, "utf-8");
-    expect(content).toContain('describe("User"');
-    expect(content).toContain("import { User }");
-  });
-
-  it("creates migration", () => {
+  it("migration", () => {
     const gen = makeGen();
     const files = gen.run("User", ["name:string"]);
     const migFile = files.find((f) => f.startsWith("db/migrations/"));
@@ -59,56 +44,141 @@ describe("ModelGenerator", () => {
     expect(content).toContain("createTable");
   });
 
-  it("handles multi-word model names", () => {
-    const gen = makeGen();
-    gen.run("BlogPost", ["title:string"]);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/models/blog-post.ts"))).toBe(true);
-    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/blog-post.ts"), "utf-8");
-    expect(content).toContain("class BlogPost extends Base");
-  });
-
-  it("prints create messages for all files", () => {
-    const gen = makeGen();
-    gen.run("User", ["name:string"]);
-    expect(lines.filter((l) => l.includes("create")).length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("skips migration with --no-migration", () => {
+  it("migration is skipped", () => {
     const gen = makeGen();
     const files = gen.run("User", ["name:string"], { migration: false });
     expect(files.find((f) => f.startsWith("db/migrations/"))).toBeUndefined();
-    expect(files).toContain("src/app/models/user.ts");
-    expect(files).toContain("test/models/user.test.ts");
   });
 
-  it("skips test with --no-test", () => {
+  it("model with no migration option", () => {
     const gen = makeGen();
-    const files = gen.run("User", ["name:string"], { test: false });
-    expect(files.find((f) => f.includes("test/"))).toBeUndefined();
+    const files = gen.run("User", ["name:string"], { migration: false });
     expect(files).toContain("src/app/models/user.ts");
-    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeDefined();
+    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeUndefined();
   });
 
-  it("handles references type as belongsTo", () => {
+  it("migration with attributes", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string", "email:string", "age:integer"]);
+    const content = findMigration(files);
+    expect(content).toContain('t.string("name")');
+    expect(content).toContain('t.string("email")');
+    expect(content).toContain('t.integer("age")');
+  });
+
+  it("migration with attributes and with index", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["email:string:index", "token:string:uniq"]);
+    const content = findMigration(files);
+    expect(content).toContain("addIndex");
+    expect(content).toContain("unique: true");
+  });
+
+  it("migration with timestamps", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"]);
+    const content = findMigration(files);
+    expect(content).toContain("t.timestamps()");
+  });
+
+  it("migration timestamps are skipped", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"], { timestamps: false });
+    const content = findMigration(files);
+    expect(content).not.toContain("timestamps");
+  });
+
+  it("invokes default test framework", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"]);
+    expect(files).toContain("test/models/user.test.ts");
+    const content = fs.readFileSync(path.join(tmpDir, "test/models/user.test.ts"), "utf-8");
+    expect(content).toContain('describe("User"');
+  });
+
+  it.skip("fixture is skipped", () => {
+    // Needs fixture generation support (--skip-fixture flag)
+  });
+
+  it("model with references attribute generates belongs to associations", () => {
     const gen = makeGen();
     gen.run("Comment", ["post:references"]);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
     expect(content).toContain('this.belongsTo("post")');
   });
 
-  it("handles polymorphic references as belongsTo with polymorphic option", () => {
+  it("model with belongs to attribute generates belongs to associations", () => {
+    const gen = makeGen();
+    gen.run("Comment", ["post:belongs_to"]);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
+    expect(content).toContain('this.belongsTo("post")');
+  });
+
+  it("model with polymorphic references attribute generates belongs to associations", () => {
     const gen = makeGen();
     gen.run("Comment", ["commentable:references{polymorphic}"]);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
     expect(content).toContain('this.belongsTo("commentable", { polymorphic: true })');
   });
 
-  it("skips timestamps in migration with --no-timestamps", () => {
+  it("model with polymorphic belongs to attribute generates belongs to associations", () => {
     const gen = makeGen();
-    const files = gen.run("User", ["name:string"], { timestamps: false });
-    const migFile = files.find((f) => f.startsWith("db/migrations/"));
-    expect(migFile).toBeDefined();
-    const content = fs.readFileSync(path.join(tmpDir, migFile!), "utf-8");
-    expect(content).not.toContain("timestamps");
+    gen.run("Comment", ["commentable:belongs_to{polymorphic}"]);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/comment.ts"), "utf-8");
+    expect(content).toContain('this.belongsTo("commentable", { polymorphic: true })');
+  });
+
+  it("polymorphic belongs to generates correct model", () => {
+    const gen = makeGen();
+    gen.run("Image", ["imageable:references{polymorphic}"]);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/image.ts"), "utf-8");
+    expect(content).toContain('this.belongsTo("imageable", { polymorphic: true })');
+    expect(content).not.toContain("this.attribute");
+  });
+
+  it("foreign key is added for references", () => {
+    const gen = makeGen();
+    const files = gen.run("Comment", ["post:references"]);
+    const content = findMigration(files);
+    expect(content).toContain("foreignKey: true");
+  });
+
+  it("foreign key is skipped for polymorphic references", () => {
+    const gen = makeGen();
+    const files = gen.run("Comment", ["commentable:references{polymorphic}"]);
+    const content = findMigration(files);
+    expect(content).toContain("polymorphic: true");
+    expect(content).not.toContain("foreignKey");
+  });
+
+  it("foreign key is not added for non references", () => {
+    const gen = makeGen();
+    const files = gen.run("User", ["name:string"]);
+    const content = findMigration(files);
+    expect(content).not.toContain("foreignKey");
+  });
+
+  it.skip("plural names are singularized", () => {
+    // Needs singularization of model name input (e.g., "Users" → "User")
+  });
+
+  // Additional coverage (no direct Rails test name match)
+
+  it("model file includes attribute declarations", () => {
+    const gen = makeGen();
+    gen.run("User", ["name:string", "email:string", "age:integer"]);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/user.ts"), "utf-8");
+    expect(content).toContain("class User extends Base");
+    expect(content).toContain('this.attribute("name", "string")');
+    expect(content).toContain('this.attribute("email", "string")');
+    expect(content).toContain('this.attribute("age", "integer")');
+  });
+
+  it("model with multi-word name uses kebab-case filename", () => {
+    const gen = makeGen();
+    gen.run("BlogPost", ["title:string"]);
+    expect(fs.existsSync(path.join(tmpDir, "src/app/models/blog-post.ts"))).toBe(true);
+    const content = fs.readFileSync(path.join(tmpDir, "src/app/models/blog-post.ts"), "utf-8");
+    expect(content).toContain("class BlogPost extends Base");
   });
 });

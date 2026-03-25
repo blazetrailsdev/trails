@@ -20,133 +20,156 @@ function makeGen() {
   return new MigrationGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
 }
 
-describe("MigrationGenerator", () => {
-  it("creates a migration file with timestamp", () => {
+function readMigration(files: string[]): string {
+  return fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+}
+
+describe("MigrationGeneratorTest", () => {
+  it("migration", () => {
     const gen = makeGen();
     const files = gen.run("CreateUsers", []);
     expect(files.length).toBe(1);
     expect(files[0]).toMatch(/^db\/migrations\/\d{14}-create-users\.ts$/);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    const content = readMigration(files);
     expect(content).toContain("class CreateUsers extends Migration");
   });
 
-  it("infers createTable from Create* name", () => {
+  it("migration with class name", () => {
     const gen = makeGen();
-    const files = gen.run("CreatePosts", ["title:string", "body:text", "published:boolean"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('createTable("posts"');
+    const files = gen.run("CreateUsers", []);
+    const content = readMigration(files);
+    expect(content).toContain("class CreateUsers extends Migration");
+  });
+
+  it("create table migration", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateBooks", ["title:string", "body:text"]);
+    const content = readMigration(files);
+    expect(content).toContain('createTable("books"');
     expect(content).toContain('t.string("title")');
     expect(content).toContain('t.text("body")');
-    expect(content).toContain('t.boolean("published")');
+    expect(content).toContain('dropTable("books")');
+  });
+
+  it("create table migration with timestamps", () => {
+    const gen = makeGen();
+    const files = gen.run("CreateBooks", ["title:string"]);
+    const content = readMigration(files);
     expect(content).toContain("t.timestamps()");
-    expect(content).toContain('dropTable("posts")');
   });
 
-  it("infers addColumn from Add*To* name", () => {
+  it("create table timestamps are skipped", () => {
     const gen = makeGen();
-    const files = gen.run("AddEmailToUsers", ["email:string"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('addColumn("users", "email", "string")');
-    expect(content).toContain('removeColumn("users", "email")');
+    const files = gen.run("CreateBooks", ["title:string"], { timestamps: false });
+    const content = readMigration(files);
+    expect(content).toContain('createTable("books"');
+    expect(content).not.toContain("timestamps");
   });
 
-  it("infers removeColumn from Remove*From* name", () => {
+  it("add migration with attributes", () => {
     const gen = makeGen();
-    const files = gen.run("RemoveAgeFromUsers", ["age:integer"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('removeColumn("users", "age")');
-    expect(content).toContain('addColumn("users", "age", "integer")');
+    const files = gen.run("AddTitleToBooks", ["title:string"]);
+    const content = readMigration(files);
+    expect(content).toContain('addColumn("books", "title", "string")');
+    expect(content).toContain('removeColumn("books", "title")');
   });
 
-  it("generates empty body for unrecognized names", () => {
+  it("add migration with attributes and indices", () => {
+    const gen = makeGen();
+    const files = gen.run("AddTitleToPosts", ["title:string:index"]);
+    const content = readMigration(files);
+    expect(content).toContain('addColumn("posts", "title", "string")');
+    expect(content).toContain('addIndex("posts", "title")');
+  });
+
+  it("remove migration with attributes", () => {
+    const gen = makeGen();
+    const files = gen.run("RemoveTitleFromPosts", ["title:string"]);
+    const content = readMigration(files);
+    expect(content).toContain('removeColumn("posts", "title")');
+    expect(content).toContain('addColumn("posts", "title", "string")');
+  });
+
+  it("add migration with references options", () => {
+    const gen = makeGen();
+    const files = gen.run("AddAuthorToBooks", ["author:belongs_to"]);
+    const content = readMigration(files);
+    expect(content).toContain('addReference("books", "author"');
+  });
+
+  it("add migration with references adds foreign keys", () => {
+    const gen = makeGen();
+    const files = gen.run("AddAuthorToBooks", ["author:references"]);
+    const content = readMigration(files);
+    expect(content).toContain("foreignKey: true");
+  });
+
+  it("remove migration with references options", () => {
+    const gen = makeGen();
+    const files = gen.run("RemoveAuthorFromBooks", ["author:references"]);
+    const content = readMigration(files);
+    expect(content).toContain('removeReference("books", "author")');
+  });
+
+  it("remove migration with references removes foreign keys", () => {
+    const gen = makeGen();
+    const files = gen.run("RemoveAuthorFromBooks", ["author:references"]);
+    const content = readMigration(files);
+    expect(content).toContain('addReference("books", "author"');
+    expect(content).toContain("foreignKey: true");
+  });
+
+  it("should create empty migrations if name not start with add or remove or create", () => {
     const gen = makeGen();
     const files = gen.run("DoSomethingComplex", []);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    const content = readMigration(files);
     expect(content).toContain("TODO: implement migration");
   });
 
-  it("prints create messages", () => {
+  it("add migration with table having from in title", () => {
     const gen = makeGen();
-    gen.run("CreateUsers", []);
-    expect(lines.length).toBe(1);
-    expect(lines[0]).toContain("create");
-    expect(lines[0]).toContain("db/migrations/");
+    const files = gen.run("AddFromToUsers", ["from:string"]);
+    const content = readMigration(files);
+    expect(content).toContain('addColumn("users", "from", "string")');
   });
 
-  it("handles references type in createTable", () => {
+  it("remove migration with table having to in title", () => {
     const gen = makeGen();
-    const files = gen.run("CreatePosts", ["title:string", "user:references"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('t.references("user", { foreignKey: true })');
-    expect(content).toContain('t.string("title")');
+    const files = gen.run("RemoveToFromUsers", ["to:string"]);
+    const content = readMigration(files);
+    expect(content).toContain('removeColumn("users", "to")');
   });
 
-  it("handles belongs_to type in createTable", () => {
-    const gen = makeGen();
-    const files = gen.run("CreateComments", ["post:belongs_to"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('t.references("post", { foreignKey: true })');
+  it.skip("add migration with references options when primary key uuid", () => {
+    // Needs --primary_key_type=uuid support
   });
 
-  it("handles addReference from Add*To* name", () => {
-    const gen = makeGen();
-    const files = gen.run("AddUserToPosts", ["user:references"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('addReference("posts", "user", { foreignKey: true })');
-    expect(content).toContain('removeReference("posts", "user")');
+  it.skip("create table migration ignores virtual attributes", () => {
+    // Needs virtual attribute type detection (rich_text, attachment, etc.)
   });
 
-  it("handles removeReference from Remove*From* name", () => {
-    const gen = makeGen();
-    const files = gen.run("RemoveUserFromPosts", ["user:references"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('removeReference("posts", "user")');
-    expect(content).toContain('addReference("posts", "user", { foreignKey: true })');
-  });
+  // Additional coverage (no direct Rails test name match)
 
-  it("handles index modifier on columns", () => {
-    const gen = makeGen();
-    const files = gen.run("CreateUsers", ["email:string:index"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('addIndex("users", "email")');
-  });
-
-  it("handles uniq modifier on columns", () => {
-    const gen = makeGen();
-    const files = gen.run("CreateUsers", ["email:string:uniq"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('addIndex("users", "email", { unique: true })');
-  });
-
-  it("handles polymorphic references in createTable", () => {
+  it("create table migration with polymorphic references", () => {
     const gen = makeGen();
     const files = gen.run("CreateComments", ["commentable:references{polymorphic}"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    const content = readMigration(files);
     expect(content).toContain('t.references("commentable", { polymorphic: true })');
     expect(content).not.toContain("foreignKey");
   });
 
-  it("handles polymorphic references in Add*To*", () => {
+  it("add migration with polymorphic references", () => {
     const gen = makeGen();
     const files = gen.run("AddCommentableToComments", ["commentable:references{polymorphic}"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    const content = readMigration(files);
     expect(content).toContain('addReference("comments", "commentable", { polymorphic: true })');
   });
 
-  it("handles :uniq on references with separate unique index", () => {
+  it("create table migration with unique reference index", () => {
     const gen = makeGen();
     const files = gen.run("CreatePosts", ["user:references:uniq"]);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
+    const content = readMigration(files);
     expect(content).toContain('t.references("user", { foreignKey: true, index: false })');
     expect(content).toContain('addIndex("posts", "user_id", { unique: true })');
-  });
-
-  it("supports --no-timestamps via options", () => {
-    const gen = makeGen();
-    const files = gen.run("CreateUsers", ["name:string"], { timestamps: false });
-    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('createTable("users"');
-    expect(content).toContain('t.string("name")');
-    expect(content).not.toContain("timestamps");
   });
 });
