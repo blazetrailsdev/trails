@@ -119,9 +119,9 @@ export class DatabaseTasks {
     }
   }
 
-  private static _migrations: Array<import("../migrator.js").MigrationProxy> = [];
+  private static _migrations: Array<import("../migration.js").MigrationProxy> = [];
 
-  static registerMigrations(migrations: Array<import("../migrator.js").MigrationProxy>): void {
+  static registerMigrations(migrations: Array<import("../migration.js").MigrationProxy>): void {
     this._migrations = migrations;
   }
 
@@ -135,7 +135,7 @@ export class DatabaseTasks {
     if (configs.length === 0) return;
 
     const config = configs.find((c) => c.name === "primary") ?? configs[0];
-    const { Migrator } = await import("../migrator.js");
+    const { Migrator } = await import("../migration.js");
     const adapter = await this._resolveAdapter(config);
     if (!adapter) {
       throw new Error("No database adapter configured. Call DatabaseTasks.setAdapter() first.");

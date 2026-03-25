@@ -101,8 +101,8 @@ export { ConnectionPool } from "./connection-adapters/abstract/connection-pool/q
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks } from "./tasks/database-tasks.js";
 export type { DatabaseTaskHandler } from "./tasks/database-tasks.js";
-export { Migrator } from "./migrator.js";
-export type { MigrationProxy, MigrationLike } from "./migrator.js";
+export { Migrator } from "./migration.js";
+export type { MigrationProxy, MigrationLike } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 
 export { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";

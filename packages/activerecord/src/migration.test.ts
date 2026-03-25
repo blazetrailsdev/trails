@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
-import type { MigrationProxy } from "./migrator.js";
+import type { MigrationProxy } from "./migration.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration } from "./migration.js";

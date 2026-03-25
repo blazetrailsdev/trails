@@ -33,10 +33,21 @@ export interface ColumnOptions {
   primaryKey?: boolean;
 }
 
-interface IndexDefinition {
-  columns: string[];
-  unique: boolean;
-  name?: string;
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::IndexDefinition
+ */
+export class IndexDefinition {
+  readonly table: string;
+  readonly name: string;
+  readonly unique: boolean;
+  readonly columns: string[];
+
+  constructor(table: string, name: string, unique: boolean = false, columns: string[] = []) {
+    this.table = table;
+    this.name = name;
+    this.unique = unique;
+    this.columns = columns;
+  }
 }
 
 /**
@@ -145,11 +156,8 @@ export class TableDefinition {
   }
 
   index(columns: string[], options: { unique?: boolean; name?: string } = {}): this {
-    this.indexes.push({
-      columns,
-      unique: options.unique ?? false,
-      name: options.name,
-    });
+    const name = options.name ?? `index_${this.tableName}_on_${columns.join("_and_")}`;
+    this.indexes.push(new IndexDefinition(this.tableName, name, options.unique ?? false, columns));
     return this;
   }
 
