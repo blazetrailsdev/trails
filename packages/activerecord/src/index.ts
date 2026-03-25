@@ -1,8 +1,13 @@
 export { Base } from "./base.js";
 export { Relation, Range } from "./relation.js";
 export type { DatabaseAdapter } from "./adapter.js";
-export { Migration, TableDefinition, Schema, MigrationContext } from "./migration.js";
-export type { ColumnType, ColumnOptions } from "./migration.js";
+export { Migration, MigrationContext } from "./migration.js";
+export { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+export type {
+  ColumnType,
+  ColumnOptions,
+} from "./connection-adapters/abstract/schema-definitions.js";
+export { Schema } from "./schema.js";
 export { MigrationRunner } from "./migration-runner.js";
 export {
   Associations,
