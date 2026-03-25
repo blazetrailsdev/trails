@@ -22,13 +22,9 @@ export {
 } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationOptions } from "./associations.js";
-export {
-  Transaction,
-  Rollback,
-  transaction,
-  savepoint,
-  currentTransaction,
-} from "./transactions.js";
+export { Transaction } from "./connection-adapters/abstract/transaction.js";
+export { transaction, savepoint, currentTransaction } from "./transactions.js";
+export { Rollback } from "./errors.js";
 export { delegate } from "./delegate.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

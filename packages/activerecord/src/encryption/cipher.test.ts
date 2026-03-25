@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Cipher } from "./cipher.js";
+import { Cipher } from "./cipher/aes256-gcm.js";
 import { DecryptionError } from "./errors.js";
 import * as crypto from "crypto";
 
