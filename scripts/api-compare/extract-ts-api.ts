@@ -21,12 +21,14 @@ const PACKAGES = [
   "activesupport",
   "actiondispatch",
   "actioncontroller",
+  "railties",
 ];
 
 /** Override package → directory mapping when they differ */
 const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actiondispatch: "actionpack",
   actioncontroller: "actionpack",
+  railties: "cli",
 };
 
 /** Override package → src subdirectory when package shares a dir */

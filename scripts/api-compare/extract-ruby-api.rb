@@ -21,6 +21,7 @@ PACKAGE_DIRS = {
   "activesupport" => File.join(RAILS_DIR, "activesupport", "lib", "active_support"),
   "actiondispatch" => File.join(RAILS_DIR, "actionpack", "lib", "action_dispatch"),
   "actioncontroller" => File.join(RAILS_DIR, "actionpack", "lib", "action_controller"),
+  "railties" => File.join(RAILS_DIR, "railties", "lib", "rails"),
 }
 
 # ---- Param extraction from Ripper AST ----

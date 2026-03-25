@@ -18,7 +18,7 @@
  *
  * By default, detailed per-file tables, misplaced tests, and wrong-describe
  * output are only shown for the focus packages (arel, activemodel, activerecord,
- * activesupport, rack). Using --package overrides this and always shows detail.
+ * activesupport, rack, railties). Using --package overrides this and always shows detail.
  *
  * Usage:
  *   npx tsx scripts/test-compare/convention-compare.ts [--missing] [--json] [--package activesupport]
@@ -31,7 +31,14 @@ import type { TestManifest } from "./types.js";
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-const DETAIL_PACKAGES = new Set(["arel", "activemodel", "activerecord", "activesupport", "rack"]);
+const DETAIL_PACKAGES = new Set([
+  "arel",
+  "activemodel",
+  "activerecord",
+  "activesupport",
+  "rack",
+  "railties",
+]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -634,6 +641,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     actioncontroller: "packages/actionpack/src/actioncontroller/",
     actionview: "packages/actionpack/src/actionview/",
     cli: "packages/cli/src/",
+    railties: "packages/cli/src/",
   };
 
   const prefix = pkgDirs[pkg];
