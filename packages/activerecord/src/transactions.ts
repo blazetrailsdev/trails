@@ -1,18 +1,8 @@
 import type { Base } from "./base.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
-/**
- * Throw inside a transaction block to trigger a rollback without
- * re-raising the error to the caller.
- *
- * Mirrors: ActiveRecord::Rollback
- */
-export class Rollback extends Error {
-  constructor() {
-    super("Rollback");
-    this.name = "Rollback";
-  }
-}
+import { Rollback } from "./errors.js";
+export { Rollback };
 
 // Track the currently-active transaction (if any) for after_commit/after_rollback callbacks
 let _currentTransaction: Transaction | null = null;

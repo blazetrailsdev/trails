@@ -23,21 +23,8 @@ export class RecordNotFound extends Error {
   }
 }
 
-/**
- * Raised when a record fails validation and save! or create! is called.
- *
- * Mirrors: ActiveRecord::RecordInvalid
- */
-export class RecordInvalid extends Error {
-  readonly record: any;
-
-  constructor(record: any) {
-    const messages = record.errors?.fullMessages?.join(", ") ?? "Validation failed";
-    super(`Validation failed: ${messages}`);
-    this.name = "RecordInvalid";
-    this.record = record;
-  }
-}
+import { RecordInvalid } from "./validations.js";
+export { RecordInvalid };
 
 /**
  * Raised when a record cannot be saved.
@@ -170,5 +157,18 @@ export class NameError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "NameError";
+  }
+}
+
+/**
+ * Throw inside a transaction block to trigger a rollback without
+ * re-raising the error to the caller.
+ *
+ * Mirrors: ActiveRecord::Rollback
+ */
+export class Rollback extends Error {
+  constructor() {
+    super("Rollback");
+    this.name = "Rollback";
   }
 }

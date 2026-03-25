@@ -96,7 +96,7 @@ export type { DatabaseConfigOptions } from "./database-configurations/database-c
 export { HashConfig } from "./database-configurations/hash-config.js";
 export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations/connection-url-resolver.js";
-export { ConnectionPool } from "./connection-pool.js";
+export { ConnectionPool } from "./connection-adapters/abstract/connection-pool/queue.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks } from "./tasks/database-tasks.js";
 export type { DatabaseTaskHandler } from "./tasks/database-tasks.js";
