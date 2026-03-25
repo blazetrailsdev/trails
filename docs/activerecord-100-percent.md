@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100%
 
-Current state: **60.8%** (5,101 / 8,385 tests). 3,046 skipped, 340 of 342 Rails test files matched.
+Current state: **61.2%** (5,135 / 8,385 tests). 3,012 skipped, 340 of 342 Rails test files matched.
 
 ```bash
 pnpm run convention:compare -- --package activerecord
@@ -10,32 +10,23 @@ pnpm run convention:compare -- --package activerecord
 
 The core source files and their roles:
 
-| File                   | Role                                                                                                                         |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `relation.ts`          | Lazy chainable query builder. WHERE, ORDER, JOIN, GROUP, preload, eager load.                                                |
-| `base.ts`              | Model class. Persistence (save/create/update/destroy), finders, attribute access, association accessor dispatch.             |
-| `associations.ts`      | Association definitions (belongsTo/hasOne/hasMany/HABTM), loaders (loadHasMany, loadBelongsTo, etc.), and `CollectionProxy`. |
-| `reflection.ts`        | `AssociationReflection`, `ThroughReflection`, `ColumnReflection`. Metadata about associations and columns.                   |
-| `autosave.ts`          | `autosaveAssociations()` — saves dirty/new children when parent saves. `markForDestruction` / `isMarkedForDestruction`.      |
-| `nested-attributes.ts` | `acceptsNestedAttributesFor` — assigns nested attrs, processes `_destroy`, wraps save.                                       |
-| `schema-dumper.ts`     | `SchemaDumper` — generates migration-like schema output from adapter introspection.                                          |
-| `migration.ts`         | Migration DSL: `createTable`, `addColumn`, `addIndex`, etc.                                                                  |
-| `migrator.ts`          | `Migrator` — discovers and runs migration files, tracks versions.                                                            |
+| File                   | Role                                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `relation.ts`          | Lazy chainable query builder. WHERE, ORDER, JOIN, GROUP, preload, eager load. Accepts Arel nodes in `where()`.    |
+| `base.ts`              | Model class. Persistence (save/create/update/destroy), finders, attribute access, association accessor dispatch.  |
+| `associations.ts`      | Association definitions (belongsTo/hasOne/hasMany), loaders, `CollectionProxy`, HABTM (via through internally).   |
+| `reflection.ts`        | `AssociationReflection`, `ThroughReflection`, `ColumnReflection`. Metadata about associations and columns.        |
+| `autosave.ts`          | `autosaveBelongsTo` (before save), `autosaveChildren` (after save), `validateAssociations`, `markForDestruction`. |
+| `nested-attributes.ts` | `acceptsNestedAttributesFor` — assigns nested attrs, processes `_destroy`, wraps save.                            |
+| `schema-dumper.ts`     | `SchemaDumper` — generates migration-like schema output from adapter introspection.                               |
+| `migration.ts`         | Migration DSL: `createTable`, `addColumn`, `addIndex`, etc.                                                       |
+| `migrator.ts`          | `Migrator` — discovers and runs migration files, tracks versions.                                                 |
 
 Association loading flow: `base.ts` accessor -> `loadHasMany`/`loadBelongsTo`/etc. in `associations.ts` -> builds a `Relation` query -> executes via adapter. Collections return `CollectionProxy` wrapping the results.
 
 ### Raw SQL that should be converted to Arel
 
-`Relation#where` now accepts Arel nodes. The following places still construct raw SQL strings and should be migrated to use Arel managers/nodes instead:
-
-**associations.ts** — HABTM join table operations (4 calls):
-
-- `loadHabtm`: `SELECT target_fk FROM join_table WHERE owner_fk = ?` — use `SelectManager`
-- `_pushHabtm`: `INSERT INTO join_table ...` — use `InsertManager`
-- `_deleteHabtm`: `DELETE FROM join_table WHERE ...` — use `DeleteManager`
-- `processDependentAssociations`: `DELETE FROM join_table WHERE ...` — use `DeleteManager`
-
-All four use manual quoting (`pkQuoted`/`targetQuoted`) which should be replaced by Arel's value binding.
+`Relation#where` accepts Arel nodes. The following places still construct raw SQL strings:
 
 **relation.ts** — raw SQL in `_whereRawClauses`:
 
@@ -47,254 +38,135 @@ Note: `where("raw sql ?", bind)` from user code is intentional (Rails supports t
 
 ---
 
-## Phase 1: Core associations (do first — unblocks ~500 tests)
+## Phase 1 remaining follow-ups
 
-These are sequential — each builds on the previous.
+Phase 1 (core associations) is complete. These follow-ups remain:
 
-### 1A. CollectionProxy completeness
+### 1B follow-ups
 
-**What exists:** `CollectionProxy` (associations.ts:996) already has `build`, `create`, `push`, `toArray`, `count`, `size`, `isEmpty`, `delete`, `destroy`, `clear`, `includes`, `first`, `last`, `take`, `many`, `none`, `one`, `exists`, `where`, `firstOrInitialize`, `firstOrCreate`, `find`, `findOrCreateBy`, `pluck`, `pick`. Through operations (`_pushThrough`, `_createThrough`, `_pushHabtm`) exist.
+1. **Nested through edge cases** (12 skipped) — STI on nested through, polymorphic with scope, preload via joins, table referenced multiple times. Requires JoinDependency/table aliasing.
 
-**Done:** Target tracking (`_target`/`_loaded`), proxy caching per record, `build`/`push` append without loading, `load`/`reload`/`reset`, `pluck`/`pick`, `scope()`, callback gating on `_target` mutations. 10 tests unskipped.
+2. **Polymorphic disable_joins** (12 skipped) — ordering, scopes, chained scopes, limits, first. Need in-memory ordering/limiting when `disableJoins` is set.
 
-**Tests unblocked:** associations.test.ts (~30), counter-cache.test.ts (~15), HABTM (~10), HMT (~10)
+3. **`disableJoins` becomes meaningful** when we add JOIN-based through loading (currently all through loading is multi-query).
 
-**Note:** `Relation#where` now accepts Arel nodes (e.g. `Nodes.In`, `Attribute.eq`). `scope()` uses Arel subqueries for through/HABTM associations via `targetAttr.in(throughTable.project(fkCol).where(...))`. No raw SQL.
+### 1C follow-ups (56 skipped)
 
----
+1. **Nested attribute processing outside transaction** — `acceptsNestedAttributesFor` wraps `save()` and processes nested attrs AFTER save returns. Nested attribute saves run outside the save transaction. Rails processes nested attributes inside the transaction. Requires moving `processNestedAttributes` into `saveBody`.
 
-### 1B. Through association operations
+2. **In-memory state revert on rollback** (~7 tests) — when save's transaction rolls back, `_newRecord`, PK, and dirty state are already mutated in memory. Rails has `remember_transaction_record_state` / `restore_transaction_record_state`. Needed to unskip "should rollback destructions" tests.
 
-**Done:**
+3. **Callback ordering on update** (~2 tests) — verify after_update timing relative to autosave.
 
-- `buildThroughAssociation` / `createThroughAssociation` for has_one :through — builds both target and intermediate record, wires FKs in correct order based on source type (belongsTo vs hasOne/hasMany), handles polymorphic sources and STI. 7 tests unskipped.
-- `disableJoins` option added to `AssociationOptions` for Rails API parity. Currently a no-op since `loadHasManyThrough` already uses multi-query loading. 8 tests unskipped.
+4. **Double-save / inverse callbacks** (~4 tests) — saving same child twice, polymorphic inverse_of callback scenarios.
 
-**Remaining follow-ups:**
+5. **`validate: false` at depth** (~1 test) — `save({ validate: false })` should skip association validation at all nesting levels.
 
-1. **Nested through edge cases** (12 skipped in nested-through-associations.test.ts) — STI on nested through, polymorphic with scope, preload via joins, table referenced multiple times. Requires deeper JoinDependency/table aliasing work. Phase 2.
+6. **CPK autosave** (~3 tests) — composite primary key autosave.
 
-2. **Polymorphic disable_joins** (12 skipped) — ordering, scopes, chained scopes, limits, first. Need in-memory ordering/limiting when `disableJoins` is set and the final query can't apply ORDER/LIMIT at DB level.
+7. **Store in two relations** (~3 tests) — same record referenced by two associations, saved once.
 
-3. **`disableJoins` becomes meaningful** when we add JOIN-based through loading (currently all through loading is multi-query). At that point, `disableJoins: false` (default) should use JOINs and `disableJoins: true` should use multi-query.
+8. **save! / callback cancelling** (~2 tests) — `save!` raising RecordInvalid, callback returning false stopping save.
 
-4. **`pluck`/`pick` on through includes unsaved records** — `_resolveRecords` falls back to `toArray()` for through associations, which merges unsaved in-memory records. Should filter to persisted-only for DB-semantics methods.
-
-5. **Transaction wrapping for `createThroughAssociation`** — multiple saves without rollback on partial failure. Needs transaction support wired in.
+9. **Various edge cases** (~35 tests) — error message deduplication, inverse polymorphic changes, etc.
 
 ---
 
-### 1C. Autosave propagation
-
-**Done:**
-
-- `validateAssociations()` runs during parent `isValid()`, propagating child errors. Works for all associations where `validate !== false`. Cycle guard via WeakSet. Passes validation context. 3 tests unskipped.
-- `autosaveBelongsTo` runs before parent INSERT/UPDATE (sets FK). `autosaveChildren` runs after (children need parent PK). Cycle guard on both. 3 tests unskipped.
-- `validate` option added to `AssociationOptions`.
-- `save()` wraps in a transaction when autosave associations exist. Failure throws `Rollback`. `after_commit`/`after_rollback` fire outside the transaction, deferring to outer transactions when nested.
-
-**Remaining follow-ups (58 skipped):**
-
-1. **In-memory state revert on rollback** (~7 tests) — when save's transaction rolls back (autosave failure), `_newRecord`, PK, and dirty state are already mutated in memory. Rails has `remember_transaction_record_state` / `restore_transaction_record_state` to snapshot and restore these. Without this, the record thinks it's persisted even though the row was rolled back. Needed to unskip the "should rollback destructions" tests.
-
-2. **Callback ordering on update** (~2 tests) — verify after_update timing relative to autosave.
-
-3. **Double-save / inverse callbacks** (~4 tests) — saving same child twice, polymorphic inverse_of callback scenarios.
-
-4. **`validate: false` at depth** (~1 test) — `save({ validate: false })` should skip association validation at all nesting levels.
-
-5. **CPK autosave** (~3 tests) — composite primary key autosave.
-
-6. **Store in two relations** (~3 tests) — same record referenced by two associations, saved once.
-
-7. **save! / callback cancelling** (~2 tests) — `save!` raising RecordInvalid, callback returning false stopping save.
-
-8. **Various edge cases** (~35 tests) — error message deduplication, inverse polymorphic changes, etc.
-
----
-
-## Phase 2: Parallel workstreams (independent, all benefit from Phase 1)
+## Phase 2: Parallel workstreams (independent)
 
 ### Stream A: Query & relation layer (~200 tests)
 
-These can be done in any order within the stream.
-
 #### A1. Association-aware `where` (where.test.ts, ~36 skip)
 
-**What exists:** `where()` in `relation.ts` handles hash conditions, raw SQL, named binds, ranges, arrays, NULL. It builds SQL from conditions.
-
-**What's missing:** Passing an association name as a key in `where()` should JOIN the association table and apply conditions there.
+Passing an association name as a key in `where()` should JOIN the association table and apply conditions there. Handle polymorphic where.
 
 Rails source: `relation/query_methods.rb#build_where_clause`, `predicate_builder/association_query_handler.rb`
 
-**Implementation:**
-
-- In `Relation.where()`, when a key matches an association name on the model, resolve it via `_associations`
-- Build a JOIN to the association's target table
-- Rewrite the conditions to reference the joined table's columns
-- Handle polymorphic where: `where(commentable: post)` should set both `commentable_id` and `commentable_type`
-
-**Files:** `relation.ts` (where method, ~line 92)
-
 #### A2. Tuple syntax for `where` (where.test.ts, ~6 skip)
 
-"where with tuple syntax" — `where([:id, :name] => [[1, "a"], [2, "b"]])` generating `WHERE (id, name) IN ((1, 'a'), (2, 'b'))`.
-
-Rails source: `predicate_builder.rb#expand_from_hash` handles array keys.
-
-**Implementation:** In `where()`, detect when a key is an array. Generate `(col1, col2) IN (...)` SQL.
+`where([:id, :name] => [[1, "a"], [2, "b"]])` generating `WHERE (id, name) IN (...)`.
 
 #### A3. Where-chain scopes and enums (where-chain.test.ts, ~27 skip)
 
-**What exists:** `where.associated()` and `where.missing()` exist in relation.ts.
-
-**What's missing:** These need to work with scopes applied to the association, and with enum values (translating enum labels to their integer values).
-
-**Files:** `relation.ts`
+`where.associated()` / `where.missing()` with scopes and enum value translation.
 
 #### A4. Async relation loading (load-async.test.ts, ~31 skip)
 
-**What's missing:** `loadAsync()` on Relation — returns a Promise-like that starts the query immediately but lets you access results later. `scheduled?` checks if it's in-flight.
-
-Rails source: `relation.rb#load_async`, `future_result.rb`
-
-**Implementation:**
-
-- Add `loadAsync()` to `Relation` — kicks off `_exec_queries` without awaiting, stores the Promise
-- `toArray()` / iteration awaits the stored Promise if present
-- `scheduled` getter returns true while the Promise is pending
-- Integrate with query cache
-
-**Files:** `relation.ts`
+`loadAsync()` on Relation — kicks off query immediately, access results later.
 
 #### A5. Relation scoping completeness (scoping/relation-scoping.test.ts, ~29 skip)
 
-**What's missing:** Joins within scoping blocks, annotation preservation, STI scoping.
-
-**Files:** `scoping/` directory, `relation.ts`
+Joins within scoping blocks, annotation preservation, STI scoping.
 
 #### A6. Strict loading N+1 mode (strict-loading.test.ts, ~30 skip)
 
-**What exists:** `_strictLoading` flag on records, `StrictLoadingViolationError` thrown on lazy load.
-
-**What's missing:** `strictLoadingMode: :n_plus_one_only` — only raises on lazy loads that happen after initial load (i.e., N+1 queries). Aggregation methods (`count`, `sum`) should bypass strict loading. HABTM strict loading.
-
-Rails source: `core.rb#strict_loading!`, checks in association loaders
-
-**Implementation:** Add `_strictLoadingMode` to Base. In association loaders, check if this is the first load or a subsequent one.
+`strictLoadingMode: :n_plus_one_only` — only raises on N+1 queries. Aggregation bypass. HABTM strict loading.
 
 #### A7. Reflection completeness (reflection.test.ts, ~32 skip)
 
-**What exists:** `AssociationReflection`, `ThroughReflection`, basic `reflectOnAssociation` / `reflectOnAllAssociations`.
-
-**What's missing:** Through scope chain (chaining scopes from each link in a through), HABTM reflection details, `sourceReflection`, `throughReflection` accessors on ThroughReflection.
-
-Rails source: `reflection.rb` — `ThroughReflection#source_reflection`, `#through_reflection`, `#scope_chain`
-
-**Implementation:** Add `sourceReflection` and `throughReflection` getters to `ThroughReflection` that look up the reflections on the intermediate model. Add `scopeChain` that collects scopes from each link.
-
-**Files:** `reflection.ts`
+Through scope chain, HABTM reflection, `sourceReflection` / `throughReflection` accessors.
 
 ---
 
 ### Stream B: PostgreSQL types & adapter (~220 tests)
 
-Each type is self-contained. They primarily involve adding type classes to the adapter and handling serialization/deserialization.
+Each type is self-contained. Pattern: create type class with `cast`/`serialize`/`deserialize`, register in PG adapter type map.
 
-**Pattern for each type:**
-
-1. Read Rails source in `activerecord/lib/active_record/connection_adapters/postgresql/oid/`
-2. Create a type class that handles `cast`, `serialize`, `deserialize`
-3. Register it in the PG adapter's type map
-4. The test file already exists — unskip tests as they pass
-
-**What exists:** `pg-range.ts` and `hstore.ts` under `adapters/postgresql/`. The PG adapter is in `adapters/postgres-adapter.ts`.
-
-| Type                                   | File to create/extend                       | Rails source                        | Skip count |
-| -------------------------------------- | ------------------------------------------- | ----------------------------------- | ---------- |
-| Range                                  | `adapters/postgresql/pg-range.ts` (exists)  | `oid/range.rb`                      | 36         |
-| Geometric (point, line, polygon, etc.) | `adapters/postgresql/geometric.ts` (exists) | `oid/point.rb`, `oid/line.rb`, etc. | 28         |
-| UUID                                   | `adapters/postgresql/uuid.ts` (exists)      | `oid/uuid.rb`                       | 29         |
-| HStore                                 | `adapters/postgresql/hstore.ts` (exists)    | `oid/hstore.rb`                     | 24         |
-| Array                                  | extend adapter                              | `oid/array.rb`, `array_parser.rb`   | 22         |
-| PG adapter internals                   | `adapters/postgres-adapter.ts`              | `postgresql_adapter.rb`             | 31         |
-| PG schema introspection                | `adapters/postgres-adapter.ts`              | `postgresql/schema_statements.rb`   | 35         |
-| PG connection                          | `adapters/postgres-adapter.ts`              | `postgresql_adapter.rb`             | 15         |
+| Type                                   | File                                        | Skip count |
+| -------------------------------------- | ------------------------------------------- | ---------- |
+| Range                                  | `adapters/postgresql/pg-range.ts` (exists)  | 36         |
+| Geometric (point, line, polygon, etc.) | `adapters/postgresql/geometric.ts` (exists) | 28         |
+| UUID                                   | `adapters/postgresql/uuid.ts` (exists)      | 29         |
+| HStore                                 | `adapters/postgresql/hstore.ts` (exists)    | 24         |
+| Array                                  | extend adapter                              | 22         |
+| PG adapter internals                   | `adapters/postgres-adapter.ts`              | 31         |
+| PG schema introspection                | `adapters/postgres-adapter.ts`              | 35         |
+| PG connection                          | `adapters/postgres-adapter.ts`              | 15         |
 
 ---
 
 ### Stream C: Schema & migrations (~140 tests)
 
-#### C1. Schema dumper (schema-dumper.test.ts, ~59 skip)
+#### C1. Schema dumper (~59 skip)
 
-**What exists:** `SchemaDumper` class in `schema-dumper.ts`. Basic structure.
+Timestamps, type-specific column options, `force: :cascade`, index dumping, constraints, defaults.
 
-**What's missing:** Most of the actual dumping logic — timestamps columns, type-specific column options (limit, precision, scale), `force: :cascade`, index dumping (partial, sort order, expression), check constraints, unique constraints, default values, comment support.
+#### C2. Migration completeness (~42 skip)
 
-Rails source: `schema_dumper.rb`, `schema_statements.rb`
+Advisory locking, version tracking, reversible blocks, `revert`.
 
-**Implementation:** The dumper needs to introspect the adapter's schema info (tables, columns, indexes, constraints) and output them as migration DSL calls. Each column type needs specific option handling.
+#### C3. Migrator file discovery (~5 skip)
 
-**Files:** `schema-dumper.ts`
-
-#### C2. Migration completeness (migration.test.ts, ~42 skip)
-
-**What's missing:** Advisory locking during migrations, `up`/`down` version tracking edge cases, reversible migration blocks, `revert` inside migrations.
-
-Rails source: `migration.rb`, `migrator.rb`
-
-**Files:** `migration.ts`, `migrator.ts`
-
-#### C3. Migrator file discovery (migrator.test.ts, ~5 skip)
-
-**What's missing:** Multi-path migration discovery, version ordering, duplicate detection.
-
-**Files:** `migrator.ts`
+Multi-path discovery, version ordering, duplicate detection.
 
 ---
 
 ### Stream D: Insert-all & serialization (~90 tests)
 
-#### D1. Insert-all enhancements (insert-all.test.ts, ~45 skip)
+#### D1. Insert-all enhancements (~45 skip)
 
-**What's missing:** `RETURNING` clause support, automatic `created_at`/`updated_at` timestamps on insert_all, adapter-specific SQL generation (PG vs SQLite vs MySQL).
+`RETURNING`, automatic timestamps, adapter-specific SQL.
 
-Rails source: `insert_all.rb`, `inserts.rb`
+#### D2. Collection cache key (~30 skip)
 
-**Files:** `base.ts` (insertAll/upsertAll methods), adapter files
+`Relation#cacheKey` / `cacheKeyWithVersion`.
 
-#### D2. Collection cache key (collection-cache-key.test.ts, ~30 skip)
+#### D3. Serialized attributes (~18 skip)
 
-**What's missing:** `Relation#cacheKey` / `cacheKeyWithVersion` — generates a cache key from the relation's SQL and the max updated_at.
-
-Rails source: `relation.rb#cache_key`, `#cache_key_with_version`
-
-**Implementation:** Add `cacheKey()` to Relation that runs `SELECT COUNT(*), MAX(updated_at) FROM (...)` and formats as `model_name/query-count-timestamp`.
-
-**Files:** `relation.ts`
-
-#### D3. Serialized attributes (serialized-attribute.test.ts, ~18 skip)
-
-**What exists:** `serialize.ts` has basic serialization support.
-
-**What's missing:** Edge cases around JSON/YAML coders, default values, dirty tracking with serialized attributes.
-
-**Files:** `serialize.ts`
+JSON/YAML coders, default values, dirty tracking.
 
 ---
 
 ## Phase 3: Specialized features (isolated, lower priority)
 
-These don't unblock other features. Each is a self-contained project.
-
-| Feature         | Skip | Key files                         | Rails source                       | Notes                                                                        |
-| --------------- | ---- | --------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------- |
-| Fixtures        | 111  | `fixtures.ts`, `test-fixtures.ts` | `fixtures.rb`, `fixture_set.rb`    | Transactional fixtures, ERB, association fixtures. Large but self-contained. |
-| Database tasks  | 78   | `tasks/database-tasks.ts`         | `tasks/database_tasks.rb`          | Create/drop/migrate/schema rake-equivalent tasks. Adapter-specific.          |
-| Encryption ORM  | 51   | `encryption.ts`, `encryption/`    | `encryption/encryptable_record.rb` | Wire encryption into attribute read/write. Encrypted finders.                |
-| Connection pool | 41   | `connection-pool.ts`              | `connection_pool.rb`               | Async checkout, reaping, flushing. Needs concurrency primitives.             |
-| Base edge cases | 53   | `base.ts`                         | `base.rb`, `core.rb`               | Abstract class resolution, table name customization, ignored columns.        |
-| Query cache     | 36   | `query-cache.ts`                  | `query_cache.rb`                   | Cache invalidation on INSERT/UPDATE/DELETE within transactions.              |
+| Feature         | Skip | Notes                                                                 |
+| --------------- | ---- | --------------------------------------------------------------------- |
+| Fixtures        | 111  | Transactional fixtures, ERB, association fixtures.                    |
+| Database tasks  | 78   | Create/drop/migrate/schema rake-equivalent tasks.                     |
+| Encryption ORM  | 51   | Wire encryption into attribute read/write. Encrypted finders.         |
+| Connection pool | 41   | Async checkout, reaping, flushing.                                    |
+| Base edge cases | 53   | Abstract class resolution, table name customization, ignored columns. |
+| Query cache     | 36   | Cache invalidation on INSERT/UPDATE/DELETE within transactions.       |
 
 ## Phase 4: Adapter & niche (lowest priority)
 
@@ -309,8 +181,6 @@ These don't unblock other features. Each is a self-contained project.
 
 ## Quick wins (independent, can be done anytime)
 
-These are small features that unblock tests without depending on the above:
-
-- **`Relation#with` (CTE support)** — relation/with.test.ts has 16 missing tests. CTE infrastructure (`_ctes` array) already exists in `relation.ts` — just needs the SQL generation wired up.
-- **`SecurePassword`** — secure-password.test.ts has 10 missing tests. `secure-password.ts` exists.
-- **Instrumentation** — instrumentation.test.ts has 18 missing tests. Event subscription for query notifications.
+- **`Relation#with` (CTE support)** — relation/with.test.ts has 16 missing tests. CTE infrastructure already exists.
+- **`SecurePassword`** — secure-password.test.ts has 10 missing tests.
+- **Instrumentation** — instrumentation.test.ts has 18 missing tests.

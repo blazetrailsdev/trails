@@ -2718,9 +2718,6 @@ describe("should update children when autosave is true and parent is new but chi
       { name: "bad", unknownCol: "boom" },
     ]);
     await expect(article.save()).rejects.toThrow(/unknown attribute/);
-    // NOTE: nested attribute processing currently runs after save's transaction,
-    // so the first tag may persist even on error. Full rollback requires moving
-    // nested attribute processing inside the transaction.
     const tags = await RBTag.where({ rb_article_id: article.id }).toArray();
     expect(tags.length).toBeLessThanOrEqual(1);
   });
