@@ -4,6 +4,8 @@ import { humanize, underscore } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./type/registry.js";
 import { Type } from "./type/value.js";
+import { Attribute } from "./attribute.js";
+import { AttributeSet } from "./attribute-set/builder.js";
 import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
@@ -173,7 +175,7 @@ export class Model {
     const current = this.readAttribute(name);
     const normalized = ctor._applyNormalization(name, current);
     if (normalized !== current) {
-      this._attributes.set(name, normalized);
+      this._attributes.writeCastValue(name, normalized);
     }
   }
 
@@ -819,43 +821,37 @@ export class Model {
 
   // -- Instance --
 
-  _attributes: Map<string, unknown> = new Map();
-  _attributesBeforeTypeCast: Map<string, unknown> = new Map();
+  _attributes: AttributeSet = new AttributeSet();
   errors: Errors = new Errors(this);
   _dirty: DirtyTracker = new DirtyTracker();
 
   constructor(attrs: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
     const defs = ctor._attributeDefinitions;
+    const attrMap = new Map<string, Attribute>();
 
     for (const [name, def] of defs) {
       if (name in attrs) {
-        this._attributesBeforeTypeCast.set(name, attrs[name]);
         let castValue = def.type.cast(attrs[name]);
-        // Apply normalization if defined
         castValue = ctor._applyNormalization(name, castValue);
-        // Nullify blank strings if configured
-        if (typeof castValue === "string" && castValue.trim() === "") {
-          const nbConfig = ctor._nullifyBlanks;
-          if (nbConfig === true || (Array.isArray(nbConfig) && nbConfig.includes(name))) {
-            castValue = null;
-          }
-        }
-        this._attributes.set(name, castValue);
+        castValue = this._applyNullifyBlanks(name, castValue);
+        attrMap.set(name, Attribute.fromUserWithValue(name, attrs[name], castValue, def.type));
       } else {
         const defVal =
           typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
-        this._attributes.set(name, defVal);
+        attrMap.set(name, Attribute.withCastValue(name, defVal ?? null, def.type));
       }
     }
 
     // Also set any extra keys passed in (for confirmation fields, etc.)
     for (const key of Object.keys(attrs)) {
-      if (!this._attributes.has(key)) {
-        this._attributes.set(key, attrs[key]);
+      if (!attrMap.has(key)) {
+        const type = typeRegistry.lookup("value");
+        attrMap.set(key, Attribute.fromUser(key, attrs[key], type));
       }
     }
 
+    this._attributes = new AttributeSet(attrMap);
     this._dirty.snapshot(this._attributes);
 
     // Fire after_initialize callbacks
@@ -869,7 +865,7 @@ export class Model {
     if (!this._attributes.has(name)) {
       return this.attributeMissing(name);
     }
-    return this._attributes.get(name) ?? null;
+    return this._attributes.fetchValue(name) ?? null;
   }
 
   /**
@@ -884,15 +880,15 @@ export class Model {
 
   writeAttribute(name: string, value: unknown): void {
     const ctor = this.constructor as typeof Model;
-    const def = ctor._attributeDefinitions.get(name);
-    const oldValue = this._attributes.get(name);
-    this._attributesBeforeTypeCast.set(name, value);
-    let newValue = def ? def.type.cast(value) : value;
-    // Apply normalization if defined
+    const oldValue = this._attributes.has(name) ? this._attributes.fetchValue(name) : undefined;
+    this._attributes.writeFromUser(name, value);
+    // Apply normalization and nullify blanks on the cast value
+    let newValue = this._attributes.fetchValue(name);
     newValue = ctor._applyNormalization(name, newValue);
-    // Nullify blank strings if configured
     newValue = this._applyNullifyBlanks(name, newValue);
-    this._attributes.set(name, newValue);
+    if (newValue !== this._attributes.fetchValue(name)) {
+      this._attributes.writeCastValue(name, newValue);
+    }
     this._dirty.attributeWillChange(name, oldValue, newValue);
   }
 
@@ -916,7 +912,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_before_type_cast
    */
   readAttributeBeforeTypeCast(name: string): unknown {
-    return this._attributesBeforeTypeCast.get(name) ?? null;
+    return this._attributes.getAttribute(name).valueBeforeTypeCast ?? null;
   }
 
   /**
@@ -925,11 +921,7 @@ export class Model {
    * Mirrors: ActiveModel::Attributes#attributes_before_type_cast
    */
   get attributesBeforeTypeCast(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of this._attributesBeforeTypeCast) {
-      result[k] = v;
-    }
-    return result;
+    return this._attributes.valuesBeforeTypeCast();
   }
 
   /**
@@ -962,15 +954,11 @@ export class Model {
   }
 
   get attributes(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of this._attributes) {
-      result[k] = v;
-    }
-    return result;
+    return this._attributes.toHash();
   }
 
   attributePresent(name: string): boolean {
-    const value = this._attributes.get(name);
+    const value = this.readAttribute(name);
     if (value === null || value === undefined) return false;
     if (typeof value === "string" && value.trim() === "") return false;
     return true;
@@ -994,7 +982,7 @@ export class Model {
       if (entry.on && entry.on !== effectiveContext) continue;
       // Check if/unless conditions
       if (!shouldValidate(this, { if: entry.if, unless: entry.unless })) continue;
-      const value = this._attributes.get(entry.attribute);
+      const value = this.readAttribute(entry.attribute);
       if (entry.strict) {
         // Strict validation: collect errors into a temporary Errors, then throw
         const tempErrors = new Errors(this);
@@ -1405,7 +1393,7 @@ export class Model {
    */
   attributeChangedInPlace(name: string): boolean {
     const original = this._dirty.attributeWas(name);
-    const current = this._attributes.get(name);
+    const current = this.readAttribute(name);
     // In-place change = same type but different identity
     if (original === undefined) return false;
     return original !== current;
@@ -1418,7 +1406,7 @@ export class Model {
    */
   toKey(): unknown[] | null {
     if (!this.isPersisted()) return null;
-    const id = this._attributes.get("id");
+    const id = this.readAttribute("id");
     return id != null ? [id] : null;
   }
 

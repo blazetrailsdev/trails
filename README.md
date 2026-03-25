@@ -8,13 +8,13 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 
 **Active focus** — these packages are where development effort is concentrated:
 
-| Package                   | Rails Equivalent                                                        | Tests     | API      | Description                                                |
-| ------------------------- | ----------------------------------------------------------------------- | --------- | -------- | ---------------------------------------------------------- |
-| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **61%**   | **5.5%** | ORM — persistence, querying, associations, migrations      |
-| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**   | **5.8%** | Core utilities, inflection, caching, notifications         |
-| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%** | **100%** | SQL AST builder and query generation                       |
-| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%** | **2%**   | Attributes, validations, callbacks, dirty tracking, i18n   |
-| `@rails-ts/rack`          | [Rack](https://rack.github.io/)                                         | **98.8%** | —        | Modular web server interface, request/response, middleware |
+| Package                   | Rails Equivalent                                                        | Tests     | API       | Description                                                |
+| ------------------------- | ----------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
+| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **61%**   | **5.5%**  | ORM — persistence, querying, associations, migrations      |
+| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**   | **5.8%**  | Core utilities, inflection, caching, notifications         |
+| `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%** | **100%**  | SQL AST builder and query generation                       |
+| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%** | **39.4%** | Attributes, validations, callbacks, dirty tracking, i18n   |
+| `@rails-ts/rack`          | [Rack](https://rack.github.io/)                                         | **98.8%** | —         | Modular web server interface, request/response, middleware |
 
 **ActionPack** — started but not the current priority:
 

@@ -20,8 +20,18 @@ export function serializableHash(
   record: AnyRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
-  const attrs: Map<string, unknown> = record._attributes ?? new Map();
-  let keys = Array.from(attrs.keys());
+  // Get keys without materializing all values
+  const attrStore = record._attributes;
+  let keys: string[];
+  if (attrStore && typeof attrStore.keys === "function" && !(attrStore instanceof Map)) {
+    keys = attrStore.keys();
+  } else if (attrStore instanceof Map) {
+    keys = Array.from(attrStore.keys());
+  } else if (record.attributes) {
+    keys = Object.keys(record.attributes);
+  } else {
+    keys = [];
+  }
 
   if (options.only) {
     keys = keys.filter((k) => options.only!.includes(k));
@@ -29,9 +39,18 @@ export function serializableHash(
     keys = keys.filter((k) => !options.except!.includes(k));
   }
 
+  // Read values only for filtered keys
   const result: Record<string, unknown> = {};
   for (const key of keys) {
-    result[key] = attrs.get(key);
+    if (attrStore && typeof attrStore.fetchValue === "function") {
+      result[key] = attrStore.fetchValue(key);
+    } else if (attrStore instanceof Map) {
+      result[key] = attrStore.get(key);
+    } else if (record.readAttribute) {
+      result[key] = record.readAttribute(key);
+    } else {
+      result[key] = record.attributes?.[key];
+    }
   }
 
   if (options.methods) {
